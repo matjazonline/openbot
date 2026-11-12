@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 24.85s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... FAILED
+
+failures:
+
+---- adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path stdout ----
+
+thread 'adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path' (40069015) panicked at src/adapters/persistence/company_agent_tests.rs:185:5:
+assertion `left == right` failed
+  left: {("src/adapters/persistence/agent.rs", "create_library", "insert_agent_on"), ("src/adapters/persistence/agent.rs", "ensure_library_agent", "insert_agent_on"), ("src/adapters/persistence/agent_publication/mod.rs", "scan_probe", "insert_agent_on"), ("src/adapters/persistence/company_agent.rs", "create_company_agent_on", "create_agent_principal_on"), ("src/adapters/persistence/company_agent.rs", "create_company_agent_on", "insert_agent_on"), ("src/adapters/persistence/thread/message.rs", "resolve_author", "create_agent_principal_on")}
+ right: {("src/adapters/persistence/agent.rs", "create_library", "insert_agent_on"), ("src/adapters/persistence/agent.rs", "ensure_library_agent", "insert_agent_on"), ("src/adapters/persistence/company_agent.rs", "create_company_agent_on", "create_agent_principal_on"), ("src/adapters/persistence/company_agent.rs", "create_company_agent_on", "insert_agent_on"), ("src/adapters/persistence/thread/message.rs", "resolve_author", "create_agent_principal_on")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3841 filtered out; finished in 2.40s
+
+error: test failed, to rerun pass `--lib`

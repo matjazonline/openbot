@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 14 tests
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_an_agent_created_as_its_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_agent_to_agent_repoints_the_same_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_competing_lead_changes_leave_the_holders_agent_answering ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_person_and_agent_leads_with_one_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_leaves_a_users_own_responder_alone ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_run_as_moves_to_the_admin_who_changes_the_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_refuses_lead_changes_it_cannot_follow ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_survives_a_rename_and_is_left_once_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_taken_address_refuses_the_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_an_agent_lead_answers_on_it ... ok
+test adapters::persistence::onboarding::tests::department_lead_desk_onboarding_address_collision_with_an_agent_is_rejected ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_lead_desk_answers_through_its_current_lead ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 3844 filtered out; finished in 14.64s
+

@@ -1,0 +1,25 @@
+# reviewer scan, working tree (digest 9204f954…15d1): docs/*.md docs/*/*.md
+TOTAL 19
+docs/departments.md:5: [1] are what the code calls channels: an address where work arrives, with workflow bindings deciding
+docs/transport_architecture.md:8: [1] > **Terminology.** "Desk" is the product word for a channel: the UI and these documents say desk,
+docs/transport_architecture.md:22: [1] | `TransportKind` | The supported interface family, initially `email` or `slack`. It replaces `ChannelType`; “channel” is reserved for the business object, the product’s desk. |
+docs/workflow-verification.md:143: [1] - Existing history continuation/retry/channel/source-retention tests retain their discovered names.
+docs/performance/run-list.md:31: [1] - Workflows 0–31 of a tenant are bound to its channels 0–31; workflows 32–39 to the company (no
+docs/performance/run-list.md:32: [1]   channel).
+docs/performance/run-list.md:205: [1] - **Counts**, by state and channel: the open runs (`state IN ('queued', 'running', 'waiting')`)
+docs/performance/run-list.md:207: [1] - **Cards**, once the route knows which counted channels the viewer may see: one subquery per state
+docs/performance/run-list.md:208: [1]   with the literal state, the visible channels, and `LIMIT 51` (`BOARD_COLUMN_CAP` + 1). Open
+docs/performance/run-list.md:217: [2] - with the cards seeing every channel and the company's runs, or 8 of the 32 channels and not the
+docs/performance/run-list.md:232: [1] | Cards, 8 of 32 channels | 159.7 ms; 48,869; 299,688 | 14.6 ms; 6,408; 2,458 | 13.7 ms; 6,530; 5,004 | **14.3 ms; 6,397; 719** | 13.6 ms; 6,508; 1,460 |
+docs/performance/run-list.md:243: [1]   plans, and under auto plans for the recent agent with 8 of 32 channels visible; the other scoped
+docs/performance/run-list.md:245: [2]   prefer a bitmap over the company's channel key, which reads every run of those channels.
+docs/performance/run-list.md:315: [1] - `eligible_runs`: every counted run, hidden channels included;
+docs/performance/run-list.md:325: [1] | `cards_ms` leads, no scope | Unscoped columns should stop at 51 entries. Check that the plan still uses `workflow_runs_finished_by_state`; a viewer who sees few channels reads past hidden runs. |
+docs/performance/run-list.md:326: [1] | `visibility_ms` leads, `channels_checked` high | One authorization per channel, as in the list: batch the visibility read. |
+docs/query-evidence/2026-09-01-thread-index-and-task-attempts.md:25: [1] channel-scoped join.
+
+# same scan at HEAD 5c64e7d1, top-level docs/*.md only
+TOTAL 126
+
+# links
+checked 63 relative links, 0 problems

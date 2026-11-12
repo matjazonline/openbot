@@ -1,0 +1,10 @@
+Command: node --test scripts/tests/memory-settings-browser.mjs
+✔ capture forms are labelled, refuse a blank reason, post the policy and swap in the saved section (612.855417ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 806.078958

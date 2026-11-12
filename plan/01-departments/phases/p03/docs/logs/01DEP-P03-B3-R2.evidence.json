@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B3-R2",
+  "artifact": "0db985062e8c8701d12d2a0b89c4eca83220d0bccce46c2a0ff154298682dbf1",
+  "checks": [
+    {
+      "criteria": [
+        "B3-F1",
+        "D13"
+      ],
+      "command": "grep/awk/git diff --numstat over docs/agent-builder-context.md, docs/agent-authoring.md, docs/custom_tools.md (docs-only correction; Rust and DB suites not required)",
+      "fixture": "working tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-docs.txt",
+          "sha256": "c4962421caad210da6b42a11a3c0b66eff27d7255dcdf09daeb07425dfb5c233"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03C.0",
+        "03C.1",
+        "D10",
+        "D11",
+        "D12",
+        "G3-F1"
+      ],
+      "command": "reused from 01DEP-P03-B3-R1: focused final at 241d6d8d (source unchanged since; only docs changed)",
+      "fixture": "openbot_dept_p03_test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-focused-final.txt",
+          "sha256": "17379e82e41ff6d93e00260b20955d1d05abac7878fa6e236a0a10122c356d00"
+        },
+        {
+          "path": "logs/B3-R1-review-focused.txt",
+          "sha256": "9ddec27fe22a0b88ec10d952b7be969adc17e421578ee8431a35bef4e10970f2"
+        }
+      ]
+    }
+  ]
+}

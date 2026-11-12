@@ -8,6 +8,14 @@
 #[path = "provisioning_agent.rs"]
 mod agent;
 use agent::provision_agent_on;
+#[path = "provisioning_builder.rs"]
+mod builder;
+#[path = "provisioning_department.rs"]
+mod department;
+use builder::create_agent_channel_on;
+pub(crate) use department::{
+    department_desk_key, follow_department_lead_on, provision_department_desk_on,
+};
 #[path = "provisioning_native.rs"]
 mod native;
 pub(crate) use native::ProvisionedAssistant;
@@ -17,11 +25,9 @@ use super::action_dispatch::{LockedActionAuthority, SqlActionAuthority, SqlLocal
 use super::http::begin_http;
 use super::http::runtime::{context, facts};
 use super::*;
-use crate::adapters::persistence::agent::insert_agent_on;
 use crate::adapters::persistence::channel::{
     insert_channel_row_on, insert_channel_slugs, write_channel_email_binding,
 };
-use crate::adapters::persistence::participant::create_agent_principal_on;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::agent::{AgentWrite, model_allowed};
 use crate::application::workflow::actions::*;
@@ -207,28 +213,24 @@ impl SqlLocalAction for ProvisioningEffects {
             return Ok(refusal.tool_error());
         }
         match kind {
-            ProvisioningKind::ListAgents => list_on(tx, company).await,
+            ProvisioningKind::ListAgents => {
+                list_on(tx, &self.templates, company, &request.arguments).await
+            }
             ProvisioningKind::CreateAgentChannel => {
                 let spec = CreateAgentChannel::parse(&request.arguments)?;
-                let provisioning = Provisioning {
-                    company,
-                    requester,
-                    agent: AssistantAgent::New(Box::new(spec.clone())),
-                    channel_slug: spec
-                        .channel_slug
-                        .clone()
-                        .unwrap_or_else(|| spec.slug.clone()),
-                    channel_name: spec
-                        .channel_name
-                        .clone()
-                        .unwrap_or_else(|| spec.name.clone()),
-                    reply_mode: spec.reply_mode,
-                    steps: spec.steps.clone(),
-                    key: ProvisioningKey::invocation(subject.invocation.as_uuid()),
-                };
+                // Boxed: creation descends into publication and template compilation.
                 Ok(
-                    match provision_guarded(tx, &self.templates, &provisioning).await? {
-                        Ok(provisioned) => provisioned.to_json(),
+                    match Box::pin(create_agent_channel_on(
+                        tx,
+                        &self.templates,
+                        company,
+                        requester,
+                        &spec,
+                        subject.invocation.as_uuid(),
+                    ))
+                    .await?
+                    {
+                        Ok(created) => created,
                         Err(refusal) => refusal.tool_error(),
                     },
                 )
@@ -350,8 +352,9 @@ fn requester_source(source_key: &str) -> RequesterSource {
     }
 }
 
-/// One listed agent: slug, name, description, provider and model.
+/// One listed agent: id, slug, name, description, provider and model.
 type ListedAgent = (
+    Uuid,
     String,
     String,
     Option<String>,
@@ -359,10 +362,38 @@ type ListedAgent = (
     Option<String>,
 );
 
-/// The company's agents by slug and the models it can run, for the Builder (D2.1). Bounded
-/// (F050): names and descriptions are cut, and entries stop at `MAX_LISTING_BYTES`, models
-/// first because creation needs one; `truncated` says whether anything was left out.
-async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppResult<Value> {
+/// The company's agents by slug -- with their departments and desks, only one department's
+/// members and role holders when `department` names it (01DEP-P03-D10) -- and its keyed models.
+async fn list_on(
+    tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
+    company: CompanyId,
+    arguments: &Value,
+) -> AppResult<Value> {
+    use crate::adapters::persistence::department_roster::{
+        DeskAddresses, agent_departments_on, agent_desks_on,
+    };
+    let department = match arguments.get("department").and_then(Value::as_str) {
+        None => None,
+        Some(slug) => {
+            let id: Option<Uuid> = sqlx::query_scalar(
+                "SELECT id FROM departments WHERE company_id = $1 AND slug = $2",
+            )
+            .bind(company.as_uuid())
+            .bind(slug)
+            .fetch_optional(&mut **tx)
+            .await?;
+            match id {
+                Some(id) => Some(id),
+                None => {
+                    return Ok(ProvisioningRefusal::Invalid(format!(
+                        "No department has the slug '{slug}'"
+                    ))
+                    .tool_error());
+                }
+            }
+        }
+    };
     let mut budget = MAX_LISTING_BYTES;
     let mut truncated = false;
     let mut fits = |entry: &Value| {
@@ -383,22 +414,47 @@ async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppR
         models.push(entry);
     }
     let rows: Vec<ListedAgent> = sqlx::query_as(
-        "SELECT slug::text, name, description, provider, model FROM agents \
-         WHERE company_id = $1 ORDER BY slug LIMIT $2",
+        "SELECT agent.id, agent.slug::text, agent.name, agent.description, agent.provider, \
+           agent.model FROM agents AS agent \
+         WHERE agent.company_id = $1 AND ($2::uuid IS NULL OR EXISTS ( \
+           SELECT 1 FROM principals AS principal WHERE principal.company_id = agent.company_id \
+             AND principal.agent_id = agent.id AND ( \
+               EXISTS (SELECT 1 FROM department_members AS member \
+                 WHERE member.company_id = principal.company_id AND member.department_id = $2 \
+                   AND member.principal_id = principal.id) \
+               OR EXISTS (SELECT 1 FROM department_roles AS role \
+                 WHERE role.company_id = principal.company_id AND role.department_id = $2 \
+                   AND role.principal_id = principal.id)))) \
+         ORDER BY agent.slug LIMIT $3",
     )
     .bind(company.as_uuid())
+    .bind(department)
     .bind(MAX_LISTED_AGENTS as i64 + 1)
     .fetch_all(&mut **tx)
     .await?;
     truncated |= rows.len() > MAX_LISTED_AGENTS;
+    let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
+    let ids: Vec<Uuid> = rows.iter().map(|row| row.0).collect();
+    let mut departments = agent_departments_on(tx, company, &ids).await?;
+    let mut addresses = DeskAddresses::new(company, Some(&templates.app_domain));
+    let mut desks = agent_desks_on(tx, &mut addresses, &ids).await?;
+    let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
     let mut agents = Vec::new();
-    for (slug, name, description, provider, model) in rows.into_iter().take(MAX_LISTED_AGENTS) {
+    for (id, slug, agent_name, description, provider, model) in rows {
+        let (placed, more) = departments.remove(&id).unwrap_or_default();
+        truncated |= more;
         let entry = json!({
             "slug": slug,
-            "name": name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>(),
+            "name": name(&agent_name),
             "description": description
                 .map(|text| text.chars().take(MAX_LISTED_DESCRIPTION_CHARS).collect::<String>()),
             "provider": provider, "model": model,
+            "departments": placed.iter().map(|department| json!({
+                "slug": department.slug,
+                "name": name(&department.name),
+                "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
+            })).collect::<Vec<_>>(),
+            "desk": desks.remove(&id).map(|desk| json!({"id": desk.id.to_string(), "address": desk.address})),
         });
         if !fits(&entry) {
             truncated = true;
@@ -411,7 +467,7 @@ async fn list_on(tx: &mut Transaction<'_, Postgres>, company: CompanyId) -> AppR
 
 /// Every enabled model of a connection that has a key, default connection first, each in the
 /// order the connection stores them.
-async fn ready_models_on(
+pub(crate) async fn ready_models_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
 ) -> AppResult<Vec<(String, String)>> {
@@ -430,14 +486,6 @@ async fn ready_models_on(
                 .map(move |model| (provider.clone(), model))
         })
         .collect())
-}
-
-/// Which agent the assistant channel answers with.
-pub(crate) enum AssistantAgent {
-    /// `create_agent_channel`: a new agent from the Builder's spec.
-    New(Box<CreateAgentChannel>),
-    /// "Create assistant channel": an existing company agent.
-    Existing(String),
 }
 
 /// The seed every provisioned id derives from: the action invocation for the tool, or the
@@ -473,7 +521,9 @@ impl ProvisioningKey {
 pub(crate) struct Provisioning {
     pub company: CompanyId,
     pub requester: WorkflowActor,
-    pub agent: AssistantAgent,
+    /// The existing company agent the desk's workflow answers with: a new agent is created
+    /// first, through company-agent creation (01DEP-P03-D1).
+    pub agent_slug: String,
     pub channel_slug: String,
     pub channel_name: String,
     pub reply_mode: ReplyMode,
@@ -503,7 +553,7 @@ pub(crate) async fn provision_guarded(
         }
         Err(error) => {
             savepoint.rollback().await?;
-            match taken_slug(tx, provisioning).await? {
+            match taken_slug(tx, provisioning.company, &provisioning.channel_slug).await? {
                 Some(refusal) => Ok(Err(refusal)),
                 None => Err(error),
             }
@@ -511,39 +561,23 @@ pub(crate) async fn provision_guarded(
     }
 }
 
-/// The conflict refusal when the new agent's slug or the channel's address is already taken in
-/// the company (channel aliases included).
+/// The conflict refusal when a desk address is already taken in the company (aliases included).
 async fn taken_slug(
     tx: &mut Transaction<'_, Postgres>,
-    provisioning: &Provisioning,
+    company: CompanyId,
+    channel_slug: &str,
 ) -> AppResult<Option<ProvisioningRefusal>> {
-    let company = provisioning.company.as_uuid();
-    if let AssistantAgent::New(spec) = &provisioning.agent {
-        let taken: bool = sqlx::query_scalar(
-            "SELECT EXISTS (SELECT 1 FROM agents WHERE company_id = $1 AND slug = $2)",
-        )
-        .bind(company)
-        .bind(spec.slug.trim().to_lowercase())
-        .fetch_one(&mut **tx)
-        .await?;
-        if taken {
-            return Ok(Some(ProvisioningRefusal::Conflict(format!(
-                "An agent named '{}' already exists in this company",
-                spec.slug.trim()
-            ))));
-        }
-    }
     let taken: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM channel_slugs WHERE company_id = $1 AND slug = $2)",
     )
-    .bind(company)
-    .bind(provisioning.channel_slug.trim().to_lowercase())
+    .bind(company.as_uuid())
+    .bind(channel_slug.trim().to_lowercase())
     .fetch_one(&mut **tx)
     .await?;
     Ok(taken.then(|| {
         ProvisioningRefusal::Conflict(format!(
-            "The address '{}' is already used by a channel in this company",
-            provisioning.channel_slug.trim()
+            "The address '{}' is already used by a desk in this company",
+            channel_slug.trim()
         ))
     }))
 }
@@ -853,7 +887,7 @@ pub(crate) async fn assistant_channel_on(
     let provisioning = Provisioning {
         company,
         requester: caller,
-        agent: AssistantAgent::Existing(request.agent_slug),
+        agent_slug: request.agent_slug,
         channel_slug: request.channel_slug,
         channel_name: request.channel_name,
         reply_mode: request.reply_mode,

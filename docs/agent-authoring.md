@@ -8,7 +8,7 @@ publishing them. A stale save keeps submitted fields for reconciliation with the
 Assign capabilities on the agent:
 
 - Built-ins provide message send/reply and knowledge search. Message authority still comes from
-  the workflow's actual channel and source message. Ordinary edits cannot add Builder provisioning
+  the workflow's actual desk and source message. Ordinary edits cannot add Builder provisioning
   privileges; a trusted Builder copy may retain or drop its existing provisioning bindings.
 - HTTP choices identify a company connection and approved operation.
 - MCP choices identify a company connection, operation, reviewed version and remote tool name.
@@ -94,7 +94,10 @@ ordered assignments and first history page. Catalog endpoints under that agent a
 `tool-connections?kind=http|mcp`, `tool-options?kind=builtin|http|mcp|workflow` (with `connection` for
 HTTP/MCP operations), and `history`. Catalog responses contain `items` and `next`; pass `next` as
 `after` for subsequent options/connections. History uses both `before_created_at` and `before_id`.
-`GET /api/companies/{company}/agents/directory` lists scoped agent identities.
+`GET /api/companies/{company}/agents/directory` lists scoped agent identities. Each entry carries
+`departments` (the departments the agent belongs to or holds a role in: `id`, `name`, `slug`,
+`charter`, `roles`) and `desk`, the agent's own desk as `{"id", "address"}`, or `null` once that
+desk is deleted.
 
 Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 
@@ -107,6 +110,7 @@ Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
     "provider": "openai",
     "model": "your-enabled-model",
     "system_prompt": "Answer support questions using the approved tools.",
+    "native_permissions": "full",
     "description": "Customer support",
     "skill_ids": []
   },
@@ -120,13 +124,34 @@ Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 }
 ```
 
+`native_permissions` is required on create and update. Choose `auto`, `accept_edits` or `full`
+for native execution; it does not grant hosted workflow tools.
+
 Read the saved revision from the response's `agent.draft_revision`. Omitting `tool_assignments`
 preserves them; `[]` clears the draft list. Omitting `skill_ids` preserves ordered skill assignments;
 `[]` clears them. For an unchanged tool, submit its existing `binding` and exact `choice` returned
 by authoring. Catalog `choice` values carry exact HTTP/MCP/workflow identifiers; use those values
 rather than fabricating operation names, review versions or workflow parameter digests.
-Create uses `POST /api/companies/{company}/agents` with flat agent metadata and creates a draft.
+Create uses `POST /api/companies/{company}/agents` with flat agent metadata. It creates the agent,
+publishes its first revision and gives it its default desk at its slug: a team desk with the
+autonomous reply workflow and an active binding, all in one transaction. The company needs a model
+connection first: an omitted provider and model are pinned to the default connection's first model.
+A taken address, a model the company's connections lack or an unmet publication prerequisite (such
+as a skill whose tool the draft does not bind) refuses the whole create. Optional `department_id`
+and `role` (`"lead"`, which needs `department_id`) place the agent in a department. Library
+copies follow the same rules. Later edits are saved to the draft and published as new revisions.
 The update contract requires the nested payload and expected revision.
+
+An `agent.run` on a desk a department owns gets that department's context as system text after
+the agent's own instructions and before its skills: the department's name and charter, a sentence
+that the agent answers as the lead when it holds the department's `lead` role, and the desks around
+it -- the department's own desk, its parent's, its child departments' and its agents' own desks,
+each by address (at most 20 children and 50 agents, with a note when there are more). The context
+follows the desk's ownership, not the agent's membership: a member agent's own default desk belongs
+to no department, so its runs there get none. A public department desk gets the name, charter and
+lead sentence but no desks, since its conversations are with outsiders. The context only lists
+addresses; a message sent to a desk does not start that desk's work. A run that is retried reuses
+the context it first prepared with, even after the charter or roster changes.
 
 `POST .../{agent}/preview` previews the saved draft and returns revision/count metadata.
 `POST .../{agent}/publish` accepts:

@@ -1,0 +1,119 @@
+{
+  "calls_with_estimates": 28,
+  "tokens_saved": 1002830,
+  "currency_estimate": null,
+  "calls": [
+    {
+      "path": "main-agent-form-test-api.txt",
+      "tokens": 241
+    },
+    {
+      "path": "main-agent-settings-api.txt",
+      "tokens": 11687
+    },
+    {
+      "path": "main-agent-update-decoder-context.txt",
+      "tokens": 8869
+    },
+    {
+      "path": "main-company-agent-api.txt",
+      "tokens": 2256
+    },
+    {
+      "path": "main-company-agent-callers.txt",
+      "tokens": 37244
+    },
+    {
+      "path": "main-company-agents-helper.txt",
+      "tokens": 186801
+    },
+    {
+      "path": "main-company-fixtures.txt",
+      "tokens": 164717
+    },
+    {
+      "path": "main-company-service-context.txt",
+      "tokens": 22794
+    },
+    {
+      "path": "main-copy-module.txt",
+      "tokens": 4584
+    },
+    {
+      "path": "main-create-form-test.txt",
+      "tokens": 45579
+    },
+    {
+      "path": "main-department-hosted-context.txt",
+      "tokens": 36790
+    },
+    {
+      "path": "main-doop-runtime-context.txt",
+      "tokens": 37741
+    },
+    {
+      "path": "main-edit-form-test.txt",
+      "tokens": 45575
+    },
+    {
+      "path": "main-integration-context.txt",
+      "tokens": 10079
+    },
+    {
+      "path": "main-json-update-callers.txt",
+      "tokens": 8875
+    },
+    {
+      "path": "main-library-callers.txt",
+      "tokens": 7390
+    },
+    {
+      "path": "main-library-copy-context.txt",
+      "tokens": 34740
+    },
+    {
+      "path": "main-model-selection-callers.txt",
+      "tokens": 61316
+    },
+    {
+      "path": "main-model-selection-source.txt",
+      "tokens": 12624
+    },
+    {
+      "path": "main-no-hosted-tests-context.txt",
+      "tokens": 12644
+    },
+    {
+      "path": "main-publication-fixtures.txt",
+      "tokens": 171653
+    },
+    {
+      "path": "main-publication-support.txt",
+      "tokens": 1607
+    },
+    {
+      "path": "main-publish-callers-context.txt",
+      "tokens": 9353
+    },
+    {
+      "path": "main-resolved-save-callers.txt",
+      "tokens": 34167
+    },
+    {
+      "path": "main-save-draft-callers.txt",
+      "tokens": 2725
+    },
+    {
+      "path": "main-save-draft-symbols.txt",
+      "tokens": 8173
+    },
+    {
+      "path": "main-skill-snapshot-context.txt",
+      "tokens": 18569
+    },
+    {
+      "path": "main-skill-tests-api.txt",
+      "tokens": 4037
+    }
+  ]
+}

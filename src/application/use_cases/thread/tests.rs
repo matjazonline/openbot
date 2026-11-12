@@ -50,6 +50,7 @@ fn company_double_with_team(
 
 struct MockChannelPersistence {
     channels: Mutex<Vec<Channel>>,
+    departments: Mutex<Vec<crate::entities::department::Department>>,
 }
 
 #[async_trait]
@@ -79,6 +80,13 @@ impl ChannelPersistence for MockChannelPersistence {
             .find(|w| w.matches_slug(channel_slug))
             .cloned())
     }
+    async fn list_departments(
+        &self,
+        _company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>> {
+        Ok(self.departments.lock().unwrap().clone())
+    }
+
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
         Ok(self
             .channels
@@ -195,6 +203,7 @@ async fn test_inter_channel_hop_limit_rejection() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -211,6 +220,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -227,6 +238,8 @@ async fn test_inter_channel_hop_limit_rejection() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -286,6 +299,7 @@ async fn test_spf_authentication_failure_rejection() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -301,6 +315,8 @@ async fn test_spf_authentication_failure_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -354,6 +370,7 @@ async fn test_high_spam_score_rejection() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -369,6 +386,8 @@ async fn test_high_spam_score_rejection() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -420,6 +439,7 @@ async fn access_level_dmarc_failure_rejects_a_known_member_address() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -435,6 +455,8 @@ async fn access_level_dmarc_failure_rejects_a_known_member_address() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -497,6 +519,7 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -512,6 +535,8 @@ async fn test_unauthorized_sender_blocked_before_spam_checks() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -564,6 +589,7 @@ async fn test_participant_sender_bypasses_spam_checks() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -579,6 +605,8 @@ async fn test_participant_sender_bypasses_spam_checks() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -632,6 +660,7 @@ async fn test_channel_in_cc_resolves_properly() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -647,6 +676,8 @@ async fn test_channel_in_cc_resolves_properly() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -704,6 +735,7 @@ async fn test_multi_channel_to_and_cc_execution() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -720,6 +752,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -736,6 +770,8 @@ async fn test_multi_channel_to_and_cc_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -821,6 +857,7 @@ async fn test_pipeline_address_chaining_execution() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -837,6 +874,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -853,6 +892,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -869,6 +910,8 @@ async fn test_pipeline_address_chaining_execution() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -931,6 +974,7 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -947,6 +991,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -963,6 +1009,8 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1009,6 +1057,10 @@ async fn test_misspelled_channel_bounce_and_strict_pipeline_validation() {
     let bounce_body = format_bounce_email_body(bounce_single, "mailagents.com");
     assert!(bounce_body.contains("suppport@acme.mailagents.com"));
     assert!(bounce_body.contains("support@acme.mailagents.com"));
+    assert!(bounce_body.contains("one or more desk addresses were not found or misspelled"));
+    assert!(bounce_body.contains("Invalid Desk Slug: 'suppport@acme.mailagents.com'"));
+    assert!(bounce_body.contains("Please check the desk address"));
+    assert!(!bounce_body.to_lowercase().contains("channel"));
 
     thread_use_cases
         .handle_bounce_dispatch(&ingest_single)
@@ -1065,6 +1117,7 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -1080,6 +1133,8 @@ async fn test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1185,6 +1240,7 @@ async fn test_participant_modes_company_team_public_and_explicit() {
     let flow_explicit = Uuid::new_v4();
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -1201,6 +1257,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1217,6 +1275,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1233,6 +1293,8 @@ async fn test_participant_modes_company_team_public_and_explicit() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1335,6 +1397,7 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
     }]));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -1350,6 +1413,8 @@ async fn test_sender_verification_refuses_strangers_replying_into_a_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1440,6 +1505,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -1456,6 +1522,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1472,6 +1540,8 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1526,6 +1596,7 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -1542,6 +1613,8 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1558,6 +1631,8 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1603,6 +1678,7 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
         created_at: Utc::now(),
     }]));
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![
             Channel {
                 enabled: true,
@@ -1619,6 +1695,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: true,
@@ -1635,6 +1713,8 @@ async fn inter_channel_max_hops_exceeded_is_rejected() {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ]),
     });
@@ -1688,6 +1768,7 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
     ));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -1703,6 +1784,8 @@ async fn test_third_party_thread_participants_addition_and_authorization() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -1867,6 +1950,7 @@ async fn test_context_only_quiet_mode_ingestion() {
     ));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -1882,6 +1966,8 @@ async fn test_context_only_quiet_mode_ingestion() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -2039,6 +2125,7 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
     ));
 
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled,
             add_3rd_party,
@@ -2054,6 +2141,8 @@ fn channel_fixture_with_settings(spec: TestChannel, config: Arc<ThreadSettings>)
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -2340,6 +2429,9 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
 
 #[path = "address_grouping_tests.rs"]
 mod address_grouping;
+
+#[path = "department_desk_relay_tests.rs"]
+mod department_desk_relay;
 
 fn cc_message(message_id: &str, body: &str, cc: &str) -> RawInboundPayload {
     RawInboundPayload {
@@ -2663,6 +2755,10 @@ async fn disabled_channel_bounces_inbound_mail() {
     assert!(body.contains("support@acme.mailagents.com"));
     assert!(body.contains("switched off"));
     assert!(!body.contains("Did you mean"));
+    assert!(body.contains("one or more desks are currently disabled"));
+    assert!(body.contains("Disabled Desk: 'support@acme.mailagents.com'"));
+    assert!(body.contains("the desk is currently switched off"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[tokio::test]
@@ -2781,7 +2877,38 @@ impl Default for DirectoryChannel {
 /// A company whose channel list the bounce directory has to filter, with `team@acme.com` on the
 /// team and nobody else.
 fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
+    use_cases_with_departments(specs, &[], &[])
+}
+
+/// [`use_cases_with_directory`] with departments `(name, parent index)`, each desk spec owned by
+/// the department at `owners[i]` (by index), if any.
+fn use_cases_with_departments(
+    specs: Vec<DirectoryChannel>,
+    departments: &[(&str, Option<usize>)],
+    owners: &[Option<usize>],
+) -> ThreadUseCases {
     let company_id = Uuid::new_v4();
+    let ids: Vec<crate::entities::department::DepartmentId> = departments
+        .iter()
+        .map(|_| crate::entities::department::DepartmentId::new(Uuid::new_v4()))
+        .collect();
+    let departments: Vec<crate::entities::department::Department> = departments
+        .iter()
+        .enumerate()
+        .map(
+            |(index, (name, parent))| crate::entities::department::Department {
+                id: ids[index],
+                company_id,
+                name: (*name).to_string(),
+                slug: name.to_lowercase().into(),
+                description: None,
+                charter: None,
+                parent_id: parent.map(|parent| ids[parent]),
+                created_by: crate::entities::creation::CreationProvenance::system(),
+                created_at: Utc::now(),
+            },
+        )
+        .collect();
 
     let company_persistence = Arc::new(company_double_with_team(
         vec![Company {
@@ -2798,7 +2925,9 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
 
     let channels = specs
         .into_iter()
-        .map(|spec| {
+        .enumerate()
+        .map(|(index, spec)| {
+            let owner = owners.get(index).copied().flatten().map(|owner| ids[owner]);
             let (access_mode, principal_grants) =
                 email_allowlist_policy(company_id, spec.participant_emails.as_deref());
             Channel {
@@ -2816,6 +2945,8 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: owner,
+                members_only: false,
             }
         })
         .collect();
@@ -2823,6 +2954,7 @@ fn use_cases_with_directory(specs: Vec<DirectoryChannel>) -> ThreadUseCases {
     ThreadUseCases::for_test(
         Arc::new(InMemoryThreads::for_company(company_id)),
         Arc::new(MockChannelPersistence {
+            departments: Mutex::new(departments),
             channels: Mutex::new(channels),
         }),
         company_persistence.clone(),
@@ -2945,10 +3077,11 @@ async fn a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use() 
     assert_eq!(bounce.available_channels[0].description, None);
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(body.contains("Channels you can write to:"));
+    assert!(body.contains("Desks you can write to:"));
     assert!(body.contains("support@acme.mailagents.com — Support Desk"));
     assert!(body.contains("Answers customer support and refund questions."));
     assert!(body.contains("billing@acme.mailagents.com — Billing"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[tokio::test]
@@ -2968,7 +3101,7 @@ async fn an_outsider_s_bounce_never_discloses_the_channel_directory() {
     );
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(!body.contains("Support Desk"));
     assert!(
         body.contains("Did you mean:"),
@@ -3025,7 +3158,7 @@ fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
     };
 
     let body = format_bounce_email_body(&bounce, "mailagents.com");
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(body.contains("support@acme.mailagents.com"));
 }
 
@@ -3137,9 +3270,96 @@ async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
     );
 }
 
+/// 01-departments 04C.3 (B2-F4): a teammate's bounce lists the desks they may write to by
+/// department — root before child, then desks no department owns — by address within each.
+#[tokio::test]
+async fn department_views_directory_orders_desks_by_department_root_first() {
+    let desk = |slug: &'static str| DirectoryChannel {
+        slug,
+        name: slug,
+        ..DirectoryChannel::default()
+    };
+    let use_cases = use_cases_with_departments(
+        vec![
+            desk("aaa-loose"),
+            desk("zz-sales"),
+            desk("ab-sales"),
+            desk("revenue"),
+        ],
+        &[("Sales", Some(1)), ("Revenue", None)],
+        &[None, Some(0), Some(0), Some(1)],
+    );
+    let result = use_cases
+        .ingest_test_email(misspelled_message_from("team@acme.com"))
+        .await
+        .unwrap();
+    let listed: Vec<(String, Option<String>)> = result
+        .bounce_info()
+        .expect("a misspelled address bounces")
+        .available_channels
+        .iter()
+        .map(|entry| {
+            (
+                entry.address.as_str().split('@').next().unwrap().to_owned(),
+                entry.department.clone(),
+            )
+        })
+        .collect();
+    let named =
+        |slug: &str, department: Option<&str>| (slug.to_owned(), department.map(str::to_owned));
+    assert_eq!(
+        listed,
+        [
+            named("revenue", Some("Revenue")),
+            named("ab-sales", Some("Sales")),
+            named("zz-sales", Some("Sales")),
+            named("aaa-loose", None),
+        ]
+    );
+}
+
+/// 01-departments 04C.3: with any desk owned, the directory lists desks under their department's
+/// heading in the order they arrive (root first, "No department" last); without, it is flat.
+#[test]
+fn department_views_help_and_bounce_list_desks_under_their_department() {
+    let entry = |address: &str, name: &str, department: Option<&str>| ChannelDirectoryEntry {
+        department: department.map(str::to_owned),
+        address: EmailAddress::from(address),
+        name: name.to_string(),
+        description: Some(format!("{name} work.")),
+    };
+    let entries = vec![
+        entry("revenue@acme.mailagents.com", "Revenue", Some("Revenue")),
+        entry("sales@acme.mailagents.com", "Sales", Some("Sales")),
+        entry("inbox@acme.mailagents.com", "Inbox", None),
+    ];
+    let body = format_help_email_body(&entries, &CompanySlug::from("acme"), "mailagents.com");
+    let revenue = body
+        .find("  Revenue:\n    - revenue@acme.mailagents.com — Revenue\n        Revenue work.")
+        .unwrap();
+    let sales = body
+        .find("  Sales:\n    - sales@acme.mailagents.com — Sales")
+        .unwrap();
+    let none = body
+        .find("  No department:\n    - inbox@acme.mailagents.com — Inbox")
+        .unwrap();
+    assert!(revenue < sales && sales < none, "{body}");
+
+    let flat = format_help_email_body(
+        &[entry("inbox@acme.mailagents.com", "Inbox", None)],
+        &CompanySlug::from("acme"),
+        "mailagents.com",
+    );
+    assert!(flat.contains(
+        "Desks you can write to:\n  - inbox@acme.mailagents.com — Inbox\n      Inbox work."
+    ));
+    assert!(!flat.contains("No department"));
+}
+
 #[test]
 fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
     let entries = vec![ChannelDirectoryEntry {
+        department: None,
         address: EmailAddress::from("support@acme.mailagents.com"),
         name: "Support Desk".to_string(),
         description: Some("Answers customer support and refund questions.".to_string()),
@@ -3155,14 +3375,20 @@ fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
     for suffix in crate::entities::channel::RESERVED_SLUG_SUFFIXES {
         assert!(body.contains(suffix), "the body should name '{suffix}'");
     }
+    assert!(body.contains("Desks you can write to:"));
+    assert!(body.contains("Send to both desks, in that order."));
+    assert!(body.contains("desk name with '+'"));
+    assert!(!body.to_lowercase().contains("channel"));
 }
 
 #[test]
 fn the_help_body_still_teaches_the_syntax_when_there_is_nothing_to_list() {
     let body = format_help_email_body(&[], &CompanySlug::from("acme"), "mailagents.com");
 
-    assert!(!body.contains("Channels you can write to:"));
+    assert!(!body.contains("Desks you can write to:"));
     assert!(body.contains("nothing to list"));
+    assert!(body.contains("not currently a participant of any desk"));
+    assert!(!body.to_lowercase().contains("channel"));
     assert!(
         body.contains("support+quiet@acme.mailagents.com"),
         "the syntax section falls back to a generic example rather than disappearing"
@@ -3231,6 +3457,7 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -3246,6 +3473,8 @@ async fn send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -3329,6 +3558,7 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -3344,6 +3574,8 @@ async fn external_email_cannot_use_mailagents_thread_id_header_to_inject() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 
@@ -3407,6 +3639,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
 
     let channel_id = Uuid::new_v4();
     let channel_persistence = Arc::new(MockChannelPersistence {
+        departments: Default::default(),
         channels: Mutex::new(vec![Channel {
             enabled: true,
             add_3rd_party: true,
@@ -3422,6 +3655,8 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }]),
     });
 

@@ -11,6 +11,7 @@ pub mod channel;
 pub mod company;
 pub mod company_invite;
 mod connection_levels;
+pub mod department;
 pub mod health;
 mod knowledge;
 mod live_updates;
@@ -31,6 +32,7 @@ pub mod ui_channels;
 pub mod ui_companies;
 pub mod ui_dashboard;
 pub mod ui_deliveries;
+pub mod ui_departments;
 mod ui_internal_notes;
 pub mod ui_invites;
 pub mod ui_local_agents;
@@ -58,6 +60,20 @@ use axum::{
 };
 
 use crate::adapters::http::{app_state::AppState, auth, pages, session::SessionAuthority};
+
+/// A department filter names one of the departments the viewer may see, or it is not found
+/// (01-departments 04B.4, 04C.1); `None` is no filter.
+pub(super) fn known_department(
+    departments: &crate::entities::department::DeskDepartments,
+    id: Option<uuid::Uuid>,
+) -> crate::app_error::AppResult<Option<crate::entities::department::DepartmentId>> {
+    match id.map(crate::entities::department::DepartmentId::new) {
+        Some(id) if departments.department(id).is_none() => Err(
+            crate::app_error::AppError::NotFound("Department not found".into()),
+        ),
+        other => Ok(other),
+    }
+}
 
 /// A query or form field where an empty string means "not given" rather than a value to parse.
 pub(super) fn deserialize_empty_string_as_none<'de, D, T>(
@@ -97,6 +113,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_local_agents::router())
         .merge(company_invite::router())
         .merge(channel::router())
+        .merge(department::router())
         .merge(schedule::router())
         .merge(skill_library::router())
         .merge(agent::router())
@@ -116,6 +133,7 @@ pub fn router(sessions: Arc<SessionAuthority>) -> Router<AppState> {
         .merge(ui_schedules::router())
         .merge(ui_companies::router())
         .merge(ui_dashboard::router())
+        .merge(ui_departments::router())
         .merge(ui_invites::router())
         .merge(ui_deliveries::router())
         .merge(ui_profile::router())

@@ -106,11 +106,26 @@ fn refusals_and_results_are_both_valid_receipts() {
 
     let (_, list) = provisioning_tool_schemas(ProvisioningKind::ListAgents);
     let listed = json!({
-        "agents": [{"slug": "a", "name": "A", "description": null, "provider": null, "model": null}],
+        "agents": [
+            {"slug": "a", "name": "A", "description": null, "provider": null, "model": null,
+                "departments": [{"slug": "sales", "name": "Sales", "roles": ["lead"]}],
+                "desk": {"id": id, "address": "a@acme.example.test"}},
+            {"slug": "b", "name": "B", "description": null, "provider": null, "model": null,
+                "departments": [], "desk": null}
+        ],
         "models": [{"provider": "anthropic", "model": "claude"}],
         "truncated": false
     });
     assert!(valid(&list, &listed));
+    // 01DEP-P03-D10: every listed agent names its departments and desk, with known roles only.
+    for field in ["departments", "desk"] {
+        let mut missing = listed.clone();
+        missing["agents"][1].as_object_mut().unwrap().remove(field);
+        assert!(!valid(&list, &missing), "{field} is required");
+    }
+    let mut unknown = listed.clone();
+    unknown["agents"][0]["departments"][0]["roles"] = json!(["owner"]);
+    assert!(!valid(&list, &unknown));
     let mut long = listed.clone();
     long["agents"][0]["name"] = json!("n".repeat(MAX_LISTED_NAME_CHARS + 1));
     assert!(!valid(&list, &long));

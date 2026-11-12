@@ -896,7 +896,7 @@ CREATE TABLE public.channel_principal_grants (
     provenance text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT channel_principal_grants_capability_check CHECK ((capability = ANY (ARRAY['participate'::text, 'view'::text]))),
-    CONSTRAINT channel_principal_grants_provenance_check CHECK ((provenance = ANY (ARRAY['configured_allowlist'::text, 'manager'::text, 'conversation_membership'::text, 'system'::text])))
+    CONSTRAINT channel_principal_grants_provenance_check CHECK ((provenance = ANY (ARRAY['configured_allowlist'::text, 'manager'::text, 'conversation_membership'::text, 'system'::text, 'department_membership'::text])))
 );
 
 
@@ -915,9 +915,15 @@ CREATE TABLE public.channels (
     created_by jsonb NOT NULL,
     description text,
     settings_revision bigint DEFAULT 0 NOT NULL,
+    department_id uuid,
+    members_only boolean DEFAULT false NOT NULL,
     CONSTRAINT channels_access_mode_check CHECK ((access_mode = ANY (ARRAY['team'::text, 'allowlist'::text, 'public'::text]))),
     CONSTRAINT channels_created_by_shape_check CHECK (public.valid_creation_provenance(created_by)),
-    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text))
+    CONSTRAINT channels_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    -- A members-only desk belongs to a department and is an allowlist desk, so channel policy
+    -- needs no rule of its own: its department's grants are its allowlist (01-departments p02).
+    CONSTRAINT channels_members_only_owned CHECK (((NOT members_only) OR (department_id IS NOT NULL))),
+    CONSTRAINT channels_members_only_allowlist CHECK (((NOT members_only) OR (access_mode = 'allowlist'::text)))
 );
 
 
@@ -5720,7 +5726,7 @@ CREATE TABLE public.workflow_provisioning_commands (
 -- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.workflow_provisioning_commands IS 'One "Create assistant channel" command per client key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. The tool path needs none; its action receipt is the record.';
+COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create additional desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
 
 
 --
@@ -6134,7 +6140,7 @@ ALTER TABLE ONLY public.channel_bindings
 --
 
 ALTER TABLE ONLY public.channel_principal_grants
-    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability);
+    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability, provenance);
 
 
 --
@@ -15478,7 +15484,176 @@ END $$;
 CREATE TRIGGER integration_connect_guard BEFORE INSERT OR UPDATE ON integration_connect_attempts
     FOR EACH ROW EXECUTE FUNCTION integration_connect_guard();
 
--- Memory service client configuration (plan/memory-service implementation-decisions E2).
+-- Departments (01-departments p01). A department groups desks and principals inside one company,
+-- nests under a parent department, and assigns roles; desks do not nest. Members and role holders
+-- are the company's person or agent principals. Department writes serialize on the company row
+-- (`FOR NO KEY UPDATE`), which is what keeps two concurrent re-parents from jointly forming a
+-- cycle; the guards below are the backstop for any writer that skips the application.
+CREATE TABLE public.departments (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    name text NOT NULL,
+    slug public.citext NOT NULL,
+    description text,
+    parent_id uuid,
+    charter text,
+    created_by jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT departments_pkey PRIMARY KEY (id),
+    CONSTRAINT departments_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT departments_company_slug_key UNIQUE (company_id, slug),
+    CONSTRAINT departments_company_id_fkey FOREIGN KEY (company_id)
+        REFERENCES public.companies(id) ON DELETE CASCADE,
+    -- Deleting a parent that still has children is refused; a company teardown removes the tree.
+    CONSTRAINT departments_parent_fk FOREIGN KEY (company_id, parent_id)
+        REFERENCES public.departments(company_id, id),
+    CONSTRAINT departments_not_own_parent CHECK ((parent_id IS NULL) OR (parent_id <> id)),
+    CONSTRAINT departments_name_not_blank CHECK ((btrim(name) <> ''::text)),
+    -- A department slug is a legal channel slug, so it can be the department desk's address.
+    CONSTRAINT departments_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+    CONSTRAINT departments_charter_size CHECK ((charter IS NULL) OR (octet_length(charter) <= 4096)),
+    CONSTRAINT departments_created_by_shape_check CHECK (public.valid_creation_provenance(created_by))
+);
+CREATE INDEX departments_parent_idx ON public.departments USING btree (company_id, parent_id)
+    WHERE (parent_id IS NOT NULL);
+COMMENT ON TABLE public.departments IS 'A named group inside one company that owns desks, has member principals and role holders, and may sit under a parent department (01-departments).';
+
+CREATE TABLE public.department_members (
+    company_id uuid NOT NULL,
+    department_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT department_members_pkey PRIMARY KEY (department_id, principal_id),
+    CONSTRAINT department_members_department_fk FOREIGN KEY (company_id, department_id)
+        REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT department_members_principal_fk FOREIGN KEY (company_id, principal_id)
+        REFERENCES public.principals(company_id, id) ON DELETE CASCADE
+);
+CREATE INDEX department_members_principal_idx ON public.department_members USING btree (company_id, principal_id);
+
+CREATE TABLE public.department_roles (
+    company_id uuid NOT NULL,
+    department_id uuid NOT NULL,
+    role text NOT NULL,
+    principal_id uuid NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT department_roles_pkey PRIMARY KEY (department_id, role, principal_id),
+    -- Widened by later plans; the string is always `DepartmentRole::as_str`.
+    CONSTRAINT department_roles_role_check CHECK ((role = 'lead'::text)),
+    CONSTRAINT department_roles_department_fk FOREIGN KEY (company_id, department_id)
+        REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+    CONSTRAINT department_roles_principal_fk FOREIGN KEY (company_id, principal_id)
+        REFERENCES public.principals(company_id, id) ON DELETE CASCADE
+);
+-- The literal is deliberate: the lead is the one single-holder role; later roles may have several.
+CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles USING btree (department_id, role)
+    WHERE (role = 'lead'::text);
+CREATE INDEX department_roles_principal_idx ON public.department_roles USING btree (company_id, principal_id);
+
+-- A desk may belong to a department (p02). Deleting a department that still owns a desk is
+-- refused; detach or delete the desk first. Deleting the desk is never blocked by its owner.
+ALTER TABLE ONLY public.channels
+    ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id)
+        REFERENCES public.departments(company_id, id) ON DELETE RESTRICT;
+CREATE INDEX channels_department_idx ON public.channels USING btree (company_id, department_id)
+    WHERE (department_id IS NOT NULL);
+
+-- Why `checked_department` may not sit under `proposed_parent`, or NULL when it may: 'cycle' when
+-- the parent is the department itself or one of its descendants; 'depth' when the department's
+-- subtree would then reach below level 8 (a root department is level 1). Both walks stop at level
+-- ten, past the deepest legal tree, so even a corrupt tree cannot loop. The shape trigger and the persistence preflight
+-- share this one definition.
+CREATE FUNCTION public.department_shape_problem(checked_company uuid, checked_department uuid, proposed_parent uuid) RETURNS text
+    LANGUAGE sql STABLE
+    AS $$
+    WITH RECURSIVE ancestors(id, parent_id, level) AS (
+        SELECT department.id, department.parent_id, 1
+          FROM public.departments AS department
+         WHERE department.company_id = checked_company AND department.id = proposed_parent
+        UNION ALL
+        SELECT department.id, department.parent_id, ancestor.level + 1
+          FROM ancestors AS ancestor
+          JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.id = ancestor.parent_id
+         WHERE ancestor.level <= 9 AND ancestor.id <> checked_department
+    ),
+    descendants(id, level) AS (
+        SELECT checked_department, 1
+        UNION ALL
+        SELECT department.id, descendant.level + 1
+          FROM descendants AS descendant
+          JOIN public.departments AS department
+            ON department.company_id = checked_company AND department.parent_id = descendant.id
+         WHERE descendant.level <= 9
+    )
+    SELECT CASE
+        WHEN proposed_parent = checked_department
+          OR EXISTS (SELECT 1 FROM ancestors WHERE ancestors.id = checked_department) THEN 'cycle'
+        WHEN COALESCE((SELECT max(level) FROM ancestors), 0)
+           + (SELECT max(level) FROM descendants) > 8 THEN 'depth'
+    END
+$$;
+
+CREATE FUNCTION public.guard_department_shape() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE problem text;
+BEGIN
+    IF NEW.parent_id IS NULL THEN RETURN NEW; END IF;
+    problem := public.department_shape_problem(NEW.company_id, NEW.id, NEW.parent_id);
+    IF problem IS NOT NULL THEN
+        RAISE EXCEPTION 'department % cannot sit under %: %', NEW.id, NEW.parent_id, problem
+            USING ERRCODE='23514', CONSTRAINT='departments_shape';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF parent_id ON public.departments
+    FOR EACH ROW EXECUTE FUNCTION public.guard_department_shape();
+
+-- Departments hold people and agents. External and system principals have no place in one.
+CREATE FUNCTION public.guard_department_principal_kind() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE principal_kind text;
+BEGIN
+    -- FOR KEY SHARE waits for a demotion in flight (a key update of `kind`) and then reads its
+    -- outcome, so a join row is never written against a principal that has just left.
+    SELECT principal.kind INTO principal_kind FROM public.principals AS principal
+     WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id
+       FOR KEY SHARE;
+    IF principal_kind IS NOT NULL AND principal_kind NOT IN ('person', 'agent') THEN
+        RAISE EXCEPTION 'principal % cannot belong to or hold a role in a department', NEW.principal_id
+            USING ERRCODE='23514', CONSTRAINT='department_principal_kind';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_department_member_kind BEFORE INSERT OR UPDATE ON public.department_members
+    FOR EACH ROW EXECUTE FUNCTION public.guard_department_principal_kind();
+CREATE TRIGGER guard_department_role_holder_kind BEFORE INSERT OR UPDATE ON public.department_roles
+    FOR EACH ROW EXECUTE FUNCTION public.guard_department_principal_kind();
+
+-- Removing a teammate, deleting an agent or deleting an account demotes the principal to
+-- `external` rather than deleting it; it leaves every department with it.
+CREATE FUNCTION public.department_principal_demoted() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM public.department_members AS member
+     WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
+    DELETE FROM public.department_roles AS holder
+     WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id;
+    -- The members-only access those rows gave goes too, or an address that still resolves to the
+    -- demoted principal would keep it; the provenance is scoped deliberately, so an allowlist
+    -- entry stays. The desks' settings move on as any grant re-derivation's do.
+    WITH removed AS (
+        DELETE FROM public.channel_principal_grants AS derived
+         WHERE derived.company_id = NEW.company_id AND derived.principal_id = NEW.id
+           AND derived.provenance = 'department_membership'
+        RETURNING derived.channel_id
+    )
+    UPDATE public.channels AS channel SET settings_revision = channel.settings_revision + 1
+     WHERE channel.company_id = NEW.company_id AND channel.id IN (SELECT channel_id FROM removed);
+    RETURN NEW;
+END $$;
+CREATE TRIGGER department_principal_demoted AFTER UPDATE OF kind ON public.principals
+    FOR EACH ROW WHEN (NEW.kind NOT IN ('person', 'agent'))
+    EXECUTE FUNCTION public.department_principal_demoted();
+
+-- Memory service client configuration (plan/.archive/memory-service implementation-decisions E2).
 -- OpenBot stores only connection state, per-namespace client credentials and the remote
 -- lifecycle; the memory corpus lives in the standalone service's own database.
 CREATE TABLE public.memory_tenants (

@@ -1,0 +1,9 @@
+Command: cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4167 filtered out; finished in 1.44s
+

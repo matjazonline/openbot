@@ -1,0 +1,8 @@
+{
+  "status": "FAIL",
+  "exit_code": 1,
+  "elapsed_seconds": 517.36,
+  "helper_sha256": "fc79364ef9bf636b677c6943a77d0a4628b3765d072f0907d847484f788fa9a9",
+  "managed_fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+  "acceptance_limits_unchanged": true
+}

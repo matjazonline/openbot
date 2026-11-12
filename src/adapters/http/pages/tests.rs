@@ -146,6 +146,8 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
         created_by: crate::entities::creation::CreationProvenance::system(),
         created_at: Utc::now(),
         settings_revision: 0,
+        department_id: None,
+        members_only: false,
     }
 }
 
@@ -409,7 +411,7 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
         next_cursor: None,
         selected_thread_id: None,
         activity: no_activity(),
-        detail_html: &empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline),
+        detail_html: &empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline),
     });
 
     assert!(html.contains(r##"class="ui-pane-list"##));
@@ -427,7 +429,7 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
 /// that is the server's answer rather than the browser's guess.
 #[test]
 fn a_detail_column_with_nothing_open_says_so() {
-    let placeholder = empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline);
+    let placeholder = empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline);
     assert!(placeholder.contains("data-pane-empty"));
 
     let company = mailbox_company();
@@ -451,7 +453,7 @@ fn a_detail_column_with_nothing_open_says_so() {
 fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
-    let detail = empty_detail_pane("Select a channel to get started.", FragmentSwap::Inline);
+    let detail = empty_detail_pane("Select a desk to get started.", FragmentSwap::Inline);
     let email = mailbox_account_email();
 
     let without_channel = mailbox_page(&MailboxPage {
@@ -469,7 +471,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     });
     // Without a channel there is no thread column, so there is nowhere for Compose to sit.
     assert!(!without_channel.contains("id=\"compose-button\""));
-    assert!(without_channel.contains("Select a channel to see its threads."));
+    assert!(without_channel.contains("Select a desk to see its threads."));
 
     let with_channel = mailbox_page(&MailboxPage {
         user: &mailbox_user(&email),
@@ -531,10 +533,10 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
     assert!(unselected.contains("inbox@acme.example.com"));
     // Channel management is the /ui Channels workspace now, not the classic page.
     assert!(unselected.contains(&format!("/ui/channels?company_id={}&new=1", company.id)));
-    assert!(!unselected.contains("Edit Channel"));
+    assert!(!unselected.contains("Edit Desk"));
 
     let selected = page(Some(&channel));
-    assert!(selected.contains("Edit Channel"));
+    assert!(selected.contains("Edit Desk"));
     assert!(selected.contains(&format!(
         "/ui/channels?company_id={}&channel_id={}",
         company.id, channel.id
@@ -558,7 +560,7 @@ fn channel_actions_swap_out_of_band_so_picking_a_channel_reveals_edit_channel() 
 
     let inline = channel_actions(company.id, None, FragmentSwap::Inline);
     assert!(!inline.contains("hx-swap-oob"));
-    assert!(!inline.contains("Edit Channel"));
+    assert!(!inline.contains("Edit Desk"));
 }
 
 #[test]
@@ -776,12 +778,13 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
     )));
 
     let list = ChannelSettingsList {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
         selected_channel_id: None,
     };
-    let pane = channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline);
+    let pane = channel_settings_empty_pane("Select a desk.", FragmentSwap::Inline);
     let channels = channel_settings_page(&ChannelSettingsPage {
         user: &mailbox_user(&email),
         companies: std::slice::from_ref(&company),
@@ -1021,6 +1024,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     }];
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1054,6 +1058,7 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
     // An agent with nothing overridden keeps the model section collapsed.
     let plain = settings_agent(company.id, "Plain", "plain");
     let plain_html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1064,6 +1069,8 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         capability_options: AgentCapabilityOptions::default(),
     });
     assert!(!plain_html.contains("bg-base-200\" open"));
+    assert!(plain_html.contains("<option value=\"\">No hosted model</option>"));
+    assert!(plain_html.contains("Leave both blank for native profiles."));
 }
 
 #[test]
@@ -1076,6 +1083,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     let plain = settings_agent(company.id, "Plain", "plain");
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1092,6 +1100,7 @@ fn an_agent_with_a_picture_shows_it_and_one_without_falls_back_to_its_letter() {
     assert!(html.contains(">T</span>"));
 
     let plain_html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1131,6 +1140,7 @@ fn agent_edit_pane_keeps_a_rejected_save_in_the_form() {
     };
 
     let html = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1157,6 +1167,7 @@ fn prompt_generator_names_the_pane_it_answers_into() {
     let agent = settings_agent(company.id, "Triage", "triage");
 
     let edit = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -1339,10 +1350,14 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
     );
     assert!(!simple.contains("/ui/agents/new/channel"));
     assert!(!simple.contains(">Next: Channel<"));
+    assert!(!simple.contains(">Next: Desk<"));
     assert!(!simple.contains(r##"<li class="step step-primary">Agent</li>"##));
 
     // A rejected Advanced submit has to come back on the Advanced tab.
     let advanced = pane(AgentCreateTab::Advanced);
+    assert!(advanced.contains("<option value=\"\">Company default</option>"));
+    assert!(advanced.contains("Creating an agent requires a model connection with an API key."));
+    assert!(!advanced.contains("Leave both blank for native profiles."));
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
     assert!(!advanced.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
 }
@@ -1352,6 +1367,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
     let company = mailbox_company();
     let channel = mailbox_channel(company.id);
     let list = ChannelSettingsList {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channels: std::slice::from_ref(&channel),
@@ -1379,7 +1395,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
         selected_channel_id: None,
         ..list
     };
-    assert!(channel_settings_list(&empty, FragmentSwap::Inline).contains("No channels yet"));
+    assert!(channel_settings_list(&empty, FragmentSwap::Inline).contains("No desks yet"));
 }
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
@@ -1409,6 +1425,7 @@ fn channel_edit_pane_prefills_the_stored_channel_and_offers_delete() {
     };
 
     let html = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1449,6 +1466,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
     let company = mailbox_company();
 
     let open = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &mailbox_channel(company.id),
@@ -1467,6 +1485,7 @@ fn channel_edit_pane_reflects_the_stored_third_party_setting() {
         ..mailbox_channel(company.id)
     };
     let closed = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &closed_channel,
@@ -1494,6 +1513,7 @@ fn channel_edit_pane_keeps_a_rejected_save_in_the_form() {
     };
 
     let html = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1531,6 +1551,7 @@ fn spam_confirmation_is_inert_until_the_channel_is_public() {
             ..ChannelDraft::default()
         };
         channel_edit_pane(&ChannelEditPane {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channel: &channel,
@@ -1570,6 +1591,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
     );
 
     let edit = channel_edit_pane(&ChannelEditPane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         channel: &channel,
@@ -1583,6 +1605,7 @@ fn cancelling_a_channel_form_dismisses_the_pane() {
 
     // All three create tabs offer the same way out.
     let create = channel_create_pane(&ChannelCreatePane {
+        departments: &[],
         company: &company,
         app_domain_name: "example.com",
         spam_scan_enabled: true,
@@ -1599,6 +1622,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
     let company = mailbox_company();
     let pane = |draft: &ChannelDraft<'_>, error| {
         channel_create_pane(&ChannelCreatePane {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             spam_scan_enabled: true,
@@ -1617,7 +1641,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
     assert!(!fresh.contains(">Easy</button>"));
     assert!(!fresh.contains("/ui/channels/easy"));
     assert!(!fresh.contains("system_prompt"));
-    assert!(fresh.contains("create an assistant channel from the agent's page"));
+    assert!(fresh.contains("create an assistant desk from the agent's page"));
 
     // A rejected submit comes back with what was typed.
     let retried = pane(
@@ -1626,7 +1650,7 @@ fn channel_create_pane_makes_a_plain_channel_and_keeps_a_rejected_draft() {
             slug: "support",
             ..ChannelDraft::default()
         },
-        Some("Failed to create channel: slug already taken"),
+        Some("Failed to create desk: slug already taken"),
     );
     assert!(retried.contains("slug already taken"));
     assert!(retried.contains("value=\"Support\""));
@@ -1639,6 +1663,7 @@ fn channels_page_opens_the_form_the_mailbox_asked_for() {
     let channels = std::slice::from_ref(&channel);
     let page = |focus| {
         channels_page(&ChannelsPage {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels,
@@ -2365,7 +2390,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     let html = message_bubble_chat(&delegated, None, scope, RunLinkAccess::Label);
 
     assert!(html.contains(&icon(Icon::Hubot, BUTTON_ICON)));
-    assert!(html.contains(r#"title="From an agent in another channel""#));
+    assert!(html.contains(r#"title="From an agent in another desk""#));
     // The sending channel's address.
     assert!(html.contains("legal@acme.mailagents.test"));
     assert!(!html.contains("<img"));
@@ -2420,7 +2445,7 @@ fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
         },
     );
     assert!(row.contains(&icon(Icon::Hubot, BUTTON_ICON)));
-    assert!(row.contains(r#"title="Opened by an agent in another channel""#));
+    assert!(row.contains(r#"title="Opened by an agent in another desk""#));
     // The subject still truncates beside the glyph rather than being replaced by it.
     assert!(row.contains(r#"<span class="truncate font-semibold">Question &lt;script&gt;</span>"#));
 
@@ -3002,6 +3027,7 @@ fn company_edit_pane_prefills_the_stored_company_and_offers_delete() {
         model_connections: &model_connections,
         app_domain_name: "example.com",
         counts: CompanyCounts {
+            departments: 0,
             channels: 3,
             agents: 2,
             skills: 0,
@@ -3097,6 +3123,7 @@ fn company_member_can_open_company_without_edit_controls_or_api_key() {
         model_connections: &[],
         app_domain_name: "example.com",
         counts: CompanyCounts {
+            departments: 0,
             channels: 3,
             agents: 2,
             skills: 0,
@@ -3539,6 +3566,7 @@ fn each_agent_form_owns_its_own_picker() {
         ..settings_agent(company.id, "Triage", "triage")
     };
     let edit = agent_edit_pane(&AgentEditPane {
+        directory: None,
         authoring: None,
         company: &company,
         app_domain_name: "mail.test",
@@ -3778,7 +3806,7 @@ fn deliveries_page_lists_queued_work_and_escapes_its_subject() {
     // The rail lights the workspace the response belongs to.
     assert!(html.contains(r##"title="Deliveries""##));
     // The channel filter is what the channel_id column and its index exist to serve.
-    assert!(html.contains(r##"<option value="">All channels</option>"##));
+    assert!(html.contains(r##"<option value="">All desks</option>"##));
     assert!(html.contains(&format!(
         r##"<option value="{}">Inbox</option>"##,
         channel.id
@@ -3975,6 +4003,8 @@ fn the_dashboard_shows_a_placeholder_with_one_initial_writer() {
     use crate::entities::dashboard::DashboardWindow;
 
     let html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &mailbox_user(&email),
         scope: DashboardScopeView::Company(&companies[0]),
         selected_company: Some(&companies[0]),
@@ -4003,7 +4033,7 @@ fn no_pane_leaks_a_placeholder_constant_into_its_markup() {
         empty_thread_column(),
         empty_detail_pane("Select a thread.", FragmentSwap::Inline),
         agent_settings_empty_pane("Select an agent.", FragmentSwap::Inline),
-        channel_settings_empty_pane("Select a channel.", FragmentSwap::Inline),
+        channel_settings_empty_pane("Select a desk.", FragmentSwap::Inline),
         company_settings_empty_pane("Select a company.", FragmentSwap::Inline),
         team_settings_empty_pane("Select a member.", FragmentSwap::Inline),
         delivery_empty_pane("Select a delivery.", FragmentSwap::Inline),
@@ -4052,6 +4082,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         user: &user,
         companies: &companies,
         list: &ChannelSettingsList {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels: &[],
@@ -4060,7 +4091,7 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         pane_html: "",
     });
     assert!(channels_html.contains(
-        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Channels</h2>"##
+        r##"<h2 class="min-w-0 flex-1 text-base font-semibold leading-tight">Desks</h2>"##
     ));
 
     let agents_html = agent_settings_page(&AgentSettingsPage {
@@ -4111,6 +4142,8 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     ));
 
     let dashboard_html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &user,
         scope: DashboardScopeView::Company(&company),
         selected_company: Some(&company),
@@ -4122,6 +4155,8 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
     ));
 
     let dashboard_global_html = dashboard_page(&DashboardShell {
+        department: None,
+        departments: &Default::default(),
         user: &user,
         scope: DashboardScopeView::Global,
         selected_company: Some(&company),
@@ -4187,7 +4222,7 @@ fn the_profile_pane_offers_the_account_its_own_details_and_never_its_password() 
     assert!(html.contains(r#"name="email" required value="dana@example.com""#));
     assert!(html.contains("Email unverified"));
     assert!(html.contains(
-        "Email-based invitations, restricted channel access, and operator access are unavailable"
+        "Email-based invitations, restricted desk access, and operator access are unavailable"
     ));
 
     // The picture is picked from disk; the URL it was stored at rides along hidden.
@@ -4593,6 +4628,7 @@ fn the_channel_form_offers_a_description_and_escapes_what_was_typed_into_it() {
     };
 
     let html = channel_create_pane(&ChannelCreatePane {
+        departments: &[],
         company: &company,
         app_domain_name: "mailagents.com",
         spam_scan_enabled: true,
@@ -4849,3 +4885,9 @@ mod workflow_conversation_tests;
 
 #[path = "knowledge_view_tests.rs"]
 mod knowledge_views;
+
+#[path = "desk_wording_tests.rs"]
+mod desk_wording;
+
+#[path = "department_ui_tests.rs"]
+mod department_ui;

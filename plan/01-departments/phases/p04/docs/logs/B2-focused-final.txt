@@ -1,0 +1,48 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.58s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 41 tests
+test adapters::http::pages::tests::department_ui::department_ui_company_pane_has_a_departments_tab_and_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_lists_group_by_department_with_a_badge ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_form_offers_the_department_and_members_only ... ok
+test adapters::http::pages::tests::department_ui::department_ui_member_sees_their_departments_without_forms ... ok
+test adapters::http::pages::tests::department_ui::department_ui_refusal_renders_on_the_form_that_made_it ... ok
+test adapters::http::pages::tests::department_ui::department_ui_pane_indents_the_tree_and_shows_the_selected_department ... ok
+test adapters::http::pages::tests::department_ui::department_ui_tree_orders_each_root_before_its_children ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_company_workspace_count ... ok
+test adapters::http::pages::tests::department_ui::department_views_run_board_filters_by_department_and_waits_on_people ... ok
+test adapters::http::pages::attention::tests::department_views_attention_groups_and_keeps_the_department ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_flash_messages_say_desk ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading ... ok
+test adapters::http::pages::dashboard::tests::department_views_dashboard_groups_and_narrows_outstanding_jobs ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_settings_breadcrumb ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_nav_names_the_desks_link ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_scan_reads_text_nodes_in_every_literal_form ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_page_sources_keep_channel_out_of_text_nodes ... ok
+test adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent ... ok
+test adapters::http::routes::ui_channels::tests::department_ui_desk_form_asks_only_for_the_ownership_it_changes ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys ... ok
+test adapters::http::routes::ui_dashboard::authorization_tests::department_views_dashboard_department_must_be_the_companys ... ok
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_member_sees_only_their_departments ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_foreign_ids_under_the_owners_path_change_nothing ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_owner_writes_render_and_refusals_land_on_their_form ... ok
+test adapters::persistence::department::tests::ui_reads::department_ui_reads_name_people_and_agents_and_list_owned_desks ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_writes_answer_404_to_members_strangers_and_foreign_companies ... ok
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+test adapters::http::routes::workflows::ui::runs::tests::department_views_runs_department_scope_is_company_scoped ... ok
+test adapters::persistence::attention::tests::department_views_company_items_are_left_out_of_a_department_view ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test application::services::model_usage::aggregate::tests::department_views_usage_groups_by_department_with_no_department_last ... ok
+test application::use_cases::builtin_agent_library::tests::desk_wording_agent_builder_prompt_says_desk ... ok
+test application::use_cases::thread::tests::department_views_help_and_bounce_list_desks_under_their_department ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::model_usage_workflow_exact_provenance_and_grouping ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_views_runs_narrow_to_the_departments_desks ... ok
+
+test result: ok. 41 passed; 0 failed; 0 ignored; 0 measured; 4122 filtered out; finished in 5.63s
+

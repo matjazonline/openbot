@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "initialized": true,
+  "closeCodes": [
+    4403,
+    4403
+  ],
+  "removalBoundary": 0,
+  "frameAttached": false
+}

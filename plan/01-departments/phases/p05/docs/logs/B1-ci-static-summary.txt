@@ -1,0 +1,8 @@
+workflow-sample-boundary-fixtures: PASS
+workflow-sample-boundary: PASS
+integration-boundary-fixtures: PASS
+integration-boundary: PASS
+integration-docs: PASS
+integration_portability_inventory: PASS
+integration_service_contract_inventory: PASS
+vault_google_e2e_inventory: PASS

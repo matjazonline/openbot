@@ -21,11 +21,6 @@ struct KnownRun {
     scope: RunReadScope,
     replay: AdmitWorkflowRequest,
 }
-struct KnownDocuments {
-    records: Vec<Value>,
-    models: Vec<ScriptedLlm>,
-}
-
 async fn admit_known(
     environment: &setup::Environment,
     document: &setup::CompanyDocument,
@@ -66,7 +61,7 @@ async fn known_documents(
     delivery: &delivery_support::DeliveryFixture,
     input: &Input,
     started: Instant,
-) -> KnownDocuments {
+) -> Vec<Value> {
     let mut runs = Vec::new();
     for (index, document) in documents.iter().enumerate() {
         runs.push(Box::pin(admit_known(environment, document, index)).await);
@@ -85,11 +80,14 @@ async fn known_documents(
             &environment.engine,
             &scopes,
             driver::Checkpoint::CreateApproval,
+            None,
         )
         .await;
     let mut models = Vec::new();
     for (index, document) in documents.iter().enumerate() {
-        models.push(model::start(document.agent, environment.client.clone(), index).await);
+        models.push(Some(
+            model::start(document.agent, environment.client.clone(), index).await,
+        ));
     }
     stage(started, "model_listeners_started");
     coordinator
@@ -97,6 +95,7 @@ async fn known_documents(
             &environment.engine,
             &scopes,
             driver::Checkpoint::EditorApproval,
+            None,
         )
         .await;
     stage(started, "editor_approval_checkpoint");
@@ -110,15 +109,27 @@ async fn known_documents(
         environment.client.clone(),
     );
     let views = coordinator
-        .drive(&restarted, &scopes, driver::Checkpoint::Terminal)
+        .drive(
+            &restarted,
+            &scopes,
+            driver::Checkpoint::Terminal,
+            Some((&mut models, input)),
+        )
         .await;
     stage(started, "documents_terminal");
     if views
         .iter()
         .any(|view| view.detail.summary.state != "succeeded")
     {
-        Box::pin(failed_documents(environment, &scopes, &views, models)).await;
+        Box::pin(failed_documents(
+            environment,
+            &scopes,
+            &views,
+            models.into_iter().flatten().collect(),
+        ))
+        .await;
     }
+    assert!(models.iter().all(Option::is_none));
     let verifier = verification::Verifier {
         environment,
         delivery,
@@ -137,7 +148,16 @@ async fn known_documents(
             AdmissionResult::Replayed(run.scope.run)
         );
     }
-    KnownDocuments { records, models }
+    records
+}
+
+async fn finish_model(mut model: ScriptedLlm, input: &Input) {
+    let observed = serde_json::to_string(&model.observed()).unwrap();
+    for company in &input.companies {
+        assert!(!observed.contains(company.token.expose_secret()));
+    }
+    assert_eq!(model.finish().await.unwrap(), 5);
+    eprintln!("DOOP_E2E_MODEL completed=5");
 }
 
 async fn failed_documents(
@@ -190,6 +210,7 @@ async fn lost_receipt(
             &environment.engine,
             &[scope],
             driver::Checkpoint::Reconciliation,
+            None,
         )
         .await;
     stage(started, "lost_receipt_parked");
@@ -203,7 +224,7 @@ async fn lost_receipt(
         environment.client.clone(),
     );
     let healthy = coordinator
-        .drive(&restarted, &[health], driver::Checkpoint::Terminal)
+        .drive(&restarted, &[health], driver::Checkpoint::Terminal, None)
         .await;
     assert_eq!(healthy[0].detail.summary.state, "succeeded");
     stage(started, "healthy_progress_after_worker_restart");
@@ -263,7 +284,7 @@ async fn doop_e2e_live_company_documents() {
         .assert_foreign(&documents[1], &documents[0])
         .await;
     let delivery = delivery_support::worker(&documents[0].fixture, documents[0].channel);
-    let known = Box::pin(known_documents(
+    let records = Box::pin(known_documents(
         &environment,
         &documents,
         &delivery,
@@ -272,15 +293,8 @@ async fn doop_e2e_live_company_documents() {
     ))
     .await;
     let lost = Box::pin(lost_receipt(&environment, &documents, &delivery, started)).await;
-    for mut model in known.models {
-        let observed = serde_json::to_string(&model.observed()).unwrap();
-        for company in &input.companies {
-            assert!(!observed.contains(company.token.expose_secret()));
-        }
-        assert_eq!(model.finish().await.unwrap(), 5);
-    }
     environment.service.shutdown().await.unwrap();
     setup::immutable_guard(&environment.persistence).await;
-    write_record(&input, known.records, lost);
+    write_record(&input, records, lost);
     println!("DOOP_OPENBOT_E2E_PASS companies=2 documents=2 creates=3 unknown=1");
 }

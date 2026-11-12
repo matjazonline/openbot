@@ -24,12 +24,15 @@ use chrono::{DateTime, Utc};
 pub enum RunsView {
     List,
     Board,
+    /// Parked decisions and escalations, by department (01-departments 04B.4).
+    Waiting,
 }
 
 impl RunsView {
     pub fn parse(view: Option<&str>) -> Self {
         match view {
             Some("board") => Self::Board,
+            Some("waiting") => Self::Waiting,
             _ => Self::List,
         }
     }
@@ -228,6 +231,75 @@ pub fn runs_view_toggle(company_id: Uuid, scope: RunFilterView<'_>, current: Run
             format!("/ui/workflow-runs?{query}&amp;view=board"),
             current == RunsView::Board
         ),
+    ) + &tab(
+        "Waiting on a person",
+        format!("/ui/workflow-runs?{query}&amp;view=waiting"),
+        current == RunsView::Waiting,
+    )
+}
+
+/// What the waiting view renders from.
+pub struct RunsWaitingView<'a> {
+    pub company_id: Uuid,
+    /// The scope the view switch keeps; only the department applies here.
+    pub scope: RunFilterView<'a>,
+    pub departments: &'a crate::entities::department::DeskDepartments,
+    pub department: Option<crate::entities::department::DepartmentId>,
+    pub page: &'a crate::entities::attention::AttentionPage,
+}
+
+/// "Waiting on a person": the team's open decisions and the run problems escalated to a person,
+/// under the department of the desk each came from, with a department filter. Its items link to
+/// the decision or run they wait on.
+pub fn runs_waiting(view: &RunsWaitingView<'_>) -> String {
+    let company_id = view.company_id;
+    let filter = super::department_filter(view.departments, view.department);
+    let form = if filter.is_empty() {
+        String::new()
+    } else {
+        format!(
+            r#"<form method="get" action="/ui/workflow-runs" class="join">
+                <input type="hidden" name="company_id" value="{company_id}">
+                <input type="hidden" name="view" value="waiting">
+                {filter}<button class="btn btn-sm join-item" type="submit">Filter</button>
+            </form>"#
+        )
+    };
+    format!(
+        r#"<section id="runs-waiting" class="flex min-h-0 flex-1 flex-col overflow-y-auto">
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-base-300 p-3">
+                {toggle}{form}
+            </header>
+            <p class="px-5 pt-3 text-xs opacity-60">Decisions waiting on a person and run problems escalated to one, by the department of the desk they came from.</p>
+            {list}
+        </section>"#,
+        toggle = runs_view_toggle(company_id, view.scope, RunsView::Waiting),
+        list = {
+            // The view reads one page; the rest is on the work queue, not past a link that would
+            // leave the runs workspace unannounced.
+            let first = crate::entities::attention::AttentionPage {
+                next_cursor: None,
+                ..view.page.clone()
+            };
+            let more = if view.page.next_cursor.is_some() {
+                format!(
+                    r#"<p class="px-5 pb-5 text-xs opacity-70">Showing the first {count}. <a class="link" href="/ui/work?company_id={company_id}&amp;view=team_work{department}">Open the work queue</a> for the rest.</p>"#,
+                    count = first.items.len(),
+                    department = view
+                        .department
+                        .map_or_else(String::new, |id| format!("&amp;department_id={id}")),
+                )
+            } else {
+                String::new()
+            };
+            super::attention_list(&super::AttentionListView {
+                company_id,
+                view: crate::entities::attention::AttentionView::TeamWork,
+                page: &first,
+                departments: view.departments,
+                department: view.department,
+            }) + &more
+        },
     )
 }
 

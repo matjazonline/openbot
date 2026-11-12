@@ -246,9 +246,12 @@ pub struct AttentionQuery<'a> {
     pub company_id: Uuid,
     pub principal_id: PrincipalId,
     pub visible_channel_ids: &'a [Uuid],
-    /// Whether the viewer is an owner or admin, who also sees company-associated items (no
-    /// channel), as on the decision page.
+    /// Whether the viewer is an owner or admin: their links reach the run pages behind failures,
+    /// reconciliations and refusals.
     pub manager: bool,
+    /// Whether company-associated items (no channel) are listed: an owner's or admin's, as on
+    /// the decision page, unless the list is narrowed to one department's desks.
+    pub company_items: bool,
     pub view: AttentionView,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: usize,

@@ -1,0 +1,141 @@
+# src/adapters/http/pages/agent_settings.rs
+565:         avatar_field = agent_avatar_field("simple", pane.draft),
+566:         system_prompt = escape_html_text(pane.draft.system_prompt),
+567:         fields = agent_fields(&AgentFields {
+568:             scope: AgentFormScope::Company(pane.company.id),
+569:             agent_id: None,
+570:             draft: pane.draft,
+571:             model_connections: pane.model_connections,
+572:             capability_options: pane.capability_options,
+573:         }),
+574:     )
+575: }
+686:                 <input id="agent-model-{id_prefix}" name="model" value="{model}" class="input w-full" placeholder="Inherit company model"></label>
+687:         </div>"##,
+688:             provider = escape_html_attr(draft.provider),
+689:             model = escape_html_attr(draft.model),
+690:         )
+691:     } else {
+692:         company_model_selection(fields.model_connections, draft, &id_prefix)
+693:     };
+694:     format!(
+695:         r##"
+883:         r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
+884:             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
+885:                 <select id="agent-provider-{id_prefix}" name="provider" class="select w-full font-mono text-sm">
+886:                     <option value="">No hosted model</option>{provider_options}
+887:                 </select>
+888:             </label>
+889:             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
+890:                 <select id="agent-model-{id_prefix}" name="model" class="select w-full font-mono text-sm">
+891:                     <option value="">No hosted model</option>{model_options}
+892:                 </select>
+893:                 <div class="label"><span class="text-[11px] opacity-60">Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.</span></div>
+894:             </label>
+895:         </div>"##
+# src/adapters/persistence/company_agent.rs
+71: pub(crate) async fn create_company_agent_on(
+72:     tx: &mut Transaction<'_, Postgres>,
+73:     templates: &ProvisioningDeployment,
+74:     company: CompanyId,
+75:     actor: WorkflowActor,
+76:     creation: CompanyAgentCreation,
+77: ) -> AppResult<CreatedCompanyAgent> {
+78:     let CompanyAgentCreation {
+79:         id,
+80:         mut write,
+81:         placement,
+82:     } = creation;
+83:     resolve_model_on(tx, company, &mut write).await?;
+84:     insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
+85:     let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
+86:     publish_initial_on(
+87:         tx,
+88:         AgentPublicationScope {
+89:             company,
+90:             actor,
+91:             agent: AgentId::new(id),
+139: async fn resolve_model_on(
+140:     tx: &mut Transaction<'_, Postgres>,
+141:     company: CompanyId,
+142:     write: &mut AgentWrite,
+143: ) -> AppResult<()> {
+144:     match (write.provider.as_deref(), write.model.as_deref()) {
+145:         (None, None) => {
+146:             let default: Option<(String, String)> = sqlx::query_as(
+147:                 "SELECT provider, models[1] FROM company_model_connections \
+148:                  WHERE company_id = $1 AND is_default AND api_key IS NOT NULL \
+149:                    AND cardinality(models) > 0",
+150:             )
+151:             .bind(company.as_uuid())
+152:             .fetch_optional(&mut **tx)
+153:             .await?;
+154:             let (provider, model) = default.ok_or_else(no_usable_model)?;
+155:             write.provider = Some(provider);
+156:             write.model = Some(model);
+157:             Ok(())
+158:         }
+159:         (Some(provider), Some(model)) => {
+160:             let ready: Vec<_> = ready_models_on(tx, company)
+161:                 .await?
+162:                 .into_iter()
+163:                 .map(
+164:                     |(provider, model)| crate::entities::company::CompanyModelConnection {
+165:                         provider: provider.into(),
+# src/adapters/http/routes/agent.rs
+184: #[derive(Debug, Clone, Deserialize, Serialize)]
+185: #[serde(deny_unknown_fields)]
+186: pub struct AgentJsonPayload {
+187:     pub name: String,
+188:     pub slug: String,
+189:     pub provider: Option<String>,
+190:     pub model: Option<String>,
+191:     pub system_prompt: Option<String>,
+192:     pub native_permissions: crate::domain::local_agents::LocalPermissions,
+193:     /// Short statement of what this agent is for, shown to sibling agents by the directory tool.
+194:     pub description: Option<String>,
+195:     #[serde(default)]
+196:     pub skill_ids: Option<Vec<Uuid>>,
+197:     pub avatar_url: Option<String>,
+198: }
+199: 
+200: #[derive(Debug, Deserialize)]
+201: #[serde(deny_unknown_fields)]
+202: pub struct CompanyAgentJsonUpdate {
+203:     pub expected_revision: crate::entities::agent_capability::AgentDraftRevision,
+204:     pub agent: AgentJsonPayload,
+205:     pub tool_assignments: Option<Vec<crate::application::agent::AgentToolAssignment>>,
+206: }
+207: 
+208: impl AgentJsonPayload {
+209:     pub(super) fn preserve_capabilities(
+210:         &mut self,
+# docs/agent-authoring.md
+101: 
+102: Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
+103: 
+104: ```json
+105: {
+106:   "expected_revision": 3,
+107:   "agent": {
+108:     "name": "Support",
+109:     "slug": "support",
+110:     "provider": "openai",
+111:     "model": "your-enabled-model",
+112:     "system_prompt": "Answer support questions using the approved tools.",
+113:     "description": "Customer support",
+114:     "skill_ids": []
+115:   },
+116:   "tool_assignments": [
+117:     {
+118:       "binding": null,
+119:       "alias": "knowledge.search",
+120:       "choice": {"kind": "builtin", "tool": "search_knowledge"}
+121:     }
+122:   ]
+123: }
+124: ```
+125: 
+126: Read the saved revision from the response's `agent.draft_revision`. Omitting `tool_assignments`
+127: preserves them; `[]` clears the draft list. Omitting `skill_ids` preserves ordered skill assignments;
+128: `[]` clears them. For an unchanged tool, submit its existing `binding` and exact `choice` returned

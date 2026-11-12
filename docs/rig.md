@@ -12,8 +12,9 @@ In **Agents**, configure a company agent's model, instructions, ordered skills a
 bindings, then save, preview and publish its draft. HTTP/MCP connections, reviewed operations,
 connection grants, workflow registrations and shared skills remain separate settings. Agent
 publication selects an active revision independently of workflow versions; root admission captures
-that revision and its dependencies for retries and children. Library copying creates a company
-draft for explicit validation/publication. See [agent authoring and API](agent-authoring.md).
+that revision and its dependencies for retries and children. Creating a company agent, from
+scratch or as a library copy, publishes its first revision with its default desk; a copy whose
+publication would fail is refused. See [agent authoring and API](agent-authoring.md).
 There is no runtime selector or alternative agent engine.
 
 For `POST /api/companies/{company}/agents`, this is a minimal request. The company must already

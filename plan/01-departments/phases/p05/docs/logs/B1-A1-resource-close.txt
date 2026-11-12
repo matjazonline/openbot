@@ -1,0 +1,34 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/docker-bin/docker ps -a --format {{.Names}}
+exit=0
+Command: psql -h 127.0.0.1 -p 5432 -U mac02 -d postgres -w -X -v ON_ERROR_STOP=1 -Atqc SELECT datname, pg_get_userbyid(datdba), (SELECT count(*) FROM pg_stat_activity WHERE datname=d.datname) FROM pg_database AS d WHERE datname IN ('openbot_dept_p05_gate','openbot_dept_p05_protocol') ORDER BY datname
+openbot_dept_p05_gate|mac02|0
+openbot_dept_p05_protocol|mac02|0
+exit=0
+Command: dropdb -h 127.0.0.1 -p 5432 -U mac02 -w openbot_dept_p05_gate
+exit=0
+Command: dropdb -h 127.0.0.1 -p 5432 -U mac02 -w openbot_dept_p05_protocol
+exit=0
+Command: psql -h 127.0.0.1 -p 5432 -U mac02 -d postgres -w -X -v ON_ERROR_STOP=1 -Atqc SELECT datname, pg_get_userbyid(datdba), (SELECT count(*) FROM pg_stat_activity WHERE datname=d.datname) FROM pg_database AS d WHERE datname IN ('openbot_dept_p05_gate','openbot_dept_p05_protocol') ORDER BY datname
+exit=0
+Command: colima stop --profile openbot-p05-r3
+Stopping 'docker.service', but its triggering units are still active:
+docker.socket
+colima-openbot-p05-r3
+time="2026-11-11T21:03:42+01:00" level=info msg="Sending SIGINT to hostagent process 56285"
+time="2026-11-11T21:03:42+01:00" level=info msg="Waiting for the host agent and the driver processes to shut down"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Received SIGINT, shutting down the host agent"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Shutting down the host agent"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/docker.sock` (guest) to `/Users/mac02/.colima/openbot-p05-r3/docker.sock` (host)"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Stopping forwarding `/var/run/containerd/containerd.sock` (guest) to `/Users/mac02/.colima/openbot-p05-r3/containerd.sock` (host)"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Unmounting disk `colima-openbot-p05-r3`"
+time="2026-11-11T21:03:42+01:00" level=info msg="[hostagent] Shutting down VZ"
+time="2026-11-11T21:03:45+01:00" level=info msg="[hostagent] [VZ] - vm state change: stopped"
+time="2026-11-11T21:03:45+01:00" level=info msg="Waiting for the instance to shut down"
+time="2026-11-11T21:03:46+01:00" level=info msg="The instance colima-openbot-p05-r3 has shut down"
+time="2026-11-11T21:03:42+01:00" level=info msg="stopping colima [profile=openbot-p05-r3]"
+time="2026-11-11T21:03:42+01:00" level=info msg="stopping ..." context=docker
+time="2026-11-11T21:03:42+01:00" level=info msg="stopping ..." context=vm
+time="2026-11-11T21:03:46+01:00" level=info msg=done
+exit=0
+PASS: no owned active check/worker/runtime; private native PG stopped; owned Docker profile stopped.
+Retained immutable image/helper/source/browser/model/build caches for reproducibility. Other profiles/global context and shared developer databases unchanged.

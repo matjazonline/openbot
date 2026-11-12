@@ -1,0 +1,9 @@
+{
+  "status": "PASS",
+  "exit_code": 0,
+  "elapsed_seconds": 519.6,
+  "helper_sha256": "1d94d46c28196318f202a1d0466d3aa917edc82e240068b4afb8ff950d31bda6",
+  "managed_fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+  "acceptance_limits_unchanged": true,
+  "own_cpu_heavy_checks_finished": true
+}

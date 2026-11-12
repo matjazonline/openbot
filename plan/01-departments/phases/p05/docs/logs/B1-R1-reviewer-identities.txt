@@ -1,0 +1,11 @@
+01DEP-P01-B1-R2 identity matches
+01DEP-P02-B2-R1 identity matches
+01DEP-P02-B1-R2 identity matches
+01DEP-P03-B1-R2 identity matches
+01DEP-P03-B2-R2 identity matches
+01DEP-P03-B3-R2 identity matches
+01DEP-P04-B1-R2 identity matches
+01DEP-P04-B2-R2 identity matches
+01DEP-P04-B3-R2 identity matches
+CSS B1 original preserved; exactly one pointer change; original content hash restored
+CSS B2 original preserved; exactly one pointer change; original content hash restored

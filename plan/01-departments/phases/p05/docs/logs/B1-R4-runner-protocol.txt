@@ -1,0 +1,19 @@
+...............E...Managed package ready: 986364fb114c92e3cd460a8c49b797c418e7462b26618fec6a71110bd112a668
+...Managed source ready: dc30bfac4b5fa16bdb51309dca41af38d2543aba23ee6cd8098b3721ef70216f
+........................
+======================================================================
+ERROR: test_recovery_stops_only_the_recorded_positive_process_group (__main__.DeploymentOwnershipTests)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/mac02/.codex/worktrees/2050/openbot/scripts/tests/doop-test.py", line 240, in test_recovery_stops_only_the_recorded_positive_process_group
+    PRIVATE.stop_retained_process(runtime, "browser", owner, grace=0.5)
+  File "/Users/mac02/.codex/worktrees/2050/openbot/scripts/doop-test/private_deployment.py", line 147, in stop_retained_process
+    if identity():
+  File "/Users/mac02/.codex/worktrees/2050/openbot/scripts/doop-test/private_deployment.py", line 139, in identity
+    raise RuntimeError("Retained PID belongs to another invocation; no process was stopped")
+RuntimeError: Retained PID belongs to another invocation; no process was stopped
+
+----------------------------------------------------------------------
+Ran 46 tests in 6.001s
+
+FAILED (errors=1)

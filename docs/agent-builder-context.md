@@ -1,33 +1,38 @@
-# Agent Builder context: agents, channels, and workflows
+# Agent Builder context: agents, desks, and workflows
 
-Use this reference to design company agents and workflow steps. Check the company's current agents, models, skills, tools, channels, and published workflows before naming dependencies. A design or YAML draft is not deployed until the corresponding application commands succeed.
+Use this reference to design company agents and workflow steps. Check the company's current agents, models, skills, tools, desks, and published workflows before naming dependencies. A design or YAML draft is not deployed until the corresponding application commands succeed.
 
 ## How the pieces fit
 
 | Piece | Owns | How it runs |
 | --- | --- | --- |
 | **Agent** | Name, slug, description, system prompt, enabled provider/model, agent-owned tool bindings, ordered skills and independent revisions. | A workflow model step selects it. `agent.run` gets its saved tools and skills; `ai.classify` and `decision.agent` use its instructions and model without them. |
-| **Channel** | Company address, aliases, access (`team`, allowlist, or public), and independent threads. It needs no agent. | Active workflow bindings decide what accepted messages start. A channel may have multiple bindings. |
+| **Desk** | Company address, aliases, access (`team`, allowlist, or public), and independent threads. It needs no agent. | Active workflow bindings decide what accepted messages start. A desk may have multiple bindings. |
 | **Workflow** | A typed, routed sequence of steps with input, parameter, and output schemas. | Publish an immutable version, configure a binding to that version, then activate it. The binding supplies parameters, resource references, run-as member, and an optional message trigger. Schedules and manual starts can also admit runs. |
 
 No active binding means messages are stored without starting that workflow. A draft, a published version, and an active binding are separate states. Save, preview and publish agent edits from **Agents** to affect new root admissions without republishing a workflow. Existing runs, retries and children retain their selected revisions. See [agent authoring](agent-authoring.md).
 
 ## What Agent Builder can create today
 
-The built-in `agent-builder` has `list_company_agents` and `create_agent_channel`. It can list existing agents and enabled models, then create **one agent plus one team-only channel** bound to the shipped autonomous or reviewed reply workflow. Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation requires an owner or admin writing in the app, after explicit confirmation of the full specification. A library copy of Agent Builder itself creates only an agent; give that copy a channel/binding to converse with it.
+The built-in `agent-builder` has `list_company_agents` and `create_agent_channel`. Both answer only an owner or admin writing in the app; any other requester gets a refusal.
 
-Agent Builder has no workflow-draft, publication, or arbitrary channel-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
+- `list_company_agents` lists the company's agents and enabled models. Each agent names the departments it belongs to, with the roles it holds there (`departments: [{slug, name, roles}]`), and its own desk (`desk: {id, address}`, `null` once that desk was deleted). Pass `department` (a slug) to list only that department's members and role holders; an unknown slug is refused. Entries carry no intake schema yet; that arrives with `channel.call`. See [departments](departments.md).
+- `create_agent_channel` creates **one agent with its own desk**: a team desk at the agent's slug, answered through the shipped autonomous reply workflow. Name another address in `channel_slug` for a reviewed desk or one with custom steps; that desk is created beside the default one, never instead of it. `department` (a slug) places the agent there as a member, and `role: "lead"` makes it that department's lead; without `department`, the agent joins the requester's department when the requester belongs to exactly one.
 
-## Design an agent and its channel
+Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
+
+Agent Builder has no workflow-draft, publication, or arbitrary desk-creation tool. It can propose workflow steps or YAML for the **Workflows** editor. Use that editor to save, validate, publish, bind, and activate a custom workflow. Report those actions as completed only after they succeed.
+
+## Design an agent and its desk
 
 1. Look for an existing agent that already owns the job. Define the outcome, users, example requests, responsibilities, non-goals, escalation conditions, needed facts, output format, and tone.
 2. Choose a distinct name and lowercase hyphenated slug, a short description, a complete operational system prompt, and an explicit enabled provider/model. Request only needed workflow tools. Attach only existing skills identified by exact company skill slug.
-3. Decide who may use the channel, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports a team-only channel, the two reply modes and the custom steps below; other channel access or workflow designs need separate authoring.
-4. Show the final agent, channel, reply-mode and custom-step specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
+3. Decide who may use the desk, what messages should trigger work, and whether sending needs review. The Builder's creation tool supports the agent's own autonomous desk, a second team desk at another address for the reviewed mode or the custom steps below, and a department and role; other desk access or workflow designs need separate authoring.
+4. Show the final agent, desk, reply-mode and custom-step specification before asking for creation confirmation. Never imply a design is live merely because it was drafted.
 
 ## The agent base and custom steps
 
-Every agent channel's workflow is composed from one base of three steps: `context` (`context.history`, the thread so far, up to 8000 tokens), `draft` (`agent.run`, the agent, which reads `untrusted_message`, `untrusted_subject` and `untrusted_history`) and `reply` (`message.reply`). A reviewed channel is the base with a `review` gate (`decision.human`) before the reply. The base is [the autonomous template](../src/application/workflow/fixtures/autonomous-response.yaml); [the composer](../src/application/workflow/templates/agent_workflow.rs) adds a workflow's own steps in three slots and never edits the base steps:
+Every agent desk's workflow is composed from one base of three steps: `context` (`context.history`, the thread so far, up to 8000 tokens), `draft` (`agent.run`, the agent, which reads `untrusted_message`, `untrusted_subject` and `untrusted_history`) and `reply` (`message.reply`). A reviewed desk is the base with a `review` gate (`decision.human`) before the reply. The base is [the autonomous template](../src/application/workflow/fixtures/autonomous-response.yaml); [the composer](../src/application/workflow/templates/agent_workflow.rs) adds a workflow's own steps in three slots and never edits the base steps:
 
 | Slot | Runs | Typical steps |
 | --- | --- | --- |
@@ -102,8 +107,8 @@ steps:
 limits: {max_steps: 10, max_context_bytes: 65536}
 ```
 
-For a reviewed reply, place `decision.human` between `draft` and `reply`, supply explicit company-user reviewers and a deadline such as `{ref: /run/deadline}`, then route approval to `reply` and rejection to `$end`. `message.reply` needs the source message and replies only to its sender from the source channel; `message.send` names explicit destinations. A model step's `output_schema` is its answer contract. Tools and skills belong to the agent selected by `agent.run`; the step cannot add or narrow them. Agent publication freezes their definitions; root admission selects active revisions for the complete run tree. Current revocation still applies.
+For a reviewed reply, place `decision.human` between `draft` and `reply`, supply explicit company-user reviewers and a deadline such as `{ref: /run/deadline}`, then route approval to `reply` and rejection to `$end`. `message.reply` needs the source message and replies only to its sender from the source desk; `message.send` names explicit destinations. A model step's `output_schema` is its answer contract. Tools and skills belong to the agent selected by `agent.run`; the step cannot add or narrow them. Agent publication freezes their definitions; root admission selects active revisions for the complete run tree. Current revocation still applies.
 
-In **Workflows**, start from a shipped template or blank draft, save and validate the exact source, resolve named agents/tools/resources, publish a version, configure its channel binding and trigger, then activate it. A binding with no message trigger can still serve a schedule or manual start. Message triggers are `direct` (To or mention), `any` (To/Cc or mention), `mentioned`, and `mentioned_or_reply`. A quiet message is filed without admitting a new run.
+In **Workflows**, start from a shipped template or blank draft, save and validate the exact source, resolve named agents/tools/resources, publish a version, configure its desk binding and trigger, then activate it. A binding with no message trigger can still serve a schedule or manual start. Message triggers are `direct` (To or mention), `any` (To/Cc or mention), `mentioned`, and `mentioned_or_reply`. A quiet message is filed without admitting a new run.
 
-Source of truth: [agent provisioning](../src/application/workflow/provisioning.rs), [step registry](../src/application/workflow/registry/mod.rs), [workflow language](workflow-language-v1.md), [autonomous template](../src/application/workflow/fixtures/autonomous-response.yaml), and [channel triggers](../src/domain/workflow/trigger.rs).
+Source of truth: [agent provisioning](../src/application/workflow/provisioning.rs), [step registry](../src/application/workflow/registry/mod.rs), [workflow language](workflow-language-v1.md), [autonomous template](../src/application/workflow/fixtures/autonomous-response.yaml), and [desk triggers](../src/domain/workflow/trigger.rs).

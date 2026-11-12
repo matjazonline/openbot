@@ -191,7 +191,7 @@ pub(super) async fn simulate_channel_handler(
     };
     if !simulation_recipient_matches(&form.to, &company, &channel, &config.app_domain_name) {
         return Ok(Html(pages::error_alert(
-            "Simulation recipient must match the selected company and channel.",
+            "Simulation recipient must match the selected company and desk.",
         ))
         .into_response());
     }
@@ -327,9 +327,7 @@ impl SimulationCommand<'_> {
         let Some(thread) = ingest.thread.as_ref() else {
             return self.failure(
                 sender,
-                ingest
-                    .reason()
-                    .unwrap_or("The channel rejected this message."),
+                ingest.reason().unwrap_or("The desk rejected this message."),
             );
         };
         match load_simulation_thread_fragment(

@@ -238,11 +238,11 @@ fn facts(view: &RunPaneView<'_>) -> String {
     let association = match summary.association {
         RelatedAssociation::Company => "Company-wide".to_owned(),
         RelatedAssociation::Channel(_) => format!(
-            "Channel {}",
+            "Desk {}",
             run.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
         RelatedAssociation::Thread { .. } => format!(
-            "A thread of channel {}",
+            "A thread of desk {}",
             run.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
     };

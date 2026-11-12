@@ -1,0 +1,56 @@
+# 01DEP-P02-B2-R1 reviewer scan: non-markup string literals under src/adapters/http/pages saying channel (outside test files)
+```
+src/adapters/http/pages/workflow_decision.rs:109: '/ui/message?company_id={company}&channel_id={channel}&thread_id={thread}&message_id={message}'
+src/adapters/http/pages/workflow_decision.rs:114: '/ui?company_id={company}&channel_id={channel}&thread_id={thread}'
+src/adapters/http/pages/channel_settings.rs:15: '        // The spam interlock only applies to a channel anyone can write to, so the confirmation\n        // stays inert until the participan'
+src/adapters/http/pages/channel_settings.rs:312: '/ui/workflows/channels/{channel_id}/bindings?company_id={company_id}'
+src/adapters/http/pages/run_counts.rs:19: 'channel:{id}'
+src/adapters/http/pages/run_counts.rs:116: 'channel:{id}'
+src/adapters/http/pages/mailbox.rs:829: 'var CHIP_SELECTED_MARK = {selected:?};\\nvar CHIP_ADD_MARK = {add:?};\\nvar AGENT_REPLIED_MARK = {replied:?};\\n{app}\\n{legacy}\\n{mailbox}\\n{lo'
+src/adapters/http/pages/mailbox.rs:854: '\nfunction closeLiveStreamsForNavigation(event, link) {\n    if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKe'
+src/adapters/http/pages/mailbox.rs:1586: '/ui/channels'
+src/adapters/http/pages/dashboard.rs:356: '{} / {channel}'
+src/adapters/http/pages/workflow_authoring/graph.rs:219: 'channel.no_reply'
+src/adapters/http/pages/workflow_authoring/catalogue.rs:54: 'channel.no_reply'
+src/adapters/http/pages/workflow_authoring/bindings.rs:369: 'channel:{}'
+src/adapters/http/pages/simulation/outcomes.rs:315: "Unauthorized Sender: Email 'from' address is not listed in channel participant_emails."
+src/adapters/http/pages/local_agents/mod.rs:54: '&channel={}&conversation={}'
+```
+# scanner
+```python
+import os,re,sys
+root=sys.argv[1]
+word=re.compile(r'(?i)\bchannels?\b')
+def literals(src):
+    i=0;n=len(src);out=[]
+    while i<n:
+        c=src[i]
+        if src.startswith('//',i):
+            j=src.find('\n',i); i=n if j<0 else j; continue
+        if src.startswith('/*',i):
+            j=src.find('*/',i); i=n if j<0 else j+2; continue
+        m=re.match(r'b?r(#*)"',src[i:])
+        if m and (i==0 or not (src[i-1].isalnum() or src[i-1]=='_')):
+            hashes=m.group(1); start=i+m.end(); end=src.find('"'+hashes,start)
+            out.append((src.count('\n',0,i)+1,src[start:end])); i=end+1+len(hashes); continue
+        if c=="'" :
+            # char literal or lifetime
+            m2=re.match(r"'(\\.|[^\\'])'",src[i:])
+            i+= m2.end() if m2 else 1; continue
+        if c=='"':
+            j=i+1;buf=[]
+            while j<n and src[j]!='"':
+                if src[j]=='\\': buf.append(src[j:j+2]); j+=2; continue
+                buf.append(src[j]); j+=1
+            out.append((src.count('\n',0,i)+1,''.join(buf))); i=j+1; continue
+        i+=1
+    return out
+for dp,_,fs in os.walk(root):
+    for f in fs:
+        if not f.endswith('.rs') or f=='tests.rs' or f.endswith('_tests.rs'): continue
+        p=os.path.join(dp,f); s=open(p,encoding='utf-8').read()
+        for line,lit in literals(s):
+            if '<' in lit or '>' in lit: continue  # markup literals are covered by the author's scan
+            if word.search(lit):
+                print(f"{p}:{line}: {lit[:140]!r}")
+```

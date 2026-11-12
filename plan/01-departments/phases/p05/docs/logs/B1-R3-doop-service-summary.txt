@@ -1,0 +1,9 @@
+/var/run/postgresql:5432 - accepting connections
+install: PASS
+format:check: PASS
+typecheck: PASS
+lint: PASS
+doc-lint: PASS
+test: FAIL
+build: PASS
+Managed source fingerprint unchanged: e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464

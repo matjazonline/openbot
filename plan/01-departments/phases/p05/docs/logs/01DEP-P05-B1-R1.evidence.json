@@ -1,0 +1,1055 @@
+{
+  "version": 1,
+  "round": "01DEP-P05-B1-R1",
+  "artifact": "b26116788fe4639df6d7a2a3dd8789a12a34736ca8450bcfb9e977f14bbaab50",
+  "checks": [
+    {
+      "criteria": [
+        "05A.2",
+        "css"
+      ],
+      "command": "generated_css_is_current (scripts/check.sh)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-navigation"
+      ],
+      "command": "node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-deployment"
+      ],
+      "command": "scripts/tests/deploy.sh && scripts/tests/credential-key-rotation.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-format"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-whitespace"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-transport"
+      ],
+      "command": "scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/tests/workflow-evidence.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --available-manifests",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Ran before G2 repair; later aggregate validation supersedes it, without deleting this failure."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "cargo fetch --locked",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-offline"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-clippy"
+      ],
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.1",
+        "05A.4-migrations"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-sqlx"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-offline"
+      ],
+      "command": "cargo test --locked --offline --all-targets --no-run",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-reachability"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "create_check_database (scripts/check.sh)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-database",
+        "05A.4-network"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Retain complete result; unrelated failures and any stack observation are documented separately in TASK."
+    },
+    {
+      "criteria": [
+        "05A.4-stack",
+        "05A.5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Retain complete result; unrelated failures and any stack observation are documented separately in TASK."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --available-manifests (after both authorized repairs)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/G2-validation.txt",
+          "sha256": "212bc1e6632fbd74d98e78955ef82e91c30aa1223484685aee86834328e27694"
+        },
+        {
+          "path": "logs/G1-repair.txt",
+          "sha256": "b8acaa366432dd3607f957c8efc3bcaf56c43cefb075235433ab7902c1fa1af1"
+        },
+        {
+          "path": "logs/G2-repair.txt",
+          "sha256": "b2718237737cb0f5e277e377371eb05d59a708ac25d8df5b091616ce0889f047"
+        },
+        {
+          "path": "logs/G1-original-p04-R1-manifest.json",
+          "sha256": "587bb4f09db182bb4e0cf5943127edd8a3bffec837dc7eca106f02d36b328702"
+        },
+        {
+          "path": "logs/G2-original-p04-R1-manifest.json",
+          "sha256": "85362382080b2a1298c4255dd1eadd00153833a84d7ac89af71d90e6690ffffe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets (fresh disposable DB, checkpoint execution)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "ea5dbf4bf14053ec00d686c7d05c1fda2454134f5553138f198423833d2cc8fb"
+        },
+        {
+          "path": "logs/B1-sqlx-cache-diff.txt",
+          "sha256": "ea77f986ebc4727b92d17006acb974592f0b1d89755f3beb266f8526b387f85f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-binary"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --bin open_bots -- --test-threads=4",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-main-target.txt",
+          "sha256": "6bde3ca5cabc07d39858bd4b4f2702e97d28b2caa58117dd86b76a33ad78640f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-inventory"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-full-test-inventory.txt",
+          "sha256": "0ec29da5a4eb9fd7e5cbf9fb22aef9a7acb1b24f348b2a3acca1415676570caf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-unrelated-failures"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup -- --nocapture --test-threads=1",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-mcp-cancellation-rerun-1.txt",
+          "sha256": "d443473a7768cb6b93c9e72e1de0f1b483c50ca2885c37ddc3916d42d7dc8a26"
+        },
+        {
+          "path": "logs/B1-unrelated-failures-source-identity.txt",
+          "sha256": "08e502ab9e0976d3a42c177a6b681cfe2105e28ae9c5484dd7e589e442b649c7"
+        }
+      ],
+      "note": "Confirmed unchanged MCP adapter/scenario/dependencies; shared stub diff is unrelated. No assertion skipped or weakened."
+    },
+    {
+      "criteria": [
+        "C001-r1"
+      ],
+      "command": "full library suite: department_desk_relay_into_a_members_only_desk_stays_trusted",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        },
+        {
+          "path": "logs/B1-doc-contract-inspection.txt",
+          "sha256": "f8ae3049de5714f21370397f00d0f2885877fee12ee1a2a46cec06cbc005878b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "C004-r1"
+      ],
+      "command": "inspect shipped docs, fixture, planner/writer/routing diffs against accepted p03",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doc-contract-inspection.txt",
+          "sha256": "f8ae3049de5714f21370397f00d0f2885877fee12ee1a2a46cec06cbc005878b"
+        }
+      ],
+      "note": "Inspection claim only; automated dispatch, escalation and round-trip/loop checks remain deferred by C004."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-workflow-sample-boundary-fixtures"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-workflow-sample-boundary-fixtures.txt",
+          "sha256": "f2fd5c7c9e5e7177fa4ea0d12363a279e81de825dbf78b3931b659e58951111c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-workflow-sample-boundary"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-workflow-sample-boundary.txt",
+          "sha256": "5019aa7f424c41f0d298a970642a5589dd68003f85d8fbac01e2f1be12d77185"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-boundary-fixtures"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-boundary-fixtures.txt",
+          "sha256": "ae8769c197f33a504446036ea0d7e48485d1f20be8840e4c99cdd4749a7be449"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-boundary"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-boundary.txt",
+          "sha256": "889089ee6c26c3fe831da899aa9213816af44b3c1a687328362675aac0bca7b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-docs"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-docs.txt",
+          "sha256": "2fe1d26be6d59d812c0956734b4bf7a223a31b3b8ed276dce4404a794e99fcfa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration_portability_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib integration_portability_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration_portability_inventory.txt",
+          "sha256": "62567b040e09d37d7158d6208100118698ada586127bbb94a124fa520cdafb86"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration_service_contract_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib integration_service_contract_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration_service_contract_inventory.txt",
+          "sha256": "6a023edbd966a2aec05deb166924f19178edf7656de670b1dd37e6e621b07575"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault_google_e2e_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib vault_google_e2e_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault_google_e2e_inventory.txt",
+          "sha256": "29432b46cff16ac90798faf459d85519b380e75c64258006576f9780e0f93b9e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-rust-1.txt",
+          "sha256": "d3d9ebe624d3c62527c9790c892aad144b2e76893417ddd84145717dd1e7e3a1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-rust-2"
+      ],
+      "command": "cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-rust-2.txt",
+          "sha256": "f95af62f6bd9a61299d57e6ff846d2c422fad0625855d16ab28aeacd9f6074c9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-browser"
+      ],
+      "command": "node --test scripts/tests/vault-authoring-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-browser.txt",
+          "sha256": "248da7b39dd6a083e81d60092a0df18b3671772366a7bdfa7c669fae7a6b5fff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-html-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-html-rust-1.txt",
+          "sha256": "0f46c7925c42ab7cc9a3cd5528d1eb6f8aaecc75fd6e5bc2f0482198f77a12b4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-html-browser"
+      ],
+      "command": "node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-html-browser.txt",
+          "sha256": "a477b1691820fd6d3b005942bedd8bcca3f3e6db16fa3ec6420a7b332e2a284f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-rust-1.txt",
+          "sha256": "7fd0052ccfb7031c84771897d0a532fdab43de306bc935dc22d75dad49d97f90"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-browser"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-browser.txt",
+          "sha256": "e3ebdb77fd2ae582d967ea633f374504dee990010518fdae54187ee5dd7bb94e"
+        }
+      ],
+      "note": "Pinned Playwright shell absent on initial attempt; successful reruns retained separately."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_memory_settings_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-rust-1.txt",
+          "sha256": "a519aa8c583f47ba5e13176f4a5bf2e5ab606edccc04fde5b54ea7d99c2c5cfe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-browser"
+      ],
+      "command": "node --test scripts/tests/memory-settings-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-browser.txt",
+          "sha256": "5dd1deb344bf043fe845eb0c5a449879464245991da44471dd5487af07862b77"
+        }
+      ],
+      "note": "Pinned Playwright shell absent on initial attempt; successful reruns retained separately."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-rust-1.txt",
+          "sha256": "802b7c56c8bd137a98fdc7147470cbdd7d80994742d04e8642ada3f5826b26a8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-browser"
+      ],
+      "command": "node --test scripts/tests/agent-authoring-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-browser.txt",
+          "sha256": "dede18bf7cba472db8220578d78bcbfb14f258eb7744cbfd961d5e457ae0a6ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-local-agents-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-local-agents-rust-1.txt",
+          "sha256": "45d8f1fb6d22ac093fb6879cf8b917a40dd1fa7a1f007e113ba8c67a54687110"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-local-agents-browser"
+      ],
+      "command": "node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-local-agents-browser.txt",
+          "sha256": "a96412885501e0ce5f076523de4802e8bda18e55a44270d7f47ee2feb9b13251"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-picker-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-picker-rust-1.txt",
+          "sha256": "861726609ec4a5448df5a88901d24f9a7a4686c5831511aa916652e008223b96"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-picker-browser"
+      ],
+      "command": "node --test scripts/tests/workflow-agent-picker-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-picker-browser.txt",
+          "sha256": "7c2862e1877fe397a2a0716f389ed3eef015fe854f4d86ae06fa8f3f05de604f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-session-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-session-rust-1.txt",
+          "sha256": "c62de5ea1a323d535ed3d1ec6e2fdcf2081ec4553e137447a702423820bb56cc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-session-browser"
+      ],
+      "command": "node --test scripts/tests/session-revocation-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-session-browser.txt",
+          "sha256": "270ef80ad270931e2f6f4f0d372920e602c8c917ba67a084dc951dc8304d6424"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-rust-1.txt",
+          "sha256": "3476701d6de86cec54a1364fa2e8845ba7a64a06436650c2aaa0860945754f52"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-rust-2"
+      ],
+      "command": "cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-rust-2.txt",
+          "sha256": "f28046067ddf13a453fa58b253cf02df90e44d0cfe8e66617f823e369c0a6c04"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-browser"
+      ],
+      "command": "node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-browser.txt",
+          "sha256": "26622a461707fec5785baf02f91d3f87dbe1c50a8255bc97976e0add546cc761"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-browser"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-browser-rerun-1.txt",
+          "sha256": "e814268131a650bc54439a1f353316eda5eb5adac1ba3659f01c58ea35ad54e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-browser"
+      ],
+      "command": "node --test scripts/tests/memory-settings-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-browser-rerun-1.txt",
+          "sha256": "13d87820ce691f7db1ffe051184babe56a2eb20dc4ddabe6055c58d6aa0c74c4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-cloudroom"
+      ],
+      "command": "npm ci; npm run typecheck; npm run build; npm test; npm run test:guards (integrations/cloudroom-plugin)",
+      "fixture": "checkpoint toolchain Node 26.5.0/npm 11.17.0; unchanged plugin sources; exact package runtime checked separately",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-cloudroom-npm-ci.txt",
+          "sha256": "3988ebdf8616ef790cfab0752416f40172066ae9c4347e5eb436d91799aac8f0"
+        },
+        {
+          "path": "logs/B1-cloudroom-plugin.txt",
+          "sha256": "50e959fcf775a7ebeb7274b24e10720549ee91788a5fb959e175d5bd3b7e432d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-cloudroom-package"
+      ],
+      "command": "Node 24.21.0/npm 11.19.0: npm --prefix integrations/cloudroom-plugin run package; direct pinned npm ci --omit=dev in extracted tgz",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-cloudroom-package-resume-2.txt",
+          "sha256": "d3485d0ece541af9640e46c31b4dfa3bc9b859d99db42e88c2b2a2336d28e749"
+        },
+        {
+          "path": "logs/B1-cloudroom-runtime-install-2.txt",
+          "sha256": "469e9b5b72953228d7637b0872767ba5cc869638c70ededb2f774e4981f692b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-node-extra"
+      ],
+      "command": "node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-node-extra.txt",
+          "sha256": "7872307add919fb548381061320fc732f2934a9cde1439fe3d343789edf23eb8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-run-counts"
+      ],
+      "command": "npm run test:run-counts",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-run-counts.txt",
+          "sha256": "cf2ac63f6efc677d8d695d5fdc3243c9a20a7cebce5e6fc7ab6a66c9aee4cdab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-doop-unit"
+      ],
+      "command": "python3 scripts/tests/knowledge-model-prepare.py; python3 scripts/tests/doop-test.py; node --test scripts/tests/doop-probe.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-py-node-gates.txt",
+          "sha256": "fe57365c601d9558ca70f3c038b939a8297d03573c2668e83875b3cf284899a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-lease",
+        "05A.5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/lease-budget.sh --offline",
+      "fixture": "openbot_dept_p05_protocol; no competing phase checks; default 50 percent WORK budget; one test thread",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-lease-budget.txt",
+          "sha256": "620a5be66c0d92552f08c7db2044cc33be98e9485154eb8c0a28332122a896f6"
+        },
+        {
+          "path": "logs/B1-lease-events.txt",
+          "sha256": "71653d4b5b0a828aa7ac2b6023ed2bb57217875afce458e469bf057835192cb6"
+        },
+        {
+          "path": "logs/B1-budget-environment.txt",
+          "sha256": "260d895d047696c8f45fab1face0a0d48380be9281a656614b6a4f87e93d52e8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.6-graph"
+      ],
+      "command": "graft build",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-graft-build.txt",
+          "sha256": "0f7c1dfee9fa99f5616ce185195742dea11e565d9d8b6ce9af36f4cf272f7304"
+        },
+        {
+          "path": "logs/B1-graft-build-final.txt",
+          "sha256": "d6412cf6bd949bf9702764bf451d1996394c4a7d3a04f8d6da3d7d89a47ce8f3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-image"
+      ],
+      "command": "docker build --tag openbot-knowledge-ci .; python3 scripts/check-knowledge-image.py --image openbot-knowledge-ci",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-unavailable-prerequisites-final.txt",
+          "sha256": "5e3ba86101a81684fd5c0279b1bdc53feb5377a60e81550139ebbbcb5469d8a3"
+        }
+      ],
+      "reason": "Docker daemon unavailable; no production image built or tested."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration"
+      ],
+      "command": "complete .github/workflows/ci.yml doop-integration job",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-unavailable-prerequisites-final.txt",
+          "sha256": "5e3ba86101a81684fd5c0279b1bdc53feb5377a60e81550139ebbbcb5469d8a3"
+        }
+      ],
+      "reason": "Docker daemon unavailable; real private deployment/probe acceptance not exercised."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-integration"
+      ],
+      "command": "scripts/memory-integration.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-unavailable-prerequisites-final.txt",
+          "sha256": "5e3ba86101a81684fd5c0279b1bdc53feb5377a60e81550139ebbbcb5469d8a3"
+        }
+      ],
+      "reason": "Local pgvector and pinned model absent; Docker daemon unavailable; real memory service acceptance not exercised."
+    }
+  ]
+}

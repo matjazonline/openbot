@@ -19,6 +19,7 @@ pub(super) struct UseCases {
     pub(super) invites: Arc<CompanyInviteUseCases>,
     pub(super) resend: Arc<CompanyResendApiUseCases>,
     pub(super) channel: Arc<ChannelUseCases>,
+    pub(super) department: Arc<crate::use_cases::department::DepartmentUseCases>,
     pub(super) agent: Arc<AgentUseCases>,
     pub(super) skill: Arc<SkillUseCases>,
     pub(super) onboarding: Arc<crate::use_cases::onboarding::OnboardingUseCases>,
@@ -27,13 +28,15 @@ pub(super) struct UseCases {
 }
 fn agents(
     p: &Arc<crate::adapters::persistence::PostgresPersistence>,
+    workflow: &crate::infra::workflow::WorkflowServices,
 ) -> anyhow::Result<Arc<AgentUseCases>> {
     let classifier: Arc<dyn TextClassifier> =
         Arc::new(crate::adapters::harness::rig::RigTextClassifier::new(
             crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
         ));
     Ok(Arc::new(
-        AgentUseCases::new(p.clone(), p.clone(), p.clone(), p.clone())
+        AgentUseCases::new(p.clone(), p.clone(), p.clone())
+            .with_company_agents(workflow.company_agents())
             .with_prompt_classifier(classifier),
     ))
 }
@@ -56,7 +59,7 @@ pub(super) fn build(
             allow_unverified_without_smtp: allow_unverified_email_without_smtp_from_env(),
         },
     ));
-    let agent = agents(p)?;
+    let agent = agents(p, workflow)?;
     Ok(UseCases {
         user,
         company: Arc::new(CompanyUseCases::new(p.clone())),
@@ -67,6 +70,10 @@ pub(super) fn build(
             p.clone(),
             p.clone(),
             f.config.spam_scanning(),
+        )),
+        department: Arc::new(crate::use_cases::department::DepartmentUseCases::new(
+            p.clone(),
+            workflow.departments(),
         )),
         onboarding: Arc::new(crate::use_cases::onboarding::OnboardingUseCases::new(
             p.clone(),

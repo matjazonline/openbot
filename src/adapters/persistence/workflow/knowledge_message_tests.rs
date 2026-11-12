@@ -328,6 +328,7 @@ async fn assert_failed_attention(setup: &Setup) {
             principal_id: PrincipalId::new(principal),
             visible_channel_ids: &[setup.channel],
             manager: true,
+            company_items: true,
             view: AttentionView::MyWork,
             cursor: None,
             limit: 100,

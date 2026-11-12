@@ -328,7 +328,9 @@ impl WorkflowEngine {
             &setup.config.public_base_url(),
             &setup.config.app_domain_name,
         );
-        let persistence = persistence.with_channel_reply_notices(notices.clone());
+        let persistence = persistence
+            .with_channel_reply_notices(notices.clone())
+            .with_app_domain(&setup.config.app_domain_name);
         let catalogue = TemplateCatalogue::shipped(&WorkflowSourceDecoder)
             .map_err(|error| anyhow::anyhow!("shipped workflow templates: {error:?}"))?;
         let templates = ProvisioningDeployment::new(

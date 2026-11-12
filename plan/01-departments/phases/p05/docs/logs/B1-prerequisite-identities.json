@@ -1,0 +1,65 @@
+[
+  {
+    "phase": "p01",
+    "round": "01DEP-P01-B1-R2",
+    "artifact": "ccc4ee26be865cf9806a1e192f05bdddb8753eb4993704e2b8f98fcc78f03880",
+    "source": "plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2.evidence.json",
+    "manifest_sha256": "df6b20b2996287f93af055914dafe4e716293eceb15d3d890604373417a0e809"
+  },
+  {
+    "phase": "p02",
+    "round": "01DEP-P02-B2-R1",
+    "artifact": "6cd8b092ebeda61840e7d22172124e546cb80372e1b99ca96c24528115dee5bf",
+    "source": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1.evidence.json",
+    "manifest_sha256": "b0a30e71459292730741d61cfb906d07c359569ab9ab59806df3adfb16cb73af"
+  },
+  {
+    "phase": "p02",
+    "round": "01DEP-P02-B1-R2",
+    "artifact": "cbca0a00bf06f97d453c5191aac2f98984cf9062aae79101246ba6bd8aa5438f",
+    "source": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2.evidence.json",
+    "manifest_sha256": "1d43a4e5423e89f16fcab88215424806b9a515591d63aec8d5d501956fcdb34a"
+  },
+  {
+    "phase": "p03",
+    "round": "01DEP-P03-B1-R2",
+    "artifact": "a75c40e7b888d42b415fe7408a319812242e96157e642c594a91ab87c7d55798",
+    "source": "plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R2.evidence.json",
+    "manifest_sha256": "63c869b5989555f191138d1265a09ed78e7ba992f94be798d268e85083f2f491"
+  },
+  {
+    "phase": "p03",
+    "round": "01DEP-P03-B2-R2",
+    "artifact": "31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea",
+    "source": "plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R2.evidence.json",
+    "manifest_sha256": "079ad553d5005a141fd293896d993b58f8623d5c4103cff772ff18a09ea2847f"
+  },
+  {
+    "phase": "p03",
+    "round": "01DEP-P03-B3-R2",
+    "artifact": "0db985062e8c8701d12d2a0b89c4eca83220d0bccce46c2a0ff154298682dbf1",
+    "source": "plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R2.evidence.json",
+    "manifest_sha256": "9bd4dac4777ed855058d5ec3e806fe99de4569b104e2635be4cc63cf0b1552fc"
+  },
+  {
+    "phase": "p04",
+    "round": "01DEP-P04-B1-R2",
+    "artifact": "9cad3b579f1e5121427ee277b620bebd9a8dffa3786d299f748844354bb63848",
+    "source": "plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R2.evidence.json",
+    "manifest_sha256": "4934e7b0f454b0cbeca210c584f5468b37742114c5d2400c412012f2559db101"
+  },
+  {
+    "phase": "p04",
+    "round": "01DEP-P04-B2-R2",
+    "artifact": "a97fdbeb6c8026e22cfc316bc13f961b61b087a7131c5c4c58ad1c1d2f0c58ba",
+    "source": "plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R2.evidence.json",
+    "manifest_sha256": "7a2f4b95498de822cd9b4728e7c4699bcc9f3eb7801f550894370cf11c8a31be"
+  },
+  {
+    "phase": "p04",
+    "round": "01DEP-P04-B3-R2",
+    "artifact": "30567a293792a0799ba5a8077dbeb361664a85e0071123743c482c0206a7c675",
+    "source": "plan/01-departments/phases/p04/docs/logs/01DEP-P04-B3-R2.evidence.json",
+    "manifest_sha256": "ac519dea9bcac12e774a3e0c5f68460c1341e1ebbab3f57ce9b97494d731d078"
+  }
+]

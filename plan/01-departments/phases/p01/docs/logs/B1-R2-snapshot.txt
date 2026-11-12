@@ -1,0 +1,25 @@
+base:   3752ea3540e3a2bf6d17178bf887fe2e99a384ac
+digest: ccc4ee26be865cf9806a1e192f05bdddb8753eb4993704e2b8f98fcc78f03880
+files:
+  migrations/20260817000000_init_schema.sql
+  src/adapters/http/app_state.rs
+  src/adapters/http/routes/department_tests.rs
+  src/adapters/http/routes/department.rs
+  src/adapters/http/routes/mod.rs
+  src/adapters/persistence/department_competing_tests.rs
+  src/adapters/persistence/department_schema_tests.rs
+  src/adapters/persistence/department_tests.rs
+  src/adapters/persistence/department.rs
+  src/adapters/persistence/mod.rs
+  src/application/ports/department.rs
+  src/application/ports/mod.rs
+  src/application/use_cases/channel.rs
+  src/application/use_cases/department_tests.rs
+  src/application/use_cases/department.rs
+  src/application/use_cases/mod.rs
+  src/domain/entities/department.rs
+  src/domain/entities/mod.rs
+  src/domain/entities/participant.rs
+  src/domain/entities/value_objects.rs
+  src/infra/setup.rs
+  src/infra/setup/accounts.rs

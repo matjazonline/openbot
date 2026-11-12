@@ -55,6 +55,8 @@ pub struct RunBoardScope {
     pub workflow: Option<WorkflowId>,
     /// An agent of the company, already resolved company-scoped: runs of versions that use it.
     pub agent: Option<Uuid>,
+    /// Runs on the desks this department owns now, resolved company-scoped.
+    pub department: Option<crate::entities::department::DepartmentId>,
 }
 
 /// Top-level runs of one state on one channel (`None`: runs without a channel) inside the board's

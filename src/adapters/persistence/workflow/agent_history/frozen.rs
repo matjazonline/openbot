@@ -1,6 +1,6 @@
 //! Exact immutable replay material, with live pre-provider audience checks.
 use super::*;
-use crate::application::workflow::agent::PreparedAgent;
+use crate::application::workflow::agent::{DepartmentContext, PreparedAgent};
 use crate::entities::access_level::AccessLevel;
 use serde_json::Value;
 
@@ -32,7 +32,13 @@ pub(super) async fn restore_on(
     };
     let history: FrozenAgentHistory =
         serde_json::from_value(saved["history"].clone()).map_err(|_| invalid())?;
-    let prepared = prepared.with_frozen_history(history)?;
+    // The saved department first: it rebuilds the preamble, whose length the frozen history's
+    // budget counts, so a department edited since replays as it was frozen (01DEP-P03-D11).
+    let department: Option<DepartmentContext> =
+        serde_json::from_value(saved["department"].clone()).map_err(|_| invalid())?;
+    let prepared = prepared
+        .with_department(department)?
+        .with_frozen_history(history)?;
     if serde_json::to_value(&prepared).map_err(|_| invalid())? != saved {
         return Err(AppError::Conflict(
             "Frozen agent preparation changed".into(),

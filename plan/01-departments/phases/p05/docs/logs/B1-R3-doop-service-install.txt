@@ -1,0 +1,4 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun install --frozen-lockfile --ignore-scripts
+bun install v1.3.10 (30e609e0)
+
+Checked 893 installs across 1059 packages (no changes) [178.00ms]

@@ -222,11 +222,11 @@ pub fn agent_usage_card(card: &AgentUsageCard<'_>) -> String {
                 association = escape_html_text(&match summary.association {
                     RelatedAssociation::Company => "Company-wide".to_owned(),
                     RelatedAssociation::Channel(_) => format!(
-                        "Channel {}",
+                        "Desk {}",
                         binding.channel_name.as_deref().unwrap_or("(unnamed)")
                     ),
                     RelatedAssociation::Thread { .. } => format!(
-                        "One thread of channel {}",
+                        "One thread of desk {}",
                         binding.channel_name.as_deref().unwrap_or("(unnamed)")
                     ),
                 }),
@@ -248,7 +248,7 @@ pub fn agent_usage_card(card: &AgentUsageCard<'_>) -> String {
         agent = card.agent,
         hidden = if card.hidden > 0 {
             format!(
-                r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on channels you cannot see.</p>"#,
+                r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on desks you cannot see.</p>"#,
                 card.hidden,
                 if card.hidden == 1 { "" } else { "s" },
                 if card.hidden == 1 { "is" } else { "are" },

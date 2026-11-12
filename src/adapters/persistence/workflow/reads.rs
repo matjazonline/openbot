@@ -229,6 +229,16 @@ fn push_run_page(
     if filter.lineage == RunLineage::TopLevel {
         query.push(" AND parent_run_id IS NULL");
     }
+    if let Some(department) = filter.department {
+        query
+            .push(
+                " AND channel_id IN (SELECT desk.id FROM channels AS desk WHERE desk.company_id = ",
+            )
+            .push_bind(company.as_uuid())
+            .push(" AND desk.department_id = ")
+            .push_bind(department.as_uuid())
+            .push(")");
+    }
     if let Some((created, id)) = cursor {
         query
             .push(" AND (created_at, id) < (")
@@ -290,6 +300,7 @@ fn warn_if_run_list_is_slow(
         workflow = filter.workflow.is_some(),
         state = logged_state(filter.state.as_deref()),
         agent = filter.agent.is_some(),
+        department = filter.department.is_some(),
         lineage = logged_lineage(filter.lineage),
         page_size,
         page_rows,

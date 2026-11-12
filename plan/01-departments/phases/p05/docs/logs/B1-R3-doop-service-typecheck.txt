@@ -1,0 +1,2 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun run typecheck
+$ tsgo --noEmit

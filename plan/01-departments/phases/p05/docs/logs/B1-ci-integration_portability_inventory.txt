@@ -1,0 +1,14 @@
+Command: cargo test --locked --offline --lib integration_portability_ -- --list
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.69s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+adapters::persistence::integrations::connect_tests::portability::integration_portability_custom_oauth_scope_pkce_and_installation_identity_need_no_email: test
+adapters::persistence::integrations::connect_tests::portability::integration_portability_installation_and_client_identity_encoding_has_no_separator_collision: test
+adapters::persistence::integrations::connect_tests::portability::integration_portability_missing_custom_scope_never_creates_an_account_or_replays_exchange: test
+adapters::persistence::integrations::connect_tests::portability::integration_portability_scope_upgrade_requires_consent_and_retires_older_app_grants: test
+adapters::persistence::integrations::connect_tests::portability::integration_portability_workspace_accounts_and_oauth_clients_keep_separate_authorizations: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::integration_portability_all_auth_methods_use_native_http_headers_and_unchanged_workflow_contract: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_bearer_google_and_strict_oauth_use_real_native_mcp_without_workflow_branches: test
+adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_http_api_key_policy_denies_mcp_consent_before_any_remote_session: test
+infra::integrations::tests::integration_portability_production_composition_registers_no_test_provider_or_app: test
+
+9 tests, 0 benchmarks

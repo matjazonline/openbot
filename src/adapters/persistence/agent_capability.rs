@@ -30,7 +30,7 @@ fn malformed() -> AppError {
     AppError::Internal("Invalid stored agent capability binding".into())
 }
 
-pub(super) fn relationship_error(error: sqlx::Error) -> AppError {
+pub(in crate::adapters::persistence) fn relationship_error(error: sqlx::Error) -> AppError {
     match error
         .as_database_error()
         .and_then(|error| error.code())

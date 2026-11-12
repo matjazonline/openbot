@@ -5,13 +5,14 @@ use std::{collections::HashSet, str::FromStr};
 use uuid::Uuid;
 
 use crate::adapters::persistence::PostgresPersistence;
+use crate::adapters::persistence::department_desks::{
+    DeskOwnership, desk_ownership_on, prelock_ownership_on, sync_desk_grants_on,
+};
 use crate::adapters::persistence::integration::email_binding::{
     CanonicalEmailBinding, write_canonical_email_binding,
 };
-use crate::adapters::persistence::participant::{
-    create_agent_principal_on, resolve_or_create_external_identity_on,
-};
-use crate::adapters::persistence::{agent::insert_agent_on, skill::copy_library_skill_on};
+use crate::adapters::persistence::participant::resolve_or_create_external_identity_on;
+use crate::adapters::persistence::skill::copy_library_skill_on;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
@@ -19,19 +20,18 @@ use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelUpdate;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::participant::IdentityObservation;
-use crate::entities::agent::Agent;
+use crate::domain::workflow::CompanyId;
 use crate::entities::channel::Channel;
 use crate::entities::channel::ChannelAccessMode;
 use crate::entities::creation::CreationProvenance;
+use crate::entities::department::DepartmentId;
 use crate::entities::participant::IdentityClaimMetadata;
 use crate::entities::participant::IdentityProvenance;
 use crate::entities::participant::PrincipalCapability;
 use crate::entities::value_objects::ChannelSlug;
 use crate::entities::value_objects::CompanySlug;
 use crate::entities::value_objects::EmailAddress;
-use crate::use_cases::agent::AgentPersistence;
 use crate::use_cases::agent::AgentWrite;
-use crate::use_cases::agent::LibraryAgentCopyPersistence;
 use crate::use_cases::participant::IdentityResolution;
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
@@ -50,6 +50,8 @@ pub struct ChannelDb {
     pub settings_revision: i64,
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
+    pub department_id: Option<Uuid>,
+    pub members_only: bool,
 }
 
 impl TryFrom<ChannelDb> for Channel {
@@ -81,6 +83,8 @@ impl TryFrom<ChannelDb> for Channel {
                 AppError::Internal(format!("Invalid channels.created_by provenance: {err}"))
             })?,
             created_at: db.created_at,
+            department_id: db.department_id.map(DepartmentId::new),
+            members_only: db.members_only,
         })
     }
 }
@@ -130,7 +134,8 @@ const CHANNEL_SELECT: &str = r#"
                 FROM channel_principal_grants AS channel_grant
                 WHERE channel_grant.company_id = ch.company_id AND channel_grant.channel_id = ch.id),
                '[]'::jsonb) AS principal_grants,
-           ch.enabled, ch.add_3rd_party, ch.settings_revision, ch.created_by, ch.created_at
+           ch.enabled, ch.add_3rd_party, ch.settings_revision, ch.created_by, ch.created_at,
+           ch.department_id, ch.members_only
     FROM channels ch
 "#;
 
@@ -182,7 +187,7 @@ fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
         && db_err.code().as_deref() == Some("23505")
     {
         return AppError::BadRequest(format!(
-            "Address '{slug}' is already in use by another channel in this company."
+            "Address '{slug}' is already in use by another desk in this company."
         ));
     }
     AppError::from(err)
@@ -242,14 +247,15 @@ pub(crate) async fn insert_email_allowlist_grants(
         )
         .await?;
 
-        // A grant this principal already holds from another provenance stays that provenance's:
-        // relabelling it would let the next allowlist edit delete access the allowlist never gave.
+        // Each provenance owns its own row, so this allowlist entry and a grant the principal holds
+        // from elsewhere (a department, a manager) never delete or relabel one another.
         for capability in [PrincipalCapability::Participate, PrincipalCapability::View] {
             sqlx::query(
                 r#"INSERT INTO channel_principal_grants
                        (company_id, channel_id, principal_id, capability, provenance)
                    VALUES ($1, $2, $3, $4, 'configured_allowlist')
-                   ON CONFLICT (company_id, channel_id, principal_id, capability) DO NOTHING"#,
+                   ON CONFLICT (company_id, channel_id, principal_id, capability, provenance)
+                   DO NOTHING"#,
             )
             .bind(company_id)
             .bind(channel_id)
@@ -302,6 +308,10 @@ pub(crate) async fn insert_channel_row_on(
     write: &ChannelWrite,
 ) -> AppResult<Vec<String>> {
     let (access_mode, participants) = channel_access(write.participant_emails.clone());
+    let ownership = write.ownership.map_or(DeskOwnership::UNOWNED, |edit| {
+        DeskOwnership::UNOWNED.merged(&edit)
+    });
+    let access_mode = ownership.stored_mode(access_mode)?;
     let created_by = serde_json::to_value(
         write
             .created_by
@@ -312,8 +322,8 @@ pub(crate) async fn insert_channel_row_on(
     sqlx::query(
         r#"INSERT INTO channels (
                 id, company_id, name, description, access_mode, enabled, add_3rd_party,
-                created_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)"#,
+                created_by, department_id, members_only)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
     )
     .bind(channel_id)
     .bind(company_id)
@@ -323,6 +333,8 @@ pub(crate) async fn insert_channel_row_on(
     .bind(write.enabled)
     .bind(write.add_3rd_party)
     .bind(created_by)
+    .bind(ownership.department_id.map(DepartmentId::as_uuid))
+    .bind(ownership.members_only)
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
@@ -334,6 +346,11 @@ impl ChannelPersistence for PostgresPersistence {
     async fn create(&self, company_id: Uuid, write: ChannelWrite) -> AppResult<Channel> {
         let uuid = Uuid::new_v4();
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
+        // An owned desk is created under the company write lock, so the department's membership
+        // its grants derive from cannot change before this commits (DEP-P02-D3).
+        if let Some(edit) = write.ownership {
+            prelock_ownership_on(&mut tx, CompanyId::new(company_id), None, &edit).await?;
+        }
         let participants = insert_channel_row_on(&mut tx, company_id, uuid, &write).await?;
 
         insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
@@ -341,6 +358,10 @@ impl ChannelPersistence for PostgresPersistence {
         write_channel_email_binding(&mut tx, company_id, uuid, &write).await?;
 
         insert_email_allowlist_grants(&mut tx, company_id, uuid, participants).await?;
+
+        if write.ownership.is_some() {
+            sync_desk_grants_on(&mut tx, CompanyId::new(company_id), uuid).await?;
+        }
 
         tx.commit().await.map_err(AppError::from)?;
         load_channel(self, uuid)
@@ -370,6 +391,17 @@ impl ChannelPersistence for PostgresPersistence {
             .map_err(AppError::from)?;
 
         db.map(TryInto::try_into).transpose()
+    }
+
+    async fn list_departments(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>> {
+        crate::adapters::persistence::department::departments_of_company(
+            &self.pool,
+            crate::domain::workflow::CompanyId::new(company_id),
+        )
+        .await
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -454,10 +486,20 @@ pub(super) async fn write_channel_settings_on(
     write: &ChannelWrite,
 ) -> AppResult<()> {
     let (access_mode, participants) = channel_access(write.participant_emails.clone());
-    let result = sqlx::query(
+    // Every save applies the members-only rule to the ownership the desk will have, including a
+    // save from a form that does not know about departments (DEP-P02-D2).
+    let current = desk_ownership_on(tx, CompanyId::new(company_id), id)
+        .await?
+        .ok_or_else(|| AppError::Internal("Channel not found".into()))?;
+    let ownership = write
+        .ownership
+        .map_or(current, |edit| current.merged(&edit));
+    let access_mode = ownership.stored_mode(access_mode)?;
+    sqlx::query(
         r#"UPDATE channels
                SET name = $1, description = $2, access_mode = $3, enabled = $4,
-                   add_3rd_party = $5, settings_revision = settings_revision + 1
+                   add_3rd_party = $5, settings_revision = settings_revision + 1,
+                   department_id = $8, members_only = $9
                WHERE id = $6 AND company_id = $7"#,
     )
     .bind(&write.name)
@@ -467,13 +509,11 @@ pub(super) async fn write_channel_settings_on(
     .bind(write.add_3rd_party)
     .bind(id)
     .bind(company_id)
+    .bind(ownership.department_id.map(DepartmentId::as_uuid))
+    .bind(ownership.members_only)
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
-
-    if result.rows_affected() == 0 {
-        return Err(AppError::Internal("Channel not found".into()));
-    }
 
     // Only the grants this form owns: a grant written by another provenance is not the email
     // allowlist's to replace.
@@ -500,44 +540,9 @@ pub(super) async fn write_channel_settings_on(
     Ok(())
 }
 
-#[async_trait]
-impl LibraryAgentCopyPersistence for PostgresPersistence {
-    async fn create_agent_from_library(
-        &self,
-        company_id: Uuid,
-        actor: crate::application::workflow::WorkflowActor,
-        library_agent_id: Uuid,
-        mut agent: AgentWrite,
-    ) -> AppResult<Agent> {
-        let agent_id = Uuid::new_v4();
-        let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
-            .bind(actor.user_id())
-            .fetch_optional(&mut *tx)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Library installation actor".into()))?;
-        super::workflow::authority::authorize_company(
-            &mut tx,
-            crate::domain::workflow::CompanyId::new(company_id),
-            actor,
-        )
-        .await?;
-        prepare_library_agent_on(&mut tx, company_id, library_agent_id, &mut agent).await?;
-        insert_agent_on(&mut tx, agent_id, Some(company_id), &agent).await?;
-        create_agent_principal_on(&mut tx, company_id, agent_id, &agent.name).await?;
-        // Library selection creates a draft so company-local tools can be configured
-        // before publication. Runnable assistant creation publishes on its own transaction.
-        tx.commit().await.map_err(AppError::from)?;
-        AgentPersistence::get_by_id(self, agent_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Created agent was not found".into()))
-    }
-}
-
 /// Copy a library definition into the company inside `tx`: its global skills become tenant-owned
-/// copies the agent is attached to, and its portable builtin grants come with it. A copy that grants
-/// tools and would inherit its model gets the company default connection's first model, because a
-/// workflow runs an agent only on an explicit model (p08 D2.6).
+/// copies the agent is attached to, and its portable builtin grants come with it. Its model is
+/// resolved by company-agent creation, like every company agent's (01DEP-P03-D3).
 pub(crate) async fn prepare_library_agent_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
@@ -577,26 +582,8 @@ pub(crate) async fn prepare_library_agent_on(
     agent.skill_ids = copied_skill_ids;
 
     // Library bindings are builtin-only; native scope constraints forbid tenant targets.
-    // A workflow runs an agent
-    // only on an explicit model, so a copy that grants tools and would inherit gets the
-    // company's default connection's first model, when it has a key.
     let mut bindings = super::agent_capability::bindings_on(tx, None, library_agent_id).await?;
     if !bindings.is_empty() {
-        if agent.provider.is_none() && agent.model.is_none() {
-            let default: Option<(String, String)> = sqlx::query_as(
-                "SELECT provider, models[1] FROM company_model_connections \
-                 WHERE company_id = $1 AND is_default AND api_key IS NOT NULL \
-                   AND cardinality(models) > 0",
-            )
-            .bind(company_id)
-            .fetch_optional(&mut **tx)
-            .await
-            .map_err(AppError::from)?;
-            if let Some((provider, model)) = default {
-                agent.provider = Some(provider);
-                agent.model = Some(model);
-            }
-        }
         for binding in &mut bindings {
             binding.id = crate::entities::agent_capability::AgentBindingId::new(Uuid::new_v4());
         }
@@ -692,6 +679,7 @@ mod tests {
                 // cannot pass this test.
                 add_3rd_party: false,
                 created_by: None,
+                ownership: None,
             },
         )
         .await

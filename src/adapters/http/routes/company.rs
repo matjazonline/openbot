@@ -271,7 +271,8 @@ mod tests {
         assert!(page_html.contains("id=\"company-form-card\" class=\"hidden"));
         assert!(page_html.contains("aria-expanded=\"false\""));
         assert!(page_html.contains("id=\"nav-channels\""));
-        assert!(page_html.find(">Channels</a>") < page_html.find(">Agents</a>"));
+        assert!(page_html.contains(">Desks</a>"));
+        assert!(page_html.find(">Desks</a>") < page_html.find(">Agents</a>"));
         assert!(page_html.find(">Agents</a>") < page_html.find(">Account</summary>"));
         assert!(page_html.contains(">Account</summary>"));
         assert!(page_html.find(">Account</summary>") < page_html.find(">Companies</a>"));

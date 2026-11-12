@@ -23,6 +23,7 @@ impl Driver<'_> {
         engine: &WorkflowEngine,
         scopes: &[RunReadScope],
         checkpoint: Checkpoint,
+        models: Option<(&mut [Option<ScriptedLlm>], &Input)>,
     ) -> Vec<RunView> {
         assert_eq!(engine.slots(), 1);
         let shutdown = CancellationToken::new();
@@ -36,7 +37,7 @@ impl Driver<'_> {
         // Preserve the existing per-graph fixture bound; the outer native helper is still80s.
         let result = tokio::time::timeout(
             Duration::from_secs(5 + 3 * steps),
-            AssertUnwindSafe(self.poll(engine, scopes, checkpoint)).catch_unwind(),
+            AssertUnwindSafe(self.poll(engine, scopes, checkpoint, models)).catch_unwind(),
         )
         .await;
         shutdown.cancel();
@@ -58,6 +59,7 @@ impl Driver<'_> {
         engine: &WorkflowEngine,
         scopes: &[RunReadScope],
         checkpoint: Checkpoint,
+        mut models: Option<(&mut [Option<ScriptedLlm>], &Input)>,
     ) -> Vec<RunView> {
         let (_delivery_shutdown, mut receiver) = tokio::sync::broadcast::channel(1);
         let mut previous = vec![None; scopes.len()];
@@ -82,6 +84,17 @@ impl Driver<'_> {
                     .await
                     .unwrap()
                     .unwrap();
+                if let Some((models, input)) = models.as_mut() {
+                    assert_eq!(models.len(), scopes.len());
+                    // The persisted editor completion proves its final response was consumed.
+                    // Close that script now; downstream reads/notices need no model server.
+                    if view.detail.executions.iter().any(|execution| {
+                        execution.step == "edit" && execution.completed_at.is_some()
+                    }) && let Some(model) = models[scope_index].take()
+                    {
+                        Box::pin(finish_model(model, input)).await;
+                    }
+                }
                 // Only committed progress hints the existing worker wake API. Claims,
                 // fairness, the positive scan delay and all deadlines stay authoritative.
                 if previous[scope_index].as_ref() != Some(&view.detail) {

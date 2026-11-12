@@ -1,0 +1,4 @@
+# Preserve immutable machine output exactly, including terminal padding and patch context.
+# Source, Markdown, Python and JSON remain ordinary text with normal whitespace checks.
+docs/logs/*.txt binary
+docs/logs/*.diff binary

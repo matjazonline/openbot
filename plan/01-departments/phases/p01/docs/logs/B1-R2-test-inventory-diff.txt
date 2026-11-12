@@ -1,0 +1,19 @@
+Test inventory diff B1-R1 -> B1-R2 (lib)
+removed 14, added 16
+
+MOVED adapters::persistence::department::tests::department_competing_creates_of_one_slug_leave_one_row -> adapters::persistence::department::tests::competing::department_competing_creates_of_one_slug_leave_one_row
+MOVED adapters::persistence::department::tests::department_competing_demotion_behind_a_member_add_removes_the_row -> adapters::persistence::department::tests::competing::department_competing_demotion_behind_a_member_add_removes_the_row
+MOVED adapters::persistence::department::tests::department_competing_lead_assignments_leave_one_holder -> adapters::persistence::department::tests::competing::department_competing_lead_assignments_leave_one_holder
+MOVED adapters::persistence::department::tests::department_competing_member_add_behind_a_demotion_is_refused -> adapters::persistence::department::tests::competing::department_competing_member_add_behind_a_demotion_is_refused
+MOVED adapters::persistence::department::tests::department_competing_reparents_never_form_a_cycle -> adapters::persistence::department::tests::competing::department_competing_reparents_never_form_a_cycle
+MOVED adapters::persistence::department::tests::department_schema_cascades_members_and_roles_and_keeps_children -> adapters::persistence::department::tests::schema::department_schema_cascades_members_and_roles_and_keeps_children
+MOVED adapters::persistence::department::tests::department_schema_drops_a_demoted_principal_from_every_department -> adapters::persistence::department::tests::schema::department_schema_drops_a_demoted_principal_from_every_department
+MOVED adapters::persistence::department::tests::department_schema_grant_provenance_check_accepts_every_variant -> adapters::persistence::department::tests::schema::department_schema_grant_provenance_check_accepts_every_variant
+MOVED adapters::persistence::department::tests::department_schema_refuses_a_cycle_and_its_own_parent -> adapters::persistence::department::tests::schema::department_schema_refuses_a_cycle_and_its_own_parent
+MOVED adapters::persistence::department::tests::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep -> adapters::persistence::department::tests::schema::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep
+MOVED adapters::persistence::department::tests::department_schema_refuses_a_second_lead_and_an_unknown_role -> adapters::persistence::department::tests::schema::department_schema_refuses_a_second_lead_and_an_unknown_role
+MOVED adapters::persistence::department::tests::department_schema_refuses_cross_company_parents_and_principals -> adapters::persistence::department::tests::schema::department_schema_refuses_cross_company_parents_and_principals
+MOVED adapters::persistence::department::tests::department_schema_refuses_external_and_system_principals -> adapters::persistence::department::tests::schema::department_schema_refuses_external_and_system_principals
+MOVED adapters::persistence::department::tests::department_schema_tears_down_a_nested_tree_with_its_company -> adapters::persistence::department::tests::schema::department_schema_tears_down_a_nested_tree_with_its_company
+NEW adapters::persistence::department::tests::competing::department_competing_write_behind_an_admin_demotion_is_refused
+NEW adapters::persistence::department::tests::department_write_persistence_reauthorizes_every_write_under_the_lock

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "status": "FAIL",
+  "runs": [
+    {
+      "name": "all-disk",
+      "status": "PASS",
+      "checks": 42,
+      "report_sha256": "40d0da8fa871298aaa4fa478e87a9ca1d782483263627b5c40751762414de303",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    },
+    {
+      "name": "all-bucket",
+      "status": "PASS",
+      "checks": 43,
+      "report_sha256": "cc44ba33af8d5f46edd3889eb6f7698fd0667d87cc3f184d875dc5d1cb8373f1",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    },
+    {
+      "name": "e2e-disk",
+      "status": "PASS",
+      "checks": 9,
+      "report_sha256": "a15aa34c50eb3fbddd8227f53def65f1f984b4afc184d0188be2ee486a0dc943",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    }
+  ],
+  "scope": "actual private image, both storage modes and both required probe families",
+  "current_run": "e2e-bucket"
+}

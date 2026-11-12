@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "round": "CH-MAIN-B1-R1-focused",
+  "artifact": "84f0e56a7169710052dfb5ea0470d8c3f8dae644c9826f842b718d5145a58220",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3"
+      ],
+      "command": "TEST_DATABASE_URL=<owned> SQLX_OFFLINE=true scripts/test-network-isolation.sh cargo test --locked --offline --lib -- native_mcp_ autonomous_agent_ department_ agent_default_desk_ skill_bundle_competing_editor_and_both_copy_paths_keep_one_revision_during_slug_retries",
+      "fixture": "fresh owned PostgreSQL18 port63451; all assertions local scripted transport",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-focused-R1.txt",
+          "sha256": "496e338905800edd775cb23a03c727cea367cfbcff61d8b77a26ca86c1c1a844"
+        }
+      ]
+    }
+  ]
+}

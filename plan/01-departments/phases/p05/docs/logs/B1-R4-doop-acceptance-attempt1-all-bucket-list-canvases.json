@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "[\n  {\n    \"id\": \"rC075-SUYp\",\n    \"name\": \"Pre-policy sync fixture\",\n    \"ownerId\": \"user-bot-a\",\n    \"workspaceId\": \"workspace-a\",\n    \"createdAt\": 1794424613819,\n    \"updatedAt\": 1794424613847,\n    \"frameCount\": 4,\n    \"previewFrameId\": \"RgaxUdViP3\",\n    \"workspace_id\": \"workspace-a\",\n    \"workspace_name\": \"Company A synthetic\",\n    \"guidelinesCount\": 0\n  },\n  {\n    \"id\": \"verification-canvas-a\",\n    \"name\": \"Human setup verification\",\n    \"ownerId\": \"user-human-a\",\n    \"shared\": true,\n    \"workspaceId\": \"workspace-a\",\n    \"createdAt\": 1794424613776,\n    \"updatedAt\": 1794424613776,\n    \"frameCount\": 0,\n    \"workspace_id\": \"workspace-a\",\n    \"workspace_name\": \"Company A synthetic\",\n    \"guidelinesCount\": 0\n  }\n]"
+    }
+  ]
+}

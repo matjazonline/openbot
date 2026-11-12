@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "round": "01DEP-P04-B1-R2",
+  "artifact": "9cad3b579f1e5121427ee277b620bebd9a8dffa3786d299f748844354bb63848",
+  "checks": [
+    {
+      "criteria": [
+        "04A.1",
+        "04A.2",
+        "04A.3",
+        "04A-focused-404",
+        "04B.1",
+        "04B.2",
+        "04B.3",
+        "B2-F2",
+        "B2-F3",
+        "B1-F1",
+        "B1-F2",
+        "B1-F3",
+        "B1-F4",
+        "B1-F5"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_ui_ department_directory_ desk_wording agent_default_desk_onboarding --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "ba539e8b12da7e4555bd549c63cd5f9122a6a90b238509557258d258a6a6d421"
+        },
+        {
+          "path": "logs/B1-R2-focused-inventory.txt",
+          "sha256": "e5b8db1b8530887efc34657478faa6b23ab5780ba7ef689dbfc86bd78b615c7e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_ui_ adapters::http::pages adapters::http::routes department_directory_ department_ use_cases::channel thread::reads email_binding desk_wording onboarding agent_default_desk_ --skip cloudroom --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-affected.txt",
+          "sha256": "09482f14f031f90e5bcb9f941ed85402961cd18ecbcab6a823e03290b7751116"
+        }
+      ],
+      "note": "1 failure rendered_markup_carries_no_inline_javascript: pre-existing (pages/workflow_authoring/sample.rs:153, unchanged vs origin/main); 659 passed"
+    },
+    {
+      "criteria": [
+        "css"
+      ],
+      "command": "tailwindcss 4.1.12 -i assets/app.css.in -o built.css --minify over a copy of src+assets; cmp with assets/app.css",
+      "fixture": "node_modules of /Users/mac02/dev/openbot (lockfile versions)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-css-check.txt",
+          "sha256": "2d485930ce7e3956e71152f3aa37120a97d9fb2e31246d5c1cddde43925c37f9"
+        }
+      ]
+    }
+  ]
+}

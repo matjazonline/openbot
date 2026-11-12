@@ -1,0 +1,99 @@
+Linux isolated clipboard, original /app layout, explicit clipboard project; source/assertions/timeouts unchanged.
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/docker-bin/docker run --rm --name openbot-p05-r4-clipboard-2 --network none --cap-drop ALL --security-opt no-new-privileges --security-opt seccomp=/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/managed-source/deploy/chromium-seccomp.json --memory 2g --cpus 2 --pids-limit 512 --shm-size 512m --tmpfs /tmp:rw,nosuid,nodev,size=512m openbot-p05-r4-clipboard-2 bun run test -- --project clipboard tests/canvasClipboardBrowser.test.ts --maxWorkers=1
+$ vitest run --project clipboard tests/canvasClipboardBrowser.test.ts "--maxWorkers=1"
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/app[39m
+
+6:55:45 PM [vite] ws proxy error:
+AggregateError: 
+    at internalConnectMultiple (node:net:1135:18)
+    at afterConnectMultiple (node:net:1716:7)
+ [31m❯[39m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts [2m([22m[2m17 tests[22m[2m | [22m[31m17 failed[39m[2m)[22m[33m 79915[2mms[22m[39m
+   [31m❯[39m canvas clipboard shortcuts [2m(17)[22m
+[31m     [31m×[31m copies a whole element after a screenshot and pastes its children as one undo step[39m[33m 4955[2mms[22m[39m
+[31m     [31m×[31m pastes a newer external image instead of stale copied elements[39m[33m 4666[2mms[22m[39m
+[31m     [31m×[31m does not paste an old element when external text replaced the clipboard[39m[33m 4616[2mms[22m[39m
+[31m     [31m×[31m copies and pastes immediately after leaving text editing with Escape[39m[33m 4673[2mms[22m[39m
+[31m     [31m×[31m keeps focus in another field when a remote lock ends text editing[39m[33m 4705[2mms[22m[39m
+[31m     [31m×[31m keeps multiple copied elements together and selects the pasted set[39m[33m 4611[2mms[22m[39m
+[31m     [31m×[31m copies through the element menu and pastes with the keyboard[39m[33m 4607[2mms[22m[39m
+[31m     [31m×[31m copies a frame through its menu and pastes with the keyboard[39m[33m 4609[2mms[22m[39m
+[31m     [31m×[31m replaces an element copy with an entire frame copied through the keyboard[39m[33m 4686[2mms[22m[39m
+[31m     [31m×[31m preserves the previous copy when the element menu copy is denied[39m[33m 4685[2mms[22m[39m
+[31m     [31m×[31m preserves the previous copy when the frame menu copy is denied[39m[33m 4613[2mms[22m[39m
+[31m     [31m×[31m leaves native text copy and paste alone while an element is selected[39m[33m 4615[2mms[22m[39m
+[31m     [31m×[31m copies selected paragraph text instead of the selected canvas element[39m[33m 4597[2mms[22m[39m
+[31m     [31m×[31m duplicates the picked element when the key arrives as uppercase D[39m[33m 4577[2mms[22m[39m
+[31m     [31m×[31m respects view protection when pasting[39m[33m 4683[2mms[22m[39m
+[31m     [31m×[31m respects frame protection when pasting[39m[33m 5215[2mms[22m[39m
+[31m     [31m×[31m respects element protection when pasting[39m[33m 4732[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 17 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies a whole element after a screenshot and pastes its children as one undo step
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpastes a newer external image instead of stale copied elements
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mdoes not paste an old element when external text replaced the clipboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies and pastes immediately after leaving text editing with Escape
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mkeeps focus in another field when a remote lock ends text editing
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mkeeps multiple copied elements together and selects the pasted set
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies through the element menu and pastes with the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies a frame through its menu and pastes with the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mreplaces an element copy with an entire frame copied through the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpreserves the previous copy when the element menu copy is denied
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpreserves the previous copy when the frame menu copy is denied
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mleaves native text copy and paste alone while an element is selected
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies selected paragraph text instead of the selected canvas element
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mduplicates the picked element when the key arrives as uppercase D
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects view protection when pasting
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects element protection when pasting
+[31m[1mTimeoutError[22m: Waiting for selector `#card` failed[39m
+[90m [2m❯[22m CSSQueryHandler.waitFor node_modules/puppeteer-core/src/common/QueryHandler.ts:[2m213:36[22m[39m
+[90m [2m❯[22m CdpFrame.waitForSelector node_modules/puppeteer-core/src/api/Frame.ts:[2m765:13[22m[39m
+[36m [2m❯[22m tests/canvasClipboardBrowser.test.ts:[2m169:5[22m[39m
+    [90m167|[39m     await page.waitForSelector('iframe[data-doop-frame]')
+    [90m168|[39m     const doc = (await (await page.$('iframe[data-doop-frame]'))!.cont…
+    [90m169|[39m     await doc.waitForSelector('#card')
+    [90m   |[39m     [31m^[39m
+    [90m170|[39m     await page.evaluate(() => navigator.clipboard.writeText('external …
+    [90m171|[39m   })
+
+[31m[1mCaused by: TimeoutError[22m: Waiting failed: 4000ms exceeded[39m
+[90m [2m❯[22m new WaitTask node_modules/puppeteer-core/lib/puppeteer/common/WaitTask.js:[2m46:34[22m[39m
+[90m [2m❯[22m IsolatedWorld.waitForFunction node_modules/puppeteer-core/lib/puppeteer/api/Realm.js:[2m49:26[22m[39m
+[90m [2m❯[22m CSSQueryHandler.waitFor node_modules/puppeteer-core/lib/puppeteer/common/QueryHandler.js:[2m176:95[22m[39m
+[90m [2m❯[22m CdpFrame.waitForSelector node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:[2m546:21[22m[39m
+[36m [2m❯[22m tests/canvasClipboardBrowser.test.ts:[2m169:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects frame protection when pasting
+[31m[1mTimeoutError[22m: Waiting for selector `#card` failed[39m
+[90m [2m❯[22m CSSQueryHandler.waitFor node_modules/puppeteer-core/src/common/QueryHandler.ts:[2m213:36[22m[39m
+[90m [2m❯[22m CdpFrame.waitForSelector node_modules/puppeteer-core/src/api/Frame.ts:[2m765:13[22m[39m
+[36m [2m❯[22m tests/canvasClipboardBrowser.test.ts:[2m169:5[22m[39m
+    [90m167|[39m     await page.waitForSelector('iframe[data-doop-frame]')
+    [90m168|[39m     const doc = (await (await page.$('iframe[data-doop-frame]'))!.cont…
+    [90m169|[39m     await doc.waitForSelector('#card')
+    [90m   |[39m     [31m^[39m
+    [90m170|[39m     await page.evaluate(() => navigator.clipboard.writeText('external …
+    [90m171|[39m   })
+
+[31m[1mCaused by: TimeoutError[22m: Waiting failed: 4000ms exceeded[39m
+[90m [2m❯[22m new WaitTask node_modules/puppeteer-core/lib/puppeteer/common/WaitTask.js:[2m46:34[22m[39m
+[90m [2m❯[22m IsolatedWorld.waitForFunction node_modules/puppeteer-core/lib/puppeteer/api/Realm.js:[2m49:26[22m[39m
+[90m [2m❯[22m CSSQueryHandler.waitFor node_modules/puppeteer-core/lib/puppeteer/common/QueryHandler.js:[2m176:95[22m[39m
+[90m [2m❯[22m CdpFrame.waitForSelector node_modules/puppeteer-core/lib/puppeteer/api/Frame.js:[2m546:21[22m[39m
+[36m [2m❯[22m tests/canvasClipboardBrowser.test.ts:[2m169:5[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/17]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m17 failed[39m[22m[90m (17)[39m
+[2m   Start at [22m 18:55:40
+[2m   Duration [22m 91.64s[2m (tests 99%, import 1%)[22m
+
+close timed out after 10000ms
+Tests closed successfully but something prevents Vite server from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter
+error: script "test" exited with code 1

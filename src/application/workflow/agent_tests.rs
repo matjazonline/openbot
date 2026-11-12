@@ -4,6 +4,9 @@ use super::*;
 #[path = "agent_history_preparation_tests.rs"]
 mod history_preparation;
 
+#[path = "agent_department_tests.rs"]
+mod department;
+
 use crate::application::workflow::registry::ModelStep;
 use crate::application::workflow::{
     agent::{AgentToolTarget, PreparedAgent, PreparedStep},

@@ -82,8 +82,8 @@ impl TryFrom<AttentionRow> for AttentionItem {
     }
 }
 
-/// The work list (p08 D4.2). `$14` is whether the viewer is an owner or admin: company-associated
-/// sources (no channel) are visible only to them, as on the decision page.
+/// The work list (p08 D4.2). `$14` is whether company-associated sources (no channel) are listed:
+/// only for an owner or admin, as on the decision page, and not in a one-department view.
 const ATTENTION_SQL: &str = r#"
 WITH params AS (
     SELECT COALESCE($5::timestamptz, CURRENT_TIMESTAMP) AS as_of
@@ -355,7 +355,7 @@ fn bind_attention<'q>(
         .bind(cursor.map_or(sentinel_id, |cursor| cursor.source_id))
         .bind((working_set + 1) as i64)
         .bind((query.clamped_limit() + 1) as i64)
-        .bind(query.manager)
+        .bind(query.company_items)
 }
 
 /// Stable destinations; their routes independently authorize company and channel access.

@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.41s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 13 tests
+test adapters::persistence::skill::tests::a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error ... ok
+test adapters::persistence::skill::tests::a_company_skill_round_trips ... ok
+test adapters::persistence::skill::tests::copied_slugs_stay_bounded ... ok
+test adapters::persistence::skill::tests::another_companys_skill_is_not_readable_updatable_or_deletable ... ok
+test adapters::persistence::skill::tests::copying_a_library_skill_produces_a_company_owned_row_and_preserves_the_source ... ok
+test adapters::persistence::skill::tests::database_bounds_skill_positions ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+test adapters::persistence::skill::tests::deleting_an_in_use_library_skill_is_refused ... ok
+test adapters::persistence::skill::tests::database_scope_trigger_refuses_live_cross_library_skill_links ... ok
+test adapters::persistence::skill::tests::two_competing_library_skill_copies_receive_distinct_slugs ... ok
+test adapters::persistence::skill::tests::deleting_either_side_cascades_a_company_agent_skill_selection ... ok
+test adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version ... ok
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4150 filtered out; finished in 0.82s
+

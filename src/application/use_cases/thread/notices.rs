@@ -68,6 +68,8 @@ pub struct ChannelDirectoryEntry {
     pub address: EmailAddress,
     pub name: String,
     pub description: Option<String>,
+    /// The department that owns the desk; entries arrive grouped by it, root first.
+    pub department: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -112,7 +114,7 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
     body.push_str("Details:\n");
     for s in &bounce.suggestions {
         body.push_str(&format!(
-            "  - Invalid Channel Slug: '{}@{}'\n",
+            "  - Invalid Desk Slug: '{}@{}'\n",
             s.invalid_slug, domain_part
         ));
         if !s.suggestions.is_empty() {
@@ -121,21 +123,21 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
                 body.push_str(&format!("      * {sug}@{domain_part}\n"));
             }
         } else {
-            body.push_str("    No similar channel suggestions found.\n");
+            body.push_str("    No similar desk suggestions found.\n");
         }
         body.push('\n');
     }
 
     for slug in &bounce.disabled_slugs {
         body.push_str(&format!(
-            "  - Disabled Channel: '{slug}@{domain_part}'\n    This address is correct, but the \
-             channel is currently switched off and is not accepting mail.\n\n"
+            "  - Disabled Desk: '{slug}@{domain_part}'\n    This address is correct, but the \
+             desk is currently switched off and is not accepting mail.\n\n"
         ));
     }
 
     push_channel_directory(&mut body, &bounce.available_channels);
 
-    body.push_str("Please check the channel address and try sending your email again.\n");
+    body.push_str("Please check the desk address and try sending your email again.\n");
     body
 }
 
@@ -149,13 +151,26 @@ fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) 
         return;
     }
 
-    body.push_str("Channels you can write to:\n");
+    body.push_str("Desks you can write to:\n");
+    // Under department headings once any desk has a department (01-departments 04C.3); the
+    // entries already arrive in that order, root departments first and "No department" last.
+    let headed = entries.iter().any(|entry| entry.department.is_some());
+    let indent = if headed { "  " } else { "" };
+    let mut heading: Option<Option<&str>> = None;
     for entry in entries {
-        body.push_str(&format!("  - {} \u{2014} {}\n", entry.address, entry.name));
+        let department = entry.department.as_deref();
+        if headed && heading != Some(department) {
+            body.push_str(&format!("  {}:\n", department.unwrap_or("No department")));
+            heading = Some(department);
+        }
+        body.push_str(&format!(
+            "{indent}  - {} \u{2014} {}\n",
+            entry.address, entry.name
+        ));
         if let Some(description) = entry.description.as_deref().map(str::trim)
             && !description.is_empty()
         {
-            body.push_str(&format!("      {description}\n"));
+            body.push_str(&format!("{indent}      {description}\n"));
         }
     }
     body.push('\n');
@@ -192,14 +207,14 @@ pub fn format_help_email_body(
     push_channel_directory(&mut body, entries);
     if entries.is_empty() {
         body.push_str(
-            "You are not currently a participant of any channel in this company, so there is \
+            "You are not currently a participant of any desk in this company, so there is \
              nothing to list. Ask a colleague to add you.\n\n",
         );
     }
 
     body.push_str("Addressing tricks:\n");
     body.push_str(&format!(
-        "  {example}+billing@{domain_part}\n      Send to both channels, in that order.\n"
+        "  {example}+billing@{domain_part}\n      Send to both desks, in that order.\n"
     ));
     body.push_str(&format!(
         "  {example}+quiet@{domain_part}\n      File it on the thread without running the agent.\n"
@@ -208,7 +223,7 @@ pub fn format_help_email_body(
         "  [[quiet]]\n      As the first thing in the body, does the same as +quiet.\n\n",
     );
     body.push_str(&format!(
-        "  {} all mean \"file it, don't answer\", and attach to a\n  channel name with '+', '.', \
+        "  {} all mean \"file it, don't answer\", and attach to a\n  desk name with '+', '.', \
          '-' or '_'.\n\n",
         crate::entities::channel::RESERVED_SLUG_SUFFIXES.join(", ")
     ));
@@ -224,10 +239,10 @@ pub fn bounce_cause(bounce: &BounceInfo) -> &'static str {
         !bounce.disabled_slugs.is_empty(),
     ) {
         (true, true) => {
-            "one or more channel addresses were not found or misspelled, and one or more are disabled"
+            "one or more desk addresses were not found or misspelled, and one or more are disabled"
         }
-        (true, false) => "one or more channel addresses were not found or misspelled",
-        (false, true) => "one or more channels are currently disabled",
+        (true, false) => "one or more desk addresses were not found or misspelled",
+        (false, true) => "one or more desks are currently disabled",
         (false, false) => "the message could not be routed",
     }
 }

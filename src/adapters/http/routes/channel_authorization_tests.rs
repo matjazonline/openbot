@@ -25,6 +25,7 @@ async fn channel_management_and_simulation_hide_foreign_companies_and_refuse_mem
             list_channels_page(
                 State(companies.clone()),
                 State(f.channels.clone()),
+                State(f.departments()),
                 State(f.config.clone()),
                 Fixture::auth(user),
                 Path(company),

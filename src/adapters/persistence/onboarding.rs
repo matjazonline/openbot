@@ -5,18 +5,16 @@ use uuid::Uuid;
 
 use super::{
     PostgresPersistence,
-    agent::{AGENT_COLUMNS, AgentDb, insert_agent_on},
+    agent::{AGENT_COLUMNS, AgentDb},
     channel::prepare_library_agent_on,
     company::{model_api_key_on, model_connections_on},
-    participant::create_agent_principal_on,
-    workflow::provisioning::{ProvisioningDeployment, assistant_channel_on},
+    company_agent::{CompanyAgentCreation, create_company_agent_on, default_desk_key},
+    department::{create_department_with_id_on, place_in_department_on},
+    workflow::provisioning::ProvisioningDeployment,
 };
 use crate::{
     app_error::{AppError, AppResult},
-    application::workflow::{
-        WorkflowActor,
-        provisioning::{AssistantChannelRequest, ProvisioningRefusal, ReplyMode},
-    },
+    application::workflow::WorkflowActor,
     domain::workflow::CompanyId,
     entities::{agent::Agent, company::CompanyModelConnection, value_objects::ModelProvider},
     use_cases::{company::company_not_found, onboarding::*},
@@ -113,16 +111,28 @@ impl OnboardingSession for Session {
         mut self: Box<Self>,
         command: OnboardingCommand,
     ) -> AppResult<OnboardingOutcome> {
+        let placed = match self.department(command.department).await {
+            Ok(placed) => placed,
+            Err(error) => {
+                self.tx.rollback().await?;
+                return rejected(error);
+            }
+        };
         for missing in command.missing {
             if let Err(error) = self.insert(missing).await {
                 self.tx.rollback().await?;
-                return match error {
-                    AppError::BadRequest(message)
-                    | AppError::Conflict(message)
-                    | AppError::NotFound(message) => Ok(OnboardingOutcome::Rejected(message)),
-                    error => Err(error),
-                };
+                return rejected(error);
             }
+        }
+        // The first agent joins the department last, once every desk exists, so the
+        // department's desk gates are the last locks taken. Joining again changes nothing, and
+        // a resubmission that names the department for the first time still places it
+        // (01DEP-P03-B1-F6).
+        if let (Some(department), Some(first)) = (placed, command.selected_ids.first().copied())
+            && let Err(error) = self.place(first, department).await
+        {
+            self.tx.rollback().await?;
+            return rejected(error);
         }
         let agents = self.existing_agents(&command.selected_ids).await?;
         let mut results = Vec::with_capacity(agents.len());
@@ -142,7 +152,49 @@ impl OnboardingSession for Session {
     }
 }
 
+/// A refusal of the submission is its outcome, with nothing committed; anything else is an error.
+fn rejected(error: AppError) -> AppResult<OnboardingOutcome> {
+    match error {
+        AppError::BadRequest(message)
+        | AppError::Conflict(message)
+        | AppError::NotFound(message) => Ok(OnboardingOutcome::Rejected(message)),
+        error => Err(error),
+    }
+}
+
 impl Session {
+    /// The submission's department: found by its id on a replay, created otherwise.
+    async fn department(
+        &mut self,
+        department: Option<OnboardingDepartment>,
+    ) -> AppResult<Option<crate::entities::department::DepartmentId>> {
+        let Some(department) = department else {
+            return Ok(None);
+        };
+        let company = CompanyId::new(self.company_id);
+        let exists: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT 1 FROM departments WHERE company_id = $1 AND id = $2)",
+        )
+        .bind(self.company_id)
+        .bind(department.id.as_uuid())
+        .fetch_one(&mut *self.tx)
+        .await?;
+        if !exists {
+            create_department_with_id_on(
+                &mut self.tx,
+                &self.templates,
+                company,
+                WorkflowActor::authenticated(self.user_id)?,
+                department.id,
+                &department.write,
+                None,
+            )
+            .await?;
+        }
+        Ok(Some(department.id))
+    }
+
+    /// One agent through company-agent creation, with its default desk (01DEP-P03-D4).
     async fn insert(&mut self, mut prepared: PreparedAgent) -> AppResult<()> {
         if let Some(library_id) = prepared.library_id {
             prepare_library_agent_on(
@@ -153,63 +205,57 @@ impl Session {
             )
             .await?;
         }
-        insert_agent_on(
-            &mut self.tx,
-            prepared.id,
-            Some(self.company_id),
-            &prepared.write,
-        )
-        .await?;
-        create_agent_principal_on(
-            &mut self.tx,
-            self.company_id,
-            prepared.id,
-            &prepared.write.name,
-        )
-        .await?;
-        if prepared.write.provider.is_some() && prepared.write.model.is_some() {
-            super::agent_publication::publish_initial_on(
-                &mut self.tx,
-                crate::application::agent::AgentPublicationScope {
-                    company: CompanyId::new(self.company_id),
-                    actor: WorkflowActor::authenticated(self.user_id)?,
-                    agent: crate::entities::agent_capability::AgentId::new(prepared.id),
-                },
-            )
-            .await?;
-        }
-        Ok(())
-    }
-
-    async fn channel(
-        &mut self,
-        agent: &Agent,
-    ) -> AppResult<Option<crate::application::workflow::provisioning::Provisioned<serde_json::Value>>>
-    {
-        if agent.model.is_none() {
-            return Ok(None);
-        }
-        let outcome = assistant_channel_on(
+        Box::pin(create_company_agent_on(
             &mut self.tx,
             &self.templates,
             CompanyId::new(self.company_id),
             WorkflowActor::authenticated(self.user_id)?,
-            AssistantChannelRequest {
-                agent_slug: agent.slug.clone(),
-                channel_slug: agent.slug.clone(),
-                channel_name: agent.name.clone(),
-                reply_mode: ReplyMode::Autonomous,
-                command_key: format!("onboarding:{}", agent.id),
+            CompanyAgentCreation {
+                id: prepared.id,
+                write: prepared.write,
+                placement: None,
             },
+        ))
+        .await?;
+        Ok(())
+    }
+
+    /// `agent` as a member of `department`.
+    async fn place(
+        &mut self,
+        agent: Uuid,
+        department: crate::entities::department::DepartmentId,
+    ) -> AppResult<()> {
+        let principal: Uuid =
+            sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2")
+                .bind(self.company_id)
+                .bind(agent)
+                .fetch_optional(&mut *self.tx)
+                .await?
+                .ok_or_else(|| AppError::Internal("Onboarded agent has no principal".into()))?;
+        place_in_department_on(
+            &mut self.tx,
+            &self.templates,
+            CompanyId::new(self.company_id),
+            WorkflowActor::authenticated(self.user_id)?,
+            department,
+            crate::entities::transport::PrincipalId::new(principal),
+            None,
         )
-        .await;
-        match outcome {
-            Ok(outcome) => Ok(Some(outcome)),
-            Err(AppError::Conflict(message)) => {
-                Ok(Some(Err(ProvisioningRefusal::Conflict(message))))
-            }
-            Err(error) => Err(error),
-        }
+        .await
+    }
+
+    /// The agent's default desk, as its creation recorded it.
+    async fn channel(&mut self, agent: &Agent) -> AppResult<serde_json::Value> {
+        sqlx::query_scalar(
+            "SELECT result FROM workflow_provisioning_commands \
+             WHERE company_id = $1 AND command_key = $2",
+        )
+        .bind(self.company_id)
+        .bind(default_desk_key(agent.id))
+        .fetch_optional(&mut *self.tx)
+        .await?
+        .ok_or_else(|| AppError::Internal(format!("Agent '{}' has no default desk", agent.slug)))
     }
 }
 

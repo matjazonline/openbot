@@ -157,7 +157,7 @@ fn binding_refusal(error: &WorkflowError) -> Option<String> {
         }),
         WorkflowError::App(AppError::BadRequest(message)) => Some(message.clone()),
         WorkflowError::App(AppError::NotFound(_)) => Some(
-            "A chosen channel, version, run-as or resource is not available: it may be hidden from \
+            "A chosen desk, version, run-as or resource is not available: it may be hidden from \
              you, disabled, revoked or not ready, or a tool the version froze is no longer \
              registered or approved."
                 .into(),
@@ -746,7 +746,7 @@ pub(super) async fn channel_bindings(
         .allows(RelatedAssociation::Channel(RelatedChannelId::new(channel)))
         .await?
     {
-        return Err(AppError::NotFound("Channel not found".into()));
+        return Err(AppError::NotFound("Desk not found".into()));
     }
     Ok(Html(
         super::channel_response::card(&ui, company, channel, None, None).await?,

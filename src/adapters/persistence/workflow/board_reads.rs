@@ -31,7 +31,10 @@ fn open_states() -> String {
 }
 
 fn scoped(scope: &RunBoardScope) -> bool {
-    scope.binding.is_some() || scope.workflow.is_some() || scope.agent.is_some()
+    scope.binding.is_some()
+        || scope.workflow.is_some()
+        || scope.agent.is_some()
+        || scope.department.is_some()
 }
 
 /// The scope's filters on the materialized working set, the first after `WHERE`. The agent is
@@ -67,6 +70,16 @@ fn push_scope(
             .push(" AND ")
             .push_bind(agent)
             .push(" = ANY(version.agent_ids))");
+        keyword = " AND ";
+    }
+    if let Some(department) = scope.department {
+        query
+            .push(keyword)
+            .push("channel_id IN (SELECT desk.id FROM channels AS desk WHERE desk.company_id = ")
+            .push_bind(company.as_uuid())
+            .push(" AND desk.department_id = ")
+            .push_bind(department.as_uuid())
+            .push(")");
     }
 }
 

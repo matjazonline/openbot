@@ -1,0 +1,6 @@
+User authorized this narrow historical-record repair on 2026-11-11.
+Original manifest retained at G1-original-p04-R1-manifest.json.
+R1 file pointer changed from logs/B1-css-check.txt to logs/B1-R1-css-check.txt.
+Restored bytes are the R2 log minus exactly its appended final R2 line.
+Restored SHA-256 matches the historical R1 manifest: 1ee814ce333fe175ee82e3031f6fce1e1804735e25010e858d765789b3e251bf
+R2 manifest and log remain unchanged. No historical results or artifact hashes changed.

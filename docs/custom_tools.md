@@ -33,9 +33,16 @@ migrations, inserted only when that library slug is absent. It guides a user thr
 purpose, constraints, system prompt, least-privilege workflow tools and company skills. It is
 granted two workflow tools:
 
-- `list_company_agents`: the company's agents, so it does not duplicate one;
-- `create_agent_channel`: provisions the new agent together with a team (never public) channel,
-  bound to the reply-mode workflow the conversation chose (p08 D2). The requester must be an
-  owner or admin, and becomes the binding's run-as member.
+- `list_company_agents`: the company's agents, so it does not duplicate one, with each agent's
+  departments and roles and its own desk's address; `department` (a slug) lists only that
+  department's members and role holders. An entry carries no intake schema yet: that arrives with
+  `channel.call` (agent-workflow-call);
+- `create_agent_channel`: provisions the new agent with its own autonomous desk at its slug and,
+  when `channel_slug` names another address, a second team (never public) desk bound to the
+  reply-mode workflow the conversation chose (p08 D2). `department` and `role` place the agent in
+  a department.
 
-An owner or admin can provision the same way from the UI ("Create assistant channel").
+Both answer only an owner or admin writing in the app; the requester becomes the binding's run-as
+member.
+
+An owner or admin can provision the same way from the UI: an agent's settings offer "Create additional desk" beside the desk the agent already has.

@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "round": "CH-MAIN-B1-R3-corrections",
+  "artifact": "a0aa542552ba808a17447d5c219eb6777ec00c9c0801550da8dc8329219b2554",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "focused production decoder/rendered create-edit/default-desk tests (see log filters)",
+      "fixture": "owned integration environment; R2 failure preserved; R1 SQL unchanged in R3",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-corrections-R3.txt",
+          "sha256": "82b6195d82ece3bae87b212466dcbe50102b297953ab6d26a941860e8dde19a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "correction R2 focused compile (unqualified decoder type)",
+      "fixture": "owned integration environment; R2 failure preserved; R1 SQL unchanged in R3",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/main-corrections-R2.txt",
+          "sha256": "7cc4b42878dac48d94022e554c2e15a59dfa0c66a0ff811f10a6c891b8ecc2bc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets; SQL unchanged by R2/R3 UI/doc corrections",
+      "fixture": "owned integration environment; R2 failure preserved; R1 SQL unchanged in R3",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-sqlx-prepare-check-R1.txt",
+          "sha256": "15c082e6e3fd0c313f522f818613d4b92a004d0e3cf962ddb448600a2e8e67e8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "git diff origin/main --check -- . :(glob,exclude)plan/**/docs/logs/**",
+      "fixture": "owned integration environment; R2 failure preserved; R1 SQL unchanged in R3",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-target-product-whitespace-R3.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

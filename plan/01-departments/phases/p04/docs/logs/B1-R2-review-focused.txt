@@ -1,0 +1,70 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.51s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 63 tests
+test adapters::http::pages::tests::department_ui::department_ui_company_pane_has_a_departments_tab_and_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments ... ok
+test adapters::http::pages::tests::department_ui::department_ui_member_sees_their_departments_without_forms ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_lists_group_by_department_with_a_badge ... ok
+test adapters::http::pages::tests::department_ui::department_ui_desk_form_offers_the_department_and_members_only ... ok
+test adapters::http::pages::tests::department_ui::department_ui_refusal_renders_on_the_form_that_made_it ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_company_workspace_count ... ok
+test adapters::http::pages::tests::department_ui::department_ui_pane_indents_the_tree_and_shows_the_selected_department ... ok
+test adapters::http::pages::tests::department_ui::department_ui_tree_orders_each_root_before_its_children ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_desks_page_heading ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_flash_messages_say_desk ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_nav_names_the_desks_link ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_settings_breadcrumb ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_scan_reads_text_nodes_in_every_literal_form ... ok
+test adapters::http::routes::ui_channels::tests::department_ui_desk_form_asks_only_for_the_ownership_it_changes ... ok
+test adapters::http::pages::tests::desk_wording::desk_wording_page_sources_keep_channel_out_of_text_nodes ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_member_sees_only_their_departments ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_foreign_ids_under_the_owners_path_change_nothing ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_owner_writes_render_and_refusals_land_on_their_form ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::http::routes::ui_departments::tests::department_ui_writes_answer_404_to_members_strangers_and_foreign_companies ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_lead_creation_takes_its_desk_gates_once ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::company_agent::tests::agent_default_desk_company_agents_have_one_creation_path ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_agent_to_agent_repoints_the_same_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_an_agent_created_as_its_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_person_and_agent_leads_with_one_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_competing_lead_changes_leave_the_holders_agent_answering ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_leaves_a_users_own_responder_alone ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_refuses_lead_changes_it_cannot_follow ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_taken_address_refuses_the_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_run_as_moves_to_the_admin_who_changes_the_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_survives_a_rename_and_is_left_once_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::department::tests::ui_reads::department_ui_reads_name_people_and_agents_and_list_owned_desks ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_an_agent_lead_answers_on_it ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::onboarding::tests::department_lead_desk_onboarding_address_collision_with_an_agent_is_rejected ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents ... ok
+test application::use_cases::builtin_agent_library::tests::desk_wording_agent_builder_prompt_says_desk ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_lead_desk_answers_through_its_current_lead ... ok
+
+test result: ok. 63 passed; 0 failed; 0 ignored; 0 measured; 4090 filtered out; finished in 22.98s
+

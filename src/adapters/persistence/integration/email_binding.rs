@@ -172,7 +172,7 @@ fn address_conflict_error(error: sqlx::Error) -> AppError {
         == Some("23505")
     {
         return AppError::BadRequest(
-            "That channel address is already answering for another channel in this company.".into(),
+            "That desk address is already answering for another desk in this company.".into(),
         );
     }
     AppError::from(error)

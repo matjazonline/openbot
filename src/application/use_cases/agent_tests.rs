@@ -54,7 +54,7 @@ impl AgentPersistence for MockAgentPersistence {
     }
 
     async fn create_library(&self, write: AgentWrite) -> AppResult<Agent> {
-        let mut agent = self.create(Uuid::nil(), write).await?;
+        let mut agent = AgentPersistence::create(self, Uuid::nil(), write).await?;
         agent.company_id = None;
         if let Some(stored) = self
             .agents
@@ -124,16 +124,43 @@ impl AgentPersistence for MockAgentPersistence {
     }
 }
 
+/// Company-agent creation over the mock: the agent row and a desk id; the desk itself and the
+/// model pinning are persistence's, tested there.
 #[async_trait]
-impl LibraryAgentCopyPersistence for MockAgentPersistence {
-    async fn create_agent_from_library(
+impl CompanyAgents for MockAgentPersistence {
+    async fn create(
         &self,
-        company_id: Uuid,
-        _actor: crate::application::workflow::WorkflowActor,
+        _actor: WorkflowActor,
+        company: CompanyId,
+        write: AgentWrite,
+        _placement: Option<AgentPlacement>,
+    ) -> AppResult<CreatedAgent> {
+        if self
+            .agents
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|agent| agent.company_id == Some(company.as_uuid()) && agent.slug == write.slug)
+        {
+            return Err(AppError::Conflict(
+                "An agent with that slug already exists.".into(),
+            ));
+        }
+        Ok(CreatedAgent {
+            agent: AgentPersistence::create(self, company.as_uuid(), write).await?,
+            desk_id: Uuid::new_v4(),
+        })
+    }
+
+    async fn copy_from_library(
+        &self,
+        actor: WorkflowActor,
+        company: CompanyId,
         _library_agent_id: Uuid,
-        agent: AgentWrite,
-    ) -> AppResult<Agent> {
-        AgentPersistence::create(self, company_id, agent).await
+        write: AgentWrite,
+        placement: Option<AgentPlacement>,
+    ) -> AppResult<CreatedAgent> {
+        CompanyAgents::create(self, actor, company, write, placement).await
     }
 }
 
@@ -207,8 +234,8 @@ fn fixture() -> Fixture {
             company_persistence,
             agent_persistence.clone(),
             agent_persistence.clone(),
-            agent_persistence,
-        ),
+        )
+        .with_company_agents(agent_persistence),
     }
 }
 
@@ -220,19 +247,33 @@ fn support_agent() -> AgentWrite {
     }
 }
 
-/// p08 D4.7: a created agent has no channel; its address is an assistant channel made later.
-/// The mock's owned-channel write is unreachable, so reaching it fails the test.
+/// 01DEP-P03-D2: creation goes through company-agent creation, which answers with the agent's
+/// default desk; without it configured, creation refuses rather than writing a bare agent.
 #[tokio::test]
-async fn creating_an_agent_creates_only_the_agent() {
+async fn agent_default_desk_creation_goes_through_company_agents() {
     let fixture = fixture();
-    let agent = fixture
+    let created = fixture
         .use_cases
-        .create_agent(fixture.owner_id, fixture.company_id, support_agent())
+        .create_agent(fixture.owner_id, fixture.company_id, support_agent(), None)
         .await
         .expect("the agent is created");
-    assert_eq!(agent.slug, "support-triage");
-    assert_eq!(agent.company_id, Some(fixture.company_id));
-    assert_eq!(agent.provider, None);
+    assert_eq!(created.agent.slug, "support-triage");
+    assert_eq!(created.agent.company_id, Some(fixture.company_id));
+    assert!(!created.desk_id.is_nil());
+
+    let unconfigured = AgentUseCases::new(
+        Arc::new(company_double(Vec::new(), Vec::new())),
+        Arc::new(MockAgentPersistence {
+            agents: Mutex::new(Vec::new()),
+        }),
+        Arc::new(MockAgentPersistence {
+            agents: Mutex::new(Vec::new()),
+        }),
+    );
+    assert!(matches!(
+        unconfigured.company_agents(),
+        Err(AppError::Internal(message)) if message == "agent creation is not configured"
+    ));
 }
 
 /// The Simple tab checks the agent before it expands the prompt, so the two must refuse the same
@@ -301,8 +342,8 @@ async fn company_owner_agent_crud_flow_works() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
-        agent_persistence,
-    );
+    )
+    .with_company_agents(agent_persistence);
 
     // 0. Invalid reserved suffix slug rejection test
     let invalid_res = use_cases
@@ -314,8 +355,10 @@ async fn company_owner_agent_crud_flow_works() {
                 slug: "quiet".to_string(),
                 ..Default::default()
             },
+            None,
         )
-        .await;
+        .await
+        .map(|created| created.agent);
     assert!(invalid_res.is_err());
 
     // 1. Owner creates agent
@@ -332,8 +375,10 @@ async fn company_owner_agent_crud_flow_works() {
                 system_prompt: Some("Prompt".to_string()),
                 ..Default::default()
             },
+            None,
         )
         .await
+        .map(|created| created.agent)
         .unwrap();
 
     assert_eq!(agent.name, "Support Bot");
@@ -353,8 +398,10 @@ async fn company_owner_agent_crud_flow_works() {
                 slug: "hacker-bot".to_string(),
                 ..Default::default()
             },
+            None,
         )
-        .await;
+        .await
+        .map(|created| created.agent);
     assert!(err.is_err());
 
     // 3. List agents for company
@@ -487,8 +534,8 @@ async fn members_read_agents_and_admins_manage_them() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
-        agent_persistence,
-    );
+    )
+    .with_company_agents(agent_persistence);
 
     let agent = use_cases
         .create_agent(
@@ -499,8 +546,10 @@ async fn members_read_agents_and_admins_manage_them() {
                 slug: "support-bot".to_string(),
                 ..Default::default()
             },
+            None,
         )
         .await
+        .map(|created| created.agent)
         .expect("the owner creates the agent");
 
     let viewer = |user_id: Uuid, email: &str| Viewer {
@@ -583,8 +632,10 @@ async fn members_read_agents_and_admins_manage_them() {
                 slug: "admin-bot".into(),
                 ..Default::default()
             },
+            None,
         )
         .await
+        .map(|created| created.agent)
         .expect("an admin creates an agent");
     let managed = use_cases
         .update_agent(
@@ -657,17 +708,12 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
-        agent_persistence,
-    );
+    )
+    .with_company_agents(agent_persistence.clone());
 
     // The definition is copied field for field, and the company owns the copy.
     let provisioned = use_cases
-        .create_agent_from_library(
-            owner_id,
-            company_id,
-            runnable.id,
-            LibraryCopyModel::FollowDefault,
-        )
+        .create_agent_from_library(owner_id, company_id, runnable.id, None)
         .await
         .expect("the owner picks a library agent");
     assert_eq!(provisioned.agent.company_id, Some(company_id));
@@ -683,38 +729,12 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
     assert!(provisioned.warnings.is_empty());
 
     // A definition published on a model this company has not enabled still gets created --
-    // on the company default, and it says so rather than failing the pick.
-    let fallback = use_cases
-        .create_agent_from_library(
-            owner_id,
-            company_id,
-            elsewhere.id,
-            LibraryCopyModel::FollowDefault,
-        )
+    // pinned to the company default, because its desk answers on an explicit model
+    // (01DEP-P03-D3) -- and it says why its own model was dropped.
+    let pinned = use_cases
+        .create_agent_from_library(owner_id, company_id, elsewhere.id, None)
         .await
         .expect("a pick whose model is unavailable here");
-    assert_eq!(fallback.agent.provider, None);
-    assert_eq!(fallback.agent.model, None);
-    assert_eq!(
-        fallback
-            .warnings
-            .iter()
-            .map(|warning| warning.code.as_str())
-            .collect::<Vec<_>>(),
-        vec!["library_model_unavailable"]
-    );
-
-    // Onboarding pins a copy that would inherit to the company default (p08 D4.7), so its
-    // assistant channel can run it; the pick still says why its own model was dropped.
-    let pinned = use_cases
-        .create_agent_from_library(
-            owner_id,
-            company_id,
-            elsewhere.id,
-            LibraryCopyModel::PinDefault,
-        )
-        .await
-        .expect("a pinned pick");
     assert_eq!(pinned.agent.provider.as_deref(), Some("openai"));
     assert_eq!(pinned.agent.model.as_deref(), Some("gpt-4o"));
     assert_eq!(
@@ -725,27 +745,35 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
             .collect::<Vec<_>>(),
         vec!["library_model_unavailable"]
     );
-    // A copy published on a model the company runs keeps it.
-    let kept = use_cases
-        .create_agent_from_library(
-            owner_id,
-            company_id,
-            runnable.id,
-            LibraryCopyModel::PinDefault,
-        )
+    // A copy published on a model the company runs keeps it; a definition with none is pinned
+    // and says so.
+    let mut unmodelled = definition("Notes", "notes", "openai", "gpt-4o");
+    unmodelled.provider = None;
+    unmodelled.model = None;
+    agent_persistence
+        .agents
+        .lock()
+        .unwrap()
+        .push(unmodelled.clone());
+    let defaulted = use_cases
+        .create_agent_from_library(owner_id, company_id, unmodelled.id, None)
         .await
-        .expect("a pick on an enabled model");
-    assert_eq!(kept.agent.model.as_deref(), Some("gpt-4o"));
+        .expect("a pick with no model of its own");
+    assert_eq!(defaulted.agent.provider.as_deref(), Some("openai"));
+    assert_eq!(defaulted.agent.model.as_deref(), Some("gpt-4o"));
+    assert_eq!(
+        defaulted
+            .warnings
+            .iter()
+            .map(|warning| warning.code.as_str())
+            .collect::<Vec<_>>(),
+        vec!["library_model_pinned"]
+    );
 
     // A company agent is not a library definition, so it cannot be picked as one.
     assert!(
         use_cases
-            .create_agent_from_library(
-                owner_id,
-                company_id,
-                provisioned.agent.id,
-                LibraryCopyModel::FollowDefault,
-            )
+            .create_agent_from_library(owner_id, company_id, provisioned.agent.id, None)
             .await
             .is_err()
     );

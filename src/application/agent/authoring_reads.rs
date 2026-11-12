@@ -141,6 +141,26 @@ pub struct AgentDirectoryEntry {
     pub key: AgentKey,
     pub name: String,
     pub active_revision: Option<AgentRevisionId>,
+    /// The departments the agent is a member of or holds a role in, by slug (01DEP-P03-D10).
+    pub departments: Vec<DepartmentRef>,
+    /// The agent's default desk, while it exists.
+    pub desk: Option<AgentDesk>,
+}
+
+/// An agent's default desk: the one created with the agent, at its current primary address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AgentDesk {
+    pub id: Uuid,
+    pub address: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DepartmentRef {
+    pub id: Uuid,
+    pub name: String,
+    pub slug: String,
+    pub charter: Option<String>,
+    pub roles: Vec<crate::entities::department::DepartmentRole>,
 }
 
 #[derive(Debug, Clone, Serialize)]

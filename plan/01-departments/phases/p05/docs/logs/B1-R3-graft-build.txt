@@ -1,0 +1,10 @@
+✓ wiring: 28964 nodes (19111 function, 3070 struct, 2076 module, 1998 file, 1265 constant, 744 enum, 246 method, 213 interface, 208 type, 33 class), 43158 edges, 1998 cards [javascript, python, rust, typescript]
+  parsed: 1 of 1998 files (1997 replayed from cache)
+  → /Users/mac02/.codex/worktrees/2050/openbot/graft
+  graft/ is git-ignored (added automatically), a local cache; teammates run `graft build` to get their own.
+
+Retained command completion from tool session46753: exit0.
+✓ wiring: 28964 nodes (19111 function, 3070 struct, 2076 module, 1998 file, 1265 constant, 744 enum, 246 method, 213 interface, 208 type, 33 class), 43158 edges, 1998 cards [javascript, python, rust, typescript]
+  parsed: 1 of 1998 files (1997 replayed from cache)
+  → /Users/mac02/.codex/worktrees/2050/openbot/graft
+  graft/ is git-ignored, a local cache.

@@ -116,9 +116,18 @@ async fn channel_allowlist_leaves_a_manager_grant_alone() {
     )
     .await
     .unwrap();
+    // Each provenance owns its own row (DEP-P02-D1): the allowlist entry is added beside the
+    // manager's grant, which keeps its own provenance.
+    let mut added = provenances(&pool, channel.id, dana).await;
+    added.sort();
     assert_eq!(
-        provenances(&pool, channel.id, dana).await,
-        vec!["manager", "manager"],
+        added,
+        vec![
+            "configured_allowlist",
+            "configured_allowlist",
+            "manager",
+            "manager"
+        ],
         "adding the address does not relabel the manager's grant"
     );
 

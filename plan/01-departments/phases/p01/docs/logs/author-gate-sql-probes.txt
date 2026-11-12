@@ -1,0 +1,15 @@
+Author (A) SQL probes run on scratch DB openbot_dept_p01_sqlcheck during gate G1 (2026-11-09).
+Transcribed from the session's tool output; superseded as evidence by the B1 Rust tests.
+
+1. Shape guard (init schema + draft block): 8-level chain inserted; 9th INSERT ->
+   ERROR department ... cannot sit under ...: depth; UPDATE d1 parent=d5 -> cycle;
+   UPDATE parent_id=id -> cycle; department_shape_problem(d2 under root e1)=NULL,
+   (d2 under e2, level 2)=depth, (d2 under its descendant d7)=cycle; DELETE parent e1 with child ->
+   departments_parent_fk violation; BEGIN; DELETE FROM companies ...; count(departments)=0; ROLLBACK.
+2. Demotion trigger: member+lead rows for principal b2; UPDATE principals SET kind='external',
+   user_id=NULL -> members=0, roles=0.
+3. KEY SHARE vs in-flight demotion: session A BEGIN; UPDATE principals SET kind='external' (b3);
+   pg_sleep(2). Session B SET lock_timeout='300ms'; SELECT kind ... FOR KEY SHARE ->
+   ERROR canceling statement due to lock timeout (while locking tuple in "principals").
+   After A committed: INSERT INTO department_members (... b3) ->
+   ERROR principal ... cannot belong to or hold a role in a department (guard_department_principal_kind).

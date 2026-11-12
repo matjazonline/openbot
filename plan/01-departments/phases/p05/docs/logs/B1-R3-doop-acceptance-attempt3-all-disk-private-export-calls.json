@@ -1,0 +1,39 @@
+{
+  "screenshot": {
+    "tool": "get_frame_screenshot",
+    "arguments": {
+      "frame_id": "vdnzOJ72NV"
+    }
+  },
+  "png": {
+    "tool": "export_frame",
+    "arguments": {
+      "frame_id": "vdnzOJ72NV",
+      "format": "png"
+    }
+  },
+  "jpg": {
+    "tool": "export_frame",
+    "arguments": {
+      "frame_id": "vdnzOJ72NV",
+      "format": "jpg"
+    }
+  },
+  "pdf-small": {
+    "tool": "export_frame",
+    "arguments": {
+      "frame_id": "mo8mhksL_y",
+      "format": "pdf"
+    }
+  },
+  "pdf": {
+    "tool": "export_frame",
+    "arguments": {
+      "frame_id": "vdnzOJ72NV",
+      "format": "pdf",
+      "frame_ids": [
+        "ecasJDCQEf"
+      ]
+    }
+  }
+}

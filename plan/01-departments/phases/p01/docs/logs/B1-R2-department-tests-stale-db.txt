@@ -1,0 +1,180 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 34 tests
+test adapters::http::routes::department::tests::department_routes_hide_foreign_companies_and_refuse_members_and_strangers ... FAILED
+test adapters::http::routes::department::tests::department_routes_round_trip_and_refuse_an_unknown_role ... FAILED
+test adapters::persistence::department::tests::competing::department_competing_demotion_behind_a_member_add_removes_the_row ... ok
+test adapters::persistence::department::tests::competing::department_competing_creates_of_one_slug_leave_one_row ... ok
+test adapters::persistence::department::tests::competing::department_competing_lead_assignments_leave_one_holder ... ok
+test adapters::persistence::department::tests::competing::department_competing_member_add_behind_a_demotion_is_refused ... ok
+test adapters::persistence::department::tests::department_write_a_name_only_edit_keeps_every_other_field ... FAILED
+test adapters::persistence::department::tests::department_write_adds_and_removes_members ... FAILED
+test adapters::persistence::department::tests::department_write_assigns_replaces_and_clears_the_lead ... FAILED
+test adapters::persistence::department::tests::department_write_persistence_reauthorizes_every_write_under_the_lock ... FAILED
+test adapters::persistence::department::tests::department_write_preflight_names_the_departments_in_a_cycle_or_too_deep ... FAILED
+test adapters::persistence::department::tests::department_write_refuses_a_taken_slug_with_conflict ... FAILED
+test adapters::persistence::department::tests::department_write_refuses_deleting_a_department_with_children ... FAILED
+test adapters::persistence::department::tests::department_write_refuses_members_and_strangers_with_not_found ... FAILED
+test adapters::persistence::department::tests::department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_departments ... FAILED
+test adapters::persistence::department::tests::department_write_round_trips_create_rename_reparent_and_delete ... FAILED
+test adapters::persistence::department::tests::department_write_shows_a_member_only_their_departments ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_cascades_members_and_roles_and_keeps_children ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_drops_a_demoted_principal_from_every_department ... FAILED
+test adapters::persistence::department::tests::competing::department_competing_reparents_never_form_a_cycle ... ok
+test adapters::persistence::department::tests::schema::department_schema_grant_provenance_check_accepts_every_variant ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_refuses_a_cycle_and_its_own_parent ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_refuses_a_second_lead_and_an_unknown_role ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_refuses_cross_company_parents_and_principals ... FAILED
+test application::use_cases::department::tests::department_edit_normalize_touches_only_the_fields_it_sets ... ok
+test application::use_cases::department::tests::department_write_normalize_refuses_what_the_schema_would ... ok
+test application::use_cases::department::tests::department_write_normalize_trims_and_canonicalizes ... ok
+test domain::entities::department::tests::an_unknown_department_role_is_refused_by_name ... ok
+test domain::entities::department::tests::every_department_role_round_trips_through_its_stored_string ... ok
+test domain::entities::department::tests::the_lead_has_a_single_holder ... ok
+test adapters::persistence::department::tests::schema::department_schema_refuses_external_and_system_principals ... FAILED
+test adapters::persistence::department::tests::schema::department_schema_tears_down_a_nested_tree_with_its_company ... FAILED
+test adapters::persistence::department::tests::competing::department_competing_write_behind_an_admin_demotion_is_refused ... ok
+
+failures:
+
+---- adapters::http::routes::department::tests::department_routes_hide_foreign_companies_and_refuse_members_and_strangers stdout ----
+
+thread 'adapters::http::routes::department::tests::department_routes_hide_foreign_companies_and_refuse_members_and_strangers' (39164458) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::department::tests::department_routes_round_trip_and_refuse_an_unknown_role stdout ----
+
+thread 'adapters::http::routes::department::tests::department_routes_round_trip_and_refuse_an_unknown_role' (39164459) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_a_name_only_edit_keeps_every_other_field stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_a_name_only_edit_keeps_every_other_field' (39164549) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_adds_and_removes_members stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_adds_and_removes_members' (39164559) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_assigns_replaces_and_clears_the_lead stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_assigns_replaces_and_clears_the_lead' (39164573) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_persistence_reauthorizes_every_write_under_the_lock stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_persistence_reauthorizes_every_write_under_the_lock' (39164576) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_preflight_names_the_departments_in_a_cycle_or_too_deep stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_preflight_names_the_departments_in_a_cycle_or_too_deep' (39164579) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_refuses_a_taken_slug_with_conflict stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_refuses_a_taken_slug_with_conflict' (39164582) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_refuses_deleting_a_department_with_children stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_refuses_deleting_a_department_with_children' (39164585) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_refuses_members_and_strangers_with_not_found stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_refuses_members_and_strangers_with_not_found' (39164588) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_departments stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_departments' (39164591) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_round_trips_create_rename_reparent_and_delete stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_round_trips_create_rename_reparent_and_delete' (39164594) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::department_write_shows_a_member_only_their_departments stdout ----
+
+thread 'adapters::persistence::department::tests::department_write_shows_a_member_only_their_departments' (39164597) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_cascades_members_and_roles_and_keeps_children stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_cascades_members_and_roles_and_keeps_children' (39164600) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_drops_a_demoted_principal_from_every_department stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_drops_a_demoted_principal_from_every_department' (39164603) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_grant_provenance_check_accepts_every_variant stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_grant_provenance_check_accepts_every_variant' (39164609) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_refuses_a_cycle_and_its_own_parent stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_refuses_a_cycle_and_its_own_parent' (39164612) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep' (39164615) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_refuses_a_second_lead_and_an_unknown_role stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_refuses_a_second_lead_and_an_unknown_role' (39164621) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_refuses_cross_company_parents_and_principals stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_refuses_cross_company_parents_and_principals' (39164624) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_refuses_external_and_system_principals stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_refuses_external_and_system_principals' (39164627) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+---- adapters::persistence::department::tests::schema::department_schema_tears_down_a_nested_tree_with_its_company stdout ----
+
+thread 'adapters::persistence::department::tests::schema::department_schema_tears_down_a_nested_tree_with_its_company' (39164630) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: VersionMismatch(20260817000000)
+
+
+failures:
+    adapters::http::routes::department::tests::department_routes_hide_foreign_companies_and_refuse_members_and_strangers
+    adapters::http::routes::department::tests::department_routes_round_trip_and_refuse_an_unknown_role
+    adapters::persistence::department::tests::department_write_a_name_only_edit_keeps_every_other_field
+    adapters::persistence::department::tests::department_write_adds_and_removes_members
+    adapters::persistence::department::tests::department_write_assigns_replaces_and_clears_the_lead
+    adapters::persistence::department::tests::department_write_persistence_reauthorizes_every_write_under_the_lock
+    adapters::persistence::department::tests::department_write_preflight_names_the_departments_in_a_cycle_or_too_deep
+    adapters::persistence::department::tests::department_write_refuses_a_taken_slug_with_conflict
+    adapters::persistence::department::tests::department_write_refuses_deleting_a_department_with_children
+    adapters::persistence::department::tests::department_write_refuses_members_and_strangers_with_not_found
+    adapters::persistence::department::tests::department_write_removing_a_teammate_or_deleting_an_agent_leaves_their_departments
+    adapters::persistence::department::tests::department_write_round_trips_create_rename_reparent_and_delete
+    adapters::persistence::department::tests::department_write_shows_a_member_only_their_departments
+    adapters::persistence::department::tests::schema::department_schema_cascades_members_and_roles_and_keeps_children
+    adapters::persistence::department::tests::schema::department_schema_drops_a_demoted_principal_from_every_department
+    adapters::persistence::department::tests::schema::department_schema_grant_provenance_check_accepts_every_variant
+    adapters::persistence::department::tests::schema::department_schema_refuses_a_cycle_and_its_own_parent
+    adapters::persistence::department::tests::schema::department_schema_refuses_a_ninth_level_and_a_subtree_moved_too_deep
+    adapters::persistence::department::tests::schema::department_schema_refuses_a_second_lead_and_an_unknown_role
+    adapters::persistence::department::tests::schema::department_schema_refuses_cross_company_parents_and_principals
+    adapters::persistence::department::tests::schema::department_schema_refuses_external_and_system_principals
+    adapters::persistence::department::tests::schema::department_schema_tears_down_a_nested_tree_with_its_company
+
+test result: FAILED. 12 passed; 22 failed; 0 ignored; 0 measured; 3762 filtered out; finished in 2.82s
+
+error: test failed, to rerun pass `--lib`

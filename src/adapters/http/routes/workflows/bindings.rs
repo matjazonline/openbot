@@ -527,6 +527,7 @@ pub async fn runs(
         state: query.state,
         agent,
         lineage: query.lineage.unwrap_or_default(),
+        department: None,
     };
     let page = engine
         .reads()

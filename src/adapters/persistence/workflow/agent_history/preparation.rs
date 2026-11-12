@@ -36,7 +36,15 @@ pub(in crate::adapters::persistence::workflow) async fn prepare(
             let mut connection = bound.acquire(persistence.pool()).await?;
             let mut tx = bound.begin(&mut connection).await?;
             let fetched = recall.lock().map_err(|_| invalid())?.take();
-            let body = Box::pin(prepare_on(&mut tx, claim, &bound, fetched, capture)).await;
+            let body = Box::pin(prepare_on(
+                &mut tx,
+                claim,
+                &bound,
+                persistence.app_domain(),
+                fetched,
+                capture,
+            ))
+            .await;
             bound.end(tx, body).await
         }))
         .await;
@@ -91,7 +99,7 @@ async fn resolve_on(
     }
     // This separate transaction may authorize Ready work; keep global-before-local order.
     let mut tx = bound.begin(&mut connection).await?;
-    let body = Box::pin(proof_on(&mut tx, claim, bound)).await;
+    let body = Box::pin(proof_on(&mut tx, claim, bound, persistence.app_domain())).await;
     bound.roll_back(tx, body).await
 }
 
@@ -99,10 +107,11 @@ async fn prepare_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
+    domain: Option<&str>,
     recall: Option<crate::application::workflow::memory_recall::FetchedRecall>,
     capture: bool,
 ) -> AppResult<End<Preparation>> {
-    let candidate = Box::pin(candidate_on(tx, claim, bound)).await?;
+    let candidate = Box::pin(candidate_on(tx, claim, bound, domain)).await?;
     let prepared = match candidate.context {
         None => candidate.prepared,
         Some(context) => {
@@ -148,11 +157,12 @@ async fn proof_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
+    domain: Option<&str>,
 ) -> AppResult<Evidence<Preparation>> {
     if let Some(wait) = turn_waits::parked_on(tx, claim.fence).await? {
         return Ok(Evidence::Applied(Preparation::Parked(wait)));
     }
-    let candidate = Box::pin(candidate_on(tx, claim, bound)).await?;
+    let candidate = Box::pin(candidate_on(tx, claim, bound, domain)).await?;
     let Some(context) = candidate.context else {
         return Ok(Evidence::Applied(Preparation::Ready(Box::new(
             candidate.prepared,
@@ -211,6 +221,7 @@ pub(super) async fn candidate_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
+    domain: Option<&str>,
 ) -> AppResult<Candidate> {
     let LockedAgent {
         actor,
@@ -220,7 +231,21 @@ pub(super) async fn candidate_on(
     if facts.step != claim.activation.step || facts.inputs != claim.activation.inputs {
         return Err(missing());
     }
-    let prepared = build(selection, &facts)?;
+    let mut prepared = build(selection, &facts)?;
+    // A run on a department-owned desk answers inside its department (01DEP-P03-D11).
+    if facts.kind == ModelStep::AgentRun
+        && let Some(channel) = facts.channel_id
+    {
+        let department = crate::adapters::persistence::department_roster::department_context_on(
+            tx,
+            claim.fence.scope.company,
+            domain,
+            channel,
+            prepared.agent_id(),
+        )
+        .await?;
+        prepared = prepared.with_department(department)?;
+    }
     let context = if agent_history_eligible(facts.kind) {
         let action = ActionScope {
             company: claim.fence.scope.company,

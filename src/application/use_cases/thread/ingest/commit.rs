@@ -230,6 +230,8 @@ mod tests {
             created_by: CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }
     }
 

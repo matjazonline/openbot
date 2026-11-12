@@ -42,9 +42,10 @@ impl Filters {
         let grouping = match self.group.as_deref().unwrap_or("model") {
             "model" => UsageGrouping::Model,
             "workflow" => UsageGrouping::Workflow,
+            "department" => UsageGrouping::Department,
             _ => {
                 return Err(AppError::BadRequest(
-                    "Group must be model or workflow".into(),
+                    "Group must be model, workflow or department".into(),
                 ));
             }
         };
@@ -173,6 +174,7 @@ mod tests {
                 end: query.end,
                 grouping: query.grouping,
                 groups: vec![UsageGroup {
+                    department: None,
                     provider: Some("<script>".into()),
                     model: Some("\"onfocus=\"evil".into()),
                     workflow: None,

@@ -1,0 +1,29 @@
+diff --git a/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/managed-source/tests/fixtures/canvasClipboard.html b/Users/mac02/openbot-p05-r3-wr3kxbjm/doop-clipboard-source/tests/fixtures/canvasClipboard.html
+index 8ba273a8..770286b9 100644
+--- a/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/managed-source/tests/fixtures/canvasClipboard.html
++++ b/Users/mac02/openbot-p05-r3-wr3kxbjm/doop-clipboard-source/tests/fixtures/canvasClipboard.html
+@@ -6,6 +6,11 @@
+   <body>
+     <div id="root"></div>
+     <script type="module">
++      // Synthetic layout/interaction fixture; no authorization/admission proof.
++      import { createElement as privateFixtureElement } from 'react'
++      import { PrivateMaterializationContext } from '/src/lib/privateMaterialization.ts'
++      import { fixturePrivateMaterializer } from '/tests/privateMediaAdapter.ts'
++
+       import React from 'react'
+       import { createRoot } from 'react-dom/client'
+       import { CanvasPage } from '/src/pages/CanvasPage.tsx'
+@@ -34,7 +39,11 @@
+         undo,
+       }
+       createRoot(document.getElementById('root')).render(
+-        React.createElement(TooltipProvider, null, React.createElement(CanvasPage, { canvasId: 'c' })),
++        privateFixtureElement(
++          PrivateMaterializationContext.Provider,
++          { value: fixturePrivateMaterializer },
++          React.createElement(TooltipProvider, null, React.createElement(CanvasPage, { canvasId: 'c' })),
++        ),
+       )
+     </script>
+   </body>

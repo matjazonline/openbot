@@ -325,18 +325,18 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
     };
     let saved = bind(f.owner, board, "").await;
     assert!(
-        saved.contains("Saved binding") && saved.contains("Channel Board"),
+        saved.contains("Saved binding") && saved.contains("Desk Board"),
         "{saved}"
     );
     // The admin manages the workflow but is not on the board's allowlist.
     let admin = f.pane(f.admin, workflow, "bindings").await.unwrap();
     assert!(!admin.contains("Board"), "{admin}");
-    assert!(admin.contains("1 more of the listed binding is on channels you cannot see"));
+    assert!(admin.contains("1 more of the listed binding is on desks you cannot see"));
     assert!(admin.contains(&format!(
-        r#"<option value="channel:{open}">Channel Open desk</option>"#
+        r#"<option value="channel:{open}">Desk Open desk</option>"#
     )));
     let refused = bind(f.admin, board, "").await;
-    assert!(refused.contains("Not saved: A chosen channel"), "{refused}");
+    assert!(refused.contains("Not saved: A chosen desk"), "{refused}");
     let card = async |user: Uuid, channel: Uuid| {
         channel_bindings(f.ui(user), Path(channel), f.query())
             .await
@@ -351,7 +351,7 @@ async fn channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card(
         quiet.contains("No responding workflow is selected"),
         "{quiet}"
     );
-    assert!(quiet.contains("No workflow is bound to this channel."));
+    assert!(quiet.contains("No workflow is bound to this desk."));
     // An active binding with a message trigger answers the channel.
     let saved = bind(f.owner, open, "direct").await;
     assert!(saved.contains("Saved binding"), "{saved}");

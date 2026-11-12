@@ -33,10 +33,10 @@ pub fn model_usage_page(company: Uuid, query: &UsageQuery, report: &UsageReport)
         escape_html_text(&report.start.to_rfc3339()),
         escape_html_text(&report.end.to_rfc3339()),
         report.scanned_calls,
-        if report.grouping == UsageGrouping::Model {
-            "model"
-        } else {
-            "workflow"
+        match report.grouping {
+            UsageGrouping::Model => "model",
+            UsageGrouping::Workflow => "workflow",
+            UsageGrouping::Department => "department",
         },
         if report.prices_truncated {
             "<p role=\"status\">Only the first 200 configured prices are shown.</p>"
@@ -51,7 +51,7 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
     format!(
         r#"<form method="get" action="/ui/companies/{company}/usage" class="flex flex-wrap gap-3 items-end" data-submit="busy-once" data-pending-label="Working…">
 <label>Last days <input class="input" type="number" name="days" min="1" max="90" value="{}" required></label>
-<label>Group by <select class="select" name="group"><option value="model" {}>Model</option><option value="workflow" {}>Workflow</option></select></label>
+<label>Group by <select class="select" name="group"><option value="model" {}>Model</option><option value="workflow" {}>Workflow</option><option value="department" {}>Department</option></select></label>
 <label>Agent ID (optional) <input class="input" name="agent" value="{}" maxlength="36"></label>
 <label>Workflow ID (optional) <input class="input" name="workflow" value="{}" maxlength="36"></label>
 <button class="btn btn-primary" type="submit"><span data-label>Show usage</span></button></form>"#,
@@ -66,12 +66,22 @@ fn filter_form(company: Uuid, query: &UsageQuery) -> String {
         } else {
             ""
         },
+        if query.grouping == UsageGrouping::Department {
+            "selected"
+        } else {
+            ""
+        },
         query.agent.map_or(String::new(), |id| id.to_string()),
         query.workflow.map_or(String::new(), |id| id.to_string())
     )
 }
 fn usage_row(group: &UsageGroup) -> String {
     let label = match (&group.provider, &group.model, group.workflow) {
+        _ if group.department.is_some() => group
+            .department
+            .as_ref()
+            .map(|department| department.name.clone())
+            .unwrap_or_default(),
         (Some(provider), Some(model), _) => format!("{provider} / {model}"),
         (_, _, Some(id)) => format!("Workflow {id}"),
         _ => "Standalone agent activity".into(),

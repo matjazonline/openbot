@@ -224,6 +224,7 @@ pub async fn board(
         binding,
         workflow,
         agent,
+        department: None,
     };
     let board = visible_board(&engine, company, actor, &scope, query.window, Utc::now()).await?;
     Ok(ok(board_json(&board)))

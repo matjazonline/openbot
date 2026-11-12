@@ -45,14 +45,33 @@ remain desks. No old rows or addresses need conversion.
 
 | Evidence | Status |
 | --- | --- |
-| 01 focused checks (schema guards, writes, competing writers) | Pending |
-| 02 focused checks (ownership, members-only, relay, desk wording) | Pending |
-| 03 focused checks (automatic agent desks, competing creates, department desk, round trip, loop, directory) | Pending |
-| 04 rendering and route tests, documentation checks | Pending |
-| Formatting, offline compilation, clippy and reachability | Pending |
-| Fresh migrations and SQLx metadata | Pending |
-| Database-backed full suite and network isolation | Pending |
-| Stack and lease budgets | Pending |
-| Startup plan paths and graph refresh | Pending |
+| 01 focused checks (schema guards, writes, competing writers) | Accepted in p01; B1-R2 artifact `ccc4ee26…3880` |
+| 02 focused checks (ownership, members-only, relay, desk wording) | Accepted in p02; B1-R2 `cbca0a00…438f`, B2-R1 `6cd8b092…e5bf` |
+| 03 focused checks (automatic agent desks, competing creates, department desk, directory/context) | Accepted in p03; B1-R2 `a75c40e7…5798`, B2-R2 `31d16940…39ea`, B3-R2 `0db98506…dbf1`. Dispatch round-trip/loop checks deferred by user decision C004 r1; they are not implemented or claimed as passing. |
+| 04 rendering and route tests, documentation checks | Accepted in p04; B1-R2 `9cad3b57…3848`, B2-R2 `a97fdbeb…58ba`, B3-R2 `30567a29…c675` |
+| Formatting, offline compilation, clippy and reachability | PASS in p05 resumed gate |
+| Fresh migrations and SQLx metadata | PASS; fresh disposable DB preparation left `.sqlx` unchanged; resumed migrate/prepare check passed |
+| Database-backed full suite and network isolation | Network guard PASS; library 4,142 passed, 2 unrelated failures, 24 ignored. Binary target 5/5 PASS separately. See p05 TASK and retained source-identity evidence. |
+| Stack and lease budgets | Stock run at 2,048 KiB completed: 4,143 passed, 1 unrelated scanner failure, 24 ignored; no overflow. Lease budget PASS at unchanged 50% WORK threshold. |
+| Startup plan paths and graph refresh | PASS: CI integration-docs check and `graft build` |
+| CI-only static/browser protocols and plugin packaging | All 28 checks have successful evidence, retaining initial browser-prerequisite failures. Reproducible plugin package and locked production install PASS with Node 24.21.0/npm 11.19.0. |
+| Query statistics activation and privacy | PASS on a p05-owned PostgreSQL 18.6 cluster after fresh app migrations: required settings, zero parameter-log limits, numeric queryid and normalized query text asserted. Shared server unchanged. |
+| Docker production image, Doop deployment and live memory-service CI jobs | PASS: actual production image guards/retrieval/RSS; pinned managed Doop service (2,711 full-run passes plus all 17 previously Darwin-skipped clipboard cases passing on isolated Linux), current private image and all four acceptance profiles (104 checks); six real memory-service tests with pinned model/pgvector. Failed attempts and fixture correction retained in p05 R3 evidence. |
 
 Do not declare the implementation complete while a required check is unavailable.
+
+The authoritative execution record is [p05 TASK](phases/p05/docs/TASK.md), with exact prerequisite
+artifact identities in `phases/p05/docs/logs/B1-prerequisite-identities.json`. The required affected integration gates now have successful execution evidence. Independent
+review and phase acceptance are recorded in p05 TASK/REVIEW. The full/stock commands still retain
+their confirmed unrelated failures; this completion record does not claim a wholly green suite.
+R4 completes the missing Linux clipboard coverage by applying the existing synthetic rendering
+fixture adapter to its HTML harness; all 17 original assertions remain unchanged. The ignored
+Doop helper checks and closes each consumed model after its editor step commits, retaining the
+exact exchange/secret checks and existing timeouts. The final real Doop run used the updated
+package/image and immutable current helper on an owned 8-CPU Docker fixture. Exact identities,
+failed attempts, resource isolation and cleanup are retained in the phase records.
+
+Raw `.txt` and `.diff` evidence under p05 `docs/logs/` is archived as binary data by the
+phase-local `.gitattributes`, preserving pinned bytes and line endings. Source, Markdown, Python
+and JSON retain normal whitespace checks. Final staged whitespace and evidence retention are
+checked after staging the complete correction.

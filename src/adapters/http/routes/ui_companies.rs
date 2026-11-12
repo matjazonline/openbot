@@ -43,6 +43,7 @@ use crate::{
         company::{CompanyModelConnectionWrite, CompanyUseCases, CompanyWrite},
         company_invite::CompanyInviteUseCases,
         company_resend_api::{CompanyResendApiUseCases, SubmittedResendApiIntegration},
+        department::DepartmentUseCases,
         skill::{MAX_SKILL_PAGE_SIZE, SkillPage, SkillPageRequest, SkillUseCases},
         user::UserUseCases,
     },
@@ -51,6 +52,7 @@ use crate::{
 use super::{
     channel::slugify,
     ui::{load_account, load_readable_company, workspace_user},
+    ui_departments::{DepartmentSelection, department_section},
     ui_team::{TeamRequest, team_tab_body},
 };
 
@@ -88,6 +90,8 @@ pub struct WorkspaceQuery {
     pub member_id: Option<Uuid>,
     /// The Team tab's selected invite.
     pub invite_id: Option<Uuid>,
+    /// The Departments tab's selected department.
+    pub department_id: Option<Uuid>,
 }
 
 /// A submitted company, before it is a [`Company`].
@@ -130,6 +134,7 @@ struct Workspace {
     resend_api_use_cases: Arc<CompanyResendApiUseCases>,
     user_use_cases: Arc<UserUseCases>,
     skill_use_cases: Arc<SkillUseCases>,
+    department_use_cases: Arc<DepartmentUseCases>,
     config: Arc<AppConfig>,
     user_id: Uuid,
 }
@@ -151,6 +156,7 @@ impl FromRequestParts<AppState> for Workspace {
             resend_api_use_cases: state.company_resend_api_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             skill_use_cases: state.skill_use_cases.clone(),
+            department_use_cases: state.department_use_cases.clone(),
             config: state.config.clone(),
             user_id: user.id,
         })
@@ -194,9 +200,14 @@ impl Workspace {
             .skill_use_cases
             .count_company(self.user_id, company_id)
             .await?;
+        let departments = self
+            .department_use_cases
+            .list_departments(self.user_id, company_id)
+            .await?;
 
         Ok(CompanyCounts {
             channels: channels.len(),
+            departments: departments.len(),
             agents: agents.len(),
             skills: usize::try_from(skills).unwrap_or(usize::MAX),
         })
@@ -327,6 +338,47 @@ impl Workspace {
         }))
     }
 
+    /// The Departments tab: the department tree beside the selected department or the create
+    /// form, which only an owner or admin is offered.
+    async fn departments_pane(
+        &self,
+        access: &CompanyAccess,
+        department: Option<Uuid>,
+        creating: bool,
+    ) -> AppResult<String> {
+        let editable = access.membership.is_owner();
+        let counts = self.counts(access.company.id, editable).await?;
+        let selection = match department {
+            _ if creating => DepartmentSelection::Create(pages::DepartmentDraft::default()),
+            Some(id) => DepartmentSelection::Department {
+                id: crate::entities::department::DepartmentId::new(id),
+                draft: None,
+            },
+            None => DepartmentSelection::None,
+        };
+        let section = department_section(
+            &self.department_use_cases,
+            &self.config,
+            self.user_id,
+            access,
+            selection,
+            None,
+            None,
+        )
+        .await?;
+        Ok(pages::company_edit_pane(&pages::CompanyEditPane {
+            company: &access.company,
+            model_connections: &[],
+            app_domain_name: &self.config.app_domain_name,
+            counts,
+            draft: None,
+            error: None,
+            editable,
+            resend_api_section: "",
+            body: pages::CompanyPaneBody::Departments(&section),
+        }))
+    }
+
     /// The sidebar with nothing lit, out of band beside a pane that belongs to no company —
     /// the placeholder, or the create form.
     async fn deselected_list(&self) -> AppResult<String> {
@@ -434,6 +486,11 @@ async fn companies_page(
                         creating,
                     },
                 )
+                .await?
+        }
+        Some(selected) if tab == CompanyTab::Departments => {
+            workspace
+                .departments_pane(selected, query.department_id, creating)
                 .await?
         }
         Some(selected) if tab == CompanyTab::Skills => {

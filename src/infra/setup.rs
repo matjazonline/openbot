@@ -193,6 +193,7 @@ fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<Ap
         company_resend_api_use_cases: c.cases.resend,
         company_resend_api_accounts: p.clone(),
         channel_use_cases: c.cases.channel,
+        department_use_cases: c.cases.department,
         schedule_use_cases: c.cases.schedules,
         agent_use_cases: c.cases.agent,
         onboarding_use_cases: c.cases.onboarding,

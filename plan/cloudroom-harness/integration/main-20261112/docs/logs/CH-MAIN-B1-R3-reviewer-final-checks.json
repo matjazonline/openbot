@@ -1,0 +1,45 @@
+{
+  "artifact": "a0aa542552ba808a17447d5c219eb6777ec00c9c0801550da8dc8329219b2554",
+  "inherited_whitespace_files_checked": 331,
+  "inherited_whitespace_mismatches": [],
+  "baseline_source_identity": [
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/sample.rs",
+      "both_inputs_identical": true
+    },
+    {
+      "path": "src/adapters/mcp/tests.rs",
+      "both_inputs_identical": true
+    }
+  ],
+  "product_target_whitespace_exit": 0,
+  "product_target_whitespace_output": "",
+  "actual_test_lines": {
+    "normal": {
+      "documented_company_agent_update_decodes_with_explicit_native_permissions": [
+        "test adapters::http::routes::ui_agents::form_tests::documented_company_agent_update_decodes_with_explicit_native_permissions ... ok"
+      ],
+      "doop_agent_observe_policy_keeps_error_observation_available_to_the_model": [
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model has been running for over 60 seconds",
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok"
+      ],
+      "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas": [
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas has been running for over 60 seconds",
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok"
+      ]
+    },
+    "stock": {
+      "documented_company_agent_update_decodes_with_explicit_native_permissions": [
+        "test adapters::http::routes::ui_agents::form_tests::documented_company_agent_update_decodes_with_explicit_native_permissions ... ok"
+      ],
+      "doop_agent_observe_policy_keeps_error_observation_available_to_the_model": [
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model has been running for over 60 seconds",
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok"
+      ],
+      "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas": [
+        "test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok"
+      ]
+    }
+  },
+  "final_log_sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+}

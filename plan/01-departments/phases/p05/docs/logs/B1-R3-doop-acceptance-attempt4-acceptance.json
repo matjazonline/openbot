@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "status": "PASS",
+  "runs": [
+    {
+      "name": "all-disk",
+      "status": "PASS",
+      "checks": 42,
+      "report_sha256": "8f9a20691ea6cefe99c04f9d8bd3ab141f9ea95504333f38ee814368185743d8",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    },
+    {
+      "name": "all-bucket",
+      "status": "PASS",
+      "checks": 43,
+      "report_sha256": "e76bedee06ebd251dfb07ea0483bf8b8c41821f01b25fdd17dc3ebd863421532",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    },
+    {
+      "name": "e2e-disk",
+      "status": "PASS",
+      "checks": 9,
+      "report_sha256": "adfb1aea10e3d9bf46c603c26783d95f2dbf3cf2a43a48fe492eae9aced9c161",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    },
+    {
+      "name": "e2e-bucket",
+      "status": "PASS",
+      "checks": 10,
+      "report_sha256": "4ef99f72bb6ecb2e11af918e19c4bb184dc6da1d9cf7a83178431580f7f0966f",
+      "cleanup_sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+    }
+  ],
+  "scope": "actual private image, both storage modes and both required probe families",
+  "identity": {
+    "source": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+    "image": {
+      "image_id": "sha256:a926537dbd8855e1b2c79292eb09d8a25705182e71f84f87526ba18ca74da285",
+      "manifest_digest": "sha256:a926537dbd8855e1b2c79292eb09d8a25705182e71f84f87526ba18ca74da285",
+      "archive_sha256": "092dab972c15d2ae56ad66859f0ee76fbc317445d511fbf6098222becb41e191",
+      "user": "node"
+    },
+    "openbot_helper_sha256": "fc79364ef9bf636b677c6943a77d0a4628b3765d072f0907d847484f788fa9a9"
+  }
+}

@@ -75,6 +75,11 @@ pub struct Channel {
     pub settings_revision: i64,
     pub created_by: CreationProvenance,
     pub created_at: chrono::DateTime<chrono::Utc>,
+    /// The department this desk belongs to. Ownership never blocks deleting the desk.
+    pub department_id: Option<crate::entities::department::DepartmentId>,
+    /// Only the owning department may use this desk: its access mode is then `Allowlist` and its
+    /// department-derived grants are the allowlist, beside any configured email entries.
+    pub members_only: bool,
 }
 
 /// Participant list entry that opens a channel to any sender.
@@ -274,6 +279,8 @@ mod tests {
             created_by: CreationProvenance::system(),
             created_at: chrono::Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }
     }
 

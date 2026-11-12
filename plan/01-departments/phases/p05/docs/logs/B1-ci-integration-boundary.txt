@@ -1,0 +1,2 @@
+Command: python3 scripts/integration-boundary.py
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS

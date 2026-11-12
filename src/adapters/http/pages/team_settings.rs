@@ -434,7 +434,7 @@ pub fn member_pane(pane: &MemberPane<'_>) -> String {
                         <dd class="truncate text-sm font-medium">{company_name}</dd>
                     </div>
                 </dl>
-                <p class="mb-4 text-xs opacity-70">A team member is trusted by every channel in this company that has no participant list of its own.</p>
+                <p class="mb-4 text-xs opacity-70">A team member is trusted by every desk in this company that has no participant list of its own.</p>
                 {removal}
                 <p class="mt-3 text-[11px] opacity-60">{footnote}</p>
             </div>
@@ -530,7 +530,7 @@ fn removal_confirmation(pane: &MemberPane<'_>) -> String {
     let username = member_name(pane.member);
     let company_name = &pane.company.name;
     format!(
-        "Remove {username} from the {company_name} team? They lose access to its channels and \
+        "Remove {username} from the {company_name} team? They lose access to its desks and \
          threads."
     )
 }
@@ -550,7 +550,7 @@ fn member_access_role_form(pane: &MemberPane<'_>) -> String {
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Access Role</span></div>
                         <select name="role" class="select w-full">{options}</select>
-                        <div class="label"><span class="text-[11px] opacity-60">Admins can manage channels, agents, schedules, tasks and deliveries, and view the company dashboard. Members can work in the inbox.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Admins can manage desks, agents, schedules, tasks and deliveries, and view the company dashboard. Members can work in the inbox.</span></div>
                     </label>
                     <button type="submit" class="btn btn-primary btn-sm">
                         <span class="loading loading-spinner loading-xs hidden [.htmx-request_&]:inline-block"></span>
@@ -767,7 +767,7 @@ pub fn invite_create_pane(pane: &InviteCreatePane<'_>) -> String {
         <section id="team-pane"{PANE_SKELETON} class="flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">Invite someone to {company_name}</h2>
-                <p class="text-xs opacity-70">They join by accepting the invite from their own account, and are then trusted by every channel with no participant list of its own.</p>
+                <p class="text-xs opacity-70">They join by accepting the invite from their own account, and are then trusted by every desk with no participant list of its own.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}

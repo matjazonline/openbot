@@ -1,0 +1,77 @@
+{
+  "version": 1,
+  "suite": "e2e",
+  "requests": 48,
+  "privateRequests": 20,
+  "checks": [
+    {
+      "name": "production signup limit honored before the fourth disposable account",
+      "status": "PASS"
+    },
+    {
+      "name": "normal signup, separate human/bot accounts, workspaces and key minting",
+      "status": "PASS"
+    },
+    {
+      "name": "live two-company Openbot document workflows and current approvals",
+      "status": "PASS"
+    },
+    {
+      "name": "live worker restart reuses known creates and parks a lost receipt",
+      "status": "PASS"
+    },
+    {
+      "name": "live document edits persist and bot keys reopen and export",
+      "status": "PASS"
+    },
+    {
+      "name": "live ordinary humans reopen their generated private documents",
+      "status": "PASS"
+    },
+    {
+      "name": "live human PDF controls export generated private documents",
+      "status": "PASS"
+    },
+    {
+      "name": "live generated document IDs and private media deny foreign and signed-out access",
+      "status": "PASS"
+    },
+    {
+      "name": "actual private bucket origin rejects unsigned known files",
+      "status": "PASS"
+    },
+    {
+      "name": "private acceptance browser cleanup",
+      "status": "PASS"
+    }
+  ],
+  "openbot_helper_sha256": "1d94d46c28196318f202a1d0466d3aa917edc82e240068b4afb8ff950d31bda6",
+  "setup": {
+    "version": 1,
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "source": "https://github.com/kgoedecke/doop.git",
+    "bun": "1.3.10",
+    "lock_sha256": "9fc8b3c110b390a9c46975da45c3a297090096703f9d9721dcea19f84dad28e3",
+    "sdk": "1.30.0"
+  },
+  "source_identity": {
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+    "kind": "packaged managed source"
+  },
+  "storage_mode": "bucket",
+  "restarts": 1,
+  "deployment": "disposable verified image/nativePostgreSQL/localTLS",
+  "image": {
+    "image_id": "sha256:a50708c0d9a1a849d1453c586fba3242e8ae340091087303fea8e13896e321f1",
+    "manifest_digest": "sha256:a50708c0d9a1a849d1453c586fba3242e8ae340091087303fea8e13896e321f1",
+    "archive_sha256": "7ffbce1ca0d223277eb3c7e840f6fb090e4b7d76fc65274056d5d106204ae5d1",
+    "user": "node"
+  },
+  "tls": {
+    "native_client": "run-local CA/hostname verification",
+    "browser": "exact generated server SPKI",
+    "openbot_helper": "run-local CA through test-only EndpointPolicy root",
+    "public_certificate_or_production_origin": false
+  }
+}

@@ -1,0 +1,44 @@
+# 01DEP-P02-B1-R1 reviewer probe: department write deleting a join row, then the p02 sync locking the same principal FOR KEY SHARE, vs a demotion of that principal
+# Scratch DB openbot_dept_p02_review, working-tree init schema at digest a3b1ed11…, PostgreSQL 18.6 (Homebrew)
+```sql
+\set ON_ERROR_STOP 1
+BEGIN;
+INSERT INTO users(id, username, email) VALUES ('10000000-0000-0000-0000-000000000001','owner1','owner1@example.test'),('10000000-0000-0000-0000-000000000002','mem1','mem1@example.test');
+INSERT INTO companies(id, user_id, name, slug) VALUES ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Acme','acme');
+INSERT INTO company_members(id, company_id, user_id, role, access_level) VALUES
+ (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','owner',9),
+ (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','member',0);
+INSERT INTO principals(id, company_id, kind, user_id, display_label) VALUES
+ ('30000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000002','Mem');
+COMMIT;
+INSERT INTO departments(id, company_id, name, slug, created_by) VALUES ('40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Ops','ops','{"actor_type":"system","actor_id":null,"actor_name":"t"}');
+INSERT INTO department_members VALUES ('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','30000000-0000-0000-0000-000000000002');
+INSERT INTO department_roles VALUES ('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000001','lead','30000000-0000-0000-0000-000000000002');
+```
+T1 statements mirror remove_department_member_on (department.rs) followed by lock_principals_on (department_desks.rs); T2 mirrors the demotion UPDATE of AgentPersistence::delete / user_lifecycle.
+```
+## T1 = remove_department_member_on(P) then the p02 sync locking P (still the lead) FOR KEY SHARE; T2 = demotion of P (agent delete / account deletion take no company lock)
+--- T1:
+BEGIN
+DELETE 1
+ pg_sleep 
+----------
+ 
+(1 row)
+
+                  id                  
+--------------------------------------
+ 30000000-0000-0000-0000-000000000002
+(1 row)
+
+COMMIT
+--- T2:
+ERROR:  deadlock detected
+DETAIL:  Process 56000 waits for ShareLock on transaction 11739781; blocked by process 55997.
+Process 55997 waits for ShareLock on transaction 11739790; blocked by process 56000.
+HINT:  See server log for query details.
+CONTEXT:  while deleting tuple (0,1) in relation "department_members"
+SQL statement "DELETE FROM public.department_members AS member
+     WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id"
+PL/pgSQL function department_principal_demoted() line 3 at SQL statement
+```

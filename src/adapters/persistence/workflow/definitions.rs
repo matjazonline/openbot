@@ -130,41 +130,13 @@ impl WorkflowDefinitions for PostgresPersistence {
     async fn save_draft(&self, command: PreparedDraft) -> AppResult<()> {
         let mut tx = self.pool.begin().await?;
         let state = command.state();
-        let draft = &state.draft;
-        authorize_company(&mut tx, draft.company(), command.actor()).await?;
-        match command.expected() {
-            None => insert_draft(&mut tx, draft).await?,
-            Some(expected) => {
-                let count = sqlx::query(
-                    "UPDATE workflow_definitions SET revision = $3, title = $4, \
-                    description = $5, source = $6, archived = $7 \
-                    WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived \
-                      AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
-                        WHERE broker.company_id=workflow_definitions.company_id \
-                          AND broker.workflow_id=workflow_definitions.id)",
-                )
-                .bind(draft.company().as_uuid())
-                .bind(draft.workflow().as_uuid())
-                .bind(revision(draft.revision().get())?)
-                .bind(draft.title())
-                .bind(draft.description())
-                .bind(draft.source())
-                .bind(state.archived)
-                .bind(revision(expected.get())?)
-                .execute(&mut *tx)
-                .await?
-                .rows_affected();
-                if count != 1 {
-                    return Err(conflict());
-                }
-            }
-        }
-        event(
+        authorize_company(&mut tx, state.draft.company(), command.actor()).await?;
+        save_draft_on(
             &mut tx,
-            draft,
+            &state.draft,
             command.actor(),
-            if state.archived { "archived" } else { "saved" },
-            None,
+            command.expected(),
+            state.archived,
         )
         .await?;
         tx.commit().await?;
@@ -223,6 +195,53 @@ pub(super) async fn publish_on(
     )
     .await?;
     Ok(command.bundle.clone())
+}
+
+/// One draft write and its event under the company lock the caller holds: a new draft, or the
+/// next revision of the one at `expected`. `save_draft` and a department desk following its lead
+/// (01DEP-P03-D9) both write through it.
+pub(super) async fn save_draft_on(
+    tx: &mut Transaction<'_, Postgres>,
+    draft: &CompanyWorkflowDraft,
+    actor: WorkflowActor,
+    expected: Option<DraftRevision>,
+    archived: bool,
+) -> AppResult<()> {
+    match expected {
+        None => insert_draft(tx, draft).await?,
+        Some(expected) => {
+            let count = sqlx::query(
+                "UPDATE workflow_definitions SET revision = $3, title = $4, \
+                description = $5, source = $6, archived = $7 \
+                WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived \
+                  AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
+                    WHERE broker.company_id=workflow_definitions.company_id \
+                      AND broker.workflow_id=workflow_definitions.id)",
+            )
+            .bind(draft.company().as_uuid())
+            .bind(draft.workflow().as_uuid())
+            .bind(revision(draft.revision().get())?)
+            .bind(draft.title())
+            .bind(draft.description())
+            .bind(draft.source())
+            .bind(archived)
+            .bind(revision(expected.get())?)
+            .execute(&mut **tx)
+            .await?
+            .rows_affected();
+            if count != 1 {
+                return Err(conflict());
+            }
+        }
+    }
+    event(
+        tx,
+        draft,
+        actor,
+        if archived { "archived" } else { "saved" },
+        None,
+    )
+    .await
 }
 
 /// The draft write a template copy makes, with its event, under the caller's company lock.

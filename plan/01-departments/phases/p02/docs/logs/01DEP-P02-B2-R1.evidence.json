@@ -1,0 +1,118 @@
+{
+  "version": 1,
+  "round": "01DEP-P02-B2-R1",
+  "artifact": "6cd8b092ebeda61840e7d22172124e546cb80372e1b99ca96c24528115dee5bf",
+  "checks": [
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib desk_wording_ -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02c_test (helper-owned); SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-desk-wording.txt",
+          "sha256": "d5458e892192774b3c1fad3131727de8eac820db0be6349711d834dfc9718a5d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib pages:: -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02c_test (helper-owned); SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-author-pages.txt",
+          "sha256": "b55ba2e0ebec61cb0403510209dd922efe015e801cce869ac141427b48c88380"
+        },
+        {
+          "path": "logs/B2-author-preexisting-failure.txt",
+          "sha256": "6fbad402ff167d4666ba78e2c86df0e2f43f61ab7036ce830518807aed687c93"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib use_cases::thread:: -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02c_test (helper-owned); SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-thread-notices.txt",
+          "sha256": "5a53fa36479c3d414e38671362f5077d5a82840e1789e7b803ccd12a3e2c0539"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib builtin_agent_library -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02c_test (helper-owned); SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-builtin-agent-library.txt",
+          "sha256": "6ccf445d8eb5816c98f1f96bfa9bf404236eff3a572ce5745b0e0c05338ee16a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::http::routes:: -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p02c_test (helper-owned); SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-routes.txt",
+          "sha256": "efe87e7e729bab80f0ed03b26dce9ab041c29528ffe7b9c21ff8379a79088494"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "lint"
+      ],
+      "command": "cargo clippy --locked --offline --lib --tests -- -D warnings",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-clippy.txt",
+          "sha256": "bdaf530021e6a72cfa0feab8a751c00dcd85f8253bb7e2c07c12fa508db89ed2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "module-tree"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "none",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-author-source-modules.txt",
+          "sha256": "8fcbc85f8db1d3d5c19118e684e40e20fe8068918af9b28d2fb3dd558599cc7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "full-gate"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "none",
+      "status": "NOT EXERCISED",
+      "reason": "User decision 2026-11-09 (01DEP-I003): focused checks only"
+    }
+  ]
+}

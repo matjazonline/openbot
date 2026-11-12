@@ -1,0 +1,105 @@
+{
+  "version": 1,
+  "round": "CH-MAIN-B1-R1",
+  "artifact": "84f0e56a7169710052dfb5ea0470d8c3f8dae644c9826f842b718d5145a58220",
+  "checks": [
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-offline-check-R2.txt",
+          "sha256": "04e14a839f68b4b3adae47e4cfb82c519fa8717da99949342d09e495bf650dc0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "cargo sqlx migrate run on freshly recreated owned database",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-fresh-migrations.txt",
+          "sha256": "16ffa97a8b5b4498fc1d073a31a88cd62b67c60dde9497df72a6a9a7df7cb4f1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm run typecheck",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-plugin-typecheck.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm test",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-plugin-tests.txt",
+          "sha256": "88c76e15c99593cce63f9dc741f5f78987e97e31cc542e8d01da07bc8b04d542"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm run test:guards",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-plugin-guards.txt",
+          "sha256": "aadff897b4f4ccc8910a4896982605267ebdb35cbeb2e5afc9f8f23b4574a435"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "npm run build:css",
+      "fixture": "owned integration worktree / PostgreSQL18 port63451 / pinned Node24",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-css-build.txt",
+          "sha256": "f2ee875995f75b4ed1f4bfb71d40777504f360da14953a8b28a08484097553df"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "initial merged offline all-target compilation",
+      "fixture": "owned integration worktree",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/main-offline-check-R1.txt",
+          "sha256": "90c4ed99eeb59d2d5fdd99fb3a27b65e2d506d0d11502edca2a3af0adc6a8283"
+        }
+      ]
+    }
+  ]
+}

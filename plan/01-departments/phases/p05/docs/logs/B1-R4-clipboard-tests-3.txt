@@ -1,0 +1,37 @@
+Command: /Users/mac02/openbot-p05-r3-wr3kxbjm/docker-bin/docker run --rm --name openbot-p05-r4-clipboard-3 --network none --cap-drop ALL --security-opt no-new-privileges --security-opt seccomp=/Users/mac02/openbot-p05-r3-wr3kxbjm/doop-clipboard-source/deploy/chromium-seccomp.json --memory 2g --cpus 2 --pids-limit 512 --shm-size 512m --tmpfs /tmp:rw,nosuid,nodev,size=512m openbot-p05-r4-clipboard-3 bun run test -- --project clipboard tests/canvasClipboardBrowser.test.ts --maxWorkers=1
+$ vitest run --project clipboard tests/canvasClipboardBrowser.test.ts "--maxWorkers=1"
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/app[39m
+
+7:07:20 PM [vite] ws proxy error:
+AggregateError: 
+    at internalConnectMultiple (node:net:1135:18)
+    at afterConnectMultiple (node:net:1716:7)
+ [32m✓[39m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts [2m([22m[2m17 tests[22m[2m)[22m[33m 11874[2mms[22m[39m
+   [32m✓[39m canvas clipboard shortcuts [2m(17)[22m
+     [33m[2m✓[22m[39m copies a whole element after a screenshot and pastes its children as one undo step[33m 1151[2mms[22m[39m
+     [33m[2m✓[22m[39m pastes a newer external image instead of stale copied elements[33m 959[2mms[22m[39m
+     [33m[2m✓[22m[39m does not paste an old element when external text replaced the clipboard[33m 651[2mms[22m[39m
+     [33m[2m✓[22m[39m copies and pastes immediately after leaving text editing with Escape[33m 1114[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps focus in another field when a remote lock ends text editing[33m 593[2mms[22m[39m
+     [33m[2m✓[22m[39m keeps multiple copied elements together and selects the pasted set[33m 636[2mms[22m[39m
+     [33m[2m✓[22m[39m copies through the element menu and pastes with the keyboard[33m 719[2mms[22m[39m
+     [33m[2m✓[22m[39m copies a frame through its menu and pastes with the keyboard[33m 622[2mms[22m[39m
+     [33m[2m✓[22m[39m replaces an element copy with an entire frame copied through the keyboard[33m 590[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves the previous copy when the element menu copy is denied[33m 690[2mms[22m[39m
+     [33m[2m✓[22m[39m preserves the previous copy when the frame menu copy is denied[33m 613[2mms[22m[39m
+     [33m[2m✓[22m[39m leaves native text copy and paste alone while an element is selected[33m 555[2mms[22m[39m
+     [33m[2m✓[22m[39m copies selected paragraph text instead of the selected canvas element[33m 550[2mms[22m[39m
+     [33m[2m✓[22m[39m duplicates the picked element when the key arrives as uppercase D[33m 526[2mms[22m[39m
+     [33m[2m✓[22m[39m respects view protection when pasting[33m 655[2mms[22m[39m
+     [33m[2m✓[22m[39m respects frame protection when pasting[33m 584[2mms[22m[39m
+     [33m[2m✓[22m[39m respects element protection when pasting[33m 600[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m17 passed[39m[22m[90m (17)[39m
+[2m   Start at [22m 19:07:15
+[2m   Duration [22m 24.95s[2m (tests 93%, import 5%, transform 2%)[22m
+
+close timed out after 10000ms
+Tests closed successfully but something prevents Vite server from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter

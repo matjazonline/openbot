@@ -262,6 +262,9 @@ pub struct RunFilter {
     /// company-scoped before it gets here.
     pub agent: Option<Uuid>,
     pub lineage: RunLineage,
+    /// Runs on the desks this department owns now (01-departments 04B.4): the department is the
+    /// run's desk's, not recorded on the run. The route resolves it company-scoped.
+    pub department: Option<crate::entities::department::DepartmentId>,
 }
 
 /// The most parents one [`WorkflowReads::child_rollup`] takes: six board columns of 50 cards

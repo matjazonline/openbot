@@ -1,0 +1,9 @@
+/Users/mac02/openbot-p05-r3-wr3kxbjm/openbot-doop-libtest-2
+adapters::persistence::doop_live_setup_tests::doop_live_company_setup: test
+adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys: test
+adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents: test
+/Users/mac02/openbot-p05-r3-wr3kxbjm/openbot-doop-libtest-3
+adapters::persistence::doop_live_setup_tests::doop_live_company_setup: test
+adapters::persistence::doop_live_setup_tests::lifecycle::doop_lifecycle_live_company_keys: test
+adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents: test
+PASS exact three helper names unchanged

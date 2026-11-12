@@ -1,0 +1,4 @@
+{
+  "DOCKER_HOST": "unix:///Users/mac02/.colima/openbot-p05-r3/docker.sock",
+  "DOCKER_CONFIG": "/Users/mac02/openbot-p05-r3-wr3kxbjm/docker-config"
+}

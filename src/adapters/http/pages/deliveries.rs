@@ -177,8 +177,8 @@ fn delivery_filter_form(company_id: Uuid, channels: &[Channel], filter: &Deliver
                 hx-target="#delivery-list" hx-swap="outerHTML" hx-sync="#delivery-list:replace">
                 <input type="hidden" name="company_id" value="{company_id}">
                 <input type="hidden" name="limit" value="{limit}">
-                <select name="channel_id" class="select select-sm w-full" aria-label="Filter by channel">
-                    <option value="">All channels</option>
+                <select name="channel_id" class="select select-sm w-full" aria-label="Filter by desk">
+                    <option value="">All desks</option>
                     {channel_options}
                 </select>
                 <select name="status" class="select select-sm w-full" aria-label="Filter by delivery status">
@@ -482,7 +482,7 @@ fn delivery_facts(pane: &DeliveryDetailPane<'_>) -> String {
             "Recipient",
             entry.external_destination.clone().unwrap_or_else(dash),
         ),
-        ("Channel", delivery_channel_name(pane)),
+        ("Desk", delivery_channel_name(pane)),
         ("Queued", super::format_time(entry.created_at)),
         ("Updated", super::format_time(entry.updated_at)),
         (

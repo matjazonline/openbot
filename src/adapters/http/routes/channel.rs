@@ -26,9 +26,10 @@ use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
 use crate::application::message_outcomes::MessageOutcomeReader;
-use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelWrite};
 use crate::entities::channel::Channel;
 use crate::entities::cursor::ThreadCursor;
+use crate::entities::department::DepartmentId;
 use crate::entities::thread::Thread;
 use crate::entities::user::Viewer;
 use crate::entities::value_objects::EmailAddress;
@@ -114,6 +115,12 @@ pub struct ChannelForm {
     pub confirm_spam_disabled: Option<String>,
     pub enabled: Option<String>,
     pub add_3rd_party: Option<String>,
+    /// The `/ui` desk form's owner select: blank for no department. Absent on a form without it,
+    /// which then leaves the ownership as it is.
+    #[serde(default)]
+    pub department_id: Option<String>,
+    #[serde(default)]
+    pub members_only: Option<String>,
 }
 
 impl ChannelForm {
@@ -189,6 +196,35 @@ pub struct ChannelJsonPayload {
     pub enabled: Option<bool>,
     /// Omitted means on, for the same reason as `enabled`.
     pub add_3rd_party: Option<bool>,
+    /// Unlike every field above, ownership is kept when absent: `null` detaches the desk from its
+    /// department, an id assigns it, and leaving the key out changes nothing.
+    #[serde(default, deserialize_with = "present")]
+    pub department_id: Option<Option<Uuid>>,
+    /// Kept when absent, like `department_id`.
+    pub members_only: Option<bool>,
+}
+
+/// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
+fn present<'de, D, T>(deserializer: D) -> Result<Option<Option<T>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    Option::<T>::deserialize(deserializer).map(Some)
+}
+
+impl ChannelJsonPayload {
+    /// The ownership change this payload asks for, if it names either field.
+    fn ownership(&self) -> Option<ChannelOwnershipWrite> {
+        (self.department_id.is_some() || self.members_only.is_some()).then(|| {
+            ChannelOwnershipWrite {
+                department_id: self
+                    .department_id
+                    .map(|department| department.map(DepartmentId::new)),
+                members_only: self.members_only,
+            }
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -295,6 +331,7 @@ pub struct ChannelsPageQuery {
 async fn list_channels_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -307,11 +344,15 @@ async fn list_channels_page(
     let channels = channel_use_cases
         .list_company_channels(user.id, company_id)
         .await?;
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
 
     Ok(Html(pages::channels_page(&pages::ChannelsPage {
         company: &company,
         app_domain_name: &config.app_domain_name,
         channels: &channels,
+        departments: &departments,
         spam_scan_enabled: config.is_spam_scan_enabled(),
         focus: pages::ChannelsPageFocus {
             create_form_open: matches!(query.new.as_deref(), Some("1") | Some("true")),
@@ -325,6 +366,7 @@ async fn list_channels_page(
 async fn create_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
@@ -336,6 +378,7 @@ async fn create_channel_handler(
         .company;
     let view = ChannelListView {
         channel_use_cases: &channel_use_cases,
+        department_use_cases: &department_use_cases,
         app_domain_name: &config.app_domain_name,
         user_id: user.id,
         company: &company,
@@ -361,6 +404,7 @@ async fn create_channel_handler(
         alias_slugs: parse_list_form(form.alias_slugs),
         participant_emails: parse_emails_form(form.participant_emails),
         created_by: None,
+        ownership: None,
     };
     if let Err(err) = channel_use_cases
         .create_channel(user.id, company_id, write, confirm_spam_disabled)
@@ -368,7 +412,7 @@ async fn create_channel_handler(
     {
         return match err {
             error @ (AppError::BadRequest(_) | AppError::Conflict(_)) => {
-                view.render(Some(format!("Failed to create channel: {error}")))
+                view.render(Some(format!("Failed to create desk: {error}")))
                     .await
             }
             error => Err(error),
@@ -383,6 +427,7 @@ async fn create_channel_handler(
 /// error alert, so the reload lives here instead of at each `return`.
 struct ChannelListView<'a> {
     channel_use_cases: &'a ChannelUseCases,
+    department_use_cases: &'a crate::use_cases::department::DepartmentUseCases,
     app_domain_name: &'a str,
     user_id: Uuid,
     company: &'a crate::entities::company::Company,
@@ -395,7 +440,16 @@ impl ChannelListView<'_> {
             .channel_use_cases
             .list_company_channels(self.user_id, company_id)
             .await?;
-        let list = pages::channel_list_fragment(self.company, self.app_domain_name, &channels);
+        let departments = self
+            .department_use_cases
+            .list_departments(self.user_id, company_id)
+            .await?;
+        let list = pages::channel_list_fragment(
+            self.company,
+            self.app_domain_name,
+            &channels,
+            &departments,
+        );
         Ok(Html(match error {
             Some(message) => format!("{}{}", pages::error_alert(&message), list),
             None => list,
@@ -424,7 +478,7 @@ async fn managed_channel(
 }
 
 fn channel_not_found() -> AppError {
-    AppError::NotFound("Channel not found".into())
+    AppError::NotFound("Desk not found".into())
 }
 
 /// GET /companies/{company_id}/channels/{id}/edit - HTMX edit channel form fragment (Protected).
@@ -457,6 +511,7 @@ async fn edit_channel_form(
 async fn cancel_channel_edit(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -469,10 +524,14 @@ async fn cancel_channel_edit(
         channel_id,
     )
     .await?;
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &channel,
+        pages::department_name(&departments, &channel),
     )))
 }
 
@@ -481,6 +540,7 @@ async fn cancel_channel_edit(
 async fn update_channel_handler(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(department_use_cases): State<Arc<crate::use_cases::department::DepartmentUseCases>>,
     State(config): State<Arc<AppConfig>>,
     user: AuthenticatedUser,
     Path((company_id, channel_id)): Path<(Uuid, Uuid)>,
@@ -517,6 +577,7 @@ async fn update_channel_handler(
         enabled,
         add_3rd_party,
         created_by: None,
+        ownership: None,
     };
 
     let updated = match channel_use_cases
@@ -535,10 +596,14 @@ async fn update_channel_handler(
         }
         Err(error) => return Err(error),
     };
+    let departments = department_use_cases
+        .list_departments(user.id, company_id)
+        .await?;
     Ok(Html(pages::channel_row_fragment(
         &company,
         &config.app_domain_name,
         &updated,
+        pages::department_name(&departments, &updated),
     )))
 }
 
@@ -651,7 +716,7 @@ async fn list_channel_threads_fragment(
     let channel = channel_use_cases
         .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
     let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
     Ok(Html(pages::channel_thread_list_fragment(
@@ -687,7 +752,7 @@ async fn list_channel_threads_json(
     let channel = channel_use_cases
         .get_company_channel(viewer.user_id, company_id, channel_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Channel not found".into()))?;
+        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
 
     let page = load_thread_page(&thread_use_cases, &viewer, &channel, &query).await?;
 
@@ -710,6 +775,7 @@ async fn create_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let ownership = payload.ownership();
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -719,6 +785,7 @@ async fn create_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
+        ownership,
     };
 
     let channel = channel_use_cases
@@ -764,6 +831,7 @@ pub(super) async fn update_channel_json(
         .map(String::from)
         .unwrap_or_else(|| slugify(&payload.name));
 
+    let ownership = payload.ownership();
     let write = ChannelWrite {
         name: payload.name,
         description: parse_text_form(payload.description),
@@ -773,6 +841,7 @@ pub(super) async fn update_channel_json(
         enabled: payload.enabled.unwrap_or(true),
         add_3rd_party: payload.add_3rd_party.unwrap_or(true),
         created_by: None,
+        ownership,
     };
 
     let channel = channel_use_cases
@@ -862,10 +931,13 @@ mod tests {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         };
 
         let channels = [channel.clone()];
         let page = pages::ChannelsPage {
+            departments: &[],
             company: &company,
             app_domain_name: "example.com",
             channels: &channels,
@@ -887,7 +959,7 @@ mod tests {
         assert!(!page_html.contains("id=\"simple_prompt_gen_box\""));
         assert!(page_html.contains("hx-disabled-elt=\"find button[type='submit']\""));
 
-        let row_html = pages::channel_row_fragment(&company, "example.com", &channel);
+        let row_html = pages::channel_row_fragment(&company, "example.com", &channel, None);
         assert!(row_html.contains("Auto Dispatcher"));
         assert!(row_html.contains("auto-dispatcher@acme.example.com"));
         assert!(row_html.contains("agent@test.com"));
@@ -1001,7 +1073,7 @@ mod tests {
         };
         let sim_result_html =
             pages::channel_simulation_result_fragment(company.id, channel.id, &sim_result);
-        assert!(sim_result_html.contains("Webhook Triggered &amp; Channel Resolved Successfully!"));
+        assert!(sim_result_html.contains("Webhook Triggered &amp; Desk Resolved Successfully!"));
 
         let test_message = stored_email_view(EmailMessageDraft {
             id: Uuid::new_v4(),
@@ -1212,3 +1284,7 @@ mod tests {
 #[cfg(test)]
 #[path = "channel_authorization_tests.rs"]
 mod authorization_tests;
+
+#[cfg(test)]
+#[path = "channel_department_tests.rs"]
+mod department_tests;

@@ -67,7 +67,7 @@ pub fn workflow_bindings_body(view: &BindingsView<'_>) -> String {
     };
     let hidden = if view.hidden > 0 {
         format!(
-            r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on channels you cannot see.</p>"#,
+            r#"<p class="text-xs opacity-70">{} more of the listed binding{} {} on desks you cannot see.</p>"#,
             view.hidden,
             if view.hidden == 1 { "" } else { "s" },
             if view.hidden == 1 { "is" } else { "are" },
@@ -341,7 +341,7 @@ fn association_field(form: &BindingFormView<'_>) -> String {
     if let Some(binding) = form.editing {
         return labelled(
             "Association",
-            "Fixed once created: a different channel needs a new binding.",
+            "Fixed once created: a different desk needs a new binding.",
             &format!(
                 r#"<p class="py-2 text-sm font-semibold">{}</p>"#,
                 escape_html_text(&super::versions::association_label(binding))
@@ -367,12 +367,12 @@ fn association_field(form: &BindingFormView<'_>) -> String {
     for channel in form.channels {
         options.push_str(&option(
             format!("channel:{}", channel.id),
-            &format!("Channel {}", channel.label),
+            &format!("Desk {}", channel.label),
         ));
     }
     labelled(
         "Association",
-        "A channel binding can answer that channel's messages; thread bindings are made through the API.",
+        "A desk binding can answer that desk's messages; thread bindings are made through the API.",
         &format!(r#"<select class="select w-full" name="association">{options}</select>"#),
     )
 }
@@ -595,7 +595,7 @@ fn trigger_field(form: &BindingFormView<'_>) -> String {
         .collect();
     labelled(
         "Message trigger",
-        "Channel bindings only; a company-wide binding takes none.",
+        "Desk bindings only; a company-wide binding takes none.",
         &format!(r#"<select class="select w-full" name="message_trigger">{options}</select>"#),
     )
 }
@@ -638,7 +638,7 @@ fn run_as_field(form: &BindingFormView<'_>) -> String {
         .collect();
     labelled(
         "Runs as",
-        "An owner or admin who can see the channel; automatic runs use their authority.",
+        "An owner or admin who can see the desk; automatic runs use their authority.",
         &format!(r#"<select class="select w-full" name="run_as">{options}</select>"#),
     )
 }
@@ -670,13 +670,13 @@ pub fn channel_bindings_card(card: &ChannelBindingsCard<'_>) -> String {
         .map(|binding| channel_binding_row(binding, company_id, responding))
         .collect();
     let list = if card.bindings.is_empty() {
-        r#"<p class="text-xs opacity-70">No workflow is bound to this channel.</p>"#.to_owned()
+        r#"<p class="text-xs opacity-70">No workflow is bound to this desk.</p>"#.to_owned()
     } else {
         format!(r#"<ul class="divide-y divide-base-300">{rows}</ul>"#)
     };
     format!(
         r#"<section id="channel-workflows-card" class="space-y-3 rounded-box border border-base-300 p-4">
-            <div><h3 class="text-sm font-bold">Workflows on this channel</h3>
+            <div><h3 class="text-sm font-bold">Workflows on this desk</h3>
             <p class="text-xs opacity-70">Bind a workflow from its Bindings tab in Workflows.</p></div>
             {status}{list}{cut}{response}
         </section>"#,
@@ -715,7 +715,7 @@ fn channel_binding_row(binding: &BindingUse, company_id: Uuid, responding: Optio
         },
         association = match summary.association {
             RelatedAssociation::Thread { .. } => "one thread",
-            _ => "the whole channel",
+            _ => "the whole desk",
         },
         trigger = summary
             .message_trigger

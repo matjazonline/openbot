@@ -6,6 +6,8 @@ pub struct UsageSample {
     pub model: ModelName,
     pub workflow: Uuid,
     pub agent: Option<Uuid>,
+    /// The department that owns the run's desk now, with its name.
+    pub department: Option<(Uuid, String)>,
     pub input: u64,
     pub output: u64,
     pub source: Option<TokenUsageSource>,
@@ -28,6 +30,8 @@ struct Total {
 enum GroupKey {
     Model(ModelProvider, ModelName),
     Workflow(Uuid),
+    /// Departments by name, then "No department" last: the flag is `true` for it.
+    Department(bool, Option<(String, Uuid)>),
 }
 pub fn aggregate(
     calls: Vec<UsageSample>,
@@ -49,6 +53,10 @@ pub fn aggregate(
         let key = match query.grouping {
             UsageGrouping::Model => GroupKey::Model(call.provider.clone(), call.model.clone()),
             UsageGrouping::Workflow => GroupKey::Workflow(call.workflow),
+            UsageGrouping::Department => GroupKey::Department(
+                call.department.is_none(),
+                call.department.clone().map(|(id, name)| (name, id)),
+            ),
         };
         if groups.len() >= 200 && !groups.contains_key(&key) {
             truncated = true;
@@ -104,6 +112,7 @@ fn group(key: GroupKey, total: Total) -> UsageGroup {
         provider: None,
         model: None,
         workflow: None,
+        department: None,
         calls: total.calls,
         completed_calls: total.completed,
         unconfirmed_calls: total.calls - total.completed,
@@ -127,6 +136,15 @@ fn group(key: GroupKey, total: Total) -> UsageGroup {
             group.model = Some(model);
         }
         GroupKey::Workflow(workflow) => group.workflow = Some(workflow),
+        GroupKey::Department(_, department) => {
+            group.department = Some(match department {
+                Some((name, id)) => UsageDepartment { id: Some(id), name },
+                None => UsageDepartment {
+                    id: None,
+                    name: "No department".into(),
+                },
+            })
+        }
     }
     group
 }
@@ -150,6 +168,7 @@ mod tests {
     }
     fn sample(source: Option<TokenUsageSource>) -> UsageSample {
         UsageSample {
+            department: None,
             provider: "openai".into(),
             model: "model".into(),
             workflow: Uuid::nil(),
@@ -236,6 +255,53 @@ mod tests {
                 .unwrap()
                 .0
                 .is_empty()
+        );
+    }
+
+    /// 01-departments 04C.2: grouping by department names each department and puts calls on
+    /// desks no department owns, and archived calls, under "No department", last.
+    #[test]
+    fn department_views_usage_groups_by_department_with_no_department_last() {
+        let sales = Uuid::new_v4();
+        let ops = Uuid::new_v4();
+        let call = |department: Option<(Uuid, &str)>| UsageSample {
+            department: department.map(|(id, name)| (id, name.to_owned())),
+            ..sample(Some(TokenUsageSource::Reported))
+        };
+        let query = UsageQuery {
+            grouping: UsageGrouping::Department,
+            ..query()
+        };
+        let (groups, truncated) = aggregate(
+            vec![
+                call(None),
+                call(Some((sales, "Sales"))),
+                call(Some((ops, "Operations"))),
+                call(Some((sales, "Sales"))),
+            ],
+            &query,
+        )
+        .unwrap();
+        assert!(!truncated);
+        let named: Vec<(Option<Uuid>, &str, u64)> = groups
+            .iter()
+            .map(|group| {
+                let department = group.department.as_ref().unwrap();
+                (department.id, department.name.as_str(), group.calls)
+            })
+            .collect();
+        assert_eq!(
+            named,
+            [
+                (Some(ops), "Operations", 1),
+                (Some(sales), "Sales", 2),
+                (None, "No department", 1)
+            ]
+        );
+        assert!(
+            groups
+                .iter()
+                .all(|group| group.workflow.is_none() && group.model.is_none())
         );
     }
 }

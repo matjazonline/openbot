@@ -84,7 +84,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
     };
     let examples: String = crate::application::workflow::channel_reply::examples::response_examples()
         .into_iter().map(|example| format!(
-            "<details><summary class=\"cursor-pointer\">{}</summary><p>Configure the response mapping separately on the channel. Replace the example reviewer with a current company admin.</p>{}{}</details>",
+            "<details><summary class=\"cursor-pointer\">{}</summary><p>Configure the response mapping separately on the desk. Replace the example reviewer with a current company admin.</p>{}{}</details>",
             escape_html_text(example.title), json_block(&example.source),
             json_block(&serde_json::json!({"contract":example.contract,"approval_policy":example.approval_policy}))
         )).collect();
@@ -93,7 +93,7 @@ pub fn workflow_catalogue(entries: &[CatalogueEntry], agents: &[AgentReference<'
         r#"<div id="workflow-reference-body" class="mt-3 space-y-4 text-sm">
             <section><h4 class="font-semibold">Step types</h4><ul class="divide-y divide-base-300">{types}</ul></section>
             <section class="space-y-1"><h4 class="font-semibold">Agents</h4>{agents}</section>
-            <section class="space-y-2"><h4 class="font-semibold">Channel response examples</h4>{examples}</section>
+            <section class="space-y-2"><h4 class="font-semibold">Desk response examples</h4>{examples}</section>
         </div>"#
     )
 }

@@ -1,0 +1,4 @@
+{
+  "path": "../target/debug/deps/open_bots-a813a4dba4341a43",
+  "inventory": "tests::a_background_owner_that_ignores_shutdown_is_aborted_inside_the_drain_grace: test\ntests::drain_deadline_expires_when_no_second_interrupt_arrives: test\ntests::operational_command_rejects_zero_and_unknown_arguments: test\ntests::operational_commands_are_parsed_before_server_startup: test\ntests::second_interrupt_ends_the_drain_immediately: test\n\n5 tests, 0 benchmarks\n"
+}

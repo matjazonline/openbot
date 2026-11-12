@@ -25,10 +25,11 @@ use crate::adapters::http::auth::AuthenticatedUser;
 use crate::adapters::http::pages;
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
-use crate::application::ports::channel::ChannelWrite;
+use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelWrite};
 use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::company::CompanyAccess;
+use crate::entities::department::{Department, DepartmentId};
 use crate::entities::schedule::ChannelSchedule;
 use crate::entities::value_objects::EmailAddress;
 use crate::infra::config::AppConfig;
@@ -38,7 +39,9 @@ use crate::use_cases::schedule::ScheduleUseCases;
 use crate::use_cases::user::UserUseCases;
 
 use super::{
-    channel::{ChannelForm, parse_emails_form, parse_list_form, parse_text_form, slugify},
+    channel::{
+        ChannelForm, checkbox_ticked, parse_emails_form, parse_list_form, parse_text_form, slugify,
+    },
     ui::{load_account, load_managed_company, workspace_user},
 };
 
@@ -77,7 +80,7 @@ pub struct CompanyQuery {
     pub company_id: Uuid,
 }
 
-const NO_SELECTION: &str = "Select a channel to configure it, or create a new one.";
+const NO_SELECTION: &str = "Select a desk to configure it, or create a new one.";
 
 /// The use cases and the caller every Channels handler starts from.
 ///
@@ -86,6 +89,7 @@ const NO_SELECTION: &str = "Select a channel to configure it, or create a new on
 struct Workspace {
     company_use_cases: Arc<CompanyUseCases>,
     channel_use_cases: Arc<ChannelUseCases>,
+    department_use_cases: Arc<crate::use_cases::department::DepartmentUseCases>,
     schedule_use_cases: Arc<ScheduleUseCases>,
     user_use_cases: Arc<UserUseCases>,
     config: Arc<AppConfig>,
@@ -104,6 +108,7 @@ impl FromRequestParts<AppState> for Workspace {
         Ok(Self {
             company_use_cases: state.company_use_cases.clone(),
             channel_use_cases: state.channel_use_cases.clone(),
+            department_use_cases: state.department_use_cases.clone(),
             schedule_use_cases: state.schedule_use_cases.clone(),
             user_use_cases: state.user_use_cases.clone(),
             config: state.config.clone(),
@@ -130,6 +135,11 @@ impl Workspace {
             config: &self.config,
             user_id: self.user_id,
             company,
+            // The scope is the managed company, so the caller may list every department.
+            departments: self
+                .department_use_cases
+                .list_departments(self.user_id, company.id)
+                .await?,
         })
     }
 }
@@ -252,20 +262,24 @@ async fn create_channel(
         Ok(Html(view.create_pane(&submitted.draft(), Some(&message))).into_response())
     };
 
-    let write = submitted.write();
-    let created = workspace
-        .channel_use_cases
-        .create_channel(
-            workspace.user_id,
-            company.id,
-            write,
-            submitted.form.confirm_spam_disabled(),
-        )
-        .await;
+    let created = match submitted.write(None) {
+        Ok(write) => {
+            workspace
+                .channel_use_cases
+                .create_channel(
+                    workspace.user_id,
+                    company.id,
+                    write,
+                    submitted.form.confirm_spam_disabled(),
+                )
+                .await
+        }
+        Err(error) => Err(error),
+    };
 
     match created {
         Ok(channel) => view.saved_response(&channel).await,
-        Err(err) => rejected(format!("Failed to create channel: {err}")),
+        Err(err) => rejected(format!("Failed to create desk: {err}")),
     }
 }
 
@@ -293,21 +307,25 @@ async fn update_channel(
         .into_response())
     };
 
-    let write = submitted.write();
-    let saved = workspace
-        .channel_use_cases
-        .update_channel(
-            workspace.user_id,
-            company.id,
-            channel_id,
-            write,
-            submitted.form.confirm_spam_disabled(),
-        )
-        .await;
+    let saved = match submitted.write(Some(&stored)) {
+        Ok(write) => {
+            workspace
+                .channel_use_cases
+                .update_channel(
+                    workspace.user_id,
+                    company.id,
+                    channel_id,
+                    write,
+                    submitted.form.confirm_spam_disabled(),
+                )
+                .await
+        }
+        Err(error) => Err(error),
+    };
 
     match saved {
         Ok(channel) => view.saved_response(&channel).await,
-        Err(err) => rejected(format!("Failed to save channel: {err}")),
+        Err(err) => rejected(format!("Failed to save desk: {err}")),
     }
 }
 
@@ -334,6 +352,7 @@ struct ChannelSettingsView<'a> {
     config: &'a AppConfig,
     user_id: Uuid,
     company: &'a Company,
+    departments: Vec<Department>,
 }
 
 impl ChannelSettingsView<'_> {
@@ -362,7 +381,7 @@ impl ChannelSettingsView<'_> {
         self.channel_use_cases
             .get_company_channel(self.user_id, self.company.id, channel_id)
             .await?
-            .ok_or_else(|| AppError::NotFound("Channel not found".into()))
+            .ok_or_else(|| AppError::NotFound("Desk not found".into()))
     }
 
     fn list<'c>(
@@ -374,6 +393,7 @@ impl ChannelSettingsView<'_> {
             company: self.company,
             app_domain_name: &self.config.app_domain_name,
             channels,
+            departments: &self.departments,
             selected_channel_id,
         }
     }
@@ -385,6 +405,7 @@ impl ChannelSettingsView<'_> {
             spam_scan_enabled: self.config.is_spam_scan_enabled(),
             draft,
             error,
+            departments: &self.departments,
         })
     }
 
@@ -404,6 +425,7 @@ impl ChannelSettingsView<'_> {
             spam_scan_enabled: self.config.is_spam_scan_enabled(),
             draft,
             error,
+            departments: &self.departments,
         })
     }
 
@@ -476,12 +498,61 @@ impl SubmittedChannel {
             participant_emails: self.form.participant_emails.as_deref().unwrap_or(""),
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
+            department_id: self.department().ok().flatten(),
+            members_only: self.members_only(),
         }
     }
 
-    /// The write this submission asks for.
-    fn write(&self) -> ChannelWrite {
-        ChannelWrite {
+    /// The owner select's value: blank is no department.
+    fn department(&self) -> AppResult<Option<Uuid>> {
+        match self
+            .form
+            .department_id
+            .as_deref()
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+        {
+            None => Ok(None),
+            Some(value) => Uuid::parse_str(value)
+                .map(Some)
+                .map_err(|_| AppError::BadRequest("That department is not valid.".into())),
+        }
+    }
+
+    /// Members-only needs a department; without one the box is ignored.
+    fn members_only(&self) -> bool {
+        checkbox_ticked(self.form.members_only.as_deref())
+            && self
+                .form
+                .department_id
+                .as_deref()
+                .is_some_and(|id| !id.trim().is_empty())
+    }
+
+    /// The ownership change the form asks for against `stored` (`None` for a new desk): `None`
+    /// when it matches, so a save that does not touch ownership takes no department lock. A form
+    /// without the owner select changes nothing.
+    fn ownership(&self, stored: Option<&Channel>) -> AppResult<Option<ChannelOwnershipWrite>> {
+        if self.form.department_id.is_none() {
+            return Ok(None);
+        }
+        let department = self.department()?.map(DepartmentId::new);
+        let members_only = self.members_only();
+        let (current_department, current_members_only) = stored.map_or((None, false), |channel| {
+            (channel.department_id, channel.members_only)
+        });
+        if department == current_department && members_only == current_members_only {
+            return Ok(None);
+        }
+        Ok(Some(ChannelOwnershipWrite {
+            department_id: Some(department),
+            members_only: Some(members_only),
+        }))
+    }
+
+    /// The write this submission asks for, against the stored desk when there is one.
+    fn write(&self, stored: Option<&Channel>) -> AppResult<ChannelWrite> {
+        Ok(ChannelWrite {
             name: self.form.name.clone(),
             description: parse_text_form(self.form.description.clone()),
             slug: self.slug.clone(),
@@ -490,6 +561,11 @@ impl SubmittedChannel {
             enabled: self.form.enabled(),
             add_3rd_party: self.form.add_3rd_party(),
             created_by: None,
-        }
+            ownership: self.ownership(stored)?,
+        })
     }
 }
+
+#[cfg(test)]
+#[path = "ui_channels_tests.rs"]
+mod tests;

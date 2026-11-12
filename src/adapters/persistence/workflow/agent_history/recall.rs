@@ -56,9 +56,14 @@ impl MemoryRecallPersistence for PostgresPersistence {
             .attempt(Box::pin(async {
                 let mut connection = bound.acquire(self.pool()).await?;
                 let mut tx = bound.begin(&mut connection).await?;
-                let targets = Box::pin(capture_targets_on(&mut tx, claim, &bound))
-                    .await
-                    .map(End::Rollback);
+                let targets = Box::pin(capture_targets_on(
+                    &mut tx,
+                    claim,
+                    &bound,
+                    self.app_domain(),
+                ))
+                .await
+                .map(End::Rollback);
                 bound.end(tx, targets).await
             }))
             .await;
@@ -101,7 +106,13 @@ async fn plan_on(
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
 ) -> AppResult<RecallPlan> {
-    let candidate = Box::pin(preparation::candidate_on(tx, claim, bound)).await?;
+    let candidate = Box::pin(preparation::candidate_on(
+        tx,
+        claim,
+        bound,
+        persistence.app_domain(),
+    ))
+    .await?;
     if candidate.context.is_none() || !candidate.prepared.binds_memory() {
         return Ok(RecallPlan::NotApplicable);
     }
@@ -142,8 +153,9 @@ async fn capture_targets_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
+    domain: Option<&str>,
 ) -> AppResult<Vec<MemoryToolScope>> {
-    let candidate = Box::pin(preparation::candidate_on(tx, claim, bound)).await?;
+    let candidate = Box::pin(preparation::candidate_on(tx, claim, bound, domain)).await?;
     if candidate.context.is_none() {
         return Ok(Vec::new());
     }
@@ -367,7 +379,13 @@ async fn scopes_on(
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
 ) -> AppResult<Revalidation> {
-    let candidate = Box::pin(preparation::candidate_on(tx, claim, bound)).await?;
+    let candidate = Box::pin(preparation::candidate_on(
+        tx,
+        claim,
+        bound,
+        persistence.app_domain(),
+    ))
+    .await?;
     let read_ceiling = super::super::memory_steps::read_ceiling_for(tx, claim.fence).await?;
     let scope = claim.fence.scope;
     let rows: Vec<Value> = sqlx::query_scalar(

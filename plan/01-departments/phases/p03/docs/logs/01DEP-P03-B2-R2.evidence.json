@@ -1,0 +1,35 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B2-R2",
+  "artifact": "31d169402e1d795115670b31b6399674904c1f0d41463afb0bdbe0c1378139ea",
+  "checks": [
+    {
+      "criteria": ["03B.1", "03B.2", "03B.3", "03B.4", "D7", "D8", "D9", "B2-F1", "B2-F2", "B2-F3", "B2-F4"],
+      "command": "cargo test --locked --offline --lib department_lead_desk -- --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-R2-lead-desk-1.txt", "sha256": "a4114d2a1681b26d540249a73e68bfb7903271ea2ce532294bfdcc4c590407ea"},
+        {"path": "logs/B2-R2-test-inventory.txt", "sha256": "5b391535bcc0344a22b41c5ba7458798220ae66431900b650b05d40a9345acf8"}
+      ]
+    },
+    {
+      "criteria": ["contract-impact"],
+      "command": "cargo test --locked --offline --lib -- department onboarding provisioning channel_reply agent_default_desk department_lead_desk binding --test-threads=4",
+      "fixture": "openbot_dept_p03_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-R2-affected.txt", "sha256": "ed8eb297863c43bba62b76ccb815c1181a6d6dee5d2a636463835e5920a6959b"}
+      ]
+    },
+    {
+      "criteria": ["test-discovery"],
+      "command": "python3 scratchpad/testnames.py (HEAD 523732b7 vs worktree)",
+      "fixture": "git HEAD vs working tree",
+      "status": "PASS",
+      "files": [
+        {"path": "logs/B2-R2-test-names.txt", "sha256": "557cfd79414422cf157e9b6ab862fb60806a2655efa5f8fd380d5b7aba1b197e"}
+      ]
+    }
+  ]
+}

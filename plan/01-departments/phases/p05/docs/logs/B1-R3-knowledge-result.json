@@ -1,0 +1,5 @@
+{
+  "command": "python3 scripts/check-knowledge-image.py --image openbot-p05-r3-knowledge",
+  "status": "PASS",
+  "exit_code": 0
+}

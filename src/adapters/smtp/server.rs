@@ -1103,6 +1103,13 @@ mod tests {
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
+
+        async fn list_departments(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::department::Department>> {
+            Ok(Vec::new())
+        }
         async fn update(
             &self,
             _request: crate::application::ports::channel::ChannelUpdate,
@@ -1179,6 +1186,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             }]),
         });
 
@@ -1401,6 +1410,8 @@ regis";
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             }]),
         });
 

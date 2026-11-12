@@ -1,7 +1,7 @@
 use super::*;
 use crate::application::agent::{AgentPublicationScope, AgentPublications};
 use crate::application::use_cases::{
-    agent::{AgentPersistence, AgentWrite, LibraryAgentCopyPersistence},
+    agent::{AgentPersistence, AgentWrite},
     company::CompanyModelConnectionWrite,
     skill::{AgentCapabilityReader, SkillManagementPersistence, SkillWrite},
 };
@@ -29,16 +29,20 @@ async fn model(fixture: &Fixture) {
     .unwrap();
 }
 
-async fn portable_library(p: &PostgresPersistence) -> PortableLibrary {
+/// A library agent with one portable skill; `requires_lookup` makes the skill need the
+/// company-selected `support.lookup` tool.
+async fn portable_library(p: &PostgresPersistence, requires_lookup: bool) -> PortableLibrary {
+    let suffix = if requires_lookup { "" } else { "-plain" };
     let skill = SkillManagementPersistence::create_library(
         p,
         SkillWrite {
             files: None,
-            slug: "portable-support".into(),
+            slug: format!("portable-support{suffix}"),
             name: "Portable support".into(),
             description: "Requires a company-selected HTTP operation".into(),
             instructions: "Use support.lookup to verify the request.".into(),
-            required_tools: Some(vec![TypeName::parse("support.lookup").unwrap()]),
+            required_tools: requires_lookup
+                .then(|| vec![TypeName::parse("support.lookup").unwrap()]),
             created_by: None,
         },
     )
@@ -48,7 +52,7 @@ async fn portable_library(p: &PostgresPersistence) -> PortableLibrary {
         p,
         AgentWrite {
             name: "Portable agent".into(),
-            slug: "portable-agent".into(),
+            slug: format!("portable-agent{suffix}"),
             skill_ids: vec![skill.id],
             ..Default::default()
         },
@@ -65,11 +69,10 @@ async fn install(
     fixture: &Fixture,
     library: &PortableLibrary,
 ) -> AppResult<crate::entities::agent::Agent> {
-    fixture
-        .persistence
-        .create_agent_from_library(
-            fixture.target.company.as_uuid(),
+    crate::adapters::persistence::test_support::company_agents(&fixture.persistence)
+        .copy_from_library(
             fixture.target.actor,
+            fixture.target.company,
             library.agent,
             AgentWrite {
                 name: "Portable agent".into(),
@@ -78,39 +81,30 @@ async fn install(
                 model: Some(SCRIPTED_MODEL.into()),
                 ..Default::default()
             },
+            None,
         )
         .await
+        .map(|created| created.agent)
 }
 
+/// 01DEP-P03-D1, plan 03A.2: a copy is published with its default desk, so a library skill that
+/// needs a company tool no binding supplies refuses the copy with the publication's own words,
+/// and nothing of it is written.
 #[tokio::test]
-async fn autonomous_agent_provisioning_library_missing_local_tool_installs_an_unpublished_draft() {
+async fn autonomous_agent_provisioning_library_missing_local_tool_refuses_the_copy() {
     let fixture = Fixture::new().await;
     model(&fixture).await;
-    let p = &fixture.persistence;
-    let library = portable_library(p).await;
-    let copied = install(&fixture, &library)
-        .await
-        .expect("portable library selection must allow local configuration before publication");
-    let capabilities = p
-        .load_capabilities(fixture.target.company.as_uuid(), copied.id)
-        .await
-        .unwrap()
-        .unwrap();
-    assert_eq!(capabilities.skills.len(), 1);
-    assert_eq!(
-        capabilities.skills[0].company_id,
-        Some(fixture.target.company.as_uuid())
+    let library = portable_library(&fixture.persistence, true).await;
+    let refused = install(&fixture, &library).await;
+    assert!(
+        matches!(&refused, Err(AppError::BadRequest(message))
+            if message.contains("requires tool alias support.lookup")),
+        "{refused:?}"
     );
-    assert_ne!(capabilities.skills[0].id, library.skill);
-    let revisions: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM agent_revisions WHERE company_id=$1 AND agent_id=$2",
-    )
-    .bind(fixture.target.company.as_uuid())
-    .bind(copied.id)
-    .fetch_one(p.pool())
-    .await
-    .unwrap();
-    assert_eq!(revisions, 0);
+    assert_eq!(
+        installation_counts(&fixture).await,
+        json!({"agents":0,"skills":0,"principals":0,"revisions":0})
+    );
 }
 
 #[tokio::test]
@@ -119,14 +113,21 @@ async fn autonomous_agent_provisioning_library_requires_explicit_company_local_b
     let setup = Box::pin(agent_setup("http://127.0.0.1:1")).await;
     let fixture = &setup.fixture;
     let p = &fixture.persistence;
-    let library = portable_library(p).await;
+    // A copy whose skill needs the company tool cannot be published, so it is refused (03A.2)...
+    let library = portable_library(p, true).await;
+    assert!(matches!(
+        install(fixture, &library).await,
+        Err(AppError::BadRequest(_))
+    ));
+    // ...and the tool is bound explicitly on a published copy's draft, then published as its
+    // next revision.
+    let library = portable_library(p, false).await;
     let copied = install(fixture, &library).await.unwrap();
     let scope = AgentPublicationScope {
         company: fixture.target.company,
         actor: fixture.target.actor,
         agent: AgentId::new(copied.id),
     };
-    assert!(p.preview_agent(scope).await.is_err());
     let mut bindings = crate::adapters::persistence::agent_binding_selection::resolve_bindings_on(
         &mut p.pool().acquire().await.unwrap(),
         fixture.target.company.as_uuid(),
@@ -196,7 +197,7 @@ async fn autonomous_agent_provisioning_library_install_failure_rolls_back_portab
     let fixture = Fixture::new().await;
     model(&fixture).await;
     let p = &fixture.persistence;
-    let library = portable_library(p).await;
+    let library = portable_library(p, false).await;
     sqlx::raw_sql("CREATE FUNCTION library_install_fault() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected principal failure'; END $$; CREATE TRIGGER library_install_fault BEFORE INSERT ON principals FOR EACH ROW WHEN (NEW.kind='agent') EXECUTE FUNCTION library_install_fault();")
         .execute(p.pool()).await.unwrap();
     assert!(install(&fixture, &library).await.is_err());
@@ -214,9 +215,20 @@ async fn autonomous_agent_provisioning_library_install_failure_rolls_back_portab
     let copied = install(&fixture, &library).await.unwrap();
     assert_eq!(
         installation_counts(&fixture).await,
-        json!({"agents":1,"skills":1,"principals":1,"revisions":0})
+        json!({"agents":1,"skills":1,"principals":1,"revisions":1})
     );
     assert_eq!(copied.slug, "installed-agent");
+    // The copy carries a company copy of the portable skill, not the library's own.
+    let capabilities = p
+        .load_capabilities(fixture.target.company.as_uuid(), copied.id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        capabilities.skills[0].company_id,
+        Some(fixture.target.company.as_uuid())
+    );
+    assert_ne!(capabilities.skills[0].id, library.skill);
 }
 
 async fn installation_counts(fixture: &Fixture) -> Value {

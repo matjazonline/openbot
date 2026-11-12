@@ -1,0 +1,62 @@
+{
+  "companies": [
+    {
+      "bot_user_id": "2tDCafZCcW0MHKd3TFvPYJO13UAozvj3",
+      "canvas_id": "fxDzFoDcl4",
+      "canvas_url": "https://127.0.0.1:50392/c/fxDzFoDcl4",
+      "connection_id": "eee2be71-0ba2-44b1-a56f-3dea578688ef",
+      "current_audience_delivery": true,
+      "expected_old_text": "Company 1 draft before targeted edit",
+      "expected_targeted_edit": "Company 1 actual targeted edit persisted",
+      "frame_id": "L7jlcCMK8t",
+      "model_exchanges": 5,
+      "openbot_company": "5ec92d63-a28f-48b5-bb28-f5a7299d52d1",
+      "post_edit_verification": "fresh bot read required before human enrichment",
+      "run_id": "7bb44e98-fcf4-4974-ac75-b08643124915",
+      "status": "draft",
+      "visual_review": "not_performed",
+      "workspace_id": "fizp8ujm1J"
+    },
+    {
+      "bot_user_id": "YzrS7dZX1GFAqhY4BnemttKlT8yJvXJh",
+      "canvas_id": "FkXZi8GlVc",
+      "canvas_url": "https://127.0.0.1:50392/c/FkXZi8GlVc",
+      "connection_id": "f6eacc9c-ba5a-4ec5-a02f-cf80b8fc18b9",
+      "current_audience_delivery": true,
+      "expected_old_text": "Company 2 draft before targeted edit",
+      "expected_targeted_edit": "Company 2 actual targeted edit persisted",
+      "frame_id": "yEcUbow_cE",
+      "model_exchanges": 5,
+      "openbot_company": "d773e1f9-b654-4b56-ba59-28c86e8e6b06",
+      "post_edit_verification": "fresh bot read required before human enrichment",
+      "run_id": "74428eae-62c5-4328-ab8d-2107d99ab0e2",
+      "status": "draft",
+      "visual_review": "not_performed",
+      "workspace_id": "TNm112qlZD"
+    }
+  ],
+  "delivery_owner": "single real counted DeliveryWorker/EmailRenderer",
+  "known_create_worker_restart": true,
+  "lost_receipt": {
+    "blind_replay": false,
+    "canvas_id": "YQhDNUIyaL",
+    "document_notifications": 0,
+    "independent_no_effect_workflow": "succeeded",
+    "injected_fault": "receipt lost after successful real response",
+    "manual_reconciliation": true,
+    "openbot_company": "5ec92d63-a28f-48b5-bb28-f5a7299d52d1",
+    "outcome": "unknown",
+    "remote_effect": "actual confirmed create",
+    "run_id": "4de5d61c-4c41-44fe-99ab-2b650bef3498"
+  },
+  "model_fixture": "deterministic responses over normal provider HTTP",
+  "origin": "https://127.0.0.1:50392",
+  "paid_live_inference": "NOT EXERCISED",
+  "snapshot_guard": "enabled before and after",
+  "source": {
+    "fingerprint": "e0c063c43c5bc70018eb8e09d0add0d32ef35159fff843bc9646da7ebe4c4464",
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a"
+  },
+  "version": 1,
+  "worker_groups": 2
+}

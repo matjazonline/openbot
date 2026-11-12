@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-#[cfg(test)]
-use crate::application::workflow::provisioning::{AssistantChannelRequest, ReplyMode};
 use axum::{
     Form, Router,
     extract::{Path, State},
@@ -64,6 +62,9 @@ struct OnboardingChannelForm {
     instructions: String,
     library_agent_ids: Option<String>,
     submission_key: Option<String>,
+    /// The company's first department, when the owner names one (03C item 0).
+    #[serde(default)]
+    department_name: Option<String>,
 }
 
 impl OnboardingChannelForm {
@@ -91,6 +92,7 @@ impl OnboardingChannelForm {
             library_agent_ids,
             name: self.name.clone(),
             instructions: self.instructions.clone(),
+            department_name: self.department_name.clone(),
         })
     }
 }
@@ -220,9 +222,9 @@ async fn channel_step(
     .into_response())
 }
 
-/// Step 2 (p08 D4.7): the chosen agents, agent-only and pinned to the company default model when
-/// there is one, then an assistant channel for each agent that has a model. The completion page
-/// is rendered here, so a refusal shows next to its agent.
+/// Step 2: the chosen agents, each created with its default desk and pinned to the company default
+/// model, and the named department with the first agent in it (01DEP-P03-D4). A refusal of any
+/// of it commits nothing and is shown on the form.
 #[allow(clippy::too_many_arguments)] // Typed Axum extractors name each application dependency.
 async fn create_agents(
     State(onboarding): State<Arc<OnboardingUseCases>>,
@@ -260,11 +262,7 @@ async fn create_agents(
                 .iter()
                 .map(|created| pages::OnboardedAgent {
                     agent: &created.agent,
-                    channel: match &created.channel {
-                        None => pages::OnboardingChannel::NoModel,
-                        Some(Ok(value)) => created_channel(value),
-                        Some(Err(refusal)) => pages::OnboardingChannel::Refused(refusal.message()),
-                    },
+                    channel: created_channel(&created.channel),
                 })
                 .collect::<Vec<_>>();
             pages::onboarding_complete_page(&mailbox_user, &company, &onboarded)
@@ -273,39 +271,8 @@ async fn create_agents(
     Ok(Html(html).into_response())
 }
 
-/// One agent's assistant channel: slug = its handle, name = its name, autonomous replies, team
-/// access, under its onboarding key. An agent without a model is skipped, not refused.
-#[cfg(test)]
-async fn onboarding_channel(
-    channels: &dyn AssistantChannels,
-    company_id: Uuid,
-    caller: WorkflowActor,
-    agent: &Agent,
-) -> AppResult<pages::OnboardingChannel> {
-    if agent.model.is_none() {
-        return Ok(pages::OnboardingChannel::NoModel);
-    }
-    let created = channels
-        .create_assistant_channel(
-            CompanyId::new(company_id),
-            caller,
-            AssistantChannelRequest {
-                agent_slug: agent.slug.clone(),
-                channel_slug: agent.slug.clone(),
-                channel_name: agent.name.clone(),
-                reply_mode: ReplyMode::Autonomous,
-                command_key: onboarding_key(agent),
-            },
-        )
-        .await?;
-    Ok(match created {
-        Ok(created) => created_channel(&created),
-        Err(refusal) => pages::OnboardingChannel::Refused(refusal.message()),
-    })
-}
-
-/// What the completion page shows for an agent on a reload: the channel its onboarding command
-/// stored, if any. A refusal is not stored, so an agent with a model and no channel is missing.
+/// What the completion page shows for an agent on a reload: the default desk its creation
+/// recorded (01DEP-P03-D4).
 async fn stored_onboarding_channel(
     channels: &dyn AssistantChannels,
     company_id: Uuid,
@@ -315,17 +282,14 @@ async fn stored_onboarding_channel(
     let stored = channels
         .assistant_channel_result(CompanyId::new(company_id), caller, &onboarding_key(agent))
         .await?;
-    Ok(match stored {
-        Some(created) => created_channel(&created),
-        None if agent.model.is_none() => pages::OnboardingChannel::NoModel,
-        None => pages::OnboardingChannel::Missing,
-    })
+    Ok(stored.map_or(pages::OnboardingChannel::Missing, |created| {
+        created_channel(&created)
+    }))
 }
 
-/// The assistant-channel command key of an onboarding agent: stable per agent, so a replay
-/// returns the stored channel and the completion page can read it back.
+/// The command key that records an agent's default desk, which the completion page reads back.
 fn onboarding_key(agent: &Agent) -> String {
-    format!("onboarding:{}", agent.id)
+    crate::adapters::persistence::company_agent::default_desk_key(agent.id)
 }
 
 fn created_channel(created: &serde_json::Value) -> pages::OnboardingChannel {
@@ -445,6 +409,8 @@ mod tests {
             created_by: crate::entities::creation::CreationProvenance::system(),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         };
 
         let company_page = pages::onboarding_company_page(&user, "example.com", None);
@@ -486,8 +452,8 @@ mod tests {
         assert!(channel_page.contains("name=\"library_agent_ids\""));
         assert!(channel_page.contains(&format!("value=\"{}\"", library_agent.id)));
         assert!(channel_page.contains("Scheduler"));
-        assert!(channel_page.contains("Each agent gets a channel with the same name"));
-        assert!(channel_page.contains("Custom agent and channel name"));
+        assert!(channel_page.contains("Each agent gets a desk with the same name"));
+        assert!(channel_page.contains("Custom agent and desk name"));
         assert!(channel_page.contains("Required when creating a custom agent."));
         assert!(
             !channel_page
@@ -502,10 +468,9 @@ mod tests {
         );
         assert!(channel_page.contains("Creating email agents…"));
 
-        // p08 D4.7: each agent with its channel, or why it has none and where to make one.
+        // Each agent with its desk, or where to make one when none is recorded.
         let scheduler = library_agent.clone();
         let triage = super::tests::library_agent("Triage", "triage");
-        let unpinned = super::tests::library_agent("Drafts", "drafts");
         let complete_page = pages::onboarding_complete_page(
             &user,
             &company,
@@ -519,13 +484,7 @@ mod tests {
                 },
                 pages::OnboardedAgent {
                     agent: &triage,
-                    channel: pages::OnboardingChannel::Refused(
-                        "The address is <already> used".into(),
-                    ),
-                },
-                pages::OnboardedAgent {
-                    agent: &unpinned,
-                    channel: pages::OnboardingChannel::NoModel,
+                    channel: pages::OnboardingChannel::Missing,
                 },
             ],
         );
@@ -533,14 +492,10 @@ mod tests {
         assert!(complete_page.contains("Your email agents are ready"));
         assert!(complete_page.contains("scheduler@acme.example.com"));
         assert!(complete_page.contains("Forward a message"));
-        assert!(complete_page.contains("The address is &lt;already&gt; used"));
         assert!(complete_page.contains(&format!(
             "href=\"/ui/agents?company_id={}&agent_id={}\"",
             company.id, triage.id
         )));
-        assert!(complete_page.contains(
-            "Connect a model in company settings, then create an assistant channel from each agent's page."
-        ));
         assert!(complete_page.contains(&format!(
             "href=\"/ui?company_id={}&channel_id={}\" class=\"btn btn-primary\">Finish</a>",
             company.id, channel.id
@@ -550,8 +505,8 @@ mod tests {
             &user,
             &company,
             &[pages::OnboardedAgent {
-                agent: &unpinned,
-                channel: pages::OnboardingChannel::NoModel,
+                agent: &triage,
+                channel: pages::OnboardingChannel::Missing,
             }],
         );
         assert!(no_channels.contains("Your agents are created"));
@@ -562,12 +517,12 @@ mod tests {
         )));
     }
 
-    /// p08 D4.7, F085.3: each agent with a model gets one team assistant channel under its
-    /// onboarding key, and replaying the step for the existing agents returns that channel and
-    /// adds none. An agent without a model is skipped, a taken address is the refusal, and a
-    /// reload reads back only what was stored -- for the company's managers.
+    /// 01DEP-P03-D4: the completion page reads back the default desk an agent's creation recorded
+    /// under `agent:{id}`, for the company's managers only; an agent with no recorded desk (a
+    /// fixture insert) shows none.
     #[tokio::test]
-    async fn the_channel_step_gives_each_modelled_agent_one_assistant_channel() {
+    async fn agent_default_desk_onboarding_completion_reads_back_the_default_desk() {
+        use crate::adapters::persistence::company_agent::CompanyAgentService;
         use crate::adapters::persistence::workflow::provisioning::{
             AssistantChannelService, ProvisioningDeployment,
         };
@@ -575,7 +530,7 @@ mod tests {
         use crate::adapters::workflow_source::WorkflowSourceDecoder;
         use crate::application::workflow::templates::TemplateCatalogue;
         use crate::use_cases::{
-            agent::{AgentPersistence, AgentWrite},
+            agent::{AgentPersistence, AgentWrite, CompanyAgents},
             company::CompanyPersistence,
             user::UserPersistence,
         };
@@ -628,124 +583,53 @@ mod tests {
         )
         .await
         .unwrap();
-        let agent = |slug: &str, pinned: bool| AgentWrite {
-            name: format!("Agent {slug}"),
-            slug: slug.into(),
-            provider: pinned.then(|| "openai".into()),
-            model: pinned.then(|| "gpt-4o-mini".into()),
-            ..Default::default()
-        };
-        let desk = AgentPersistence::create(&persistence, company, agent("desk", true))
-            .await
-            .unwrap();
-        let drafts = AgentPersistence::create(&persistence, company, agent("drafts", false))
-            .await
-            .unwrap();
-        let taken = AgentPersistence::create(&persistence, company, agent("taken", true))
-            .await
-            .unwrap();
-        let channels = AssistantChannelService::new(
-            persistence.clone(),
-            ProvisioningDeployment::new(
-                Arc::new(TemplateCatalogue::shipped(&WorkflowSourceDecoder).unwrap()),
-                &[],
-                "agents.test",
-            ),
+        let templates = ProvisioningDeployment::new(
+            Arc::new(TemplateCatalogue::shipped(&WorkflowSourceDecoder).unwrap()),
+            &[],
+            "agents.test",
         );
         let caller = WorkflowActor::authenticated(owner).unwrap();
-        let company_channels = || async {
-            sqlx::query_scalar::<_, i64>("SELECT count(*) FROM channels WHERE company_id = $1")
-                .bind(company)
-                .fetch_one(persistence.pool())
-                .await
-                .unwrap()
-        };
-
-        // Something else already answers on "taken".
-        channels
-            .create_assistant_channel(
-                CompanyId::new(company),
+        let created = CompanyAgentService::new(persistence.clone(), templates.clone())
+            .create(
                 caller,
-                AssistantChannelRequest {
-                    agent_slug: "desk".into(),
-                    channel_slug: "taken".into(),
-                    channel_name: "Taken".into(),
-                    reply_mode: ReplyMode::Autonomous,
-                    command_key: "elsewhere".into(),
+                CompanyId::new(company),
+                AgentWrite {
+                    name: "Agent desk".into(),
+                    slug: "desk".into(),
+                    ..Default::default()
                 },
+                None,
             )
             .await
-            .unwrap()
             .unwrap();
-        let before = company_channels().await;
-
-        let first = onboarding_channel(&channels, company, caller, &desk)
-            .await
-            .unwrap();
-        let pages::OnboardingChannel::Created {
-            channel_id,
-            address,
-        } = first.clone()
-        else {
-            panic!("the desk agent gets its channel: {first:?}");
-        };
-        assert_eq!(address, format!("desk@{suffix}.agents.test"));
-        let (slug, name, access): (String, String, String) = sqlx::query_as(
-            "SELECT slug.slug::text, channel.name, channel.access_mode FROM channels AS channel \
-             JOIN channel_slugs AS slug ON slug.channel_id = channel.id AND slug.is_primary \
-             WHERE channel.id = $1 AND channel.company_id = $2",
+        let bare = AgentPersistence::create(
+            &persistence,
+            company,
+            AgentWrite {
+                name: "Bare".into(),
+                slug: "bare".into(),
+                ..Default::default()
+            },
         )
-        .bind(channel_id)
-        .bind(company)
-        .fetch_one(persistence.pool())
         .await
         .unwrap();
-        assert_eq!(
-            (slug.as_str(), name.as_str(), access.as_str()),
-            ("desk", "Agent desk", "team")
-        );
-        assert_eq!(company_channels().await, before + 1);
+        let channels = AssistantChannelService::new(persistence.clone(), templates);
 
-        // A replay of the step for the agents that already exist adds nothing.
-        let replayed = onboarding_channel(&channels, company, caller, &desk)
+        let read = stored_onboarding_channel(&channels, company, caller, &created.agent)
             .await
             .unwrap();
-        assert_eq!(replayed, first);
-        assert_eq!(company_channels().await, before + 1);
-
         assert_eq!(
-            onboarding_channel(&channels, company, caller, &drafts)
-                .await
-                .unwrap(),
-            pages::OnboardingChannel::NoModel
-        );
-        let refused = onboarding_channel(&channels, company, caller, &taken)
-            .await
-            .unwrap();
-        assert!(
-            matches!(&refused, pages::OnboardingChannel::Refused(message) if message.contains("'taken'")),
-            "{refused:?}"
-        );
-        assert_eq!(company_channels().await, before + 1);
-
-        // A reload reads back what was stored; a refusal was not.
-        assert_eq!(
-            stored_onboarding_channel(&channels, company, caller, &desk)
-                .await
-                .unwrap(),
-            first
+            read,
+            pages::OnboardingChannel::Created {
+                channel_id: created.desk_id,
+                address: format!("desk@{suffix}.agents.test"),
+            }
         );
         assert_eq!(
-            stored_onboarding_channel(&channels, company, caller, &taken)
+            stored_onboarding_channel(&channels, company, caller, &bare)
                 .await
                 .unwrap(),
             pages::OnboardingChannel::Missing
-        );
-        assert_eq!(
-            stored_onboarding_channel(&channels, company, caller, &drafts)
-                .await
-                .unwrap(),
-            pages::OnboardingChannel::NoModel
         );
         // Someone who does not manage the company reads nothing.
         assert_eq!(
@@ -753,7 +637,7 @@ mod tests {
                 &channels,
                 company,
                 WorkflowActor::authenticated(outsider).unwrap(),
-                &desk
+                &created.agent
             )
             .await
             .unwrap(),

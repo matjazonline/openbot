@@ -51,7 +51,7 @@ graft connector were unavailable. Phase10 used the scoped source/owner inventory
 run `graft build` in an environment with the repository's graph tool before relying on graph spans.
 
 
-## Channel response verification
+## Desk response verification
 
 Use disposable PostgreSQL18 databases and the loopback network guard. The focused response groups
 are `channel_reply_e2e_`, `channel_reply_authoring_`, `channel_reply_views_` and

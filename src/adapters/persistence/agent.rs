@@ -4,7 +4,7 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{PostgresPersistence, participant::create_agent_principal_on},
+    adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         agent::Agent, creation::CreationProvenance, skill::Skill, value_objects::AvatarUrl,
@@ -327,11 +327,18 @@ fn slug_conflict(error: sqlx::Error) -> AppError {
 
 #[async_trait]
 impl AgentPersistence for PostgresPersistence {
+    #[cfg(test)]
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let id = Uuid::new_v4();
         let mut transaction = self.pool.begin().await?;
         insert_agent_on(&mut transaction, id, Some(company_id), &write).await?;
-        create_agent_principal_on(&mut transaction, company_id, id, &write.name).await?;
+        super::participant::create_agent_principal_on(
+            &mut transaction,
+            company_id,
+            id,
+            &write.name,
+        )
+        .await?;
         let db = sqlx::query_as::<_, AgentDb>(&format!(
             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE id = $1"
         ))

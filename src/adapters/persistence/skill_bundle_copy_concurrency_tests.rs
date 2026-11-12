@@ -40,8 +40,24 @@ async fn request(p: &PostgresPersistence, path: CopyPath) -> CopyRequest {
     let library_agent = match path {
         CopyPath::Standalone => None,
         CopyPath::LibraryAgent => {
+            sqlx::query("INSERT INTO company_model_connections(company_id,provider,api_key,models,is_default) VALUES($1,'openai','fixture-key','{gpt-test}',true)")
+                .bind(company).execute(p.pool()).await.unwrap();
             let mut input = agent_write("library-copy");
             input.skill_ids = vec![source.id];
+            input.tool_bindings = Some(
+                ["tool_a", "tool_b"]
+                    .map(|alias| {
+                        let mut binding =
+                            crate::entities::agent_capability::AgentToolBinding::builtin(
+                                crate::entities::agent_capability::AgentBuiltinTool::MessageReply,
+                            );
+                        binding.alias =
+                            crate::entities::agent_capability::AgentToolAlias::parse(alias)
+                                .unwrap();
+                        binding
+                    })
+                    .into(),
+            );
             Some(AgentPersistence::create_library(p, input).await.unwrap().id)
         }
     };
@@ -55,15 +71,17 @@ async fn request(p: &PostgresPersistence, path: CopyPath) -> CopyRequest {
 
 async fn copy(p: &PostgresPersistence, request: &CopyRequest) -> Skill {
     if let Some(agent) = request.library_agent {
-        let copied = p
-            .create_agent_from_library(
-                request.company,
+        let copied = crate::adapters::persistence::test_support::company_agents(p)
+            .copy_from_library(
                 WorkflowActor::authenticated(request.actor).unwrap(),
+                crate::domain::workflow::CompanyId::new(request.company),
                 agent,
                 agent_write("company-copy"),
+                None,
             )
             .await
-            .unwrap();
+            .unwrap()
+            .agent;
         p.load_capabilities(request.company, copied.id)
             .await
             .unwrap()

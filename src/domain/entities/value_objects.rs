@@ -187,6 +187,10 @@ impl ModelName {
 // A channel's URL slug, e.g. the `support` in `support@acme.mailagents.com`.
 string_newtype!(ChannelSlug);
 
+// A department's slug, unique within its company. It is also the address of the department's own
+// desk, so it obeys the channel slug rules, but it names a department, not a channel.
+string_newtype!(DepartmentSlug);
+
 // A company MCP catalog identifier, distinct from a mail channel address.
 string_newtype!(McpConnectionSlug);
 

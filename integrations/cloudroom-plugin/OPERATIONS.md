@@ -7,6 +7,40 @@ pnpm 10.34.9 and npm 11.19.0. This is a source build, not the upstream
 Rust Core/VPS launcher and hosted sandboxes are outside this integration.
 Linux installation, systemd boot and native provider acceptance remain **NOT EXERCISED**.
 
+## One-step installation
+
+`scripts/install-local.mjs` runs the build, packaging, installation and registration
+steps of the next two sections in order, as the same unprivileged account. From this
+plugin directory:
+
+```sh
+node scripts/install-local.mjs --cloudroom /absolute/cloudroom --profile /absolute/private-company-profile --plugin /absolute/openbot-plugin
+```
+
+Before building it reports every mismatched pin (Node, npm, pnpm) and every missing
+git, `c++`, `tar` or (unless `--skip-tests`) OpenSSL together, and it refuses root.
+It runs `npm ci`, `npm run typecheck`, then `npm test` and `npm run test:guards`
+unless `--skip-tests`. It clones the pinned revision only when `--cloudroom` does not
+exist; an existing checkout is left as it is for `prepare-runtime` to verify.
+`--plugin` must be absent or empty, because Cloudroom runs a `path:` plugin from that
+directory in place. The three directories must be separate. Artifacts go to
+`artifacts/` here unless `--artifacts` names another absolute directory.
+
+The tarball is compared with the integrity file the same packaging run wrote. That only
+detects a damaged archive. Pass `--trusted-integrity /absolute/copy.integrity.json` to
+also require the SHA-256 of an independently trusted copy.
+
+It then starts `services/run.mjs` on the profile, installs and reloads the plugin
+through the Cloudroom CLI with inherited `BB_*`/`ROOM_*` variables removed, and stops
+the wrapper. `--keep-running` leaves the wrapper in the foreground until Ctrl-C instead.
+`--server-port`, `--daemon-port` and `--ui-port` override 4310, 4311 and 4312. A
+failure after the wrapper starts stops it before the installer exits.
+
+It does not install or log in to provider CLIs, change plugin settings or accept a
+pairing code. It finishes by reporting which provider CLIs are on PATH, the remaining
+steps from "Providers, pairing and a first task", and the command that starts the
+profile again. It installs no LaunchAgent or systemd unit.
+
 ## Build and verify the artifact
 
 Use one unprivileged company OS account with a C/C++ toolchain, git and the pinned

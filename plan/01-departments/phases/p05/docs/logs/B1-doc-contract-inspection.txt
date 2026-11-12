@@ -1,0 +1,297 @@
+
+docs/departments.md
+40: A desk marked **members only** must belong to a department. It is an allowlist desk whose
+41: grants are derived from the department, in the same transaction as every change that affects
+42: them:
+43: 
+44: - the department's members and its role holders;
+45: - the holder of the parent department's `lead` role;
+46: - the `lead` of each direct child department.
+47: 
+48: Nothing further up or down is granted: one step of the hierarchy each way. The addresses in the
+49: desk's Participant Emails still have access as before, and the company owner keeps access as on
+50: every desk; a members-only desk cannot be open to `@public`. Everyone else in the company, and
+51: anyone outside it, is refused.
+52: 
+53: Messages that other desks in the company hand to a members-only desk are still admitted, bound by
+54: the usual hop budget and loop refusal (see `inter_channel_agent_communication.md`): the
+55: restriction is on people and outside senders, not on desk-to-desk relays.
+56: 
+89: not listed. The context is frozen with the run's prepared request, so a retry sees what the first
+90: attempt saw.
+91: 
+92: The Agent Builder's `list_company_agents` tool names each agent's departments, roles and own
+93: desk and can list one department (`department` slug); it stays an owner's or admin's tool. The
+94: plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
+95: one yet.
+96: 
+97: ## Dispatch and escalation
+98: 
+99: A lead hands work to a member, or escalates to the parent department, by sending a message to that
+100: desk's address. Today such a message is delivered as an outbound message on the target desk; it
+101: does not start the target desk's workflow, and a reply that comes back along the same trace is
+102: refused as a loop. Dispatch that starts the member's work and returns an answer waits for
+103: `channel.call` (agent-workflow-call).
+104: 
+105: ## Where departments show up
+106: 
+107: - **Desk lists** group desks under their department, root departments first, "No department"
+108:   last, and badge each owned desk.
+109: - **Run board** (`/ui/workflow-runs`): a department filter beside the workflow and agent filters
+110:   (runs on the desks the department owns now), and a **Waiting on a person** view listing the
+
+docs/inter_channel_agent_communication.md
+38: The access-policy step does not apply the receiving desk's participant list to a relay: once
+39: `authorize_relay` has matched the sender address to its source desk, ingress trusts
+40: `IngressOrigin::InternalChannel`. A members-only desk, whose allowlist is derived from its
+41: department's members, role holders and adjacent leads, therefore restricts people and outside
+42: senders only; any desk of the same company may relay into it, still bound by the hop budget
+43: and the loop rule below.
+44: 
+45: From there the receiving desk's workflow bindings decide, by their message triggers, whether
+46: it starts a run. The relay itself starts no work. A `message.send` step whose destination is a
+47: desk posts into a new thread on that desk as an outbound system note, which starts none of
+48: its bindings: one desk cannot hand work to another this way (see "Department dispatch and
+49: escalation" below). An intent that answers a message a run is
+50: waiting on is offered to that run before ordinary admission (reply correlation,
+51: `application/workflow/message_admission.rs`).
+52: 
+53: ## Department dispatch and escalation
+54: 
+55: Departments ([departments](departments.md)) organize desks into a hierarchy with a lead, and a
+56: lead's job is to hand work to its members' desks and to escalate to its parent department's desk.
+57: What holds today:
+58: 
+59: - **The lead knows where to send.** An `agent.run` on a desk its department owns gets the
+60:   department's name, charter, whether the agent is the lead, and — on a desk that is not public —
+61:   the addresses of the department's own desk, its parent's, its direct children's and its agents'
+62:   own desks, frozen with the run (coordination C003).
+63: - **Relays are admitted.** A relay into a members-only desk is trusted like any other relay inside
+64:   the company; members-only restricts people and outside senders (coordination C001). For people,
+65:   a members-only desk admits its department's members and role holders, the parent department's
+66:   lead and each direct child department's lead: one step up and one step down (coordination C002).
+67: - **A send does not start the member's work.** A `message.send` to a member's desk is an outbound
+68:   note on that desk; none of its bindings run. A member's reply travelling back along the trace to
+69:   the lead's desk is refused as a cycle (see "Loops").
+70: 
+71: So dispatch that starts the member's run, and escalation that returns an answer to the lead, wait
+72: for `channel.call` in agent-workflow-call, which the plan names as their successor (coordination
+73: C004). Until then a lead can tell a person where work belongs, and people can forward it.
+
+docs/custom_tools.md
+34: granted two workflow tools:
+35: 
+36: - `list_company_agents`: the company's agents, so it does not duplicate one, with each agent's
+37:   departments and roles and its own desk's address; `department` (a slug) lists only that
+38:   department's members and role holders. An entry carries no intake schema yet: that arrives with
+39:   `channel.call` (agent-workflow-call);
+40: - `create_agent_channel`: provisions the new agent with its own autonomous desk at its slug and,
+41:   when `channel_slug` names another address, a second team (never public) desk bound to the
+42:   reply-mode workflow the conversation chose (p08 D2). `department` and `role` place the agent in
+43:   a department.
+44: 
+45: Both answer only an owner or admin writing in the app; the requester becomes the binding's run-as
+
+plan/01-departments/03-leads-and-coordination.md
+125:    **Status after p03 (coordination C004).** Items 2–4 did not hold against the code: a
+126:    `message.send` to a desk posts an outbound system note into a new thread there and starts none
+127:    of its bindings, and a reply back along the relay chain to the lead's desk is refused as a
+128:    cycle. Dispatch, escalation, the round trip and the loop test therefore wait for
+129:    `channel.call`; p03 made no core messaging change and has no `department_lead_round_trip_` or
+130:    `department_lead_loop_` tests. What p03 shipped instead (C003): the department context in
+131:    `agent.run` names the department's desks by address (item 1), and `department-lead.yaml`
+132:    (`fixtures::ALL`, not in the shipped template catalogue) is the agent base run by the lead,
+133:    whose framing comes from that context rather than from its prompt.
+
+src/application/workflow/fixtures/department-lead.yaml
+1: # A department lead's desk: the agent base run by the agent `lead`. The workflow adds nothing for
+2: # the department: a run on a department-owned desk gets the department's name, charter, its lead
+3: # sentence and the desks around it as trusted system text from preparation (01DEP-P03-D11), and
+4: # the context below stays untrusted message data. Handing work to another desk waits for
+5: # `channel.call` (01DEP-C004): a message sent to a desk does not start that desk's workflow.
+6: format_version: 1
+7: workflow_id: 00000000-0000-0000-0000-000000000008
+8: input_schema:
+9:   type: object
+10:   properties:
+11:     message: {type: string}
+12:     source_message: {type: string, maxLength: 128}
+13:     subject: {type: string, maxLength: 998}
+14:     sender: {type: string, maxLength: 320}
+15:   required: [message, source_message]
+16:   additionalProperties: false
+17: parameter_schema: {type: object, additionalProperties: false}
+18: output_schema:
+19:   type: object
+20:   properties: {body: {type: string, maxLength: 16384}}
+21:   required: [body]
+22:   additionalProperties: false
+23: resources: []
+24: entry: context
+
+Inspection result: shipped documentation consistently states trusted internal relays, adjacent-lead grants, frozen roster context, and deferred dispatch/escalation until channel.call. This is a documentation claim; no unimplemented round-trip or loop test is claimed as passing.
+
+Integrated-code cross-check for C004:
+src/application/workflow/message_planner.rs
+288: fn plan_channel(
+289:     kind: DestinationKind,
+290:     destination_id: Uuid,
+291:     channel: Uuid,
+292:     content: &CanonicalContent,
+293:     routes: &MessageRoutes,
+294: ) -> PlannedDestination {
+295:     let thread_id = Uuid::new_v4();
+296:     let message = MessageWrite::internal(
+297:         thread_id,
+298:         MessageAuthorWrite::Platform,
+299:         content.subject().to_string(),
+300:         content.body_text().to_string(),
+301:         MessageDirection::Outbound,
+302:         MessageRole::System,
+303:         routes.correlation_id,
+304:     )
+305:     // It opens its own thread, so a conversation entry answers no earlier turn.
+306:     .with_entry_kind(ThreadEntryKind::Conversation);
+307:     PlannedDestination {
+308:         kind,
+309:         destination_id,
+310:         new_thread: Some(NewThread {
+311:             id: thread_id,
+312:             channel_id: channel,
+313:             subject: content.subject().to_string(),
+314:         }),
+315:         channel_id: channel,
+316:         thread_id,
+317:         message,
+318:         delivery: None,
+319:         principal_id: None,
+320:         recipient: None,
+321:         check: RouteCheck::Channel { channel },
+322:     }
+323: }
+src/adapters/persistence/workflow/message_writer.rs
+15: pub(in crate::adapters::persistence::workflow) async fn write_destination_on(
+16:     tx: &mut Transaction<'_, Postgres>,
+17:     scope: ActionScope,
+18:     destination: &PlannedDestination,
+19: ) -> AppResult<CanonicalDestinationReceipt> {
+20:     create_thread_on(tx, scope.company, destination).await?;
+21:     let inserted = insert_message_on(
+22:         tx,
+23:         &destination.message,
+24:         MessageStampSource::Workflow {
+25:             company: scope.company,
+26:             run: scope.run,
+27:         },
+28:     )
+29:     .await?;
+30:     if inserted.canonical_id != destination.message.id {
+31:         return Err(AppError::Conflict(
+32:             "Workflow message identity already belongs to another message".into(),
+33:         ));
+34:     }
+35:     let delivery = match &destination.delivery {
+36:         Some(delivery) => match insert_delivery_on(tx, delivery).await? {
+37:             DeliveryCreation::Created(id) if id == delivery.id => Some(id),
+38:             _ => {
+39:                 return Err(AppError::Conflict(
+40:                     "Workflow message delivery key already belongs to another delivery".into(),
+41:                 ));
+42:             }
+43:         },
+44:         None => None,
+45:     };
+46:     Ok(CanonicalDestinationReceipt {
+47:         message: inserted.canonical_id,
+48:         delivery,
+49:     })
+50: }
+51: 
+52: async fn create_thread_on(
+53:     db: &mut PgConnection,
+54:     company: CompanyId,
+55:     destination: &PlannedDestination,
+56: ) -> AppResult<()> {
+57:     let Some(thread) = &destination.new_thread else {
+58:         return Ok(());
+59:     };
+60:     sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,$4)")
+61:         .bind(thread.id)
+62:         .bind(company.as_uuid())
+63:         .bind(thread.channel_id)
+64:         .bind(&thread.subject)
+65:         .execute(&mut *db)
+66:         .await?;
+67:     // A member's send opens its own thread; the recipient belongs to exactly that thread.
+68:     if let (DestinationKind::User, Some(principal)) = (destination.kind, destination.principal_id) {
+69:         sqlx::query("INSERT INTO thread_principals (company_id, channel_id, thread_id, principal_id, role) VALUES ($1,$2,$3,$4,'participant')")
+70:             .bind(company.as_uuid()).bind(thread.channel_id).bind(thread.id).bind(principal)
+71:             .execute(db).await?;
+72:     }
+73:     Ok(())
+74: }
+src/application/workflow/message_planner.rs unchanged since p03: True 1399834656a869ec5948efce880f94b9d5446a4e 1399834656a869ec5948efce880f94b9d5446a4e
+src/adapters/persistence/workflow/message_writer.rs unchanged since p03: True d1c51f65afeac9dd9b9a3fa74429d1979333135f d1c51f65afeac9dd9b9a3fa74429d1979333135f
+src/application/use_cases/thread/ingest/routing.rs unchanged since p03: False f109874e4fa40b848721dba85f184c341da937b2 d9027f94b43c1a9249da267a9af8a22c0705be92
+
+Routing-file disposition: p04 changed reserved-address directory grouping only; authorization, hop and loop branches are unchanged since p03. Complete diff follows:
+diff --git a/src/application/use_cases/thread/ingest/routing.rs b/src/application/use_cases/thread/ingest/routing.rs
+index d9027f94..f109874e 100644
+--- a/src/application/use_cases/thread/ingest/routing.rs
++++ b/src/application/use_cases/thread/ingest/routing.rs
+@@ -5,7 +5,7 @@
+ //! none of them does is write: nothing an inbound message produces becomes durable until
+ //! [`super::commit::CommitPlan`] hands the whole set to the committer at once.
+ 
+-use std::collections::HashSet;
++use std::collections::{HashMap, HashSet};
+ 
+ use tracing::warn;
+ 
+@@ -680,19 +680,36 @@ impl ThreadUseCases {
+             return Ok(Vec::new());
+         }
+ 
++        // Grouped by the owning department in tree order (a root before its children), desks no
++        // department owns last; by address within each (01-departments 04C.3).
++        let departments = directory.departments(company.id).await?;
++        let order: HashMap<_, (usize, String)> =
++            crate::entities::department::department_tree(&departments)
++                .into_iter()
++                .enumerate()
++                .map(|(rank, (_, department))| (department.id, (rank, department.name.clone())))
++                .collect();
+         let mut entries = Vec::new();
+         for channel in directory.channels(company.id).await? {
+             if !channel.enabled || !channel.participant_access(context).authorized {
+                 continue;
+             }
+-            entries.push(ChannelDirectoryEntry {
+-                address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
+-                name: channel.name.clone(),
+-                description: channel.description.clone(),
+-            });
++            let owner: Option<(usize, String)> = channel
++                .department_id
++                .and_then(|id| order.get(&id))
++                .map(|(rank, name)| (*rank, name.clone()));
++            entries.push((
++                owner.as_ref().map_or(usize::MAX, |(rank, _)| *rank),
++                ChannelDirectoryEntry {
++                    address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
++                    name: channel.name.clone(),
++                    description: channel.description.clone(),
++                    department: owner.map(|(_, name)| name),
++                },
++            ));
+         }
+-        entries.sort_by(|a, b| a.address.cmp(&b.address));
+-        Ok(entries)
++        entries.sort_by(|a, b| (a.0, &a.1.address).cmp(&(b.0, &b.1.address)));
++        Ok(entries.into_iter().map(|(_, entry)| entry).collect())
+     }
+ 
+     /// Reply to every reserved address the message named, reporting whether any answer went out.
+
+Current full library run trusted-relay evidence:
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted ... ok

@@ -8,6 +8,7 @@ pub mod company_resend_api;
 #[cfg(test)]
 pub(crate) mod company_test_support;
 pub mod delivery;
+pub mod department;
 pub mod integration;
 pub mod onboarding;
 pub mod participant;

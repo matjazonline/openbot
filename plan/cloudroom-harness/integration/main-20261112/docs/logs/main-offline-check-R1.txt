@@ -1,0 +1,43 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0432]: unresolved import `crate::use_cases::agent::LibraryAgentCopyPersistence`
+  --> src/adapters/persistence/agent_publication/tests/native.rs:69:9
+   |
+69 |     use crate::use_cases::agent::LibraryAgentCopyPersistence;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `LibraryAgentCopyPersistence` in `application::use_cases::agent`
+
+error[E0599]: no method named `create_agent_from_library` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/skill_bundle_copy_concurrency_tests.rs:59:14
+   |
+58 |           let copied = p
+   |  ______________________-
+59 | |             .create_agent_from_library(
+   | |             -^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `&persistence::PostgresPersistence`
+   | |_____________|
+   |
+
+error[E0599]: no method named `create_agent_from_library` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/agent_publication/tests/native.rs:119:13
+    |
+119 |         f.p.create_agent_from_library(
+    |         ----^^^^^^^^^^^^^^^^^^^^^^^^^ method not found in `persistence::PostgresPersistence`
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 | pub struct PostgresPersistence {
+    | ------------------------------ method `create_agent_from_library` not found for this struct
+
+error[E0063]: missing field `files` in initializer of `application::use_cases::skill::SkillWrite`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:296:9
+    |
+296 |         SkillWrite {
+    |         ^^^^^^^^^^ missing `files`
+
+error[E0063]: missing fields `description` and `files` in initializer of `application::agent::SkillSnapshot`
+  --> src/application/workflow/publication/../agent_department_tests.rs:59:16
+   |
+59 |         skill: SkillSnapshot {
+   |                ^^^^^^^^^^^^^ missing `description` and `files`
+
+Some errors have detailed explanations: E0063, E0432, E0599.
+For more information about an error, try `rustc --explain E0063`.
+error: could not compile `open_bots` (lib test) due to 5 previous errors

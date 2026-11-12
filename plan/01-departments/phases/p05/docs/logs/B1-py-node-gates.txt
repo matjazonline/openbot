@@ -1,0 +1,52 @@
+==> python3 scripts/tests/knowledge-model-prepare.py
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.013s
+
+OK
+exit 0 : python3 scripts/tests/knowledge-model-prepare.py
+==> python3 scripts/tests/doop-test.py
+...................Managed package ready: 737f3be4ba7718432940b751425a31a9a16d2256c13b6caac30d4ddf404094b4
+...Managed source ready: 21529400ea663e69f0542fb9a29e26676e086bc67686b8586a7aad1bb786eea9
+........................
+----------------------------------------------------------------------
+Ran 46 tests in 6.182s
+
+OK
+exit 0 : python3 scripts/tests/doop-test.py
+==> node --test scripts/tests/doop-probe.mjs
+✔ document fresh readback accepts the actual expected replacement and parent identities (0.604584ms)
+✔ document fresh readback rejects a stale saved pre-edit snapshot (0.443334ms)
+✔ document fresh readback rejects a partial replacement retaining old text (0.082666ms)
+✔ document fresh readback rejects a foreign frame identity (0.29675ms)
+✔ document fresh readback rejects a foreign canvas identity (0.108042ms)
+✔ document fresh readback rejects a foreign workspace identity (0.090709ms)
+✔ document fresh readback rejects a frame missing from its parent (2.068ms)
+✔ document fresh readback rejects a missing HTML observation (0.099542ms)
+✔ competing browser launches create one process with the existing profile and sandbox (52.284375ms)
+✔ failed browser shutdown retains its created receipt for authoritative recovery (17.116042ms)
+✔ browser with no positive process identity cannot claim confirmed removal (5.979667ms)
+✔ lifecycle helper rejects an old executable that exits successfully without its exact marker (225.049042ms)
+✔ shared native launcher refuses oversized stdin before starting any executable (0.304667ms)
+✔ e2e helper rejects an old executable with zero selected document workflow tests (157.006125ms)
+✔ native helper diagnostics redact retired and replacement keys (192.350334ms)
+✔ compatibility report accepts the controlled positive (63.901333ms)
+✔ compatibility report rejects list_canvases-error (57.838792ms)
+✔ compatibility report rejects get_frame-error (63.45725ms)
+✔ compatibility report rejects get_canvas-error (58.75275ms)
+✔ compatibility report rejects wrong-workspace (59.918125ms)
+✔ compatibility report rejects unpersisted-edit (58.475959ms)
+✔ compatibility report rejects wrong-frame (57.671625ms)
+✔ compatibility report rejects wrong-canvas (60.206375ms)
+✔ compatibility report rejects helper-zero-matches (270.39825ms)
+✔ compatibility report rejects helper-nonzero (1290.46475ms)
+✔ compatibility report rejects helper-unavailable (61.617709ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2818.300583
+exit 0 : node --test scripts/tests/doop-probe.mjs

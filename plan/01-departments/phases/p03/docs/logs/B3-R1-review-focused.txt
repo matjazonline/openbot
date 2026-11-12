@@ -1,0 +1,45 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 38 tests
+test adapters::persistence::department::tests::roster::department_context_roster_is_bounded ... ok
+test adapters::persistence::department::tests::roster::department_context_roster_lists_the_desks_around_the_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_all_compile_and_freeze_with_real_child_content ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_autonomous_omission_uses_frozen_saved_defaults ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_invalid_variants_return_source_located_errors ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_constructed_arguments_check_allof_contracts ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_preserves_typed_arguments_results_and_missing_default ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_mcp_required_result_and_recursive_child_are_rejected ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_reply_templates_pass_the_subject_and_history_to_the_agent ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_review_routes_human_edits_and_requires_rejection_feedback ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_contract_pins_rounds_and_accepted_data ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_escalation_reaches_a_specialist_with_artifact_and_feedback ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_revision_rounds_carry_feedback_and_never_approve_on_exhaustion ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_successor_maps_human_feedback_and_data_explicitly ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_taking_a_message_accept_the_standard_message_input ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_triage_selects_declared_routes_and_default ... ok
+test application::workflow::fixtures::tests::workflow_fixtures_nested_defaults_and_allof_keep_compile_work_bounded ... ok
+test application::workflow::publication::storage::tests::workflow_storage_deserialization_preserves_name_invariants ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... ok
+test application::workflow::publication::storage::tests::workflow_storage_rejects_incompatible_compiler_before_rebuilding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_context_frozen_preparation_replays_the_department_it_froze ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_belongs_to_agent_runs_only ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_follows_the_instructions_and_precedes_skills ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_names_the_lead_only_for_its_run_and_no_roster_on_a_public_desk ... ok
+test application::workflow::publication::storage::tests::workflow_storage_rejects_corruption_and_compiler_drift ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test application::workflow::storage::tests::workflow_storage_cursor_advances_past_full_error_and_protected_page_without_time_advance ... ok
+test application::workflow::sample::tests::department_lead_fixture_runs_as_a_sample ... ok
+test application::workflow::storage::tests::workflow_storage_history_cursors_advance_past_error_and_protected_prefix_and_share_the_record_budget ... ok
+test application::workflow::storage::tests::workflow_storage_shutdown_drops_pending_write_and_joins ... ok
+test application::workflow::storage::tests::workflow_storage_full_error_page_still_has_positive_worker_delay ... ok
+test application::workflow::publication::storage::tests::workflow_storage_restores_all_frozen_fixtures_and_child_identity ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk ... ok
+
+test result: ok. 38 passed; 0 failed; 0 ignored; 0 measured; 3832 filtered out; finished in 14.66s
+

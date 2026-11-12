@@ -1,0 +1,207 @@
+# 01DEP-P01-G1-R1 reviewer SQL probes (scratch DB openbot_dept_p01_review, PostgreSQL 18.6 (Homebrew))
+# Reconstructions of the r1 decisions as written, not the author's implementation.
+
+## Probe A: shape rule reconstruction (D2) on a minimal table
+```sql
+\set ON_ERROR_STOP 0
+DROP SCHEMA IF EXISTS s CASCADE; CREATE SCHEMA s; SET search_path=s,public;
+CREATE TABLE departments(id int PRIMARY KEY, company_id int NOT NULL, parent_id int, UNIQUE(company_id,id),
+  FOREIGN KEY(company_id,parent_id) REFERENCES departments(company_id,id),
+  CONSTRAINT departments_not_own_parent CHECK (parent_id IS NULL OR parent_id <> id));
+-- Reconstruction of DEP-P01-D2 as written: cycle if proposed_parent = checked or upward walk from
+-- proposed_parent reaches checked; depth if ancestor_depth(proposed_parent) + subtree_height(checked) > 8.
+CREATE FUNCTION department_shape_problem(c int, d int, p int) RETURNS text LANGUAGE sql STABLE AS $$
+WITH RECURSIVE up(id, parent_id, n) AS (
+    SELECT id, parent_id, 1 FROM s.departments WHERE company_id=c AND id=p
+  UNION ALL
+    SELECT x.id, x.parent_id, up.n+1 FROM s.departments x JOIN up ON x.id=up.parent_id AND x.company_id=c
+     WHERE up.n < 9 AND up.id <> d),
+down(id, n) AS (
+    SELECT d, 1
+  UNION ALL
+    SELECT x.id, down.n+1 FROM s.departments x JOIN down ON x.parent_id=down.id AND x.company_id=c
+     WHERE down.n < 9)
+SELECT CASE
+  WHEN p IS NULL THEN CASE WHEN (SELECT max(n) FROM down) > 8 THEN 'depth' END
+  WHEN p = d OR EXISTS (SELECT 1 FROM up WHERE id=d) THEN 'cycle'
+  WHEN coalesce((SELECT max(n) FROM up),0) + (SELECT max(n) FROM down) > 8 THEN 'depth'
+END $$;
+CREATE FUNCTION guard_department_shape() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE problem text := department_shape_problem(NEW.company_id, NEW.id, NEW.parent_id);
+BEGIN
+  IF problem IS NOT NULL THEN
+    RAISE EXCEPTION 'department shape: %', problem USING ERRCODE='23514', CONSTRAINT='departments_shape';
+  END IF; RETURN NEW;
+END $$;
+CREATE TRIGGER guard_department_shape BEFORE INSERT OR UPDATE OF parent_id ON departments FOR EACH ROW EXECUTE FUNCTION guard_department_shape();
+-- chain 1..8 (level 1..8)
+INSERT INTO departments VALUES (1,1,NULL);
+INSERT INTO departments SELECT g,1,g-1 FROM generate_series(2,8) g;
+\echo '--- 9th level insert (expect depth)'
+INSERT INTO departments VALUES (9,1,8);
+\echo '--- separate tree: 20 -> 21 -> 22 (height 3)'
+INSERT INTO departments VALUES (20,1,NULL),(21,1,20),(22,1,21);
+\echo '--- re-parent 20 under 5 (level 5 + height 3 = 8, expect ok)'
+UPDATE departments SET parent_id=5 WHERE id=20;
+\echo '--- re-parent 20 under 6 (6+3=9, expect depth)'
+UPDATE departments SET parent_id=6 WHERE id=20;
+\echo '--- cycle: re-parent 1 under 22 (22 is in 1 subtree now; expect cycle)'
+UPDATE departments SET parent_id=22 WHERE id=1;
+\echo '--- self parent (expect not_own_parent check or cycle)'
+UPDATE departments SET parent_id=3 WHERE id=3;
+\echo '--- move 20 back to root (expect ok)'
+UPDATE departments SET parent_id=NULL WHERE id=20;
+\echo '--- sibling move within subtree: 22 under 20 (already) and 21 under 22?? (cycle)'
+UPDATE departments SET parent_id=22 WHERE id=21;
+\echo '--- UPDATE not touching parent_id bypasses trigger (fine)'
+\echo '--- multi-row UPDATE forming a cycle in ONE statement: 30->31, swap parents'
+INSERT INTO departments VALUES (30,1,NULL),(31,1,NULL);
+UPDATE departments SET parent_id = CASE id WHEN 30 THEN 31 WHEN 31 THEN 30 END WHERE id IN (30,31);
+SELECT id,parent_id FROM departments WHERE id IN (30,31) ORDER BY id;
+```
+```
+drop cascades to function s.department_shape_problem(integer,integer,integer)
+drop cascades to function s.guard_department_shape()
+--- 9th level insert (expect depth)
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:36: ERROR:  department shape: depth
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+--- separate tree: 20 -> 21 -> 22 (height 3)
+--- re-parent 20 under 5 (level 5 + height 3 = 8, expect ok)
+UPDATE 1
+--- re-parent 20 under 6 (6+3=9, expect depth)
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:42: ERROR:  department shape: depth
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+--- cycle: re-parent 1 under 22 (22 is in 1 subtree now; expect cycle)
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:44: ERROR:  department shape: cycle
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+--- self parent (expect not_own_parent check or cycle)
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:46: ERROR:  department shape: cycle
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+--- move 20 back to root (expect ok)
+UPDATE 1
+--- sibling move within subtree: 22 under 20 (already) and 21 under 22?? (cycle)
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:50: ERROR:  department shape: cycle
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+--- UPDATE not touching parent_id bypasses trigger (fine)
+--- multi-row UPDATE forming a cycle in ONE statement: 30->31, swap parents
+psql:/private/tmp/claude-501/-Users-mac02--codex-worktrees-2050-openbot/68933786-cbe7-4b6b-9387-b5dcb29689a4/scratchpad/sql/shape_probe.sql:54: ERROR:  department shape: cycle
+CONTEXT:  PL/pgSQL function guard_department_shape() line 5 at RAISE
+ id | parent_id 
+----+-----------
+ 30 |          
+ 31 |          
+(2 rows)
+
+```
+
+## Probe B: real init schema + D1 tables; demotion as remove_member does it; company teardown under RESTRICT/NO ACTION
+```sql
+\set ON_ERROR_STOP 1
+BEGIN;
+-- D1 reconstruction (as written in gate r1), appended block
+CREATE TABLE public.departments (
+  id uuid PRIMARY KEY, company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+  name text NOT NULL, slug public.citext NOT NULL, parent_id uuid,
+  created_by jsonb NOT NULL, created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT departments_created_by_check CHECK (public.valid_creation_provenance(created_by)),
+  CONSTRAINT departments_not_own_parent CHECK (parent_id IS NULL OR parent_id <> id),
+  UNIQUE (company_id, slug), UNIQUE (company_id, id));
+ALTER TABLE public.departments ADD CONSTRAINT departments_parent_fk FOREIGN KEY (company_id, parent_id) REFERENCES public.departments(company_id, id) ON DELETE :pact;
+CREATE TABLE public.department_members (company_id uuid NOT NULL, department_id uuid NOT NULL, principal_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (department_id, principal_id),
+  FOREIGN KEY (company_id, department_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE);
+CREATE TABLE public.department_roles (company_id uuid NOT NULL, department_id uuid NOT NULL, role text NOT NULL, principal_id uuid NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (department_id, role, principal_id),
+  CONSTRAINT department_roles_role_check CHECK (role = 'lead'),
+  FOREIGN KEY (company_id, department_id) REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+  FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE);
+CREATE UNIQUE INDEX department_roles_one_lead ON public.department_roles (department_id, role) WHERE role = 'lead';
+-- p02 column
+ALTER TABLE public.channels ADD COLUMN department_id uuid;
+ALTER TABLE public.channels ADD CONSTRAINT channels_department_fk FOREIGN KEY (company_id, department_id) REFERENCES public.departments(company_id, id) ON DELETE :cact;
+COMMIT;
+\set ON_ERROR_STOP 0
+BEGIN;
+INSERT INTO users(id, username, email) VALUES ('10000000-0000-0000-0000-000000000001','owner1','owner1@example.test'),('10000000-0000-0000-0000-000000000002','mem1','mem1@example.test');
+INSERT INTO companies(id, user_id, name, slug) VALUES ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','Acme','acme');
+INSERT INTO company_members(id, company_id, user_id, role, access_level) VALUES (gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001','owner', 9),(gen_random_uuid(),'20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000002','member', 0);
+INSERT INTO principals(id, company_id, kind, user_id, display_label) VALUES
+ ('30000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000001','Owner'),
+ ('30000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','person','10000000-0000-0000-0000-000000000002','Mem');
+COMMIT;
+INSERT INTO departments(id, company_id, name, slug, parent_id, created_by) VALUES
+ ('40000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Ops','ops',NULL,'{"actor_type":"system","actor_id":null,"actor_name":"t"}'),
+ ('40000000-0000-0000-0000-000000000002','20000000-0000-0000-0000-000000000001','Ops2','ops2','40000000-0000-0000-0000-000000000001','{"actor_type":"system","actor_id":null,"actor_name":"t"}'),
+ ('40000000-0000-0000-0000-000000000003','20000000-0000-0000-0000-000000000001','Ops3','ops3','40000000-0000-0000-0000-000000000002','{"actor_type":"system","actor_id":null,"actor_name":"t"}');
+INSERT INTO department_members VALUES ('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000003','30000000-0000-0000-0000-000000000002');
+INSERT INTO department_roles VALUES ('20000000-0000-0000-0000-000000000001','40000000-0000-0000-0000-000000000002','lead','30000000-0000-0000-0000-000000000002');
+INSERT INTO channels(id, company_id, name, created_by, department_id) VALUES ('50000000-0000-0000-0000-000000000001','20000000-0000-0000-0000-000000000001','Desk','{"actor_type":"system","actor_id":null,"actor_name":"t"}','40000000-0000-0000-0000-000000000003');
+\echo '--- simulate remove_member demotion of mem1 (kind -> external)'
+BEGIN;
+DELETE FROM company_members WHERE company_id='20000000-0000-0000-0000-000000000001' AND user_id='10000000-0000-0000-0000-000000000002' AND false;
+UPDATE principals SET kind='external', user_id=NULL WHERE company_id='20000000-0000-0000-0000-000000000001' AND user_id='10000000-0000-0000-0000-000000000002';
+DELETE FROM company_members WHERE company_id='20000000-0000-0000-0000-000000000001' AND user_id='10000000-0000-0000-0000-000000000002';
+COMMIT;
+SELECT 'member rows of demoted principal', m.department_id, p.kind FROM department_members m JOIN principals p ON p.id=m.principal_id;
+SELECT 'role rows of demoted principal', r.department_id, r.role, p.kind FROM department_roles r JOIN principals p ON p.id=r.principal_id;
+\echo '--- company teardown via user account deletion path'
+DELETE FROM companies WHERE id='20000000-0000-0000-0000-000000000001';
+SELECT 'departments left', count(*) FROM departments;
+```
+```
+===== parent=RESTRICT channel=RESTRICT
+--- simulate remove_member demotion of mem1 (kind -> external)
+             ?column?             |            department_id             |   kind   
+----------------------------------+--------------------------------------+----------
+ member rows of demoted principal | 40000000-0000-0000-0000-000000000003 | external
+(1 row)
+
+            ?column?            |            department_id             | role |   kind   
+--------------------------------+--------------------------------------+------+----------
+ role rows of demoted principal | 40000000-0000-0000-0000-000000000002 | lead | external
+(1 row)
+
+--- company teardown via user account deletion path
+     ?column?     | count 
+------------------+-------
+ departments left |     0
+(1 row)
+
+===== parent=NO ACTION channel=RESTRICT
+--- simulate remove_member demotion of mem1 (kind -> external)
+             ?column?             |            department_id             |   kind   
+----------------------------------+--------------------------------------+----------
+ member rows of demoted principal | 40000000-0000-0000-0000-000000000003 | external
+(1 row)
+
+            ?column?            |            department_id             | role |   kind   
+--------------------------------+--------------------------------------+------+----------
+ role rows of demoted principal | 40000000-0000-0000-0000-000000000002 | lead | external
+(1 row)
+
+--- company teardown via user account deletion path
+     ?column?     | count 
+------------------+-------
+ departments left |     0
+(1 row)
+
+===== parent=NO ACTION channel=NO ACTION
+--- simulate remove_member demotion of mem1 (kind -> external)
+             ?column?             |            department_id             |   kind   
+----------------------------------+--------------------------------------+----------
+ member rows of demoted principal | 40000000-0000-0000-0000-000000000003 | external
+(1 row)
+
+            ?column?            |            department_id             | role |   kind   
+--------------------------------+--------------------------------------+------+----------
+ role rows of demoted principal | 40000000-0000-0000-0000-000000000002 | lead | external
+(1 row)
+
+--- company teardown via user account deletion path
+     ?column?     | count 
+------------------+-------
+ departments left |     0
+(1 row)
+
+```

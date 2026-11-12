@@ -59,6 +59,7 @@ async fn assert_typed_attention(j: &SalesJourney) {
                 principal_id: PrincipalId::new(owner),
                 visible_channel_ids: &[j.d.channel],
                 manager: true,
+                company_items: true,
                 view: AttentionView::MyWork,
                 cursor: None,
                 limit: 100,

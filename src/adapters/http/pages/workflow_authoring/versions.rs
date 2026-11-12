@@ -79,11 +79,11 @@ pub(super) fn association_label(binding: &BindingUse) -> String {
     match binding.binding.association {
         RelatedAssociation::Company => "Company-wide (manual starts and schedules)".to_owned(),
         RelatedAssociation::Channel(_) => format!(
-            "Channel {}",
+            "Desk {}",
             binding.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
         RelatedAssociation::Thread { .. } => format!(
-            "One thread of channel {}",
+            "One thread of desk {}",
             binding.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
     }
@@ -141,7 +141,7 @@ fn usage_list(view: &VersionsView<'_>) -> String {
         .collect();
     let hidden = if view.hidden_bindings > 0 {
         format!(
-            r#"<p class="text-xs opacity-70">{} more binding{} on channels you cannot see.</p>"#,
+            r#"<p class="text-xs opacity-70">{} more binding{} on desks you cannot see.</p>"#,
             view.hidden_bindings,
             if view.hidden_bindings == 1 { "" } else { "s" }
         )

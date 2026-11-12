@@ -1,0 +1,45 @@
+git diff --cached --check
+exit: 2
+plan/01-departments/phases/p05/docs/logs/B1-author-artifact-audit.diff:8: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-author-artifact-audit.diff:11: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-author-artifact-audit.diff:12: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-author-artifact-audit.diff:19: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-author-artifact-audit.diff:42: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-ci-agent-picker-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-agent-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-decisions-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-decisions-rust-2.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-html-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-knowledge-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-local-agents-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-memory-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-session-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-vault-rust-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-ci-vault-rust-2.txt:9: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:6: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:10: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:15: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:19: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:22: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:27: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:29: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:35: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:37: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:50: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:58: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:60: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:64: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:76: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:83: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:92: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:209: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:245: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:248: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:250: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:254: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-doc-contract-inspection.txt:293: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-graft-build-final.txt:2: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-graft-build.txt:2: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-main-target.txt:13: new blank line at EOF.
+plan/01-departments/phases/p05/docs/logs/B1-mcp-cancellation-rerun-1.txt:6: trailing whitespace.
+plan/01-departments/phases/p05/docs/logs/B1-unrelated-failures-source-identity.txt:21: trailing whitespace.

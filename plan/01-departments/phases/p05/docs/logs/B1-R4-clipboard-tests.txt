@@ -1,0 +1,244 @@
+Isolated Linux clipboard; unchanged managed source/tests/timeouts; node user, namespace sandbox, no network/host pasteboard.
+$ vitest run tests/canvasClipboardBrowser.test.ts "--maxWorkers=1"
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.3 [39m[90m/test[39m
+
+6:52:01 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/authForm.html?html-proxy&index=0.js
+6:52:01 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/authForm.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:01 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:01 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/drawing.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/drawing.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/elementContextMenu.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/elementContextMenu.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/elementPanel.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/elementPanel.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/frameRaster.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/frameRaster.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/frameRasterZoom.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/frameRasterZoom.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/frameReplay.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/frameReplay.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/pages.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/pages.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:02 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/privateConsumers.html?html-proxy&index=0.js
+6:52:02 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/privateConsumers.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:03 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/prototype.html?html-proxy&index=0.js
+6:52:03 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/prototype.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:03 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/rulers.html?html-proxy&index=0.js
+6:52:03 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/rulers.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:06 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:06 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:10 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:10 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:14 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:14 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:18 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:18 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:23 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:23 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:27 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:27 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:31 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:31 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:35 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:35 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:39 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:39 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:43 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:43 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:47 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:47 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:51 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:51 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:55 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:55 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:52:59 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:52:59 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:53:03 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:53:03 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:53:07 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:53:07 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+6:53:11 PM [vite] (client) Pre-transform error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+6:53:11 PM [vite] Internal server error: No matching HTML proxy module found from /test/tests/fixtures/canvasClipboard.html?html-proxy&index=0.js
+      at LoadPluginContext.handler (file:///test/node_modules/vite/dist/node/chunks/node.js:31614:17)
+      at EnvironmentPluginContainer.load (file:///test/node_modules/vite/dist/node/chunks/node.js:8503:56)
+      at async loadAndTransform (file:///test/node_modules/vite/dist/node/chunks/node.js:20137:21)
+      at async viteTransformMiddleware (file:///test/node_modules/vite/dist/node/chunks/node.js:20404:20)
+ [31m❯[39m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts [2m([22m[2m17 tests[22m[2m | [22m[31m17 failed[39m[2m)[22m[33m 68755[2mms[22m[39m
+   [31m❯[39m canvas clipboard shortcuts [2m(17)[22m
+[31m     [31m×[31m copies a whole element after a screenshot and pastes its children as one undo step[39m[33m 4076[2mms[22m[39m
+[31m     [31m×[31m pastes a newer external image instead of stale copied elements[39m[33m 4034[2mms[22m[39m
+[31m     [31m×[31m does not paste an old element when external text replaced the clipboard[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m copies and pastes immediately after leaving text editing with Escape[39m[33m 4043[2mms[22m[39m
+[31m     [31m×[31m keeps focus in another field when a remote lock ends text editing[39m[33m 4040[2mms[22m[39m
+[31m     [31m×[31m keeps multiple copied elements together and selects the pasted set[39m[33m 4042[2mms[22m[39m
+[31m     [31m×[31m copies through the element menu and pastes with the keyboard[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m copies a frame through its menu and pastes with the keyboard[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m replaces an element copy with an entire frame copied through the keyboard[39m[33m 4041[2mms[22m[39m
+[31m     [31m×[31m preserves the previous copy when the element menu copy is denied[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m preserves the previous copy when the frame menu copy is denied[39m[33m 4037[2mms[22m[39m
+[31m     [31m×[31m leaves native text copy and paste alone while an element is selected[39m[33m 4039[2mms[22m[39m
+[31m     [31m×[31m copies selected paragraph text instead of the selected canvas element[39m[33m 4041[2mms[22m[39m
+[31m     [31m×[31m duplicates the picked element when the key arrives as uppercase D[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m respects view protection when pasting[39m[33m 4038[2mms[22m[39m
+[31m     [31m×[31m respects frame protection when pasting[39m[33m 4022[2mms[22m[39m
+[31m     [31m×[31m respects element protection when pasting[39m[33m 4039[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 17 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies a whole element after a screenshot and pastes its children as one undo step
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpastes a newer external image instead of stale copied elements
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mdoes not paste an old element when external text replaced the clipboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies and pastes immediately after leaving text editing with Escape
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mkeeps focus in another field when a remote lock ends text editing
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mkeeps multiple copied elements together and selects the pasted set
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies through the element menu and pastes with the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies a frame through its menu and pastes with the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mreplaces an element copy with an entire frame copied through the keyboard
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpreserves the previous copy when the element menu copy is denied
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mpreserves the previous copy when the frame menu copy is denied
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mleaves native text copy and paste alone while an element is selected
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mcopies selected paragraph text instead of the selected canvas element
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mduplicates the picked element when the key arrives as uppercase D
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects view protection when pasting
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects frame protection when pasting
+[41m[1m FAIL [22m[49m [30m[43m clipboard [49m[39m tests/canvasClipboardBrowser.test.ts[2m > [22mcanvas clipboard shortcuts[2m > [22mrespects element protection when pasting
+[31m[1mTimeoutError[22m: Waiting failed: 4000ms exceeded[39m
+[90m [2m❯[22m new WaitTask node_modules/puppeteer-core/src/common/WaitTask.ts:[2m77:28[22m[39m
+[90m [2m❯[22m IsolatedWorld.waitForFunction node_modules/puppeteer-core/src/api/Realm.ts:[2m170:22[22m[39m
+[90m [2m❯[22m CdpFrame.waitForFunction node_modules/puppeteer-core/src/api/Frame.ts:[2m813:36[22m[39m
+[90m [2m❯[22m CdpFrame.<anonymous> node_modules/puppeteer-core/src/util/decorators.ts:[2m63:21[22m[39m
+[90m [2m❯[22m CdpPage.waitForFunction node_modules/puppeteer-core/src/api/Page.ts:[2m3257:29[22m[39m
+[36m [2m❯[22m tests/canvasClipboardBrowser.test.ts:[2m162:16[22m[39m
+    [90m160|[39m     uploads = 0
+    [90m161|[39m     await page.goto(fixtureUrl('canvasClipboard.html'))
+    [90m162|[39m     await page.waitForFunction(() => !!window.canvasClipboardHarness &…
+    [90m   |[39m                [31m^[39m
+    [90m163|[39m     await page.evaluate((frame) => {
+    [90m164|[39m       localStorage.clear()
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/17]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m17 failed[39m[22m[90m (17)[39m
+[2m   Start at [22m 18:51:59
+[2m   Duration [22m 75.75s[2m (tests 99%, import 1%)[22m
+
+close timed out after 10000ms
+Tests closed successfully but something prevents 2 Vite servers from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter
+error: script "test" exited with code 1

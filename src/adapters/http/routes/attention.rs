@@ -18,11 +18,13 @@ use crate::{
     application::attention::{AttentionListRequest, AttentionUseCases},
     entities::{
         attention::{AttentionCursor, AttentionPage, AttentionView},
+        department::DepartmentId,
         user::Viewer,
     },
-    use_cases::company::CompanyUseCases,
+    use_cases::{company::CompanyUseCases, department::DepartmentUseCases},
 };
 
+use super::known_department;
 use super::ui::{load_readable_company, workspace_user};
 
 pub fn router() -> Router<AppState> {
@@ -45,6 +47,9 @@ struct ListQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
+    /// One department's desks; "" (the select's "any") is none.
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
+    department_id: Option<Uuid>,
 }
 
 impl ListQuery {
@@ -77,11 +82,13 @@ fn list_request<'a>(
         view: query.view()?,
         cursor,
         limit: query.limit,
+        department: query.department_id.map(DepartmentId::new),
     })
 }
 
 async fn list_attention(
     State(attention): State<Arc<AttentionUseCases>>,
+    State(department_use_cases): State<Arc<DepartmentUseCases>>,
     viewer: Viewer,
     Path(company_id): Path<Uuid>,
     Query(query): Query<ListQuery>,
@@ -90,6 +97,14 @@ async fn list_attention(
     let listing = attention
         .list(&viewer, company_id, list_request(&query, cursor.as_ref())?)
         .await?;
+    // Checked after the read, against what this viewer may see: a department they cannot see
+    // listed nothing and is not found.
+    if query.department_id.is_some() {
+        let departments = department_use_cases
+            .desk_departments(viewer.user_id, company_id, &listing.readable_desks)
+            .await?;
+        known_department(&departments, query.department_id)?;
+    }
     Ok(Json(listing.page))
 }
 
@@ -171,6 +186,8 @@ struct WorkQuery {
     view: Option<String>,
     cursor: Option<String>,
     limit: Option<usize>,
+    #[serde(default, deserialize_with = "super::deserialize_empty_string_as_none")]
+    department_id: Option<Uuid>,
 }
 
 async fn work_page(
@@ -185,6 +202,7 @@ async fn work_page(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
+        department_id: query.department_id,
     };
     let cursor = list_query.cursor()?;
     let listing = state
@@ -195,6 +213,11 @@ async fn work_page(
             list_request(&list_query, cursor.as_ref())?,
         )
         .await?;
+    let departments = state
+        .department_use_cases
+        .desk_departments(viewer.user_id, access.company.id, &listing.readable_desks)
+        .await?;
+    let department = known_department(&departments, query.department_id)?;
     let page = listing.page;
     let account = state
         .user_use_cases
@@ -210,12 +233,15 @@ async fn work_page(
         view: list_query.view()?,
         page: &page,
         manager: access.membership.manages_company_operations(),
+        departments: &departments,
+        department,
     })))
 }
 
 async fn work_list(
     State(attention): State<Arc<AttentionUseCases>>,
     State(companies): State<Arc<CompanyUseCases>>,
+    State(department_use_cases): State<Arc<DepartmentUseCases>>,
     viewer: Viewer,
     Query(query): Query<WorkQuery>,
 ) -> AppResult<Html<String>> {
@@ -225,6 +251,7 @@ async fn work_list(
         view: query.view,
         cursor: query.cursor,
         limit: query.limit,
+        department_id: query.department_id,
     };
     let view = list_query.view()?;
     let cursor = list_query.cursor()?;
@@ -235,11 +262,17 @@ async fn work_list(
             list_request(&list_query, cursor.as_ref())?,
         )
         .await?;
-    Ok(Html(pages::attention_list(
-        access.company.id,
+    let departments = department_use_cases
+        .desk_departments(viewer.user_id, access.company.id, &listing.readable_desks)
+        .await?;
+    let department = known_department(&departments, query.department_id)?;
+    Ok(Html(pages::attention_list(&pages::AttentionListView {
+        company_id: access.company.id,
         view,
-        &listing.page,
-    )))
+        page: &listing.page,
+        departments: &departments,
+        department,
+    })))
 }
 
 #[cfg(test)]

@@ -4,6 +4,7 @@ use crate::{
     entities::{
         channel::Channel,
         creation::CreationProvenance,
+        department::DepartmentId,
         value_objects::{ChannelSlug, CompanySlug},
     },
 };
@@ -27,6 +28,18 @@ pub struct ChannelWrite {
     /// Whether a trusted sender may pull CC'd outsiders onto this channel's threads.
     pub add_3rd_party: bool,
     pub created_by: Option<CreationProvenance>,
+    /// Which department owns the desk and whether it is members-only. `None` leaves both as they
+    /// are on an edit and creates an unowned desk: every form that predates departments builds
+    /// this write wholesale, and must not detach a desk by saving it.
+    pub ownership: Option<ChannelOwnershipWrite>,
+}
+
+/// A change to a desk's ownership; an absent field keeps its current value.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ChannelOwnershipWrite {
+    /// `Some(None)` detaches the desk from its department.
+    pub department_id: Option<Option<DepartmentId>>,
+    pub members_only: Option<bool>,
 }
 
 /// One authorized channel edit, as persistence receives it.
@@ -53,6 +66,12 @@ pub trait ChannelPersistence: Send + Sync {
     ) -> AppResult<Option<Channel>>;
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
+
+    /// The company's departments, to label its desks by owner (01-departments 04C.3).
+    async fn list_departments(
+        &self,
+        company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>>;
 
     /// Save one channel edit under the channel's gate; any failure leaves it unchanged.
     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;

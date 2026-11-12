@@ -1,0 +1,63 @@
+{
+  "version": 1,
+  "round": "01DEP-P04-B2-R2",
+  "artifact": "a97fdbeb6c8026e22cfc316bc13f961b61b087a7131c5c4c58ad1c1d2f0c58ba",
+  "checks": [
+    {
+      "criteria": [
+        "04B.4",
+        "04C.1",
+        "04C.2",
+        "04C.3",
+        "04C.4",
+        "B2-F1",
+        "B2-F2",
+        "B2-F3",
+        "B2-F4",
+        "B2-F5"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_views_ agent_default_desk_json_create_places api_agents_carry_no_retired department_desk_ownership_json model_usage_workflow_exact department_ui_ department_directory_ desk_wording picking_a_library_agent_copies_its_skills --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-focused.txt",
+          "sha256": "5f0a36ca278b7f687e2ea21893286d09e37ef4e0eea7eccce9cd940e2226afb4"
+        },
+        {
+          "path": "logs/B2-R2-focused-inventory.txt",
+          "sha256": "64d8436c405e95d1482a5afafaa07aabba99c38a7784afc96cb56488679d00bb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --locked --offline --lib -- attention adapters::http reads_tests run_board run_lineage model_usage storage_report storage_tests application::use_cases::thread adapters::smtp department_ channel agent_api tool_tests jev_runtime_recovery dashboard skill --skip cloudroom --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-affected.txt",
+          "sha256": "f8166c1915ab778e04dfcd88ec806daa9c8faf9590e0466b21a255655e900c34"
+        }
+      ],
+      "note": "1187 passed, 1 failed: rendered_markup_carries_no_inline_javascript (pre-existing, pages/workflow_authoring/sample.rs:153, unrelated)"
+    },
+    {
+      "criteria": [
+        "css"
+      ],
+      "command": "tailwindcss 4.1.12 -i assets/app.css.in -o built.css --minify over a copy of src+assets; rebuilt; rebuild reproduces",
+      "fixture": "node_modules of /Users/mac02/dev/openbot (lockfile versions)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-css-check.txt",
+          "sha256": "6a7c4a067997d5e96ba476f52f6530327e324ce03cadf07a64cacef6c3165ec4"
+        }
+      ]
+    }
+  ]
+}

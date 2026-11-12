@@ -74,6 +74,8 @@ pub struct UsageScope {
 pub enum UsageGrouping {
     Model,
     Workflow,
+    /// By the department that owns the run's desk now (01-departments 04C.2).
+    Department,
 }
 #[derive(Clone)]
 pub struct UsageQuery {
@@ -134,11 +136,21 @@ impl PriceWrite {
         Ok(())
     }
 }
+/// The department a usage group is for; `id` is `None` for "No department".
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct UsageDepartment {
+    pub id: Option<Uuid>,
+    pub name: String,
+}
+
 #[derive(Debug, Serialize)]
 pub struct UsageGroup {
     pub provider: Option<ModelProvider>,
     pub model: Option<ModelName>,
     pub workflow: Option<Uuid>,
+    /// Set when grouping by department: the department, or `None` for runs on a desk no
+    /// department owns, runs without a desk, and archived usage, which keeps no run.
+    pub department: Option<UsageDepartment>,
     pub calls: u64,
     pub completed_calls: u64,
     pub unconfirmed_calls: u64,

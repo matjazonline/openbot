@@ -5,7 +5,7 @@
 //! none of them does is write: nothing an inbound message produces becomes durable until
 //! [`super::commit::CommitPlan`] hands the whole set to the committer at once.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use tracing::warn;
 
@@ -680,19 +680,36 @@ impl ThreadUseCases {
             return Ok(Vec::new());
         }
 
+        // Grouped by the owning department in tree order (a root before its children), desks no
+        // department owns last; by address within each (01-departments 04C.3).
+        let departments = directory.departments(company.id).await?;
+        let order: HashMap<_, (usize, String)> =
+            crate::entities::department::department_tree(&departments)
+                .into_iter()
+                .enumerate()
+                .map(|(rank, (_, department))| (department.id, (rank, department.name.clone())))
+                .collect();
         let mut entries = Vec::new();
         for channel in directory.channels(company.id).await? {
             if !channel.enabled || !channel.participant_access(context).authorized {
                 continue;
             }
-            entries.push(ChannelDirectoryEntry {
-                address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
-                name: channel.name.clone(),
-                description: channel.description.clone(),
-            });
+            let owner: Option<(usize, String)> = channel
+                .department_id
+                .and_then(|id| order.get(&id))
+                .map(|(rank, name)| (*rank, name.clone()));
+            entries.push((
+                owner.as_ref().map_or(usize::MAX, |(rank, _)| *rank),
+                ChannelDirectoryEntry {
+                    address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
+                    name: channel.name.clone(),
+                    description: channel.description.clone(),
+                    department: owner.map(|(_, name)| name),
+                },
+            ));
         }
-        entries.sort_by(|a, b| a.address.cmp(&b.address));
-        Ok(entries)
+        entries.sort_by(|a, b| (a.0, &a.1.address).cmp(&(b.0, &b.1.address)));
+        Ok(entries.into_iter().map(|(_, entry)| entry).collect())
     }
 
     /// Reply to every reserved address the message named, reporting whether any answer went out.

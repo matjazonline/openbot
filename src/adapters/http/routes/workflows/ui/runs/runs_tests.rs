@@ -231,6 +231,7 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
+                department_id: None,
                 company_id: self.company,
                 binding_id: None,
                 workflow_id: None,
@@ -252,6 +253,7 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
+                department_id: None,
                 company_id: self.company,
                 binding_id: None,
                 workflow_id: None,
@@ -330,6 +332,7 @@ fn pane_query(company_id: Uuid, part: Option<PanePart>) -> Query<PaneQuery> {
 /// The runs UI for `user` over `persistence` and its engine.
 fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui {
     let shared = Arc::new(persistence.clone());
+    let reads = super::super::test_reads(persistence);
     Ui {
         engine: engine.clone(),
         companies: Arc::new(CompanyUseCases::new(shared.clone())),
@@ -342,8 +345,9 @@ fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui
             shared.clone(),
             shared.clone(),
             shared.clone(),
-            shared.clone(),
         )),
+        departments: reads.0,
+        attention: reads.1,
         config: crate::adapters::http::routes::ui::stream_tests::test_config(),
         user,
     }
@@ -539,7 +543,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     // The admin's first page holds the newest 50; its second page holds the oldest, hidden one.
     let admin_first = f.list(f.admin, None).await;
     assert!(admin_first.contains("Load more"), "{admin_first}");
-    assert!(admin_first.contains("2 runs of these are on channels you cannot see"));
+    assert!(admin_first.contains("2 runs of these are on desks you cannot see"));
     // "Load more" names only its cursor; the filter form supplies the rest.
     assert!(
         admin_first.contains(
@@ -549,7 +553,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     let next = field_after(&admin_first, "list?after=");
     let admin_second = f.list(f.admin, Some((next, 50))).await;
     assert!(!admin_second.contains(r#"id="run-list""#), "entries only");
-    assert!(admin_second.contains("1 run of these is on channels you cannot see"));
+    assert!(admin_second.contains("1 run of these is on desks you cannot see"));
     assert!(!admin_second.contains("Load more"));
     // "Load more" tells the list how far it has read now (50 sent back + 1).
     assert!(
@@ -564,7 +568,7 @@ async fn the_list_pages_over_runs_an_admin_cannot_see_and_labels_reruns_and_chil
     let grown = f.entries(f.admin, 5, runs[10]).await;
     assert!(grown.contains(r#"id="run-list-shown" name="shown" value="50" hx-swap-oob="true""#));
     assert!(!again.contains("Load more") && !again.contains(r#"id="run-list""#));
-    assert!(again.contains("3 runs of these are on channels you cannot see"));
+    assert!(again.contains("3 runs of these are on desks you cannot see"));
     assert_eq!(again.matches("menu-active").count(), 1);
     let active = again.find("menu-active").unwrap();
     let anchor = again[..active].rfind("<a ").unwrap();
@@ -749,6 +753,7 @@ async fn other_tenants_and_plain_members_reach_no_run_and_hostile_content_is_esc
         let listed = list(
             f.ui(user),
             Query(ListQuery {
+                department_id: None,
                 company_id: company,
                 binding_id: None,
                 workflow_id: None,
@@ -819,4 +824,81 @@ async fn every_runs_write_refuses_a_cross_origin_cookie_post() {
             .unwrap();
         assert_eq!(same.status(), StatusCode::NO_CONTENT, "{path}");
     }
+}
+
+/// 01-departments 04B.4: the department filter resolves company-scoped — another company's
+/// department is not found — and the waiting view renders for the company's own.
+#[tokio::test]
+async fn department_views_runs_department_scope_is_company_scoped() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
+    let write = |slug: &str| crate::application::ports::department::DepartmentWrite {
+        name: slug.into(),
+        slug: slug.into(),
+        ..Default::default()
+    };
+    let mine = departments
+        .create_department(f.owner, f.company, write("mine"), None)
+        .await
+        .unwrap();
+    let theirs = departments
+        .create_department(f.stranger, f.other, write("theirs"), None)
+        .await
+        .unwrap();
+    let ui = f.ui(f.owner);
+    let scope = ui
+        .scope(
+            f.company,
+            ScopeIds {
+                department: Some(mine.id.as_uuid()),
+                ..ScopeIds::default()
+            },
+        )
+        .await
+        .unwrap();
+    assert_eq!(scope.department, Some(mine.id));
+    assert!(matches!(
+        ui.scope(
+            f.company,
+            ScopeIds {
+                department: Some(theirs.id.as_uuid()),
+                ..ScopeIds::default()
+            },
+        )
+        .await,
+        Err(AppError::NotFound(_))
+    ));
+    let options = ui.scope_options(f.company).await.unwrap();
+    assert_eq!(
+        options
+            .departments
+            .iter()
+            .map(|option| option.id)
+            .collect::<Vec<_>>(),
+        [mine.id.as_uuid()]
+    );
+    let html = waiting_workspace(
+        f.ui(f.owner),
+        WorkspaceQuery {
+            company_id: Some(f.company),
+            run_id: None,
+            binding_id: None,
+            workflow_id: None,
+            agent_id: None,
+            department_id: Some(mine.id.as_uuid()),
+            state: None,
+            view: Some("waiting".into()),
+            window: None,
+            part: None,
+            reload: None,
+        },
+    )
+    .await
+    .unwrap()
+    .0;
+    assert!(html.contains(">Waiting on a person</a>"), "{html}");
+    assert!(html.contains(&format!(r#"<option value="{}" selected>"#, mine.id)));
 }

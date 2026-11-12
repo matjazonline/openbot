@@ -225,6 +225,35 @@ pub struct AgentResponse {
     pub success: bool,
     pub agent: Agent,
     pub skill_ids: Vec<Uuid>,
+    /// The departments the agent belongs to or holds a role in, with its roles there
+    /// (01-departments 04C.4), by slug; at most 16.
+    pub departments: Vec<crate::entities::department::HeldDepartment>,
+    /// The agent is in more departments than `departments` lists.
+    pub more_departments: bool,
+}
+
+type DepartmentUseCasesState = State<Arc<crate::use_cases::department::DepartmentUseCases>>;
+
+/// The response for `agent`, with its departments read for `user`.
+async fn agent_response(
+    departments: &crate::use_cases::department::DepartmentUseCases,
+    user: Uuid,
+    company: Uuid,
+    agent: Agent,
+    skill_ids: Vec<Uuid>,
+) -> AppResult<AgentResponse> {
+    let (departments, more_departments) = departments
+        .agent_departments(user, company, &[agent.id])
+        .await?
+        .remove(&agent.id)
+        .unwrap_or_default();
+    Ok(AgentResponse {
+        success: true,
+        agent,
+        skill_ids,
+        departments,
+        more_departments,
+    })
 }
 
 /// What an agent answers with when it should not take the company's LLM settings.
@@ -344,6 +373,7 @@ async fn create_agent_handler(
                     avatar_url,
                     created_by: None,
                 },
+                None,
             )
             .await
         {
@@ -506,11 +536,16 @@ async fn delete_agent_handler(
 async fn list_agents_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skill_use_cases): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
 ) -> AppResult<impl IntoResponse> {
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
+        .await?;
+    let ids: Vec<Uuid> = agents.iter().map(|agent| agent.id).collect();
+    let mut placed = departments
+        .agent_departments(user.id, company_id, &ids)
         .await?;
     let mut response = Vec::with_capacity(agents.len());
     for agent in agents {
@@ -518,25 +553,70 @@ async fn list_agents_json(
             .company_agent_capabilities(user.id, company_id, agent.id)
             .await?
             .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+        let (departments, more_departments) = placed.remove(&agent.id).unwrap_or_default();
         response.push(AgentResponse {
             success: true,
             agent,
             skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
+            departments,
+            more_departments,
         });
     }
     Ok((StatusCode::OK, Json(response)))
 }
 
-/// JSON API: Create company agent (Protected).
+/// Where a JSON-created agent goes: `department_id` and `role`, beside the agent's own fields
+/// (plan 01-departments 03C item 0). Taken out of the body so the agent fields keep their strict
+/// shape.
+fn json_placement(
+    body: &mut serde_json::Value,
+) -> AppResult<Option<crate::use_cases::agent::AgentPlacement>> {
+    let fields = body
+        .as_object_mut()
+        .ok_or_else(|| AppError::BadRequest("The agent must be a JSON object.".into()))?;
+    let department = match fields.remove("department_id") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(id)) => Some(
+            Uuid::parse_str(&id)
+                .map(crate::entities::department::DepartmentId::new)
+                .map_err(|_| AppError::BadRequest("Invalid department id.".into()))?,
+        ),
+        Some(_) => return Err(AppError::BadRequest("Invalid department id.".into())),
+    };
+    let role = match fields.remove("role") {
+        None | Some(serde_json::Value::Null) => None,
+        Some(serde_json::Value::String(role)) => Some(
+            role.parse::<crate::entities::department::DepartmentRole>()
+                .map_err(|_| AppError::BadRequest(format!("'{role}' is not a department role.")))?,
+        ),
+        Some(_) => return Err(AppError::BadRequest("Invalid department role.".into())),
+    };
+    match (department, role) {
+        (None, Some(_)) => Err(AppError::BadRequest(
+            "Name the department the agent holds its role in.".into(),
+        )),
+        (None, None) => Ok(None),
+        (Some(department), role) => Ok(Some(crate::use_cases::agent::AgentPlacement {
+            department,
+            role,
+        })),
+    }
+}
+
+/// JSON API: Create company agent (Protected), with its default desk and its placement.
 async fn create_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path(company_id): Path<Uuid>,
-    Json(payload): Json<AgentJsonPayload>,
+    Json(mut body): Json<serde_json::Value>,
 ) -> AppResult<impl IntoResponse> {
+    let placement = json_placement(&mut body)?;
+    let payload: AgentJsonPayload = serde_json::from_value(body)
+        .map_err(|error| AppError::BadRequest(format!("Invalid agent: {error}")))?;
     let avatar_url = payload.avatar_url().map_err(AppError::BadRequest)?;
 
-    let agent = agent_use_cases
+    let created = agent_use_cases
         .create_agent(
             user.id,
             company_id,
@@ -554,16 +634,22 @@ async fn create_agent_json(
                 avatar_url,
                 created_by: None,
             },
+            placement,
         )
         .await?;
 
     Ok((
         StatusCode::CREATED,
-        Json(AgentResponse {
-            success: true,
-            agent,
-            skill_ids: payload.skill_ids.unwrap_or_default(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                created.agent,
+                payload.skill_ids.unwrap_or_default(),
+            )
+            .await?,
+        ),
     ))
 }
 
@@ -571,6 +657,7 @@ async fn create_agent_json(
 async fn get_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skill_use_cases): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
 ) -> AppResult<impl IntoResponse> {
@@ -585,11 +672,16 @@ async fn get_agent_json(
         .ok_or_else(crate::use_cases::agent::agent_not_found)?;
     Ok((
         StatusCode::OK,
-        Json(AgentResponse {
-            success: true,
-            agent,
-            skill_ids: capabilities.skills.iter().map(|skill| skill.id).collect(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                agent,
+                capabilities.skills.iter().map(|skill| skill.id).collect(),
+            )
+            .await?,
+        ),
     ))
 }
 
@@ -597,6 +689,7 @@ async fn get_agent_json(
 pub(super) async fn update_agent_json(
     State(agent_use_cases): State<Arc<AgentUseCases>>,
     State(skills): State<Arc<SkillUseCases>>,
+    State(departments): DepartmentUseCasesState,
     user: AuthenticatedUser,
     Path((company_id, agent_id)): Path<(Uuid, Uuid)>,
     Json(body): Json<CompanyAgentJsonUpdate>,
@@ -636,11 +729,16 @@ pub(super) async fn update_agent_json(
 
     Ok((
         StatusCode::OK,
-        Json(AgentResponse {
-            success: true,
-            agent,
-            skill_ids: payload.skill_ids.unwrap_or_default(),
-        }),
+        Json(
+            agent_response(
+                &departments,
+                user.id,
+                company_id,
+                agent,
+                payload.skill_ids.unwrap_or_default(),
+            )
+            .await?,
+        ),
     ))
 }
 

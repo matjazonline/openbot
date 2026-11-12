@@ -6,7 +6,9 @@
 //! sends the sidebar list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
-use crate::entities::{channel::PUBLIC_PARTICIPANT, schedule::ChannelSchedule};
+use crate::entities::{
+    channel::PUBLIC_PARTICIPANT, department::Department, schedule::ChannelSchedule,
+};
 use crate::use_cases::schedule::ScheduleBindingChoice;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
@@ -28,6 +30,19 @@ pub(crate) const CHANNEL_SETTINGS_SCRIPT: &str = r##"        // The spam interlo
                 if (!isPublic) checkbox.checked = false;
             }
         }
+
+        // The members-only box means something only for a desk a department owns.
+        function toggleDeskMembersOnly(select) {
+            var form = select.closest('form');
+            if (!form) return;
+            var box = form.querySelector('.desk-members-only');
+            if (!box) return;
+            box.classList.toggle('hidden', !select.value);
+            if (!select.value) {
+                var checkbox = box.querySelector('input[type="checkbox"]');
+                if (checkbox) checkbox.checked = false;
+            }
+        }
 "##;
 
 /// The channel list in the sidebar — the only part of the workspace a write has to refresh.
@@ -36,6 +51,8 @@ pub struct ChannelSettingsList<'a> {
     /// Domain the channel addresses are built on, e.g. `mailagents.com`.
     pub app_domain_name: &'a str,
     pub channels: &'a [Channel],
+    /// The company's departments, to group the desks under.
+    pub departments: &'a [Department],
     pub selected_channel_id: Option<Uuid>,
 }
 
@@ -66,6 +83,11 @@ pub struct ChannelDraft<'a> {
     pub enabled: bool,
     /// Whether CC'd outsiders may join this channel's threads. Starts on, like `enabled`.
     pub add_3rd_party: bool,
+    /// The department that owns the desk, if any.
+    pub department_id: Option<Uuid>,
+    /// Only the department's people (and the neighbouring leads) may use the desk; meaningful
+    /// only with a department.
+    pub members_only: bool,
 }
 
 impl Default for ChannelDraft<'_> {
@@ -78,6 +100,8 @@ impl Default for ChannelDraft<'_> {
             participant_emails: "",
             enabled: true,
             add_3rd_party: true,
+            department_id: None,
+            members_only: false,
         }
     }
 }
@@ -107,6 +131,8 @@ pub struct ChannelEditPane<'a> {
     /// What the user last typed, when a save was rejected; `None` shows the stored channel.
     pub draft: Option<&'a ChannelDraft<'a>>,
     pub error: Option<&'a str>,
+    /// The company's departments, for the owner select.
+    pub departments: &'a [Department],
 }
 
 /// The pane for a channel that does not exist yet.
@@ -116,6 +142,7 @@ pub struct ChannelCreatePane<'a> {
     pub spam_scan_enabled: bool,
     pub draft: &'a ChannelDraft<'a>,
     pub error: Option<&'a str>,
+    pub departments: &'a [Department],
 }
 
 pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
@@ -130,13 +157,13 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
         {pane_html}
         "##,
         header = sidebar_header_with_action(
-            "Channels",
+            "Desks",
             "Inbound addresses and their routing rules.",
             &format!(
                 r##"<button type="button" class="btn btn-primary btn-xs shrink-0"
                     hx-get="/ui/channels/new?company_id={company_id}"
                     hx-target="#channel-pane" hx-swap="outerHTML" hx-sync="#channel-pane:replace"
-                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Channel</button>"##,
+                    hx-push-url="/ui/channels?company_id={company_id}&new=1">{plus_glyph} New Desk</button>"##,
                 company_id = company.id,
                 plus_glyph = icon(Icon::Plus, BUTTON_ICON),
             ),
@@ -147,7 +174,7 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
     );
 
     ui_shell(&UiShell {
-        title: &format!("{} Channels", company.name),
+        title: &format!("{} Desks", company.name),
         user: page.user,
         company: Some(company),
         section: UiSection::Channels,
@@ -161,30 +188,76 @@ pub fn channel_settings_page(page: &ChannelSettingsPage<'_>) -> String {
 /// Rendered out of band after a write, so a created, renamed or deleted channel shows up without
 /// the pane having to reload the whole workspace.
 pub fn channel_settings_list(list: &ChannelSettingsList<'_>, swap: FragmentSwap) -> String {
-    let entries: String = list
-        .channels
-        .iter()
-        .map(|channel| {
-            channel_settings_entry(
-                list.company.id,
-                channel,
-                &channel.inbound_address(&list.company.slug, list.app_domain_name),
-                list.selected_channel_id == Some(channel.id),
-            )
-        })
-        .collect();
-
     let menu_body = if list.channels.is_empty() {
-        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No channels yet. Create your first one below.</li>"##
+        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No desks yet. Create your first one below.</li>"##
             .to_string()
     } else {
-        entries
+        grouped_by_department(list.channels, list.departments)
+            .into_iter()
+            .map(|(heading, channels)| {
+                let entries: String = channels
+                    .into_iter()
+                    .map(|channel| {
+                        channel_settings_entry(
+                            list.company.id,
+                            channel,
+                            &channel.inbound_address(&list.company.slug, list.app_domain_name),
+                            list.selected_channel_id == Some(channel.id),
+                        )
+                    })
+                    .collect();
+                match heading {
+                    Some(heading) => format!(
+                        r#"<li class="menu-title desk-group pt-3 text-[11px] uppercase tracking-wider">{}</li>{entries}"#,
+                        escape_html_text(&heading)
+                    ),
+                    None => entries,
+                }
+            })
+            .collect()
     };
 
     format!(
         r##"<ul id="channel-menu" class="menu w-full flex-1 flex-nowrap gap-1 overflow-y-auto px-2"{oob}>{menu_body}</ul>"##,
         oob = swap.oob_attribute(),
     )
+}
+
+/// The desks under their department's heading, departments in tree order (a root before its
+/// children), then "No department" last. With no department owning any desk there are no
+/// headings at all: a company that does not use departments sees its list as before.
+pub fn grouped_by_department<'c>(
+    channels: &'c [Channel],
+    departments: &[Department],
+) -> Vec<(Option<String>, Vec<&'c Channel>)> {
+    let owned =
+        |department: Option<crate::entities::department::DepartmentId>| -> Vec<&'c Channel> {
+            channels
+                .iter()
+                .filter(|channel| channel.department_id == department)
+                .collect()
+        };
+    let known: std::collections::HashSet<_> =
+        departments.iter().map(|department| department.id).collect();
+    let mut groups: Vec<(Option<String>, Vec<&'c Channel>)> =
+        crate::entities::department::department_tree(departments)
+            .into_iter()
+            .map(|(_, department)| (Some(department.name.clone()), owned(Some(department.id))))
+            .filter(|(_, desks)| !desks.is_empty())
+            .collect();
+    // A desk whose department is not in `departments` (deleted since the list was read) is shown
+    // with the unowned ones rather than dropped.
+    let rest: Vec<&Channel> = channels
+        .iter()
+        .filter(|channel| channel.department_id.is_none_or(|id| !known.contains(&id)))
+        .collect();
+    if groups.is_empty() {
+        return vec![(None, rest)];
+    }
+    if !rest.is_empty() {
+        groups.push((Some("No department".to_owned()), rest));
+    }
+    groups
 }
 
 fn channel_settings_entry(
@@ -251,8 +324,8 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
         r##"<button type="button" class="btn btn-error btn-outline ml-auto"
                             hx-delete="/ui/channels/{channel_id}?company_id={company_id}"
                             hx-target="#channel-pane" hx-swap="outerHTML"
-                            hx-confirm="Delete channel '{name}'? Its threads go with it."
-                            hx-push-url="/ui/channels?company_id={company_id}">Delete Channel</button>"##,
+                            hx-confirm="Delete desk '{name}'? Its threads go with it."
+                            hx-push-url="/ui/channels?company_id={company_id}">Delete Desk</button>"##,
         name = escape_html_attr(&pane.channel.name),
     );
 
@@ -306,12 +379,13 @@ pub fn channel_edit_pane(pane: &ChannelEditPane<'_>) -> String {
             app_domain_name: pane.app_domain_name,
             draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            departments: pane.departments,
         }),
         delete_action = delete_action,
         workflows_html = super::lazy_card(
             &format!("/ui/workflows/channels/{channel_id}/bindings?company_id={company_id}"),
-            "Loading the workflows on this channel…",
-            "The workflows on this channel could not be loaded.",
+            "Loading the workflows on this desk…",
+            "The workflows on this desk could not be loaded.",
         ),
         schedules_html = channel_schedules_card(&ChannelSchedulesCard {
             company_id,
@@ -327,8 +401,8 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
         r##"
         <section id="channel-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
-                <h2 class="text-xl font-bold">New channel in {company_name}</h2>
-                <p class="text-xs opacity-70">A channel is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span>. An agent answers it through a workflow: create an assistant channel from the agent's page.</p>
+                <h2 class="text-xl font-bold">New desk in {company_name}</h2>
+                <p class="text-xs opacity-70">A desk is an inbound address at <span class="font-mono">@{company_slug}.{app_domain_name}</span>. An agent answers it through a workflow: create an assistant desk from the agent's page.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
@@ -339,7 +413,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
                     <div class="flex items-center gap-3">
                         <button type="submit" class="btn btn-primary">
                             <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
-                            <span class="[.htmx-request_&]:hidden">Create Channel</span>
+                            <span class="[.htmx-request_&]:hidden">Create Desk</span>
                             <span class="hidden [.htmx-request_&]:inline">Creating...</span>
                         </button>
                         <button type="button" class="btn btn-ghost"
@@ -361,6 +435,7 @@ pub fn channel_create_pane(pane: &ChannelCreatePane<'_>) -> String {
             app_domain_name: pane.app_domain_name,
             draft: pane.draft,
             spam_scan_enabled: pane.spam_scan_enabled,
+            departments: pane.departments,
         }),
     )
 }
@@ -371,6 +446,62 @@ struct ChannelFields<'a> {
     app_domain_name: &'a str,
     draft: &'a ChannelDraft<'a>,
     spam_scan_enabled: bool,
+    departments: &'a [Department],
+}
+
+/// The owning department and, once one is picked, whether only its people may use the desk.
+///
+/// The members-only box stays hidden until a department is chosen (`toggleDeskMembersOnly`), and
+/// the route ignores it without one, so a desk is never members-only of nobody.
+fn department_fields(departments: &[Department], draft: &ChannelDraft<'_>) -> String {
+    if departments.is_empty() && draft.department_id.is_none() {
+        return String::new();
+    }
+    let options: String = crate::entities::department::department_tree(departments)
+        .into_iter()
+        .map(|(depth, department)| {
+            let id = department.id.as_uuid();
+            format!(
+                r#"<option value="{id}"{selected}>{indent}{name}</option>"#,
+                selected = if draft.department_id == Some(id) {
+                    " selected"
+                } else {
+                    ""
+                },
+                indent = "&nbsp;&nbsp;".repeat(depth),
+                name = escape_html_text(&department.name),
+            )
+        })
+        .collect();
+    format!(
+        r##"
+                    <label class="form-control w-full">
+                        <div class="label"><span class="text-xs opacity-70">Department</span></div>
+                        <select name="department_id" class="select w-full" data-input="desk-members-only">
+                            <option value="">No department</option>{options}
+                        </select>
+                        <div class="label"><span class="text-[11px] opacity-60">The department that owns this desk. Ownership alone changes nobody's access.</span></div>
+                    </label>
+                    <div class="desk-members-only form-control w-full{hidden}">
+                        <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
+                            <input type="checkbox" name="members_only" value="true" class="checkbox checkbox-sm mt-0.5"{checked}>
+                            <span class="text-xs">
+                                <span class="font-semibold">Members only</span>
+                                <span class="block opacity-70">Only the department's members, its lead, the lead of its parent department, the leads of its direct child departments and the addresses in Participant Emails can use this desk. Everyone else in the company, and anyone outside it, is refused. Other desks in the company can still hand work to it.</span>
+                            </span>
+                        </label>
+                    </div>"##,
+        hidden = if draft.department_id.is_some() {
+            ""
+        } else {
+            " hidden"
+        },
+        checked = if draft.members_only && draft.department_id.is_some() {
+            " checked"
+        } else {
+            ""
+        },
+    )
 }
 
 fn channel_fields(fields: &ChannelFields<'_>) -> String {
@@ -389,7 +520,7 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
         r##"
                     <div class="grid grid-cols-1 gap-4 md:grid-cols-2">
                         <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Channel Name</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Desk Name</span></div>
                             <input type="text" name="name" required value="{name}" placeholder="Inbound Email Handler" data-input="slugify"
                                 class="input w-full">
                         </label>
@@ -400,14 +531,14 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <input type="text" name="description" value="{description}" autocomplete="off"
                             placeholder="Answers supplier capacity and delivery-date questions."
                             class="input w-full">
-                        <div class="label"><span class="text-[11px] opacity-60">What this channel is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the channel they meant.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">What this desk is for, in one line. Shown to teammates who mail an address that does not exist, so they can find the desk they meant.</span></div>
                     </label>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Alias Addresses (@{company_slug}.{app_domain_name})</span></div>
                         <input type="text" name="alias_slugs" value="{alias_slugs}" autocomplete="off"
                             placeholder="sales, help, contact"
                             class="input w-full font-mono">
-                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this channel, and replies go back out from the address it arrived on.</span></div>
+                        <div class="label"><span class="text-[11px] opacity-60">Comma-separated. Mail to any of these reaches this desk, and replies go back out from the address it arrived on.</span></div>
                     </label>
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Participant Emails</span></div>
@@ -421,8 +552,8 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                         <label class="flex cursor-pointer items-start gap-3 rounded-lg border border-base-300 bg-base-200 p-3">
                             <input type="checkbox" name="enabled" value="true" class="checkbox checkbox-sm mt-0.5"{enabled_checked}>
                             <span class="text-xs">
-                                <span class="font-semibold">Channel enabled</span>
-                                <span class="block opacity-70">Unticking this keeps the channel and its threads, but mail sent to its address bounces back to the sender, and other channels can no longer hand work to it.</span>
+                                <span class="font-semibold">Desk enabled</span>
+                                <span class="block opacity-70">Unticking this keeps the desk and its threads, but mail sent to its address bounces back to the sender, and other desks can no longer hand work to it.</span>
                             </span>
                         </label>
                     </div>
@@ -431,12 +562,14 @@ fn channel_fields(fields: &ChannelFields<'_>) -> String {
                             <input type="checkbox" name="add_3rd_party" value="true" class="checkbox checkbox-sm mt-0.5"{add_3rd_party_checked}>
                             <span class="text-xs">
                                 <span class="font-semibold">Add CC'd outsiders to threads</span>
-                                <span class="block opacity-70">Unticking this keeps the channel internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this channel bounces.</span>
+                                <span class="block opacity-70">Unticking this keeps the desk internal: people outside your team who are CC'd on a message are never added to the thread and are never copied on the agent's reply, and mail they send to this desk bounces.</span>
                             </span>
                         </label>
                     </div>
+                    {department_html}
                     {spam_html}
         "##,
+        department_html = department_fields(fields.departments, draft),
         name = escape_html_text(draft.name),
         description = escape_html_text(draft.description),
         company_slug = escape_html_text(&fields.company.slug),
@@ -471,10 +604,10 @@ fn spam_disabled_confirmation(spam_scan_enabled: bool, is_public: bool) -> Strin
                     <div class="spam-confirm-box alert alert-warning text-sm transition-opacity{dimmed}">
                         <div class="space-y-2">
                             <div class="font-semibold">Spam scanning is disabled in server configuration</div>
-                            <div class="text-xs">A channel with no participant restrictions receives mail without spam filtering.</div>
+                            <div class="text-xs">A desk with no participant restrictions receives mail without spam filtering.</div>
                             <label class="flex cursor-pointer items-center gap-3">
                                 <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{disabled}>
-                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> channel anyway.</span>
+                                <span class="text-xs">I understand, and confirm saving a <code class="font-mono">@public</code> desk anyway.</span>
                             </label>
                         </div>
                     </div>
@@ -499,6 +632,8 @@ fn stored_channel_draft<'a>(
         participant_emails,
         enabled: channel.enabled,
         add_3rd_party: channel.add_3rd_party,
+        department_id: channel.department_id.map(|department| department.as_uuid()),
+        members_only: channel.members_only,
     }
 }
 
@@ -547,7 +682,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
         bindings,
     } = *card;
     let rows_html: String = if schedules.is_empty() {
-        r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this channel yet.</div>"#.to_string()
+        r#"<div class="rounded-lg border border-dashed border-base-300 p-4 text-center text-xs opacity-60">No automated schedules configured for this desk yet.</div>"#.to_string()
     } else {
         schedules
             .iter()
@@ -640,7 +775,7 @@ pub fn channel_schedules_card(card: &ChannelSchedulesCard<'_>) -> String {
             <div class="flex items-center justify-between">
                 <div>
                     <h3 class="text-sm font-bold">Automated Schedules &amp; Triggers</h3>
-                    <p class="text-xs opacity-60">Start a workflow run on this channel on a recurring interval or once.</p>
+                    <p class="text-xs opacity-60">Start a workflow run on this desk on a recurring interval or once.</p>
                 </div>
             </div>
 

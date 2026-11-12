@@ -1,0 +1,4 @@
+usage: doop-test.py [-h]
+                    {setup,prepare-managed,cleanup-private,fingerprint,package,run,acceptance,image}
+                    ...
+doop-test.py: error: --private-deployment requires --managed, --image and --suite all or e2e

@@ -1,0 +1,48 @@
+Reviewed R1 manifest: 66 entries
+Query-statistics matches in commands/criteria/files: []
+CI requirement (.github/workflows/ci.yml:147-176):
+147:       - name: Enable pg_stat_statements in CI PostgreSQL
+148:         run: |
+149:           container="$(docker ps --filter ancestor=postgres:18.6-bookworm --format '{{.ID}}' | head -n 1)"
+150:           test -n "$container"
+151:           docker exec "$container" psql -U postgres -d open_bots_test -v ON_ERROR_STOP=1 \
+152:             -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements'" \
+153:             -c "ALTER SYSTEM SET compute_query_id = 'on'" \
+154:             -c "ALTER SYSTEM SET log_parameter_max_length = '0'" \
+155:             -c "ALTER SYSTEM SET log_parameter_max_length_on_error = '0'"
+156:           docker restart "$container"
+157:           until docker exec "$container" pg_isready -U postgres -d open_bots_test; do sleep 1; done
+158:           docker exec "$container" psql -U postgres -d open_bots_test -v ON_ERROR_STOP=1 \
+159:             -c "ALTER SYSTEM SET pg_stat_statements.track = 'top'" \
+160:             -c "ALTER SYSTEM SET pg_stat_statements.track_utility = 'off'" \
+161:             -c "SELECT pg_reload_conf()"
+162:       - name: Migrations
+163:         env:
+164:           SQLX_OFFLINE: "false"
+165:         run: cargo sqlx migrate run
+166:       - name: Query statistics activation
+167:         run: |
+168:           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+169:             -c "SELECT 1 AS ci_pg_stat_statements_probe"
+170:           test "$(psql "$DATABASE_URL" -X -Atqc "SHOW pg_stat_statements.track")" = "top"
+171:           test "$(psql "$DATABASE_URL" -X -Atqc "SHOW pg_stat_statements.track_utility")" = "off"
+172:           test "$(psql "$DATABASE_URL" -X -Atqc "SHOW log_parameter_max_length")" = "0"
+173:           test "$(psql "$DATABASE_URL" -X -Atqc "SHOW log_parameter_max_length_on_error")" = "0"
+174:           psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atqc \
+175:             "SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1" \
+176:             | grep -Eq '^-?[0-9]+$'
+check.sh exclusion: # Two CI steps are left out. `npm ci` would replace node_modules; run it yourself if tailwindcss is
+# missing. The pg_stat_statements setup reconfigures CI's disposable Postgres with ALTER SYSTEM,
+# which is not something to do to a local server, and no test depends on it.
+Unrelated-failure source identical to merged origin/main 6091c3cd: Cargo.toml sha256 4a8f3e8f130c94de06d2b83e656e566bab4c6756b182e482195d828fcfa171e8
+Unrelated-failure source identical to merged origin/main 6091c3cd: Cargo.lock sha256 787dc111f178529201e0864ae427c70cd7ef50714e3966b37f4c27ccbc95e311
+Unrelated-failure source identical to merged origin/main 6091c3cd: .cargo/config.toml sha256 26b3ff9d739592b6f40561b3bcb75eea0af3eef6ac78e301cd5a980265c878a4
+Unrelated-failure source identical to merged origin/main 6091c3cd: src/adapters/mcp/tests.rs sha256 b25f9e643c8c3e19cdff3e8bf97fca3e809f7b628823eb125b1ad6b7ff072cb0
+Unrelated-failure source identical to merged origin/main 6091c3cd: src/adapters/mcp/mod.rs sha256 fd57579cc975753f9a0661138fe1a85cca8881f551a773779a8af3cd78178784
+Unrelated-failure source identical to merged origin/main 6091c3cd: src/application/services/test_support/scenario.rs sha256 13aff67fd6bf1014472f3152902899af989fcb4953fcfecc903befa915fe41b1
+Unrelated-failure source identical to merged origin/main 6091c3cd: src/adapters/http/pages/workflow_authoring/sample.rs sha256 c6060c0cb96e5067fa042664bf497eae478736589e43de0a38bf0f746ca6bc88
+department_desk_relay_into_a_members_only_desk_stays_trusted: PASS in both full library and stock runs
+department_desk_members_only_reaches_one_step_up_and_down: PASS in both full library and stock runs
+department_context_reaches_the_lead_on_its_department_desk: PASS in both full library and stock runs
+department_context_frozen_preparation_replays_the_department_it_froze: PASS in both full library and stock runs
+department_desk_competing_membership_and_ownership_edit_agree: PASS in both full library and stock runs

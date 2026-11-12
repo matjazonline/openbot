@@ -8,6 +8,7 @@ use crate::application::workflow::reads::RunStateName;
 
 fn board_query(company: Uuid) -> WorkspaceQuery {
     WorkspaceQuery {
+        department_id: None,
         company_id: Some(company),
         run_id: None,
         binding_id: None,
@@ -469,6 +470,7 @@ impl Fixture {
         list(
             self.ui(user),
             Query(ListQuery {
+                department_id: None,
                 company_id: self.company,
                 binding_id: ids.binding,
                 workflow_id: ids.workflow,
@@ -534,6 +536,7 @@ async fn run_board_view_filter_scopes_both_views_alone_and_combined() {
     );
     assert!(first < second, "by name");
     let ids = |binding, workflow, agent| ScopeIds {
+        department: None,
         binding,
         workflow,
         agent,
@@ -654,6 +657,7 @@ async fn run_board_view_filter_switch_and_links_keep_the_scope() {
     let binding = f.agent_binding(workflow, "assistant").await;
     let run = f.start(binding, json!({})).await;
     let ids = ScopeIds {
+        department: None,
         binding: Some(binding),
         workflow: Some(workflow),
         agent: Some(assistant),
@@ -743,6 +747,7 @@ fn run_board_view_filter_reports_a_cut_option_list() {
     };
     let hostile = format!("<{}>x", "script");
     let options = pages::ScopeOptions {
+        departments: Vec::new(),
         workflows: vec![option("First"), option(&hostile)],
         workflows_cut: true,
         agents: vec![option("Assistant")],

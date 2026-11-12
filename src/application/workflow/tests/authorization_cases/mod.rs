@@ -24,6 +24,8 @@ fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
         created_by: CreationProvenance::system(),
         created_at: chrono::Utc::now(),
         settings_revision: 0,
+        department_id: None,
+        members_only: false,
     }
 }
 

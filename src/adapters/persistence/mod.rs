@@ -15,6 +15,7 @@ pub mod channel;
 pub(crate) mod channel_edit;
 pub(crate) mod channel_gate;
 pub mod company;
+pub(crate) mod company_agent;
 pub mod company_invite;
 pub mod company_resend_api;
 pub mod credential_rotation;
@@ -22,6 +23,9 @@ pub mod credentials;
 pub mod dashboard;
 pub mod database_query_health;
 pub mod delivery;
+pub mod department;
+pub(crate) mod department_desks;
+pub(crate) mod department_roster;
 pub mod inbound_event;
 pub mod integration;
 pub(crate) mod integrations;
@@ -49,6 +53,7 @@ pub struct PostgresPersistence {
     pool: PgPool,
     credential_cipher: Option<Arc<credentials::CredentialCipher>>,
     channel_reply_notices: Option<Arc<crate::application::workflow::decisions::DecisionNotices>>,
+    app_domain: Option<Arc<str>>,
 }
 
 impl PostgresPersistence {
@@ -57,6 +62,7 @@ impl PostgresPersistence {
             pool,
             credential_cipher: None,
             channel_reply_notices: None,
+            app_domain: None,
         }
     }
 
@@ -68,6 +74,7 @@ impl PostgresPersistence {
             pool,
             credential_cipher: Some(Arc::new(credential_cipher)),
             channel_reply_notices: None,
+            app_domain: None,
         }
     }
 
@@ -89,6 +96,17 @@ impl PostgresPersistence {
         &self,
     ) -> Option<&crate::application::workflow::decisions::DecisionNotices> {
         self.channel_reply_notices.as_deref()
+    }
+
+    /// The domain desk addresses are formed under, for the department context of an agent run
+    /// (01DEP-P03-D11). Configured by the workflow engine, like the reply notices.
+    pub fn with_app_domain(mut self, app_domain: &str) -> Self {
+        self.app_domain = Some(Arc::from(app_domain));
+        self
+    }
+
+    pub(crate) fn app_domain(&self) -> Option<&str> {
+        self.app_domain.as_deref()
     }
 
     /// The configured cipher, or an error naming the missing configuration.

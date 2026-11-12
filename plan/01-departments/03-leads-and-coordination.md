@@ -74,6 +74,14 @@ list their nonzero selected counts before running them. Keep the full suite for 
 4. Department delete runs after the department desk is detached or deleted by the user (decision
    9). The desk's own delete rules apply (`channel.rs:401`).
 
+   Factorings that turned out to be needed (p03 B2, gate `01DEP-P03-D9`): `apply` has no edit
+   path, so re-pointing is new code over the existing primitives -- `save_draft_on` (out of
+   `save_draft`), `configure_reply_on` and `native_contract` (out of `configure_channel_reply` and
+   `bootstrap_native_on`), `provisioned_reconfiguration` and `provisioned_activation` (beside
+   `provisioned_binding`), and `provision_workflow_on` reachable for an existing desk without the
+   reply bootstrap. Both desk kinds are marked by the `department:{id}` command row, which also
+   records the binding the department owns; a slug edit therefore never loses the desk.
+
 ## Batch 03C What a lead can see and do
 
 0. Placement. Every path that creates a company agent (the UI form, the JSON API, a library copy,
@@ -114,6 +122,15 @@ list their nonzero selected counts before running them. Keep the full suite for 
    bounces back to the lead is refused when the channel reappears in the trace. Add a test with a
    two-department chain to show a reply chain of lead → member → lead is admitted (the reply
    continues the trace) and a new send lead → member → lead is refused.
+   **Status after p03 (coordination C004).** Items 2–4 did not hold against the code: a
+   `message.send` to a desk posts an outbound system note into a new thread there and starts none
+   of its bindings, and a reply back along the relay chain to the lead's desk is refused as a
+   cycle. Dispatch, escalation, the round trip and the loop test therefore wait for
+   `channel.call`; p03 made no core messaging change and has no `department_lead_round_trip_` or
+   `department_lead_loop_` tests. What p03 shipped instead (C003): the department context in
+   `agent.run` names the department's desks by address (item 1), and `department-lead.yaml`
+   (`fixtures::ALL`, not in the shipped template catalogue) is the agent base run by the lead,
+   whose framing comes from that context rather than from its prompt.
 5. People as leads or members see the department's desks in the UI and get its notifications
    through the grants from [02](02-desks-ownership-and-access.md); nothing further.
 6. When `channel.call` lands ([agent-workflow-call](../agent-workflow-call/README.md)), a lead can

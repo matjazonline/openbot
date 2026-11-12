@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "round": "01DEP-P04-B1-R1",
+  "artifact": "8e8f63fe8cb3a161ee7af33529f5a432ab49359a7515dd403960d564fa3c1840",
+  "checks": [
+    {
+      "criteria": [
+        "04A.1",
+        "04A.2",
+        "04A.3",
+        "04A-focused-404",
+        "04B.1",
+        "04B.2",
+        "04B.3",
+        "B2-F2",
+        "B2-F3"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_ui_ department_directory_ desk_wording agent_default_desk_onboarding --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-final.txt",
+          "sha256": "e8fc7888dbb9d111fdaed8e59bfbd16b2312f47068a287ca4bdc6577e17ec0c0"
+        },
+        {
+          "path": "logs/B1-focused-inventory.txt",
+          "sha256": "187596227b569f94e6a200489dcea7c9425eb8f4d2b99b872c88b8c8d6070bf0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_ui_ adapters::http::pages adapters::http::routes department_directory_ department_ use_cases::channel thread::reads email_binding desk_wording onboarding agent_default_desk_ --skip cloudroom --test-threads=4 (rerun after the intended heading-test update)",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-affected-2.txt",
+          "sha256": "bb9267dec576efe34e03c7434259af36004a685da3b4e6620956b4c64df8a5e8"
+        },
+        {
+          "path": "logs/B1-test-inventory.txt",
+          "sha256": "1b527543d893bb15b347718a9650b6a39abb1a3f89c3a138da9a45206a246f70"
+        }
+      ],
+      "note": "1 failure rendered_markup_carries_no_inline_javascript: pre-existing, pages/workflow_authoring/sample.rs unchanged vs origin/main"
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "same filters, first run",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p04_test + own_database per test; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-affected-1.txt",
+          "sha256": "ae1094b60bb1278f460f7f4ac61f48ccae131656d9b87f76736f252342e5250d"
+        }
+      ],
+      "note": "desk_wording_flash_messages_say_desk (intended copy change, test updated) + the pre-existing failure"
+    },
+    {
+      "criteria": [
+        "css"
+      ],
+      "command": "tailwindcss 4.1.12 -i assets/app.css.in -o built.css --minify over a copy of src+assets; cmp with assets/app.css",
+      "fixture": "node_modules of /Users/mac02/dev/openbot (lockfile versions)",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-css-check.txt",
+          "sha256": "1ee814ce333fe175ee82e3031f6fce1e1804735e25010e858d765789b3e251bf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "merge"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_ desk agent_default_desk_ agent_history_ memory recall provisioning workflow_agent_ workflow_fixtures_ workflow_storage_ sample authoring picker agent_preparation application::workflow::agent_tests channel_access channel_reply --test-threads=4",
+      "fixture": "openbot_dept_merge_test (dropped); SQLX_OFFLINE=true",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/merge-main-affected-1.txt",
+          "sha256": "1447c363f5dad2b43fac1032500b7ed3066d9b1a9d4c0bb83e4caa8a7cf35cd9"
+        }
+      ]
+    }
+  ]
+}

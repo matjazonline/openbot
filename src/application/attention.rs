@@ -45,6 +45,8 @@ pub struct AttentionReadContext {
     pub access: CompanyAccess,
     pub principal_id: PrincipalId,
     pub visible_channel_ids: Vec<Uuid>,
+    /// The department each visible desk belongs to, for a one-department view.
+    pub desk_departments: Vec<(Uuid, Option<crate::entities::department::DepartmentId>)>,
 }
 
 /// One page request of the queue, already parsed from the transport.
@@ -53,6 +55,8 @@ pub struct AttentionListRequest<'a> {
     pub view: AttentionView,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: Option<usize>,
+    /// Only this department's desks (01-departments 04C.1).
+    pub department: Option<crate::entities::department::DepartmentId>,
 }
 
 /// A page of the queue together with the access it was read under, for the page shell.
@@ -60,6 +64,8 @@ pub struct AttentionListRequest<'a> {
 pub struct AttentionListing {
     pub access: CompanyAccess,
     pub page: AttentionPage,
+    /// The desks the viewer can read, for naming their departments.
+    pub readable_desks: Vec<Uuid>,
 }
 
 #[derive(Clone)]
@@ -108,15 +114,15 @@ impl AttentionUseCases {
             channels: self.channels.as_ref(),
             participants: self.participants.as_ref(),
         };
-        let visible_channel_ids = readable_channels(&readers, viewer, company_id)
-            .await?
-            .into_iter()
-            .map(|channel| channel.id)
-            .collect();
+        let visible = readable_channels(&readers, viewer, company_id).await?;
         Ok(AttentionReadContext {
             access,
             principal_id,
-            visible_channel_ids,
+            visible_channel_ids: visible.iter().map(|channel| channel.id).collect(),
+            desk_departments: visible
+                .iter()
+                .map(|channel| (channel.id, channel.department_id))
+                .collect(),
         })
     }
 
@@ -135,14 +141,30 @@ impl AttentionUseCases {
                 "Only the company owner or an admin can see the team's work.",
             ));
         }
+        // A one-department view reads only that department's visible desks, and no
+        // company-associated items, which belong to no desk.
+        let department_desks: Vec<Uuid>;
+        let (visible_channel_ids, company_items) = match request.department {
+            None => (context.visible_channel_ids.as_slice(), manager),
+            Some(department) => {
+                department_desks = context
+                    .desk_departments
+                    .iter()
+                    .filter(|(_, owner)| *owner == Some(department))
+                    .map(|(desk, _)| *desk)
+                    .collect();
+                (department_desks.as_slice(), false)
+            }
+        };
         let started = Instant::now();
         let page = self
             .attention
             .list_attention(AttentionQuery {
                 company_id: context.access.company.id,
                 principal_id: context.principal_id,
-                visible_channel_ids: &context.visible_channel_ids,
+                visible_channel_ids,
                 manager,
+                company_items,
                 view: request.view,
                 cursor: request.cursor,
                 limit: request.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
@@ -152,6 +174,7 @@ impl AttentionUseCases {
         Ok(AttentionListing {
             access: context.access,
             page,
+            readable_desks: context.visible_channel_ids,
         })
     }
 

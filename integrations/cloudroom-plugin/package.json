@@ -39,7 +39,7 @@
     "typecheck": "tsc --noEmit",
     "build": "node scripts/build.mjs",
     "test": "node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs",
-    "test:guards": "node --test compatibility/check-source.test.mjs",
+    "test:guards": "node --test compatibility/check-source.test.mjs scripts/install-local.test.mjs",
     "package": "node scripts/package.mjs"
   },
   "dependencies": {

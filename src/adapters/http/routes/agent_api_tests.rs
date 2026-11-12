@@ -1,7 +1,6 @@
 use super::*;
 use crate::adapters::persistence::{PostgresPersistence, test_support::test_pool};
 use crate::use_cases::{
-    agent::LibraryCopyModel,
     company::{CompanyPersistence, CompanyWrite},
     user::UserPersistence,
 };
@@ -44,17 +43,35 @@ impl Fixture {
         .await
         .unwrap()
         .id;
+        // Every company agent is created with a desk, which answers on a keyed model.
+        CompanyPersistence::replace_model_connections_for_user(
+            persistence.as_ref(),
+            user,
+            company,
+            vec![crate::use_cases::company::CompanyModelConnectionWrite {
+                provider: "openai".into(),
+                api_key: Some("test-key".into()),
+                models: vec!["gpt-4o-mini".into()],
+                is_default: true,
+            }],
+        )
+        .await
+        .unwrap();
         let skills = Arc::new(SkillUseCases::new(
             persistence.clone(),
             persistence.clone(),
             persistence.clone(),
         ));
-        let agents = Arc::new(AgentUseCases::new(
-            persistence.clone(),
-            persistence.clone(),
-            persistence.clone(),
-            persistence.clone(),
-        ));
+        let agents = Arc::new(
+            AgentUseCases::new(
+                persistence.clone(),
+                persistence.clone(),
+                persistence.clone(),
+            )
+            .with_company_agents(
+                crate::adapters::persistence::test_support::company_agents(persistence.as_ref()),
+            ),
+        );
         Some(Self {
             persistence,
             agents,
@@ -68,6 +85,11 @@ impl Fixture {
         response_json(
             create_agent_json(
                 State(self.agents.clone()),
+                State(
+                    crate::adapters::persistence::test_support::department_use_cases(
+                        &self.persistence,
+                    ),
+                ),
                 AuthenticatedUser { id: self.user },
                 Path(self.company),
                 Json(serde_json::from_value(body).unwrap()),
@@ -92,6 +114,11 @@ impl Fixture {
             update_agent_json(
                 State(self.agents.clone()),
                 State(self.skills.clone()),
+                State(
+                    crate::adapters::persistence::test_support::department_use_cases(
+                        &self.persistence,
+                    ),
+                ),
                 AuthenticatedUser { id: self.user },
                 Path((self.company, id)),
                 Json(serde_json::from_value(body).unwrap()),
@@ -132,6 +159,9 @@ async fn api_agents_carry_no_retired_runtime_fields() {
     }
     assert!(saved.get("sub_agent_ids").is_none());
     assert_eq!(edited["agent"]["description"], "Updated description");
+    // An agent in no department lists none (01-departments 04C.4).
+    assert_eq!(saved["departments"], json!([]));
+    assert_eq!(edited["departments"], json!([]));
     f.cleanup().await;
 }
 
@@ -181,16 +211,12 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
     let channels_before = company_channels().await;
     let copied = f
         .agents
-        .create_agent_from_library(
-            f.user,
-            f.company,
-            definition.id,
-            LibraryCopyModel::FollowDefault,
-        )
+        .create_agent_from_library(f.user, f.company, definition.id, None)
         .await
         .unwrap();
-    // p08 D4.7: the install creates the agent only; "Create assistant channel" gives it one.
-    assert_eq!(company_channels().await, channels_before);
+    // 01DEP-P03-D1: the copy comes with its default desk at its slug; "Create additional desk"
+    // adds more.
+    assert_eq!(company_channels().await, channels_before + 1);
     assert_eq!(
         (
             copied.agent.provider.as_deref(),
@@ -253,5 +279,85 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         )
         .await
         .unwrap();
+    f.cleanup().await;
+}
+
+/// 03C.0 over the JSON API: `department_id` and `role` beside the agent's fields place the new
+/// agent; a role without a department, a bad role or an unknown field is a 400 with nothing
+/// written.
+#[tokio::test]
+async fn agent_default_desk_json_create_places_the_agent() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let department = Uuid::new_v4();
+    sqlx::query(
+        "INSERT INTO departments (id, company_id, name, slug, created_by) \
+         VALUES ($1, $2, 'Support', 'support', \
+                 '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
+    )
+    .bind(department)
+    .bind(f.company)
+    .execute(f.persistence.pool())
+    .await
+    .unwrap();
+    let saved = f
+        .create(
+            json!({"name": "Lead", "slug": "lead", "department_id": department,
+            "role": "lead"}),
+        )
+        .await;
+    let agent: Uuid = serde_json::from_value(saved["agent"]["id"].clone()).unwrap();
+    let placed: (bool, Option<String>) = sqlx::query_as(
+        "SELECT EXISTS (SELECT 1 FROM department_members AS member \
+                         WHERE member.department_id = $1 AND member.principal_id = principal.id), \
+                (SELECT role.role FROM department_roles AS role \
+                  WHERE role.department_id = $1 AND role.principal_id = principal.id) \
+           FROM principals AS principal WHERE principal.agent_id = $2",
+    )
+    .bind(department)
+    .bind(agent)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    assert_eq!(placed, (true, Some("lead".into())));
+    // 01-departments 04C.4: the response names the department and the role the agent holds there.
+    assert_eq!(
+        saved["departments"],
+        json!([{"id": department, "name": "Support", "slug": "support", "roles": ["lead"]}])
+    );
+    assert_eq!(saved["more_departments"], false);
+    let edited = f
+        .update(agent, json!({"name": "Lead", "slug": "lead"}))
+        .await
+        .unwrap();
+    assert_eq!(edited["departments"], saved["departments"]);
+
+    for body in [
+        json!({"name": "Stray", "slug": "stray", "role": "lead"}),
+        json!({"name": "Stray", "slug": "stray", "department_id": department, "role": "boss"}),
+        json!({"name": "Stray", "slug": "stray", "department_id": "not-a-uuid"}),
+        json!({"name": "Stray", "slug": "stray", "harness_kind": "rig"}),
+    ] {
+        let refused = create_agent_json(
+            State(f.agents.clone()),
+            State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
+            AuthenticatedUser { id: f.user },
+            Path(f.company),
+            Json(body.clone()),
+        )
+        .await;
+        assert!(
+            matches!(refused, Err(AppError::BadRequest(_))),
+            "{body}: {:?}",
+            refused.map(|_| ())
+        );
+    }
+    let agents: i64 = sqlx::query_scalar("SELECT count(*) FROM agents WHERE company_id = $1")
+        .bind(f.company)
+        .fetch_one(f.persistence.pool())
+        .await
+        .unwrap();
+    assert_eq!(agents, 1);
     f.cleanup().await;
 }

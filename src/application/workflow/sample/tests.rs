@@ -405,3 +405,22 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
 
 #[path = "jev_tests.rs"]
 mod jev_tests;
+/// 01DEP-P03-D12: the department lead fixture runs as a sample: its history read and its lead's
+/// answer are scripted, and the reply maps the answer.
+#[test]
+fn department_lead_fixture_runs_as_a_sample() {
+    let bundle = fixture(Fixture::DepartmentLead);
+    let mut req = request(vec![
+        script(
+            8,
+            "context",
+            vec![json!({"items": [], "token_count": 0, "omitted": 0})],
+        ),
+        script(8, "lead", vec![json!({"body": "On it."})]),
+    ]);
+    req.input = json!({"message":"Who handles refunds?","source_message":Uuid::from_u128(701)});
+    let report = execute(bundle, req).unwrap();
+    complete(&report);
+    assert_eq!(report.output, Some(json!({"body": "On it."})));
+    assert_eq!(report.usage.model_calls, 1);
+}

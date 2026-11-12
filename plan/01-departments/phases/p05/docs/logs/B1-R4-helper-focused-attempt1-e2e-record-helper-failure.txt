@@ -1,0 +1,15 @@
+
+running 1 test
+DOOP_E2E_STAGE stage=environment_ready elapsed_ms=995
+DOOP_E2E_STAGE stage=company_registered_and_published elapsed_ms=3029
+DOOP_E2E_STAGE stage=company_registered_and_published elapsed_ms=4395
+DOOP_E2E_STAGE stage=documents_admitted elapsed_ms=5716
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=model_listeners_started elapsed_ms=15385
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=editor_approval_checkpoint elapsed_ms=38358
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::live_tests::doop_e2e_live_company_documents has been running for over 60 seconds
+DOOP_E2E_MODEL completed=5
+DOOP_E2E_MODEL completed=5
+DOOP_E2E_CHECKPOINT workers_idle=true
+DOOP_E2E_STAGE stage=documents_terminal elapsed_ms=77295

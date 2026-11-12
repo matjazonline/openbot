@@ -257,6 +257,13 @@ impl ChannelPersistence for ChannelDirectoryStub {
             .cloned())
     }
 
+    async fn list_departments(
+        &self,
+        _company_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::department::Department>> {
+        Ok(Vec::new())
+    }
+
     async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
         if let Some(message) = self.lookup_error.as_ref() {
             return Err(crate::app_error::AppError::Database(message.clone()));

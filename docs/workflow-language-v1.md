@@ -122,7 +122,7 @@ finite `label` enum; scalar alternatives are rejected. There is no second
 
 Registration-owned objects reject unknown fields. Scope is `{kind, id?}` where
 kind is company/agent/user and agent/user require an ID. Reviewer is `{kind, id}`
-with user/group kind. Destinations are `{kind, id}` with user/group/channel kind.
+with user/group kind. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
 Content is `{subject?, body}`. MCP content accepts bounded text (including empty text), image/audio base64, embedded
 text/blob resources and resource links, with protocol annotations, icons and `_meta`.
 Resource links and icon URIs remain data and are never automatically fetched. These fields follow
@@ -313,7 +313,7 @@ key for another revision/version fails. A template copy retains its original pro
 `BindingService` configures immutable binding revisions and activates/deactivates with an
 expected lifecycle revision. The lifecycle revision changes on configuration and activity writes,
 preventing stale activation after an intervening edit or deactivate/reactivate cycle. Related
-channel/thread association is fixed when created. Reconfiguration preserves active state only
+desk/thread association is fixed when created. Reconfiguration preserves active state only
 after current readiness validation. Archive blocks new selection; deactivation remains available
 after archive or resource revocation and never cancels an existing run.
 
@@ -416,7 +416,7 @@ by letters, digits or underscores, at most 64 bytes) to immutable private messag
 attachment references. Each reference has exactly `channel_id`, `thread_id` (nonnil
 UUIDs), and `sha256` (64 lowercase hex characters). Public URLs, object keys,
 base64 and unverifiable references are rejected. The run actor must currently
-have company and channel/thread visibility; cross-company attachments are refused.
+have company and desk/thread visibility; cross-company attachments are refused.
 Missing, changed, unsupported or oversized images produce explicit `jev.asset_*`
 failures. A retry verifies the same digest again before replay or a new provider call.
 

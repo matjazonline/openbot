@@ -19,10 +19,12 @@ use tracing::warn;
 use super::{
     channel::write_channel_settings_on,
     channel_gate::{ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on},
+    department_desks::{prelock_ownership_on, sync_desk_grants_on},
 };
 use crate::app_error::AppError;
 use crate::app_error::AppResult;
 use crate::application::ports::channel::ChannelUpdate;
+use crate::domain::workflow::CompanyId;
 use crate::use_cases::channel::channel_not_found;
 
 /// The bounds one channel edit must finish inside.
@@ -103,6 +105,12 @@ pub(crate) async fn update_channel_on(
     budget: EditBudget,
 ) -> AppResult<()> {
     bound_statements_on(tx, budget).await?;
+    let company = CompanyId::new(request.company_id);
+    // Changing who owns the desk takes the company write lock, the department and the
+    // principals its grants will name before the gate, as department writes do (DEP-P02-D3).
+    if let Some(edit) = request.write.ownership {
+        prelock_ownership_on(tx, company, Some(request.channel_id), &edit).await?;
+    }
     acquire_channel_gate_on(
         tx,
         ChannelGateKey::new(request.company_id, request.channel_id),
@@ -110,7 +118,11 @@ pub(crate) async fn update_channel_on(
     )
     .await?;
     lock_channel_on(tx, request).await?;
-    write_channel_settings_on(tx, request.company_id, request.channel_id, &request.write).await
+    write_channel_settings_on(tx, request.company_id, request.channel_id, &request.write).await?;
+    if request.write.ownership.is_some() {
+        sync_desk_grants_on(tx, company, request.channel_id).await?;
+    }
+    Ok(())
 }
 
 /// Bound every statement and lock wait in this transaction.

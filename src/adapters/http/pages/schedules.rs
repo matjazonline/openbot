@@ -214,7 +214,7 @@ pub fn schedule_runs_column(props: &ScheduleRunsColumnProps<'_>, swap: FragmentS
 pub(crate) fn schedule_runs_column_fragment(props: &ScheduleRunsColumnProps<'_>) -> String {
     let schedule = props.schedule;
     let company_id = props.company_id;
-    let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Channel");
+    let channel_name = props.channel.map(|c| c.name.as_str()).unwrap_or("Desk");
 
     let toggle_label = if schedule.enabled { "Pause" } else { "Resume" };
     let toggle_val = if schedule.enabled { "false" } else { "true" };
@@ -510,7 +510,7 @@ fn schedule_channel_field(props: &ScheduleFormPaneProps<'_>) -> String {
             .map(|channel| format!("#{} ({})", channel.slug, channel.name))
             .unwrap_or_else(|| schedule.channel_id.to_string());
         return format!(
-            r#"<input type="hidden" name="channel_id" value="{}"><p class="py-2">{}</p><p class="text-xs opacity-70">The channel is fixed when the schedule is created.</p>"#,
+            r#"<input type="hidden" name="channel_id" value="{}"><p class="py-2">{}</p><p class="text-xs opacity-70">The desk is fixed when the schedule is created.</p>"#,
             schedule.channel_id,
             escape_html_text(&label)
         );
@@ -584,7 +584,7 @@ pub fn schedule_form_pane(props: &ScheduleFormPaneProps<'_>) -> String {
                             <input type="text" name="name" required value="{name}" placeholder="Daily Operations Report" class="input w-full">
                         </label>
                         <label class="form-control w-full">
-                            <div class="label"><span class="text-xs opacity-70">Target Channel</span></div>
+                            <div class="label"><span class="text-xs opacity-70">Target Desk</span></div>
                             {channel_field}
                         </label>
                     </div>

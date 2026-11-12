@@ -1,0 +1,1 @@
+Doop test setup/run failed: [Errno 2] No such file or directory: '/Users/mac02/openbot-p05-r3-wr3kxbjm/doop-clipboard-source/node_modules/@modelcontextprotocol/sdk/package.json'

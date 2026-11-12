@@ -1,0 +1,3870 @@
+{
+  "version": 1,
+  "round": "01DEP-P05-B1-R4",
+  "artifact": "b715976039bbe891c5771d5e7946621afe528baf95b4d57bfd6fd41f59b89e35",
+  "reuses_round": "01DEP-P05-B1-R3",
+  "coordination": {
+    "revision": 18,
+    "file": "logs/coordination-r18.md",
+    "sha256": "064fdab3d6e4d2d71ed57351e36634648a0b6a2532a03e2ed6315acb4d0aecd0"
+  },
+  "checks": [
+    {
+      "criteria": [
+        "05A.2",
+        "css"
+      ],
+      "command": "generated_css_is_current (scripts/check.sh)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-navigation"
+      ],
+      "command": "node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-deployment"
+      ],
+      "command": "scripts/tests/deploy.sh && scripts/tests/credential-key-rotation.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-format"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-whitespace"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "CI-transport"
+      ],
+      "command": "scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/tests/workflow-evidence.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --available-manifests",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Ran before G2 repair; later aggregate validation supersedes it, without deleting this failure."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "cargo fetch --locked",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-offline"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-clippy"
+      ],
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.1",
+        "05A.4-migrations"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-sqlx"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare --check -- --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-offline"
+      ],
+      "command": "cargo test --locked --offline --all-targets --no-run",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-reachability"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "create_check_database (scripts/check.sh)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result."
+    },
+    {
+      "criteria": [
+        "05A.4-database",
+        "05A.4-network"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Retain complete result; unrelated failures and any stack observation are documented separately in TASK."
+    },
+    {
+      "criteria": [
+        "05A.4-stack",
+        "05A.5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ],
+      "note": "Actual scripts/check.sh gate result. Retain complete result; unrelated failures and any stack observation are documented separately in TASK."
+    },
+    {
+      "criteria": [
+        "05A.2"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "G1",
+        "G2"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --available-manifests (after both authorized repairs)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/G2-validation.txt",
+          "sha256": "212bc1e6632fbd74d98e78955ef82e91c30aa1223484685aee86834328e27694"
+        },
+        {
+          "path": "logs/G1-repair.txt",
+          "sha256": "b8acaa366432dd3607f957c8efc3bcaf56c43cefb075235433ab7902c1fa1af1"
+        },
+        {
+          "path": "logs/G2-repair.txt",
+          "sha256": "b2718237737cb0f5e277e377371eb05d59a708ac25d8df5b091616ce0889f047"
+        },
+        {
+          "path": "logs/G1-original-p04-R1-manifest.json",
+          "sha256": "587bb4f09db182bb4e0cf5943127edd8a3bffec837dc7eca106f02d36b328702"
+        },
+        {
+          "path": "logs/G2-original-p04-R1-manifest.json",
+          "sha256": "85362382080b2a1298c4255dd1eadd00153833a84d7ac89af71d90e6690ffffe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.1"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets (fresh disposable DB, checkpoint execution)",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "ea5dbf4bf14053ec00d686c7d05c1fda2454134f5553138f198423833d2cc8fb"
+        },
+        {
+          "path": "logs/B1-sqlx-cache-diff.txt",
+          "sha256": "ea77f986ebc4727b92d17006acb974592f0b1d89755f3beb266f8526b387f85f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-binary"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --bin open_bots -- --test-threads=4",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-main-target.txt",
+          "sha256": "6bde3ca5cabc07d39858bd4b4f2702e97d28b2caa58117dd86b76a33ad78640f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-inventory"
+      ],
+      "command": "cargo test --locked --offline --all-targets -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-full-test-inventory.txt",
+          "sha256": "0ec29da5a4eb9fd7e5cbf9fb22aef9a7acb1b24f348b2a3acca1415676570caf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-unrelated-failures"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup -- --nocapture --test-threads=1",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-mcp-cancellation-rerun-1.txt",
+          "sha256": "d443473a7768cb6b93c9e72e1de0f1b483c50ca2885c37ddc3916d42d7dc8a26"
+        },
+        {
+          "path": "logs/B1-unrelated-failures-source-identity.txt",
+          "sha256": "08e502ab9e0976d3a42c177a6b681cfe2105e28ae9c5484dd7e589e442b649c7"
+        }
+      ],
+      "note": "Confirmed unchanged MCP adapter/scenario/dependencies; shared stub diff is unrelated. No assertion skipped or weakened."
+    },
+    {
+      "criteria": [
+        "C001-r1"
+      ],
+      "command": "full library suite: department_desk_relay_into_a_members_only_desk_stays_trusted",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-resume-1.txt",
+          "sha256": "c1e417a65fc6a49b6786ad738bcf63578ca3d9a08586f0994f0b8c2867d7bb6b"
+        },
+        {
+          "path": "logs/B1-doc-contract-inspection.txt",
+          "sha256": "f8ae3049de5714f21370397f00d0f2885877fee12ee1a2a46cec06cbc005878b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "C004-r1"
+      ],
+      "command": "inspect shipped docs, fixture, planner/writer/routing diffs against accepted p03",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doc-contract-inspection.txt",
+          "sha256": "f8ae3049de5714f21370397f00d0f2885877fee12ee1a2a46cec06cbc005878b"
+        }
+      ],
+      "note": "Inspection claim only; automated dispatch, escalation and round-trip/loop checks remain deferred by C004."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-workflow-sample-boundary-fixtures"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-workflow-sample-boundary-fixtures.txt",
+          "sha256": "f2fd5c7c9e5e7177fa4ea0d12363a279e81de825dbf78b3931b659e58951111c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-workflow-sample-boundary"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-workflow-sample-boundary.txt",
+          "sha256": "5019aa7f424c41f0d298a970642a5589dd68003f85d8fbac01e2f1be12d77185"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-boundary-fixtures"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-boundary-fixtures.txt",
+          "sha256": "ae8769c197f33a504446036ea0d7e48485d1f20be8840e4c99cdd4749a7be449"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-boundary"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-boundary.txt",
+          "sha256": "889089ee6c26c3fe831da899aa9213816af44b3c1a687328362675aac0bca7b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration-docs"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration-docs.txt",
+          "sha256": "2fe1d26be6d59d812c0956734b4bf7a223a31b3b8ed276dce4404a794e99fcfa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration_portability_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib integration_portability_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration_portability_inventory.txt",
+          "sha256": "62567b040e09d37d7158d6208100118698ada586127bbb94a124fa520cdafb86"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-integration_service_contract_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib integration_service_contract_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-integration_service_contract_inventory.txt",
+          "sha256": "6a023edbd966a2aec05deb166924f19178edf7656de670b1dd37e6e621b07575"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault_google_e2e_inventory"
+      ],
+      "command": "cargo test --locked --offline --lib vault_google_e2e_ -- --list",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault_google_e2e_inventory.txt",
+          "sha256": "29432b46cff16ac90798faf459d85519b380e75c64258006576f9780e0f93b9e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-rust-1.txt",
+          "sha256": "d3d9ebe624d3c62527c9790c892aad144b2e76893417ddd84145717dd1e7e3a1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-rust-2"
+      ],
+      "command": "cargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-rust-2.txt",
+          "sha256": "f95af62f6bd9a61299d57e6ff846d2c422fad0625855d16ab28aeacd9f6074c9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-vault-browser"
+      ],
+      "command": "node --test scripts/tests/vault-authoring-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-vault-browser.txt",
+          "sha256": "248da7b39dd6a083e81d60092a0df18b3671772366a7bdfa7c669fae7a6b5fff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-html-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-html-rust-1.txt",
+          "sha256": "0f46c7925c42ab7cc9a3cd5528d1eb6f8aaecc75fd6e5bc2f0482198f77a12b4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-html-browser"
+      ],
+      "command": "node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-html-browser.txt",
+          "sha256": "a477b1691820fd6d3b005942bedd8bcca3f3e6db16fa3ec6420a7b332e2a284f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-rust-1.txt",
+          "sha256": "7fd0052ccfb7031c84771897d0a532fdab43de306bc935dc22d75dad49d97f90"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-browser"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-browser.txt",
+          "sha256": "e3ebdb77fd2ae582d967ea633f374504dee990010518fdae54187ee5dd7bb94e"
+        }
+      ],
+      "note": "Pinned Playwright shell absent on initial attempt; successful reruns retained separately."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_memory_settings_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-rust-1.txt",
+          "sha256": "a519aa8c583f47ba5e13176f4a5bf2e5ab606edccc04fde5b54ea7d99c2c5cfe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-browser"
+      ],
+      "command": "node --test scripts/tests/memory-settings-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-browser.txt",
+          "sha256": "5dd1deb344bf043fe845eb0c5a449879464245991da44471dd5487af07862b77"
+        }
+      ],
+      "note": "Pinned Playwright shell absent on initial attempt; successful reruns retained separately."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-rust-1.txt",
+          "sha256": "802b7c56c8bd137a98fdc7147470cbdd7d80994742d04e8642ada3f5826b26a8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-browser"
+      ],
+      "command": "node --test scripts/tests/agent-authoring-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-browser.txt",
+          "sha256": "dede18bf7cba472db8220578d78bcbfb14f258eb7744cbfd961d5e457ae0a6ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-local-agents-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-local-agents-rust-1.txt",
+          "sha256": "45d8f1fb6d22ac093fb6879cf8b917a40dd1fa7a1f007e113ba8c67a54687110"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-local-agents-browser"
+      ],
+      "command": "node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-local-agents-browser.txt",
+          "sha256": "a96412885501e0ce5f076523de4802e8bda18e55a44270d7f47ee2feb9b13251"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-picker-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-picker-rust-1.txt",
+          "sha256": "861726609ec4a5448df5a88901d24f9a7a4686c5831511aa916652e008223b96"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-agent-picker-browser"
+      ],
+      "command": "node --test scripts/tests/workflow-agent-picker-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-agent-picker-browser.txt",
+          "sha256": "7c2862e1877fe397a2a0716f389ed3eef015fe854f4d86ae06fa8f3f05de604f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-session-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-session-rust-1.txt",
+          "sha256": "c62de5ea1a323d535ed3d1ec6e2fdcf2081ec4553e137447a702423820bb56cc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-session-browser"
+      ],
+      "command": "node --test scripts/tests/session-revocation-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-session-browser.txt",
+          "sha256": "270ef80ad270931e2f6f4f0d372920e602c8c917ba67a084dc951dc8304d6424"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-rust-1"
+      ],
+      "command": "cargo test --locked --offline --lib decision_browser_markup_and_closed_draft_recovery",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-rust-1.txt",
+          "sha256": "3476701d6de86cec54a1364fa2e8845ba7a64a06436650c2aaa0860945754f52"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-rust-2"
+      ],
+      "command": "cargo test --locked --offline --lib source_message_outside_window_is_exact_and_authorized",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-rust-2.txt",
+          "sha256": "f28046067ddf13a453fa58b253cf02df90e44d0cfe8e66617f823e369c0a6c04"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-decisions-browser"
+      ],
+      "command": "node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-decisions-browser.txt",
+          "sha256": "26622a461707fec5785baf02f91d3f87dbe1c50a8255bc97976e0add546cc761"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-browser"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-knowledge-browser-rerun-1.txt",
+          "sha256": "e814268131a650bc54439a1f353316eda5eb5adac1ba3659f01c58ea35ad54e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-browser"
+      ],
+      "command": "node --test scripts/tests/memory-settings-browser.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-ci-memory-browser-rerun-1.txt",
+          "sha256": "13d87820ce691f7db1ffe051184babe56a2eb20dc4ddabe6055c58d6aa0c74c4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-cloudroom"
+      ],
+      "command": "npm ci; npm run typecheck; npm run build; npm test; npm run test:guards (integrations/cloudroom-plugin)",
+      "fixture": "checkpoint toolchain Node 26.5.0/npm 11.17.0; unchanged plugin sources; exact package runtime checked separately",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-cloudroom-npm-ci.txt",
+          "sha256": "3988ebdf8616ef790cfab0752416f40172066ae9c4347e5eb436d91799aac8f0"
+        },
+        {
+          "path": "logs/B1-cloudroom-plugin.txt",
+          "sha256": "50e959fcf775a7ebeb7274b24e10720549ee91788a5fb959e175d5bd3b7e432d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-cloudroom-package"
+      ],
+      "command": "Node 24.21.0/npm 11.19.0: npm --prefix integrations/cloudroom-plugin run package; direct pinned npm ci --omit=dev in extracted tgz",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-cloudroom-package-resume-2.txt",
+          "sha256": "d3485d0ece541af9640e46c31b4dfa3bc9b859d99db42e88c2b2a2336d28e749"
+        },
+        {
+          "path": "logs/B1-cloudroom-runtime-install-2.txt",
+          "sha256": "469e9b5b72953228d7637b0872767ba5cc869638c70ededb2f774e4981f692b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-node-extra"
+      ],
+      "command": "node --test scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-node-extra.txt",
+          "sha256": "7872307add919fb548381061320fc732f2934a9cde1439fe3d343789edf23eb8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-run-counts"
+      ],
+      "command": "npm run test:run-counts",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-run-counts.txt",
+          "sha256": "cf2ac63f6efc677d8d695d5fdc3243c9a20a7cebce5e6fc7ab6a66c9aee4cdab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-doop-unit"
+      ],
+      "command": "python3 scripts/tests/knowledge-model-prepare.py; python3 scripts/tests/doop-test.py; node --test scripts/tests/doop-probe.mjs",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-py-node-gates.txt",
+          "sha256": "fe57365c601d9558ca70f3c038b939a8297d03573c2668e83875b3cf284899a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.4-lease",
+        "05A.5"
+      ],
+      "command": "scripts/test-network-isolation.sh scripts/lease-budget.sh --offline",
+      "fixture": "openbot_dept_p05_protocol; no competing phase checks; default 50 percent WORK budget; one test thread",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-lease-budget.txt",
+          "sha256": "620a5be66c0d92552f08c7db2044cc33be98e9485154eb8c0a28332122a896f6"
+        },
+        {
+          "path": "logs/B1-lease-events.txt",
+          "sha256": "71653d4b5b0a828aa7ac2b6023ed2bb57217875afce458e469bf057835192cb6"
+        },
+        {
+          "path": "logs/B1-budget-environment.txt",
+          "sha256": "260d895d047696c8f45fab1face0a0d48380be9281a656614b6a4f87e93d52e8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.6-graph"
+      ],
+      "command": "graft build",
+      "fixture": "p05 local fixtures; see TASK resource identities",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-graft-build.txt",
+          "sha256": "0f7c1dfee9fa99f5616ce185195742dea11e565d9d8b6ce9af36f4cf272f7304"
+        },
+        {
+          "path": "logs/B1-graft-build-final.txt",
+          "sha256": "d6412cf6bd949bf9702764bf451d1996394c4a7d3a04f8d6da3d7d89a47ce8f3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-query-statistics",
+        "01DEP-P05-B1-F1"
+      ],
+      "command": "python3 plan/01-departments/phases/p05/docs/logs/B1-R2-query-statistics.py",
+      "fixture": "owned PostgreSQL 18.6 cluster openbot_dept_p05_stats; actual app migration; CI startup settings; numeric queryid and normalized text; cluster stopped",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-query-statistics.py",
+          "sha256": "9c2dcfc2a77a2d64847dc7c0c54b416cb615f6bc6113509835a12e21187fedee"
+        },
+        {
+          "path": "logs/B1-R2-query-statistics.txt",
+          "sha256": "d733230c816751d52244afe47c3dc73877f7e747d2ba8df27b865d6a2e9bf7f5"
+        },
+        {
+          "path": "logs/B1-R2-query-statistics-server.txt",
+          "sha256": "f151b130e52431c426946a129672f8fe2e40e85d5eae545201b691a016704bc6"
+        },
+        {
+          "path": "logs/B1-R2-query-statistics-resource.json",
+          "sha256": "a07bfce53ee4a3e4eabba9f70965616196943d5b624b483c07bfa6becde68d3f"
+        },
+        {
+          "path": "logs/B1-query-statistics-prerequisites.txt",
+          "sha256": "8a1b6cf54873b0c4c0fcb34651e184cbd4c3beb628babab9cf4442d7896485a6"
+        }
+      ],
+      "note": "Read-only shared-server prerequisite failures are context. Required CI assertions actually pass on an isolated configured cluster; shared server unchanged."
+    },
+    {
+      "criteria": [
+        "05A.4-whitespace",
+        "01DEP-P05-B1-F2"
+      ],
+      "command": "git diff --cached --check (pre-archive-classification audit)",
+      "fixture": "p05 correction fixtures; see TASK",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-staged-whitespace-audit.txt",
+          "sha256": "af5ac730028d6e919eb975d816ed0ee87e253899f4ed0da179b59b7cae05ad3f"
+        },
+        {
+          "path": "logs/B1-R1-reviewer-whitespace.txt",
+          "sha256": "704e8095e3f8f35b7173d5f8f79f99d9f41f06eb00f66b0ab851aaa6fff25094"
+        }
+      ],
+      "note": "Original raw archive whitespace failure retained verbatim."
+    },
+    {
+      "criteria": [
+        "05A.4-whitespace",
+        "01DEP-P05-B1-F2"
+      ],
+      "command": "git diff --cached --check; git diff --check (complete staged correction)",
+      "fixture": "p05 correction fixtures; see TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-whitespace.txt",
+          "sha256": "73b36cd6689cf8d53c71ebf753b1f8677427dbac4cc9a28b61dc0f56d8bd6ec0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "retained-evidence",
+        "01DEP-P05-B1-F2"
+      ],
+      "command": "SHA-256 comparison of every unique file referenced by unchanged R1 manifest",
+      "fixture": "p05 correction fixtures; see TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-original-evidence-identity.txt",
+          "sha256": "00dae38b266e92358bece834c40c0266f45a7b60feddd56922f754d039d1cad7"
+        }
+      ],
+      "note": "R1 manifest and all its referenced bytes remain unchanged; source metadata changes archival classification only."
+    },
+    {
+      "criteria": [
+        "archive-scope",
+        "01DEP-P05-B1-F2"
+      ],
+      "command": "git check-attr binary diff text merge -- raw logs and representative source/Markdown/Python/JSON paths",
+      "fixture": "p05 correction fixtures; see TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-archive-attributes.txt",
+          "sha256": "6df31454dc5ba33d2d3e6a4502a3f6b88e786cd7d7526e6996e8623df3037687"
+        }
+      ],
+      "note": "Only p05 raw TXT/diff paths binary; source and human/structured records retain normal text checks. Attributes file is included in artifact, outside record exclusions."
+    },
+    {
+      "criteria": [
+        "05A.6-graph"
+      ],
+      "command": "graft build after correction helpers",
+      "fixture": "p05 correction fixtures; see TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-graft-build.txt",
+          "sha256": "705243648f0fc907e7f9e94c1b3809418446e0ab4d3daefa44f59f55900eeb08"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-image"
+      ],
+      "command": "docker build --tag openbot-p05-r3-knowledge . (BuildKit); python3 scripts/check-knowledge-image.py --image openbot-p05-r3-knowledge",
+      "fixture": "owned openbot-p05-r3 Docker engine; production Dockerfile; pinned image ID in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-knowledge-build-2.txt",
+          "sha256": "7e4e5e4681a50fc91fecc6ba9e28f9737eda3c8650a7d01b8ce542939205491b"
+        },
+        {
+          "path": "logs/B1-R3-knowledge-check.txt",
+          "sha256": "31ec4a300b3e49df37a604c982a75d7eb978642952eeb90f745b94dd1104aff7"
+        },
+        {
+          "path": "logs/B1-R3-knowledge-result.json",
+          "sha256": "dd672fdeb360905ef748238c563187bd3b11d56ebe0d34836239ec959624d17b"
+        }
+      ],
+      "note": "Actual non-root/read-only/offline image, retrieval and RSS/model-integrity assertions. Later edit is cfg(test)-only teardown order."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-knowledge-image-attempt1"
+      ],
+      "command": "docker build --tag openbot-p05-r3-knowledge . (legacy attempt)",
+      "fixture": "same owned engine; legacy builder before private Buildx configuration",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-knowledge-build.txt",
+          "sha256": "5ba20979701058e9c560c359eaac06264acf70dd2f6f4831ef8fcb983652f38f"
+        }
+      ],
+      "note": "Canceled initial attempt retained; successful BuildKit build supersedes it."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-install"
+      ],
+      "command": "managed Bun frozen install or run install",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-install.txt",
+          "sha256": "d05d152e2ad94ae330af5595b9e66eccd89d118682b12b5ae4f0b26bc26aa4e4"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-format-check"
+      ],
+      "command": "managed Bun frozen install or run format-check",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-format-check.txt",
+          "sha256": "144d4b6b3474c453ad1955a4b74f6f0cde1d28acc3023d65957fd2a9c5f4c140"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-typecheck"
+      ],
+      "command": "managed Bun frozen install or run typecheck",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-typecheck.txt",
+          "sha256": "3e49242089a585e9d7c4a20eb73826d380de0dad1640ef35ce389f4c124f4292"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-lint"
+      ],
+      "command": "managed Bun frozen install or run lint",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-lint.txt",
+          "sha256": "b6c9417010a4f46c36811c99d01e4ef64154885f352c8d794b8f6af4ae5aa111"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-doc-lint"
+      ],
+      "command": "managed Bun frozen install or run doc-lint",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-doc-lint.txt",
+          "sha256": "814166ae4461a49507b8950187dc17a581dd46fd64568bb7a1cbe8ab77912798"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-build"
+      ],
+      "command": "managed Bun frozen install or run build",
+      "fixture": "pinned managed Doop source e0c063c4; clean dedicated HOME; Node22.23.4/Bun1.3.10",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-build.txt",
+          "sha256": "8e51619cf2ed5a8ca9214e600a20dd4f03feeddfc38aa1b33bd2d045e1dcd857"
+        }
+      ],
+      "note": "Exact commands and exits retained in service-results JSON."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-tests"
+      ],
+      "command": "bun run test -- --maxWorkers=2 (runner.clean_environment)",
+      "fixture": "same immutable managed source; phase Docker PATH adapter and isolated PostgreSQL",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-docker-clean-env-adapter.txt",
+          "sha256": "bcb4bf919e579d69a2163ae5fa23ae73a99a8b2d6cf8c77ac689443bc4917fb3"
+        },
+        {
+          "path": "logs/B1-R3-docker-environment-initial.json",
+          "sha256": "db0773fd631c74ed54c4b5d0703e874990c68aaee68e4876964808f6fae8941d"
+        },
+        {
+          "path": "logs/B1-R3-docker-environment.json",
+          "sha256": "27659c8ea38b9ec85ab1b7d0cd3d8a90672f0f47377bf994bc97c87854abb405"
+        },
+        {
+          "path": "logs/B1-R3-docker-wrapper.txt",
+          "sha256": "750c7c30e93f5d4021b054ba7ec1a8dfdd94d62e17237ba4add9399ddcdb798e"
+        },
+        {
+          "path": "logs/B1-R3-doop-service-gate.py",
+          "sha256": "89c0123a28a0036ab9d90092b5f945663906fb21212a970d997615cee518ed63"
+        },
+        {
+          "path": "logs/B1-R3-doop-service-results.json",
+          "sha256": "6878f547cc1cae66d2db65770b570247876ef1239e97a7edbc6296d344323f6d"
+        },
+        {
+          "path": "logs/B1-R3-doop-service-test-rerun-result.json",
+          "sha256": "327bdadcbe1071f2bc9a5faf54a80bb181b45768b4002eade091b3097c208749"
+        },
+        {
+          "path": "logs/B1-R3-doop-service-test-rerun.txt",
+          "sha256": "29db9ad721ed309baf2f4acc6ee7e1a873a6075d3bfdc4e62e21dd7060e6c23f"
+        },
+        {
+          "path": "logs/B1-R3-doop-setup.txt",
+          "sha256": "2d6190ee938727c88676129190bfe2de236daa95cb3c701925d010a153f14181"
+        },
+        {
+          "path": "logs/B1-R3-node22.txt",
+          "sha256": "386bacc5f9ca59ef14ebe11be8aef601bbe87cd739394c7852f88e9e5114a749"
+        }
+      ],
+      "note": "2,711 passed/17 explicit clipboard skips; no source or test edits; source fingerprint unchanged."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-tests-attempt1"
+      ],
+      "command": "bun run test -- --maxWorkers=2 (initial clean environment)",
+      "fixture": "same source, before phase Docker discovery adapter",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-service-test.txt",
+          "sha256": "147f8e67d156a31ee208ab6f30c7e58fbd0a3c1c4672812ab20ad5fb15d8f171"
+        }
+      ],
+      "note": "Initial private storage fixture failures retained; identical full test step passes after environment correction."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-private-image"
+      ],
+      "command": "python3 scripts/doop-test.py image --managed --output <owned>/doop-image-2",
+      "fixture": "pinned managed source, owned Docker engine, unchanged300s command bound",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-image-2.txt",
+          "sha256": "cb329d6260cd6abb8386e968ac8184dd9aa06a0d4e9cdd23ddb8ed6660b43b9b"
+        },
+        {
+          "path": "logs/B1-R3-doop-image-metadata.json",
+          "sha256": "7f938aaaa2e8e36d706eea77c68db68aa74a7502e625fe7d48b64e87fd53dba2"
+        },
+        {
+          "path": "logs/B1-R3-doop-image-result-2.json",
+          "sha256": "b269e0bd91e0bf909bf0f75ba139e1cffb6d2611e5c36304134b187f8ac53d3b"
+        }
+      ],
+      "note": "Actual node-user image and archive/source identity validated."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-private-image-attempt1"
+      ],
+      "command": "python3 scripts/doop-test.py image --managed --output <owned>/doop-image",
+      "fixture": "cold owned Docker dependency cache; same source and bound",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-image-build-attempt1.txt",
+          "sha256": "5fca2d078ccf072c8a74fca2ff55a6fcad7f8cfc6fc8fef0292f50ac503bc159"
+        },
+        {
+          "path": "logs/B1-R3-doop-image-result.json",
+          "sha256": "545b6fba0e828df20ad89460c33e9f79a4f63495c8961488b9048219d5413b04"
+        },
+        {
+          "path": "logs/B1-R3-doop-image.txt",
+          "sha256": "f1ebbbd883ef3f863d06ad39f2ff354326c888de47305f46b6884cf9fccb2c8c"
+        }
+      ],
+      "note": "Cold dependency installation exceeded existing300s bound; unchanged retry passed after warming cache."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration"
+      ],
+      "command": "python3 scripts/doop-test.py acceptance --directory <owned>/doop --image <owned>/doop-image-2/image.json --output <owned>/doop-acceptance-4 --openbot-test-binary <immutable-current-helper> --openbot-test-database <owned-native-PG> --ui-chrome <system-Chrome>",
+      "fixture": "real private image/local verified TLS; pinned managed source; identical required four profiles; owned native Openbot PG18.6",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-acceptance-4.txt",
+          "sha256": "67da7e28ed37a0050458ccdb60b6013f9b5bdfbe580cf27bda8741769144f9ee"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-acceptance.json",
+          "sha256": "7fccd137e51a376a932364ff8d90328e8cf5c18e779bbbdbe4c17e25dce27881"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-database-restore.json",
+          "sha256": "aa8b752d59cb0f7c2164db0e52f4e8dd0827e2a61ec631a7d9ba66cd59669171"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-get-canvas.json",
+          "sha256": "b3ffa0d924f94b6626b18357afa79d6d73ad2c74cce3f93a5f3baee1e02bd9bf"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-get-frame.json",
+          "sha256": "b0726578e0c4da1738d5763791a6e55546741b3140df66234f733691e2d1ba89"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-lifecycle-record.json",
+          "sha256": "39bdc6fd7c6542e1ce7df966287cc0852e2cce62b82a3c522825d3e16be06e7b"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-list-canvases.json",
+          "sha256": "ed2af69dda82d6cc7d4280b73123af56df2a3238fa217f2b29626ace5ad64091"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-pdf.json",
+          "sha256": "1ead69e842ba65e80ea5a5bc492b3c03c67cfe2912cdd0c9747fc8db45b3c695"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-backend-policy.json",
+          "sha256": "35e0b06bd3a379b53fe0530e48207fda99145f85220a8d676d36251e378b1bd9"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-browser-export.pdf",
+          "sha256": "e9aee95eea66c5f704ae0947683cc143e3b6da4507ef4a8c8190c7f944a98026"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-browser.png",
+          "sha256": "add22131f9e330111388e0ddf63ce3b0d1364dffb95b4c878b72c09072b87458"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-export-calls.json",
+          "sha256": "5e1f04a0cb5bb321c741bcdd088e5a95fe4e6c6154c88c3611d5965cf7daf6e9"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-jpg.json",
+          "sha256": "21252bdcc3e34b5ec75ac0ee334aa285f82fe74c72df1fb76fdb05e8ad0a1e62"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-pdf-small.json",
+          "sha256": "da941590e25bafeaea43a595d6d8816ce098f06bd680ac114a4560cf7b9b5107"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-pdf.json",
+          "sha256": "d91e932acb0696f30cccbd871b6b41798f5ba5d32b48d43a32daf3578593d829"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-png.json",
+          "sha256": "ca6985cbea117916046556d108438d09fcd3207cf1b7cf356c471aa065704c48"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-screenshot.json",
+          "sha256": "b0ee575e1f62afae0127d6b932899a37e3ddf3f21e71c7146c20b8607670c9ba"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-private-visual.pdf",
+          "sha256": "855439b70803c998ff4c848f6eb6d69ec824bd104de7a27fb71145f5f09330fd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-report.json",
+          "sha256": "e76bedee06ebd251dfb07ea0483bf8b8c41821f01b25fdd17dc3ebd863421532"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-screenshot.json",
+          "sha256": "3855d77e5e5edaa0c88cdb0ce9d0df66f7500dfe8eb354ec66840c05cb303e39"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-setup-record.json",
+          "sha256": "fcb0e77d8018d081d9b75edced168c31e206465290d1966e711d6b3bce695b6d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-bucket-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-database-restore.json",
+          "sha256": "1a8c4653d9ced6787d3e93f28c01ce1bd19d31ddc7a1bc09ff5298d899375062"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-get-canvas.json",
+          "sha256": "e95f8f05f8fc8dd674401ab9c7e2a53af712804fae372dbede234680f0a8f6e4"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-get-frame.json",
+          "sha256": "c112fca4391efa534802dbcddb44f33d5615f1345bbb2caf2c1f286a3587e181"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-lifecycle-record.json",
+          "sha256": "da949d5d63f9830c5e608d8e4d2d02f9226f25bc6c84224e034a9e3b20fa6ed5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-list-canvases.json",
+          "sha256": "498cba3f689736b810f3cd2d47b3480f63c513ef27e639b4957d1750959a6972"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-pdf.json",
+          "sha256": "62b281735d487405c7c8404070060b4531a505269d086016cd80b4444d02db75"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-backend-policy.json",
+          "sha256": "b2fceed4d57d125d19f542862dd51cb5a48de5846b6dbbaa2ee913e1bc739bfc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-browser-export.pdf",
+          "sha256": "c60073bded3e522bc95e681dc15b578b1f3e63e000f874041bebb7b695f5b606"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-browser.png",
+          "sha256": "362ef72431183b58d6de02e1ca00e2dc56247c1be4bed3336345699374e5e6de"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-export-calls.json",
+          "sha256": "365a40af969309d9a96c136063f62b134f83de092c24f81442e84f099b106916"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-jpg.json",
+          "sha256": "830a9295230c58c891d4e838df020856521b13754e05c1668d1e6b7706f3f8ba"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-pdf-small.json",
+          "sha256": "71060f67f1c095fa82aff0a66572c47222daacc5de4e77a183b7b1c49ea497fa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-pdf.json",
+          "sha256": "7bf4fee5f53535d4ad598aeb0071e40d78887fb08b11dfd3dd6b94ac2e0e368f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-png.json",
+          "sha256": "36d426a54aebda0c4d5d96d8ecc929ddb9f8343b14e73c5f3c53baabe05feac6"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-screenshot.json",
+          "sha256": "e4a32768be94bc682e89d802f957a21b4b85aae60460c468cfa64e21a53956ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-private-visual.pdf",
+          "sha256": "e0854804f998acae908b9048defe13fd3bb9754e73c7acb6b439041caf3d8a17"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-report.json",
+          "sha256": "8f9a20691ea6cefe99c04f9d8bd3ab141f9ea95504333f38ee814368185743d8"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-screenshot.json",
+          "sha256": "9edf4870f95d964e688ab27d23d28b90e1b1d6158ef07e63f280c55bda0d4cdb"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-setup-record.json",
+          "sha256": "b91b371fc03b030d7202c79bb9461201c494914d8d31ed71924991f622f27af7"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-all-disk-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-1.pdf",
+          "sha256": "4f6da6f72dbe99e107d9c7cfb4621cf0dd865799b170ec1e2ebbcf28647fc7f9"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-2.pdf",
+          "sha256": "678c0e63802ed94c91b44a85f875af62db5345d67eb640f9764c62dbe7a65f2c"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-1-0.png",
+          "sha256": "35c56d73b6e4b4964575ebbedaef618ab67a9e5b48aaee8f34dfa01dada79a02"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-1-1.png",
+          "sha256": "ff4c61c900796afb9d308f5c8268b2078eedfb96ff02bd0f21260c51e76a327b"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-2-0.png",
+          "sha256": "8a3b6a6d4633bd7b010660035c23f82e32e1e49489ddc6dce5eb940dadb23e5b"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-human-image-2-1.png",
+          "sha256": "d2ea0b946fe383efe5f9b2f227ffbcb12bc86d8e7454a739d7e95d23f9dc70f2"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-media-scope.json",
+          "sha256": "2d4dc308496cb9e559ecb0bc851c3c42662c596000748d05e7b76af7b18ed2bd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-persisted-edits.json",
+          "sha256": "b48f260916ac0af85514967f9c2d09dcd5167839272b58198b3d019f1ef0fa55"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-e2e-record.json",
+          "sha256": "fb681ade5aa525e1abfff57c782cca8905b8cd80023b307431cb82d78812f124"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-bucket-report.json",
+          "sha256": "4ef99f72bb6ecb2e11af918e19c4bb184dc6da1d9cf7a83178431580f7f0966f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-1.pdf",
+          "sha256": "31bc6929f0b52ec154fe58dd8c0208e1fbfbfedd7db51f165a7a7d4db2d6511c"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-2.pdf",
+          "sha256": "54a65eeede06fd6b7cfb4f99acc37ba7537220d7e9de282d4fc33540f535e230"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-1-0.png",
+          "sha256": "c9615a53e0f61880e2f4e8361945a02c947f2c69a65c6ee58fabd4edd092193b"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-1-1.png",
+          "sha256": "aae294fbee9985afb7300b28781d4216572201b5a2a9e5785708f96fe7d26cc7"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-2-0.png",
+          "sha256": "ee610b698ff0e69c6f7a4f5175af1cbfd3d20fa5d3b266af27be3c661cdec843"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-human-image-2-1.png",
+          "sha256": "47f0dc143f1ad110726d0c7e96a2ff0152f9755bd4ce27b7d16834187e094b1b"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-media-scope.json",
+          "sha256": "3e1a61e2bf8527c6639ccc69105e85977c81eb06e41f9acf5479f25769cc5b3f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-persisted-edits.json",
+          "sha256": "bdc3f60640d3199267056f44c622382ae9ea50846a8a8bf61a0bf77ab80d5987"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-e2e-record.json",
+          "sha256": "1cc6419c26796b2eb9c9d6ed9d9b0b0966f794a70ac8fd5564fa937d1d8ef092"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt4-e2e-disk-report.json",
+          "sha256": "adfb1aea10e3d9bf46c603c26783d95f2dbf3cf2a43a48fe492eae9aced9c161"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-result-4.json",
+          "sha256": "4a6ee08bf7fcda50f2c392213a14a177e578ccef4ff796e75d4ca762fa2232b8"
+        },
+        {
+          "path": "logs/B1-R3-helper-build-stderr-2.txt",
+          "sha256": "2e4527650a9a4305a64e747a1b2f5a2f8bf843c8310ad9e720d26fab81ca9ef7"
+        },
+        {
+          "path": "logs/B1-R3-helper-discovery-2.txt",
+          "sha256": "6a1458a4c72b5705d3c1865247693200e2af5082773200d3c965f94e6055d5b2"
+        },
+        {
+          "path": "logs/B1-R3-helper-identity-2.json",
+          "sha256": "6fcef555ce1d0267740fee9745fa46ef7809602cb47a6554751819e3477b1e6d"
+        },
+        {
+          "path": "logs/B1-R3-native-pg-resource.json",
+          "sha256": "2749f0ee30cee618548849d0f75ddaefe9c2ad9e9108edde3913b419ff5765d0"
+        }
+      ],
+      "note": "All four required profiles exercise the exact current immutable helper; report hashes and confirmed runtime cleanup retained."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration-attempt1"
+      ],
+      "command": "same official four-profile acceptance (earlier attempt)",
+      "fixture": "owned VM Openbot DB for attempt1; owned native Openbot DB for attempt2; old preserved helper",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-acceptance.json",
+          "sha256": "8a9cbc890cb0a6a1028e8d3a722fa07820b32b30ce07d7a0b19b257eac6116e6"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-lifecycle-record-helper-failure.txt",
+          "sha256": "5bdad484923101755ae0f203e66212309698f87dc2590e8e86f36a11744e9498"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-report.json",
+          "sha256": "68b90ce8cadf97265a43e8af9948cb106aec2be067ecfbc1e27ab412cac24e20"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt1-all-disk-setup-record.json",
+          "sha256": "4e7f3fcf792d0aaf696abd50e037040d5b94b6d45a2b3b0dba01b69709551859"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-result.json",
+          "sha256": "0a1c1af45e1eeaa9cc2c394c17776366a661836bf3fde0f9b5d774b82b14b191"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance.txt",
+          "sha256": "13aea6edf231eb38c3af63ef2bdd8b5e6714c9d61cb5298de520f5d6e72560e1"
+        }
+      ],
+      "note": "Attempt1 lifecycle hit80s on VM DB; attempt2 model teardown exceeded60s; attempt3 passed three profiles and hit80s in S3 E2E. See TASK fixture correction and capacity retry; every failed attempt retained."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration-attempt2"
+      ],
+      "command": "same official four-profile acceptance (earlier attempt)",
+      "fixture": "owned VM Openbot DB for attempt1; owned native Openbot DB for attempt2; old preserved helper",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-acceptance-2.txt",
+          "sha256": "fef476a6680e06e0f64b9c39a2d5598a1fe3c06cce5a8bd2afc0351643fff732"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-acceptance.json",
+          "sha256": "902a715154ab0e82d4a78c371c87f839e5989415cc845cf895ca1aa6a8be4c00"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-database-restore.json",
+          "sha256": "c3c209e5a4889476f01ee229ec72bd85d8a8ce617454d140ac2e81a30a5ffce8"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-get-canvas.json",
+          "sha256": "d99c1d4d29ca6b76515b067e78beda3b79acc7d3cf538ead521541a8f461293f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-get-frame.json",
+          "sha256": "9c590da06ce0ac2fdf05ec2aae93c94a7b5a7b8ba5cb15b7b83b2d5ffb7c8d35"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-lifecycle-record.json",
+          "sha256": "ecc79e3a4d6e146951570db43a03ceb9e2f8ee75e958ce944db0ac5c899be146"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-list-canvases.json",
+          "sha256": "56ffc85a3143457124409adbec3697db64125ee199397c8537dc70e4e7e84d55"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-pdf.json",
+          "sha256": "c11bd1220df9f40c24e8a0d44771f36852dfd9d2d95eac5f418d4c0ae3d178f0"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-backend-policy.json",
+          "sha256": "2e1ca722d0e1d98d8a7399d57f9ad5c3d28e66f5c3d3a7797cb7f484110e32cc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-browser-export.pdf",
+          "sha256": "02eb3a0be182ad51c29bf1f8f04b67fad44ffe18701393eed0d9927abb110a8f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-browser.png",
+          "sha256": "69fd1bbae5e790bac03e0e415be6c4919d8eb9737518ec992c9ee3d21999ff52"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-export-calls.json",
+          "sha256": "b0583cc72056caff3562c3184ad0cfac677eef40ce3a22c42159ff890f894776"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-jpg.json",
+          "sha256": "7b77da48504ba690ae1640afae4fea50e7c7676f2874fdd7e8f4f342ead48d08"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-pdf-small.json",
+          "sha256": "1d6efc3bee46c581db1dfd3be40bbe9383f3580100f401a0843eb89c33400c56"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-pdf.json",
+          "sha256": "4ab45efa888698edfbe612f9eff8dfe31eba1dd06b136b58970343b7c3a9ed68"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-png.json",
+          "sha256": "73567a51453baa050c9f0dcf09baee464c533fd7cf00017004bbb9fa025af01f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-screenshot.json",
+          "sha256": "d32a44bb0d97168790feff9aabf5c507c2e8879346ba66d45b259b30a47fb91a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-private-visual.pdf",
+          "sha256": "9ef63ba53e639a31a47fa3e013fb5a5122d02c68d94f1d7746593f185e9c1a36"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-report.json",
+          "sha256": "8f5d3dabf5e5eca54e921fda48c994edc744c54768c2883089103b3221bc3b1a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-screenshot.json",
+          "sha256": "6a6e2b29a3ce632d2dd22a6566b41a7c42be5030d6e50ffdf8e2cc812417a392"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-setup-record.json",
+          "sha256": "ba0be8fd496b08d8f717d63a442515791def766ca644ac53af8726941888e117"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-bucket-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-database-restore.json",
+          "sha256": "8eb422fee8509bb0e588bdd7d8806e085e92242b3774cbf55f50b302a7149692"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-get-canvas.json",
+          "sha256": "09f44d1f3c5d6d0a70ac1b12b9e501abd65c06838ddd3edfaf73c9461d7f2a94"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-get-frame.json",
+          "sha256": "22035f2b393a65e3c75d9ee663182cf26b85977cc01719ffa53d35f37eeade9a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-lifecycle-record.json",
+          "sha256": "69c5680072ef06b0722f4a3b64a7f1c31399b2516301c5677c6fc6380f855c60"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-list-canvases.json",
+          "sha256": "1205a4509deb48dc9dbf8775496f337e5eb245f22d958d9a4992d38b1b8f84b4"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-pdf.json",
+          "sha256": "6db7cb6fa16f70a6d0655c1536d9769aef39792e8fd714c0c3a5d58896700dea"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-backend-policy.json",
+          "sha256": "00d45db38a196e2d86ef68adbf1d752e1de4462c8ae0762d5ff57f0fa543e213"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-browser-export.pdf",
+          "sha256": "3e8b51b1d475881ef0986b4c470991238846c84bb612b46e52240777a943cd88"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-browser.png",
+          "sha256": "3cc59c6b0e15769ec0d6936e99d715be85f7296dfcbf02ab7d90433b3583fbe6"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-export-calls.json",
+          "sha256": "a794736506499ed85db6aaa5949276cfff91e600383cbad61dd3cdceb6feebae"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-jpg.json",
+          "sha256": "ac5be889375df1e7a2257ddf98472124cd26ff24e8e8dcaa0ebe2483aab6156e"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-pdf-small.json",
+          "sha256": "1f868742549d257a5d4c71e5f48486ae619944da1ddb081fcff223c0701c609e"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-pdf.json",
+          "sha256": "3c738efe38e6b2201929fb51b2b8c6b7145b9ad2e109232e1e3caf5dffc96b90"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-png.json",
+          "sha256": "4a2ecb52a0f67e53bde139b6a6f5a16974b06ec173ecedee581e5f1f0e853fe7"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-screenshot.json",
+          "sha256": "49288ca311251a296aa87ba9868af84c7815493e30d8ba1ef25f2012b0de060d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-private-visual.pdf",
+          "sha256": "683eef577bd5777c5bb4ed0de5be5c11c140c6f9a09c0f01d56391fd2dd663b4"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-report.json",
+          "sha256": "e3d684b95d33c057e9da3e690637536d5d57a202f5c071bbad735a0894cd5d57"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-screenshot.json",
+          "sha256": "a77122a9cb1cc953a3a98d3803743d58578f94e8f70d6dd33dcc788d9690b106"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-setup-record.json",
+          "sha256": "16deb7b423cde1d14897db7bcc5d66ac57ba382b9d070267c401c1dfba7abfcc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-all-disk-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-e2e-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-e2e-disk-e2e-record-helper-failure.txt",
+          "sha256": "265202f10d396c0072c3d366b41f35f1d5a1a0e92042e1495b817197d8e5c525"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-e2e-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-e2e-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt2-e2e-disk-report.json",
+          "sha256": "141ede42020f704d076a2e4002cf1fe0d05217c0e4c4eb54f9efcc6e7a21a5be"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-result-2.json",
+          "sha256": "bc8826c4d1b35e20da8b290bb46321fba5771ce5ffa6c3810e1940941d456331"
+        }
+      ],
+      "note": "Attempt1 lifecycle hit80s on VM DB; attempt2 model teardown exceeded60s; attempt3 passed three profiles and hit80s in S3 E2E. See TASK fixture correction and capacity retry; every failed attempt retained."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration-attempt3"
+      ],
+      "command": "same official four-profile acceptance (earlier attempt)",
+      "fixture": "owned VM Openbot DB for attempt1; owned native Openbot DB for attempt2; old preserved helper",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R3-doop-acceptance-3.txt",
+          "sha256": "4cdd9da659998b60daf3ad54ee033d3597031cefff2428977a699b63e6a1a67f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-acceptance.json",
+          "sha256": "a3c410363550a44b85d5c942d25bbdc3de10fa482a48b0e69852f6f4cd4feab4"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-database-restore.json",
+          "sha256": "4e148e79d062643356c1c9d4a60c5f1765b9acddb0ac52c15ba1281995eadba1"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-get-canvas.json",
+          "sha256": "bdccb26978b02f667b6494a36a6fcf8deadfce741588d0676d442f7c67644772"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-get-frame.json",
+          "sha256": "679c9cd71144652a5aaf1e0e2e75dd4041f7bd186c4096b0151e9f01a812af36"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-lifecycle-record.json",
+          "sha256": "3a1ec3ebdfd3afb58a3d2844d6a9b0a3e54e6c0313c1e9db4be0932a525d868e"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-list-canvases.json",
+          "sha256": "8fb75f31e41b7d35afdd1a3a0502a1bb95dcb445b44e1a4373178f59597b7774"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-pdf.json",
+          "sha256": "7b71b57db349b01346c71d960b88ef5922f309710a84d15ab008e121ecbab6d7"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-backend-policy.json",
+          "sha256": "d2e5d07f025b8394c06033ee44f789efdaa0dc0d1f0a69d94f3abe12de454785"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-browser-export.pdf",
+          "sha256": "fde4e31778d2fbab83b7b1c9db8c13308034de50b7f040aa0662e70432406c45"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-browser.png",
+          "sha256": "e5f73363657aa56fca30adfd49b802b89b962aad7e4b6e395e18c42df3a84b7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-export-calls.json",
+          "sha256": "b2fae7d02081a11dda17c6de55e61f44aa7072ad74df3018f0dee38a628fe52a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-jpg.json",
+          "sha256": "4c16fdc06f31d77f3bcd6baf84b05d63c95f3c70e97e2e239fba5d0aee458817"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-pdf-small.json",
+          "sha256": "c926752a040f4a1f95b54dc387738da6f944caf019f4fc1d4558b9833a358f38"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-pdf.json",
+          "sha256": "082243f9da5e50d1bbefee6881b00a51e4b4444132357a76dd5c59f0de6a95be"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-png.json",
+          "sha256": "e5f636b841789d5838dc80c5977fe11898f08ce308bc7e6a23c78db6624ebfd2"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-screenshot.json",
+          "sha256": "1bee64bd1c8a6186e4ebe54d6c42d4fadc6a3f854b4a694fe2ec921ca620a6ce"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-private-visual.pdf",
+          "sha256": "82c4e6a6ecd0ac8af9ed390a373f7899e7cb0ed4615c1046b00f468c9e7328e4"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-report.json",
+          "sha256": "e76bedee06ebd251dfb07ea0483bf8b8c41821f01b25fdd17dc3ebd863421532"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-screenshot.json",
+          "sha256": "46d6352eb2ba29031b151395e5426e32162d0c511b5318c97a19f05fa93c2465"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-setup-record.json",
+          "sha256": "8b8246669c45177af5a390dac7bf4d477161d9c3f7c76bc91f0e97617b2e46cd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-bucket-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-database-restore.json",
+          "sha256": "18c2c233f3da6399057abf5e4607367cc2f66ba2f81a1a761d3e756974dbe533"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-get-canvas.json",
+          "sha256": "836c8d5978496f856308f9f24d417b7c7600c8ca2eb51a5982d4aa4bc756c1ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-get-frame.json",
+          "sha256": "48175b49dd2726a5434b6a17aa0c5f6bfa9081547b52b5b1749993135405583f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-lifecycle-record.json",
+          "sha256": "ea695445cd31808d243038547f2eb12fa255bb1364c96c901aec25160e9ebf17"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-list-canvases.json",
+          "sha256": "78317ed6eb9b98a15e8129756fd76e4b82d21ebb4c5113386565701b499cfebc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-pdf.json",
+          "sha256": "cbae005c3cae695f1cdea2590a2b399e09fbf133d4daec1a05e500a0465cca95"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-backend-policy.json",
+          "sha256": "b82250450314138eb37903df15818d21739ea71eb6ec2d9368478211565d1f68"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-browser-export.pdf",
+          "sha256": "87a5d1f55ab910e26f265554c5672e7cd10965b10dc253fc69214d25ac9cb024"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-browser.png",
+          "sha256": "4f21e7a3fc3df9fb45dd1029120e8c315ad18d50dd42706bd2424e6b0cb34f6a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-export-calls.json",
+          "sha256": "cfea152ac236f341a4f574f3b474acd25ee47d0a338a66263a5ad93cb9d8b20d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-jpg.json",
+          "sha256": "5b36a8c811332843838b83eeab4754281055ac79bf631c98bd3944c1b1516c3d"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-pdf-small.json",
+          "sha256": "53606d286f122379ff4404e613c7241576132f6c9ba030a55197cff2969b8fc0"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-pdf.json",
+          "sha256": "9852831ff0ea8e2af85570b7a161176200242193f23e8160c4b7a8465a784b56"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-png.json",
+          "sha256": "a693f3c5961b194744d1ca5719519c05bc2a1c737bdcc84a8919f521c510b7a5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-screenshot.json",
+          "sha256": "3e2f75515ba3b5f26dfca885a703dafb275e3535cdbe11ced27ced72c979246c"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-private-visual.pdf",
+          "sha256": "eb353e4a044511fbbbd706260ba97d323ebaec64b667c1a13999d58ec1f25893"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-report.json",
+          "sha256": "8f9a20691ea6cefe99c04f9d8bd3ab141f9ea95504333f38ee814368185743d8"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-screenshot.json",
+          "sha256": "1af9c6fd8418ba2aa7eb58ad3e028f91529438cde277725a1a01f00c4afacede"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-setup-record.json",
+          "sha256": "46cb7baac17acdc0fa5c67dba180fdc5f1ac270557432e304cda65a850454231"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-all-disk-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-bucket-e2e-record-helper-failure.txt",
+          "sha256": "1131e863cb2f235bb990d848038d9d17bf8f867170dad84c048e669eb0a147ff"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-bucket-report.json",
+          "sha256": "5fc0cb502d85cad3cf4db4d5ebbd1d844648645bc4e6a280c87bf7073ed54bc7"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-1.pdf",
+          "sha256": "5102cf4e580d7b475990ce10ee91f74b06c54451afdda70cc010df03a95db589"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-2.pdf",
+          "sha256": "adffc0f616cd997a5f3f1f32813f6c75b3c8c29ce5fb845f6ca8b9395cd28c17"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-1-0.png",
+          "sha256": "66ac2adcf191ea9e8e799b9d4ba5d65cc1cb3d79bd7b8a3ae47abfbf6dbb6c5c"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-1-1.png",
+          "sha256": "880d25e9011a7f61e8725c1b9b972bf9423cd582a504703e1bff0ecc735a9f65"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-2-0.png",
+          "sha256": "5fcdea3cdf8f8612a135bd27476a7cd08eea4d1e7fa69ed06718eac426c0146f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-human-image-2-1.png",
+          "sha256": "78932debee88cb90e4f800534e65677e4c36978bd7cd2bb8458247e2ec9d0a01"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-media-scope.json",
+          "sha256": "d4de24db2756c9b30c1560f97124d3d34b1bb6640a45b1c7272df8f9f0d1f240"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-persisted-edits.json",
+          "sha256": "e126b9d143642148df7ed2b75f73c8fd387dc1c027263fa4799838065bfbae16"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-e2e-record.json",
+          "sha256": "2f286df7cfb27f98a3102b0b75fe0b4637fe53a1c5f845652efceca0c9c6643f"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-attempt3-e2e-disk-report.json",
+          "sha256": "adfb1aea10e3d9bf46c603c26783d95f2dbf3cf2a43a48fe492eae9aced9c161"
+        },
+        {
+          "path": "logs/B1-R3-doop-acceptance-result-3.json",
+          "sha256": "865c07ff4c4482e1cca30e1cff6625d5beea03c20b943d2375a56274914ff34e"
+        }
+      ],
+      "note": "Attempt1 lifecycle hit80s on VM DB; attempt2 model teardown exceeded60s; attempt3 passed three profiles and hit80s in S3 E2E. See TASK fixture correction and capacity retry; every failed attempt retained."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-capacity-focused"
+      ],
+      "command": "python3 scripts/doop-test.py run --managed --suite e2e --private-deployment bucket (same helper/image/assertions)",
+      "fixture": "owned Docker engine reallocated4 to8 CPUs; RAM8GiB;80s helper/60s model/probe bounds unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-capacity-retry.txt",
+          "sha256": "0415b8ae2efe027b8201d44dcc869eb31e090f7ef4dd060a6e1f0365d6fd9ba4"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-e2e-2.txt",
+          "sha256": "85045dd900c309b206078755c0856602162cc3a57adde54e38f63741ce7d9437"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-e2e-result-2.json",
+          "sha256": "ebf18a091699ea63d64d211c83c01ddd1be138e8794ce3737210050b0068a398"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-1.pdf",
+          "sha256": "8581cb7b534dac203ccb2ad268b89d99941b65031b0ca52fcfe99ff863b51f18"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-2.pdf",
+          "sha256": "3bfbfb1f631ce4d9f0ca2b62ce0e9368e6fad03c07ff6ee03a606d040ff8b2b5"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-1-0.png",
+          "sha256": "99f4805c40da252a8107b545000e49266ad9236b155d7585ceae2372efd32052"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-1-1.png",
+          "sha256": "63cdf70a8002f662c7cb9f34d6a586cccd573f58335e83d1395b242c097c9500"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-2-0.png",
+          "sha256": "cbf4860f41d6379ab880a308ad725812f79c0bded95fc2eb12d362ee8fea3d93"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-human-image-2-1.png",
+          "sha256": "cbf4860f41d6379ab880a308ad725812f79c0bded95fc2eb12d362ee8fea3d93"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-media-scope.json",
+          "sha256": "1bb8a694c9156af81fd1743bc477a9f37c6e2132eaf9bb7d3c91792b6b4b1873"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-persisted-edits.json",
+          "sha256": "82d62ad11d9b218e391b006587c2ca7ed9b1b4212ec0d047f57259cf723e4277"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-e2e-record.json",
+          "sha256": "07e6975412b7617399b4380561f1c77ebc67a618c3169940b7875e951b5b676c"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R3-doop-capacity-public-report.json",
+          "sha256": "4ef99f72bb6ecb2e11af918e19c4bb184dc6da1d9cf7a83178431580f7f0966f"
+        }
+      ],
+      "note": "Focused real S3 end-to-end check before official full acceptance. Increased local CPU allocation; no acceptance threshold changed."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-memory-integration"
+      ],
+      "command": "scripts/memory-integration.sh",
+      "fixture": "owned pinned pgvector PG18 container; actual pinned native ORT/model; service/fake ports18095/18096",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-memory-cleanup-and-model.txt",
+          "sha256": "59b2cf677ddb71a4acded2e2fe7ebc2fba8d02a719c6674fce16c8ed34fd9c04"
+        },
+        {
+          "path": "logs/B1-R3-memory-integration.txt",
+          "sha256": "f08b77161f75846f7b0d0d90a5ea57a7c52cc321565208161ad6db6cc2c8fe4d"
+        },
+        {
+          "path": "logs/B1-R3-memory-result.json",
+          "sha256": "5a387a1c63d752f56059b70c8e6d852af1c1c308097c8b62be1eb1a06757ee35"
+        }
+      ],
+      "note": "Six required ignored tests execute, role-isolation assertions pass and fake Messages API observed; per-test resources cleaned."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "R3-fixture-correction"
+      ],
+      "command": "cargo fmt/check/clippy and focused doop_e2e_ tests (locked/offline)",
+      "fixture": "current worktree; cfg(test)-only helper teardown-order correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-focused-checks-0.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-R3-focused-checks-1.txt",
+          "sha256": "f2f627d84b9558890be4027466c0310217cb0a5b47ec5d4f5c18a353aa8d0137"
+        },
+        {
+          "path": "logs/B1-R3-focused-checks-2.txt",
+          "sha256": "ba3bb01abf1c7521de1948b76e1ba3fa902bb29d5ee2b6364724da114ebd07bc"
+        },
+        {
+          "path": "logs/B1-R3-focused-checks-3.txt",
+          "sha256": "610d53669291347bd2eb1bead2beef30d68f2c8b62cd7ec76cdabc0c9afefce7"
+        },
+        {
+          "path": "logs/B1-R3-focused-checks.json",
+          "sha256": "bb1b6f67cfa0d36fff1af087c5a1eccd45b2efe34c49685401bc2f716b1ad577"
+        },
+        {
+          "path": "logs/B1-R3-helper-discovery-2.txt",
+          "sha256": "6a1458a4c72b5705d3c1865247693200e2af5082773200d3c965f94e6055d5b2"
+        }
+      ],
+      "note": "No test name/assertion/limit removed or weakened; completed model fixtures are checked/closed before independent lost-receipt work."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "05A.3",
+        "retention-and-cleanup"
+      ],
+      "command": "git diff --check; evidence validators; owned resource cleanup; graft build",
+      "fixture": "p05 worktree and owned resources only; no shared server/global Docker changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-cleanup.txt",
+          "sha256": "e13b2dc011494f1584493ac235cb97e65aa028e1f777f483cb6fbdd1c4a803de"
+        },
+        {
+          "path": "logs/B1-R3-final-whitespace.txt",
+          "sha256": "bd29590d22034d063a7a616043a7cfa7b84244e79728628c4138bbb75bfadd05"
+        },
+        {
+          "path": "logs/B1-R3-graft-build.txt",
+          "sha256": "e897e4b1ea764ac125778ec002a5e02362205a6d7a0262ce2588b0bc67ce676a"
+        },
+        {
+          "path": "logs/B1-R3-helper-identity.json",
+          "sha256": "e31a7e497a60d07749ddafd1373b053f946ca0a56403b2fc19e15414320fdbd1"
+        },
+        {
+          "path": "logs/B1-R3-resource-root.txt",
+          "sha256": "b459a155e44a17a63ca66c85ecc9741caa8b781881c4fc6cc8aba5e4cf539018"
+        }
+      ],
+      "note": "Required historical evidence retained; cleanup scope documented. Full/stock unrelated failures remain explicit in reused R2 evidence."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-clipboard",
+        "01DEP-P05-B1-F3"
+      ],
+      "command": "bun run test -- --project clipboard tests/canvasClipboardBrowser.test.ts --maxWorkers=1 (isolated Linux fixture)",
+      "fixture": "pinned managed source351a2180; existing synthetic materializer provider; Linux/arm64, node user, sandboxed Chromium,2CPU/2GiB,networknone",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-clipboard-Dockerfile-2.txt",
+          "sha256": "c9f399375f5e10d71377e761af1e7ded931fb177ecd08a39e341e105cb1bb7bd"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-build-3.txt",
+          "sha256": "311a8f51d8b7e911df5ca6a17e5bc419c8883b59cfdfc1866bc5c9e386638a33"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-image-3.json",
+          "sha256": "7eacdab6faec60b750dfb5cd66483c5fbbf0b2207ee5d2513843717c6a7c5e4f"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-result-3.json",
+          "sha256": "3344cc057aa86998216cf44a073d0211ddab5c2c4eee5e00d65d7d882707d66c"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-tests-3.txt",
+          "sha256": "238ceb4e32a73d014543ce6fbbca35bcf5cc0f3989b3cf98444ff3b07523927b"
+        }
+      ],
+      "note": "All17 original clipboard assertions execute and pass, zero skips; test bodies/timeouts unchanged. Synthetic fixture proves interaction only, not server authorization/admission. Supplements unchanged2711-pass macOS service coverage."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-clipboard-attempt1"
+      ],
+      "command": "same focused Linux clipboard case file, earlier fixture attempt",
+      "fixture": "same pinned original source; first relocated fixture, second original/app with missing provider",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R4-clipboard-image.json",
+          "sha256": "861312081225be7815c63319f7a158f729829fbb5401e17131458a35cc7d3a64"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-result.json",
+          "sha256": "f78bd0d1918f1aed0641dcf5af107742f662647d1059e7a46ade3c5e29afca1f"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-tests.txt",
+          "sha256": "20e6b69f8ff8faabe238cac6788a7f154badf98dea880d67f14d3199d2eebba2"
+        }
+      ],
+      "note": "All17 failed in harness/frame readiness before clipboard assertions. Failures retained; current test fixture supplies established materializer context, preserving every assertion."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-service-clipboard-attempt2"
+      ],
+      "command": "same focused Linux clipboard case file, earlier fixture attempt",
+      "fixture": "same pinned original source; first relocated fixture, second original/app with missing provider",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R4-clipboard-image-2.json",
+          "sha256": "a4addd2f5b24b1f430f2ca70396601c6a5dc0b2427b11479dab73b3b3d731b79"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-result-2.json",
+          "sha256": "f448564e1f37e8f01239256250917f08ea3bd5cdcf8271bd4474f021fe1d0fc9"
+        },
+        {
+          "path": "logs/B1-R4-clipboard-tests-2.txt",
+          "sha256": "2d0616eea1c689b2e11149312235baca1484006a1c11692abfabee4cd5c90b89"
+        }
+      ],
+      "note": "All17 failed in harness/frame readiness before clipboard assertions. Failures retained; current test fixture supplies established materializer context, preserving every assertion."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-package"
+      ],
+      "command": "python3 scripts/doop-test.py package --directory <verified> --source <corrected-source> --source-fingerprint <351a2180...>",
+      "fixture": "separate pristine clone plus canonical patch; original reviewed source preserved",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-setup.txt",
+          "sha256": "c7a8e656240fade9cd8b0b17c8326d6308bd649215190d4cec75778fe0684a6e"
+        },
+        {
+          "path": "logs/B1-R4-package-2.txt",
+          "sha256": "9ec5a788c071bb042559cbb9e292e0ab5febc9385403676ad4557abe6871b13a"
+        },
+        {
+          "path": "logs/B1-R4-source-delta.diff",
+          "sha256": "f7cb01560410c219997578412c0855226e38be0140ea79ddbc30580a231f8e1c"
+        },
+        {
+          "path": "logs/B1-R4-source-identity.json",
+          "sha256": "1a3ddb8937c3dbd2421d0f2523a3bee28a5e15124a62addcb8aa5dcb4542d144"
+        }
+      ],
+      "note": "Only canvasClipboard.html differs in source bytes. Canonical managed.patch/source.json regenerated with official producer. Pinned runtime source and dependency lock unchanged."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-private-image"
+      ],
+      "command": "python3 scripts/doop-test.py image --managed --directory <new-verified-setup> --output <new-image>",
+      "fixture": "new canonical source351a2180, same Docker engine/pinned dependencies and existing build bound",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-image-metadata.json",
+          "sha256": "c8ec913fc0139b5b6be9edf8ffceecf9171738d296d6f2f21926c049ef3cee2d"
+        },
+        {
+          "path": "logs/B1-R4-doop-image-result.json",
+          "sha256": "b269e0bd91e0bf909bf0f75ba139e1cffb6d2611e5c36304134b187f8ac53d3b"
+        },
+        {
+          "path": "logs/B1-R4-doop-image.txt",
+          "sha256": "9202a74cd26b36f9ad82dbd7960e03616c5814c04e44645ecaa50e66ddcfc87e"
+        }
+      ],
+      "note": "Actual image carries new source fingerprint and node user; archive/manifest identity retained. Production source bytes unchanged."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration"
+      ],
+      "command": "python3 scripts/doop-test.py acceptance --directory <new-setup> --image <new-image.json> --output <new-r4> --openbot-test-binary <current-immutable-helper> --openbot-test-database <owned-native-PG> --ui-chrome <system-Chrome>",
+      "fixture": "new canonical managed source/image; same current helper, private PostgreSQL/local TLS and8CPU fixture",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-acceptance-2.txt",
+          "sha256": "67da7e28ed37a0050458ccdb60b6013f9b5bdfbe580cf27bda8741769144f9ee"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-acceptance.json",
+          "sha256": "69b9ec77198ffa788daca8f8cf45958e16ee96656c9d0ad17407059abc656e54"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-database-restore.json",
+          "sha256": "4e8d573af9578bef15d6dc0c082741e806649048c2312e95c3422be46d90c504"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-get-canvas.json",
+          "sha256": "e0f7f8581deaf271bd456c4545ce993016258468b00c0169c422b432c992bbb1"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-get-frame.json",
+          "sha256": "9ec046650fb1caec647dd605f5a6d90f897ac668d080d7ed52ab0868bf1c0f95"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-lifecycle-record.json",
+          "sha256": "2b312a4d5372a123889bb395523bf64f2ad875d41263a53c960407391e20849f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-list-canvases.json",
+          "sha256": "b1a08d9ee10423594bcc15a1a3aa85f1e548b2cce4c577a5d13dc34e71cf7f73"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-pdf.json",
+          "sha256": "93978366029b55316fc49ed48ae49220a4b227135c5455ab2d998882b79d4874"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-backend-policy.json",
+          "sha256": "dd62f392787d6aeecf6a840dd7ea2c85d0c2bd1e522f0216d8803ed57b13a8c8"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-browser-export.pdf",
+          "sha256": "22b50a1e7b0b3d4c17edcf40750a8b429e74a4e7fa357213a42274c08a59bbea"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-browser.png",
+          "sha256": "5e191e6bbf96117a75e0de8d5fed86cb9104a212ac0c88ea03980c12f7ee1b79"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-export-calls.json",
+          "sha256": "019a72f7373f11ac1c36393781a1bcff57475e49672da95a2ae0c1d2dded05a2"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-jpg.json",
+          "sha256": "b2677a3a2f4e053e725554553f4aca1cd6191e83d0a508497eb787d707e4a632"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-pdf-small.json",
+          "sha256": "0482dabc789969156f3fa3dd32988b35c2434819c759cfb13a6deea163dd811e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-pdf.json",
+          "sha256": "0e03f30d529fd28198ba3c4e7772731975fb32081f9669168c7353bf8811b85d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-png.json",
+          "sha256": "491e0172e4607d87edb5d89bdb83115e7e84220fe1d79286978a9d659cefbb3e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-screenshot.json",
+          "sha256": "f051f7a26f71b6f7a3dc82bdc40cd022ad40d139d86440c983c7d897baf3f5e7"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-private-visual.pdf",
+          "sha256": "ea7ac8199718f354a4ee80a4f784410808f30fd1f53194789cbd5864490507ee"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-report.json",
+          "sha256": "073c32715dde46bedbc451762a6fa61ccf32af1ae5fa1dbab46470b420a3a551"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-screenshot.json",
+          "sha256": "8964fa1a088e6d3236338471afcda7c1e6eb060e50eed0c3f1ff14d50818f8c1"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-setup-record.json",
+          "sha256": "62e578832ee7bbe33aa47a1e52f34eb42e5ee60030a64bb543de240a725be793"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-bucket-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-database-restore.json",
+          "sha256": "2f4cb88118a401d795695f796d88909e6e1b1f29b99423e3fc0003b561f3f662"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-get-canvas.json",
+          "sha256": "cc60bcc083959fbe5f3bbed2adad06132f31978895048033e9788df6defc5fb7"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-get-frame.json",
+          "sha256": "42b5387726d40248d44c4efd33c957b39963f3eaa0f0dc8c40e2eb1ccac6c985"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-lifecycle-record.json",
+          "sha256": "95f780b9074f09b64e00a04900355e5a797fd30aaa80c0ed30d090bbc936689c"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-list-canvases.json",
+          "sha256": "12f89897d1cb5e57ec57d5d748b8cde984a8b6366d8d56913c8e5e2dd518d2ba"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-pdf.json",
+          "sha256": "b72ba13d826e72cbea20af3f9bf0aa2f0887a7baf902875ab87d97a7ef3153af"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-backend-policy.json",
+          "sha256": "389862c3b7e10868de5f368ad0308b66e8a11a38639e5a9bd2fc2d8c76cbe3ef"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-browser-export.pdf",
+          "sha256": "1d234ef4a3e4dd292cd24e2df1e5c7252d6066ccd32b88ca277bde1977ad61d6"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-browser.png",
+          "sha256": "81a187c00cd1e3a2a423e68c89cfed9e87266db84cc36503ff58f5ea53b31b36"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-export-calls.json",
+          "sha256": "a1562a8deae672a8c901930d5693160ba2dca1479ffb9e435d20ca681b887286"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-jpg.json",
+          "sha256": "acb8f70cd481e6fc609f028a423d0187b1a216e335f389848ad95a4101e23ef3"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-pdf-small.json",
+          "sha256": "ff68199c9dd6f56ce0c9ed6590cd620137b5b5b3554b6b44969847d38ca4a38c"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-pdf.json",
+          "sha256": "e7c6000c96df9725d1717ff19b85473e2178f1d5c5bd57598e696864039aed0e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-png.json",
+          "sha256": "718cb2640e0e57aa62bd0f56345fa57f273328de769fbfe67a729b6ca1799a99"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-screenshot.json",
+          "sha256": "dc8815b757d6d2f187e6af792aca90a3cbfb9ae4cb7a621de06d478d5f0e49b7"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-private-visual.pdf",
+          "sha256": "bb8ab9674401c304e499206c792c0b31cddcefdf57b6b674c8b8e935369209ce"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-report.json",
+          "sha256": "f0e691133c02e3f6695f843dae7e9028f1b00fd466185e2fe0fe18f8998e9977"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-screenshot.json",
+          "sha256": "b9feac41fc99ac7707e0882f986c4b9374a5b6f66595facb1122182d8e8751a4"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-setup-record.json",
+          "sha256": "315627879fedd47adf445de2b4fd9f75b7856cffe2ed912561194d092dc5b14c"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-all-disk-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-1.pdf",
+          "sha256": "516448bacb4f3c74cdf29290516b64ec64381f379330d0f8af7102db0575cb34"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-2.pdf",
+          "sha256": "28192718b33313f7e20406a1199780106f203eaf9fcce42c743b79bd6d4846df"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-1-0.png",
+          "sha256": "a052b9d8ff89b755529f8dd65eec3ab843be097f8e4e943ff61d6d9ff7fd34df"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-1-1.png",
+          "sha256": "a052b9d8ff89b755529f8dd65eec3ab843be097f8e4e943ff61d6d9ff7fd34df"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-2-0.png",
+          "sha256": "8620a909933b1c0199c03eeed75dda128dbbbeb15c34fb7a29aa212de1cfbece"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-human-image-2-1.png",
+          "sha256": "3eebbb89a767e1d3bf325676cde1cb9472d34426cf242c7045888409f74c1a4a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-media-scope.json",
+          "sha256": "d0de5294039a867a99bf8667ebec43a856a17944f40d371f689a48e4dabe25b3"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-persisted-edits.json",
+          "sha256": "33504a1c69403470acd2767d0d11c1f47ac135fd3b42ef5b55252f734d498a47"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-e2e-record.json",
+          "sha256": "f4d0a581a1d0eea22d038e1156cb1be372bafcd6dfb54010181c106a86ce66dc"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-bucket-report.json",
+          "sha256": "25b24d226264e72d0d0220871b489fccbcd5d2b4ece38934d7942c37c2910c24"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-1.pdf",
+          "sha256": "c03af1434582a56e3fce227d003f9c1c110a75b00a3df4145d1b508a5e141f69"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-2.pdf",
+          "sha256": "7e9434d965ced38423657305bc89c96ee3cf33f0dfa88f1789968481dfae388d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-1-0.png",
+          "sha256": "f294da80f6c52ea3c4dce7ff7fb475ddd69394366bf098444ad40a59aac3b7ea"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-1-1.png",
+          "sha256": "daad5ce2225dd0ad58e0f4422dfd4fe45ff28456fb10c7ab6a46d17702a397ee"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-2-0.png",
+          "sha256": "c5dc83559da6f4e0efa9fef011844f45589aaae663071a3a7b527e4a881fce60"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-human-image-2-1.png",
+          "sha256": "c5dc83559da6f4e0efa9fef011844f45589aaae663071a3a7b527e4a881fce60"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-media-scope.json",
+          "sha256": "b3323eaa12c24caaecfd8d8f25c2fb741e1dd74f7cfd3076674c4d4a5032f9d4"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-persisted-edits.json",
+          "sha256": "013bd33c5a3a444e9b30b62b67cb9ce1e1e69f74884618d64598be713013da6d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-e2e-record.json",
+          "sha256": "3fc1495dd80a7e61ca6327e22ebe3533342c208e2b7c4e141fc69b1eb5cb9651"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-public-e2e-disk-report.json",
+          "sha256": "a15b36c994e87f93dd1855fbd3cd3159d4e98488f3984858e1db42aea210ce7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-result-2.json",
+          "sha256": "76ab11a34c5ca65efb549e8371f26427cd2d0b72d11761140fbe83f6ad61ef5a"
+        },
+        {
+          "path": "logs/B1-R4-helper-build-stderr-3.txt",
+          "sha256": "76aae3a887e1364ec8d5d26ceea1bf90ebd4eda28197e908c63c78d75cfad8ea"
+        },
+        {
+          "path": "logs/B1-R4-helper-discovery-2.txt",
+          "sha256": "5e878112ae50aed1731074b0b98547cb5bf541e30c120c57d12b1f22255a87b6"
+        },
+        {
+          "path": "logs/B1-R4-helper-identity-2.json",
+          "sha256": "3cf7a8c88b98f08b22db9969b61c6079cfa2068c8a6287f2c33a0bb1244f3fa5"
+        }
+      ],
+      "note": "Official four-profile aggregate repeats all104 assertions for the updated package identity with unchanged limits and confirmed runtime cleanup."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-integration-r4-attempt1"
+      ],
+      "command": "same official aggregate with earlier helper",
+      "fixture": "new canonical source/image, prior helper; three profiles pass, final S3 model deadline fails",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-acceptance.json",
+          "sha256": "3d071e1f3f437f333319c32a7da6db93905f861fa2ab837ee570ffd7b81334bb"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-database-restore.json",
+          "sha256": "b3264618fa66224cc49b9dec603f7a1f0d9bcbc1dfd8ff8b37c3b0bcfbc4eb0c"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-get-canvas.json",
+          "sha256": "4aa54b989cf505886ff6f6a2c65b57857f8d6c73e63b781afcba9587de268dc3"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-get-frame.json",
+          "sha256": "308b4d1fb789b89b2e1639bf85e40bbb6ebcf55371dfa07c6e8970ddbcdafea3"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-lifecycle-record.json",
+          "sha256": "dd8222d858af88c71329aeb4b7ef5a6b9ebbab406a2ecd92347f37bd28ab0c1a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-list-canvases.json",
+          "sha256": "c223e0ee28da74f06ec96169b53ce3be15d23b13835b5e9714790aa733132a96"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-pdf.json",
+          "sha256": "575eab10cbdda60a1584383412d00059c28177fc01318c8361487fb3ac3a20f5"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-backend-policy.json",
+          "sha256": "ac510c49a17d865f9a1caebf55a52e3e367b23e7f87da7b5a5cbae43a4b6be96"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-browser-export.pdf",
+          "sha256": "d86141cdb5970aeacbd01b28f4973a85d9e718d39fab9246cc4d11d79895dd4e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-browser.png",
+          "sha256": "a558c3644ff21b833770e37d3b75013320b26737d89e7539860fb220379dc4ac"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-export-calls.json",
+          "sha256": "887426825cb3df9bf09d1d4ba01901da1016063966e15c2ee3f269c41f5f4e91"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-jpg.json",
+          "sha256": "099a8b66168ef7e1ad60cdfbf557c28e4ba0c6934d483e0a92aee0539d8ef00f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-pdf-small.json",
+          "sha256": "46efe076eae38aa70686a40112d990d6b7defdf6d50ead1f6a4afd15eb9eec84"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-pdf.json",
+          "sha256": "207f099a92a78533e2df1292f8cd24bae7dfdaf7e389acb82cf12053723fea66"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-png.json",
+          "sha256": "5713e269459b94801e6c25cc9f2b33256834cde0b6f6471b20015c5210e3344e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-screenshot.json",
+          "sha256": "3c89456b745f580fde6dc5365e495305fde44c5fbd97509dec35810384745b8f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-private-visual.pdf",
+          "sha256": "e346e0ea6a036610cac4b93d901e7aad8c1f6ebd33bf9611bf33cb9a27c4897a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-report.json",
+          "sha256": "cc44ba33af8d5f46edd3889eb6f7698fd0667d87cc3f184d875dc5d1cb8373f1"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-screenshot.json",
+          "sha256": "d6d72c84af48a4672f0abd5376572e9e4560ad190972b9f38fa14d3f2a0f704d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-setup-record.json",
+          "sha256": "adc07b2498aae6621ac15ee097641e272f6cf35641cb891fbc23cb3890812ab8"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-bucket-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-create-canvas.json",
+          "sha256": "ed5a8cb290955a548d87d0d4fde14ead3032bed90c2688b3a4deab6f1ac9afaa"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-database-restore.json",
+          "sha256": "560f90ff00619b7dcdf74041bd9af12663884fbea04ee809419ad4f5123c7387"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-foreign-canvas-error.json",
+          "sha256": "73335357c54ef07b93ea29c6926e06bee63fc39c9f3f8821c2fbc88728ae823d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-get-canvas.json",
+          "sha256": "6f4fd9aa8b80f89c52c19dadc2878bd3da89b71dee5de7413a162014bee19903"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-get-frame.json",
+          "sha256": "c5a3553ad5363d0b413774a411b0044ee860d26d923fccfcadd4061a99f35795"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-guide.json",
+          "sha256": "eee578dab5c758471e6e2bc79c85324caf72bb1784b429464e257ec647651946"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-initialize.json",
+          "sha256": "06951225b48a9bee6cfc9c37ad28422c9a30bc26bc0c7b1bbd594786465eddcd"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-lifecycle-record.json",
+          "sha256": "2432f73bac446cd1e531b4f9a1b9e12dcaa9140c8a670aa116873adb24681a11"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-list-canvases.json",
+          "sha256": "8e2148dcf25ecd7b2abda2db57982dd66bd8fc0defcaac6ee83b450abcf5fbfe"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-pdf.json",
+          "sha256": "7e3e083b940e35791d8e4a0e94c50bf3c307b75c1d312969a07c436fa2c95b7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-backend-policy.json",
+          "sha256": "addbc8397200de4020a870ec3e107f45d6a23fca71f4867a4ee9b16e963f3f40"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-browser-export.pdf",
+          "sha256": "f752f5f83294ca7c439d5fa81f0736295aee4c5105ac41e608c2a6a5eacec382"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-browser.png",
+          "sha256": "04ed65d8db25206e141f102e7cc9897d6272ff609f35d4775dc44b53451bd92b"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-export-calls.json",
+          "sha256": "5a1b7ff4905f726c2b9e39820a3dbe647a9a722ee740aac8a3af039911ec00d4"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-human-edit-proof.json",
+          "sha256": "ccebd58f6a5ac3891539bab833f6c5783a03d0af88bf2edea6db848f21836fef"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-human-revocation-proof.json",
+          "sha256": "22855bb577c66844cced92f8fdfe6e84bac57e2b0a20a0c47fce9a2b88a8f207"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-jpg.json",
+          "sha256": "0fe7e0a1357a7b62fdd1c95d86142dad5eb537639bd8b599702192783c8b711e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-pdf-small.json",
+          "sha256": "3a3afc40a4e635acf798d556360bf8899912514ab9faa29223f9d0a3de7adc29"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-pdf.json",
+          "sha256": "893b6b6b688fce73ef20959389e0288155095baa5ad4e9d5e972fa0473c539e4"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-png.json",
+          "sha256": "cdbab0475ba83098e131a66ed7d8a8dd316ae2204abf00d00d514cb3ddf9ff6a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-screenshot.json",
+          "sha256": "72c376dd76b36d4d4e3fafa2d27823607b3afc508569c002e0233ec045d0fd46"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-private-visual.pdf",
+          "sha256": "b27e32758f1562cb333bda7011d885db2b4febe0c22a365d52708f9c08c3fb54"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-profile.json",
+          "sha256": "b3f6b5424ede3526c1a87eec61fd4e1eae6097838b8f2dd0b97b30221e93c62f"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-report.json",
+          "sha256": "40d0da8fa871298aaa4fa478e87a9ca1d782483263627b5c40751762414de303"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-screenshot.json",
+          "sha256": "86b7b2ea2293f5352d74833ee53918eab0fa447d408a604249246d9ef7687dcf"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-setup-record.json",
+          "sha256": "850ea77d5b7d8a8f80edb40134e3697da3f2ac6df7bf32426008d3b5af39cc1e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-all-disk-tools.json",
+          "sha256": "c085e146362c5d729393deca5aaa3a52677bdae8fe15eb40a683640184e855f5"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-bucket-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-bucket-e2e-record-helper-failure.txt",
+          "sha256": "e7914dadbad8a91599e62237a5d00d4d1949ae0c4cc195e608fc79c71c4fbc4a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-bucket-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-bucket-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-bucket-report.json",
+          "sha256": "c31a1f5eaaae361e93a6099bfbab9dde5c80cedf89ca24cf5cac240c71871c7d"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-1.pdf",
+          "sha256": "04d2a58d200f740766bfc68c1c1ecaeb65434608e4074811899ac5881bb931ab"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-2.pdf",
+          "sha256": "1b74917b4c79b7dfebfa4a648c043f47d91858fe3c25024aed97a2d0b8dc0141"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-1-0.png",
+          "sha256": "5bf6c5c04f437376827422bda816b72894f8c5273797b4326280ea5b5a1cd517"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-1-1.png",
+          "sha256": "6ba545c9594a88038234f8ec0009f8281159c06edc9261085a7f46ce3d8a4a62"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-2-0.png",
+          "sha256": "b17b56207132eddf3862165790f8442c68ea42a961f4c5ade79a995be7d1f288"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-human-image-2-1.png",
+          "sha256": "d11e4638dc7d06d61513c9c631f64e87306d0f6b308e2095198248a885074475"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-media-scope.json",
+          "sha256": "663fd2e65336112807de19d60dfd6ea734329b135b11514db9804ee67bb81b67"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-persisted-edits.json",
+          "sha256": "10183217714c19c6a9d95dab764de8c5fd86a714744d7f1b149d2ce43cded338"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-e2e-record.json",
+          "sha256": "cc512ae05f10d91611d961a1fcb5d3ca7dc72bb3df05581e9faa19ca732f2600"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-attempt1-e2e-disk-report.json",
+          "sha256": "a15aa34c50eb3fbddd8227f53def65f1f984b4afc184d0188be2ee486a0dc943"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance-result.json",
+          "sha256": "a91aa1ad09766607cb24a698dfecdb95ccabc9b2387f01a55daaf79aa6f55e7e"
+        },
+        {
+          "path": "logs/B1-R4-doop-acceptance.txt",
+          "sha256": "4cdd9da659998b60daf3ad54ee033d3597031cefff2428977a699b63e6a1a67f"
+        }
+      ],
+      "note": "Models outlived their actual editor work while downstream verification ran; corrected lifetime follows persisted edit completion with exact-five/secret checks intact."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-helper-focused-attempt1"
+      ],
+      "command": "same official focused S3 E2E with corrected helper",
+      "fixture": "current helper, overlapping own Rust checks",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-helper-focused-result.json",
+          "sha256": "b3e2863cd957b48839f5bb1579de73b302a45c08c9609b53ccce93a25fa63af3"
+        },
+        {
+          "path": "logs/B1-R4-doop-helper-focused.txt",
+          "sha256": "bf54d417fbc39cdeb4895c6dfe79cfd349ccbc3f6122bca5c0dc0e402a1cdb31"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-attempt1-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-attempt1-e2e-record-helper-failure.txt",
+          "sha256": "ee6c544ccdde75b147e5ad2c03431e88e61427cdbdd289f6179472465879eb08"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-attempt1-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-attempt1-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-attempt1-report.json",
+          "sha256": "bfe50a488435f6786e8768770498ff9a67f868ddd7b01617babb3814aeb3c54a"
+        }
+      ],
+      "note": "Both model closures pass exact-five checks; later80s outer limit reached. Serialized rerun after own CPU-heavy checks passes; existing bounds retained."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-helper-focused"
+      ],
+      "command": "python3 scripts/doop-test.py run --managed --suite e2e --private-deployment bucket (serialized)",
+      "fixture": "current helper1d94d46c, new canonical source351a2180/image, same8CPU Docker/native PG fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-doop-helper-focused-2.txt",
+          "sha256": "85045dd900c309b206078755c0856602162cc3a57adde54e38f63741ce7d9437"
+        },
+        {
+          "path": "logs/B1-R4-doop-helper-focused-result-2.json",
+          "sha256": "a245b134ac18ddfadb233607f92c6d0e00e1dd27189dcfb09086530be3a2caa5"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-cleanup-receipt.json",
+          "sha256": "a8de1e962a6b0677277d570b3a4b7d44641fdde6547d25a863542e656cb0f477"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-bot-1.png",
+          "sha256": "c88c947640004dcb6e7f1b83745dc4cbdbda4a5ac950a3c6578945f9c3e4a858"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-bot-2.jpg",
+          "sha256": "606b3b7bdcf5b0d3e179437d3143c43e022c5d32095aa14d2c63890f791977bc"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-1.pdf",
+          "sha256": "70fbee99c6fae1f35a832517bd70f2d0c2501c95ee6c716c0665058d657e6112"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-2.pdf",
+          "sha256": "019f50906274120d15a2807b128ef12605ffb3f543efb8ded4044f0d86d0fec4"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-1-0.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-1-0.png",
+          "sha256": "b2ff5a20ed7f64b97d3e9df8f96f99fa45c0c15c7e469c35012796d3d208888f"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-1-1.json",
+          "sha256": "3b28b2f2754b3d5aace93fb72fc86f3a45d3beed123f97490b5f5b5acaa38032"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-1-1.png",
+          "sha256": "b2ff5a20ed7f64b97d3e9df8f96f99fa45c0c15c7e469c35012796d3d208888f"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-2-0.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-2-0.png",
+          "sha256": "34c51e137056c697a95c331492e4c145a96bb5011aec3c95353eb0629202ee4d"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-2-1.json",
+          "sha256": "1a264fdd4c851699f6f9bb44643cd8a7712f99842a311642c886fc0652a77c7a"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-human-image-2-1.png",
+          "sha256": "06b350f833e87ab91485446dad8bd89ce8944d9f64244cc57121d475196392d0"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-media-scope.json",
+          "sha256": "c69d8615b4c702e369b896ba81a97e6121679a97fe1bde5e62cc49cfea4791f7"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-persisted-edits.json",
+          "sha256": "dca343db7a73ea82b6f820fd39fae4b746f9d0779d241ddf1db5dd9589a3200d"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-e2e-record.json",
+          "sha256": "54e5579ecc2599fa272ea86344e05dead349d3a693d486d772b0b14ab3ab0dfa"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-image-runtime.json",
+          "sha256": "cd3cd728c839ee18eebf1b5d432072da1d2386f116c0e226a0870ad5c30997ca"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-postgres-runtime.json",
+          "sha256": "7a7998b333a96ac81b61120dbc6bab466da51b170c5f796e004822c1c0ba048a"
+        },
+        {
+          "path": "logs/B1-R4-helper-focused-pass-report.json",
+          "sha256": "25b24d226264e72d0d0220871b489fccbcd5d2b4ece38934d7942c37c2910c24"
+        }
+      ],
+      "note": "All10 S3 end-to-end checks pass with original60s/80s/probe bounds; persisted edit completion closes each consumed model before downstream work."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "R4-helper-lifetime"
+      ],
+      "command": "cargo fmt/check/clippy and focused doop_e2e_ tests (locked/offline)",
+      "fixture": "cfg(test)-only lifetime callback in existing Driver poll; no new queries/claim protocols or production changes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-focused-checks-0.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-R4-focused-checks-1.txt",
+          "sha256": "6afe75409ce08d874c642bf70afaa60cd542994cad176f2aaf69345da21c7bdb"
+        },
+        {
+          "path": "logs/B1-R4-focused-checks-2.txt",
+          "sha256": "66075f43e2c2b14bb88362ce19b9ba7bf1f383cb6dba693fd28faee252a2218e"
+        },
+        {
+          "path": "logs/B1-R4-focused-checks-3.txt",
+          "sha256": "dfd646f3f82cef26433969423af1a26ce38f013f76c039e965cda51ff78ad072"
+        },
+        {
+          "path": "logs/B1-R4-focused-checks.json",
+          "sha256": "bb1b6f67cfa0d36fff1af087c5a1eccd45b2efe34c49685401bc2f716b1ad577"
+        },
+        {
+          "path": "logs/B1-R4-helper-discovery-2.txt",
+          "sha256": "5e878112ae50aed1731074b0b98547cb5bf541e30c120c57d12b1f22255a87b6"
+        }
+      ],
+      "note": "All four focused checks pass; exact3 required test names unchanged. Actual end-to-end case checks exact-five exchanges and token secrecy for both companies."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-format"
+      ],
+      "command": "bun run format:check",
+      "fixture": "new canonical managed source, same pinned Bun/Node dependency setup",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-managed-format.txt",
+          "sha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2"
+        }
+      ],
+      "note": "Changed HTML fixture format checked. Other service command/assertion bodies and production source unchanged; reuse unaffected R3 evidence."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-runner-protocol-attempt1"
+      ],
+      "command": "python3 scripts/tests/doop-test.py",
+      "fixture": "unchanged runner/protocol sources on macOS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R4-runner-protocol.txt",
+          "sha256": "5bbb922ee09c5ec5e4863c755419e17ba8daaf2aa3365ac7c435d493d24aae19"
+        }
+      ],
+      "note": "Existing process-identity/reaper race; ownership protection refused to stop an unconfirmed PID. Isolated test and complete46-test rerun pass; no identity check weakened."
+    },
+    {
+      "criteria": [
+        "05A.3",
+        "CI-doop-runner-protocol"
+      ],
+      "command": "python3 scripts/tests/doop-test.py DeploymentOwnershipTests.test_recovery_stops_only_the_recorded_positive_process_group; python3 scripts/tests/doop-test.py",
+      "fixture": "same unchanged runner sources and corrected canonical package",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-runner-process-isolated.txt",
+          "sha256": "b5d60f9cf290c92111f9ab63678371e24861312262d57baf5092eb5d8dca5096"
+        },
+        {
+          "path": "logs/B1-R4-runner-protocol-2.txt",
+          "sha256": "4b4ce255ee24615b458feee7b46522b9f3acf7f50e5fbf524794b0d18091d12d"
+        }
+      ],
+      "note": "Isolated recovery assertion and full46 protocol assertions pass. First failed attempt retained."
+    },
+    {
+      "criteria": [
+        "05A.2",
+        "05A.3",
+        "R4-resource-retention"
+      ],
+      "command": "git diff --check; git diff --cached --check; owned runtime cleanup; graft build",
+      "fixture": "phase-owned fixtures only; preserved historical manifests and shared resources",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-cleanup.txt",
+          "sha256": "50fbe8cca1494cdf7fa1f7940cb024d050767ebeb17f1416506e3c7c0ebee7ba"
+        },
+        {
+          "path": "logs/B1-R4-final-whitespace.txt",
+          "sha256": "bd29590d22034d063a7a616043a7cfa7b84244e79728628c4138bbb75bfadd05"
+        },
+        {
+          "path": "logs/B1-R4-graft-build.txt",
+          "sha256": "28ff5f3191fc6ba31c425100ee8b96742f131479ace1fe3f84c3b1726cc19d94"
+        },
+        {
+          "path": "logs/B1-R4-retained-identities.txt",
+          "sha256": "8c147c60c7b3c2b60cdca38bb1c9e4a9ee2be59c3b93d9c800d77b86c5a40bed"
+        }
+      ],
+      "note": "R1/R2/R3 files unchanged; all required current checks exercised. Known unrelated full/stock failures remain qualified, not a wholly green-suite claim."
+    }
+  ]
+}

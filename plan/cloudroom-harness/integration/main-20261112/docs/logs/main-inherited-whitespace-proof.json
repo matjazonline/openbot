@@ -1,0 +1,2325 @@
+{
+  "raw_head_check_exit": 2,
+  "affected_files": 331,
+  "all_are_retained_evidence": true,
+  "all_identical_to_input": true,
+  "files": [
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1-reviewer-affected-tests.txt",
+      "sha256": "06e372e25f5295ce4d43dfe396c61e10df6883b4026ac27073a43c351a4eca6b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1-reviewer-department-tests.txt",
+      "sha256": "c118afadca007affdbaab7b37a1976216f3e917b1b2724b41ad8536cba68da63",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2-reviewer-department-tests.txt",
+      "sha256": "a1728fb3922c284e466e5968774db8ef24debd9d11b64f78593aa316c0c3a32f",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt",
+      "sha256": "9a7b8dde0f1ca91491ceefe29f369a37ec74d83708028835ccf1e551a0c6a711",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R1-affected-tests.txt",
+      "sha256": "c86ee7e90d0d930ae3ca3a85156aabdeaaf7ff2840acc68d39b3c84d8ee62395",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R1-demotion-callers.txt",
+      "sha256": "4cb203a77239c6e40d08d31493d06abfef3d766ea6341e5610fe58e21be21ed6",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R1-department-tests.txt",
+      "sha256": "e1ea055675e18c78dced867dd0cb99e06a1a308cb50f1b7255b2ae6392617e39",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R1-router-mount.txt",
+      "sha256": "ec84c189eb2a1772be7825c6b0874ebd73c10dc30765ec479b5d7395667ec75f",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R2-department-tests.txt",
+      "sha256": "9270cfd3cc1cab7fa302beecfdc3866f6731927dcb1ada0ef415f7f66628f7ab",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p01/docs/logs/B1-R2-source-modules.txt",
+      "sha256": "ff140d3e0a7ac96c0f616857a78c72e43fad0afad2bffe6cbe373d86de7ab15c",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-reviewer-affected-tests.txt",
+      "sha256": "ccade16ff308bca196db0b300691cada8122dd8637b14f2d9cdca0ee5377cfec",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-reviewer-department-tests.txt",
+      "sha256": "57381a2bb109c8bbbe42c7944852cdd52d592cd046f149270e0fdae500c48857",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt",
+      "sha256": "41d6f1844b04b2895da7d13f8cda3d743a5d58b47928d764eb06396ca8ddd34a",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2-reviewer-department-tests.txt",
+      "sha256": "eb76e57b4c7fad61d036a848a297a083c57e1260e1e01a7c46f44cf46f561fa4",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1-reviewer-routes-tests.txt",
+      "sha256": "488ff28f9d6452e8d452d1cbbfc011c0dd2ce362dc27f71f984cef9804cd1aac",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/01DEP-P02-G1-R1-sql-probes.txt",
+      "sha256": "e9a994b624453143fa4a0d4224359f5ee3949173ea96b0c422e815d65c7c168b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B1-R1-allowlist-rerun.txt",
+      "sha256": "8887518675c4562c3757beee3d82db031a888fcce6013c4e25e5f3d090ff5a8b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B1-R1-department-tests.txt",
+      "sha256": "7a85d59d437d691ee03dcf68159ec8d0e2f14be54b860eb341f86edd93514426",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B1-R1-source-modules.txt",
+      "sha256": "d7c2a9bbc8a706beda482ae04becc0c8d536bd79cb73d38b1578f761687e644a",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B1-R2-department-tests.txt",
+      "sha256": "8e00ec305675fc9a78cce12e895e9bcbdb122bb00cc6a4619dfeb1cc27169fbb",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B2-author-builtin-agent-library.txt",
+      "sha256": "6ccf445d8eb5816c98f1f96bfa9bf404236eff3a572ce5745b0e0c05338ee16a",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B2-author-desk-wording.txt",
+      "sha256": "d5458e892192774b3c1fad3131727de8eac820db0be6349711d834dfc9718a5d",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B2-author-routes.txt",
+      "sha256": "efe87e7e729bab80f0ed03b26dce9ab041c29528ffe7b9c21ff8379a79088494",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p02/docs/logs/B2-author-thread-notices.txt",
+      "sha256": "5a53fa36479c3d414e38671362f5077d5a82840e1789e7b803ccd12a3e2c0539",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R1-review-affected.txt",
+      "sha256": "fe7487599cbac131ff052e5eb8ca9d0ba1079a050faf3f48d0480c10060d692b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R1-review-agent-default-desk.txt",
+      "sha256": "c24aba7ef65f8f7ffef049ad104e5d2d84e753b97e7b0a1eacfff6c47fd0a97e",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R2-affected.txt",
+      "sha256": "b2193fbeeb29baaf51bfdd4a49e21af5e97f3d19b5c86e4aed761872bc64b0a2",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R2-agent-default-desk.txt",
+      "sha256": "5c95ffd63cb9e759add801c6294e1a7deac6ad5183148f3cb4eb22be434cd8f8",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R2-review-affected.txt",
+      "sha256": "a7dc20100a4c7c1444e1f60faf0c08f50e57a0ec4794c1cb238c88ae393d71d1",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-R2-review-agent-default-desk.txt",
+      "sha256": "b827683153214c0abd425bf38537a29bdeea948e643c5b12b371a9e4bc82ece3",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-affected-2.txt",
+      "sha256": "7d60321e93a961f5471a49281e4b5a580687e7619d318f4e4f3dd26dd2278079",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-affected-3.txt",
+      "sha256": "83262e0833974571c7f9b723221e726a128831c44d3da00869cc8a60ada5eedb",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-3.txt",
+      "sha256": "3e202c7950151ee8f6fa6a6011fb1334cb50d548a1f2888fbb302f29263a7d37",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-4.txt",
+      "sha256": "953658558f2f7f1fd6d427c9a7168e97c5fd21c3b3a7030eff937b64be36f880",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-5.txt",
+      "sha256": "0508252854a19d7d2dd05fa8e767b875b4432ca2d10206fa930fe3bcf8ff9527",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R1-review-affected.txt",
+      "sha256": "2eb3646c8f05fb8c0185e1fa1bb4ee8190989224f77c5a5ac574cb232652db85",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R1-review-focused.txt",
+      "sha256": "e5b2da42efc654a2605600242fcbf77f69fa9dc7c14269f1d3760f37d801f30c",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R2-affected.txt",
+      "sha256": "ed8eb297863c43bba62b76ccb815c1181a6d6dee5d2a636463835e5920a6959b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R2-lead-desk-1.txt",
+      "sha256": "a4114d2a1681b26d540249a73e68bfb7903271ea2ce532294bfdcc4c590407ea",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R2-review-affected.txt",
+      "sha256": "6b2b66f5f316c49f5b781b77accd79f46b8ef9200d50d1ba24cb2b66acb0630a",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-R2-review-lead-desk.txt",
+      "sha256": "a6ad580003968d8031e125698d46203b5ee5f222766688ec0ae28722d140a8e2",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-affected-1.txt",
+      "sha256": "b935f193bf1df91ff6a82a2772cb22a5855cd819e696adeb46d40646688f9240",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-desk-3.txt",
+      "sha256": "1615becb032fd4e081390519104474ab0e514e0b5bcd2db7b46ccb4537c3e366",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-e2e-1.txt",
+      "sha256": "f03f74da55bc016510ceb50c0bbb3c0bfd7ed5bdca7cd2a2c42fb7c17af81fd2",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-e2e-2.txt",
+      "sha256": "a883ae18915e74fb27f5bd306ac912a3e36b9b5c5c19d4d597956ddc174c2b81",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-focused-final.txt",
+      "sha256": "1371a40c959ddf1d6575d8f76f8a5c157a1c7e456658f05192c9c0bbbdb3d66b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B2-third-run.txt",
+      "sha256": "12edc82bbb9297d00562b9173664859681bce8f28b295f5babe1d09848c01e40",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B3-R1-review-affected.txt",
+      "sha256": "34bf220d3c9ef1c6f97012d0842427bf666fb0d7fc6b72a7808a5f20bede6e53",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B3-R1-review-focused.txt",
+      "sha256": "9ddec27fe22a0b88ec10d952b7be969adc17e421578ee8431a35bef4e10970f2",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B3-affected-2.txt",
+      "sha256": "0c3c44ecdefa425bbf6889ec4b1e9a3d5c16669607388d6dc98bccf412347ccf",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/B3-focused-final.txt",
+      "sha256": "17379e82e41ff6d93e00260b20955d1d05abac7878fa6e236a0a10122c356d00",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B2-r1.md",
+      "sha256": "3ff959634457bc807196c3e7219b189a23ceb6b1cd0b8e28435f0177483891ce",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B2-r2.md",
+      "sha256": "d309c78e9dfa8a5a8cea461d057744a7e27f251da1e2d5a09a5b0977825dbdbf",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B2-r3.md",
+      "sha256": "bb6dcc95378586701cbe978277a65906f6893efec7460e613b3d533636dda745",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B2-r4.md",
+      "sha256": "51d4dee8d53b30ff8033d8373b06f07024bd26fcbcdf193c61062f9e74fd8553",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B3-r1.md",
+      "sha256": "84f90db5a109344c0bec1b3bffa29259315251b7584bfe628cded9c0cbafda64",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p03/docs/logs/gate-B3-r2.md",
+      "sha256": "4aa241d522246d03781fe256eb8c2d815e7813c3550779cb167958657138357c",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B1-R1-review-focused.txt",
+      "sha256": "bb2ff184a981f423c48f6b32fba42e326c1f32e2a3bf9c9e9a72f9c50336ac35",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B1-R2-focused.txt",
+      "sha256": "ba539e8b12da7e4555bd549c63cd5f9122a6a90b238509557258d258a6a6d421",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B1-R2-review-focused.txt",
+      "sha256": "619aabaa6b5e59be964cee7994803cdebe4e2d64a10db68cd5325f1bf838acf3",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B1-focused-final.txt",
+      "sha256": "e8fc7888dbb9d111fdaed8e59bfbd16b2312f47068a287ca4bdc6577e17ec0c0",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-R1-review-db.txt",
+      "sha256": "7b5c77f74ccd5dc49311717b32f4d8678c6ba13c37c721d328b9acca1812c673",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-R1-review-focused.txt",
+      "sha256": "6c1742ff61d3ae0f9b73bbdc60362bbad35157cf765cd317f4b208600c6b355f",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-R2-focused.txt",
+      "sha256": "5f0a36ca278b7f687e2ea21893286d09e37ef4e0eea7eccce9cd940e2226afb4",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-R2-review-focused.txt",
+      "sha256": "c2f1d67421ab639ba15637ef773f17573768f0db540680d667be05366a91c184",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-focused-final.txt",
+      "sha256": "f6da908a75932a2bd7049985ed084f95a047eafee8b2ce85345824aabb06dd9b",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B2-skill-rerun.txt",
+      "sha256": "6f086fd41e6b71c296242be5be89593da1f59a826477961dd6a1d9c5b597cc5a",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B3-R1-review-doc-readers.txt",
+      "sha256": "6dbd1067f4c009ad0d7657d25bf439ca2ba5fff053b29d3ad888d3a0558609e7",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B3-R2-doc-readers.txt",
+      "sha256": "977fdaf00c6059560556dcfd45e31b51ed5b1f67a3e8db36bcafce0b86a11880",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/B3-doc-readers.txt",
+      "sha256": "0d172553e957e769b294e365fbf4ddac4805b5d4f9d1dcefa295ccce601b3eb1",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/01-departments/phases/p04/docs/logs/merge-main-affected-1.txt",
+      "sha256": "1447c363f5dad2b43fac1032500b7ed3066d9b1a9d4c0bb83e4caa8a7cf35cd9",
+      "identical_inputs": [
+        "103004a8ac2fd643cf14bde7e09022ae79f72053"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-agent-contracts.txt",
+      "sha256": "e1465d416751d2ac7790af85d65d01586073ef3c028de796077792166e48b35e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-auth.txt",
+      "sha256": "6d17b50180af31164855ccd282c55c3a32a5b6d3e6d9e2e7ad5a90cc2b5c47eb",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-browser-fixtures.txt",
+      "sha256": "c4a2d2b77b46857f73adb8fc68d23527962be65e7f453c25e0b9a13fe22e0343",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-browser.txt",
+      "sha256": "e0c6b3fb7bdf7ca0989df16423d5bdb0f607735a5d7b78a21961db4726cd6eac",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-frozen-skills.txt",
+      "sha256": "e6c996001fda55f6288279420e873977961e3fd3390a1cc7d1b6702ccf6ce0ef",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-skill-persistence.txt",
+      "sha256": "3f4b540c8162366dfa1a1a27a3b332605862018be2e40d83d62a604c4768225c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-skill-usecases.txt",
+      "sha256": "da06c4ea4a8b2786d808121cc11351ec246566c08f41ef852dea87b2cdf61954",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R1-source-modules.txt",
+      "sha256": "069d19b34b5afec70df50f0aa1953c4e33d575e97cd479b28d7bf3e9d9e318db",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-archives.txt",
+      "sha256": "a1e699ee86d327eae7997d59c01f27cb3e296a1b9f3239b5c9e8a8c18b1ed7c0",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-browser-fixtures.txt",
+      "sha256": "f735cd139d302cb353a4c87fd63af73f70392bcf0835399d96f020a61af1d3ec",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-frozen-skills.txt",
+      "sha256": "97fe16e31dd9459c36c3052d944400a5a054d35600c6d4acb348eae0072bcb93",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-skill-persistence.txt",
+      "sha256": "6aad05ceb42b89e164b93b35f49e914c112bcbb59d16bf90735ddc372244acd4",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-skill-usecases.txt",
+      "sha256": "ef75280d1377bab1ebd082818fb44b594a0e5025d7387dcd50603ad96077ef82",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R2-source-modules.txt",
+      "sha256": "701a6348e04ca2641768f216be0c8aeb2dc8ec9be77f7350080a962992625ac7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R3-all-skill-callers.txt",
+      "sha256": "4859696acf42837b6f5ecdae59bb8ba5e2724318049c1fe0e4fe9d9f42805ed1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R3-browser-fixtures.txt",
+      "sha256": "b5a1f6dbdc55fcfe7362dca90cd8b31e3494e735b7b29445d58347fff0c0bb1f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R4-all-skill-callers.txt",
+      "sha256": "e8e12c5f56b9647e087c3034a992954cfef6a5d0e6678d8c35819731db8e4067",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R4-browser-fixtures.txt",
+      "sha256": "f486840aa1524bf6f2215ffeb79f34c70962ae7e5c63d4d0b45249fbf0580f85",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R4-source-modules.txt",
+      "sha256": "5f903da2205278003afc90a7d8ce7ce5f3302523debbc0b71d7a47e19ef7d91d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R5-browser-fixtures.txt",
+      "sha256": "92bc15aaaa23d0af5469f676d51d380d0b49476a7497bc29db3220297c1400aa",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R6-all-skill-callers.txt",
+      "sha256": "74bb5c21c15e6866252838577762a8a198d535314750eb53b23d7faca5404831",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-focused-R6-browser-fixtures.txt",
+      "sha256": "89f6ea0aa94dc89983d4ec5a96a05bb812471670ed9e29fdcc35a1c70ae83a27",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-freeze-R2-graft-build.txt",
+      "sha256": "f538f483d38b82de411a0517c8fbb252e42f16dd8450597f03bcc6b85d6e6583",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B1-graft-build.txt",
+      "sha256": "6471c0fe2c540d9341cef44317c8e010b1449f74280609d6f71653f63df23a74",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F1-skill-callers-R1.txt",
+      "sha256": "ff31b5b7d55327245ebdfadf168707fab3d480bfcc62620097cf4fe4d6e9bb35",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F1-skill-callers-R2.txt",
+      "sha256": "3e931fe91a0fbd5c8c8c0a965bfe9fa59a3b5680e710867844f7c9b85928be08",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R1.txt",
+      "sha256": "5bd021abc1576f303d07546f3ec45570ae0e617473e70d09a75ca685cf62c9a9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R10.txt",
+      "sha256": "0a5a2e19e88be9341091cf383847835486a0e7828d9f9deaf3c2171d2193cfa1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R11.txt",
+      "sha256": "e1ad5c2e364be66fb49f0ab517dc874d3609acb16a3152604e0f305dfc468f93",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R12.txt",
+      "sha256": "8cee2d62569bb45908e3f22699b9e94002f6d425d926d73cbb75ae08e864fffc",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R13.txt",
+      "sha256": "8713ea866fb09ffb76875d896f4ae4879f5de4bfa901d67bcf1bb8fd5ff21e6c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R2.txt",
+      "sha256": "234aec6c239b39ce9625b69af89857bdc18ab56f2705aef0bb5b6291fcc6b71b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R3.txt",
+      "sha256": "57151a7feefedef4a8fd7dfefca09b56c16473c03db0842f2f749aca4a436fec",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R4.txt",
+      "sha256": "d3c575f091daaf8590a3a413f44580ef65797e7d860e70343d6bdd2b82184066",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R5.txt",
+      "sha256": "b83e8954fbebb287a7192e84e2ab60e2b21d6f956d5b8d6b54631170ea1fe5f1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R6.txt",
+      "sha256": "f83e46431f5b2ddbb8c8438896d4ed472aa81c0725c6fb883c343d25f7db4dea",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R7.txt",
+      "sha256": "9f5b6436df1632f55f8d4c40bc37b0b6cacac9671c1f5b0046323798caa62b12",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R8.txt",
+      "sha256": "1354da9779ae50a74ee8a99a35556847b505a358b7ee528d4c3d29e22a0e569b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F2-native-permissions-R9.txt",
+      "sha256": "5e6d69b4cde2a19c785e737080babaa579e148c01c92b9a7bef73aba29af9337",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F3-restart-R3.txt",
+      "sha256": "f89453b4feb46bb61513c60dbf9e468872a86ced57029e993610d3b4737428b9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-F4-browser-fixture-R1.txt",
+      "sha256": "57a88c9769ebb79457365e479f09eb71ec43f115f8b7093faffd3d27027eb833",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-core-combined-R2.txt",
+      "sha256": "27784c40e762d08c46b83713e7b1289f54019dabb2b13f9a4152073b4b91e259",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-graft-build.txt",
+      "sha256": "3cc1ff3d1076a832bbc557a2091eddebd520d1d5399e9fc5aaea54c015926d61",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-plugin-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-runtime-build-R2.txt",
+      "sha256": "7847cc44eb4399e41b474765500e09655b8236b590ea9f1b33973b73d1d7791e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-R2-runtime-build.txt",
+      "sha256": "103ef1af735059bf08413d1652f7bee96cbd8b54392656a5b347c139f446c7c9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R3-domain.txt",
+      "sha256": "2880fbe8f46d0bcea45912e53371b585cf91b9fbb9e604fc3c84a20f848e88a7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-agent-api.txt",
+      "sha256": "ca247ecde664f436a254a939119f92606f67fe13ddc985a7b9a15487ce7a8d5e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-agent-publication.txt",
+      "sha256": "d40f247ac8b8a40d1cb7c2a6c41ed3fe765b96fc2e2cffe96067060b805bc2e4",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-agent-runtime.txt",
+      "sha256": "bc9520df66c71c3beb7321a0902ca74a15ad7930afb5350038f3fe4b08f04e08",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-agent-ui.txt",
+      "sha256": "143358170498a654c51a656852257db551ab4f2047c118aa5f1a92aa2202e084",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-agent-workflow-publication.txt",
+      "sha256": "33944e0feafd5a8f9b35b65a7698d32e1c68e0913e56fae67968ad896111cc39",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-local-management-db.txt",
+      "sha256": "920e738bf93db28445daaeff7a9e27def4f991e9759b11d9e4fcb790a627b6fc",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-capture-R4-local-management-ui.txt",
+      "sha256": "18524e04cd77cdb623ae078470bcb2bf5c350344d7fcad1d637bea48767e78b3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-agent-domain.txt",
+      "sha256": "adfda44c12fd91f988d253568cade39f2f8d765b497581f9283fd9d2e3c46f85",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-publication-db.txt",
+      "sha256": "274361e29742d7d01fe96434aacbb2ffa62424b94078c8f9ffadced308afa05f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R4-workflow-publication.txt",
+      "sha256": "1602674418fc0c15fcefd4a15c4e47eaf28c45bd9d04c3cae2847274e89f62e2",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R10-cascade.txt",
+      "sha256": "7c4e79ec547204af1bdc1a10a4ce7247d35ab339a168de0a5a90c47bc29ea14e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R13-db-workflow.txt",
+      "sha256": "8f623dfd55ff353ffcf497519c68d061911a91c2ff99081b8344e207d77aeee1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R14-browser-fixtures.txt",
+      "sha256": "9a911281d3dc30d97fd1adabc8dbcc0bd9d869055a700cc2a330572aa2565302",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R15-local-regression.txt",
+      "sha256": "119ae16f35feb1c9fdd66456460b04dee66c56eeb941da304331941813357d91",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R16-workflow-regression.txt",
+      "sha256": "a750d0fb4eb462dc6d4af3d0234628a187c56198f2785570db557f77c75e1874",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R4-db.txt",
+      "sha256": "aee14c3862bf5dc62425e56dd773d97b9a68758eac4b6f49fc6307bc1dd2a01c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-R5-headroom.txt",
+      "sha256": "0aaaf69760c36d41538cb22f84b42d87407d6f809f1fd083459b135a893dd92a",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-cache-R1-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R1-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R10-tests.txt",
+      "sha256": "75f542ae26ebfeba9396a273ae5d445782e12e8a9f3f987e3d1ab4ac8a3d48c5",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R10-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R11-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R12-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R13-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R14-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R15-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R3-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R4-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R6-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R7-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-native-plugin-R8-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R2-domain-wire.txt",
+      "sha256": "eaed45d812ea256899e54fe1c301cf24a9958e8c893e60926636ad8cbf5c0335",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R2-node-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R3-domain-wire.txt",
+      "sha256": "ab7b8957ea9d0ff35d81e9b55c4c74cbcb97bd67234b8df606b1f4ae1b154b74",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R3-http-ui.txt",
+      "sha256": "dbb4aa10cf9a2854ebafd592e6cd71c029fa5ab0d53836a0f3253991354b5a98",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R3-persistence.txt",
+      "sha256": "1d70230f89ee88d15ca1cb448509b716ea2bfcb9a9b1da6ece5a62154e873d97",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R4-http-ui.txt",
+      "sha256": "336214bd98d604eca5fa3eb8c82a38f43b34d4a008b603ade492fce913a1b2bd",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-connection.txt",
+      "sha256": "b3ef526fac5ad2c845259e0597865e94484bc04803f9b1ed415bcafd5182b998",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-node-typecheck.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-persistence.txt",
+      "sha256": "2a20642148c60c5c595c804e06c738169f42728aa9c752422abb225c11d8cf6d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R5-workflow.txt",
+      "sha256": "b5fda7a572846f72d154ff947a2bcd50bb99aa4ec24144fa16ad3a53291a16e5",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R6-protocol-frame.txt",
+      "sha256": "f782207ba4f78e9ad793c8a50d55ad6cb5c336829cafd3c41dd2bb859cd56382",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R7-graft-build.txt",
+      "sha256": "f1b5be916eafc96263e9b27e91fef0c419e3547e2675a8a778cc69543d736ad0",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-permissions-R7-workflow.txt",
+      "sha256": "8b92792074b744c9926d78dedd13285a6f5210bcbb8563e89b76f09f68228a99",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-pre-review-graft-build-R2.txt",
+      "sha256": "1d9d956ede586ad8cef3c60fdbcc7bbabc1adecdc317fcd86bf96e38997e5191",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-pre-review-graft-build.txt",
+      "sha256": "d279b1ae03be0fa32cc6780c8985b86bdb07333c2756e36adad309e9b417d7eb",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R10-acp-required.txt",
+      "sha256": "26b82c4e7d86db1440b85ac3274fdecbb2b4b5daff356a1827b6a58bb4749b62",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R10-claude-capability.txt",
+      "sha256": "3ad7bdf3416d15a44efed4a47b8ac520c1963d7d8106bd81178f3f05f8f5cf15",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R10-runtime-capability.txt",
+      "sha256": "e777a6ebf5ad35fd657ae923fa1a6886038d3fea089daed82a6f01a7e75b36c8",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R10-test-bridges.txt",
+      "sha256": "bd36a528b5540d2689e47c5d88b702a71b6f9485e7ddf1ade3c4742eebcbd9b1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R11-combined.txt",
+      "sha256": "889a171033f94e3cd1a52046a6a8ebf164d99414c771cebf05c5a3abd59fda3e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R12-combined.txt",
+      "sha256": "29c2f46f9c7e58d699566c36f4ae0eef51a61a247ae314ad6fb9d0a573fc7455",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R12-typecheck.txt",
+      "sha256": "a00ea7860f1c0d06403bf8e4991b8067f8f27df1c2db014739cd1017258f2286",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R2-owner-transfer.txt",
+      "sha256": "52ec5460ac86c2778e0f2508ff8d8da062948999227c144f29b640acb968128f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R2-transfer.txt",
+      "sha256": "e2bfa58b7a455135a0b403c45c02274c701e3335596b5e6ded94fc01021873af",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R3-lifecycle-boundary.txt",
+      "sha256": "f2ebe1ef3e02b176027612ecc4265daec5f0193cf084e9b90cbaba092074ad88",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R4-lifecycle-boundary.txt",
+      "sha256": "246d6e0162d911909654db692d9ff593ca713a0c26e9273dc24379e7108b4ac7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R6-staged-native.txt",
+      "sha256": "226c9366fc9e86ca5417192f71a3fefa00364c849b5f007960d1b89414653bd7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R6-typecheck.txt",
+      "sha256": "a00ea7860f1c0d06403bf8e4991b8067f8f27df1c2db014739cd1017258f2286",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-core-R8-combined.txt",
+      "sha256": "0f0017200f47e4cdc774770abc9e3d9462c83887f98a9a901ef8d703dc214162",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-runtime-R1-build.txt",
+      "sha256": "6ebb3125d78713c88ebdeead6a0ac8f1e21f92b1c853fc8a228e0b24c6e3424e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B2-required-runtime-R2-build.txt",
+      "sha256": "9976dd530612ddb1bb29339bff120dbfa183d1a0dcf30bca6ae186f0805410e0",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F2-core-combined-tests-R1.txt",
+      "sha256": "3cf4da26be7ea35ea39815eea0c3be737143bea1f6facdd6c1d5c38a794c67d9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F2-origin-tests-R1.txt",
+      "sha256": "b8b33be22ed9f6e0d495f9b42069286b8efb4a29fb5d9a16142c5435aa77b530",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F3-plugin-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-TLS-relay-regression-R1.txt",
+      "sha256": "481165637537eb85553db26298eddc565c6b65457cdda9983159bf241386ff98",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-empty-live-query-timing.txt",
+      "sha256": "a1e8cee007cb9a6f82495c63d90ca3d079e14b404a1b8341acf1161cfed95077",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R18.native.txt",
+      "sha256": "85a2847d7020f3456c1b542ad33822415423b193cbe3d0636910b6a9266adfd3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R18.txt",
+      "sha256": "3d9d9fb827de125a55d53f36132358bd550ae33b9669f3f1340427a5334cf7ee",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R19-long.native.txt",
+      "sha256": "3e1b3cf3f953ffefb01efd2053a8b494bd77f50ed819bb78b67f15afa1676aa9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R20-driver.native.txt",
+      "sha256": "45c315ac67f0a4d0637d4fd4eafd52538888c32bbe0351db3b060f7203a58485",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R20-driver.txt",
+      "sha256": "7531b03ade7e6f7d7dcd14ea203fdddd220db89fc1346aa7873d3c1f92aa678a",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R21-fixed-long.native.txt",
+      "sha256": "234826d408c3c0a7768d4a78e9ae7d4ce9a5fa2dd08712db876009a302ee1315",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-F4-native-company-R21-fixed-long.txt",
+      "sha256": "276be03efd803c6bc34124a6925c93f1a811bd2586fb0d04e0f756f0820b8d2a",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-JEV-lost-lease-barrier-R1.txt",
+      "sha256": "edf6c58a37c92ac490347f3524dc0df0e8460e26dc1b618f5e0a0363f1af9d79",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-1.txt",
+      "sha256": "5a6658a32c1600e4f3662cbecdcd5ed74686c7e4b7fb16aed7a9420157767590",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-2.txt",
+      "sha256": "db3840fa9ff59bd2380cfdacd35373fba6324cb625f40fd81121027d4b26c8d3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-3.txt",
+      "sha256": "a3e64202dc7946312775382755b623b9eac63e5d5158551093f3c5802667e0d7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-4.txt",
+      "sha256": "03db2de711c493febbbbe8443678c8fef50c2596db5759b51032c92bfab3b58c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-5.txt",
+      "sha256": "b5e89b5ee19fdb7cdae17360044b01611f1ff504e3b03de80609aeffb07293d6",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-6.txt",
+      "sha256": "5db275096e67c79df5a7b5c0d5b66ccc537e621211f00c342555e85e89d5fd1a",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-affected-regressions-7.txt",
+      "sha256": "430ffe6d571ef1c67cbf5e62abbd2b9f333d83d62ce96c5b4d96c274a8223178",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-graft-build.txt",
+      "sha256": "5c28700ebd958eceacd7b5785744519ea3751f2d4114683d142dfd311449f47b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-native-integration-tests-R6.txt",
+      "sha256": "40c16285ae86c091db679feaf31d5ee6dd7b3d9c0f61b21fca4d7544cc7e34bc",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-native-integration-tests-R7.txt",
+      "sha256": "4f9a1229e4d6fcbae8445f5de1380ad5671b0dce8df5a5c95ecfc35b99bd0557",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R2-plugin-typecheck-R2.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R3-doop-normal-failures.txt",
+      "sha256": "f35439576b41ad4de5ca49a0c2fd8ed06fcc04f3b2ed54259d7d7f106853e053",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R3-graft-build.txt",
+      "sha256": "6ffc8f1bc66be3783b49a3b5b61462dbfbc91eb69708d6fa4d725c2535855ee8",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R3-native-regressions-R1.txt",
+      "sha256": "507b720640073df4803519008151542d460d4a9e4715bd2e7a749648c2e71dc8",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R3-publication-regressions-R1.txt",
+      "sha256": "3f8fe4a9fdd4d3af663f453bc71be89505df59207b64ba6741255de479ea28a9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R4-doop-agent-regressions-R1.txt",
+      "sha256": "1bc34fc5ca5de07855f9215adadba062bc3122db09de394b2fc749e5454fe10b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R4-graft-build.txt",
+      "sha256": "3cf60efa3162592ca5e8fa3669e9964cb76eff5731915ece3e63e31cc9c9d2d3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R4-native-company-long.native.txt",
+      "sha256": "ac8ad93d4b4b22a71f89c3b3631cc03a92f20df1e05d52d53534e5761724688d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R4-native-company-long.txt",
+      "sha256": "4bc730acc49f2504b08b9be674ee555779da4524d21f340ba52a16805d2998ca",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-R4-native-regressions-R1.txt",
+      "sha256": "49fe8d3d2a08e9c8c753ee3d210c291cf14cc49bcbdff63f205c36625f716b94",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-1-R1.txt",
+      "sha256": "77e424aff7c114083026ff052201513ea76ac97b775719a1b2698e807d727d36",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-1-R2.txt",
+      "sha256": "630d7df103c67a009bb3fd3ba9e3fa704bbe819ae6e470b29961064e1a3b8c17",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-1-R3.txt",
+      "sha256": "1f22ffbccb1c353d0b03d6604e90fb5a6de9dec85fa990c61be130c06c8a046f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-2-R1.txt",
+      "sha256": "941ed045e5dc6c3cf4c8e68c4d41f656360bb5fe45a916c4c0d5701f2254c0d5",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-2-R2.txt",
+      "sha256": "f706a438c753245511aa0e84f7007403173244394cbdf38ae9980a5946a32131",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-2-R3.txt",
+      "sha256": "55722c01f921d3a2d6cc960dc8ac89d60735d57f26e5630efd8e42d5d62b4ef6",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-3-R1.txt",
+      "sha256": "102bb3a39f6c58899c82d29492655446aedd40363431da230564c823fdc6d92f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-3-R2.txt",
+      "sha256": "c7828ab54014086044c163da2d368f74987fc4981c6de3730cec7ef804f75f97",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-3-R3.txt",
+      "sha256": "ac1920f3480359ce09d41dc2f096c5062e39d0e44ed4c9281dd7f0b2198a11f9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-4-R1.txt",
+      "sha256": "8faae40c09b51f1c7b72d99bf265883fcfa798374c67eb644f43a0819eba66c0",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-4-R2.txt",
+      "sha256": "06909fe6bddaabfedb9c67b3723e00b4a01b66935304077b8305c223d1b21027",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-4-R3.txt",
+      "sha256": "ac14095a77c40229124e88e7559f85e13dce0d6468133418ba2bea213e51a621",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-5-R1.txt",
+      "sha256": "c610b49d8403c93d4b389d684e9862dd4f9b574e046d3bd5c6c344754ca69c75",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-5-R2.txt",
+      "sha256": "4c2c9d39efba3012ebef4ed765f27647824487243a5c670e5cd4e83d2d4d90e2",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-5-R3.txt",
+      "sha256": "65874634da349366dca3043802aa6e5756e09cb87f36f83015a3f7ab7cf344cc",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-6-R1.txt",
+      "sha256": "bb5b624b8b2b7e906a137c672b58c2bae6882c7ca225b0e137f170b32ee76223",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-6-R2.txt",
+      "sha256": "57ec4eb67318fdddf4b794de0f2423ab58bd9a2c535927584205207cc661f9af",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-baseline-filter-6-R3.txt",
+      "sha256": "811dd4fbb9545de7fafb89cd157f99cc8ae00e8e5124c8446936c2ce75b0fc1e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-broker-admission-tests-R3.txt",
+      "sha256": "d73d8fffbbd9d5f929e79cf0cee85b07c44f45a6aebed774d1280a606d4c4424",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-broker-compiler-tests-R2.txt",
+      "sha256": "ef71921dfbe387be5a0786605a683ded1f205b17e9f0c8ccd79f1f9db85ba3c3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-broker-compiler-tests-R3.txt",
+      "sha256": "753a7261e94bd10a7164806d4cdd3d5ed7154bd2ce70d667b0b1e87dec531193",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-broker-maintenance-tests-R1.txt",
+      "sha256": "37cc1ac076d3635fbd5bd6e73cf8f0955f5d451012b7a32237db5b4472032c4f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-browser-fixtures-cascade-R1.txt",
+      "sha256": "92745c95a9ed301705e72baf897951432e53fce21ccf486047a60959b4664005",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-acp-required-tests-R1.txt",
+      "sha256": "015265c1d050c08dbe0de3a387591341398ff69427d8964c3c1be9d6eed4e127",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-claude-required-tests-R1.txt",
+      "sha256": "8aada0a1db93d74fdc88f99c907fafd6c858df4452ec080a536c71e996879a48",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-core-required-tests-R1.txt",
+      "sha256": "a2c9396055d244a2e8368658a3c2444ea8f40db43c8b0abf01e5862e1bf0839f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-native-company-R12.native.txt",
+      "sha256": "08970a462da88a68fbb3dbfff80888c81564cad6b7e785bb921c5c6585df66ab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-native-company-R12.txt",
+      "sha256": "a65b659479bbeada12bf71743d48add2b62deda2f3f0e0516cd89e3026d3d31c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-native-regressions-R1.txt",
+      "sha256": "85adf64c17355bfbe95f77768c51d4914d967cbfa546a209d8983758085b3f0d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-runtime-required-tests-R1.txt",
+      "sha256": "c447f4609bd61c6f7a16b662fde94554fca60638e19f33d14f6368a751fe499f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-clean-runtime-required-tests-R2.txt",
+      "sha256": "29ef57850102ea3244ba6ccb72e1b025ac2fd3a5744df0e376766922f041fd00",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-core-claude-required-tests-R2.txt",
+      "sha256": "2f008ae9c5c519c3aa4efc5fdcfa9f8b088c48cd7d9e7d64e05783547ac2cdc7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-1-R1.txt",
+      "sha256": "eebc7d3065f70f011699ee3050c032e1f4dfb04602cce3ef9cc140ca97ec0bb7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-1-R2.txt",
+      "sha256": "1f52e4aad43b867ddf324e239e1975c1a2cffc6a1590527ea881967ab7cf4455",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-1-R3.txt",
+      "sha256": "d7e12760fa132ba4b27c6fad7559afe1c3aa37cce3c4b1c8c9800888f22ce3e5",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-2-R1.txt",
+      "sha256": "0d1fd2010c7b1fa101929fa5ebf46e09206882aa511df295f427aab70f23d3f3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-2-R2.txt",
+      "sha256": "28a42d5141ffcb5ced9a556fc0b7d1e7d548a822eeec1e722b92ac75f18f1463",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-2-R3.txt",
+      "sha256": "3fc573067f25cfa79b625b38968d9e4b14b102e90f4ec12029f57d389643b013",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-3-R1.txt",
+      "sha256": "ee4e2dc4a63fa128f6a384e9462e82c6d0b18fb32c05936f45f4084101128e48",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-3-R2.txt",
+      "sha256": "2eaa7bc9eb4a3f3cfe740063a9b8584014f387830c86b8fb9546443eb01a2f6e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-3-R3.txt",
+      "sha256": "5aaed3a9c497bb9b3ac3115f94a8a2f8d94b09046fde8d1c64ebdbbfda912cef",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-4-R1.txt",
+      "sha256": "6de7a82af1b46cfb2360fd922cea37519292a06cfb1dc4bb4afc210c86926e09",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-4-R2.txt",
+      "sha256": "351c22a80b2c33218be7836d4507e4ab179f6708c3b92ae9e45ad59bfa79b42b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-current-filter-4-R3.txt",
+      "sha256": "74744f61e50bbb5f7bb3f330581cab632b4a60dd4109dcb60f71d7c7c639f6f7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-claude-typecheck-R1.txt",
+      "sha256": "d39e93356e94c1faafecf525d0684243b61275a3fa19403113dd8e6f69c77f08",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-core-required-stage-tests-R2.txt",
+      "sha256": "81878c3c65bb523da1b0a633a5aaef178081129944e9a7a489424635b8fa4949",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-graft-build-R1.txt",
+      "sha256": "83e8b8a5319927ae4c5d10f2eb0c5ad0e465875ae1744a8eb92b178f55fb4fb2",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R13.native.txt",
+      "sha256": "2a199cb96ec87074ca4c7087290b679b247165362e06baddf05bae1acba24cfc",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R14.native.txt",
+      "sha256": "61eeb2c2480c468110fc56ad27647391bbf72851cd219f86069474d7acce0a2c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R15.native.txt",
+      "sha256": "ffb4c3cb3ff958f6443b6b46f00c51e3040b0f79146b3dde25528679a8e06fd5",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R15.txt",
+      "sha256": "fd968e23fb232e13161dda0811c6592f2d1a1ac61c601cc708313bde2b214a92",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R16.native.txt",
+      "sha256": "f726fee33c974b483f3e985a28a4e8ff0ea3685b4f0e8adc0ab2c8f02ac52786",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R17.native.txt",
+      "sha256": "fc54333c69f9b62f686b4335cca404216088164bbadeeea893c9550ce7c4a3bf",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-company-R17.txt",
+      "sha256": "bd34e9f9c4a517838d7f2bc2397cec887ec149f043a4012dd2d5688c7242f2df",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-native-regressions-R2.txt",
+      "sha256": "46880fa32977c360329743d37afeba292a40330a60eae6a3df7aa0724594c3e8",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-final-plugin-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-cancel-recovery-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-journal-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-journal-typecheck-R3.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-tests-R1.txt",
+      "sha256": "aaf78f1e3931ee8a8a1794d69761706af2e5c4253fcf454bee042aaf282778b4",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-typecheck-R2.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-typecheck-R4.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-typecheck-R5.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-proxy-typecheck-R6.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-mcp-wire-budget-tests-R1.txt",
+      "sha256": "9e5e6c7b96ac0b306c65cba2aedabbde4899213e249f697ec4ec68d609567d35",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-arguments-typecheck-R2.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R1.native.txt",
+      "sha256": "b0260fa3ad49ac903d28b35bbb996cc208fb1b992134148047597b8d6d7123e6",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R10.native.txt",
+      "sha256": "565d6e9594ce30627bd9fe59ae66952c4385c1ecc91ab92c01f5e280595c1d80",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R11.native.txt",
+      "sha256": "c42fa77f7ba4cf60819b8a9b29f8e04c598a4eb6bf7f89b0ce2940cbc5e6dffe",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R11.txt",
+      "sha256": "347bfbfc6f2424913a0e55a5f375365c85166d529c3ec1af15f2f988271d9f92",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R2.native.txt",
+      "sha256": "38d095a1262fe1ef6909b81e754fb0a8b1409298e1a94bb5ffe1655562d971a6",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R3.native.txt",
+      "sha256": "38d095a1262fe1ef6909b81e754fb0a8b1409298e1a94bb5ffe1655562d971a6",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R4.native.txt",
+      "sha256": "8827c8106e91a79deff77c0330e9d40d5125cc01b6d23ab8cf75af3ed81ed553",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R5.native.txt",
+      "sha256": "eab83c2cdc593b59a307e3c7aec79866b1c969081fec342e41de0b47bde9e012",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R6.native.txt",
+      "sha256": "11547c229bc4555d8c0cb17d3a5860bbe428e43de2944550a93b441862b86f80",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R7.native.txt",
+      "sha256": "29c62e5a2cb153e4d059333f76621dbaa2814cff631e6ca56c9d6a63d4e46990",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R8.native.txt",
+      "sha256": "8bb82cdf67648c05fae76b26025fd84911a1ce66792e7f03b5de241c91ca1a8a",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R9.native.txt",
+      "sha256": "fb53f9a05bec617548867965657c668482c90798d42aa7ce26472382e329cbb3",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-R9.txt",
+      "sha256": "c6ba34a078cf02a359b955427889e96242ee8ed94f3e218a5fc707556ec51c62",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-company-plugin-types-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-history-http-tests-R12.txt",
+      "sha256": "d0cf8ae63725ed9f66a4350fc13d97c5afc9ca92c695793bf0a7770bd014aa0d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-ingress-tests-R2.txt",
+      "sha256": "49f107cb138127df0075b465f6772b0a6260062b44883c7a3ee69e35622641b9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-late-approval-tests-R16.txt",
+      "sha256": "3083d81173cbaacc607fd59b3761fd9921d5fa9d08dcfaf71ba8af2da20f6efa",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-limits-tests-R1.txt",
+      "sha256": "ddca315eaf5168eaf06ecb567e5b0565dbdc668e7e11ccd6bdd73cb17063bc7e",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-live-tests-R2.txt",
+      "sha256": "1a9e0b1fae0cda87f5e20b99763c04df4075fa625f7fe2b4ed7ee0e818d956d7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-producer-R1.txt",
+      "sha256": "5fdaaa311445037f23a6337546cf7e5dac856999efa0fd29df42212c10d92197",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-producer-R2.txt",
+      "sha256": "75f4f6ee7fcc24f97d53ab99451f1ca95105e2645c99e40660006676254687c9",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-producer-R3.txt",
+      "sha256": "aa28fc01c875a8f5b0b055a16b5a2c16cce8f1a53b26e65bf24770001e01c30d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-producer-R4.txt",
+      "sha256": "ade446fffe72617c1a13814d4b44f03068b876db7b6f010b095677803ceadb62",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-native-retention-tests-R2.txt",
+      "sha256": "feaa86d6f26228b1e66efff1a60e33a140e7112efe6d32313d5a0c9413eb8731",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-prepare-runtime-clean-R1.txt",
+      "sha256": "1994e7520c9a9774c19fb6caf53368e9fb91c6a3b3fad7a1b48f5fc7b3fa78ae",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-prepare-runtime-clean-R2.txt",
+      "sha256": "f418473868874cc6c2bbbe09123402e32c4750637c04249c26dd7556e5ad858d",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-prepare-runtime-diagnostics-R3.txt",
+      "sha256": "7bdeb3a03a116c4650f9529ce2e83ad3a42336abcb36db02395909c976996b66",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-prepare-runtime-teardown-R4.txt",
+      "sha256": "9cba4b559ae209926c4a847bfeb046b639ab732cf684e128786fb0fc79903866",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-producer-bounds-tests-R1.txt",
+      "sha256": "6b6b54e58bc34b287cb8d341f538cf15c4ffc26df25e9bf2841c8d6d45d24865",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-producer-origins-R1.txt",
+      "sha256": "84f83f7781e134b343bef9325639fe3f6a3eb9c6cad2ebcaea8aca12fb71dd41",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-projection-R2.txt",
+      "sha256": "93f40741a56712ff538965429ed4edacb3247dd049bd171970c26f9e1935d7c2",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-projection-plugin-typecheck-R1.txt",
+      "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/B3-required-runtime-R5-build.txt",
+      "sha256": "95be7e703ec97f848a34b1c894c753769f5d1dc4ad3ff9d52c9eb61ae47899d7",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG1-inspection.md",
+      "sha256": "53f760261c2ed53ac6e1edad672c6be134dfc74586aedeac7dd388b70ebef3bf",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG2-R2-inspection.md",
+      "sha256": "4f6c8ab608fa4385cbbfbbef02db3b05639f5ad014d5269cf6ae770c9768518f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG2-source-evidence.md",
+      "sha256": "771c0060c01d3e17ea06dcc79c4d00e487a0f20cbcd808ca9196ab92b21cf4ad",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG3-R1-inspection.md",
+      "sha256": "fabf0246b81a99dcd706fe3aafa7a80deda0a63e5cf9c542cad427d40ae5b798",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG3-R2-inspection.md",
+      "sha256": "e5576181bdc929a2e3a9e4e76a474f5ea4134ab0d2ea2cef4897e2ca6c21b4e0",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG3-R2-producer-followup.md",
+      "sha256": "8460d36442c7c5b3b785bfc6d551803beaa80c6e95b8b58d7767f9255017d37c",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-reviewer-browser-fixture.txt",
+      "sha256": "ce274141db68e56f66ab4c7ad9d574a542ca8b7609db1790256d1159c2eb337b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-reviewer-core-corrections.txt",
+      "sha256": "338ed833355336f9088cdf26bd1771ef722b8491ebeb238f1f7011bb916caa55",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-reviewer-native-permissions.txt",
+      "sha256": "e4fcdfd14379e9051f9d1a55950b13c353daba9df2358f23f35880c18ee642ac",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-reviewer-skill-tests.txt",
+      "sha256": "25ec234ca87570d81c4c5bd7b813254682acc7829f37b7c3f4f32a1c36ea92dd",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-reviewer-case-probe.txt",
+      "sha256": "39dea53bd4f813979a991ea386ff1fdad1f77086eec68c42660ea40e904f28e1",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-reviewer-core-tests.txt",
+      "sha256": "bcb910e0ba6e6e67ee204afba2a8513de3794b9cfd6640308f0362f0af9aa393",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-reviewer-native-db.txt",
+      "sha256": "bcfce4fbd894db5a997f0623b7e1c4b69de3eb706341cc906baa66e8a5e65a0f",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/branch-publication-whitespace.txt",
+      "sha256": "8a84c7ce282c6a8b0d41573136e9d2f0102b25223b8a3f1e01387c88351da22b",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/cloudroom-baseline-build.txt",
+      "sha256": "7cc3d81c1374b675170c00faca04ee95d3a536d512f08f240e57ede4cc1519f2",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/cloudroom-baseline-install.txt",
+      "sha256": "a20a1ea7fced497d0bc3aef3684fd70be1cf80d018aae9291fda70eb126533fe",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/cloudroom-graft-resume.txt",
+      "sha256": "33a50e7b155c21638542623643c8926deec999506b1795ca829662ae87e0d232",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    },
+    {
+      "path": "plan/cloudroom-harness/phases/p01/docs/logs/stop-graft-build.txt",
+      "sha256": "3242e9c58dc907fedff264eaaa2e9055586683da6429167a698875ec5fabcbbe",
+      "identical_inputs": [
+        "23eb638d609614cafe958bd6a5d17a4e9bef6463"
+      ]
+    }
+  ]
+}

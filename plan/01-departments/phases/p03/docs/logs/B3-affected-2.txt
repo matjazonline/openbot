@@ -1,0 +1,67 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 60 tests
+test adapters::http::routes::agent::authorization_tests::agent_pages_hide_foreign_names_refuse_members_and_propagate_database_errors ... ok
+test adapters::http::routes::agent::harness_payload_tests::retired_agent_fields_are_unknown ... ok
+test adapters::http::routes::agent::tests::agent_pages_and_fragments_render_correctly ... ok
+test adapters::http::routes::agent::tests::clearing_every_capability_checkbox_submits_empty_lists ... ok
+test adapters::http::routes::agent::tests::json_payload_round_trips_every_capability_field ... ok
+test adapters::http::routes::agent::tests::test_ai_prompt_generator_renders_link_button_and_textarea ... ok
+test adapters::http::routes::agent_library::authorization_tests::nonoperators_get_not_found_before_library_form_or_avatar_validation ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_page_hides_foreign_companies_and_refuses_members ... ok
+test adapters::http::routes::onboarding::authorization_tests::onboarding_submission_key_is_required_and_denials_propagate ... ok
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, exports native authoring responses for the browser gate
+test adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete ... ok
+test adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... ok
+test adapters::http::routes::ui_agents::form_tests::a_native_urlencoded_submission_builds_the_write ... ok
+test adapters::http::routes::ui_companies::tests::a_blank_submitted_key_becomes_preserve_at_the_form_boundary ... ok
+test adapters::http::routes::ui_companies::tests::a_rejected_form_never_renders_its_submitted_api_key ... ok
+test adapters::http::routes::ui_companies::tests::an_explicit_remove_omits_only_that_provider_from_the_replacement ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_operation_cas_cascades_and_tenant_constraints ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_agent_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... ok
+test application::agent::contract_tests::autonomous_agent_contract_alias_and_identity_uniqueness_is_agent_local ... ok
+test application::agent::contract_tests::autonomous_agent_contract_binding_count_and_parameter_bytes_fail_before_execution ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_agent_child ... ok
+test application::agent::contract_tests::autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets ... ok
+test application::agent::contract_tests::autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts ... ok
+test application::agent::contract_tests::autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority ... ok
+test application::agent::contract_tests::autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content ... ok
+test application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools ... ok
+test application::agent::contract_tests::autonomous_agent_contract_target_variants_and_remote_aliases_round_trip ... ok
+test application::workflow::provisioning::tests::arguments_are_held_to_the_input_contract ... ok
+test application::workflow::provisioning::tests::every_built_in_name_is_reserved ... ok
+test application::workflow::provisioning::tests::custom_steps_are_held_to_the_builder_step_types ... ok
+test application::workflow::provisioning::tests::http_operations_cannot_take_a_built_in_name ... ok
+test application::workflow::provisioning::tests::only_the_exact_name_only_built_in_is_trusted ... ok
+test application::workflow::registry::message_tests::message_registry_built_in_names_cannot_be_registered_tools ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... ok
+test application::workflow::registry::message_tests::message_registry_destinations_are_twenty_distinct_users_or_channels ... ok
+test application::workflow::registry::message_tests::message_registry_runtime_check_refuses_what_the_schema_admits ... ok
+test application::workflow::registry::message_tests::message_registry_reply_wait_takes_the_standard_payload_and_a_message_correlation ... ok
+test application::workflow::registry::message_tests::message_registry_subject_is_bounded_in_utf8_bytes_at_publication ... ok
+test application::workflow::registry::message_tests::provisioning_names_are_not_step_tools ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete ... ok
+
+test result: ok. 59 passed; 0 failed; 1 ignored; 0 measured; 3810 filtered out; finished in 5.55s
+

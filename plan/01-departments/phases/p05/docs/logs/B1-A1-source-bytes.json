@@ -1,0 +1,12 @@
+{
+  "integrations/doop/managed.patch": "b50dcb46770b13ba87dc058462b4dac0d062cb67599090ff17b9743e54deea8b",
+  "integrations/doop/source.json": "6393cf7629a09e236928abae42ead9d07500978a944666558e89dc3c70f959b8",
+  "plan/01-departments/05-integration-and-final-verification.md": "e7575464fb1ede9038ce931d866e66678b4a5b7620e4b46e4e0605ea6ea36f00",
+  "plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json": "05a19f78e3b26c892ba3a1123c21f4a0da5735432911d8ce48039983812a63f6",
+  "plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json": "1ba05378895ae7fc28d07fbb71871099bc944f2718634d2cafe9cb735254b166",
+  "plan/01-departments/phases/p04/docs/logs/B1-R1-css-check.txt": "1ee814ce333fe175ee82e3031f6fce1e1804735e25010e858d765789b3e251bf",
+  "plan/01-departments/phases/p04/docs/logs/B2-R1-css-check.txt": "df7d0266b7cd3837efceab2a9aa9e86028cc68c342ff84310082246f3bbaf3e8",
+  "plan/01-departments/phases/p05/.gitattributes": "61fc69becb4fbeb9b20cfcfc7e5abf3763e29e71f7d49a24948a4553eaa10592",
+  "src/adapters/persistence/workflow/doop_document_live_driver.rs": "f22fc7841ad63e51760d949c26e1fda6e1e3f0dfb0a46d4ab3435cb180dc5d9c",
+  "src/adapters/persistence/workflow/doop_document_live_tests.rs": "8ec6e7527834f0cdc7e776454161cf62685160476f740c718c188c340aaccbf2"
+}

@@ -1,0 +1,246 @@
+{
+  "image": "openbot-p05-r3-knowledge",
+  "image_id": "sha256:6f9bbcdce34c7c02da43eb8d2b189b241ca3f6b0935bbdf76b48b831d72a753c",
+  "docker_reported_image_size_bytes": 355390525,
+  "installed_app_bytes": 591317265,
+  "user": "mailagents",
+  "network": "none",
+  "read_only": true,
+  "container_memory_mib": 2048,
+  "peak_rss_budget_mib": 1536,
+  "probe": {
+    "model_id": "intfloat/multilingual-e5-small@614241f622f53c4eeff9890bdc4f31cfecc418b3/fp32/mean/384",
+    "dimensions": 384,
+    "norm": 1.0000000162263665,
+    "translation_score": 0.8418708013514999,
+    "unrelated_score": 0.7169436551792845,
+    "load_ms": 2907,
+    "probe_ms": 2155,
+    "peak_rss_bytes": 1522753536,
+    "batch_size": 4,
+    "batch_tokens": 512,
+    "chunk_count": 7,
+    "largest_chunk_tokens": 381,
+    "oversized_query_and_batch_refused": true,
+    "retrieval": {
+      "threshold": 0.75,
+      "questions": 16,
+      "matched": 16,
+      "exact_first_checks": 3,
+      "exact_first_passed": 3,
+      "min_expected_similarity": 0.8030392,
+      "max_unrelated_similarity": 0.7431378,
+      "bounded_corpus_chunks": 8192,
+      "outcomes": [
+        {
+          "query": "How long can I return a product for a refund?",
+          "expected_file": "returns.md",
+          "returned_files": [
+            "returns.md",
+            "warranty.md",
+            "payments.md",
+            "support.md",
+            "ax4401.md"
+          ],
+          "expected_similarity": 0.8374708,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "\u00bfCu\u00e1nto tiempo tengo para devolver un producto y recuperar el dinero?",
+          "expected_file": "returns.md",
+          "returned_files": [
+            "returns.md",
+            "shipping.md",
+            "warranty.md",
+            "support.md",
+            "payments.md"
+          ],
+          "expected_similarity": 0.8299237,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Quanto dura la garanzia dei prodotti?",
+          "expected_file": "warranty.md",
+          "returned_files": [
+            "warranty.md",
+            "returns.md",
+            "international.md",
+            "shipping.md",
+            "ax4401.md"
+          ],
+          "expected_similarity": 0.87181044,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "How long does the product warranty last?",
+          "expected_file": "warranty.md",
+          "returned_files": [
+            "warranty.md",
+            "ax4401.md",
+            "ax4410.md",
+            "returns.md",
+            "delta-pro.md"
+          ],
+          "expected_similarity": 0.85695094,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "\u00bfCu\u00e1nto tarda en llegar un pedido nacional?",
+          "expected_file": "shipping.md",
+          "returned_files": [
+            "shipping.md",
+            "support.md",
+            "warranty.md",
+            "international.md",
+            "returns.md"
+          ],
+          "expected_similarity": 0.9180797,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Quels sont les horaires de l\u2019assistance ?",
+          "expected_file": "support.md",
+          "returned_files": [
+            "support.md",
+            "shipping.md",
+            "warranty.md",
+            "ax4401.md",
+            "returns.md"
+          ],
+          "expected_similarity": 0.8754769,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "When must a business invoice be paid?",
+          "expected_file": "payments.md",
+          "returned_files": [
+            "payments.md",
+            "shipping.md",
+            "support.md",
+            "international.md",
+            "pricing.md"
+          ],
+          "expected_similarity": 0.9002544,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "What is the minimum quantity for a wholesale order?",
+          "expected_file": "bulk.md",
+          "returned_files": [
+            "bulk.md",
+            "pricing.md",
+            "warranty.md",
+            "international.md",
+            "delta-basic.md"
+          ],
+          "expected_similarity": 0.9144393,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Quale sconto si applica a un ordine di cento unit\u00e0?",
+          "expected_file": "pricing.md",
+          "returned_files": [
+            "warranty.md",
+            "pricing.md",
+            "international.md",
+            "bulk.md",
+            "support.md"
+          ],
+          "expected_similarity": 0.8030392,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "What is the battery life of the AX-4410 scanner?",
+          "expected_file": "ax4410.md",
+          "returned_files": [
+            "ax4410.md",
+            "ax4401.md",
+            "warranty.md"
+          ],
+          "expected_similarity": 0.92960906,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "\u00bfCu\u00e1nto dura la bater\u00eda del AX-4401?",
+          "expected_file": "ax4401.md",
+          "returned_files": [
+            "ax4401.md",
+            "ax4410.md",
+            "warranty.md",
+            "shipping.md",
+            "support.md"
+          ],
+          "expected_similarity": 0.87891287,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "What motor power does Delta Pro have?",
+          "expected_file": "delta-pro.md",
+          "returned_files": [
+            "delta-pro.md",
+            "delta-basic.md",
+            "ax4401.md",
+            "ax4410.md"
+          ],
+          "expected_similarity": 0.8769004,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Quale Incoterms usate per gli ordini internazionali?",
+          "expected_file": "international.md",
+          "returned_files": [
+            "international.md",
+            "warranty.md",
+            "shipping.md"
+          ],
+          "expected_similarity": 0.8955252,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Innerhalb welcher Frist kann ich Waren zur\u00fcckgeben?",
+          "expected_file": "returns.md",
+          "returned_files": [
+            "returns.md",
+            "warranty.md",
+            "support.md",
+            "shipping.md",
+            "international.md"
+          ],
+          "expected_similarity": 0.8775569,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "How many moons orbit Neptune?",
+          "expected_file": null,
+          "returned_files": [],
+          "expected_similarity": null,
+          "matched": true,
+          "exact_first": true
+        },
+        {
+          "query": "Qual \u00e8 la capitale dell\u2019Islanda?",
+          "expected_file": null,
+          "returned_files": [],
+          "expected_similarity": null,
+          "matched": true,
+          "exact_first": true
+        }
+      ]
+    }
+  },
+  "missing_and_tampered_model_check_and_serve": "PASS"
+}

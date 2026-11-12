@@ -165,16 +165,18 @@ pub(super) async fn picker(
                     .iter()
                     .any(|entry| entry.id.as_uuid() == selected.agent.id)
             {
-                directory.items.insert(
-                    0,
-                    AgentDirectoryEntry {
-                        id: AgentId::new(selected.agent.id),
-                        key: AgentKey::parse(&selected.agent.slug)
-                            .ok_or_else(|| AppError::Internal("Invalid stored agent key".into()))?,
-                        name: selected.agent.name.clone(),
-                        active_revision: selected.active.as_ref().map(|active| active.id),
-                    },
-                );
+                let key = AgentKey::parse(&selected.agent.slug)
+                    .ok_or_else(|| AppError::Internal("Invalid stored agent key".into()))?;
+                // The directory's own entry, so it names the departments and desk as a page
+                // entry does (01DEP-P03-D10).
+                if let Some(entry) = ui
+                    .engine
+                    .agent_authoring_reads()
+                    .agent_directory_entry(scope, key)
+                    .await?
+                {
+                    directory.items.insert(0, entry);
+                }
             }
             pages::workflow_agent_picker(&pages::WorkflowAgentPicker {
                 company: query.company_id,

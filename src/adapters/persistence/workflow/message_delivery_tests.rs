@@ -290,6 +290,7 @@ async fn attention_lists_a_dead_workflow_delivery_for_its_run_actor() {
             principal_id: viewer,
             visible_channel_ids: &visible,
             manager: true,
+            company_items: true,
             view,
             cursor: None,
             limit: 100,

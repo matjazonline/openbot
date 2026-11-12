@@ -50,6 +50,7 @@ impl Fixture {
 
     fn ui(&self, user: Uuid) -> Ui {
         let shared = Arc::new(self.persistence.clone());
+        let reads = super::super::test_reads(&self.persistence);
         Ui {
             engine: self.engine.clone(),
             companies: Arc::new(CompanyUseCases::new(shared.clone())),
@@ -62,8 +63,9 @@ impl Fixture {
                 shared.clone(),
                 shared.clone(),
                 shared.clone(),
-                shared.clone(),
             )),
+            departments: reads.0,
+            attention: reads.1,
             config: crate::adapters::http::routes::ui::stream_tests::test_config(),
             user,
         }

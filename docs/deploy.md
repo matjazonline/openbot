@@ -212,7 +212,7 @@ Secrets — set with `fly secrets set`, never in `fly.toml`:
 `fly.toml` and `.env.example`. With no usable outbound confirmation transport, password
 registration and email address changes are unavailable by default. Set it to `true` only when
 deliberately allowing those operations without SMTP: the resulting address remains unverified,
-so email-based invitations, participant-restricted channels, and operator access stay unavailable.
+so email-based invitations, participant-restricted desks, and operator access stay unavailable.
 The flag has no effect when outbound SMTP is configured, including when a send fails. A loopback
 SMTP relay counts as configured only when `SMTP_ALLOW_PLAINTEXT_LOCAL=true` meets its local-only
 requirements; the default localhost placeholder does not enable confirmation.
@@ -572,14 +572,14 @@ that uploads are not configured; avatars already stored keep rendering.
 
 ### Mail attachments
 
-Attachments arriving on a channel are stored in a **second bucket with no public access**
+Attachments arriving on a desk are stored in a **second bucket with no public access**
 (`GCS_ATTACHMENTS_BUCKET_PRIVATE`), never the avatar bucket. They are downloaded through the app
 (`/ui/threads/{thread}/attachments/{sha256}`), which authorizes each request the same way opening
 the thread is authorized, and serves the bytes with `Content-Disposition: attachment` and
 `X-Content-Type-Options: nosniff` so nothing emailed to us ever renders as a page on this origin.
 
 There is no signed or public URL anywhere in that path, so nothing is forwardable and access ends
-the moment someone leaves the channel. The same service account key covers both buckets; grant it
+the moment someone leaves the desk. The same service account key covers both buckets; grant it
 Storage Object Creator **and** Storage Object Viewer on the private one.
 
 Objects are named by the SHA-256 of their contents, so the same file arriving twice is stored once.
@@ -592,15 +592,15 @@ Sessions are HS256 tokens signed with `JWT_SECRET` (cookie `session`, `HttpOnly`
 `Secure` off localhost). Deploying this invalidates every existing session once: the old cookie was
 an unsigned user id, and it is no longer believed.
 
-Reads are scoped by the channel a message arrived on, not by the company alone:
+Reads are scoped by the desk a message arrived on, not by the company alone:
 
-| Channel's participant list | Who may read its threads and files |
+| Desk's participant list | Who may read its threads and files |
 | --- | --- |
 | absent or empty | the company team (owner + `company_members`) |
 | contains `@public` | the company team — `@public` admits *mail*, never readers |
 | specific addresses | those addresses, plus the company owner |
 
-Administration (channels, agents, company settings) stays owner-only regardless.
+Administration (desks, agents, company settings) stays owner-only regardless.
 
 ### Do not use `sslmode=require`
 

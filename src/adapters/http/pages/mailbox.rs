@@ -992,6 +992,7 @@ document.addEventListener('input', function (event) {
         case 'agent-simple-address-preview': updateSimpleAgentAddressPreview(control); break;
         case 'spam-warning': toggleSpamWarning(control); break;
         case 'channel-spam-confirm': toggleChannelSpamConfirm(control); break;
+        case 'desk-members-only': toggleDeskMembersOnly(control); break;
         case 'auto-grow-composer': autoGrowComposer(control); break;
     }
 });
@@ -1073,7 +1074,7 @@ pub fn mailbox_no_company_page(user: &MailboxUser<'_>) -> String {
             <div class="card w-full max-w-md bg-base-200 shadow-xl">
                 <div class="card-body items-center text-center">
                     <h2 class="card-title">No companies yet</h2>
-                    <p class="text-sm opacity-70">Create a company to get channels, threads and a mailbox.</p>
+                    <p class="text-sm opacity-70">Create a company to get desks, threads and a mailbox.</p>
                     <div class="card-actions mt-4">
                         <a href="/ui/companies" class="btn btn-primary">Go to Companies</a>
                     </div>
@@ -1587,7 +1588,7 @@ fn rail_destinations() -> [RailDestination; 11] {
             "/ui/channels",
             &[],
             Icon::Hash,
-            "Channels",
+            "Desks",
         ),
         destination(
             UiSection::Knowledge,
@@ -1758,7 +1759,7 @@ pub(crate) fn sidebar_header_with_action(title: &str, subtitle: &str, action: &s
 
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
-    let header = sidebar_header("Mailbox", "Inbound channels and conversations.");
+    let header = sidebar_header("Mailbox", "Inbound desks and conversations.");
     let items: String = page
         .channels
         .iter()
@@ -1773,7 +1774,7 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
         .collect();
 
     let menu_body = if page.channels.is_empty() {
-        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No channels yet. Create one under Channels.</li>"##
+        r##"<li class="px-2 py-6 text-center text-xs opacity-60">No desks yet. Create one under Desks.</li>"##
             .to_string()
     } else {
         items
@@ -1816,10 +1817,9 @@ fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
     let selected_name = page
         .selected_channel
         .map(|channel| channel.name.as_str())
-        .unwrap_or("Select a channel");
+        .unwrap_or("Select a desk");
     let options = if page.channels.is_empty() {
-        r##"<li class="px-3 py-4 text-center text-xs opacity-60">No channels yet.</li>"##
-            .to_string()
+        r##"<li class="px-3 py-4 text-center text-xs opacity-60">No desks yet.</li>"##.to_string()
     } else {
         page.channels
             .iter()
@@ -1889,7 +1889,7 @@ pub fn channel_actions(
     let edit_button = match selected_channel {
         Some(channel) => format!(
             r##"<a href="/ui/channels?company_id={company_id}&channel_id={channel_id}"
-                    class="btn btn-ghost btn-sm btn-block justify-start">{pencil} Edit Channel</a>"##,
+                    class="btn btn-ghost btn-sm btn-block justify-start">{pencil} Edit Desk</a>"##,
             channel_id = channel.id,
             pencil = icon(Icon::Pencil, BUTTON_ICON),
         ),
@@ -1899,7 +1899,7 @@ pub fn channel_actions(
     format!(
         r##"
             <div id="channel-actions" class="space-y-1 border-t border-base-300 p-2"{oob}>
-                <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">{plus} New Channel</a>
+                <a href="/ui/channels?company_id={company_id}&new=1" class="btn btn-ghost btn-sm btn-block justify-start">{plus} New Desk</a>
                 {edit_button}
             </div>
         "##,
@@ -1937,7 +1937,7 @@ pub(crate) fn selected_when(selected: bool) -> &'static str {
 fn compose_button(company_id: Uuid, channel: &Channel) -> String {
     format!(
         r##"<button id="compose-button" type="button" class="btn btn-primary btn-sm"
-                    title="Start a new thread in this channel"
+                    title="Start a new thread in this desk"
                     hx-get="/ui/compose?company_id={company_id}&channel_id={channel_id}"
                     hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{pencil} New Thread</button>"##,
         channel_id = channel.id,
@@ -1986,7 +1986,7 @@ pub fn empty_thread_column() -> String {
                 <h2 class="text-lg font-bold">Threads</h2>
             </div>
             <div class="flex flex-1 items-center justify-center p-6 text-center text-sm opacity-60">
-                Select a channel to see its threads.
+                Select a desk to see its threads.
             </div>
         </section>
     "##
@@ -2046,7 +2046,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
 pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
     let cards = if column.threads.is_empty() && swap == FragmentSwap::Inline {
         r##"
-            <p class="no-threads p-6 text-center text-sm opacity-60">No threads in this channel yet. Use New Thread to start one.</p>
+            <p class="no-threads p-6 text-center text-sm opacity-60">No threads in this desk yet. Use New Thread to start one.</p>
         "##
         .to_string()
     } else {
@@ -2192,7 +2192,7 @@ pub fn thread_row_fragment(
         subject = escape_html_text(&thread.subject),
         channel_glyph = other_channel_glyph(
             marks.from_other_channel,
-            "Opened by an agent in another channel",
+            "Opened by an agent in another desk",
         ),
         activity_slot = thread_activity_slot(thread.id, marks.activity),
         // Only rows arriving over the stream carry this: the reply mark means "while you were
@@ -2583,7 +2583,7 @@ fn unrestricted_message_bubble(
             ""
         },
         note_controls = message_note_controls(message, scope, actions),
-        channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another channel"),
+        channel_glyph = other_channel_glyph(from_other_channel, "From an agent in another desk"),
         transport_badge =
             transport_badge(message.author.transport, message.author.handle.as_deref()),
         avatar = avatar_bubble(avatar_url, writer, AvatarSize::Row),
@@ -2785,7 +2785,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
         <section id="detail-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New thread in {channel_name}</h2>
-                <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in.</p>
+                <p class="text-xs opacity-70">The message enters the desk as if it had been emailed in.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}
@@ -2839,7 +2839,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         <section id="detail-pane"{PANE_SKELETON} class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
             <div class="border-b border-base-300 px-4 py-4 sm:px-6">
                 <h2 class="text-xl font-bold">New message in {subject}</h2>
-                <p class="text-xs opacity-70">The message enters the channel as if it had been emailed in, continuing this thread.</p>
+                <p class="text-xs opacity-70">The message enters the desk as if it had been emailed in, continuing this thread.</p>
             </div>
             <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6">
                 {error_html}

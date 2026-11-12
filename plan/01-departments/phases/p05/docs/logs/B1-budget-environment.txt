@@ -1,0 +1,7 @@
+RUST_MIN_STACK=None
+STACK_BUDGET_KIB=None
+LEASE_BODY_BUDGET_PCT=None
+LEASE_BUDGET_FILTERS=None
+LEASE_BUDGET_REQUIRED_OPS=None
+Repository defaults: test thread stack 16777216 bytes; stack-budget.sh exports 2048 KiB; lease budget gates WORK at 50 percent and requires the default converted-operation set.
+check.sh explicitly uses RUST_TEST_THREADS=4. The isolated lease benchmark will use one test thread as its script requires.

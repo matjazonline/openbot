@@ -26,6 +26,7 @@ fn query(
         principal_id,
         visible_channel_ids: &[],
         manager,
+        company_items: manager,
         view,
         cursor: None,
         limit: 100,
@@ -109,4 +110,36 @@ async fn the_working_set_is_bounded_and_the_company_scoped() {
 
     let elsewhere = query(Uuid::new_v4(), owner, AttentionView::TeamWork, true);
     assert!(p.list_attention(elsewhere).await.unwrap().items.is_empty());
+}
+
+/// 01-departments 04C.1: `company_items` alone decides whether company-associated items are
+/// listed, so a manager's one-department view leaves them out; `manager` still gives the run link.
+#[tokio::test]
+async fn department_views_company_items_are_left_out_of_a_department_view() {
+    let f = Box::pin(uncertain_http(HttpForm::Slot)).await;
+    let p = &f.persistence;
+    let owner = principal(p, f.company, f.owner).await;
+    let channel: Option<Uuid> =
+        sqlx::query_scalar("SELECT channel_id FROM workflow_runs WHERE id = $1")
+            .bind(f.run)
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+    assert_eq!(channel, None, "the fixture's run is company-associated");
+    let listed = p
+        .list_attention(query(f.company, owner, AttentionView::TeamWork, true))
+        .await
+        .unwrap()
+        .items;
+    assert_eq!(listed.len(), 1);
+    assert!(listed[0].href.is_some(), "a manager gets the run link");
+    let narrowed = p
+        .list_attention(AttentionQuery {
+            company_items: false,
+            ..query(f.company, owner, AttentionView::TeamWork, true)
+        })
+        .await
+        .unwrap()
+        .items;
+    assert!(narrowed.is_empty(), "{narrowed:?}");
 }

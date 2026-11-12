@@ -8,18 +8,19 @@ use uuid::Uuid;
 
 use super::{
     agent::{
-        AgentPersistence, AgentWrite, LibraryCopyModel,
+        AgentPersistence, AgentWrite,
         model_preparation::{prepare_library_write, prompt_model, validate_model_selection},
     },
     company::{CompanyPersistence, owned_company},
 };
 use crate::{
     app_error::{AppError, AppResult},
-    application::workflow::provisioning::Provisioned,
+    application::ports::department::DepartmentWrite,
     entities::{
         agent::Agent,
         company::CompanyModelConnection,
         creation::CreationProvenance,
+        department::DepartmentId,
         value_objects::{ModelName, ModelProvider},
     },
 };
@@ -29,6 +30,9 @@ pub struct OnboardingSubmission {
     pub library_agent_ids: Vec<Uuid>,
     pub name: String,
     pub instructions: String,
+    /// The company's first department, created with the first agent in it, when named
+    /// (plan 01-departments 03C item 0).
+    pub department_name: Option<String>,
 }
 
 /// Fully resolved provider input. Deliberately neither Debug nor Serialize: it contains a key.
@@ -65,16 +69,25 @@ pub struct PreparedAgent {
     pub write: AgentWrite,
 }
 
+/// The department onboarding creates, under an id the submission determines, so a replay finds
+/// it instead of creating another.
+pub struct OnboardingDepartment {
+    pub id: DepartmentId,
+    pub write: DepartmentWrite,
+}
+
 pub struct OnboardingCommand {
     pub selected_ids: Vec<Uuid>,
     pub missing: Vec<PreparedAgent>,
+    /// Created when missing; the first selected agent, when it is created here, joins it.
+    pub department: Option<OnboardingDepartment>,
 }
 
 #[derive(Debug)]
 pub struct OnboardedAgent {
     pub agent: Agent,
-    /// None means the agent has no model; a refusal keeps the agent and its editable settings.
-    pub channel: Option<Provisioned<serde_json::Value>>,
+    /// The agent's default desk, as its creation recorded it (`agent:{id}`).
+    pub channel: serde_json::Value,
 }
 
 #[derive(Debug)]
@@ -130,9 +143,14 @@ impl OnboardingUseCases {
             Err(AppError::BadRequest(message)) => return Ok(OnboardingOutcome::Rejected(message)),
             Err(error) => return Err(error),
         };
+        let department = match department(user_id, company_id, &submission) {
+            Ok(department) => department,
+            Err(AppError::BadRequest(message)) => return Ok(OnboardingOutcome::Rejected(message)),
+            Err(error) => return Err(error),
+        };
         tokio::time::timeout(
             self.operation_timeout,
-            self.run(user_id, company_id, &submission, selected),
+            self.run(user_id, company_id, &submission, selected, department),
         )
         .await
         .map_err(|_| timeout_error())?
@@ -144,6 +162,7 @@ impl OnboardingUseCases {
         company_id: Uuid,
         submission: &OnboardingSubmission,
         selected: Vec<SelectedAgent>,
+        department: Option<OnboardingDepartment>,
     ) -> AppResult<OnboardingOutcome> {
         // Begin errors remain authorization/infrastructure errors, never draft feedback.
         let mut session = self.persistence.begin(user_id, company_id).await?;
@@ -165,6 +184,7 @@ impl OnboardingUseCases {
             .complete(OnboardingCommand {
                 selected_ids: ids,
                 missing: prepared,
+                department,
             })
             .await
     }
@@ -185,13 +205,7 @@ impl OnboardingUseCases {
             let (library_id, write) = match selected.library {
                 Some(definition) => (
                     Some(definition.id),
-                    prepare_library_write(
-                        &definition,
-                        user_id,
-                        LibraryCopyModel::PinDefault,
-                        &connections,
-                    )?
-                    .0,
+                    prepare_library_write(&definition, user_id, &connections)?.0,
                 ),
                 None => (
                     None,
@@ -303,6 +317,39 @@ fn selection(
         });
     }
     Ok(selected)
+}
+
+/// The named department as a normalized write under the submission's department id.
+fn department(
+    user_id: Uuid,
+    company_id: Uuid,
+    submission: &OnboardingSubmission,
+) -> AppResult<Option<OnboardingDepartment>> {
+    let Some(name) = submission
+        .department_name
+        .as_deref()
+        .map(str::trim)
+        .filter(|name| !name.is_empty())
+    else {
+        return Ok(None);
+    };
+    let mut write = DepartmentWrite {
+        name: name.to_owned(),
+        slug: custom_slug(name),
+        description: None,
+        charter: None,
+        parent_id: None,
+        created_by: Some(CreationProvenance::user(user_id)),
+    };
+    write.normalize()?;
+    Ok(Some(OnboardingDepartment {
+        id: DepartmentId::new(agent_id(
+            company_id,
+            submission.submission_key,
+            "department",
+        )),
+        write,
+    }))
 }
 
 fn custom_slug(name: &str) -> String {

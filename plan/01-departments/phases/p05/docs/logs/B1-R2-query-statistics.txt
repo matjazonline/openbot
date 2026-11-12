@@ -1,0 +1,61 @@
+Command: postgres --version
+postgres (PostgreSQL) 18.6 (Homebrew)
+Command: initdb -D /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster -U mac02 -A trust --no-locale -E UTF8
+The files belonging to this database system will be owned by user "mac02".
+This user must also own the server process.
+
+The database cluster will be initialized with locale "C".
+The default text search configuration will be set to "english".
+
+Data page checksums are enabled.
+
+creating directory /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster ... ok
+creating subdirectories ... ok
+selecting dynamic shared memory implementation ... posix
+selecting default "max_connections" ... 100
+selecting default "shared_buffers" ... 128MB
+selecting default time zone ... Europe/Rome
+creating configuration files ... ok
+running bootstrap script ... ok
+performing post-bootstrap initialization ... ok
+syncing data to disk ... ok
+
+Success. You can now start the database server using:
+
+    pg_ctl -D /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster -l logfile start
+
+Command: pg_ctl -D /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster -l /Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/phases/p05/docs/logs/B1-R2-query-statistics-server.txt -o -p 52648 -c listen_addresses=127.0.0.1 -c unix_socket_directories= -c shared_preload_libraries=pg_stat_statements -c compute_query_id=on -c pg_stat_statements.track=top -c pg_stat_statements.track_utility=off -c log_parameter_max_length=0 -c log_parameter_max_length_on_error=0 -w start
+waiting for server to start.... done
+server started
+Command: createdb -h 127.0.0.1 -p 52648 -U mac02 openbot_dept_p05_stats
+Command: cargo sqlx migrate run
+Applied 20260817000000/migrate init schema (357.2565ms)
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW shared_preload_libraries
+pg_stat_statements
+PASS setting: shared_preload_libraries = pg_stat_statements
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW compute_query_id
+on
+PASS setting: compute_query_id = on
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW pg_stat_statements.track
+top
+PASS setting: pg_stat_statements.track = top
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW pg_stat_statements.track_utility
+off
+PASS setting: pg_stat_statements.track_utility = off
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW log_parameter_max_length
+0
+PASS setting: log_parameter_max_length = 0
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SHOW log_parameter_max_length_on_error
+0
+PASS setting: log_parameter_max_length_on_error = 0
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SELECT 1 AS ci_pg_stat_statements_probe
+1
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1
+-3688696628780506391
+Command: psql postgres://mac02@127.0.0.1:52648/openbot_dept_p05_stats -X -v ON_ERROR_STOP=1 -Atqc SELECT query FROM pg_stat_statements WHERE queryid = -3688696628780506391 AND dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) LIMIT 1
+SELECT $1 AS ci_pg_stat_statements_probe
+PASS: all CI query-statistics activation/privacy assertions and numeric normalized queryid probe exercised
+Command: pg_ctl -D /var/folders/qc/f8s9x42x5sz6vbh79sb0cfth0000gn/T/openbot-dept-p05-ul20wvf0/query-statistics-cluster -m fast -w stop
+waiting for server to shut down.... done
+server stopped
+Owned cluster stopped; shared server untouched

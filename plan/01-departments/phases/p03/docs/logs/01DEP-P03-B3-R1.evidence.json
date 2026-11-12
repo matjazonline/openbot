@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "round": "01DEP-P03-B3-R1",
+  "artifact": "241d6d8d955a1f236e384677c12f66cb37918ff980e2b3e1fef596b69c1524e9",
+  "checks": [
+    {
+      "criteria": [
+        "03C.0",
+        "03C.1",
+        "D10",
+        "D11",
+        "D12",
+        "G3-F1",
+        "G3-F2",
+        "G3-F3",
+        "G3-F4"
+      ],
+      "command": "cargo test --locked --offline --lib -- department_directory_ department_context_ department_lead_fixture workflow_fixtures_ workflow_storage_ provisioning_lists refusals_and_results --test-threads=4",
+      "fixture": "TEST_DATABASE_URL db openbot_dept_p03_test (schema unchanged in B3) + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-focused-final.txt",
+          "sha256": "17379e82e41ff6d93e00260b20955d1d05abac7878fa6e236a0a10122c356d00"
+        },
+        {
+          "path": "logs/B3-test-inventory.txt",
+          "sha256": "ef3a7203b0fbf3142ee9babef7bbaa549f04edfc4e2461c7af3f834ea6f39f8a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "G3-F1"
+      ],
+      "command": "mutation: restore_on without with_department(saved); cargo test --locked --offline --lib -- department_context_frozen --test-threads=4 (expected FAIL), then restored",
+      "fixture": "openbot_dept_p03_test; SQLX_OFFLINE=true",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-frozen-mutation.txt",
+          "sha256": "9c8296774618f554f17973b9182266fc201b398f0c53b959e6b7c695bd97862c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --lib -- agent_history_ provisioning department_ agent_default_desk_ workflow_agent_ workflow_model workflow_classify workflow_decide picker authoring sample workflow_fixtures_ workflow_storage_ ingress autonomous_agent channel_reply knowledge_e2e agent_tests onboarding builder agent_preparation --test-threads=4",
+      "fixture": "openbot_dept_p03_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-affected-1.txt",
+          "sha256": "5dbd712228b36dd46b7fc8e1f2cd2a565acb04e4c5948b448263213ab51c5cee"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "contract-impact"
+      ],
+      "command": "cargo test --lib -- agent_api_tests catalog_tests workflow_tool_registration agent::contract_tests registry::message_tests application::workflow::provisioning::tests ui_agents routes::agent routes::onboarding ui_companies --test-threads=4",
+      "fixture": "openbot_dept_p03_test + own_database; SQLX_OFFLINE=true; test-threads=4",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-affected-2.txt",
+          "sha256": "0c3c44ecdefa425bbf6889ec4b1e9a3d5c16669607388d6dc98bccf412347ccf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "test-discovery"
+      ],
+      "command": "git diff 01608b1f -- '*.rs' fn lines + new test files",
+      "fixture": "git HEAD vs working tree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-test-names.txt",
+          "sha256": "db4d2c66caeb713e81106a663cdb6cffb35a1fe0f51c22bac6f1b546b88ae51d"
+        }
+      ]
+    }
+  ]
+}

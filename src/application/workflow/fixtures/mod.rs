@@ -20,9 +20,11 @@ pub enum Fixture {
     HumanRevisionRound,
     McpLookup,
     ReviewFeedbackSuccessor,
+    /// A department lead's desk (01DEP-P03-D12); its department framing comes from preparation.
+    DepartmentLead,
 }
 
-pub const ALL: [Fixture; 7] = [
+pub const ALL: [Fixture; 8] = [
     Fixture::ReviewedSupport,
     Fixture::AutonomousResponse,
     Fixture::TriageRouting,
@@ -30,6 +32,7 @@ pub const ALL: [Fixture; 7] = [
     Fixture::HumanRevisionRound,
     Fixture::McpLookup,
     Fixture::ReviewFeedbackSuccessor,
+    Fixture::DepartmentLead,
 ];
 
 impl Fixture {
@@ -42,6 +45,7 @@ impl Fixture {
             Self::HumanRevisionRound => include_str!("human-revision-round.yaml"),
             Self::McpLookup => include_str!("mcp-lookup.yaml"),
             Self::ReviewFeedbackSuccessor => include_str!("review-feedback-successor.yaml"),
+            Self::DepartmentLead => include_str!("department-lead.yaml"),
         }
     }
 
@@ -54,6 +58,7 @@ impl Fixture {
             Self::HumanRevisionRound => 105,
             Self::McpLookup => 106,
             Self::ReviewFeedbackSuccessor => 107,
+            Self::DepartmentLead => 108,
         };
         VersionId::new(Uuid::from_u128(suffix))
     }
@@ -70,7 +75,8 @@ impl Fixture {
             | Self::RepeatedHumanRevision
             | Self::HumanRevisionRound
             | Self::ReviewFeedbackSuccessor
-            | Self::TriageRouting => agent_snapshots(self, company),
+            | Self::TriageRouting
+            | Self::DepartmentLead => agent_snapshots(self, company),
             Self::McpLookup => DependencySnapshots {
                 tools: vec![mcp_snapshot(company)],
                 ..Default::default()
@@ -94,7 +100,12 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots 
             ("specialist", AgentUseMode::Tools),
         ],
         Fixture::RepeatedHumanRevision => &[("specialist", AgentUseMode::Tools)],
+        Fixture::DepartmentLead => &[("lead", AgentUseMode::Tools)],
         Fixture::McpLookup => &[],
+    };
+    let key = match fixture {
+        Fixture::DepartmentLead => "lead",
+        _ => "assistant",
     };
     DependencySnapshots {
         agents: if steps.is_empty() {
@@ -103,7 +114,7 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots 
             vec![AgentReference {
                 agent_id: crate::entities::agent_capability::AgentId::new(uuid::Uuid::from_u128(1)),
                 company_id: company,
-                key: AgentKey::parse("assistant").expect("fixture agent key"),
+                key: AgentKey::parse(key).expect("fixture agent key"),
                 uses: steps
                     .iter()
                     .map(|(step, mode)| AgentReferenceUse {

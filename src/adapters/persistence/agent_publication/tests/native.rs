@@ -66,7 +66,6 @@ async fn autonomous_agent_publication_native_result_cannot_reference_another_age
 #[tokio::test]
 async fn autonomous_agent_native_permissions_round_trip_freeze_and_library_copy() {
     use crate::domain::local_agents::LocalPermissions;
-    use crate::use_cases::agent::LibraryAgentCopyPersistence;
     let f = Fixture::new().await;
     let initial = AgentPersistence::get_by_id(&f.p, f.scope.agent.as_uuid())
         .await
@@ -115,10 +114,10 @@ async fn autonomous_agent_native_permissions_round_trip_freeze_and_library_copy(
     )
     .await
     .unwrap();
-    let copy =
-        f.p.create_agent_from_library(
-            f.scope.company.as_uuid(),
+    let copy = crate::adapters::persistence::test_support::company_agents(&f.p)
+        .copy_from_library(
             f.scope.actor,
+            f.scope.company,
             library.id,
             AgentWrite {
                 name: library.name.clone(),
@@ -126,9 +125,11 @@ async fn autonomous_agent_native_permissions_round_trip_freeze_and_library_copy(
                 native_permissions: library.native_permissions,
                 ..Default::default()
             },
+            None,
         )
         .await
-        .unwrap();
+        .unwrap()
+        .agent;
     assert_eq!(copy.native_permissions, LocalPermissions::AcceptEdits);
     let error = sqlx::query("UPDATE agents SET native_permissions='provider_default' WHERE id=$1")
         .bind(copy.id)

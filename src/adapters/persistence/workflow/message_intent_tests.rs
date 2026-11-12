@@ -1338,6 +1338,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
             principal_id,
             visible_channel_ids,
             manager: true,
+            company_items: true,
             view,
             cursor: None,
             limit: 100,

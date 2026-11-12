@@ -1,0 +1,82 @@
+[
+  {
+    "name": "install",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "install",
+      "--frozen-lockfile",
+      "--ignore-scripts"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-install.txt"
+  },
+  {
+    "name": "format:check",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "format:check"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-format-check.txt"
+  },
+  {
+    "name": "typecheck",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "typecheck"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-typecheck.txt"
+  },
+  {
+    "name": "lint",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "lint"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-lint.txt"
+  },
+  {
+    "name": "doc-lint",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "doc-lint"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-doc-lint.txt"
+  },
+  {
+    "name": "test",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "test",
+      "--",
+      "--maxWorkers=2"
+    ],
+    "status": "FAIL",
+    "exit_code": 1,
+    "log": "B1-R3-doop-service-test.txt"
+  },
+  {
+    "name": "build",
+    "command": [
+      "/Users/mac02/openbot-p05-r3-wr3kxbjm/doop/tools/node_modules/.bin/bun",
+      "run",
+      "build"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "log": "B1-R3-doop-service-build.txt"
+  }
+]

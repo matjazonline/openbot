@@ -7,9 +7,9 @@
 Status: proposed, 2026-11-09; knowledge folded in the same day. Fifth of seven organization plans;
 depends on
 [01-departments](../01-departments/README.md) through [04-root-unit](../04-root-unit/README.md)
-and on the memory service integration (`plan/memory-service`, batch 05A), which is implemented on
-the memory-service branch of the working checkout and not yet on `main`. File anchors below that
-name memory modules refer to that branch.
+and on the memory service integration (batch 05A of the archived plan
+[`plan/.archive/memory-service`](../.archive/memory-service/README.md)), which has been on `main`
+since 2026-11-10. File anchors in this plan were rechecked against `main` that day.
 
 ## Intended behavior
 
@@ -21,7 +21,7 @@ reads what its position in the tree allows. One resolver computes that read set 
 both consumers use it.
 
 Today the memory client knows three scope kinds, `company`, `agent` and `user`
-(`NamespaceOwner`, `src/application/memory/settings.rs:164`; `memory_namespaces.scope_kind`), each
+(`NamespaceOwner`, `src/application/memory/settings.rs:302`; `memory_namespaces.scope_kind`), each
 provisioned lazily when a run first wants it. After the organization plans there is one tree of
 departments with the company as its root, and principals attached to it. Memory follows that tree:
 
@@ -66,7 +66,7 @@ flows down the tree, never sideways, and a lead change moves nothing, because ro
    writes only its own namespace.
 7. **Levels stay orthogonal.** Access levels remain a classification inside a namespace, the read
    ceiling still comes from root membership and the run's authorized audience, and the consumed
-   watermark rules in `plan/memory-service/05-openbot-integration.md` are unchanged. Department
+   watermark rules in `plan/.archive/memory-service/05-openbot-integration.md` are unchanged. Department
    membership never changes a level.
 8. **The service does not learn about departments.** It still sees opaque tenant and namespace ids,
    a read set and a ceiling. OpenBot computes the read set from the tree.

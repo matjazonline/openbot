@@ -1,0 +1,92 @@
+[
+  {
+    "status": "PASS",
+    "seconds": 1,
+    "gate": "Generated CSS is current"
+  },
+  {
+    "status": "PASS",
+    "seconds": 2,
+    "gate": "SSE navigation lifecycle"
+  },
+  {
+    "status": "PASS",
+    "seconds": 1,
+    "gate": "Deployment script tests"
+  },
+  {
+    "status": "PASS",
+    "seconds": 3,
+    "gate": "Formatting"
+  },
+  {
+    "status": "FAIL",
+    "seconds": 0,
+    "gate": "Patch whitespace"
+  },
+  {
+    "status": "PASS",
+    "seconds": 7,
+    "gate": "Transport abstraction boundary"
+  },
+  {
+    "status": "PASS",
+    "seconds": 1,
+    "gate": "Workflow evidence validator fixtures"
+  },
+  {
+    "status": "PASS",
+    "seconds": 29,
+    "gate": "Retained workflow evidence"
+  },
+  {
+    "status": "PASS",
+    "seconds": 1,
+    "gate": "Fetch locked Rust dependencies"
+  },
+  {
+    "status": "PASS",
+    "seconds": 22,
+    "gate": "Offline compilation"
+  },
+  {
+    "status": "PASS",
+    "seconds": 130,
+    "gate": "Clippy"
+  },
+  {
+    "status": "PASS",
+    "seconds": 0,
+    "gate": "Migrations"
+  },
+  {
+    "status": "PASS",
+    "seconds": 22,
+    "gate": "SQLx metadata matches migrated schema"
+  },
+  {
+    "status": "PASS",
+    "seconds": 109,
+    "gate": "Compile tests"
+  },
+  {
+    "status": "PASS",
+    "seconds": 8,
+    "gate": "Rust source module reachability"
+  },
+  {
+    "status": "PASS",
+    "seconds": 0,
+    "gate": "Test database for this run"
+  },
+  {
+    "status": "FAIL",
+    "seconds": 1368,
+    "gate": "Database-backed test suite (isolated network)"
+  },
+  {
+    "status": "FAIL",
+    "seconds": 1384,
+    "gate": "Stack budget"
+  }
+]

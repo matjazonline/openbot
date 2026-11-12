@@ -1,0 +1,64 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+warning: unused import: `CompanyAgents`
+  --> src/adapters/persistence/department_tests.rs:91:47
+   |
+91 |     use crate::use_cases::agent::{AgentWrite, CompanyAgents};
+   |                                               ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `CompanyAgents`
+   --> src/adapters/persistence/department_lead_desk_tests.rs:561:63
+    |
+561 |     use crate::use_cases::agent::{AgentPlacement, AgentWrite, CompanyAgents};
+    |                                                               ^^^^^^^^^^^^^
+
+warning: `open_bots` (lib test) generated 2 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 45s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 28 tests
+test adapters::http::routes::channel::department_tests::department_desk_ownership_json_fields_are_kept_when_absent ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_admits_members_and_the_owner_only ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_rederivation_behind_a_demotion_leaves_it_out ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_removal_and_demotion_of_one_principal_both_commit ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_apart ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_removal_revokes_access_and_notifications_in_one_commit ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_reaches_one_step_up_and_down ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_removing_a_teammate_drops_only_derived_grants ... ok
+test adapters::persistence::department::tests::desks::department_desk_competing_membership_and_ownership_edit_agree ... ok
+test adapters::persistence::department::tests::desks::department_desk_members_only_set_desk_ownership_on_takes_the_desk_edit_path ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_company_teardown_takes_owned_desks_with_it ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_moving_or_opening_a_desk_rederives_its_grants ... ok
+test adapters::persistence::department::tests::desks::department_desk_ownership_refuses_another_companys_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_agent_to_agent_repoints_the_same_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_an_agent_created_as_its_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_follows_person_and_agent_leads_with_one_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_run_as_moves_to_the_admin_who_changes_the_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow ... FAILED
+test adapters::persistence::department::tests::lead_desks::department_desk_taken_address_refuses_the_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_competing_lead_changes_leave_the_holders_agent_answering ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_survives_a_rename_and_is_left_once_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::department::tests::lead_desks::department_desk_with_an_agent_lead_answers_on_it ... ok
+
+failures:
+
+---- adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow stdout ----
+
+thread 'adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow' (40352612) panicked at src/adapters/persistence/department_lead_desk_tests.rs:517:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "invalid channel response settings revision", detail: None, hint: None, position: None, where: Some("PL/pgSQL function guard_channel_reply_settings() line 13 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pl_exec.c"), line: Some(3923), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::department::tests::lead_desks::department_desk_refuses_lead_changes_it_cannot_follow
+
+test result: FAILED. 27 passed; 1 failed; 0 ignored; 0 measured; 3827 filtered out; finished in 4.32s
+
+error: test failed, to rerun pass `--lib`

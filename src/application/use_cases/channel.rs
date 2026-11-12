@@ -35,12 +35,12 @@ impl ChannelWrite {
 
         if self.name.is_empty() {
             return Err(AppError::BadRequest(
-                "The channel name cannot be empty.".into(),
+                "The desk name cannot be empty.".into(),
             ));
         }
         if self.slug.is_empty() {
             return Err(AppError::BadRequest(
-                "The channel address cannot be empty.".into(),
+                "The desk address cannot be empty.".into(),
             ));
         }
         validate_slug(&self.slug, SlugKind::ChannelAddress)?;
@@ -106,7 +106,7 @@ fn check_spam_interlock(
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
 /// cannot tell a foreign channel from a nonexistent one. See [`managed_company`].
 pub fn channel_not_found() -> AppError {
-    AppError::NotFound("Channel not found in this company.".into())
+    AppError::NotFound("Desk not found in this company.".into())
 }
 
 /// The ports the channel read rule needs, borrowed from whichever use case asks.
@@ -417,14 +417,16 @@ pub enum SlugKind {
     ChannelAddress,
     ChannelAlias,
     AgentSlug,
+    DepartmentAddress,
 }
 
 impl SlugKind {
     fn noun(self) -> &'static str {
         match self {
-            SlugKind::ChannelAddress => "channel address",
-            SlugKind::ChannelAlias => "channel alias",
+            SlugKind::ChannelAddress => "desk address",
+            SlugKind::ChannelAlias => "desk alias",
             SlugKind::AgentSlug => "agent slug",
+            SlugKind::DepartmentAddress => "department address",
         }
     }
 }
@@ -585,6 +587,13 @@ mod tests {
                 .cloned())
         }
 
+        async fn list_departments(
+            &self,
+            _company_id: Uuid,
+        ) -> AppResult<Vec<crate::entities::department::Department>> {
+            Ok(Vec::new())
+        }
+
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self
                 .channels
@@ -638,6 +647,8 @@ mod tests {
             created_by: write.created_by.unwrap_or_else(CreationProvenance::system),
             created_at: Utc::now(),
             settings_revision: 0,
+            department_id: None,
+            members_only: false,
         }
     }
 
@@ -1159,7 +1170,7 @@ mod tests {
             "Internal drops the message on the way out: {alias_err:?}"
         );
         let message = alias_err.to_string();
-        assert!(message.contains("channel alias"), "{message}");
+        assert!(message.contains("desk alias"), "{message}");
         assert!(message.contains("ops-quiet"), "{message}");
         assert!(
             message.contains("noagent, quiet, message, msg, na"),
@@ -1171,7 +1182,7 @@ mod tests {
             .unwrap_err()
             .to_string();
         assert!(
-            address_message.contains("channel address"),
+            address_message.contains("desk address"),
             "{address_message}"
         );
 
@@ -1203,6 +1214,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
             Channel {
                 enabled: false,
@@ -1219,6 +1232,8 @@ mod tests {
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: chrono::Utc::now(),
                 settings_revision: 0,
+                department_id: None,
+                members_only: false,
             },
         ];
 

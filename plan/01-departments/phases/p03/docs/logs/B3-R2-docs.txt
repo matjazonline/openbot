@@ -1,0 +1,7 @@
+# B3-F1 doc lines after correction
+22:Autonomous sends the agent's answer; reviewed asks a human to approve, edit, or reject it before sending. Creation needs explicit confirmation of the full specification. A library copy of Agent Builder, like every company agent, gets its own autonomous desk at its slug, where you converse with it.
+104:copies follow the same rules. Later edits are saved to the draft and published as new revisions.
+47:An owner or admin can provision the same way from the UI ("Create assistant desk").
+# lines over 100 chars in agent-authoring.md 95-120:
+# git diff --stat docs (agent-authoring adds only):
+11	0	docs/agent-authoring.md

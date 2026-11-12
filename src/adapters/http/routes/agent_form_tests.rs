@@ -1,5 +1,19 @@
 use super::*;
 
+#[test]
+fn documented_company_agent_update_decodes_with_explicit_native_permissions() {
+    let guide = include_str!("../../../../docs/agent-authoring.md");
+    let (_, update) = guide.split_once("Update an existing draft with").unwrap();
+    let (_, example) = update.split_once("```json\n").unwrap();
+    let (json, _) = example.split_once("```").unwrap();
+    let payload: crate::adapters::http::routes::agent::CompanyAgentJsonUpdate =
+        serde_json::from_str(json).unwrap();
+    assert_eq!(
+        payload.agent.native_permissions,
+        crate::domain::local_agents::LocalPermissions::Full
+    );
+}
+
 /// The no-JS path: a native urlencoded submission builds the same write the scripted form does.
 #[tokio::test]
 async fn a_native_urlencoded_submission_builds_the_write() {

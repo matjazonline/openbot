@@ -1,0 +1,5 @@
+Actual four-profile acceptance; fixed source/image/helper; owned database and Docker context; system sandboxed Chrome
+PASS live Openbot company connections and encrypted custody
+PASS live Doop bot-key rotation revokes both old keys
+FAIL live frozen Openbot publications enforce current keys, disable and disconnect
+Doop test setup/run failed: Required private acceptance run failed: all-disk

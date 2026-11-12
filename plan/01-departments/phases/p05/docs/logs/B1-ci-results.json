@@ -1,0 +1,396 @@
+[
+  {
+    "name": "workflow-sample-boundary-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.1,
+    "log": "B1-ci-workflow-sample-boundary-fixtures.txt"
+  },
+  {
+    "name": "workflow-sample-boundary",
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.04,
+    "log": "B1-ci-workflow-sample-boundary.txt"
+  },
+  {
+    "name": "integration-boundary-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.09,
+    "log": "B1-ci-integration-boundary-fixtures.txt"
+  },
+  {
+    "name": "integration-boundary",
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.95,
+    "log": "B1-ci-integration-boundary.txt"
+  },
+  {
+    "name": "integration-docs",
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.1,
+    "log": "B1-ci-integration-docs.txt"
+  },
+  {
+    "name": "integration_portability_inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "integration_portability_",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.75,
+    "log": "B1-ci-integration_portability_inventory.txt"
+  },
+  {
+    "name": "integration_service_contract_inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "integration_service_contract_",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.25,
+    "log": "B1-ci-integration_service_contract_inventory.txt"
+  },
+  {
+    "name": "vault_google_e2e_inventory",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "vault_google_e2e_",
+      "--",
+      "--list"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.3,
+    "log": "B1-ci-vault_google_e2e_inventory.txt"
+  },
+  {
+    "name": "vault-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.35,
+    "log": "B1-ci-vault-rust-1.txt"
+  },
+  {
+    "name": "vault-rust-2",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.71,
+    "log": "B1-ci-vault-rust-2.txt"
+  },
+  {
+    "name": "vault-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/vault-authoring-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 9.23,
+    "log": "B1-ci-vault-browser.txt"
+  },
+  {
+    "name": "html-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_html_injection_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.26,
+    "log": "B1-ci-html-rust-1.txt"
+  },
+  {
+    "name": "html-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/team-autocomplete-browser.mjs",
+      "scripts/tests/html-injection-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 2.83,
+    "log": "B1-ci-html-browser.txt"
+  },
+  {
+    "name": "knowledge-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_knowledge_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.27,
+    "log": "B1-ci-knowledge-rust-1.txt"
+  },
+  {
+    "name": "knowledge-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/knowledge-browser.mjs"
+    ],
+    "status": "FAIL",
+    "exit_code": 1,
+    "seconds": 0.25,
+    "log": "B1-ci-knowledge-browser.txt"
+  },
+  {
+    "name": "memory-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_memory_settings_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.27,
+    "log": "B1-ci-memory-rust-1.txt"
+  },
+  {
+    "name": "memory-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/memory-settings-browser.mjs"
+    ],
+    "status": "FAIL",
+    "exit_code": 1,
+    "seconds": 0.24,
+    "log": "B1-ci-memory-browser.txt"
+  },
+  {
+    "name": "agent-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_autonomous_agent_authoring_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.89,
+    "log": "B1-ci-agent-rust-1.txt"
+  },
+  {
+    "name": "agent-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/agent-authoring-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 3.59,
+    "log": "B1-ci-agent-browser.txt"
+  },
+  {
+    "name": "local-agents-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_cloudroom_management_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.21,
+    "log": "B1-ci-local-agents-rust-1.txt"
+  },
+  {
+    "name": "local-agents-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/local-agents-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 2.43,
+    "log": "B1-ci-local-agents-browser.txt"
+  },
+  {
+    "name": "agent-picker-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_autonomous_workflow_agent_picker_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.75,
+    "log": "B1-ci-agent-picker-rust-1.txt"
+  },
+  {
+    "name": "agent-picker-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/workflow-agent-picker-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 2.67,
+    "log": "B1-ci-agent-picker-browser.txt"
+  },
+  {
+    "name": "session-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_session_revocation_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 1.14,
+    "log": "B1-ci-session-rust-1.txt"
+  },
+  {
+    "name": "session-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/session-revocation-browser.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 2.3,
+    "log": "B1-ci-session-browser.txt"
+  },
+  {
+    "name": "decisions-rust-1",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "decision_browser_markup_and_closed_draft_recovery"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.27,
+    "log": "B1-ci-decisions-rust-1.txt"
+  },
+  {
+    "name": "decisions-rust-2",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "source_message_outside_window_is_exact_and_authorized"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 0.61,
+    "log": "B1-ci-decisions-rust-2.txt"
+  },
+  {
+    "name": "decisions-browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/workflow-decisions.mjs"
+    ],
+    "status": "PASS",
+    "exit_code": 0,
+    "seconds": 3.14,
+    "log": "B1-ci-decisions-browser.txt"
+  }
+]

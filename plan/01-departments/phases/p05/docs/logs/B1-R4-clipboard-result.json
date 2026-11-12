@@ -1,0 +1,8 @@
+{
+  "status": "FAIL",
+  "exit_code": 1,
+  "elapsed_seconds": 86.26,
+  "fixture_image": "sha256:a13a7b86e3e3a96aa8e6e2da5e39adfb46145dca4352985498290a243198bf64",
+  "platform": "linux/arm64",
+  "host_clipboard_access": false
+}

@@ -1,0 +1,8 @@
+{
+  "content": [
+    {
+      "type": "text",
+      "text": "{\"file_name\":\"Private image deployment specimen.pdf\",\"bytes\":237699,\"pages\":2,\"inline_embedded\":false,\"download_url\":\"https://127.0.0.1:50795/api/canvases/zScLyyAQA_/export.pdf?frames=3aPHIMn2LW,mFnCHG0szg\",\"note\":\"The full PDF exceeds the inline result limit. The download requires a current normal browser session with access to this canvas; an MCP bearer alone cannot fetch it. The URL renders the selected current stored designs when fetched, not an immutable snapshot. Each page is one frame; text stays selectable.\"}"
+    }
+  ]
+}

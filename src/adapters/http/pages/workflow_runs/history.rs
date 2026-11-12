@@ -129,7 +129,7 @@ pub fn agent_history_detail(anchor: HistoryAnchor, detail: &HistoryDetail) -> St
     }
     if let Some(status) = &detail.status {
         body.push_str(&format!(
-            "<p>Workflow: {}{} · channel response: {} · delivery: {}</p>",
+            "<p>Workflow: {}{} · desk response: {} · delivery: {}</p>",
             escape_html_text(&status.workflow),
             status
                 .waiting_reason
