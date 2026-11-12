@@ -1,5 +1,5 @@
 {
-  "estimated_saved_tokens": 20535369,
+  "estimated_saved_tokens": 20536102,
   "estimates": [
     5166,
     5059014,
@@ -750,7 +750,8 @@
     84950,
     7946,
     4592,
-    1741
+    1741,
+    733
   ],
   "priced_by_graft": false,
   "through": "2026-11-11 B3 NoWait ingress + actual queued native B R10",

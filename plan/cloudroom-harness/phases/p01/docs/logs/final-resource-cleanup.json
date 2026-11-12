@@ -1,0 +1,9 @@
+{
+  "ownedRuntimeProcesses": 0,
+  "archivedTempRoots": 13,
+  "removedOwnedTempRoots": 13,
+  "archive": "/Users/mac02/dev/openbot-review-records/cloudroom-harness-20261110/final-owned-native-temp-20261112-065210UTC.tar.gz",
+  "archiveSha256": "1bc7d024dae74f2395ba7df6cf1083f86bd0209e97de13d6b5ce6b626c7cc725",
+  "worktreesAndBuildArtifacts": "preserved",
+  "postgres": "owned PG18 stopped; data retained"
+}
