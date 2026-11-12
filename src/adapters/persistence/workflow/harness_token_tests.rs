@@ -31,8 +31,9 @@ async fn configured() -> TokenFixture {
 async fn configured_source(mut source: Value) -> TokenFixture {
     let fixture = Fixture::new().await;
     let reviewer = member(&fixture, "admin").await;
+    let reviewer_principal = fixture.principal(reviewer).await;
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
-        "tokens":{"max_tokens":150,"reviewers":[{"kind":"user","id":reviewer}]}});
+        "tokens":{"max_tokens":150,"reviewers":[{"kind":"principal","id":reviewer_principal}]}});
     let model = open_native(model_support::fixture(fixture, source).await).await;
     TokenFixture {
         model,
@@ -47,12 +48,14 @@ async fn workflow_harness_token_approval_never_admits_and_claim_consumes_exact_r
     let p = model.native.fixture.persistence();
     let notices = notices(p);
     let request = model_request(&reservation());
-    assert!(matches!(
-        p.reserve_workflow_model(model.write, request.clone(), Some(&notices))
-            .await
-            .unwrap(),
-        WorkflowModelAdmission::Parked(_)
-    ));
+    let admission = p
+        .reserve_workflow_model(model.write, request.clone(), Some(&notices))
+        .await
+        .unwrap();
+    assert!(
+        matches!(admission, WorkflowModelAdmission::Parked(_)),
+        "{admission:?}"
+    );
     assert_eq!(accounting(model).await["calls"], 0);
     assert_eq!(accounting(model).await["rows"], json!([]));
     let paused = stored(&model.native.fixture, model.run.run_id.0).await;

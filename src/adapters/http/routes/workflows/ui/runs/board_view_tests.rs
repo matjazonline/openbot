@@ -155,6 +155,7 @@ async fn foreign(f: &Fixture) -> Foreign {
         actor(),
         binding,
         BindingRequest {
+            escalation: None,
             expected_state_revision: None,
             association: RelatedAssociation::Company,
             version,

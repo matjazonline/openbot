@@ -1,0 +1,32 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 49s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 5 tests
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock' (48746143) panicked at src/adapters/persistence/workflow/reviewer_account_race_tests.rs:108:14:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"workflow_action_intents\" violates foreign key constraint \"workflow_decisions_action_identity\" on table \"workflow_decisions\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock' (48746142) panicked at src/adapters/persistence/workflow/reviewer_account_race_tests.rs:148:32:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"workflow_action_intents\" violates foreign key constraint \"workflow_decisions_action_identity\" on table \"workflow_decisions\"")
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock
+
+test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 4210 filtered out; finished in 4.94s
+
+error: test failed, to rerun pass `--lib`

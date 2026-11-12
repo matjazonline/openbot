@@ -1,7 +1,6 @@
 //! A local read commits directly into the canonical harness invocation. The driver's normal
 //! result update then observes the exact AlreadyApplied value, without a second state machine.
 use super::*;
-use crate::application::agent::AgentKey;
 use crate::{
     application::{
         knowledge::search::KnowledgeObservation,
@@ -233,19 +232,22 @@ pub(super) async fn frozen_selection(
     {
         return Err(missing());
     }
-    let key = row
-        .frozen_inputs
-        .get("agent")
-        .and_then(Value::as_str)
-        .and_then(AgentKey::parse)
-        .ok_or_else(missing)?;
+    let agent = super::super::agent_manifest::agent_for_step_on(
+        tx,
+        scope.company,
+        scope.run,
+        &facts.bundle,
+        &step,
+        &row.frozen_inputs,
+    )
+    .await?;
     Ok(FrozenSelection {
         selection: super::super::agent_manifest::selected_on(
             tx,
             scope.company,
             scope.run,
             facts.actor,
-            facts.bundle.agent_reference(scope.company, &key)?.agent_id,
+            agent,
         )
         .await?,
         access: KnowledgeSearchAccess {

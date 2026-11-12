@@ -37,6 +37,24 @@ fn parameters(shape: &Shape) -> Vec<(&'static str, &'static str)> {
     if agent {
         // The merge of the per-version ranges takes the same page size.
         parameters.push(("limit", " LIMIT "));
+        parameters.push(("company", "FROM workflow_runs WHERE company_id = "));
+        parameters.push(("company", "WHERE ownership.company_id="));
+        parameters.push(("agent", " AND role_binding.agent_id="));
+        if shape.filter.binding.is_some() {
+            parameters.push(("binding", " AND binding_id = "));
+        }
+        if shape.filter.workflow.is_some() {
+            parameters.push(("workflow", " AND workflow_id = "));
+        }
+        if shape.filter.state.is_some() {
+            parameters.push(("state", " AND state = "));
+        }
+        if shape.cursor {
+            parameters.push(("cursor_created", " AND (created_at, id) < ("));
+            parameters.push(("cursor_id", ", "));
+        }
+        parameters.push(("limit", " LIMIT "));
+        parameters.push(("limit", " LIMIT "));
     }
     parameters
 }
@@ -135,7 +153,8 @@ fn run_list_query_binds_each_present_filter_once_in_placeholder_order() {
         // each version's range when an agent is present.
         assert_eq!(
             sql.matches(" AND parent_run_id IS NULL").count(),
-            usize::from(shape.filter.lineage == RunLineage::TopLevel),
+            usize::from(shape.filter.lineage == RunLineage::TopLevel)
+                * if shape.filter.agent.is_some() { 2 } else { 1 },
             "{}: {sql}",
             shape.name
         );
@@ -194,6 +213,8 @@ fn board_scope_parameters(
     if scope.agent.is_some() {
         parameters.push(("company", "WHERE version.company_id = "));
         parameters.push(("agent", " AND "));
+        parameters.push(("company", "WHERE ownership.company_id="));
+        parameters.push(("agent", " AND role_binding.agent_id="));
     }
 }
 

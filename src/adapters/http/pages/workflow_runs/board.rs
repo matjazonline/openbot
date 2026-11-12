@@ -144,7 +144,7 @@ fn board_card(view: &RunBoardView<'_>, run: &RunSummary) -> String {
         r##"<li><a {attrs} data-run="{id}"{current}
             class="flex flex-col items-start gap-1 rounded-box border bg-base-100 p-2 text-sm hover:bg-base-200 aria-busy:cursor-progress aria-busy:opacity-60 {edge}">
             <span class="w-full truncate font-semibold" title="{title_attr}">{title}</span>
-            {state}
+            {state}{roles}
             <span class="font-mono text-[11px] opacity-70">run {short} · {age}</span>{rerun}{children}</a></li>"##,
         attrs = card_attrs(view, id),
         current = if selected {
@@ -160,6 +160,7 @@ fn board_card(view: &RunBoardView<'_>, run: &RunSummary) -> String {
         title_attr = escape_html_attr(title),
         title = escape_html_text(title),
         state = run_state_badge(&run.state, run.waiting_reason.as_deref()),
+        roles = super::provenance::role_markers(&run.role_holders, run.role_holders_truncated),
         short = short_id(id),
         children = child_rollup(view.children.get(&run.run).copied().unwrap_or_default()),
     )

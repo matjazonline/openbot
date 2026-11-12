@@ -35,6 +35,7 @@ fn state_json(state: &BindingState) -> Value {
         "configuration_revision": state.configuration.revision().get(),
         "active": state.active,
         "association": association_json(state.association),
+        "escalation": state.configuration.escalation(),
     })
 }
 
@@ -50,6 +51,7 @@ fn summary_json(binding: &BindingSummary) -> Value {
         "params": binding.params,
         "run_as": binding.run_as,
         "message_trigger": binding.message_trigger.map(MessageTrigger::as_str),
+        "escalation": binding.escalation,
     })
 }
 
@@ -193,6 +195,7 @@ pub struct ConfigureBody {
     /// somebody else (p08 D1.1).
     pub run_as: Option<Uuid>,
     pub message_trigger: Option<String>,
+    pub escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
 }
 
 fn empty_object() -> Value {
@@ -213,6 +216,7 @@ pub async fn configure(
         resources: body.resources,
         run_as: body.run_as,
         message_trigger: body.message_trigger,
+        escalation: body.escalation,
     };
     let state = configure_binding(&engine, company_id, actor(&user)?, binding, request).await?;
     Ok(ok(state_json(&state)))
@@ -228,6 +232,7 @@ pub(super) struct BindingRequest {
     pub resources: BTreeMap<String, Uuid>,
     pub run_as: Option<Uuid>,
     pub message_trigger: Option<String>,
+    pub escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
 }
 
 /// Configure (or create) `binding` through the binding command, which authorizes, checks the
@@ -253,6 +258,7 @@ pub(super) async fn configure_binding(
     Ok(engine
         .bindings()
         .configure(ConfigureBinding {
+            escalation: request.escalation,
             target: binding_target(company_id, actor, binding),
             expected: request
                 .expected_state_revision

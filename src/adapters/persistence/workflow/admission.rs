@@ -33,6 +33,9 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         let source = SourceKey::from_trigger(command.trigger());
+        if let Some(replay) = admission_refusal::resolve_on(&mut tx, command, &source).await? {
+            return finish_refusal_replay(tx, command, replay).await;
+        }
         if let Some(result) = admission_replay::resolve(&mut tx, command, &source).await? {
             if let AdmissionResult::Replayed(run) = result
                 && !settle_claim(&mut tx, command, run).await?
@@ -50,7 +53,16 @@ impl WorkflowAdmission for PostgresPersistence {
         }
         authorize_token_reviewers(&mut tx, command).await?;
         resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
-        admission_write::create(&mut tx, command, &source).await?;
+        if let Err(error) = admission_write::create(&mut tx, command, &source).await {
+            if let AppError::WorkflowRole(refusal) = &error {
+                if !admission_refusal::record_on(&mut tx, command, &source, refusal).await? {
+                    tx.rollback().await?;
+                    return Ok(AdmissionResult::Stale);
+                }
+                tx.commit().await?;
+            }
+            return Err(error);
+        }
         if !settle_claim(&mut tx, command, command.proposed_run_id()).await? {
             tx.rollback().await?;
             return Ok(AdmissionResult::Stale);
@@ -61,7 +73,7 @@ impl WorkflowAdmission for PostgresPersistence {
     }
 }
 
-async fn claim_holds(
+pub(super) async fn claim_holds(
     tx: &mut Transaction<'_, Postgres>,
     command: &PreparedAdmission,
 ) -> AppResult<bool> {
@@ -114,6 +126,24 @@ async fn claim_holds(
                  AND materialization_generation=$4 AND materialization_lock_expires_at > clock_timestamp() FOR UPDATE",
             ).bind(claim.company.as_uuid()).bind(claim.occurrence).bind(claim.worker.0)
                 .bind(claim.generation).fetch_optional(&mut **tx).await?.is_some())
+        }
+    }
+}
+
+async fn finish_refusal_replay(
+    mut tx: Transaction<'_, Postgres>,
+    command: &PreparedAdmission,
+    replay: admission_refusal::RefusalReplay,
+) -> AppResult<AdmissionResult> {
+    match replay {
+        admission_refusal::RefusalReplay::Conflict => Ok(AdmissionResult::Conflict),
+        admission_refusal::RefusalReplay::Refused { refusal, revision } => {
+            if !admission_refusal::settle_replay_on(&mut tx, command, &refusal, revision).await? {
+                tx.rollback().await?;
+                return Ok(AdmissionResult::Stale);
+            }
+            tx.commit().await?;
+            Err(AppError::WorkflowRole(refusal))
         }
     }
 }
@@ -176,7 +206,15 @@ async fn authorize_token_reviewers(
     db: &mut PgConnection,
     command: &PreparedAdmission,
 ) -> AppResult<()> {
-    for user in token_reviewers(command) {
+    for principal in token_reviewers(command) {
+        let user: Uuid = sqlx::query_scalar(
+            "SELECT user_id FROM principals WHERE company_id=$1 AND id=$2 AND kind='person'",
+        )
+        .bind(command.company_id().as_uuid())
+        .bind(principal)
+        .fetch_optional(&mut *db)
+        .await?
+        .ok_or_else(missing)?;
         let actor = WorkflowActor::authenticated(user).map_err(|_| invalid())?;
         let reviewer = authority::authorize_reviewer_on(db, command.company_id(), actor).await?;
         if !reviewer.privileged {
@@ -246,6 +284,7 @@ async fn verify_current(
         || current.configuration.resources() != selected.resources()
         || current.configuration.run_as() != selected.run_as()
         || current.configuration.message_trigger() != selected.message_trigger()
+        || current.configuration.escalation() != selected.escalation()
         || store_bundle(current.configuration.bundle())? != store_bundle(selected.bundle())?
     {
         return Ok(false);

@@ -1,0 +1,74 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0365]: `RefusalKey` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/admission_refusal.rs:10:25
+   |
+10 | pub(super) use replay::{RefusalKey, saved_binding_on};
+   |                         ^^^^^^^^^^ re-export of private `RefusalKey`
+   |
+   = note: consider declaring type or module `RefusalKey` with `pub`
+
+error[E0603]: struct import `RefusalKey` is private
+  --> src/adapters/persistence/workflow/admission_binding.rs:93:32
+   |
+93 |             admission_refusal::RefusalKey {
+   |                                ^^^^^^^^^^ private struct import
+   |
+note: the struct import `RefusalKey` is defined here...
+  --> src/adapters/persistence/workflow/admission_refusal.rs:10:25
+   |
+10 | pub(super) use replay::{RefusalKey, saved_binding_on};
+   |                         ^^^^^^^^^^
+note: ...and refers to the struct `RefusalKey` which is defined here
+  --> src/adapters/persistence/workflow/admission_refusal_replay.rs:28:1
+   |
+28 | pub(super) struct RefusalKey<'a> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `clone` found for struct `application::workflow::contracts::AdmitWorkflowRequest` in the current scope
+   --> src/adapters/persistence/workflow/escalation_refusal_tests.rs:109:47
+    |
+109 |     let command = f.admission.prepare(request.clone()).await;
+    |                                               ^^^^^ method not found in `application::workflow::contracts::AdmitWorkflowRequest`
+    |
+   ::: src/application/workflow/contracts.rs:86:1
+    |
+ 86 | pub struct AdmitWorkflowRequest {
+    | ------------------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+
+error[E0599]: no method named `clone` found for struct `application::workflow::contracts::AdmitWorkflowRequest` in the current scope
+   --> src/adapters/persistence/workflow/escalation_refusal_tests.rs:113:47
+    |
+113 |     let changed = f.admission.prepare(request.clone()).await;
+    |                                               ^^^^^ method not found in `application::workflow::contracts::AdmitWorkflowRequest`
+    |
+   ::: src/application/workflow/contracts.rs:86:1
+    |
+ 86 | pub struct AdmitWorkflowRequest {
+    | ------------------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+
+error[E0599]: no method named `clone` found for struct `application::workflow::contracts::AdmitWorkflowRequest` in the current scope
+   --> src/adapters/persistence/workflow/escalation_refusal_tests.rs:120:45
+    |
+120 |     let alias = f.admission.prepare(request.clone()).await;
+    |                                             ^^^^^ method not found in `application::workflow::contracts::AdmitWorkflowRequest`
+    |
+   ::: src/application/workflow/contracts.rs:86:1
+    |
+ 86 | pub struct AdmitWorkflowRequest {
+    | ------------------------------- method `clone` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is implemented and in scope
+    = note: the following trait defines an item `clone`, perhaps you need to implement it:
+            candidate #1: `Clone`
+
+Some errors have detailed explanations: E0365, E0599, E0603.
+For more information about an error, try `rustc --explain E0365`.
+error: could not compile `open_bots` (lib test) due to 5 previous errors

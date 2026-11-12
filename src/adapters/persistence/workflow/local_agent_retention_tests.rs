@@ -281,7 +281,7 @@ async fn cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_
 async fn cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session() {
     let s = Setup::new().await;
     let p = &s.fixture.persistence;
-    let approval = json!({"reviewers":[{"kind":"user","id":s.fixture.target.actor.user_id()}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
+    let approval = json!({"reviewers":[{"kind":"principal","id":s.fixture.principal(s.fixture.target.actor.user_id()).await}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
     let a = waiting_root(&s, Some(approval)).await;
     let b = waiting_root(&s, None).await;
     let follow = target(&s, &a, b.session).await;

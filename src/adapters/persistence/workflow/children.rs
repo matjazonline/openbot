@@ -34,7 +34,7 @@ async fn park_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<ParkedWorkflow>> {
-    let Some(run) = waits::lock(db, scope).await? else {
+    let Some(run) = waits::lock(db, scope, waits::LockPurpose::Transition).await? else {
         return Ok(None);
     };
     if let Some(wait) = waits::row(db, scope, waits::WaitSelection::Execution).await? {
@@ -177,6 +177,7 @@ pub(super) fn configured_child(
         .collect();
     Ok(ConfiguredBinding::new(
         BindingConfiguration {
+            escalation: parent.escalation(),
             company_id: parent.company_id(),
             id: parent.id(),
             revision: parent.revision(),

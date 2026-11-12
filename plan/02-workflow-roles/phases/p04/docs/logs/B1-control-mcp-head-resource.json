@@ -1,0 +1,7 @@
+{
+  "worktree": "/Users/mac02/openbot-p04-mcp-baseline-6xwpp7ro",
+  "base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "source": "clean original HEAD, before all plan02 edits",
+  "previous_probe": "accepted p03 reconstructed206 exact paths, MCP same3of4 failure",
+  "target": "shared root Cargo target; rebuild root before native test reuse"
+}

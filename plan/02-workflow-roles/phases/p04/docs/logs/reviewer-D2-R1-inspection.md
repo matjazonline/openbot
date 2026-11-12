@@ -1,0 +1,23 @@
+# 02WR-P04-D2-R1 independent architecture inspection
+
+2026-11-12; independent B; D2/r1 supplement only, not review or acceptance of partial B1. Source fffdbcd9c996956ab18e91ab892767ee33179be9f77c263062a61ddc4b810210.
+
+Original04B.4 and accepted D1.7 require atomic role clearing/audit/refresh. Inspected full D2/r1 and premise, active coordination24/proposed C006-r1, and affected D1 authority/history rules. Actual schema3592–3605 proves binding_audit_events is transport-binding-specific. A purpose-specific company-owned fact is justified; no fabricated binding/run/decision is needed.
+
+Lifecycle/source inspection:
+- user_lifecycle.rs31–121: user lock precedes companies/memberships; account path demotes principals, then deletes owned companies. D1's stronger nonowner company lock and final refresh remain implementation obligations, not claimed present in partial source.
+- company_invite.rs549–632: account SHARE then company NO KEY UPDATE; captures notice recipient, demotes before membership removal, then cancellation/cleanup. Actual principal boundary precedes source role cleanup.
+- agent.rs466–502: company agent deletion demotes agent principal before deleting agent. Raw principal deletion is also reachable via company-membership FK cascade.
+- init schema953–968: principal kind/shape and255-byte display label bound. 9980–10001: principals company and membership cascades; agent relationship NO ACTION. 15437–15468: roles and department membership each reference principal and department directly. Roles are not dependent on department-members row deletion; demotion hook must nevertheless snapshot before cleanup.
+- schema15549–15570: existing demotion AFTER UPDATE trigger clears roles/members/grants; BEFORE DELETE hook can capture before principal FK cascades. Existing notification BEFORE DELETE trigger at8565 calls1043–1054 and withdraws notices; new audit must not introduce account/company lock upgrades or perform refresh from this row trigger.
+- company.rs104–138: production full company deletion locks company and executes DELETE FROM companies. Company-owned audit rows intentionally disappear with tenant. On cascade, company may already be absent before a principal BEFORE DELETE trigger runs, or source roles/departments may already have been cascaded. Required full teardown test must ensure the audit producer/guards do not try to recreate a fact with a missing company or rely on a fixed sibling cascade order. This is an implementation obligation of D2's explicit tenant-deletion exception, not a separately unresolved retention policy.
+
+Historical and proof assessment:
+Historical principal/department IDs without live FKs are justified by exact company-scoped source snapshots and physical retirement/otherwise-permitted department deletion. Company FK and immutable guards retain tenant scope; IDs confer no authority. Nested trigger provenance is judged under the existing installed-schema trust boundary, not as protection against a database owner installing arbitrary triggers. The sole lifecycle producer plus actual role-source validation/material absence at commit closes ordinary direct-insert forgery; test exact rejection boundaries rather than relying only on pg_trigger_depth.
+
+A deferred material-absence check is evaluated in the retirement transaction. It must not make later independently committed re-invitation/re-grant rewrite historical events or run a lifetime absence check. D2 creates no role FK and requires immutable history; no new re-grant prohibition is stated. Same-transaction reconstitution of the exact audited role is deliberately rejected by its explicit material-clear requirement. No separate architecture finding on this point.
+
+Concrete unresolved bound:
+Department names are text NOT NULL and only nonblank at schema15407–15430. normalized_name in application/use_cases/department.rs41–49 only trims/rejects empty. Both create176–188 and update191–202 use it. Thus a nonblank name longer than4096 bytes is accepted production input, unlike the bounded principal label. D2 requires actual exact department-name snapshot plus a4KiB whole-row cap and incorrectly assumes existing department label bounds. Without an explicit policy this either rejects valid retirement or violates its data bound; silent truncation would contradict exact snapshot validation. Saved as D2-R1/F1.
+
+No database/Cargo/browser/SQLx checks; read-only graph/source investigation and source/coordination pins only. Existing tests are not claimed executed. D1's real retirement/role/vote/projection races, full owner teardown and rollback/refresh/cancellation requirements remain unverified until B1. Partial source was inspected only to establish supplement premises/callers.

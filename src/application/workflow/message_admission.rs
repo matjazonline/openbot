@@ -88,11 +88,12 @@ pub struct CandidateBinding {
     pub trigger: MessageTrigger,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BindingOutcome {
     Admitted(RunId),
     /// A deterministic refusal; the code is bounded and names no foreign record.
     Refused(&'static str),
+    RoleRefused(crate::entities::department::RoleAdmissionRefusal),
     Failed(&'static str),
 }
 
@@ -248,10 +249,11 @@ where
             }
             match self.admit_binding(&intent, binding).await? {
                 Attempt::Outcome(outcome) => {
+                    let admitted = matches!(&outcome, BindingOutcome::Admitted(_));
                     if !self.record(&intent, &binding, outcome).await? {
                         return Ok(()); // The claim was lost; its new owner continues.
                     }
-                    if matches!(outcome, BindingOutcome::Admitted(_)) {
+                    if admitted {
                         self.wake_workers();
                     }
                 }
@@ -411,7 +413,12 @@ where
         binding: &CandidateBinding,
         outcome: BindingOutcome,
     ) -> AppResult<bool> {
-        if let BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason) = outcome {
+        let reason = match &outcome {
+            BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason) => Some(*reason),
+            BindingOutcome::RoleRefused(refusal) => Some(refusal.kind.code()),
+            BindingOutcome::Admitted(_) => None,
+        };
+        if let Some(reason) = reason {
             tracing::warn!(
                 company_id = %intent.claim.company.as_uuid(),
                 binding_id = %binding.id.as_uuid(),
@@ -443,6 +450,9 @@ pub(super) enum Classified {
 /// this binding or input is permanent, and anything else may succeed later.
 pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
     match result {
+        Err(AppError::WorkflowRole(refusal)) => {
+            Classified::Settled(BindingOutcome::RoleRefused(refusal))
+        }
         Ok(AdmissionResult::Created(run) | AdmissionResult::Replayed(run)) => {
             Classified::Settled(BindingOutcome::Admitted(run))
         }

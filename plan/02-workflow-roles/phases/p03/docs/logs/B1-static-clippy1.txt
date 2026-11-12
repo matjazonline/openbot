@@ -1,0 +1,45 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error: returning the result of a `let` binding from a block
+   --> src/adapters/http/pages/workflow_authoring/reviewer_picker.rs:175:5
+    |
+156 | /     let preview = view
+157 | |         .preview
+158 | |         .iter()
+159 | |         .map(|preview| {
+...   |
+173 | |         })
+174 | |         .collect::<String>();
+    | |_____________________________- unnecessary `let` binding
+175 |       preview
+    |       ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+156 ~     
+157 ~     view
+158 +         .preview
+159 +         .iter()
+160 +         .map(|preview| {
+161 +             format!(
+162 +                 "<li>{role}: {holders}</li>",
+163 +                 role = preview.role,
+164 +                 holders = preview
+165 +                     .refusal
+166 +                     .map(escape_html_text)
+167 +                     .unwrap_or_else(|| preview
+168 +                         .holders
+169 +                         .iter()
+170 +                         .map(|label| escape_html_text(label))
+171 +                         .collect::<Vec<_>>()
+172 +                         .join(", "))
+173 +             )
+174 +         })
+175 +         .collect::<String>()
+    |
+
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 1 previous error

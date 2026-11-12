@@ -133,6 +133,7 @@ impl Fixture {
             self.actor(),
             binding,
             BindingRequest {
+                escalation: None,
                 expected_state_revision: None,
                 association,
                 version,

@@ -1,0 +1,10 @@
+$ cargo test --locked --offline --lib knowledge_checkpoint
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 08s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4200 filtered out; finished in 0.00s
+

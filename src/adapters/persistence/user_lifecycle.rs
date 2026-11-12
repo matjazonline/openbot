@@ -25,7 +25,7 @@ pub(in crate::adapters::persistence) struct AccountLocks {
 
 /// The account first (serializing against membership and ownership writes), then every company it
 /// touches in one id-ordered pass: owned ones `FOR UPDATE` (they are deleted), member companies
-/// `FOR KEY SHARE`. Only then the membership rows. Taking the member companies first orders this
+/// `FOR NO KEY UPDATE`. Only then the membership rows. Taking the member companies first orders this
 /// against a concurrent company delete (`FOR UPDATE`, then the memory rows, then the cascade to
 /// members), which otherwise deadlocks with the memory hook below (review p7b r1 M4).
 pub(in crate::adapters::persistence) async fn lock_account_on(
@@ -52,7 +52,7 @@ pub(in crate::adapters::persistence) async fn lock_account_on(
         let statement = if is_owner {
             "SELECT id FROM companies WHERE id=$1 AND user_id=$2 FOR UPDATE"
         } else {
-            "SELECT id FROM companies WHERE id=$1 AND $2::uuid IS NOT NULL FOR KEY SHARE"
+            "SELECT id FROM companies WHERE id=$1 AND $2::uuid IS NOT NULL FOR NO KEY UPDATE"
         };
         let locked: Option<Uuid> = sqlx::query_scalar(statement)
             .bind(company)
@@ -80,11 +80,15 @@ pub(in crate::adapters::persistence) async fn finish_account_deletion_on(
         owned: companies,
         memberships,
     } = locks;
-    for company in memberships {
+    for company in &memberships {
+        let company = *company;
         lifecycle::revoke_membership_on(&mut *tx, &owner_for_user(user), &company_binding(company))
             .await
             .map_err(AppError::from)?;
-        super::delivery::cancellation::cancel_member_notices_on(tx, company, user).await?;
+        let notice_recipient =
+            super::delivery::cancellation::member_notice_recipient_on(tx, company, user).await?;
+        super::delivery::cancellation::cancel_member_notices_on(tx, company, notice_recipient)
+            .await?;
         super::memory::retire_namespaces_on(
             &mut *tx,
             company,
@@ -114,5 +118,12 @@ pub(in crate::adapters::persistence) async fn finish_account_deletion_on(
         .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
+    for company in memberships {
+        Box::pin(super::workflow::refresh_member_dependents_on(
+            tx,
+            crate::domain::workflow::CompanyId::new(company),
+        ))
+        .await?;
+    }
     Ok(())
 }

@@ -657,7 +657,8 @@ fn validate_commit_request(
 
 fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
     match error {
-        AppError::KnowledgeTrigger { .. }
+        AppError::WorkflowRole(_)
+        | AppError::KnowledgeTrigger { .. }
         | AppError::KnowledgeRelease { .. }
         | AppError::Execution(_)
         | AppError::McpAuthentication

@@ -697,7 +697,15 @@ async fn assistant_channel_command_replays_by_key_and_refuses_a_changed_request(
             .fetch_one(f.persistence().pool())
             .await
             .unwrap();
-    assert_eq!(params, json!({"reviewer": owner(&f).user_id().to_string()}));
+    let principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(company(&f).as_uuid())
+    .bind(owner(&f).user_id())
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
+    assert_eq!(params, json!({"reviewer": principal.to_string()}));
     // A member may not; an agent without an explicit model cannot answer a workflow.
     let member = person(&f, "member").await;
     assert!(matches!(

@@ -58,7 +58,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     let Some(config) = head.inputs.get("approval") else {
         return Ok(None);
     };
-    let Ok((users, deadline)) = reviewer_deadline(config) else {
+    let Ok((selectors, deadline)) = reviewer_deadline(config) else {
         return Ok(None);
     };
     let deadline = deadline.min(head.deadline);
@@ -71,7 +71,12 @@ pub(in crate::adapters::persistence::workflow) async fn park(
     if used {
         return Ok(None);
     }
-    let Some(reviewers) = approvers(tx, scope, &users).await? else {
+    let principals = match super::reviewer_resolution::resolve_on(tx, scope, &selectors).await {
+        Ok(principals) => principals,
+        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let Some(reviewers) = approvers(tx, scope, &principals).await? else {
         return Ok(None);
     };
     let context: NoticeContext = sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
@@ -97,15 +102,15 @@ pub(in crate::adapters::persistence::workflow) async fn park(
 pub(in crate::adapters::persistence::workflow) async fn approvers(
     db: &mut PgConnection,
     scope: ActivationRequest,
-    users: &[Uuid],
+    principals: &[Uuid],
 ) -> AppResult<Option<Vec<Reviewer>>> {
-    let mut reviewers = Vec::with_capacity(users.len());
-    for user in users {
-        let Some(reviewer) = eligible_reviewer(db, scope, *user).await? else {
+    let mut reviewers = Vec::with_capacity(principals.len());
+    for principal in principals {
+        let Some(reviewer) = eligible_reviewer(db, scope, *principal).await? else {
             return Ok(None);
         };
-        let privileged: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_members AS member JOIN companies AS company ON company.id=member.company_id WHERE member.company_id=$1 AND member.user_id=$2 AND (member.role IN ('admin','owner') OR company.user_id=$2))")
-            .bind(scope.company.as_uuid()).bind(user).fetch_one(&mut *db).await?;
+        let privileged: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_members AS member JOIN companies AS company ON company.id=member.company_id JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND principal.id=$2 AND principal.kind='person' AND (member.role IN ('admin','owner') OR company.user_id=member.user_id))")
+            .bind(scope.company.as_uuid()).bind(principal).fetch_one(&mut *db).await?;
         if !privileged {
             return Ok(None);
         }

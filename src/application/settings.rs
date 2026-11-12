@@ -9,4 +9,5 @@ pub struct ThreadSettings {
 pub struct NotificationMailSettings {
     pub mail_domain: MailDomain,
     pub public_base_url: PublicBaseUrl,
+    pub escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
 }

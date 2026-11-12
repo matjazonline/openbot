@@ -2,7 +2,9 @@
 //! Lifecycle authorization and atomic revision selection belong to the command/store
 //! layer. Readiness is a current observation, never a durable authorization grant.
 
+mod escalation;
 mod resources;
+pub use escalation::{EscalationAckHours, EscalationHops, EscalationPolicy};
 pub(crate) use resources::validate as validate_resource;
 pub use resources::{ResourceDirectory, ResourceReadiness, ResourceStatus};
 
@@ -29,6 +31,7 @@ pub struct BindingConfiguration {
     pub run_as: WorkflowActor,
     /// Which accepted messages admit a run; `None` admits none (p08 D1.2).
     pub message_trigger: Option<MessageTrigger>,
+    pub escalation: Option<EscalationPolicy>,
 }
 
 /// Validated configuration. Replacing the selected revision cannot mutate this value
@@ -79,6 +82,9 @@ impl ConfiguredBinding {
     }
     pub fn message_trigger(&self) -> Option<MessageTrigger> {
         self.configuration.message_trigger
+    }
+    pub fn escalation(&self) -> Option<EscalationPolicy> {
+        self.configuration.escalation
     }
     pub fn bundle(&self) -> &Arc<PublishedBundle> {
         &self.bundle

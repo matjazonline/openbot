@@ -422,13 +422,14 @@ pub(in crate::adapters::persistence) struct AgentDeleteLocks {
     company: Option<Uuid>,
 }
 
-/// The locks agent deletion takes before writing: its company `FOR KEY SHARE`, then the agent
+/// The locks agent deletion takes before writing: its company `FOR NO KEY UPDATE`, then the agent
 /// `FOR UPDATE`. `None` when the agent is gone.
 ///
 /// The company comes first (memory E2 order users → company → … → agent): company deletion
 /// takes `FOR UPDATE` and then the memory rows before cascading to agents, so an agent delete
 /// holding the agent and then retiring its namespaces would deadlock with it (review p7b r1 M4).
-/// `KEY SHARE` blocks only that deletion, never `FOR NO KEY UPDATE` writers.
+/// The company lock also serializes principal demotion and derived channel-grant cleanup with
+/// admission and department writers, before either side locks channels or the agent (02WR-P02-D1/r2).
 ///
 /// Locking the agent next means a concurrent `create_agent_principal_on` -- whose foreign key
 /// check needs a share lock on this row -- either committed before us, so its principal is
@@ -447,7 +448,7 @@ pub(in crate::adapters::persistence) async fn lock_agent_delete_on(
         return Ok(None);
     };
     if let Some(company) = company {
-        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR KEY SHARE")
+        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
             .bind(company)
             .fetch_optional(&mut **transaction)
             .await?;
@@ -497,6 +498,13 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
         .execute(&mut **transaction)
         .await
         .map_err(agent_delete_error)?;
+    if let Some(company) = company_id {
+        Box::pin(super::workflow::follow_reviewers::refresh_on(
+            transaction,
+            crate::domain::workflow::CompanyId::new(company),
+        ))
+        .await?;
+    }
     Ok(())
 }
 

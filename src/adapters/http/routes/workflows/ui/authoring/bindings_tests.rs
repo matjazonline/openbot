@@ -509,6 +509,7 @@ fn an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_config
     let (company, workflow) = (Uuid::new_v4(), Uuid::new_v4());
     let binding = |active: bool| BindingUse {
         binding: BindingSummary {
+            escalation: None,
             binding: WorkflowBindingId::new(Uuid::new_v4()),
             state_revision: 4,
             configuration_revision: 1,
@@ -713,6 +714,7 @@ async fn params_the_fields_cannot_carry_open_as_json_and_save_unchanged() {
         WorkflowActor::authenticated(f.owner).unwrap(),
         binding,
         crate::adapters::http::routes::workflows::bindings::BindingRequest {
+            escalation: None,
             expected_state_revision: None,
             association: crate::application::workflow::RelatedAssociation::Company,
             version,
@@ -767,3 +769,54 @@ async fn params_the_fields_cannot_carry_open_as_json_and_save_unchanged() {
 
 #[path = "channel_response_tests.rs"]
 mod channel_response_tests;
+
+#[tokio::test]
+async fn workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let workflow = Uuid::new_v4();
+    let mut source = example("agent.run", workflow);
+    source["steps"]["start"]["with"]
+        .as_object_mut()
+        .unwrap()
+        .remove("agent");
+    source["steps"]["start"]["with"]["role"] = json!({"literal":"lead"});
+    let version = f
+        .published(workflow, "Role workflow", &source.to_string())
+        .await
+        .to_string();
+    let pane = f.pane(f.owner, workflow, "bindings").await.unwrap();
+    let key = field_value(&pane, "form_key");
+    let saved = f
+        .save_binding(
+            f.owner,
+            workflow,
+            &[
+                ("form_key", &key),
+                ("version_id", &version),
+                ("association", "company"),
+            ],
+        )
+        .await;
+    assert!(saved.contains("Saved binding"), "{saved}");
+    let usage = f.usage(workflow).await;
+    let refused = f
+        .activity(
+            f.owner,
+            workflow,
+            usage[0].binding.binding.as_uuid(),
+            usage[0].binding.state_revision,
+            true,
+        )
+        .await
+        .unwrap();
+    assert!(
+        refused.contains("Not activated")
+            && refused.contains("start")
+            && refused.contains("lead")
+            && refused.contains("department"),
+        "{refused}"
+    );
+    assert!(!f.usage(workflow).await[0].binding.active);
+}

@@ -370,6 +370,7 @@ async fn used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_dia
             WorkflowActor::authenticated(f.owner).unwrap(),
             binding,
             crate::adapters::http::routes::workflows::bindings::BindingRequest {
+                escalation: None,
                 expected_state_revision: expected,
                 association: crate::application::workflow::RelatedAssociation::Company,
                 version,

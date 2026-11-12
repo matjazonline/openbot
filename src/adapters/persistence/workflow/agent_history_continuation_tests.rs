@@ -22,8 +22,8 @@ async fn reviewed(origin: &str) -> Reviewers {
     source["steps"]["start"]["routes"]["success"] = json!("task");
     source["steps"]["task"]["with"]["context"] = json!({"literal":"current task"});
     source["steps"]["task"]["with"]["approval"] = json!({"literal":{
-        "reviewers":[{"kind":"user","id":setup.fixture.target.actor.user_id()},
-            {"kind":"user","id":admin}],
+        "reviewers":[{"kind":"principal","id":setup.fixture.principal(setup.fixture.target.actor.user_id()).await},
+            {"kind":"principal","id":setup.fixture.principal(admin).await}],
         "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
     let graph = publish_graph(&setup, source, json!({})).await;
     let AdmissionResult::Created(run) = admit_graph(&setup, &graph, "history-human-rounds")

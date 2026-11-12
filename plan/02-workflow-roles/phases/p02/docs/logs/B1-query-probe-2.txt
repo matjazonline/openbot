@@ -1,0 +1,211 @@
+== Table and index sizes (temporary clones)
+                             relname                             |  rows   |    size    
+-----------------------------------------------------------------+---------+------------
+ run_dependency_manifests                                        | 1096000 | 97 MB
+ workflow_run_role_bindings                                      |  191800 | 35 MB
+ workflow_runs                                                   | 1095948 | 335 MB
+ workflow_versions                                               |   80000 | 21 MB
+ pg_toast_3366332_index                                          |       0 | 8192 bytes
+ pg_toast_3366366_index                                          |       0 | 8192 bytes
+ pg_toast_3366454_index                                          |       0 | 8192 bytes
+ run_dependency_manifests_company_id_run_id_manifest_id_key      | 1096000 | 92 MB
+ run_dependency_manifests_pkey                                   | 1096000 | 68 MB
+ workflow_run_role_bindings_company_id_run_id_version_id_ste_idx |  191800 | 23 MB
+ workflow_run_role_bindings_pkey                                 |  191800 | 27 MB
+ workflow_runs_company_id_binding_id_created_at_id_idx           | 1095948 | 143 MB
+ workflow_runs_company_id_bundle_digest_idx                      | 1095948 | 8584 kB
+ workflow_runs_company_id_channel_id_state_idx                   |   53738 | 520 kB
+ workflow_runs_company_id_created_at_id_idx                      | 1095948 | 109 MB
+ workflow_runs_company_id_id_binding_id_key                      | 1095948 | 92 MB
+ workflow_runs_company_id_id_channel_id_thread_id_key            | 1095948 | 100 MB
+ workflow_runs_company_id_id_parent_run_id_key                   | 1095948 | 81 MB
+ workflow_runs_company_id_id_parent_run_id_parent_execution__key | 1095948 | 83 MB
+ workflow_runs_company_id_id_workflow_id_key                     | 1095948 | 92 MB
+ workflow_runs_company_id_id_workflow_id_version_id_key          | 1095948 | 118 MB
+ workflow_runs_company_id_rerun_of_run_id_idx                    |       0 | 8192 bytes
+ workflow_runs_company_id_state_created_at_idx                   |  362540 | 31 MB
+ workflow_runs_company_id_state_finished_at_id_idx               |  928780 | 117 MB
+ workflow_runs_company_id_thread_id_created_at_idx               |       0 | 8192 bytes
+ workflow_runs_company_id_version_id_created_at_id_idx           | 1095948 | 135 MB
+ workflow_runs_company_id_version_id_created_at_id_idx1          |  982518 | 122 MB
+ workflow_runs_company_id_workflow_id_created_at_id_idx          | 1095948 | 143 MB
+ workflow_runs_finished_at_company_id_id_idx                     |  928780 | 68 MB
+ workflow_runs_pkey                                              | 1095948 | 68 MB
+ workflow_versions_company_id_command_key_key                    |   80000 | 5240 kB
+ workflow_versions_company_id_workflow_id_id_key                 |   80000 | 7136 kB
+ workflow_versions_pkey                                          |   80000 | 5480 kB
+(33 rows)
+
+== Shipped indexes on public.workflow_runs and public.workflow_versions
+                                                                                                        indexdef                                                                                                         
+-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ CREATE INDEX workflow_retention_roots ON public.workflow_runs USING btree (finished_at, company_id, id) WHERE ((parent_run_id IS NULL) AND (state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])))
+ CREATE INDEX workflow_runs_attention ON public.workflow_runs USING btree (company_id, state, created_at DESC) WHERE (state = ANY (ARRAY['waiting'::text, 'failed'::text]))
+ CREATE INDEX workflow_runs_binding_newest ON public.workflow_runs USING btree (company_id, binding_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_by_bundle ON public.workflow_runs USING btree (company_id, bundle_digest)
+ CREATE INDEX workflow_runs_by_thread ON public.workflow_runs USING btree (company_id, thread_id, created_at DESC) WHERE (thread_id IS NOT NULL)
+ CREATE INDEX workflow_runs_finished_by_state ON public.workflow_runs USING btree (company_id, state, finished_at DESC, id DESC) WHERE ((finished_at IS NOT NULL) AND (parent_run_id IS NULL))
+ CREATE INDEX workflow_runs_newest ON public.workflow_runs USING btree (company_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_open_by_channel ON public.workflow_runs USING btree (company_id, channel_id, state) WHERE (state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text]))
+ CREATE INDEX workflow_runs_reruns ON public.workflow_runs USING btree (company_id, rerun_of_run_id) WHERE (rerun_of_run_id IS NOT NULL)
+ CREATE INDEX workflow_runs_version_newest ON public.workflow_runs USING btree (company_id, version_id, created_at DESC, id DESC)
+ CREATE INDEX workflow_runs_version_top_level ON public.workflow_runs USING btree (company_id, version_id, created_at DESC, id DESC) WHERE (parent_run_id IS NULL)
+ CREATE INDEX workflow_runs_workflow_newest ON public.workflow_runs USING btree (company_id, workflow_id, created_at DESC, id DESC)
+ CREATE UNIQUE INDEX workflow_run_budget_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id)
+ CREATE UNIQUE INDEX workflow_run_parent_identity ON public.workflow_runs USING btree (company_id, id, parent_run_id, parent_execution_id)
+ CREATE UNIQUE INDEX workflow_run_workflow_identity ON public.workflow_runs USING btree (company_id, id, workflow_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_binding_id_key ON public.workflow_runs USING btree (company_id, id, binding_id)
+ CREATE UNIQUE INDEX workflow_runs_company_id_id_channel_id_thread_id_key ON public.workflow_runs USING btree (company_id, id, channel_id, thread_id)
+ CREATE UNIQUE INDEX workflow_runs_pkey ON public.workflow_runs USING btree (company_id, id)
+ CREATE UNIQUE INDEX workflow_usage_version_identity ON public.workflow_runs USING btree (company_id, id, workflow_id, version_id)
+ CREATE UNIQUE INDEX workflow_versions_company_id_command_key_key ON public.workflow_versions USING btree (company_id, command_key)
+ CREATE UNIQUE INDEX workflow_versions_company_id_workflow_id_id_key ON public.workflow_versions USING btree (company_id, workflow_id, id)
+ CREATE UNIQUE INDEX workflow_versions_pkey ON public.workflow_versions USING btree (company_id, id)
+(22 rows)
+
+                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=16037.04..16037.04 rows=1 width=240)
+   ->  Sort  (cost=16037.04..16037.05 rows=5 width=240)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         ->  Unique  (cost=16036.78..16036.98 rows=5 width=240)
+               ->  Sort  (cost=16036.78..16036.80 rows=5 width=240)
+                     Sort Key: workflow_runs.id, workflow_runs.binding_id, workflow_runs.workflow_id, workflow_runs.version_id, workflow_runs.channel_id, workflow_runs.thread_id, workflow_runs.state, workflow_runs.waiting_reason, workflow_runs.revision, workflow_runs.actor_id, workflow_runs.parent_run_id, workflow_runs.rerun_of_run_id, workflow_runs.created_at, workflow_runs.deadline, workflow_runs.finished_at
+                     ->  Append  (cost=2008.33..16036.73 rows=5 width=240)
+                           ->  Limit  (cost=2008.33..2008.34 rows=4 width=193)
+                                 ->  Sort  (cost=2008.33..2008.43 rows=39 width=193)
+                                       Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+                                       ->  Nested Loop  (cost=34.85..2007.30 rows=39 width=193)
+                                             ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16)
+                                                   Recheck Cond: (company_id = $1)
+                                                   Filter: ($2 = ANY (agent_ids))
+                                                   ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0)
+                                                         Index Cond: (company_id = $1)
+                                             ->  Limit  (cost=0.43..6.28 rows=1 width=193)
+                                                   ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=2 width=193)
+                                                         Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           ->  Limit  (cost=14028.36..14028.36 rows=1 width=193)
+                                 ->  Sort  (cost=14028.36..14028.36 rows=1 width=193)
+                                       Sort Key: workflow_runs_1.created_at DESC, workflow_runs_1.id DESC
+                                       ->  Nested Loop  (cost=14022.31..14028.35 rows=1 width=193)
+                                             ->  HashAggregate  (cost=14021.88..14021.89 rows=1 width=16)
+                                                   Group Key: ownership.run_id
+                                                   ->  Nested Loop  (cost=136.03..14021.88 rows=1 width=16)
+                                                         ->  Bitmap Heap Scan on workflow_run_role_bindings role_binding  (cost=135.60..3666.93 rows=19 width=48)
+                                                               Recheck Cond: ((company_id = $7) AND (resolution_revision = 0) AND (agent_id IS NOT NULL))
+                                                               Filter: (agent_id = $8)
+                                                               ->  Bitmap Index Scan on workflow_run_role_bindings_company_id_run_id_version_id_ste_idx  (cost=0.00..135.60 rows=1918 width=0)
+                                                                     Index Cond: ((company_id = $7) AND (resolution_revision = 0))
+                                                         ->  Index Scan using run_dependency_manifests_company_id_run_id_manifest_id_key on run_dependency_manifests ownership  (cost=0.43..544.99 rows=1 width=64)
+                                                               Index Cond: ((company_id = $7) AND (manifest_id = role_binding.manifest_id))
+                                                               Filter: (root_run_id = role_binding.run_id)
+                                             ->  Index Scan using workflow_runs_pkey on workflow_runs workflow_runs_1  (cost=0.43..6.45 rows=1 width=193)
+                                                   Index Cond: ((company_id = $6) AND (id = ownership.run_id))
+(36 rows)
+
+                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2250.49..2250.49 rows=1 width=240)
+   ->  Sort  (cost=2250.49..2250.50 rows=5 width=240)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         ->  Unique  (cost=2250.23..2250.43 rows=5 width=240)
+               ->  Sort  (cost=2250.23..2250.24 rows=5 width=240)
+                     Sort Key: workflow_runs.id, workflow_runs.binding_id, workflow_runs.workflow_id, workflow_runs.version_id, workflow_runs.channel_id, workflow_runs.thread_id, workflow_runs.state, workflow_runs.waiting_reason, workflow_runs.revision, workflow_runs.actor_id, workflow_runs.parent_run_id, workflow_runs.rerun_of_run_id, workflow_runs.created_at, workflow_runs.deadline, workflow_runs.finished_at
+                     ->  Append  (cost=2008.33..2250.17 rows=5 width=240)
+                           ->  Limit  (cost=2008.33..2008.34 rows=4 width=193)
+                                 ->  Sort  (cost=2008.33..2008.43 rows=39 width=193)
+                                       Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+                                       ->  Nested Loop  (cost=34.85..2007.30 rows=39 width=193)
+                                             ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16)
+                                                   Recheck Cond: (company_id = $1)
+                                                   Filter: ($2 = ANY (agent_ids))
+                                                   ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0)
+                                                         Index Cond: (company_id = $1)
+                                             ->  Limit  (cost=0.43..6.28 rows=1 width=193)
+                                                   ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=2 width=193)
+                                                         Index Cond: ((company_id = $3) AND (version_id = version.id))
+                           ->  Limit  (cost=241.80..241.80 rows=1 width=193)
+                                 ->  Sort  (cost=241.80..241.80 rows=1 width=193)
+                                       Sort Key: workflow_runs_1.created_at DESC, workflow_runs_1.id DESC
+                                       ->  Nested Loop  (cost=235.75..241.79 rows=1 width=193)
+                                             ->  HashAggregate  (cost=235.32..235.33 rows=1 width=16)
+                                                   Group Key: ownership.run_id
+                                                   ->  Nested Loop  (cost=0.85..235.32 rows=1 width=16)
+                                                         ->  Index Only Scan using role_agent_probe on workflow_run_role_bindings role_binding  (cost=0.42..74.58 rows=19 width=48)
+                                                               Index Cond: ((company_id = $7) AND (agent_id = $8))
+                                                         ->  Index Only Scan using role_owner_probe on run_dependency_manifests ownership  (cost=0.43..8.45 rows=1 width=64)
+                                                               Index Cond: ((company_id = $7) AND (root_run_id = role_binding.run_id) AND (manifest_id = role_binding.manifest_id))
+                                             ->  Index Scan using workflow_runs_pkey on workflow_runs workflow_runs_1  (cost=0.43..6.45 rows=1 width=193)
+                                                   Index Cond: ((company_id = $6) AND (id = ownership.run_id))
+(32 rows)
+
+                                                                                                                                                                                                          QUERY PLAN                                                                                                                                                                                                          
+------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2250.49..2250.49 rows=1 width=240) (actual time=423.067..423.080 rows=201.00 loops=1)
+   Buffers: local hit=296593 read=172977
+   ->  Sort  (cost=2250.49..2250.50 rows=5 width=240) (actual time=423.066..423.072 rows=201.00 loops=1)
+         Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+         Sort Method: quicksort  Memory: 76kB
+         Buffers: local hit=296593 read=172977
+         ->  Unique  (cost=2250.23..2250.43 rows=5 width=240) (actual time=423.016..423.048 rows=201.00 loops=1)
+               Buffers: local hit=296593 read=172977
+               ->  Sort  (cost=2250.23..2250.24 rows=5 width=240) (actual time=423.015..423.022 rows=201.00 loops=1)
+                     Sort Key: workflow_runs.id, workflow_runs.binding_id, workflow_runs.workflow_id, workflow_runs.version_id, workflow_runs.channel_id, workflow_runs.thread_id, workflow_runs.state, workflow_runs.waiting_reason, workflow_runs.revision, workflow_runs.actor_id, workflow_runs.parent_run_id, workflow_runs.rerun_of_run_id, workflow_runs.created_at, workflow_runs.deadline, workflow_runs.finished_at
+                     Sort Method: quicksort  Memory: 58kB
+                     Buffers: local hit=296593 read=172977
+                     ->  Append  (cost=2008.33..2250.17 rows=5 width=240) (actual time=422.973..422.997 rows=201.00 loops=1)
+                           Buffers: local hit=296593 read=172977
+                           ->  Limit  (cost=2008.33..2008.34 rows=4 width=193) (actual time=0.161..0.162 rows=0.00 loops=1)
+                                 Buffers: local read=36
+                                 ->  Sort  (cost=2008.33..2008.43 rows=39 width=193) (actual time=0.161..0.162 rows=0.00 loops=1)
+                                       Sort Key: workflow_runs.created_at DESC, workflow_runs.id DESC
+                                       Sort Method: quicksort  Memory: 25kB
+                                       Buffers: local read=36
+                                       ->  Nested Loop  (cost=34.85..2007.30 rows=39 width=193) (actual time=0.160..0.161 rows=0.00 loops=1)
+                                             Buffers: local read=36
+                                             ->  Bitmap Heap Scan on workflow_versions version  (cost=34.43..1762.17 rows=39 width=16) (actual time=0.160..0.160 rows=0.00 loops=1)
+                                                   Recheck Cond: (company_id = $1)
+                                                   Filter: ($2 = ANY (agent_ids))
+                                                   Rows Removed by Filter: 800
+                                                   Heap Blocks: exact=27
+                                                   Buffers: local read=36
+                                                   ->  Bitmap Index Scan on workflow_versions_pkey  (cost=0.00..34.42 rows=800 width=0) (actual time=0.039..0.039 rows=800.00 loops=1)
+                                                         Index Cond: (company_id = $1)
+                                                         Index Searches: 1
+                                                         Buffers: local read=9
+                                             ->  Limit  (cost=0.43..6.28 rows=1 width=193) (never executed)
+                                                   ->  Index Scan using workflow_runs_company_id_version_id_created_at_id_idx on workflow_runs  (cost=0.43..12.12 rows=2 width=193) (never executed)
+                                                         Index Cond: ((company_id = $3) AND (version_id = version.id))
+                                                         Index Searches: 0
+                           ->  Limit  (cost=241.80..241.80 rows=1 width=193) (actual time=422.811..422.826 rows=201.00 loops=1)
+                                 Buffers: local hit=296593 read=172941
+                                 ->  Sort  (cost=241.80..241.80 rows=1 width=193) (actual time=422.810..422.819 rows=201.00 loops=1)
+                                       Sort Key: workflow_runs_1.created_at DESC, workflow_runs_1.id DESC
+                                       Sort Method: top-N heapsort  Memory: 110kB
+                                       Buffers: local hit=296593 read=172941
+                                       ->  Nested Loop  (cost=235.75..241.79 rows=1 width=193) (actual time=162.525..412.987 rows=62500.00 loops=1)
+                                             Buffers: local hit=296593 read=172941
+                                             ->  HashAggregate  (cost=235.32..235.33 rows=1 width=16) (actual time=162.506..168.274 rows=62500.00 loops=1)
+                                                   Group Key: ownership.run_id
+                                                   Batches: 1  Memory Usage: 4145kB
+                                                   Buffers: local hit=153624 read=65910
+                                                   ->  Nested Loop  (cost=0.85..235.32 rows=1 width=16) (actual time=0.027..154.086 rows=62500.00 loops=1)
+                                                         Buffers: local hit=153624 read=65910
+                                                         ->  Index Only Scan using role_agent_probe on workflow_run_role_bindings role_binding  (cost=0.42..74.58 rows=19 width=48) (actual time=0.015..49.016 rows=43750.00 loops=1)
+                                                               Index Cond: ((company_id = $7) AND (agent_id = $8))
+                                                               Heap Fetches: 43750
+                                                               Index Searches: 1
+                                                               Buffers: local hit=17728 read=26437
+                                                         ->  Index Only Scan using role_owner_probe on run_dependency_manifests ownership  (cost=0.43..8.45 rows=1 width=64) (actual time=0.002..0.002 rows=1.43 loops=43750)
+                                                               Index Cond: ((company_id = $7) AND (root_run_id = role_binding.run_id) AND (manifest_id = role_binding.manifest_id))
+                                                               Heap Fetches: 62500
+                                                               Index Searches: 43750
+                                                               Buffers: local hit=135896 read=39473
+                                             ->  Index Scan using workflow_runs_pkey on workflow_runs workflow_runs_1  (cost=0.43..6.45 rows=1 width=193) (actual time=0.004..0.004 rows=1.00 loops=62500)
+                                                   Index Cond: ((company_id = $6) AND (id = ownership.run_id))
+                                                   Index Searches: 62500
+                                                   Buffers: local hit=142969 read=107031
+ Planning Time: 0.021 ms
+ Execution Time: 424.259 ms
+(66 rows)
+

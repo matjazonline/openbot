@@ -18,6 +18,7 @@ fn unresolved_resources_cannot_enter_admission_configuration() {
         .unwrap(),
     );
     let mut config = binding::BindingConfiguration {
+        escalation: None,
         id: WorkflowBindingId::new(Uuid::new_v4()),
         revision: BindingRevision::new(1).unwrap(),
         company_id,
@@ -31,6 +32,7 @@ fn unresolved_resources_cannot_enter_admission_configuration() {
     };
     assert!(binding::ConfiguredBinding::new(config, bundle.clone()).is_err());
     config = binding::BindingConfiguration {
+        escalation: None,
         id: WorkflowBindingId::new(Uuid::new_v4()),
         revision: BindingRevision::new(1).unwrap(),
         company_id,

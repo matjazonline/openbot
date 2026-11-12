@@ -1,0 +1,18 @@
+{
+  "owner": "/root",
+  "phase": "02WR-P04",
+  "postgres_data": "/Users/mac02/openbot-workflow-roles-tjdv6uy3",
+  "host": "127.0.0.1",
+  "port": 60242,
+  "database": "openbot_roles_p04_v17",
+  "test_database": "openbot_roles_p04_test_v17",
+  "prior_databases_preserved": [
+    "v14",
+    "v15",
+    "v16"
+  ],
+  "cargo_session": null,
+  "note": "Fresh migrations15/16/17 pass. Focused native tests serialized with compilation/SQLx; no server.",
+  "status": "stopped by user; no active jobs; database cluster retained",
+  "last_check": "B1-person-notice-tests3 PASS9"
+}

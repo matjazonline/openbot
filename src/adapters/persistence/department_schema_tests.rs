@@ -293,3 +293,6 @@ async fn department_schema_grant_provenance_check_accepts_every_variant() {
         "channel_principal_grants_provenance_check"
     );
 }
+
+#[path = "department_retirement_audit_tests.rs"]
+mod retirement_audit;

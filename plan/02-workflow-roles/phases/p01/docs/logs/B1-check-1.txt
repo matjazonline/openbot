@@ -1,0 +1,95 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0425]: cannot find value `current` in this scope
+   --> src/adapters/persistence/channel.rs:315:8
+    |
+315 |     if current.department_id.is_some() && ownership.department_id.is_none() {
+    |        ^^^^^^^ not found in this scope
+    |
+help: consider importing this function
+    |
+  1 + use std::thread::current;
+    |
+
+error[E0425]: cannot find value `id` in this scope
+   --> src/adapters/persistence/channel.rs:316:88
+    |
+316 |         super::workflow::role_binding::check_detach_on(tx, CompanyId::new(company_id), id).await?;
+    |                                                                                        ^^ not found in this scope
+    |
+help: consider importing this function
+    |
+  1 + use std::process::id;
+    |
+
+error[E0425]: cannot find function `read_version` in this scope
+  --> src/adapters/persistence/workflow/role_binding.rs:68:22
+   |
+68 |         let bundle = read_version(&mut *tx, company, VersionId::new(version)).await?;
+   |                      ^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this function
+   |
+ 2 + use crate::adapters::persistence::workflow::binding_rows::read_version;
+   |
+
+error[E0425]: cannot find value `current` in this scope
+   --> src/adapters/persistence/channel.rs:315:8
+    |
+315 |     if current.department_id.is_some() && ownership.department_id.is_none() {
+    |        ^^^^^^^ not found in this scope
+    |
+note: function `crate::application::workflow::compiler::compile::review1_tests::current` exists but is inaccessible
+   --> src/application/workflow/compiler/review1_tests.rs:10:1
+    |
+ 10 | fn current() -> WorkflowId {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^ not accessible
+help: consider importing this function
+    |
+  1 + use std::thread::current;
+    |
+
+error[E0425]: cannot find value `id` in this scope
+   --> src/adapters/persistence/channel.rs:316:88
+    |
+316 |         super::workflow::role_binding::check_detach_on(tx, CompanyId::new(company_id), id).await?;
+    |                                                                                        ^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/persistence/workflow/agent_history_views_tests.rs:26:1
+    |
+ 26 | fn id(claim: &ClaimedWorkflow) -> AgentExchangeId {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::id`: not accessible
+    |
+   ::: src/domain/entities/cursor.rs:87:5
+    |
+ 87 |     fn id(last: u8) -> Uuid {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ `crate::entities::cursor::tests::id`: not accessible
+    |
+   ::: src/infra/events.rs:312:5
+    |
+312 |     fn id(last: u8) -> Uuid {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ `crate::infra::events::tests::id`: not accessible
+    |
+   ::: src/domain/workflow/context/tests.rs:4:1
+    |
+  4 | fn id(s: &str) -> StepId {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^ `crate::workflow::context::tests::id`: not accessible
+    |
+   ::: src/domain/workflow/graph.rs:242:5
+    |
+242 |     fn id(s: &str) -> StepId {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ `crate::workflow::graph::tests::id`: not accessible
+    |
+   ::: src/domain/workflow/outcome.rs:276:5
+    |
+276 |     fn id(name: &str) -> StepId {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::workflow::outcome::tests::id`: not accessible
+help: consider importing this function
+    |
+  1 + use std::process::id;
+    |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 3 previous errors

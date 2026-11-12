@@ -63,13 +63,21 @@ fn push_scope(
         query
             .push(keyword)
             .push(
-                "version_id IN (SELECT version.id FROM workflow_versions AS version \
+                "(version_id IN (SELECT version.id FROM workflow_versions AS version \
                  WHERE version.company_id = ",
             )
             .push_bind(company.as_uuid())
             .push(" AND ")
             .push_bind(agent)
             .push(" = ANY(version.agent_ids))");
+        query.push(" OR ");
+        super::reads::push_role_agent_scope(
+            query,
+            company,
+            agent,
+            super::reads::RoleAgentScope::BoardWindow,
+        );
+        query.push(")");
         keyword = " AND ";
     }
     if let Some(department) = scope.department {
@@ -90,7 +98,7 @@ pub(super) fn board_counts_query(
     cutoff: DateTime<Utc>,
 ) -> QueryBuilder<'static, Postgres> {
     let working =
-        "SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
+        "SELECT id, state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
     let mut query = QueryBuilder::new(format!(
         "WITH working AS MATERIALIZED ({working} WHERE company_id = "
     ));
@@ -104,7 +112,7 @@ pub(super) fn board_counts_query(
         .push_bind(cutoff)
         .push(
             " AND parent_run_id IS NULL) \
-             SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working",
+             SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working AS run_scope",
         );
     push_scope(&mut query, company, scope);
     query.push(" GROUP BY state, channel_id");
@@ -140,7 +148,7 @@ pub(super) fn board_cards_query(
         }
         query.push(format!("(SELECT {RUN_COLUMNS} FROM "));
         if scoped(scope) {
-            query.push(state.as_str());
+            query.push(state.as_str()).push(" AS run_scope");
             push_scope(&mut query, company, scope);
         } else {
             push_column(&mut query, company, state, cutoff, visible);

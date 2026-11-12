@@ -1,0 +1,22 @@
+[
+  {
+    "name": "B1-reachability-1.txt",
+    "exit": 0
+  },
+  {
+    "name": "B1-query-shapes-1.txt",
+    "exit": 0
+  },
+  {
+    "name": "B1-query-plans-1.txt",
+    "exit": 3
+  },
+  {
+    "name": "B1-clippy-1.txt",
+    "exit": 0
+  },
+  {
+    "name": "B1-check-11.txt",
+    "exit": 0
+  }
+]

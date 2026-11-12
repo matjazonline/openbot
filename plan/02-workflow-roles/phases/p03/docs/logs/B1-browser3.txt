@@ -1,0 +1,74 @@
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (2618.125417ms)
+✖ reviewer roles and people update unsaved source with visible progress and stale-response protection (7538.901834ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10414.727167
+
+✖ failing tests:
+
+test at scripts/tests/workflow-agent-picker-browser.mjs:143:1
+✖ reviewer roles and people update unsaved source with visible progress and stale-response protection (7538.901834ms)
+  Error: expect(locator).toHaveValue(expected) failed
+  
+  Locator: locator('#workflow-source')
+  - Expected string  - 1
+  + Received string  + 1
+  
+  @@ -16,11 +16,11 @@
+              "continue": "$end",
+              "revise": "$end"
+            }
+          },
+          "type": "decision.human",
+  -       "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer",{"id":"429f1328-93f2-4e7e-ac99-8cd7f131c231","kind":"principal"}]}}
+  +       "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}
+        }
+      },
+      "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"
+    }
+    # browser reviewer edit
+  Timeout: 5000ms
+  
+  Call log:
+  [2m  - Expect "to.have.value" with timeout 5000ms[22m
+  [2m  - waiting for locator('#workflow-source')[22m
+  [2m    9 × locator resolved to <textarea rows="28" wrap="off" name="source" spellcheck="false" autocomplete="off" id="workflow-source" autocapitalize="off" aria-describedby="workflow-source-help" class="textarea w-full font-mono text-xs">{↵  "entry": "start",↵  "format_version": 1,↵  "i…</textarea>[22m
+  [2m      - unexpected value "{[22m
+  [2m  "entry": "start",[22m
+  [2m  "format_version": 1,[22m
+  [2m  "input_schema": true,[22m
+  [2m  "limits": {[22m
+  [2m    "max_context_bytes": 65536,[22m
+  [2m    "max_steps": 100[22m
+  [2m  },[22m
+  [2m  "output_schema": true,[22m
+  [2m  "parameter_schema": true,[22m
+  [2m  "resources": [],[22m
+  [2m  "steps": {[22m
+  [2m    "start": {[22m
+  [2m      "routes": {[22m
+  [2m        "choices": {[22m
+  [2m          "continue": "$end",[22m
+  [2m          "revise": "$end"[22m
+  [2m        }[22m
+  [2m      },[22m
+  [2m      "type": "decision.human",[22m
+  [2m      "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}[22m
+  [2m    }[22m
+  [2m  },[22m
+  [2m  "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"[22m
+  [2m}[22m
+  [2m# browser reviewer edit[22m
+  [2m"[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/dev/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/2050/openbot/scripts/tests/workflow-agent-picker-browser.mjs:229:28)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    matcherResult: { name: 'toHaveValue', expected: '{\n  "entry": "start",\n  "format_version": 1,\n  "input_schema": true,\n  "limits": {\n    "max_context_bytes": 65536,\n    "max_steps": 100\n  },\n  "output_schema": true,\n  "parameter_schema": true,\n  "resources": [],\n  "steps": {\n    "start": {\n      "routes": {\n        "choices": {\n          "continue": "$end",\n          "revise": "$end"\n        }\n      },\n      "type": "decision.human",\n      "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer",{"id":"429f1328-93f2-4e7e-ac99-8cd7f131c231","kind":"principal"}]}}\n    }\n  },\n  "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"\n}\n# browser reviewer edit\n', message: `expect(locator).toHaveValue(expected) failed\n\nLocator: locator('#workflow-source')\n- Expected string  - 1\n+ Received string  + 1\n\n@@ -16,11 +16,11 @@\n            "continue": "$end",\n            "revise": "$end"\n          }\n        },\n        "type": "decision.human",\n-       "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer",{"id":"429f1328-93f2-4e7e-ac99-8cd7f131c231","kind":"principal"}]}}\n+       "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}\n      }\n    },\n    "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"\n  }\n  # browser reviewer edit\nTimeout: 5000ms\n\nCall log:\n\x1B[2m  - Expect "to.have.value" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('#workflow-source')\x1B[22m\n\x1B[2m    9 × locator resolved to <textarea rows="28" wrap="off" name="source" spellcheck="false" autocomplete="off" id="workflow-source" autocapitalize="off" aria-describedby="workflow-source-help" class="textarea w-full font-mono text-xs">{↵  "entry": "start",↵  "format_version": 1,↵  "i…</textarea>\x1B[22m\n\x1B[2m      - unexpected value "{\x1B[22m\n\x1B[2m  "entry": "start",\x1B[22m\n\x1B[2m  "format_version": 1,\x1B[22m\n\x1B[2m  "input_schema": true,\x1B[22m\n\x1B[2m  "limits": {\x1B[22m\n\x1B[2m    "max_context_bytes": 65536,\x1B[22m\n\x1B[2m    "max_steps": 100\x1B[22m\n\x1B[2m  },\x1B[22m\n\x1B[2m  "output_schema": true,\x1B[22m\n\x1B[2m  "parameter_schema": true,\x1B[22m\n\x1B[2m  "resources": [],\x1B[22m\n\x1B[2m  "steps": {\x1B[22m\n\x1B[2m    "start": {\x1B[22m\n\x1B[2m      "routes": {\x1B[22m\n\x1B[2m        "choices": {\x1B[22m\n\x1B[2m          "continue": "$end",\x1B[22m\n\x1B[2m          "revise": "$end"\x1B[22m\n\x1B[2m        }\x1B[22m\n\x1B[2m      },\x1B[22m\n\x1B[2m      "type": "decision.human",\x1B[22m\n\x1B[2m      "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}\x1B[22m\n\x1B[2m    }\x1B[22m\n\x1B[2m  },\x1B[22m\n\x1B[2m  "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"\x1B[22m\n\x1B[2m}\x1B[22m\n\x1B[2m# browser reviewer edit\x1B[22m\n\x1B[2m"\x1B[22m\n`, pass: false, actual: '{\n  "entry": "start",\n  "format_version": 1,\n  "input_schema": true,\n  "limits": {\n    "max_context_bytes": 65536,\n    "max_steps": 100\n  },\n  "output_schema": true,\n  "parameter_schema": true,\n  "resources": [],\n  "steps": {\n    "start": {\n      "routes": {\n        "choices": {\n          "continue": "$end",\n          "revise": "$end"\n        }\n      },\n      "type": "decision.human",\n      "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}\n    }\n  },\n  "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"\n}\n# browser reviewer edit\n', log: [ '  - Expect "to.have.value" with timeout 5000ms', "  - waiting for locator('#workflow-source')", '    9 × locator resolved to <textarea rows="28" wrap="off" name="source" spellcheck="false" autocomplete="off" id="workflow-source" autocapitalize="off" aria-describedby="workflow-source-help" class="textarea w-full font-mono text-xs">{↵  "entry": "start",↵  "format_version": 1,↵  "i…</textarea>', '      - unexpected value "{\n  "entry": "start",\n  "format_version": 1,\n  "input_schema": true,\n  "limits": {\n    "max_context_bytes": 65536,\n    "max_steps": 100\n  },\n  "output_schema": true,\n  "parameter_schema": true,\n  "resources": [],\n  "steps": {\n    "start": {\n      "routes": {\n        "choices": {\n          "continue": "$end",\n          "revise": "$end"\n        }\n      },\n      "type": "decision.human",\n      "with": {"data_schema":{"literal":{"maxLength":128,"type":"string"}},"deadline":{"literal":"2030-01-01T00:00:00Z"},"feedback_required":{"literal":["revise"]},"proposal":{"literal":{"summary":"review"}},"reviewers":{"literal":["reviewer"]}}\n    }\n  },\n  "workflow_id": "3b80711e-871c-4cfc-8af6-28968e0921a0"\n}\n# browser reviewer edit\n"' ], timeout: 5000 }
+  }

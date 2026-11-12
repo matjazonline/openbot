@@ -40,6 +40,7 @@ pub(super) struct BindingForm {
     params: ParamsInput,
     resources: BTreeMap<String, Uuid>,
     message_trigger: String,
+    escalation: Result<Option<crate::application::workflow::binding::EscalationPolicy>, String>,
     run_as: Option<Uuid>,
     error: Option<String>,
 }
@@ -54,6 +55,7 @@ impl BindingForm {
             params: ParamsInput::Stored(serde_json::json!({})),
             resources: BTreeMap::new(),
             message_trigger: String::new(),
+            escalation: Ok(None),
             run_as: None,
             error: None,
         }
@@ -68,6 +70,7 @@ impl BindingForm {
             association: association_value(summary.association),
             params: ParamsInput::Stored(summary.params.clone()),
             resources: binding.resources.clone(),
+            escalation: Ok(summary.escalation),
             message_trigger: summary
                 .message_trigger
                 .map(|trigger| trigger.as_str().to_owned())
@@ -101,10 +104,30 @@ impl BindingForm {
             },
             resources,
             message_trigger: form.text("message_trigger"),
+            escalation: escalation_of(form.get("escalation").unwrap_or("")),
             run_as: form.get("run_as").and_then(|id| id.parse().ok()),
             error: None,
         }
     }
+}
+
+fn escalation_of(
+    value: &str,
+) -> Result<Option<crate::application::workflow::binding::EscalationPolicy>, String> {
+    use crate::application::workflow::binding::{EscalationHops, EscalationPolicy};
+    use crate::entities::department::DepartmentRole;
+    let (notify, hops) = match value {
+        "" => return Ok(None),
+        "lead:1" => (DepartmentRole::Lead, 1),
+        "lead:2" => (DepartmentRole::Lead, 2),
+        "reviewer:1" => (DepartmentRole::Reviewer, 1),
+        "reviewer:2" => (DepartmentRole::Reviewer, 2),
+        _ => return Err("Choose a role and one or two escalation hops.".into()),
+    };
+    Ok(Some(EscalationPolicy {
+        notify,
+        hops: EscalationHops::try_from(hops).map_err(str::to_owned)?,
+    }))
 }
 
 fn association_value(association: RelatedAssociation) -> String {
@@ -156,6 +179,7 @@ fn binding_refusal(error: &WorkflowError) -> Option<String> {
             _ => diagnostic.message.to_string(),
         }),
         WorkflowError::App(AppError::BadRequest(message)) => Some(message.clone()),
+        WorkflowError::App(AppError::WorkflowRole(refusal)) => Some(refusal.to_string()),
         WorkflowError::App(AppError::NotFound(_)) => Some(
             "A chosen desk, version, run-as or resource is not available: it may be hidden from \
              you, disabled, revoked or not ready, or a tool the version froze is no longer \
@@ -189,7 +213,7 @@ impl Ui {
     }
 
     /// The choices a binding form offers, with the channels the viewer cannot see left out.
-    async fn binding_options(&self, company: Uuid) -> AppResult<BindingOptions> {
+    pub(super) async fn binding_options(&self, company: Uuid) -> AppResult<BindingOptions> {
         let company_id = super::company(company);
         let mut options = self
             .engine
@@ -337,6 +361,7 @@ impl Ui {
             mcp: &options.mcp,
             typesafe: &typesafe,
             message_trigger: &form.message_trigger,
+            escalation: form.escalation.as_ref().ok().copied().flatten(),
             run_as: form.run_as,
             owner: company.user_id == self.user,
             viewer: self.user,
@@ -529,8 +554,12 @@ pub(super) async fn save_binding(
                 .await?,
         ));
     };
-    let params = match params_of(&definition, &fields) {
-        Ok(params) => params,
+    let (params, escalation) = match params_of(&definition, &fields).and_then(|params| {
+        form.escalation
+            .clone()
+            .map(|escalation| (params, escalation))
+    }) {
+        Ok(configuration) => configuration,
         Err(message) => {
             let form = refused(form, message);
             return Ok(Html(
@@ -563,6 +592,7 @@ pub(super) async fn save_binding(
         resources: form.resources.clone(),
         run_as: form.run_as,
         message_trigger: Some(form.message_trigger.clone()).filter(|trigger| !trigger.is_empty()),
+        escalation,
     };
     match configure_binding(&ui.engine, company, ui.actor()?, binding, request).await {
         Ok(state) => {

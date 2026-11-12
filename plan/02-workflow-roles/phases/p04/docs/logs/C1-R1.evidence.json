@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "round": "02WR-P04-C1-R1",
+  "artifact": "d6afad07875439fc5bdf12f3e5ceac1fb7c396e0fe9a214a19e070b231528038",
+  "checks": [
+    {
+      "criteria": [
+        "C1-producer-inventory-inspection"
+      ],
+      "command": "graft grep AppError::WorkflowRole / RoleAdmissionRefusal::new in application; exhaustive persistence inventory; callers of sample guard/capture error/bounded_snapshots; inspect actual production owner and pure preparation/sample assertions",
+      "fixture": "frozen partial source, source and coordination pins C1-R1-inputs.json; static inspection only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/C1-r1.md",
+          "sha256": "a57d61c00258b37dd936bdb301f6c85c4936686257d730182b4f65e5094d4b2e"
+        },
+        {
+          "path": "logs/C1-R1-inputs.json",
+          "sha256": "e0a8561edf3c586084c4c8aa0f5cbaec2960083310fefdd320eff351b355fbb5"
+        },
+        {
+          "path": "logs/B1-preparation-role-errors-app.txt",
+          "sha256": "61f0f9f24bb508cb5e371dd33a75963d8e3fc7f87542e189f66caa92ea81ad26"
+        },
+        {
+          "path": "logs/B1-preparation-role-constructors-app.txt",
+          "sha256": "90842b5239063317ecddb0dc2bffb14ffa32bf2460ec88cf314001ef55663b7c"
+        },
+        {
+          "path": "logs/B1-preparation-sample-refusal-callers.txt",
+          "sha256": "8b5e931fa164d8992dc5bd76c2ef4a8c89e0436045146c2c96d16d8f61ed80fb"
+        },
+        {
+          "path": "logs/B1-preparation-refusal-persistence-all.txt",
+          "sha256": "d422964d874c8250f667dc2db23d52f98dbbcb2d364e8ff04c8455ca5562e66f"
+        },
+        {
+          "path": "logs/B1-preparation-capture-error-callers.txt",
+          "sha256": "7c4fa511c2caa93329454a62bee71e308ce3525fc6f29f5bbc535ccf5fbc1861"
+        },
+        {
+          "path": "logs/B1-preparation-bounded-snapshots-callers.txt",
+          "sha256": "68260d089b8802ec332077a8997b18ef926265a790b6968e7715bb15aefeef1c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "p04-B1-implementation-acceptance"
+      ],
+      "command": "whole cohesive phase B1 runtime/UI/concurrency/authority/full affected verification and independent review",
+      "fixture": "current partial p04 source",
+      "status": "NOT EXERCISED",
+      "reason": "C1 only reviews a contradicted architecture/coverage premise; substantial implementation and B1 verification remain."
+    }
+  ]
+}

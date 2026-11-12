@@ -105,6 +105,10 @@ pub(super) fn reference_uses(
         else {
             continue;
         };
+        if step.inputs.contains_key("role") && !step.inputs.contains_key("agent") {
+            // The compiler validates the fixed literal requirement. No holder is captured here.
+            continue;
+        }
         let mode = if kind == crate::application::workflow::registry::ModelStep::AgentRun {
             AgentUseMode::Tools
         } else {

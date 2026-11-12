@@ -126,7 +126,8 @@ async fn approval_on(
     }
     for reviewer in policy.reviewers() {
         if let Err(error) =
-            channel_reply_approvals::require_clearance_on(db, row.activation(), *reviewer).await
+            channel_reply_approvals::require_principal_clearance_on(db, row.activation(), *reviewer)
+                .await
         {
             return Ok(Some(classify_refusal(error, Failure::AuthorityRevoked)?));
         }

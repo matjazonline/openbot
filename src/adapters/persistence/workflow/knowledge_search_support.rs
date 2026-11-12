@@ -316,7 +316,7 @@ pub(super) async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
     source["workflow_id"] = json!(f.target.workflow.to_string());
     if let Some(max_tokens) = budget {
         source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
-            "tokens":{"max_tokens":max_tokens,"reviewers":[{"kind":"user","id":f.target.actor.user_id()}]}});
+            "tokens":{"max_tokens":max_tokens,"reviewers":[{"kind":"principal","id":f.principal(f.target.actor.user_id()).await}]}});
     }
     let version = VersionId::new(Uuid::new_v4());
     f.publish_source(&service, f.target.workflow, source.to_string(), version)

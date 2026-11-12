@@ -19,6 +19,7 @@ async fn binding_destinations_authorize_tenant_role_and_private_channel() {
         WorkflowActor::authenticated(f.owner).unwrap(),
         binding,
         BindingRequest {
+            escalation: None,
             expected_state_revision: None,
             association: RelatedAssociation::Channel(RelatedChannelId::new(private)),
             version,

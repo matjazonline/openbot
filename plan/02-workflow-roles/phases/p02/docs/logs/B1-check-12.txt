@@ -1,0 +1,2 @@
+$ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.25s

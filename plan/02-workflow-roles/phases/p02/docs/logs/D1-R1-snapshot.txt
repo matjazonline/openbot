@@ -1,0 +1,27 @@
+base:   103004a8ac2fd643cf14bde7e09022ae79f72053
+digest: 91741e066ae90284ca17ba5163cbc89561eef3ac1fb728daec3645392d1f473d
+files:
+  docs/workflow-language-v1.md
+  migrations/20260817000000_init_schema.sql
+  src/adapters/persistence/channel.rs
+  src/adapters/persistence/department_desks.rs
+  src/adapters/persistence/workflow/bindings.rs
+  src/adapters/persistence/workflow/mod.rs
+  src/adapters/persistence/workflow/role_binding.rs
+  src/adapters/persistence/workflow/role_binding_tests.rs
+  src/adapters/persistence/workflow/tests.rs
+  src/application/workflow/compiler/compile.rs
+  src/application/workflow/compiler/mod.rs
+  src/application/workflow/compiler/roles.rs
+  src/application/workflow/fixtures/mod.rs
+  src/application/workflow/fixtures/role-lead-response.yaml
+  src/application/workflow/publication/capabilities.rs
+  src/application/workflow/publication/mod.rs
+  src/application/workflow/publication/role_tests.rs
+  src/application/workflow/publication/tests.rs
+  src/application/workflow/publication/types.rs
+  src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
+  src/application/workflow/registry/help.rs
+  src/application/workflow/registry/mod.rs
+  src/application/workflow/registry/roles.rs
+  src/domain/entities/department.rs

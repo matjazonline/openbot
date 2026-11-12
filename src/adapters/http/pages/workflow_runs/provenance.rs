@@ -26,9 +26,13 @@ pub(super) fn dependencies(run: &RunView) -> String {
             )
         })
         .collect::<String>();
+    let roles = role_markers(
+        &run.detail.summary.role_holders,
+        run.detail.summary.role_holders_truncated,
+    );
     format!(
         r#"<section class="space-y-2"><h3 class="font-semibold">Captured dependencies</h3>
-        <p class="break-all text-xs">Manifest {} · root run {}</p>
+        <p class="break-all text-xs">Manifest {} · root run {}</p>{roles}
         <p class="text-xs opacity-70">Selected at root admission and retained by retries and children. Published definitions describe available capabilities; model-only steps use no tools or skills.</p>
         <details><summary class="cursor-pointer">Agent revisions and workflow versions</summary>{agents}<ul>{workflows}</ul>{cut}</details></section>{calls}"#,
         selected.manifest.as_uuid(),
@@ -41,7 +45,36 @@ pub(super) fn dependencies(run: &RunView) -> String {
     )
 }
 
+pub(super) fn role_markers(
+    holders: &[crate::application::workflow::reads::RunRoleHolder],
+    truncated: bool,
+) -> String {
+    let mut seen = std::collections::BTreeSet::new();
+    let mut result = String::new();
+    let limit = crate::application::workflow::run_views::MAX_STEP_ITEMS as usize;
+    for holder in holders.iter().take(limit) {
+        if seen.insert((holder.role.as_str(), holder.principal)) {
+            result.push_str(&format!(
+                r#"<span class="badge badge-sm badge-ghost">{}: {} · via role</span>"#,
+                holder.role.as_str(),
+                escape_html_text(&holder.label)
+            ));
+        }
+    }
+    if truncated || holders.len() > limit {
+        result.push_str(
+            r#"<span class="text-xs opacity-70">More role resolutions are omitted.</span>"#,
+        );
+    }
+    result
+}
+
 pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
+    let role = agent
+        .via_role
+        .as_ref()
+        .map(|holder| role_markers(std::slice::from_ref(holder), false))
+        .unwrap_or_default();
     let bindings = agent
         .bindings
         .iter()
@@ -78,7 +111,7 @@ pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
         }
     };
     format!(
-        r#"<div class="space-y-1 py-2"><p class="text-sm">@{} · {}</p>
+        r#"<div class="space-y-1 py-2"><p class="text-sm">@{} · {}</p>{role}
         <p class="break-all text-xs">Agent {} · revision {} · manifest {}</p>
         <p class="text-xs">tools {}; skills {}</p><ul>{bindings}{assignments}</ul></div>"#,
         escape_html_text(&agent.key),
@@ -132,5 +165,41 @@ fn truncation(truncated: bool, message: &str) -> String {
         format!("<p class=\"text-xs\">{}</p>", escape_html_text(message))
     } else {
         String::new()
+    }
+}
+
+#[cfg(test)]
+mod role_tests {
+    use super::*;
+    use crate::application::workflow::reads::RunRoleHolder;
+    use crate::domain::workflow::{StepId, VersionId};
+    use crate::entities::department::{DepartmentId, DepartmentRole};
+    use crate::entities::transport::PrincipalId;
+
+    #[test]
+    fn workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers() {
+        let holder = RunRoleHolder {
+            version: VersionId::new(Uuid::new_v4()),
+            step: StepId::parse("start").unwrap(),
+            role: DepartmentRole::Lead,
+            department: DepartmentId::new(Uuid::new_v4()),
+            principal: PrincipalId::new(Uuid::new_v4()),
+            label: "<img src=x onerror=alert(1)>".into(),
+        };
+        let duplicate = role_markers(&[holder.clone(), holder.clone()], false);
+        assert_eq!(duplicate.matches("via role").count(), 1);
+        assert!(duplicate.contains("&lt;img"));
+        assert!(!duplicate.contains("<img"));
+        let holders: Vec<_> = (0..51)
+            .map(|_| RunRoleHolder {
+                principal: PrincipalId::new(Uuid::new_v4()),
+                ..holder.clone()
+            })
+            .collect();
+        let bounded = role_markers(&holders, false);
+        assert_eq!(bounded.matches("via role").count(), 50);
+        assert!(bounded.contains("More role resolutions are omitted"));
+        assert!(role_markers(&[], true).contains("More role resolutions are omitted"));
+        assert!(role_markers(&[], false).is_empty());
     }
 }

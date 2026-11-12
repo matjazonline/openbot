@@ -45,6 +45,7 @@ pub struct CompileFacts<'a> {
 }
 
 pub struct CompiledWorkflow {
+    roles: Vec<crate::application::workflow::publication::RoleReference>,
     source: String,
     representation: Value,
     source_map: BTreeMap<String, SourceSpan>,
@@ -70,6 +71,9 @@ impl PreparedInputs {
 }
 
 impl CompiledWorkflow {
+    pub fn role_references(&self) -> &[crate::application::workflow::publication::RoleReference] {
+        &self.roles
+    }
     pub fn source(&self) -> &str {
         &self.source
     }
@@ -170,6 +174,7 @@ impl CompiledWorkflow {
                     error
                 })?;
         }
+        super::roles::validate_inputs(&self.roles, step, &value, &root, self.span(&root))?;
         Ok(PreparedInputs { value })
     }
 
@@ -682,6 +687,7 @@ pub(crate) fn compile_resolved(
     dependencies: &BTreeMap<WorkflowId, BTreeSet<WorkflowId>>,
     tool_workflows: &BTreeSet<WorkflowId>,
 ) -> Result<CompiledWorkflow, Diagnostic> {
+    let roles = super::roles::references(&parsed)?;
     let dependencies = dependency_facts(&parsed, dependencies, tool_workflows)?;
     check_expanded_facts(descriptors, &dependencies, located(&parsed, "/steps"))?;
     let graph = validate(parsed.definition.clone()).map_err(|error| graph_error(error, &parsed))?;
@@ -711,6 +717,7 @@ pub(crate) fn compile_resolved(
         "definition": super::json_value(&decoded.root, "")?,
         "descriptors": steps.facts,
         "dependencies": dependencies,
+        "roles": roles,
         "root_budget": {
             "activations": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::Activation),
             "model_calls": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::ModelCall),
@@ -722,6 +729,7 @@ pub(crate) fn compile_resolved(
     }
     let content_hash = identity(&decoded.source, &representation);
     Ok(CompiledWorkflow {
+        roles,
         source: decoded.source,
         representation,
         source_map: parsed.locations,

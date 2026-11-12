@@ -678,3 +678,6 @@ async fn run_board_view_filter_workflow_pages_link_to_the_board() {
         "{page}"
     );
 }
+
+#[path = "reviewer_picker_tests.rs"]
+mod reviewer_picker_tests;

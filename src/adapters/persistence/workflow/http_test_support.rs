@@ -252,6 +252,7 @@ pub(super) async fn bound(
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association,

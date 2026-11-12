@@ -11,6 +11,7 @@ pub struct WorkflowAgentPicker<'a> {
     pub next_step: Option<&'a StepId>,
     pub agents: &'a AgentDirectoryPage,
     pub selected_agent: Option<&'a AgentAuthoringState>,
+    pub selected_role: Option<crate::entities::department::DepartmentRole>,
 }
 
 pub(super) fn workflow_agent_picker_loader(company: Uuid, workflow: Uuid) -> String {
@@ -57,7 +58,9 @@ pub fn workflow_agent_picker(view: &WorkflowAgentPicker<'_>) -> String {
             )
         })
         .unwrap_or_default();
-    let disabled = if view.selected_step.is_none() || view.selected_agent.is_none() {
+    let disabled = if view.selected_step.is_none()
+        || (view.selected_agent.is_none() && view.selected_role.is_none())
+    {
         " disabled"
     } else {
         ""
@@ -65,19 +68,19 @@ pub fn workflow_agent_picker(view: &WorkflowAgentPicker<'_>) -> String {
     format!(
         r##"<section id="workflow-agent-picker" data-workflow-agent-picker class="space-y-3 rounded-box border border-base-300 p-4">
         <h3 class="font-semibold">Choose an agent for a model step</h3>
-        <p class="text-xs opacity-70">This edits the agent reference in your current source. Save and validate the workflow afterward. No connection slots or duplicated agent configuration are added.</p>
+        <p class="text-xs opacity-70">This edits the agent or role reference in your current source. A role selects the department holder when a run starts. Save and validate the workflow afterward. No connection slots or duplicated agent configuration are added.</p>
         <form hx-post="/ui/workflows/{workflow}/agent-picker?company_id={company}" hx-include="#workflow-source" hx-target="#workflow-agent-picker" hx-swap="outerHTML" hx-sync="#workflow-agent-picker:replace" class="space-y-3">
         <label class="form-control">Model step<select class="select" name="step" hx-post="/ui/workflows/{workflow}/agent-picker?company_id={company}" hx-params="source,step"><option value="" disabled{no_step}>Select a model step</option>{steps}</select></label>{more_steps}
-        <label class="form-control">Company agent<select class="select" name="agent" hx-post="/ui/workflows/{workflow}/agent-picker?company_id={company}"><option value="" disabled{no_agent}>Select an agent</option>{agents}</select></label>{more_agents}
+        <label class="form-control">Agent or role<select class="select" name="agent" hx-post="/ui/workflows/{workflow}/agent-picker?company_id={company}"><option value="" disabled{no_agent}>Select an agent</option>{agents}</select></label>{more_agents}
         <p class="text-xs opacity-60">Up to 50 model steps and 50 agents per page. The current selection remains available outside its page.</p>
-        <div class="flex flex-wrap gap-2"><button type="submit" class="btn btn-ghost btn-sm">Refresh choices</button><button type="button" class="btn btn-primary btn-sm" hx-post="/ui/workflows/{workflow}/agent-reference?company_id={company}" hx-target="#workflow-agent-reference-result" hx-swap="innerHTML"{disabled}>Use selected agent in source</button></div></form>
+        <div class="flex flex-wrap gap-2"><button type="submit" class="btn btn-ghost btn-sm">Refresh choices</button><button type="button" class="btn btn-primary btn-sm" hx-post="/ui/workflows/{workflow}/agent-reference?company_id={company}" hx-target="#workflow-agent-reference-result" hx-swap="innerHTML"{disabled}>Use selection in source</button></div></form>
         <div id="workflow-agent-reference-result" role="status" aria-live="polite"></div>{capabilities}</section>"##,
         no_step = if view.selected_step.is_none() {
             " selected"
         } else {
             ""
         },
-        no_agent = if view.selected_agent.is_none() {
+        no_agent = if view.selected_agent.is_none() && view.selected_role.is_none() {
             " selected"
         } else {
             ""
@@ -108,7 +111,8 @@ fn step_options(view: &WorkflowAgentPicker<'_>) -> String {
 }
 
 fn agent_options(view: &WorkflowAgentPicker<'_>) -> String {
-    view.agents
+    let agents = view
+        .agents
         .items
         .iter()
         .map(|agent| {
@@ -132,7 +136,23 @@ fn agent_options(view: &WorkflowAgentPicker<'_>) -> String {
                 }
             )
         })
-        .collect::<String>()
+        .collect::<String>();
+    let roles = crate::entities::department::DepartmentRole::ALL
+        .into_iter()
+        .map(|role| {
+            format!(
+                r#"<option value="role:{role}"{selected}>{role} · role</option>"#,
+                selected = if view.selected_role == Some(role) {
+                    " selected"
+                } else {
+                    ""
+                },
+            )
+        })
+        .collect::<String>();
+    format!(
+        r#"<optgroup label="Agents">{agents}</optgroup><optgroup label="Role">{roles}</optgroup>"#
+    )
 }
 
 fn more_choices(company: Uuid, workflow: Uuid, field: &str, after: &str, label: &str) -> String {
@@ -211,7 +231,7 @@ fn active_capabilities(state: &AgentAuthoringState) -> String {
 
 pub fn workflow_agent_reference_applied(source: &str) -> String {
     format!(
-        r#"<p>Agent reference applied to the editor. Save and validate the workflow when ready.</p><span hidden data-workflow-agent-source="{}"></span>"#,
+        r#"<p>Reference applied to the editor. Save and validate the workflow when ready.</p><span hidden data-workflow-agent-source="{}"></span>"#,
         escape_html_attr(source)
     )
 }
@@ -220,18 +240,19 @@ pub const WORKFLOW_AGENT_PICKER_SCRIPT: &str = r#"
 var workflowAgentRequests = new WeakMap();
 document.addEventListener('htmx:beforeRequest', function (event) {
     var element = event.detail.elt;
-    if (!element.closest('[data-workflow-agent-picker]')) return;
+    var picker = element.closest('[data-workflow-agent-picker],[data-workflow-reviewer-picker]');
+    if (!picker) return;
     var source = document.getElementById('workflow-source');
     if (!source) return;
-    var context = { field: source, value: source.value };
+    var context = { field: source, value: source.value, status: picker.id === 'workflow-reviewer-picker' ? 'workflow-reviewer-result' : 'workflow-agent-reference-result' };
     var request = event.detail.xhr;
     workflowAgentRequests.set(request, context);
     element.addEventListener('htmx:beforeOnLoad', function (answer) {
         if (answer.detail.xhr !== request) return;
         if (!context.field.isConnected || document.getElementById('workflow-source') !== context.field || context.field.value !== context.value) {
             answer.preventDefault();
-            var status = document.getElementById('workflow-agent-reference-result');
-            if (status && context.field.isConnected) status.textContent = 'The source changed. Refresh the agent choices before applying a reference.';
+            var status = document.getElementById(context.status);
+            if (status && context.field.isConnected) status.textContent = 'The source changed. Refresh the choices before applying a reference.';
         }
     }, { once: true });
 }, true);

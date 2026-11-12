@@ -4,11 +4,12 @@ use super::*;
 async fn configured() -> (AdmissionFixture, Uuid) {
     let fixture = Fixture::new().await;
     let reviewer = member(&fixture, "admin").await;
+    let reviewer_principal = fixture.principal(reviewer).await;
     let mut source: Value =
         serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({
         "activations": 10, "model_calls": 10, "repetitions": 10,
-        "tokens": {"max_tokens": 2000, "reviewers": [{"kind":"user","id":reviewer}]}
+        "tokens": {"max_tokens": 2000, "reviewers": [{"kind":"principal","id":reviewer_principal}]}
     });
     let binding = BindingFixture::from_fixture(fixture, source).await;
     (AdmissionFixture::with_binding(binding).await, reviewer)
@@ -47,9 +48,10 @@ async fn workflow_admit_token_reviewers_current_authority_and_saved_replay() {
     .fetch_one(f.persistence().pool())
     .await
     .unwrap();
+    let reviewer_principal = f.binding.fixture.principal(reviewer).await;
     assert_eq!(
         policy,
-        json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+        json!({"max_tokens":2000,"reviewers":[{"kind":"principal","id":reviewer_principal}]})
     );
 }
 
@@ -121,11 +123,12 @@ async fn workflow_admit_token_child_admission_refused_and_runtime_child_shares_r
 
     let fixture = Fixture::new().await;
     let reviewer = member(&fixture, "admin").await;
+    let reviewer_principal = fixture.principal(reviewer).await;
     let mut source: Value =
         serde_json::from_str(&registry::example("data.map").unwrap().source).unwrap();
     source["limits"]["root_budget"] = json!({
         "activations": 10, "model_calls": 10, "repetitions": 10,
-        "tokens": {"max_tokens": 2000, "reviewers": [{"kind":"user","id":reviewer}]}
+        "tokens": {"max_tokens": 2000, "reviewers": [{"kind":"principal","id":reviewer_principal}]}
     });
     let (f, scopes) = AdmissionFixture::chain_in(fixture, source, 1).await;
     let (root, child) = (scopes[0], scopes[1]);
@@ -140,7 +143,10 @@ async fn workflow_admit_token_child_admission_refused_and_runtime_child_shares_r
     .await
     .unwrap();
     assert_eq!(root_id, root.run.as_uuid());
-    assert_eq!(reviewers, json!([{"kind":"user","id":reviewer}]));
+    assert_eq!(
+        reviewers,
+        json!([{"kind":"principal","id":reviewer_principal}])
+    );
     let budgets: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_root_budgets")
         .fetch_one(f.persistence().pool())
         .await
@@ -161,9 +167,10 @@ async fn root_budget_admission_token_policy_equals_the_compiled_policy() {
     .fetch_one(f.persistence().pool())
     .await
     .unwrap();
+    let reviewer_principal = f.binding.fixture.principal(reviewer).await;
     assert_eq!(
         policy,
-        json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+        json!({"max_tokens":2000,"reviewers":[{"kind":"principal","id":reviewer_principal}]})
     );
     let compiled:Value=sqlx::query_scalar("SELECT version->'compiled'->'root_budget'->'tokens' FROM workflow_runs AS run CROSS JOIN LATERAL jsonb_array_elements(convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->'versions') AS version WHERE run.id=$1 AND version->>'version'=convert_from((SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=run.company_id AND stored.digest=run.bundle_digest),'UTF8')::jsonb->>'root'")
         .bind(prepared.proposed_run_id().as_uuid()).fetch_one(f.persistence().pool()).await.unwrap();

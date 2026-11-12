@@ -71,6 +71,7 @@ impl RevisionRow {
             })
             .collect::<Vec<_>>();
         Ok(SelectedAgentSummary {
+            via_role: None,
             manifest: DependencyManifestId::new(self.manifest_id),
             agent_id: definition.agent_id,
             revision_id: AgentRevisionId::new(self.id),

@@ -53,7 +53,7 @@ fn workflow_registry_static_declarations_and_nested_configuration_are_checked() 
         (
             "decision.human",
             "reviewers",
-            json!([{"kind":"user","id":"00000000-0000-0000-0000-000000000006","extra":1}]),
+            json!([{"kind":"principal","id":"00000000-0000-0000-0000-000000000006","extra":1}]),
         ),
         (
             "message.send",

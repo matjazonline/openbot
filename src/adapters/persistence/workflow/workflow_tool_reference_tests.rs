@@ -28,7 +28,7 @@ async fn autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_age
     assert_eq!(tool.policy.recovery, ActionRecovery::SafeRepeat);
     assert_eq!(
         tool.workflow.as_ref().unwrap().params,
-        json!({"reviewer":setup.reviewer.to_string()})
+        json!({"reviewer":setup.fixture.principal(setup.reviewer).await.to_string()})
     );
     let bundle = p
         .selectable_version(company, setup.parent)

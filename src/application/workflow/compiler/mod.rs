@@ -6,13 +6,14 @@
 /// context/evaluation budgets, registry specialization or interpreter semantics,
 /// even when the serialized representation would remain identical. Old revisions
 /// require an explicit compatible loader; they must never be silently recompiled.
-pub const SEMANTIC_REVISION: u32 = 9;
+pub const SEMANTIC_REVISION: u32 = 12;
 mod agent_selection;
 mod analysis;
 mod binding;
 mod compile;
 mod fact_budget;
 mod rebase;
+mod roles;
 pub use agent_selection::{AgentReferenceStep, agent_reference_steps, select_agent_reference};
 mod schema;
 mod schema_budget;
@@ -44,3 +45,14 @@ pub(crate) use compile::{
 pub(crate) use source::input_span;
 
 pub(crate) use fact_budget::FactBudget;
+
+mod role_selection;
+pub use role_selection::{
+    ReviewerReferenceStep, reviewer_reference_steps, select_reviewer_references,
+    select_role_reference,
+};
+
+#[cfg(test)]
+mod role_selection_tests;
+
+mod selection_span;

@@ -1,0 +1,8 @@
+{
+  "worktree": "/Users/mac02/openbot-p04-mcp-baseline-6xwpp7ro",
+  "base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "accepted_artifact": "5bd5645a4256002c4202f11f1bdfdea9814c98188e1d6e2dcbd181cd503ba1db",
+  "verified_paths": 206,
+  "purpose": "read-only MCP baseline test of accepted p03; no phase records changed",
+  "target": "shared serialized root Cargo target; rebuild root before using its native binary again"
+}

@@ -90,7 +90,7 @@ async fn agent_setup_source(
     origin: &str,
     skill: Option<&str>,
     protected: bool,
-    customize: impl FnOnce(&mut Value, Uuid),
+    customize: impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId),
 ) -> AgentSetup {
     let mut fixture = Fixture::new().await;
     fixture.persistence = PostgresPersistence::with_credential_cipher(
@@ -167,10 +167,15 @@ async fn agent_setup_source(
         serde_json::from_str(&registry::example("agent.run").unwrap().source).unwrap();
     if protected {
         source["steps"]["start"]["with"]["approval"] = json!({"literal":{
-            "reviewers":[{"kind":"user","id":fixture.target.actor.user_id()}],
+            "reviewers":[{"kind":"principal","id":fixture.principal(fixture.target.actor.user_id()).await}],
             "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
     }
-    customize(&mut source, fixture.target.actor.user_id());
+    customize(
+        &mut source,
+        crate::domain::entities::transport::PrincipalId::new(
+            fixture.principal(fixture.target.actor.user_id()).await,
+        ),
+    );
     draft.content.source = source.to_string();
     definitions.save(draft).await.unwrap();
     let publication = fixture.publish();

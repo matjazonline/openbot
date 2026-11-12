@@ -1,0 +1,27 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/people_resolutions.rs:40:18
+   |
+40 |     let content: Value =
+   |                  ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::templates::agent_workflow::tests::SourceNode::Value`; try using the variant's enum
+   |
+40 -     let content: Value =
+40 +     let content: crate::application::workflow::templates::agent_workflow::tests::SourceNode =
+   |
+
+error[E0425]: cannot find type `Value` in this scope
+  --> src/adapters/persistence/workflow/people_resolutions.rs:76:18
+   |
+76 |     let content: Value = sqlx::query_scalar(
+   |                  ^^^^^ not found in this scope
+   |
+help: there is an enum variant `crate::application::workflow::templates::agent_workflow::tests::SourceNode::Value`; try using the variant's enum
+   |
+76 -     let content: Value = sqlx::query_scalar(
+76 +     let content: crate::application::workflow::templates::agent_workflow::tests::SourceNode = sqlx::query_scalar(
+   |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

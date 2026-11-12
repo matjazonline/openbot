@@ -35,6 +35,9 @@ mod schedule_runtime_tests;
 #[path = "provisioning_runtime_tests.rs"]
 mod provisioning_runtime_tests;
 
+#[path = "role_runtime_tests.rs"]
+mod role_runtime_tests;
+
 #[path = "reviewed_delivery_tests.rs"]
 mod reviewed_delivery_tests;
 

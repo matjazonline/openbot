@@ -50,6 +50,9 @@ pub(super) async fn save_binding_on(
     // All workflow lifecycle mutations serialize on company before their heads.
     let current = read_binding(tx, company, configuration.id()).await?;
     let change = validate_change(command, current.as_ref())?;
+    if state.active {
+        super::role_binding::check_on(tx, configuration, state.association).await?;
+    }
     if !matches!(change, Change::Deactivate) {
         verify_selection(tx, configuration).await?;
         resources::check_readiness(tx, configuration.as_ref().into()).await?;
@@ -166,11 +169,12 @@ async fn insert_configuration(
     command: &PreparedBinding,
 ) -> AppResult<()> {
     let configuration = &command.state().configuration;
-    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id, run_as_user_id, message_trigger) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)")
+    sqlx::query("INSERT INTO workflow_binding_revisions (company_id, binding_id, revision, version_id, params, resources, actor_id, run_as_user_id, message_trigger, escalation) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)")
         .bind(configuration.company_id().as_uuid()).bind(configuration.id().as_uuid()).bind(revision(configuration.revision().get())?)
         .bind(configuration.bundle().compiled().graph().definition().version_id.as_uuid()).bind(configuration.params())
         .bind(serde_json::to_value(configuration.resources()).map_err(|_| invalid())?).bind(command.actor().user_id())
         .bind(configuration.run_as().user_id()).bind(configuration.message_trigger().map(MessageTrigger::as_str))
+        .bind(configuration.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)
         .execute(&mut **tx).await.map_err(write_error)?;
     Ok(())
 }

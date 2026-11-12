@@ -5,6 +5,10 @@ use serde_json::{Value, json};
 /// Versioned, unambiguous logical source identity. Trigger UUID is deliberately
 /// excluded for externally identified events, allowing redelivery command aliases.
 pub(super) struct SourceKey(String);
+pub(super) enum AdmissionPayloadSource {
+    Public,
+    Message(Uuid),
+}
 impl SourceKey {
     pub(super) fn from_trigger(trigger: &TriggerRef) -> Self {
         let source = match trigger.source() {
@@ -60,6 +64,29 @@ impl SourceKey {
                 matches!(source.as_array().map(Vec::as_slice), Some([kind, _]) if kind == "manual")
             })
     }
+
+    /// Only validated manual/schedule sources have the existing public admission-input stamp.
+    /// A damaged or unknown stored key must never lower a message's payload classification.
+    pub(super) fn payload_source(stored: &str) -> AppResult<AdmissionPayloadSource> {
+        if stored.len() > 512 {
+            return Err(invalid());
+        }
+        if let Some(message) = Self::message(stored) {
+            return Ok(AdmissionPayloadSource::Message(message));
+        }
+        let document: Value = serde_json::from_str(stored.strip_prefix("v1:").ok_or_else(invalid)?)
+            .map_err(|_| invalid())?;
+        let values = document.as_array().ok_or_else(invalid)?;
+        let identities = match values.as_slice() {
+            [_, trigger] if Self::is_manual(stored) => std::slice::from_ref(trigger),
+            [kind, _, _] if kind == "schedule" => &values[1..],
+            _ => return Err(invalid()),
+        };
+        for identity in identities {
+            Uuid::parse_str(identity.as_str().ok_or_else(invalid)?).map_err(|_| invalid())?;
+        }
+        Ok(AdmissionPayloadSource::Public)
+    }
 }
 
 #[async_trait]
@@ -86,6 +113,22 @@ impl WorkflowBindings for PostgresPersistence {
         let selected = if let Some(run) = saved {
             Some(AdmissionBinding {
                 binding: read_saved_binding(&mut tx, company, binding, run).await?,
+                saved: true,
+            })
+        } else if let Some(binding) = admission_refusal::saved_binding_on(
+            &mut tx,
+            admission_refusal::RefusalKey {
+                company,
+                binding,
+                command: key,
+                trigger,
+                source: &source,
+            },
+        )
+        .await?
+        {
+            Some(AdmissionBinding {
+                binding,
                 saved: true,
             })
         } else {
@@ -180,6 +223,7 @@ struct SavedBindingRow {
     params: Value,
     resources: Value,
     actor_id: Uuid,
+    escalation: Option<Value>,
 }
 
 /// A committed run's own configuration snapshot. It never reads the binding head or its
@@ -192,7 +236,7 @@ pub(super) async fn read_saved_binding(
     run: Uuid,
 ) -> AppResult<Arc<ConfiguredBinding>> {
     let row = sqlx::query_as::<_, SavedBindingRow>(
-        "SELECT workflow_id, version_id, binding_revision, stored.bundle AS bundle, params, resources, actor_id \
+        "SELECT workflow_id, version_id, binding_revision, stored.bundle AS bundle, params, resources, actor_id, run.escalation \
          FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id = $1 AND id = $2 AND binding_id = $3",
     )
     .bind(company.as_uuid())
@@ -217,6 +261,11 @@ pub(super) async fn read_saved_binding(
             .ok_or_else(invalid)?;
     ConfiguredBinding::new(
         BindingConfiguration {
+            escalation: row
+                .escalation
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|_| invalid())?,
             company_id: company,
             id: binding,
             revision,

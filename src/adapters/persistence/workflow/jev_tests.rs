@@ -189,6 +189,7 @@ pub(super) async fn bound_source(f: &Fixture, c: &JevConnection, source: Value) 
     let service = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = service
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,
@@ -404,6 +405,7 @@ async fn jev_binding_foreign_selection_model_allowance_and_stale_revision() {
         .version_id;
     let service = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let request = |id, expected| ConfigureBinding {
+        escalation: None,
         target,
         expected,
         association: RelatedAssociation::Company,

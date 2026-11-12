@@ -344,7 +344,7 @@ async fn workflow_message_receipt_unknown_is_uncertain_until_the_deadline() {
 async fn workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth() {
     // Two email destinations of one parked step: one in flight, one unsent. (A saved model
     // tool delivery parks its own job, so it can no longer be an unsent sibling here.)
-    let setup = Box::pin(setup_with_owner(|_, _, user, owner| {
+    let setup = Box::pin(setup_with_owner(|MessageSetup { user, owner, .. }| {
         (
             "message.send",
             json!({"content":{"literal":{"subject":"Status","body":"Two recipients."}},

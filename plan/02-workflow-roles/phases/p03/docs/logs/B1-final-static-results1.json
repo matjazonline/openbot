@@ -1,0 +1,38 @@
+[
+  {
+    "name": "sqlx-prepare",
+    "command": "cargo sqlx prepare -- --all-targets",
+    "exit": 0,
+    "log": "B1-final-sqlx-prepare1.txt"
+  },
+  {
+    "name": "format",
+    "command": "cargo fmt --check",
+    "exit": 0,
+    "log": "B1-final-format1.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": "git diff --check",
+    "exit": 0,
+    "log": "B1-final-whitespace1.txt"
+  },
+  {
+    "name": "offline",
+    "command": "cargo check --locked --offline --all-targets",
+    "exit": 0,
+    "log": "B1-final-offline1.txt"
+  },
+  {
+    "name": "clippy",
+    "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+    "exit": 0,
+    "log": "B1-final-clippy1.txt"
+  },
+  {
+    "name": "focused-build",
+    "command": "cargo test --locked --offline --lib --no-run",
+    "exit": 0,
+    "log": "B1-final-focused-build1.txt"
+  }
+]

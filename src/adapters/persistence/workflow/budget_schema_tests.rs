@@ -280,7 +280,7 @@ async fn workflow_budget_current_compiler_admission_activates() {
 #[tokio::test]
 async fn workflow_budget_token_policy_sql_shape_matches_compiler_contract() {
     let (f, _) = limited().await;
-    let reviewer = json!({"kind":"user","id":Uuid::new_v4()});
+    let reviewer = json!({"kind":"principal","id":Uuid::new_v4()});
     let valid = json!({"max_tokens":2000,"reviewers":[reviewer.clone()]});
     let mut cases = vec![
         (valid.clone(), true),
@@ -304,9 +304,9 @@ async fn workflow_budget_token_policy_sql_shape_matches_compiler_contract() {
         json!([]),
         json!([reviewer.clone(), reviewer.clone()]),
         json!([{"kind":"agent","id":Uuid::new_v4()}]),
-        json!([{"kind":"user","id":"bad"}]),
-        json!([{"kind":"user"}]),
-        json!([{"kind":"user","id":Uuid::new_v4(),"extra":true}]),
+        json!([{"kind":"principal","id":"bad"}]),
+        json!([{"kind":"principal"}]),
+        json!([{"kind":"principal","id":Uuid::new_v4(),"extra":true}]),
     ] {
         let mut policy = valid.clone();
         policy["reviewers"] = reviewers;

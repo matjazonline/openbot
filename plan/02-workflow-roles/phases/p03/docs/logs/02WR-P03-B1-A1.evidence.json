@@ -1,0 +1,332 @@
+{
+  "version": 1,
+  "round": "02WR-P03-B1-A1",
+  "artifact": "5bd5645a4256002c4202f11f1bdfdea9814c98188e1d6e2dcbd181cd503ba1db",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "REGRESSIONS"
+      ],
+      "command": "native lib binary workflow_role_ workflow_reviewer_principal_ compiler/publication/registry module filters workflow_decision_ channel_reply_publication_;250PASS",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused1.txt",
+          "sha256": "1d456c8fd7cc2e49d61f57260f19470bfd15258142e0d6dcf3c563c294eb54eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "command": "current final native lib binary workflow_role_ workflow_reviewer_principal_;60PASS, includes distinct principal parameter override",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-focused2.txt",
+          "sha256": "73a0439dbe545d9eccc22b8e6c1df14a32ec298caa2f18c4968aa045c8907815"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-sqlx1.txt",
+          "sha256": "7f4f03b522e8db132a1e25a25338116a00c75acf710af14e1e5c299870277f49"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-format1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "git diff --check",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-whitespace1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-offline1.txt",
+          "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-clippy1.txt",
+          "sha256": "5f720538d09c39c0e0796a16d17effa806383888f829e4771b306b8b084f74a2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-reachability1.txt",
+          "sha256": "5a6f765fcd1fa930b1c30999bf8bc5c0a6f217c0f3c42ce55f01fd8c96aab003"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-build1.txt",
+          "sha256": "2806619f7f8a80e165d6859f708ae07090e21b581e552de884e210ba83b34ef6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-inventory1.txt",
+          "sha256": "6a66dabb4c9cc969ddd2ca21eee50fd5c5134a1a067c18b3ed4868d6f979495f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "INVENTORY"
+      ],
+      "command": "compare discovered lib test names R1/R2;4224\u21924228,4added,zero removed",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static-inventory1.txt",
+          "sha256": "6a66dabb4c9cc969ddd2ca21eee50fd5c5134a1a067c18b3ed4868d6f979495f"
+        },
+        {
+          "path": "logs/B1-R2-discovered-test-delta.json",
+          "sha256": "9dba742dd8741db274fc5bb298fb5100fa141c653cd70d0e6faf76706c53a6e3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "UNCHANGED-SCHEMA",
+        "REGRESSIONS"
+      ],
+      "command": "reuse reviewed R1 executions for unchanged UI/labels/cancellation/schema and unaffected full batch; R2 correction delta bounds this reuse",
+      "fixture": "same R1 owned schema/resources; UI/JS/schema/lifecycle production files unchanged by R2; R1 failures and scoped successful reruns remain qualified in TASK",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/02WR-P03-B1-R1.evidence.json",
+          "sha256": "a5cfd3d7caa81d8f838f59b13b7316299a6974677f82dbf5466308a5ecf1e1ce"
+        },
+        {
+          "path": "logs/02WR-P03-B1-R1-schema.evidence.json",
+          "sha256": "ff89d6f2a6172aab7b0260f340ae7e8744e91c930150b93025b086c31f2b46da"
+        },
+        {
+          "path": "logs/B1-browser5.txt",
+          "sha256": "4eab3bd9de3857f464e5bb1f51e647200b38944d286608c5b120d7b52bd30a61"
+        },
+        {
+          "path": "logs/B1-R2-correction-delta.json",
+          "sha256": "0f6ab553fa1a90b2f53f54eb2bb4ada137de617656caabaf1be3b321d01bd40e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "GRAPH"
+      ],
+      "command": "graft build",
+      "fixture": "local deterministic graph refresh, no API key",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-graft-build.txt",
+          "sha256": "8141db74910e81f8fb3ca6f576f1f4c4c4c947c2beacbd578d31b7b522e8d4e1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "ARTIFACT"
+      ],
+      "command": "snapshot.sh exact five exclusions; complete206path source archive and5path245line correction delta",
+      "fixture": "branchcodex/departments-addressing-plans; start/base/HEAD103004a8ac2fd643cf14bde7e09022ae79f72053",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-snapshot.txt",
+          "sha256": "7450f5ad305e6e08f5a47d766d24f9eaf9b88ba30d869f427850ee36525a54ac"
+        },
+        {
+          "path": "logs/B1-R2-source.tar.gz",
+          "sha256": "2dee4c1769bcbab0df5e8c7f2c8f7056c1e86a6c8a3fcd4cd628d99fb9463695"
+        },
+        {
+          "path": "logs/B1-R2-source-bytes.json",
+          "sha256": "582ed62181254887ab610a2a57747bbfcb41421bf7615e26e296895750d963c0"
+        },
+        {
+          "path": "logs/B1-R2-correction-delta.json",
+          "sha256": "0f6ab553fa1a90b2f53f54eb2bb4ada137de617656caabaf1be3b321d01bd40e"
+        },
+        {
+          "path": "logs/B1-R2-correction-delta.patch",
+          "sha256": "8cbb716dd47509347521866a9821c10284d46d65c5429f015246c96e82861bc7"
+        },
+        {
+          "path": "logs/B1-R2-coordination-r16.md",
+          "sha256": "8379877c9c73ecf3848de45bfca718c65de98f44a8129a59e7bef6215aa33c07"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "P05-full-suite"
+      ],
+      "command": "full repository suite",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Reserved for plan02p05 per active I003/r1; no full-suite claim in p03."
+    },
+    {
+      "criteria": [
+        "C1-inherited-teardown"
+      ],
+      "command": "full same-run-company owner account-deletion teardown commit",
+      "fixture": "owned PG18.6 localhost60242; current p03_v2/test_v2; scoped/isolated fixtures; stock2MiB for behavior",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/C1-inherited-action-fk.json",
+          "sha256": "a3306cac4107475d4ab5f55c860ee52658bc071d3ba810b6c9f2851019721ff9"
+        }
+      ],
+      "reason": "C1/r1 accepted bounded F3 disposition; independent C1-R1/F1 remains separately reportable atp05, outside this correction."
+    },
+    {
+      "criteria": [
+        "B-REVIEW",
+        "ACCEPTANCE"
+      ],
+      "command": "independent B PASS02WR-P03-B1-R2/N1 plus root exact snapshot and current coordination/manifest verification",
+      "fixture": "same worktree and exact five exclusions; current authority coordination16 unchanged active notices",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "REVIEW.md",
+          "sha256": "11c44005530fba59ab2edf8e865027db68cfc72315b22e6468cb380d84dd506c"
+        },
+        {
+          "path": "agent-review-notes.md",
+          "sha256": "5091f25547a8e7df94028b5a3edfd9e2fc558e5a37d823fc694b55b454791d37"
+        },
+        {
+          "path": "agent-review-findings.md",
+          "sha256": "0b4920a3df66182a783b7f8b83e514d4dcde0ef034bc5140a09fb9e9d9b03a80"
+        },
+        {
+          "path": "logs/B1-A1-snapshot.txt",
+          "sha256": "7450f5ad305e6e08f5a47d766d24f9eaf9b88ba30d869f427850ee36525a54ac"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-archive-verification.json",
+          "sha256": "90ea9aaf6382e1f77a92f91758707c56fced451e4dc61857b0e4e91e36ef7143"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-delta-verification.json",
+          "sha256": "1ef0c8efebf7ca4a3e5922deadb71c93d9aa2387f4e8829d0abcb76198baed1f"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-evidence-validation.txt",
+          "sha256": "d52b3a0e3ee9561182702b22dc4a4c79e456e9b200bccedf7bf2e2218d87fb3f"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-final-snapshot.txt",
+          "sha256": "7450f5ad305e6e08f5a47d766d24f9eaf9b88ba30d869f427850ee36525a54ac"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-initial-snapshot.txt",
+          "sha256": "7450f5ad305e6e08f5a47d766d24f9eaf9b88ba30d869f427850ee36525a54ac"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-principal-tests.txt",
+          "sha256": "11c30219c4a894e4230ee4a32af27499a0f322326b6384bc1e6f405756fb8d72"
+        },
+        {
+          "path": "logs/reviewer-B1-R2-publication-tests.txt",
+          "sha256": "661dcd8aa85ef7c47e183a72c92bc1f963b3a1551ebac7ad56b7eaf46bcd80dd"
+        }
+      ]
+    }
+  ]
+}

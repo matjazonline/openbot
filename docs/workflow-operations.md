@@ -187,7 +187,7 @@ PUT carries `expected_revision` (null for the first save), `responder` (null to 
 ```
 
 References select required string fields of the declared final output. The optional final approval
-policy is `{"reviewers":[{"kind":"user","id":"CURRENT_ADMIN_UUID"}],"review_timeout_seconds":300}`.
+policy is `{"reviewers":[{"kind":"principal","id":"CURRENT_ADMIN_PRINCIPAL_UUID"}],"review_timeout_seconds":300}`.
 Reviewers must currently be company admins who can see the desk. Re-read after a revision
 conflict; a stale form keeps its typed values and offers an explicit reload. Clearing selection
 persists a new revision. Replaying a native create command never restores a cleared responder.

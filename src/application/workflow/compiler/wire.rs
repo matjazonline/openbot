@@ -460,7 +460,7 @@ fn token_allowance(node: &LocatedNode) -> Result<TokenAllowance, Diagnostic> {
     if items.is_empty() || items.len() > TokenAllowance::MAX_REVIEWERS {
         return Err(Diagnostic::at(
             "budget.reviewers",
-            "Token allowance requires 1..16 distinct user reviewers",
+            "Token allowance requires 1..16 distinct principal reviewers",
             &reviewer_path,
             reviewer_node.span,
         ));
@@ -472,11 +472,11 @@ fn token_allowance(node: &LocatedNode) -> Result<TokenAllowance, Diagnostic> {
         if scalar_string(
             required(&fields, "kind", &item_path, item)?,
             &child(&item_path, "kind"),
-        )? != "user"
+        )? != "principal"
         {
             return Err(Diagnostic::at(
                 "budget.reviewers",
-                "Token reviewers must be explicit users",
+                "Token reviewers must be explicit person principals",
                 &item_path,
                 item.span,
             ));
@@ -489,7 +489,7 @@ fn token_allowance(node: &LocatedNode) -> Result<TokenAllowance, Diagnostic> {
     TokenAllowance::new(max_tokens, reviewers).map_err(|_| {
         Diagnostic::at(
             "budget.reviewers",
-            "Token allowance requires 1..16 distinct user reviewers",
+            "Token allowance requires 1..16 distinct principal reviewers",
             &reviewer_path,
             reviewer_node.span,
         )

@@ -420,7 +420,7 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
     };
     assert_eq!(recipient.user_id, setup.owner);
     assert_eq!(recipient.run_id, Some(setup.scope().run.as_uuid()));
-    assert_eq!(recipient.channel_id, channel);
+    assert_eq!(recipient.channel_id, Some(channel));
     assert!(recipient.thread_id.is_some());
     assert!(!projection.should_email());
     let (outcome, _) = p
@@ -428,6 +428,7 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
             fence: &claimed.lease,
             expected: &projection,
             email: None,
+            escalation_ack_hours: Default::default(),
         })
         .await
         .unwrap();

@@ -18,7 +18,7 @@ async fn channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_
         1,
         |source| {
             source["steps"]["start"]["with"]["approval"] = json!({"literal":{
-            "reviewers":[{"kind":"user","id":owner.user_id()}],
+            "reviewers":[{"kind":"principal","id":s.owner_principal()}],
             "deadline":(Utc::now()+chrono::Duration::minutes(10)).to_rfc3339()}});
         },
         crate::application::workflow::DeliveryPolicy::Deliver,

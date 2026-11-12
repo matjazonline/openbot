@@ -82,10 +82,13 @@ pub struct BindingSummary {
     pub params: Value,
     pub run_as: Uuid,
     pub message_trigger: Option<MessageTrigger>,
+    pub escalation: Option<super::binding::EscalationPolicy>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct RunSummary {
+    pub role_holders: Vec<RunRoleHolder>,
+    pub role_holders_truncated: bool,
     pub run: RunId,
     pub binding: WorkflowBindingId,
     pub workflow: WorkflowId,
@@ -102,6 +105,17 @@ pub struct RunSummary {
     /// When the run reached its terminal state; `None` while it is open. Stamped by the database
     /// (`stamp_workflow_run_finished`), kept while terminal, cleared by a retry.
     pub finished_at: Option<DateTime<Utc>>,
+}
+
+/// Initial role holders from the sealed root capture, never today's role assignments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunRoleHolder {
+    pub version: VersionId,
+    pub step: crate::domain::workflow::StepId,
+    pub role: crate::entities::department::DepartmentRole,
+    pub department: crate::entities::department::DepartmentId,
+    pub principal: crate::entities::transport::PrincipalId,
+    pub label: String,
 }
 
 /// The six values `workflow_runs.state` stores, in the run board's column order. One list for the
@@ -255,11 +269,9 @@ pub struct RunFilter {
     /// definition of the company) before it gets here.
     pub workflow: Option<WorkflowId>,
     pub state: Option<String>,
-    /// Runs of versions that *use* this agent: its id is in the version's `agent_ids` display
-    /// index, directly or through a pinned child, including branches a run never took. Not the
-    /// agents a run actually called: `model_usage_calls.agent_id` exists only once a model call
-    /// has happened, so a queued run would never match. The route resolves the id
-    /// company-scoped before it gets here.
+    /// Runs whose published pinned-agent universe or frozen root role capture includes this
+    /// agent, including unexecuted branches and inherited child selections. Queued runs match
+    /// without a model usage row. The route resolves the id company-scoped before this read.
     pub agent: Option<Uuid>,
     pub lineage: RunLineage,
     /// Runs on the desks this department owns now (01-departments 04B.4): the department is the
@@ -460,8 +472,30 @@ pub struct ToolTarget {
 }
 
 /// The authoring pages' reads (p09 B1a, B1b); company-scoped, lock-free, granting nothing.
+#[derive(Debug, Clone)]
+pub struct ReviewerChoice {
+    pub principal: crate::entities::transport::PrincipalId,
+    pub label: String,
+}
+#[derive(Debug, Clone, Default)]
+pub struct ReviewerChoices {
+    pub items: Vec<ReviewerChoice>,
+    pub next: Option<crate::entities::transport::PrincipalId>,
+}
+
 #[async_trait]
 pub trait AuthoringReads: Send + Sync {
+    async fn reviewer_choice(
+        &self,
+        company: CompanyId,
+        principal: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<ReviewerChoice>>;
+    /// Company person principals,50 per page, ordered by immutable principal id.
+    async fn reviewer_choices(
+        &self,
+        company: CompanyId,
+        after: Option<crate::entities::transport::PrincipalId>,
+    ) -> AppResult<ReviewerChoices>;
     async fn version_source(
         &self,
         company: CompanyId,

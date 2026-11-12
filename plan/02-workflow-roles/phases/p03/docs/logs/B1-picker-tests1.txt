@@ -1,0 +1,20 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0432]: unresolved import `crate::domain::workflow::WorkflowJobId`
+ --> src/adapters/persistence/workflow/role_reviewer_tests.rs:5:5
+  |
+5 | use crate::domain::workflow::WorkflowJobId;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ no `WorkflowJobId` in `domain::workflow`
+  |
+help: a similar name exists in the module
+  |
+5 - use crate::domain::workflow::WorkflowJobId;
+5 + use crate::domain::workflow::WorkflowId;
+  |
+help: consider importing this struct instead
+  |
+5 - use crate::domain::workflow::WorkflowJobId;
+5 + use crate::application::workflow::activation::WorkflowJobId;
+  |
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

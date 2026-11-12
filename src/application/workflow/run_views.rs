@@ -189,6 +189,7 @@ pub struct CallProvenancePage {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct SelectedAgentSummary {
+    pub via_role: Option<super::reads::RunRoleHolder>,
     pub manifest: DependencyManifestId,
     pub bindings: Vec<SelectedToolSummary>,
     pub assignments: Vec<SelectedSkillSummary>,
@@ -277,6 +278,8 @@ impl RunView {
         self.payload_restricted = true;
         self.response = None;
         self.dependencies = None;
+        self.detail.summary.role_holders.clear();
+        self.detail.summary.role_holders_truncated = false;
         for child in &mut self.children {
             child.dependency = None;
         }

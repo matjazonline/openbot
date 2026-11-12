@@ -23,6 +23,8 @@ mod history_reader_tests;
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
 #[path = "model_usage_tests.rs"]
 mod model_usage_tests;
+#[path = "role_snapshot_tests.rs"]
+mod role_snapshot_tests;
 #[path = "run_board_tests.rs"]
 mod run_board_tests;
 #[path = "run_finished_at_tests.rs"]

@@ -1,0 +1,78 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 09s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 49 tests
+test adapters::http::app_error_impl::role_tests::workflow_role_http_refusal_is_a_bounded_named_bad_request ... ok
+test adapters::http::pages::workflow_runs::provenance::role_tests::workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_preserves_unsaved_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_agent ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_missing_holder_refuses_before_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_company_teardown_releases_the_complete_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_malformed_frozen_role_requirements_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_every_domain_kind ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_rows_and_future_resolution_revision_are_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_captures_exact_principal_revision_and_canonical_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_missing_holder_has_no_run_or_partial_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_sealed_set_rejects_late_people_and_extra_requirements ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority ... FAILED
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor ... ok
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_model_and_people_requirements_coexist_on_one_step_without_selector_confusion ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_has_requirements_without_agent_capture_and_restores_exactly ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_mixed_steps_keep_only_the_pinned_agent ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_sample_and_help_explain_the_same_requirement ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind ... ok
+test application::workflow::roles::tests::workflow_role_admission_input_preparation_uses_the_frozen_requirement_and_sample_refuses_contextless_execution ... ok
+test application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents ... ok
+test application::workflow::roles::tests::workflow_role_resolve_missing_depth_and_cycle_are_bounded ... ok
+test application::workflow::roles::tests::workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through ... ok
+test application::workflow::roles::tests::workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_capture_refuses_foreign_principals_and_unselected_revisions ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_message_refusal_is_definite_named_visible_and_admits_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::model_only::workflow_role_admission_model_only_classification_and_decision_execute_without_tools_or_history ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::children::workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture' (48846423) panicked at src/adapters/persistence/workflow/role_reviewer_child_tests.rs:111:5:
+assertion `left == right` failed: {"actor_id":"27003290-3d63-4787-9888-705e00f4802b","binding_id":"4705b883-03b5-49cf-a806-1dda3f6572ff","binding_revision":2,"bundle_digest":"\\x2cf1358e3a1896e10464f32005f59c0ee183dc9b52fa2d3d8dea2e62e0e5f0aa","channel_id":"6c832176-b57a-44ae-99eb-7ec3ce8b092b","company_id":"36d02187-080b-4a1b-ac37-b21c1cdc449f","content_exact":false,"content_level":0,"correlation_id":"d1841b34-dac0-4bd9-b136-85d5a4b65bdd","created_at":"2026-11-12T02:09:10.404236+00:00","deadline":"2026-11-13T02:09:10.404236+00:00","delivery_policy":"deliver","finished_at":null,"id":"12ab5e73-552a-4dd4-9a86-2ed974832b01","input":{"value":1},"knowledge_ceiling":9,"max_context_bytes":65536,"max_steps":100,"params":{},"parent_execution_id":null,"parent_run_id":null,"rerun_of_run_id":null,"resources":{},"revision":13,"state":"waiting","terminal_execution_id":null,"terminal_wakeup_sequence":null,"thread_id":null,"trigger_id":"34b38667-f481-4d95-8c5d-68003d0ac5ec","version_id":"1a2ec957-ba98-439d-b5c3-569705b81b97","waiting_reason":"child_run","workflow_id":"00000000-0000-0000-0000-000000000001"}
+  left: String("waiting")
+ right: "running"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority' (48846723) panicked at src/adapters/persistence/workflow/http_test_support.rs:233:52:
+called `Result::unwrap()` on an `Err` value: Application(Conflict("Workflow lifecycle revision or command conflict"))
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture
+    adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority
+
+test result: FAILED. 47 passed; 2 failed; 0 ignored; 0 measured; 4175 filtered out; finished in 20.10s
+
+error: test failed, to rerun pass `--lib`

@@ -51,6 +51,7 @@ async fn autonomous_agent_authoring_workflow_registration_revocation_refuses_adm
         actor,
         binding,
         json_bindings::BindingRequest {
+            escalation: None,
             expected_state_revision: None,
             association: crate::application::workflow::RelatedAssociation::Company,
             version,

@@ -1,0 +1,1640 @@
+{
+  "base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "digest": "fffdbcd9c996956ab18e91ab892767ee33179be9f77c263062a61ddc4b810210",
+  "excludes": [
+    "plan/02-workflow-roles/phases/p01/docs",
+    "plan/02-workflow-roles/phases/p02/docs",
+    "plan/02-workflow-roles/phases/p03/docs",
+    "plan/02-workflow-roles/phases/p04/docs",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/03-principal-addresses/COORDINATION.md"
+  ],
+  "files": {
+    "docs/agent-builder-context.md": {
+      "kind": "file",
+      "sha256": "f89a50b47c79bfcfba03ee33587abfe734fc8de4726d6346ab2c86da06b1527c",
+      "size": 10570,
+      "executable": false
+    },
+    "docs/doop-documents.md": {
+      "kind": "file",
+      "sha256": "df9f0211c396b88987afeb2005814b7f9a3d3c9387f145c81de8128adef32958",
+      "size": 10908,
+      "executable": false
+    },
+    "docs/gmail-workflows.md": {
+      "kind": "file",
+      "sha256": "4661d88f39143d08d549c197f80e82ee47f68e28b3123f4d653d952cb7907f0d",
+      "size": 6897,
+      "executable": false
+    },
+    "docs/inter_channel_agent_communication.md": {
+      "kind": "file",
+      "sha256": "839f2d4a9d9755d45a4ea184107c4a7b2d633d10ea9291e20a14851bbc438bf1",
+      "size": 5964,
+      "executable": false
+    },
+    "docs/workflow-language-v1.md": {
+      "kind": "file",
+      "sha256": "c5976001a2ea6f4b56575be6da6e899c006ce4e9739b439ae9bfed8101c7724e",
+      "size": 34526,
+      "executable": false
+    },
+    "docs/workflow-operations.md": {
+      "kind": "file",
+      "sha256": "858e617daeb4a8686e29f303696768da19bef5499775d056d6f66c359f074eee",
+      "size": 30848,
+      "executable": false
+    },
+    "integrations/doop/create-document.sample.json": {
+      "kind": "file",
+      "sha256": "5c75b9d7538ba73afb4781dd618aa0cae913ebaa7146e1f225e4f0da1ee6f05e",
+      "size": 7385,
+      "executable": false
+    },
+    "integrations/doop/create-document.workflow.json": {
+      "kind": "file",
+      "sha256": "334d6168431de1e09b9609c239a9e446e71bc27e8226194400b98af1475d2cb4",
+      "size": 20946,
+      "executable": false
+    },
+    "migrations/20260817000000_init_schema.sql": {
+      "kind": "file",
+      "sha256": "aeba6ebce9bbec9272b5a8016904616bcd0676a1cb79c7426337a4de94259102",
+      "size": 891900,
+      "executable": false
+    },
+    "samples/gmail-reviewed-send.json": {
+      "kind": "file",
+      "sha256": "e0189a9608313f4030c292ece83d0133d085dcb28c7509094c49ca20238b2d11",
+      "size": 3695,
+      "executable": false
+    },
+    "samples/jev-triage.json": {
+      "kind": "file",
+      "sha256": "e01fd7bf47da78f944b88c0676058e42ba2910ae4bbd493fdbd27d3d5569a6e3",
+      "size": 7291,
+      "executable": false
+    },
+    "scripts/tests/run-list-query-plan.py": {
+      "kind": "file",
+      "sha256": "fe126eedce6120b854283ba330047f151b6e0f39995178fd082f818ed5ac93e4",
+      "size": 21451,
+      "executable": false
+    },
+    "scripts/tests/workflow-agent-picker-browser.mjs": {
+      "kind": "file",
+      "sha256": "d5d29e909f6aad704fdac40779e40c9b1281013b38ca0bdbf97418eb41b9ef77",
+      "size": 14166,
+      "executable": false
+    },
+    "src/adapters/http/app_error_impl.rs": {
+      "kind": "file",
+      "sha256": "c70e9cbd2fd75c58ad7c57a1aee71fb79fdebefe0b4f37a00590adf6743ef7f2",
+      "size": 5185,
+      "executable": false
+    },
+    "src/adapters/http/pages/notifications.rs": {
+      "kind": "file",
+      "sha256": "b1fcc11cc6bd30dc119cc63e9fc551f5589bc9d12db173278f4d4aec9d155d43",
+      "size": 5276,
+      "executable": false
+    },
+    "src/adapters/http/pages/simulation/live.rs": {
+      "kind": "file",
+      "sha256": "5eae240a4dd99986b2f2f382e9be3e27569ed08d0f299eed9dd15fd6f33e468f",
+      "size": 31226,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/agent_picker.rs": {
+      "kind": "file",
+      "sha256": "4eb12c14dc3a9ced5018380c23ddc5da2315555c80de910b2102e36be412d7a5",
+      "size": 12152,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/bindings.rs": {
+      "kind": "file",
+      "sha256": "784d6d5e8f34ff828a2e22b1d2582a6f6498bfc3a5e83501406efac5250d397b",
+      "size": 30505,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/channel_response.rs": {
+      "kind": "file",
+      "sha256": "ee1f4c35b2400133a2390d8610750cd8ea8869aef173f1312153e3503a1fedd3",
+      "size": 5979,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/editor.rs": {
+      "kind": "file",
+      "sha256": "3c728778de20d6008bda253845f6855a4c29bbc1b3aa0cf1eb184123dcc29b8a",
+      "size": 27618,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/mod.rs": {
+      "kind": "file",
+      "sha256": "71d32d857f8cdfe09a94732f1b06670d3837146eab760bca902e43ee7ef82a34",
+      "size": 13865,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs": {
+      "kind": "file",
+      "sha256": "5649696fdd504f4c823718509e9e265e45f7c6082ed9088a6a976b2a10c3940a",
+      "size": 7952,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_decision.rs": {
+      "kind": "file",
+      "sha256": "356f632ccfda93d823c46c200065841d18e98998e7a75e22a15ce1554ec9d43d",
+      "size": 11744,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_decision/tests.rs": {
+      "kind": "file",
+      "sha256": "8a707ef2d24f43bc0fba8470f27bb86f26bb637e0ae023ccb0a95d9a9d77cca3",
+      "size": 6985,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_runs/board.rs": {
+      "kind": "file",
+      "sha256": "79f338a674820c4f2f410113328f7cfc299c523e9f0df6eaed9ceae70e03977c",
+      "size": 17494,
+      "executable": false
+    },
+    "src/adapters/http/pages/workflow_runs/provenance.rs": {
+      "kind": "file",
+      "sha256": "bf7e4c5f62040f09b4eb1258ddb6c1c00ca8a09b46d264b3d3dbe09f7872f755",
+      "size": 7685,
+      "executable": false
+    },
+    "src/adapters/http/routes/ui_schedules.rs": {
+      "kind": "file",
+      "sha256": "26aec2068b51c62f33a9e2da8fad168b190dc080b7434441b8eaeb6b9fa2f832",
+      "size": 33381,
+      "executable": false
+    },
+    "src/adapters/http/routes/ui_stream_tests.rs": {
+      "kind": "file",
+      "sha256": "10882c48fbfeb01fccdf9e6fb271b2cde2e2d140994bc5c0977d59c9be408f18",
+      "size": 19755,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/bindings.rs": {
+      "kind": "file",
+      "sha256": "eff1843f505bdc8c4db7a94cbb6c075a770218dd7ddb9e6b11bfea16efa966e9",
+      "size": 27783,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/decision_tests.rs": {
+      "kind": "file",
+      "sha256": "5d5258e83bdde5e39a84f4da2563b510c2d68c1a4c812fdf32e04fef2bbde3b4",
+      "size": 9463,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/decisions.rs": {
+      "kind": "file",
+      "sha256": "5c2c54616c941df559c23b46d03a407c5151c54b516b32b0e17b4f21f1d202c1",
+      "size": 11108,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/agent_picker.rs": {
+      "kind": "file",
+      "sha256": "790597b3c490d77d75840e136e0fbb3f19f249f2e2616b2a2b698c89e764be8f",
+      "size": 8677,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs": {
+      "kind": "file",
+      "sha256": "e003b5e93f1a3e3279a743eb0ccc4996969b17b9a3fbf5a5cb27a72742381fbe",
+      "size": 15962,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/bindings.rs": {
+      "kind": "file",
+      "sha256": "b06970ed3bcba95555dcc8fe11831355fcc0ba01695242c0884c98344a743d59",
+      "size": 30015,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs": {
+      "kind": "file",
+      "sha256": "9843a0b21bd4c532963df47aa8845490e0f9190bfab48c1259a2d3554913fd41",
+      "size": 28261,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/destination_tests.rs": {
+      "kind": "file",
+      "sha256": "8515a9da67317b5e85b72c6d1980095d9ebf48790165d1751ebb4db2edff4550",
+      "size": 1852,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/mod.rs": {
+      "kind": "file",
+      "sha256": "b93a16b2156aef7712a18df4e3390d7aabab3674eb26be3916fc2e85889b6fbc",
+      "size": 12056,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/registration_authority_tests.rs": {
+      "kind": "file",
+      "sha256": "c2a9a66ea4e4485d525e6db857ae7a355274c7c667275c14b17e012e8c8faa2c",
+      "size": 7947,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs": {
+      "kind": "file",
+      "sha256": "5165ca6ee94922ae686d3fa8a3b28130c735b3a83c3d1158ee5f0905368a4ae7",
+      "size": 10471,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs": {
+      "kind": "file",
+      "sha256": "c6f2fdca668655db481cc741746faa5153c2c3b10e3ee6a1f9c9d0563cd2b128",
+      "size": 5735,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/tests.rs": {
+      "kind": "file",
+      "sha256": "a6391ad4a4651ef28ea4b258ff06711d66f3b0a409918ea475e37d9dd3c263be",
+      "size": 23021,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs": {
+      "kind": "file",
+      "sha256": "47b82ccfda156fa51587de26e18f0ebcb2a99c7520d98e588ac1e3bef9a48a49",
+      "size": 13680,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs": {
+      "kind": "file",
+      "sha256": "ef199005a7b08381976b874be0da08d9899474a63a110b916f996db16c6cca76",
+      "size": 32662,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/runs/pages_tests.rs": {
+      "kind": "file",
+      "sha256": "327464aba2a39b6bf685705df2b86f5e789627fc2476cd3777f49a3178ab2df5",
+      "size": 9674,
+      "executable": false
+    },
+    "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs": {
+      "kind": "file",
+      "sha256": "43c107da91d7923d0b4921b595280c9e5a36b934c668db0443e51f32460bcba5",
+      "size": 31693,
+      "executable": false
+    },
+    "src/adapters/persistence/agent.rs": {
+      "kind": "file",
+      "sha256": "8cd8b27038481f45e49d6758d1b69d860ec0190da2c67b9e07cb40f3c94876bb",
+      "size": 27457,
+      "executable": false
+    },
+    "src/adapters/persistence/agent_publication/commands.rs": {
+      "kind": "file",
+      "sha256": "87a4909d1ab191f2bd70cb8829cb56b525a1574f4ed41e0998ff346795cbd9cc",
+      "size": 5903,
+      "executable": false
+    },
+    "src/adapters/persistence/attention.rs": {
+      "kind": "file",
+      "sha256": "8898060bce80662992ff057ea01676a73caa89c58a8dbaa9c8246c6197a4769d",
+      "size": 26419,
+      "executable": false
+    },
+    "src/adapters/persistence/channel.rs": {
+      "kind": "file",
+      "sha256": "d7394fca33298d1e2044fa40ee1ca545c529b5ea4116ca71abe2a53333a9b269",
+      "size": 42667,
+      "executable": false
+    },
+    "src/adapters/persistence/company_invite.rs": {
+      "kind": "file",
+      "sha256": "0e77ffaa4eb9a7d70d9cf2510c6c7edfa7911e11bdea9a022933c3cab121fde4",
+      "size": 26653,
+      "executable": false
+    },
+    "src/adapters/persistence/delivery/cancellation.rs": {
+      "kind": "file",
+      "sha256": "a8d4cb0142c74e9eee87344ce500b9d4bd3a43f8ecd6f023879fc07e2e327b73",
+      "size": 20287,
+      "executable": false
+    },
+    "src/adapters/persistence/department.rs": {
+      "kind": "file",
+      "sha256": "42f8f7247c6b7749b61a545c083fab25a0a8f53d342a12dd57f7944be3426a47",
+      "size": 33974,
+      "executable": false
+    },
+    "src/adapters/persistence/department/lifecycle.rs": {
+      "kind": "file",
+      "sha256": "190c49fc7c564d13b70c83872620a4e6e171dc9259bdf5ff8991cd6bd1b13cb3",
+      "size": 8772,
+      "executable": false
+    },
+    "src/adapters/persistence/department_desks.rs": {
+      "kind": "file",
+      "sha256": "1800e75252fea22276cec121b7e73da181f2aa51987db373f9368679a40e6e6d",
+      "size": 17879,
+      "executable": false
+    },
+    "src/adapters/persistence/department_lead_desk_tests.rs": {
+      "kind": "file",
+      "sha256": "dfc0dfe3dcacbb70a93f4f12fffc365486d2c86d35c5f9127571026b0f89561a",
+      "size": 31076,
+      "executable": false
+    },
+    "src/adapters/persistence/doop_live_workflow.rs": {
+      "kind": "file",
+      "sha256": "ac7e8a8e904e854373cfa18fc5443b00278e9a7933543add1d4475efd6cf2718",
+      "size": 8930,
+      "executable": false
+    },
+    "src/adapters/persistence/notification.rs": {
+      "kind": "file",
+      "sha256": "61b5ccba7a580b2a046f6e3de64f55f65bbaf0c7027ca1c73076862ba536e98f",
+      "size": 25388,
+      "executable": false
+    },
+    "src/adapters/persistence/notification/projection.rs": {
+      "kind": "file",
+      "sha256": "3f21c47ea85d17bf284ebd2e51eb94ce2f697c03f944bbdb2e71818cc3ecde53",
+      "size": 13100,
+      "executable": false
+    },
+    "src/adapters/persistence/notification/projection_lock.rs": {
+      "kind": "file",
+      "sha256": "20b261bbcb5f320229ee84f6bcdf5fc932347dfeab7d1052246a188ccbc74a0d",
+      "size": 2127,
+      "executable": false
+    },
+    "src/adapters/persistence/notification/reviewer_notice.rs": {
+      "kind": "file",
+      "sha256": "3cbbea950ec8565fb1887731676f69bc4d444102c51bc5603517fadb67e08938",
+      "size": 5010,
+      "executable": false
+    },
+    "src/adapters/persistence/user_lifecycle.rs": {
+      "kind": "file",
+      "sha256": "ef0bdb71cf5a98228c9ec1c71ac3e37340bac1e576493972abf1523236e65fef",
+      "size": 4965,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/action_approval_http_tests.rs": {
+      "kind": "file",
+      "sha256": "3b18de9d35d9d54b76a0528e3161f65af97228d9eb9389850a0dd51ae66e46cf",
+      "size": 19228,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/action_approval_mcp_tests.rs": {
+      "kind": "file",
+      "sha256": "e9050c633b9b5c733537d7bab91491bb921bacf44cea73194bf6954ed2110fcc",
+      "size": 6603,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/action_approval_message_tests.rs": {
+      "kind": "file",
+      "sha256": "8523eebfcacb6ef233eb21409371b9ee03b5bcb7975aed47a1195e901e5d6aaf",
+      "size": 7136,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/action_authority.rs": {
+      "kind": "file",
+      "sha256": "2896341db22088cdcc11954488835a9ea32898e3bdc1ca64ad01a57ad9fa28fc",
+      "size": 6419,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/activation.rs": {
+      "kind": "file",
+      "sha256": "0edf70d792d61114909357c163553537f549eef92aa979f7c4b676755538833f",
+      "size": 11780,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/admission.rs": {
+      "kind": "file",
+      "sha256": "94871ca1d47f23c836cce2b27bc97b7da560baa645b70c1cbd4b6fc9e006f368",
+      "size": 10971,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/admission_binding.rs": {
+      "kind": "file",
+      "sha256": "fb215ba6b19f8a521b3f268f71372b6051ad32df0da08eda297acaf49ab4bda6",
+      "size": 8717,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/admission_tests.rs": {
+      "kind": "file",
+      "sha256": "1ac37fe4450e10c2fe53e9d4f78fa4d9e7c50917e7fd3878b1c003ed003cbb5d",
+      "size": 18203,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/admission_token_tests.rs": {
+      "kind": "file",
+      "sha256": "8a3e169f1052301d94cb9f7dd415b08fde98d09282337f6d88ef08e861fa5059",
+      "size": 7639,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/admission_write.rs": {
+      "kind": "file",
+      "sha256": "c892a234c64a5d8c005a342a5aca1f8578b5a87cf89b6b0fc4ac6b96318f7a33",
+      "size": 9341,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_driver_tests.rs": {
+      "kind": "file",
+      "sha256": "d55ed5fbd32b1194c59521ec4eeaf665760f3d4c642f34c2fd76ffa0d61f89f1",
+      "size": 11483,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_history_continuation_tests.rs": {
+      "kind": "file",
+      "sha256": "1ed1c8ac009232a3b07b70ae568a4a4e4af6e62892b899fb22bf51b5cf859377",
+      "size": 12570,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs": {
+      "kind": "file",
+      "sha256": "6db2aff413afe440464d3f09811fee58fc4d92371bdaa15f122c42bc70fe15ca",
+      "size": 11330,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_history_human_cc_e2e_tests.rs": {
+      "kind": "file",
+      "sha256": "f08fb34523ccfc677e44236d7f3b0b1094d2328eca42229388ccc9ce7811d840",
+      "size": 4589,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_manifest/capture.rs": {
+      "kind": "file",
+      "sha256": "57dd7dd44ec8eeacffe5c0b721e3f75d11edc9cc2c7151bc4ff0c49f0487cc9b",
+      "size": 3290,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_manifest/capture_tests.rs": {
+      "kind": "file",
+      "sha256": "d251d39247be370f01ea7bc5de0e7e90bbe492b8d72716aef24df4830a2636e8",
+      "size": 2261,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_manifest/mod.rs": {
+      "kind": "file",
+      "sha256": "92e0862720df1b4d30ecded1946574e0b85805b15b80160f4091834f7b7bf3f2",
+      "size": 6528,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_manifest/roles.rs": {
+      "kind": "file",
+      "sha256": "04eb8577f0e5ff409072e79944a5fdf7954c90da5808214f2075f06b9b06449c",
+      "size": 12249,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_manifest/storage.rs": {
+      "kind": "file",
+      "sha256": "ee07780f68a99f033e433e56d691bbb5bfa96452e5c8e2e072952fb0b5ecc158",
+      "size": 10510,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_recovery_tests.rs": {
+      "kind": "file",
+      "sha256": "da19ddc6a69910ad052240a7c05416d6c80add88c59b8bb0951964be6f21e42e",
+      "size": 27515,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/agent_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "6f164a96c0445264640daa9d01682083119572168ec25c2296c879843740d735",
+      "size": 33224,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/approval_accounts.rs": {
+      "kind": "file",
+      "sha256": "468d174c7efe77dafe05788fe9229f61d725d9085d77045f9ddfa0748bccfc33",
+      "size": 2394,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/authoring_reads.rs": {
+      "kind": "file",
+      "sha256": "e2bf5ffc0afc18852e0464fab6bb07ad3b64d052cf88bbf54056c9e136cf4d7e",
+      "size": 19827,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs": {
+      "kind": "file",
+      "sha256": "db2ecf0ce343b19dda028aaf8f6fee9ae3193527dfd423848460d33cb3540ccb",
+      "size": 13881,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs": {
+      "kind": "file",
+      "sha256": "c6dce7aca9b9ee7975ef101bf4b4b298e1b2dc72f75bddd8a2ed3e9dbff9ef20",
+      "size": 12030,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/binding_rows.rs": {
+      "kind": "file",
+      "sha256": "0cfd3a52f3b6b6d62afa117ad2f32117f3f9320400091b9e7dc3bd153bc72a42",
+      "size": 5053,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/binding_tests.rs": {
+      "kind": "file",
+      "sha256": "84869c2b88a30d44f94de57e639aa3f378df754d52e3a0fabae8f8ca6ee68f45",
+      "size": 17594,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/bindings.rs": {
+      "kind": "file",
+      "sha256": "9c02b76ce4e4cc6d9d958ac4c784f10118bf0b592ada521bf550d3a2d3341fac",
+      "size": 11413,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/board_reads.rs": {
+      "kind": "file",
+      "sha256": "839672ef6d93183c0fa9df0262b912065af027fe3c56f7e065395966fdfe130e",
+      "size": 7430,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/budget_schema_tests.rs": {
+      "kind": "file",
+      "sha256": "3d32cad585e1202933cbe746310b2ab4e6356719e57e55d109496584ca53e40a",
+      "size": 15411,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_question_approval_tests.rs": {
+      "kind": "file",
+      "sha256": "05a16d15677879349cd0aabe09b72370706a121d36393f318e9ebdb9b361c6a9",
+      "size": 2887,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_question_final_tests.rs": {
+      "kind": "file",
+      "sha256": "888c70bd34c13740444122b7babc97309edcaa20c1b4b92e8666b635ffb6947c",
+      "size": 5450,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply.rs": {
+      "kind": "file",
+      "sha256": "4a9322799913152cdcb48ff30acb8d2715500ab787d734e351c33b0f8260be92",
+      "size": 14473,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_approvals.rs": {
+      "kind": "file",
+      "sha256": "e89727d49e50058e710a42ecca9856385271ba9f0a14d641f3888f7b87508cae",
+      "size": 5807,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_completion_owner_tests.rs": {
+      "kind": "file",
+      "sha256": "a2f5829ae2c21baad3b0ccb323dc5a54df37e8031c50e30ebae02b7ce9583935",
+      "size": 9757,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "d6ae71a44209195ffadf5154af8d44d432c746f52963e37cc94851df49736ceb",
+      "size": 14288,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_completion_slot_tests.rs": {
+      "kind": "file",
+      "sha256": "3753e5dc8f5c3b1b52d4a36aaaf26e6cd73c20af7aaa136a8f9ed7b748b23560",
+      "size": 5585,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_completion_tests.rs": {
+      "kind": "file",
+      "sha256": "90ca4e77ebb7ed761e382847128c284079dd357d3a40e9e71fafa43e6b0cacbe",
+      "size": 19587,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_continuation_views_test_support.rs": {
+      "kind": "file",
+      "sha256": "b0b7f18e1a7361e7b3fa3c08b88865b0a5a731402d3e8fbc1e164f5887e75948",
+      "size": 16076,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs": {
+      "kind": "file",
+      "sha256": "6ac0d796fcfbb6b26d56014388f90892fe847e1c2a4874bcca65191fb514eca0",
+      "size": 14552,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_policy_tests.rs": {
+      "kind": "file",
+      "sha256": "86dfbe1e09139a7ffde9afd7c2b4d5a321f72650f568c86b879369e7e267b2b9",
+      "size": 3344,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs": {
+      "kind": "file",
+      "sha256": "e7b561bd31cf2a0c72fb6ba48cb63e96a8e448550780d0c8f2d56c2761ec8bd4",
+      "size": 9136,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs": {
+      "kind": "file",
+      "sha256": "8a19fb2bb0a286318a687030c9552ebf31ad5fea5fd536d4c0c1855b99dd91b6",
+      "size": 14583,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_publication_tests.rs": {
+      "kind": "file",
+      "sha256": "8377f31f7c094d20c8646b88db9013c6245f5f59b800026280b2969d2a06854f",
+      "size": 6504,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/channel_reply_publish_authority.rs": {
+      "kind": "file",
+      "sha256": "2e68b1f4d58865310715bcb54e84e51e1efa39717c3a3de1c16346e870b329f1",
+      "size": 6981,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/child_decision_round_tests.rs": {
+      "kind": "file",
+      "sha256": "468d7b49e2907690a49c4a16a41b356a5136a2c06c96aa25a2b7c2cdd96b1b89",
+      "size": 14666,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/children.rs": {
+      "kind": "file",
+      "sha256": "88268ee1e58e113ec44f8739bbf4fb50eb54e9426a6af091d83b8d7aaa3c8871",
+      "size": 12968,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_approvals.rs": {
+      "kind": "file",
+      "sha256": "c125b07eeae7c642334e3233c1700867cad6977b1244fc4b5fe8064db6594b94",
+      "size": 18673,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_authority_tests.rs": {
+      "kind": "file",
+      "sha256": "a1fe463f66d71d7875a6af1283c065d37ef5debf0c07a320ef60c5ffd1e26729",
+      "size": 17864,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_business_member_tests.rs": {
+      "kind": "file",
+      "sha256": "72ae9edb9cdc140b3ada01477c875ab4ea70b4dc0df5b68a1e44dd80f404b1ba",
+      "size": 1764,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_lifecycle_tests.rs": {
+      "kind": "file",
+      "sha256": "396d2d7403d2f78097fc83ebbc6887f25feda989528854be3da75954576a004d",
+      "size": 8152,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_provenance_tests.rs": {
+      "kind": "file",
+      "sha256": "a3eab1e8745621aef83dc24c779a7c9673b073d5714c423bb9eb90a060f6b66c",
+      "size": 10877,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_sql_tests.rs": {
+      "kind": "file",
+      "sha256": "4681b55894dfef42aefcdcafa8026268f7b0afc0b28e3e733e45628ae3ccdff5",
+      "size": 5184,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_tests.rs": {
+      "kind": "file",
+      "sha256": "4c551e3146bfdb5327fed376769613d4f95ed8b7bedaab748008e6959a6109a6",
+      "size": 25435,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decision_tokens.rs": {
+      "kind": "file",
+      "sha256": "4e485ec24315ee24ead28e8a8b71da98139650461026553adbfccf2c4ead60c4",
+      "size": 8537,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decisions.rs": {
+      "kind": "file",
+      "sha256": "b312a0195685742dfd1b9713ded2be08e9621815e1804f8dacd97d97573f4526",
+      "size": 30507,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/decisions/read.rs": {
+      "kind": "file",
+      "sha256": "5a7f1df8033fbfae48f8af4de73ec063b84488210cffba6cb9fae17ab2432bd5",
+      "size": 9834,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_binary_mcp_child_tests.rs": {
+      "kind": "file",
+      "sha256": "b3f88f268371f81e16c22afe3fff453d632e044c6b8fc773a29a0fbd53f79b51",
+      "size": 8494,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_document_live_setup.rs": {
+      "kind": "file",
+      "sha256": "9779508d0509fd56093f191c4cf5ead18701d27edc31d4d6f152680710557946",
+      "size": 13568,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_document_result_tests.rs": {
+      "kind": "file",
+      "sha256": "45b3bce4cfcafe0928a62ba18bb9ca64bb719e1c4500df25c2f43ceb967995b9",
+      "size": 17986,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_document_sample_tests.rs": {
+      "kind": "file",
+      "sha256": "8845d2aeab9c3c6b8396d245c4f6f3392583c7c9f338912ec4b8817bb71b0e83",
+      "size": 5863,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_document_tests.rs": {
+      "kind": "file",
+      "sha256": "cc5e6d78701c75536f9474d919e4f0ec4043a3b0873bca8a5740d89e81ad1d12",
+      "size": 13838,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_setup_scope_tests.rs": {
+      "kind": "file",
+      "sha256": "b0c91f1aaa1c41429dd51ca861bdcde01c3ea5cf05fca14eaa1eb7e39bbac3cd",
+      "size": 1425,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/doop_setup_tests.rs": {
+      "kind": "file",
+      "sha256": "0aa3d59aea7f508b8eda84f89088b34b7551e00159b170a36e9cc47405f3cf71",
+      "size": 14712,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/escalation_binding_tests.rs": {
+      "kind": "file",
+      "sha256": "adfc43a4eb259c219723e18e8cf663d5eb29b1164fb4ec19d15dc306d972a66d",
+      "size": 5485,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/follow_reviewer_tests.rs": {
+      "kind": "file",
+      "sha256": "b9bc0998192b7411c37d3920bfa2dc560073b3d2a132e1cb67960e413863248c",
+      "size": 15170,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/follow_reviewers/mod.rs": {
+      "kind": "file",
+      "sha256": "d5318e40d4e6c80e4d8a47504ac5078285a3867f79d954f328b0a29f304515e2",
+      "size": 9085,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/follow_reviewers/roles.rs": {
+      "kind": "file",
+      "sha256": "61e358d382208a687cee28266b2d75464db1dbbc1850cb91115a75e05c1e21e4",
+      "size": 5640,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/follow_reviewers/storage.rs": {
+      "kind": "file",
+      "sha256": "8b1ffd54684962eed689f318f5edd186e2d36cfc8a4a27dd8fbca6d27fd0949d",
+      "size": 7876,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/harness_token_tests.rs": {
+      "kind": "file",
+      "sha256": "3339798ff615d5cc1e760d31b8b3365c3a16b759d9859e94acb2e22fb3bb16db",
+      "size": 8869,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/http_authority_tests.rs": {
+      "kind": "file",
+      "sha256": "61475b2f8ae690ff90f4722a52ace7f1031dbf1d7c6071ad441ac7e3a60c4fd3",
+      "size": 4059,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/http_test_support.rs": {
+      "kind": "file",
+      "sha256": "4e286ed25e5bb7a193a8d637341197aa08bc23c1a596c68b7fb812b9478a640b",
+      "size": 12988,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/jev_end_to_end_tests.rs": {
+      "kind": "file",
+      "sha256": "40077292cd4a3df04c627fac2a29ae75538961a6a8c0fd165674b246dc5978e3",
+      "size": 8878,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/jev_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "436318fb3b3793a5508ffba823494b42d958e31ac267030e9a7383ad5fff1329",
+      "size": 15136,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/jev_tests.rs": {
+      "kind": "file",
+      "sha256": "71c52dbf335c60fea6873afa77305aacbc0b350c43fe1f61200ad5b764891027",
+      "size": 15720,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/knowledge_checkpoint.rs": {
+      "kind": "file",
+      "sha256": "a1bc8e6584f403a356c8acc0859a5b9e38a1fc9cf06d649b38d1e897715540e1",
+      "size": 10972,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/knowledge_search_support.rs": {
+      "kind": "file",
+      "sha256": "5a537268b13d5c72b8dca94b67dad3062375e8e64bf54cf179a64a432e27bd7f",
+      "size": 15459,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/knowledge_view_delivery_tests.rs": {
+      "kind": "file",
+      "sha256": "7c6def8ca62020d7fc0f0ed32dc8cb0668322e1785f16c55b7a8ae6a82be329d",
+      "size": 8663,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/local_agent_behavior_tests.rs": {
+      "kind": "file",
+      "sha256": "f27deece18cde3a459bf0f3e96ce82d88675185b95c6366a1cdf1ebe9e4bbb63",
+      "size": 11847,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/local_agent_continuation_tests.rs": {
+      "kind": "file",
+      "sha256": "02763363ef45207fb0d7d5611e992aee72727ce119f7272196b36f9c8e37e8b9",
+      "size": 12878,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs": {
+      "kind": "file",
+      "sha256": "135afa0c256ffc36a74314b62cbebaab6b033f3aba6c31c340ecfd8d59b31a05",
+      "size": 10587,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/local_agent_retention_tests.rs": {
+      "kind": "file",
+      "sha256": "39c35683f254c715de4c2a09f9c50e514d9b42d646b8517a14803d43b4a3c623",
+      "size": 16643,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/local_agent_tests.rs": {
+      "kind": "file",
+      "sha256": "717f3b68648e9069c454ef6bb81efd9a8d18e5d666eea18d755bdef32e78222e",
+      "size": 18159,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/mcp_agent_tests.rs": {
+      "kind": "file",
+      "sha256": "37b7bbe7d9ec854369617307e8d383654c0fbb5c332d447893bcd8b7177521fc",
+      "size": 15187,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/mcp_catalog_tests.rs": {
+      "kind": "file",
+      "sha256": "a5b92fdbc890b818c9dc64201cee98b1cfdda1a2877fdb68ade780868cecfae4",
+      "size": 8643,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/mcp_test_support.rs": {
+      "kind": "file",
+      "sha256": "0f8856f1b5c27882f56dcd424071d35f2331c20b710978a04aa097669d72fe71",
+      "size": 24843,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_delivery_tests.rs": {
+      "kind": "file",
+      "sha256": "6007015338835cdf98fd9025cce8ef8893216b5b3dec60445f0ad279656c8979",
+      "size": 21813,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_ingress_binding_support.rs": {
+      "kind": "file",
+      "sha256": "b4e374674a5ce440647aaf79c6c7c1fa3f7738345cf5ddcb46c43073f02f286a",
+      "size": 2263,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_ingress_tests.rs": {
+      "kind": "file",
+      "sha256": "2b30e83a7f1bd7e15a2dc807c0f1d75c754790d390f95b8a1f012197b8a644b1",
+      "size": 24380,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_intent_tests.rs": {
+      "kind": "file",
+      "sha256": "9f44eec3b16e37f37dfcf12b64eb3e4deeb0cca3ccfcbef99721aa42e869ebc5",
+      "size": 63750,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_intents.rs": {
+      "kind": "file",
+      "sha256": "27181beb35445f89e6ba63b9a523e0066d53adadc7c367a9bdb343f862845815",
+      "size": 19564,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_outcomes.rs": {
+      "kind": "file",
+      "sha256": "39eca993bb8a1dbd76bec50a4b9deb03a013de61cd2bc6de7b05dc37d60eb891",
+      "size": 8570,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_test_support.rs": {
+      "kind": "file",
+      "sha256": "74e06927482cae039794ab3fda83b0e43d030634dd25749e361e939d09414060",
+      "size": 22037,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/message_tests.rs": {
+      "kind": "file",
+      "sha256": "55f13eb4438ff4ae710a073f2b190550d09930c5b164f2feb3270b78d1bc79ee",
+      "size": 25747,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/mod.rs": {
+      "kind": "file",
+      "sha256": "9f0942c23b8ea51c72164b1af84b1f5890450e4b874133e9e57f869659a45673",
+      "size": 4706,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/people_resolution_tests.rs": {
+      "kind": "file",
+      "sha256": "2f5eef8e163f9871a015467afacdf6b93343a3f16b08652482498dc2825cd75e",
+      "size": 11697,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/people_resolutions.rs": {
+      "kind": "file",
+      "sha256": "bc045d62ba1bd8048b363d472352dc44b7ea137bcf2ce622aa981789ae2c20e7",
+      "size": 4364,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs": {
+      "kind": "file",
+      "sha256": "8f85926133c1d0a5947e558010bd8a329324d2e482cee6d2de8e8d63c2a816c4",
+      "size": 43926,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/provisioning_native.rs": {
+      "kind": "file",
+      "sha256": "a7bcc35e0592e3527a74d5cb1278fc83f49985d733d512294d6fd43c69b6725d",
+      "size": 8240,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reads.rs": {
+      "kind": "file",
+      "sha256": "32f4fbecd5ee2bf7e88fc3bdf6d68eb09fc5f7bcd2795195b083bd32369f567d",
+      "size": 30928,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reads_tests.rs": {
+      "kind": "file",
+      "sha256": "33f3a4993aae3e57c6a50b9a841de597abbccdd044dd8b662cf41bc0672ca212",
+      "size": 14690,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewed_delivery_tests.rs": {
+      "kind": "file",
+      "sha256": "3f264bb47e20620b5fb75681e3fc1accbb012409b7de72e56ee586a997fcd461",
+      "size": 10448,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewer_account_race_tests.rs": {
+      "kind": "file",
+      "sha256": "3957134cb809bb230d3598dd72eff5b689336df5c145cb80310c877d890bc76b",
+      "size": 10869,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewer_accounts.rs": {
+      "kind": "file",
+      "sha256": "a61c6eb509c7c92f17daed6fd35058feac8c5c478ed71ce051f154fd5e8759ad",
+      "size": 5347,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewer_action_tests.rs": {
+      "kind": "file",
+      "sha256": "4adb946291958a04db4e819027c44d9f2133355cda612eaa3ab6b62d68cad00e",
+      "size": 7043,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewer_principal_tests.rs": {
+      "kind": "file",
+      "sha256": "e00245a5ed6a023373212fe97de9127e705cf76f12460b52bb472ec9805e94eb",
+      "size": 9385,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/reviewer_resolution.rs": {
+      "kind": "file",
+      "sha256": "8df0bc2bd01e57e2237786902c8f63f3686d7198aad802ab13fcf760f0dcde2a",
+      "size": 3297,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_binding.rs": {
+      "kind": "file",
+      "sha256": "ee78b4ed4411c77bb3574047f104bb0d91d807d350cf7596d8e737498e12c667",
+      "size": 4009,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_binding_tests.rs": {
+      "kind": "file",
+      "sha256": "52b473920e424b248f5ea8dfdcb38e7e75d167b6cf993e8daad624ea1dfe6d32",
+      "size": 8837,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_child_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "a3e31bec4d59907c0ab5e7e73a5921ef79f10453bc6ea2cba275781653724238",
+      "size": 7038,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_context_tests.rs": {
+      "kind": "file",
+      "sha256": "6bf859fde556a973a9df2241ee462064d8902d1c3c0086e44668851ea9286cd9",
+      "size": 4279,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_model_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "ce94147af8073935be7d80d2eeb3b8cedf519ebbddd048475b6ccaad8ad901f7",
+      "size": 3485,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "b32cd313444016c6ab34618c14f34c205160c540336e1ba64524abebe22ba241",
+      "size": 6816,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_reviewer_child_tests.rs": {
+      "kind": "file",
+      "sha256": "8fe53a4848e4d151a8cb8806ac4db4d9c215f1b293892c07e64b54f14269cba5",
+      "size": 7513,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_reviewer_tests.rs": {
+      "kind": "file",
+      "sha256": "59fad754ef84fcea9a36202b630156a21e78cd5a53924e594f8b41ba8b4dbd88",
+      "size": 20867,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_runtime_race_support.rs": {
+      "kind": "file",
+      "sha256": "76b3c34a1e7bd0c5ef9bc0ed41f42b89a57b0d0aeb3c75b821db7e0404de231a",
+      "size": 2931,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_runtime_tests.rs": {
+      "kind": "file",
+      "sha256": "18b6ce6504b513f5d79f00ffe5fccd1d3e821ef32064b84974f2f23c730ddfc4",
+      "size": 11797,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_snapshot_race_tests.rs": {
+      "kind": "file",
+      "sha256": "966c69d66bafd6a5ff2e9ee1b6558dc1d51474560b2e9f7544ee8d27c8060145",
+      "size": 6427,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs": {
+      "kind": "file",
+      "sha256": "153b0b6effca65c815618f3e8a4f988000db33ae82eed49005c881383d546001",
+      "size": 16008,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_snapshot_tests.rs": {
+      "kind": "file",
+      "sha256": "6d23453bf14e8bf39d0d8d6dc46f3d08e41e685ead922f0b51c0c65964012bbe",
+      "size": 11724,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/role_views.rs": {
+      "kind": "file",
+      "sha256": "76bd5e223cea52daab972db33c657a97b1f8324e02f2d65807cceddd870db92a",
+      "size": 4560,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/run_provenance/mod.rs": {
+      "kind": "file",
+      "sha256": "9dd97f756cc4d7d4a471b97fd51c880d4975345270ae34c90a1a56fe1e30e12a",
+      "size": 6892,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/run_views.rs": {
+      "kind": "file",
+      "sha256": "3fb46e08885a19f15767fc3987ca59fd6cda65ee0a73309cb727808f5dfd4068",
+      "size": 26852,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/schedule_test_support.rs": {
+      "kind": "file",
+      "sha256": "7d3aa6db287af6ba7d68613692fde778812e50383610c46ef44ec0b71cc20774",
+      "size": 4886,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/schedule_tests.rs": {
+      "kind": "file",
+      "sha256": "efce3ab1455dde64cc145c1a3652570c92aa7ded46592d48f2b18c1b5948c08c",
+      "size": 59226,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/schedules.rs": {
+      "kind": "file",
+      "sha256": "3d8405d9c4a1b1cb884ced107d76d2f3e7120d47d913e0b72414909d1c7c05be",
+      "size": 36620,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/tests.rs": {
+      "kind": "file",
+      "sha256": "9f1e987e4a446b29de1ee8c1a387ce3672d8e0d7eaed7e3bef73fb6a2fa74aed",
+      "size": 25000,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/token_budget.rs": {
+      "kind": "file",
+      "sha256": "a30c5eebb2dc9ef29114fd89b0d3d9477626df5ab8a3da27891abbf472f87040",
+      "size": 10129,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/wait_commit.rs": {
+      "kind": "file",
+      "sha256": "c96cb35775ab7958e0252c98cd0fbaeb57ce67e77b10da312f978ae6028417b2",
+      "size": 23713,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/waits.rs": {
+      "kind": "file",
+      "sha256": "48a538181d4c0bd4208674f77d1870a2832d07d4b3410cddf9b120106c843407",
+      "size": 17998,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_closure_tests.rs": {
+      "kind": "file",
+      "sha256": "8b0825cfdb3fe071b82c9e4172e49c40b6e452c3082d38a0a8aaca0e5808baae",
+      "size": 4333,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_current_authority_tests.rs": {
+      "kind": "file",
+      "sha256": "baf8782b55607d5ffe3fa9e32d7a9fa3cc94bd47003dd5033d45d3cad8fd5b15",
+      "size": 6392,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_reference_tests.rs": {
+      "kind": "file",
+      "sha256": "331c7bfd9cbd2747c30a5b9d9ee7f1b48431cfddedacb7df3151890dbeda754e",
+      "size": 6812,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs": {
+      "kind": "file",
+      "sha256": "40a8bd2bfb70f27b17eecd33ddb82819953aeec26da45bb5509e65c4a21b68c3",
+      "size": 14980,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_support.rs": {
+      "kind": "file",
+      "sha256": "de13f6ff4de1162abda78423ad8a852d8caa4b75eb0a93a003a19650655c0f9c",
+      "size": 20934,
+      "executable": false
+    },
+    "src/adapters/persistence/workflow/workflow_tool_tests.rs": {
+      "kind": "file",
+      "sha256": "63ef6f35ec03b85fe9d215efef8f993263a12f8dbcacfbb53afba1ea29abba44",
+      "size": 23475,
+      "executable": false
+    },
+    "src/adapters/smtp/server.rs": {
+      "kind": "file",
+      "sha256": "7fe421c5165737fa4bd641e2494b72c1a3be3013501cc1fc4ca29eb8ceddd54d",
+      "size": 69399,
+      "executable": false
+    },
+    "src/application/agent/contract_tests.rs": {
+      "kind": "file",
+      "sha256": "e0b32efb0ed832ebc1d6f383f7274b2865e3584389931d97c4de55bdada04f12",
+      "size": 9323,
+      "executable": false
+    },
+    "src/application/agent/manifest.rs": {
+      "kind": "file",
+      "sha256": "b1f7e6be8e8a096ad8499496a5658f656ec81e127c42bb7413f5ce4b3cc29ab1",
+      "size": 6333,
+      "executable": false
+    },
+    "src/application/app_error.rs": {
+      "kind": "file",
+      "sha256": "1e1e154c8c439aeacd9f0dbad71b673f86fb3f6f79e10168864260e80e1442e5",
+      "size": 6416,
+      "executable": false
+    },
+    "src/application/services/inbound_event_worker.rs": {
+      "kind": "file",
+      "sha256": "eb1083312c48cb0b41aa636390158cee0b2fe2e1db49d74120fde31cbddeb961",
+      "size": 25195,
+      "executable": false
+    },
+    "src/application/settings.rs": {
+      "kind": "file",
+      "sha256": "43667357d7180d7781c006a57c8c29cbf9f1e9464a1f323312f18fee1439a22e",
+      "size": 475,
+      "executable": false
+    },
+    "src/application/workflow/binding/escalation.rs": {
+      "kind": "file",
+      "sha256": "829ac44a0ccf82025600e55e8a5ead07d0dbd1bf1eea44c3f0e8e64ece81d457",
+      "size": 2992,
+      "executable": false
+    },
+    "src/application/workflow/binding/mod.rs": {
+      "kind": "file",
+      "sha256": "223ab2492211334dcfe75a780fb707668f121546873e7d79059237f4d90d888b",
+      "size": 7419,
+      "executable": false
+    },
+    "src/application/workflow/binding/tests.rs": {
+      "kind": "file",
+      "sha256": "139ece1e48b9d0455349849e06e3cfef0b9ebf724ca5beba7790461f5825677d",
+      "size": 6815,
+      "executable": false
+    },
+    "src/application/workflow/board_tests.rs": {
+      "kind": "file",
+      "sha256": "856c3dff3c0555c1ccc8f6537a734a97e8714e719831266113ea267b8e70e31b",
+      "size": 4317,
+      "executable": false
+    },
+    "src/application/workflow/channel_reply/approval.rs": {
+      "kind": "file",
+      "sha256": "7c3ff2c28c7a77664afa546549ffc163eb2b46aeae0a5b4ca2a44fb33f4fc19b",
+      "size": 3705,
+      "executable": false
+    },
+    "src/application/workflow/channel_reply/approval_tests.rs": {
+      "kind": "file",
+      "sha256": "be9ba87ee95550cd9411a7e46976e764ba41663635568e8fbb08cea15d6a8196",
+      "size": 2356,
+      "executable": false
+    },
+    "src/application/workflow/compiler/agent_selection.rs": {
+      "kind": "file",
+      "sha256": "65d496c833b736494e7d634aba8d07146fced3792ca418987fc31c1a5c55f5a0",
+      "size": 2470,
+      "executable": false
+    },
+    "src/application/workflow/compiler/budget_tests.rs": {
+      "kind": "file",
+      "sha256": "93e8b7b15e541ab7e7291c65e6a641e7e05680d4f9cd00ff1ffdf5787e3ec7c3",
+      "size": 4092,
+      "executable": false
+    },
+    "src/application/workflow/compiler/compile.rs": {
+      "kind": "file",
+      "sha256": "50bc75566ea748a8e3fc0233fcdd2eaea5973ea6cf5e2cfdc846b0b8830860a2",
+      "size": 29223,
+      "executable": false
+    },
+    "src/application/workflow/compiler/mod.rs": {
+      "kind": "file",
+      "sha256": "81975d2464a43af8ceee8d1a33f70d84fe3b7c675c1763d57c53e1937c20034b",
+      "size": 2011,
+      "executable": false
+    },
+    "src/application/workflow/compiler/role_selection.rs": {
+      "kind": "file",
+      "sha256": "51b8b4360930a2d4aaa848c902a18629e44c3dabc5d00eda98a8a020506d120f",
+      "size": 5954,
+      "executable": false
+    },
+    "src/application/workflow/compiler/role_selection_tests.rs": {
+      "kind": "file",
+      "sha256": "a5508db188516cd9ced4da1772b280189dadb81e56a7e11439b79cab193896af",
+      "size": 3556,
+      "executable": false
+    },
+    "src/application/workflow/compiler/roles.rs": {
+      "kind": "file",
+      "sha256": "8ccbee6a613f7ec964f5fa7d6ab98e465c88ae21b0989ab8df38bdd57a10a2f6",
+      "size": 6430,
+      "executable": false
+    },
+    "src/application/workflow/compiler/selection_span.rs": {
+      "kind": "file",
+      "sha256": "8fd9bb5956cf022e03285f5cc96b06c3645b817b89894c6afcc5e53ecdc1ebdd",
+      "size": 3443,
+      "executable": false
+    },
+    "src/application/workflow/compiler/wire.rs": {
+      "kind": "file",
+      "sha256": "4482d301edaa17035f191135191059762a6ef52aa0855a916c48201ff05daf1b",
+      "size": 17340,
+      "executable": false
+    },
+    "src/application/workflow/decisions.rs": {
+      "kind": "file",
+      "sha256": "59fc6539b04eca125905c81ba4c652f0d265265baf7757f14ee02e5e22f1d9df",
+      "size": 16270,
+      "executable": false
+    },
+    "src/application/workflow/escalation.rs": {
+      "kind": "file",
+      "sha256": "59842eb3f747e9822c27b7a9c3314421336b026b126d5f7d30f0cd04ecb7c875",
+      "size": 9486,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/human-revision-round.yaml": {
+      "kind": "file",
+      "sha256": "60168adc6c6da3962d378ce8091cae2b386cdcd8569345fd59f26d9f2bfee999",
+      "size": 4414,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/mod.rs": {
+      "kind": "file",
+      "sha256": "bcc7a6058c6c15c58a150471a2f93682e8f808fd1d3b707897b5aaa629c6b046",
+      "size": 7170,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/repeated-human-revision.yaml": {
+      "kind": "file",
+      "sha256": "659e01a63cb35a6988911f31696f6d31741f284886fd7269ab9eb4787b7d9c01",
+      "size": 4261,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/review-feedback-successor.yaml": {
+      "kind": "file",
+      "sha256": "bc4d80a4b820ec15d24946e2e6b7991d4c74d1bcbb01e3bf3f36da6c45dbc0a1",
+      "size": 2404,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/reviewed-support.yaml": {
+      "kind": "file",
+      "sha256": "2bbd8b20b7ca51512fa18e25306b5fdd19fedd7531e8710f9d5b7a2ade861060",
+      "size": 2768,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/role-lead-response.yaml": {
+      "kind": "file",
+      "sha256": "7ec328cca833dc1250cb74fc81be46f564569124e780230963c9aaae49b66950",
+      "size": 1630,
+      "executable": false
+    },
+    "src/application/workflow/fixtures/tests.rs": {
+      "kind": "file",
+      "sha256": "b01a9bbb7533f813acbfd8cf23cba8ffae491e552563d23c7b2dc7e0360800c2",
+      "size": 23710,
+      "executable": false
+    },
+    "src/application/workflow/lifecycle/bindings.rs": {
+      "kind": "file",
+      "sha256": "3cb0b5797d860e8a0a8d1a83f4cb6ff9b0442c7297ca7efac22a58d11c172a02",
+      "size": 6526,
+      "executable": false
+    },
+    "src/application/workflow/lifecycle/contracts.rs": {
+      "kind": "file",
+      "sha256": "0880b9e19fdc663b24215119b6e37ab0fc16dba5fa6d722c91bdaef06f196332",
+      "size": 5255,
+      "executable": false
+    },
+    "src/application/workflow/lifecycle/provisioned.rs": {
+      "kind": "file",
+      "sha256": "2e89a0b0b02ef13930f496bc8eac89759c65005e0c8449b254e925b96ccc6c99",
+      "size": 5562,
+      "executable": false
+    },
+    "src/application/workflow/lifecycle/test_support.rs": {
+      "kind": "file",
+      "sha256": "07027773451a0eb1173a69a1c5d98d34cd1532d25d4ca40be67fb4983c5b20e9",
+      "size": 10564,
+      "executable": false
+    },
+    "src/application/workflow/message_admission.rs": {
+      "kind": "file",
+      "sha256": "7ee39f6ef95ac2a4ec582b7e79f71a535e38b15041584362ed33e11148085f37",
+      "size": 24374,
+      "executable": false
+    },
+    "src/application/workflow/mod.rs": {
+      "kind": "file",
+      "sha256": "75d4b2a84026fbe9dff02890a3217f367fff385cd056bccb79de23f968911d8f",
+      "size": 1659,
+      "executable": false
+    },
+    "src/application/workflow/people_resolution.rs": {
+      "kind": "file",
+      "sha256": "b9fbdd0242590d913ad299aa4e9c3653cabb68ba8bfacb03cc96093493f5b478",
+      "size": 7246,
+      "executable": false
+    },
+    "src/application/workflow/publication/capabilities.rs": {
+      "kind": "file",
+      "sha256": "0c97ef89ebcbf3214af2faef1cfd6694fcf3b2fd74a9b3cb96997301d8a87591",
+      "size": 5664,
+      "executable": false
+    },
+    "src/application/workflow/publication/mod.rs": {
+      "kind": "file",
+      "sha256": "baf44e6b5296d1fa928f00caefa11f9ee5b7fe8a74c3914576597841b8ca30bd",
+      "size": 8915,
+      "executable": false
+    },
+    "src/application/workflow/publication/role_tests.rs": {
+      "kind": "file",
+      "sha256": "be612f3bc88b9ffbe464bcea6c5b3e27da752d98d4c203f860d0e9d63d9d5f0d",
+      "size": 9555,
+      "executable": false
+    },
+    "src/application/workflow/publication/tests.rs": {
+      "kind": "file",
+      "sha256": "addab13b8166d9590d28b8850479387f74f416e2d7c34c3f45d329cc50f7d760",
+      "size": 20679,
+      "executable": false
+    },
+    "src/application/workflow/publication/types.rs": {
+      "kind": "file",
+      "sha256": "0300a434d393e1710a1fe03a3fbb167b07bf8bc2f159c484c4a3c7e8ccb2d365",
+      "size": 5581,
+      "executable": false
+    },
+    "src/application/workflow/reads.rs": {
+      "kind": "file",
+      "sha256": "82aa737ebde1f46cc638616b7cb31b390d32a6bedc81acfe5032bb8f41e2f663",
+      "size": 20647,
+      "executable": false
+    },
+    "src/application/workflow/registry/channel_reply_terminal_contract_tests.rs": {
+      "kind": "file",
+      "sha256": "516e27d895569e865e617196cecc04442eab5edb517ebcd5fa76482943428b70",
+      "size": 4849,
+      "executable": false
+    },
+    "src/application/workflow/registry/contract_tests.rs": {
+      "kind": "file",
+      "sha256": "a6373545353568b94c92a56e1e5cdcfefa35a93b1499cd342861c40d790227bc",
+      "size": 6182,
+      "executable": false
+    },
+    "src/application/workflow/registry/decision_tests.rs": {
+      "kind": "file",
+      "sha256": "5c10e753fb9532e45026dc851ab0b923e80739b578763e819710d56919ae3a5d",
+      "size": 9990,
+      "executable": false
+    },
+    "src/application/workflow/registry/examples.rs": {
+      "kind": "file",
+      "sha256": "63e80f8b4c8abf09db26ea3664ccd61d42b8d43c0b1addf6f52007146868194c",
+      "size": 7136,
+      "executable": false
+    },
+    "src/application/workflow/registry/families.rs": {
+      "kind": "file",
+      "sha256": "2933bf71400499d196a48c10fb7911ceccae49f8064ab5603f0ee0821184bbb7",
+      "size": 12941,
+      "executable": false
+    },
+    "src/application/workflow/registry/help.rs": {
+      "kind": "file",
+      "sha256": "5558179fd24027a73f4533e8145e23e88c333bfe597f277d8b1c97fa5b2b1816",
+      "size": 11373,
+      "executable": false
+    },
+    "src/application/workflow/registry/mod.rs": {
+      "kind": "file",
+      "sha256": "05aafc0ad6cd352a2e0c4a121596af5fef1d34f369e5940113d135f1b351bbd1",
+      "size": 18250,
+      "executable": false
+    },
+    "src/application/workflow/registry/roles.rs": {
+      "kind": "file",
+      "sha256": "01c721bc9cb6653dbdd76849f553853c81eb623b34d35de471c2b18ebc6469e3",
+      "size": 2007,
+      "executable": false
+    },
+    "src/application/workflow/registry/schemas.rs": {
+      "kind": "file",
+      "sha256": "ebda78fa5ed958936100fa39fbde693715c67d35075e86165e2b1a0261a2e0ff",
+      "size": 4776,
+      "executable": false
+    },
+    "src/application/workflow/registry/tests.rs": {
+      "kind": "file",
+      "sha256": "ccd1124a8d05d25d6de10715181826c72033490cd18fc72c90efe2527427d03d",
+      "size": 8108,
+      "executable": false
+    },
+    "src/application/workflow/reviewer_assignment.rs": {
+      "kind": "file",
+      "sha256": "76c1cbd6a94f9644bd703d650b6226ee0b34e6b00a76b1c1e1033f5d7f00176e",
+      "size": 11130,
+      "executable": false
+    },
+    "src/application/workflow/reviewers.rs": {
+      "kind": "file",
+      "sha256": "3e85ac83142787866f47c3c8ab0084d257e008fd5ab2d1d2a7d29a45c0088ca7",
+      "size": 3111,
+      "executable": false
+    },
+    "src/application/workflow/roles.rs": {
+      "kind": "file",
+      "sha256": "080a1d2d4be10f81b764f7d1d19b407cd9a50832e03526687de35f442dcea6e8",
+      "size": 3072,
+      "executable": false
+    },
+    "src/application/workflow/roles_tests.rs": {
+      "kind": "file",
+      "sha256": "bdd0123213dcd84aa46aa3e6ca6ecf0f3298efabf396572ab0571db74d69066e",
+      "size": 8068,
+      "executable": false
+    },
+    "src/application/workflow/run_views.rs": {
+      "kind": "file",
+      "sha256": "bff4740e6e69c1c4c873d6fca650ef2fd5bf80a401aeaf0a1fc72c25d426fd65",
+      "size": 10288,
+      "executable": false
+    },
+    "src/application/workflow/sample/channel_reply_preview_tests.rs": {
+      "kind": "file",
+      "sha256": "ce7921ab12de7068730a7c26ca8d462b5f96be9c19f1136cd494894763c7016a",
+      "size": 9896,
+      "executable": false
+    },
+    "src/application/workflow/sample/dispatch.rs": {
+      "kind": "file",
+      "sha256": "a4d07385fb64552a9187efa53ea297a5ec64dd54496770b71d002c03745ccdae",
+      "size": 10685,
+      "executable": false
+    },
+    "src/application/workflow/sample/history.rs": {
+      "kind": "file",
+      "sha256": "621f44f63a2055c6b9bdaead237f176e7aaeee1c165552b64a99f41caf87af87",
+      "size": 3606,
+      "executable": false
+    },
+    "src/application/workflow/sample/tests.rs": {
+      "kind": "file",
+      "sha256": "510f3e62c564d0f628b9cacdd72140df71e7270bd9fce2d50009e9d7858fb27b",
+      "size": 15767,
+      "executable": false
+    },
+    "src/application/workflow/sample/tools_tests.rs": {
+      "kind": "file",
+      "sha256": "5d53b9c496b9cd8284c6a647c85d52f457f504ae5f218c4531f6e34bc5e8c1f9",
+      "size": 6933,
+      "executable": false
+    },
+    "src/application/workflow/schedule_admission.rs": {
+      "kind": "file",
+      "sha256": "495668195449ff5c6ec8f5a7114181ca0c0b2272b36e59b93cc64464ddeb90dc",
+      "size": 16049,
+      "executable": false
+    },
+    "src/application/workflow/templates/agent_workflow.rs": {
+      "kind": "file",
+      "sha256": "4ee6b0698880a280b32cdbf1ac7cf64af10626b8c64ba0df0e6e556d005cbe45",
+      "size": 18494,
+      "executable": false
+    },
+    "src/application/workflow/tests.rs": {
+      "kind": "file",
+      "sha256": "ffda131a7b8760583434e278d9b363259c315b2dacd07a50ac36afe11ab4c78e",
+      "size": 19938,
+      "executable": false
+    },
+    "src/application/workflow/tests/authorization_cases/resources.rs": {
+      "kind": "file",
+      "sha256": "1dac4e61750ed16e54ad25cd92c262da112805c1d24fb2157965cccbe50fd93a",
+      "size": 1820,
+      "executable": false
+    },
+    "src/application/workflow/tests/snapshot_cases.rs": {
+      "kind": "file",
+      "sha256": "0aba6f01f3bf6db6041af64df8639644cf2dab29bee62363cbeb231a5a431133",
+      "size": 7664,
+      "executable": false
+    },
+    "src/domain/entities/department.rs": {
+      "kind": "file",
+      "sha256": "bd17c4224a6056b05586b3fe7906a71a1a13da35e4184bb06afd7cf66cf01a0d",
+      "size": 11905,
+      "executable": false
+    },
+    "src/domain/entities/message_outcome.rs": {
+      "kind": "file",
+      "sha256": "030f8a029c7c39f0856ff6240bd5e701958a9b14d8928b0ce88c10755f152179",
+      "size": 2171,
+      "executable": false
+    },
+    "src/domain/entities/notification.rs": {
+      "kind": "file",
+      "sha256": "6914d2e28fdf89ffdd8ebc4e41cdc26faeac41628fba69f0c66db9808e40a862",
+      "size": 11270,
+      "executable": false
+    },
+    "src/domain/entities/schedule.rs": {
+      "kind": "file",
+      "sha256": "59844c868ebec23a20ea7ed246a0e827393151b780071807f2e993a29159b85e",
+      "size": 9650,
+      "executable": false
+    },
+    "src/domain/workflow/budget.rs": {
+      "kind": "file",
+      "sha256": "6f699eb0597d18d6485e7a29bd09cb2d48b5e6835d50025bd1f08860b8cc2b92",
+      "size": 6444,
+      "executable": false
+    },
+    "src/infra/config.rs": {
+      "kind": "file",
+      "sha256": "325b11b56b0188600786340bb771367d15c11ace2ab28cee212cbd97f0db04f0",
+      "size": 33901,
+      "executable": false
+    }
+  }
+}

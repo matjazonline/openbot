@@ -77,7 +77,8 @@ fn workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_polic
     let budget = |tokens: &str| {
         format!("{{activations: 7, model_calls: 3, repetitions: 2, tokens: {tokens}}}")
     };
-    let tokens = format!("{{max_tokens: 2000, reviewers: [{{kind: user, id: '{reviewer}'}}]}}");
+    let tokens =
+        format!("{{max_tokens: 2000, reviewers: [{{kind: principal, id: '{reviewer}'}}]}}");
     let compiled = compile_one(&with_budget(&budget(&tokens))).unwrap();
     let policy = compiled
         .graph()
@@ -90,17 +91,17 @@ fn workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_polic
     assert_eq!(policy.reviewers(), &[reviewer]);
     assert_eq!(
         compiled.representation()["root_budget"]["tokens"],
-        json!({"max_tokens":2000,"reviewers":[{"kind":"user","id":reviewer}]})
+        json!({"max_tokens":2000,"reviewers":[{"kind":"principal","id":reviewer}]})
     );
     for invalid in [
         "null".to_owned(),
         "{max_tokens: 1, reviewers: []}".to_owned(),
         tokens.replace("2000", "0"),
         tokens.replace("2000", "2147483648"),
-        tokens.replace("kind: user", "kind: agent"),
+        tokens.replace("kind: principal", "kind: agent"),
         tokens.replace(&reviewer.to_string(), "bad-uuid"),
         format!(
-            "{{max_tokens: 2, reviewers: [{{kind: user, id: '{reviewer}'}}, {{kind: user, id: '{reviewer}'}}]}}"
+            "{{max_tokens: 2, reviewers: [{{kind: principal, id: '{reviewer}'}}, {{kind: principal, id: '{reviewer}'}}]}}"
         ),
         tokens.replace("max_tokens:", "money:"),
     ] {

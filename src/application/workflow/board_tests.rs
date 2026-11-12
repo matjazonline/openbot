@@ -6,6 +6,8 @@ use crate::domain::workflow::{RunId, VersionId, WorkflowId};
 fn card(state: RunStateName) -> RunSummary {
     let now = chrono::Utc::now();
     RunSummary {
+        role_holders: Vec::new(),
+        role_holders_truncated: false,
         run: RunId::new(Uuid::new_v4()),
         binding: WorkflowBindingId::new(Uuid::new_v4()),
         workflow: WorkflowId::new(Uuid::new_v4()),

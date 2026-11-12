@@ -254,6 +254,7 @@ pub struct ScheduleRun {
     pub run_state: Option<String>,
     /// Why admission refused the occurrence (`unavailable`, `input_rejected`, `key_conflict`).
     pub refusal: Option<String>,
+    pub role_refusal: Option<super::department::RoleAdmissionRefusal>,
     pub last_error: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,

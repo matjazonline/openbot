@@ -1,0 +1,33 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0004]: non-exhaustive patterns: `domain::entities::notification::NotificationDisposition::Control` not covered
+   --> src/adapters/persistence/notification.rs:468:31
+    |
+468 |             let state = match projection.disposition {
+    |                               ^^^^^^^^^^^^^^^^^^^^^^ pattern `domain::entities::notification::NotificationDisposition::Control` not covered
+    |
+note: `domain::entities::notification::NotificationDisposition` defined here
+   --> src/domain/entities/notification.rs:231:10
+    |
+231 | pub enum NotificationDisposition {
+    |          ^^^^^^^^^^^^^^^^^^^^^^^
+...
+235 |     Control,
+    |     ------- not covered
+    = note: the matched value is of type `domain::entities::notification::NotificationDisposition`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+471 ~                 NotificationDisposition::Active(_) => unreachable!(),
+472 ~                 domain::entities::notification::NotificationDisposition::Control => todo!(),
+    |
+
+warning: unused variable: `visible_channel_ids`
+   --> src/adapters/persistence/notification.rs:428:9
+    |
+428 |         visible_channel_ids: &[Uuid],
+    |         ^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_visible_channel_ids`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0004`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 1 previous error; 1 warning emitted

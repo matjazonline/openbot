@@ -45,6 +45,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
     let step_view = StepView {
         agent: Some(
             crate::application::workflow::run_views::SelectedAgentSummary {
+                via_role: None,
                 manifest: crate::entities::agent_capability::DependencyManifestId::new(
                     Uuid::new_v4(),
                 ),
@@ -133,6 +134,8 @@ fn sample_view(
         calls: Default::default(),
         detail: RunDetail {
             summary: RunSummary {
+                role_holders: Vec::new(),
+                role_holders_truncated: false,
                 run: RunId::new(Uuid::new_v4()),
                 binding: WorkflowBindingId::new(Uuid::new_v4()),
                 workflow: WorkflowId::new(Uuid::new_v4()),

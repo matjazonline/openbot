@@ -1,0 +1,44 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:101:19
+    |
+101 |         parameters["expected_bot_id"] = json!(input.bot);
+    |                   ^^^^^^^^^^^^^^^^^^^
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:102:19
+    |
+102 |         parameters["expected_workspace_id"] = json!(input.workspace);
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:103:19
+    |
+103 |         parameters["doop_origin"] = json!(origin);
+    |                   ^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `clone` found for opaque type `impl futures::Future<Output = JsonValue>` in the current scope
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:114:24
+    |
+114 |             parameters.clone(),
+    |                        ^^^^^ method not found in `impl futures::Future<Output = JsonValue>`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:126:13
+    |
+126 |             parameters,
+    |             ^^^^^^^^^^ expected `Value`, found future
+    |
+note: calling an async function returns a future
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:126:13
+    |
+126 |             parameters,
+    |             ^^^^^^^^^^
+help: consider `await`ing on the `Future`
+    |
+126 |             parameters.await,
+    |                       ++++++
+
+Some errors have detailed explanations: E0308, E0599, E0608.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 5 previous errors

@@ -1,0 +1,2 @@
+plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 2, "PASS": 16}
+1 evidence manifest(s) validated; declared results are not acceptance

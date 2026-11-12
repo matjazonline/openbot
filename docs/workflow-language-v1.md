@@ -121,8 +121,7 @@ finite `label` enum; scalar alternatives are rejected. There is no second
 `config` authority.
 
 Registration-owned objects reject unknown fields. Scope is `{kind, id?}` where
-kind is company/agent/user and agent/user require an ID. Reviewer is `{kind, id}`
-with user/group kind. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
+kind is company/agent/user and agent/user require an ID. A reviewer is a person principal `{kind: principal, id: UUID}` or a literal department role string (`lead` or `reviewer`). Human and action-review roles are frozen at admission; parameter-selected reviewers use pinned principal objects. Effective reviewers are deduplicated and limited to16 after role expansion. Token allowance and final-response policies use pinned person principals. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
 Content is `{subject?, body}`. MCP content accepts bounded text (including empty text), image/audio base64, embedded
 text/blob resources and resource links, with protocol annotations, icons and `_meta`.
 Resource links and icon URIs remain data and are never automatically fetched. These fields follow
@@ -451,3 +450,34 @@ leave the generic script `tokens` at zero. Samples charge one simulated model ca
 and enforce their token allowance, without billing or external access.
 Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
 and [Box](https://docs.typesafe.ai/primitives/box).
+
+## Roles
+
+`agent.run`, `decision.agent` and `ai.classify` take exactly one of `agent` or a
+literal `role`, using the fixed vocabulary `lead` and `reviewer`:
+
+```yaml
+role: {literal: lead}
+```
+
+The published procedure freezes the role requirement. At admission it resolves
+against the desk's owning department, walking to the nearest ancestor that holds
+the role within depth 8, and freezes the selected principal and agent revision.
+An agent step requires exactly one agent holder; missing, ambiguous or person
+holders refuse admission. Later role changes affect later runs. Active bindings
+for a role procedure require a department-owned desk; remove or deactivate those
+bindings before clearing its department. Pinned agent selection remains available.
+
+A message accepted by the desk stays delivered when role resolution refuses workflow admission.
+The message's workflow outcome identifies the step and role that could not be resolved; the
+refused workflow creates no run and its intent settles without retrying. Scheduled occurrences
+record the same typed refusal, and manual starts return a named bad request.
+
+Agent identity, revision and grants freeze at admission, including requirements in pinned child
+workflows. Informational department framing (roster, current lead and charter) freezes when the
+agent is first prepared; it cannot select another agent or grant capabilities. Run inspection
+and board cards label captured holders with “via role”. Agent filters include the root's frozen
+role selections for its children as well as the published pinned-agent universe.
+
+See `src/application/workflow/fixtures/role-lead-response.yaml` for the reusable
+`context.history` → role-based `agent.run` → reply example.

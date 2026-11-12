@@ -863,3 +863,27 @@ mod tests {
         );
     }
 }
+
+pub(crate) fn notification_worker(
+    persistence: &super::PostgresPersistence,
+    escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
+) -> crate::application::services::notification_worker::NotificationWorker {
+    use crate::application::transport::{DeliveryComposer, TransportRenderers};
+    use std::sync::Arc;
+    let store = Arc::new(persistence.clone());
+    let renderers = TransportRenderers::new()
+        .register(Arc::new(
+            crate::adapters::protocols::email::EmailRenderer::new("example.test"),
+        ))
+        .unwrap();
+    crate::application::services::notification_worker::NotificationWorker::new(
+        store.clone(),
+        DeliveryComposer::new(Arc::new(renderers), store),
+        crate::application::settings::NotificationMailSettings {
+            escalation_ack_hours,
+            mail_domain: "example.test".into(),
+            public_base_url: "https://example.test".into(),
+        },
+        Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+    )
+}

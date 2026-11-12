@@ -1,0 +1,27 @@
+[
+  {
+    "pattern": "department_",
+    "exit": 101,
+    "log": "B1-regression-16.txt"
+  },
+  {
+    "pattern": "run_board_",
+    "exit": 101,
+    "log": "B1-regression-17.txt"
+  },
+  {
+    "pattern": "knowledge_search_",
+    "exit": 101,
+    "log": "B1-regression-18.txt"
+  },
+  {
+    "pattern": "memory_tool_",
+    "exit": 101,
+    "log": "B1-regression-19.txt"
+  },
+  {
+    "pattern": "workflow_role_",
+    "exit": 101,
+    "log": "B1-regression-20.txt"
+  }
+]

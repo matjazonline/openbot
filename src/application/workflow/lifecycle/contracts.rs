@@ -145,6 +145,7 @@ pub struct ConfigureBinding {
     /// company owner may name somebody else (p08 D1.1).
     pub run_as: Option<WorkflowActor>,
     pub message_trigger: Option<crate::domain::workflow::MessageTrigger>,
+    pub escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
 }
 
 #[derive(Debug, Clone, Copy)]

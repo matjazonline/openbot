@@ -1,0 +1,18 @@
+
+running 13 tests
+test adapters::http::pages::notifications::tests::notification_rows_render_only_safe_taxonomy_and_escaped_labels ... ok
+test adapters::persistence::notification::tests::notification_census_executes_against_postgres ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::a_failed_projection_batch_backs_off_before_it_can_be_claimed_again ... ok
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference ... ok
+test domain::entities::notification::tests::a_delivery_failure_emails_only_when_its_preference_is_on ... ok
+test domain::entities::notification::tests::only_the_delivery_source_and_action_parse ... ok
+test domain::entities::notification::tests::self_triggered_actions_keep_in_app_but_suppress_email ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::a_dead_workflow_delivery_notifies_its_run_actor_once ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4236 filtered out; finished in 3.78s
+

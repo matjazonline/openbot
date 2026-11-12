@@ -21,6 +21,7 @@ impl WorkflowDecisions for PostgresPersistence {
     ) -> AppResult<Option<ParkedWorkflow>> {
         tokio::time::timeout(Duration::from_secs(2), async {
             let mut tx = self.pool.begin().await?;
+            reviewer_accounts::prelock_business_on(&mut tx, scope).await?;
             let parked = Box::pin(park_on(&mut tx, scope, notices)).await?;
             tx.commit().await?;
             Ok(parked)
@@ -96,6 +97,7 @@ pub(super) struct Reviewer {
 }
 #[derive(sqlx::FromRow)]
 struct ReviewerRow {
+    user_id: Uuid,
     principal_id: Uuid,
     email: String,
 }
@@ -112,7 +114,7 @@ async fn park_on(
     scope: ActivationRequest,
     notices: &DecisionNotices,
 ) -> AppResult<Option<ParkedWorkflow>> {
-    let Some(run) = waits::lock(tx, scope).await? else {
+    let Some(run) = waits::lock(tx, scope, waits::LockPurpose::BusinessPark).await? else {
         return Ok(None);
     };
     if let Some(wait) = waits::row(tx, scope, waits::WaitSelection::Decision).await? {
@@ -158,16 +160,124 @@ async fn park_on(
         }
     };
     let deadline = spec.deadline.min(run.deadline);
-    let mut reviewers = Vec::with_capacity(spec.reviewers.len());
-    for user in &spec.reviewers {
-        match eligible_reviewer(tx, scope, *user).await? {
+    let decision = Uuid::new_v4();
+    let preparation = ReviewerPreparation {
+        scope,
+        notices,
+        activation: &activation,
+        spec: &spec,
+        decision,
+        deadline,
+    };
+    let Some(reviewers) = Box::pin(prepare_reviewers_on(tx, preparation)).await? else {
+        return unavailable(tx, scope).await;
+    };
+    // Boxing keeps the compound transactional park below the stock test-thread stack budget.
+    Box::pin(write_park_on(
+        tx,
+        DecisionPark {
+            scope,
+            decision,
+            deadline,
+            proposal_digest: &spec.proposal_digest,
+            reviewers,
+        },
+    ))
+    .await
+}
+
+struct DecisionPark<'a> {
+    scope: ActivationRequest,
+    decision: Uuid,
+    deadline: DateTime<Utc>,
+    proposal_digest: &'a str,
+    reviewers: PreparedReviewers,
+}
+
+async fn write_park_on(
+    tx: &mut Transaction<'_, Postgres>,
+    write: DecisionPark<'_>,
+) -> AppResult<Option<ParkedWorkflow>> {
+    let DecisionPark {
+        scope,
+        decision,
+        deadline,
+        proposal_digest,
+        reviewers,
+    } = write;
+    let wait = Uuid::new_v4();
+    let intent = json!({"version":1,"kind":"wait_registered","wait_id":wait,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()});
+    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,notification_intent) VALUES($1,$2,$3,$4,'decision',$5,clock_timestamp(),$6) RETURNING deadline")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).bind(deadline).bind(intent).fetch_one(&mut **tx).await?;
+    sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest) VALUES($1,$2,$3,$4,$5,'business',$6)")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision).bind(wait).bind(proposal_digest).execute(&mut **tx).await?;
+    match reviewers {
+        PreparedReviewers::Follow => follow_reviewers::park_on(tx, scope, decision).await?,
+        PreparedReviewers::Synchronous {
+            reviewers,
+            composed,
+        } => {
+            insert_reviewers(tx, scope.company, decision, &reviewers, &composed).await?;
+        }
+    }
+    completion_job::finish(tx, scope, completion_job::CompletionOwner::Pure).await?;
+    sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='decision' WHERE company_id=$1 AND id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
+    waits::audit(tx, scope, "decision_opened").await?;
+    Ok(Some(ParkedWorkflow {
+        wait: WaitId::new(wait),
+        deadline,
+    }))
+}
+
+enum PreparedReviewers {
+    Follow,
+    Synchronous {
+        reviewers: Vec<Reviewer>,
+        composed: Vec<Option<crate::transport::NewStandaloneDelivery>>,
+    },
+}
+
+struct ReviewerPreparation<'a> {
+    scope: ActivationRequest,
+    notices: &'a DecisionNotices,
+    activation: &'a ActivatedExecution,
+    spec: &'a DecisionSpecification,
+    decision: Uuid,
+    deadline: DateTime<Utc>,
+}
+
+async fn prepare_reviewers_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: ReviewerPreparation<'_>,
+) -> AppResult<Option<PreparedReviewers>> {
+    let ReviewerPreparation {
+        scope,
+        notices,
+        activation,
+        spec,
+        decision,
+        deadline,
+    } = request;
+    if follow_reviewers::enabled(spec.reviewers_follow_role, &spec.reviewers) {
+        return Ok(Some(PreparedReviewers::Follow));
+    }
+    let selected = match super::reviewer_resolution::resolve_on(tx, scope, &spec.reviewers).await {
+        Ok(selected) => selected,
+        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => {
+            return Ok(None);
+        }
+        Err(error) => return Err(error),
+    };
+    let mut reviewers = Vec::with_capacity(selected.len());
+    for principal in selected {
+        match eligible_reviewer(tx, scope, principal).await? {
             Some(reviewer) => reviewers.push(reviewer),
-            None => return unavailable(tx, scope).await,
+            None => return Ok(None),
         }
     }
     let context: NoticeContext = sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.workflow_id=run.workflow_id AND version.id=run.version_id JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
-    let decision = Uuid::new_v4();
     let composed = match compose_notices(
         notices,
         &reviewers,
@@ -177,23 +287,12 @@ async fn park_on(
         deadline,
     ) {
         Ok(deliveries) => deliveries,
-        Err(AppError::BadRequest(_)) => return unavailable(tx, scope).await,
+        Err(AppError::BadRequest(_)) => return Ok(None),
         Err(error) => return Err(error),
     };
-    let wait = Uuid::new_v4();
-    let intent = json!({"version":1,"kind":"wait_registered","wait_id":wait,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()});
-    let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,notification_intent) VALUES($1,$2,$3,$4,'decision',$5,clock_timestamp(),$6) RETURNING deadline")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).bind(deadline).bind(intent).fetch_one(&mut **tx).await?;
-    sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest) VALUES($1,$2,$3,$4,$5,'business',$6)")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision).bind(wait).bind(&spec.proposal_digest).execute(&mut **tx).await?;
-    insert_reviewers(tx, scope.company, decision, &reviewers, &composed).await?;
-    completion_job::finish(tx, scope, completion_job::CompletionOwner::Pure).await?;
-    sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='decision' WHERE company_id=$1 AND id=$2")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
-    waits::audit(tx, scope, "decision_opened").await?;
-    Ok(Some(ParkedWorkflow {
-        wait: WaitId::new(wait),
-        deadline,
+    Ok(Some(PreparedReviewers::Synchronous {
+        reviewers,
+        composed,
     }))
 }
 
@@ -285,13 +384,13 @@ async fn unavailable(
 async fn eligible_reviewer(
     db: &mut PgConnection,
     scope: ActivationRequest,
-    user: Uuid,
+    principal: Uuid,
 ) -> AppResult<Option<Reviewer>> {
-    let Some(row) = eligible_reviewer_row(db, scope, user).await? else {
+    let Some(row) = eligible_reviewer_row(db, scope, principal).await? else {
         return Ok(None);
     };
     let decision_email: Option<bool> = sqlx::query_scalar("SELECT decision_email_enabled FROM user_notification_preferences WHERE user_id=$1 FOR SHARE")
-        .bind(user).fetch_optional(&mut *db).await?;
+        .bind(row.user_id).fetch_optional(&mut *db).await?;
     Ok(Some(Reviewer {
         principal_id: row.principal_id,
         email: row.email,
@@ -302,15 +401,15 @@ async fn eligible_reviewer(
 async fn eligible_reviewer_row(
     db: &mut PgConnection,
     scope: ActivationRequest,
-    user: Uuid,
+    principal: Uuid,
 ) -> AppResult<Option<ReviewerRow>> {
-    Ok(sqlx::query_as("SELECT principal.id AS principal_id,account.email::text AS email FROM principals AS principal \
+    Ok(sqlx::query_as("SELECT principal.user_id,principal.id AS principal_id,account.email::text AS email FROM principals AS principal \
         JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id \
         JOIN users AS account ON account.id=principal.user_id \
         JOIN companies AS company ON company.id=principal.company_id \
         JOIN workflow_runs AS run ON run.company_id=principal.company_id AND run.id=$3 \
         LEFT JOIN channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id \
-        WHERE principal.company_id=$1 AND principal.user_id=$2 AND principal.kind='person' \
+        WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person' \
           AND (company.user_id=principal.user_id \
             OR (run.channel_id IS NULL AND member.role IN ('owner','admin')) \
             OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public') \
@@ -320,13 +419,14 @@ async fn eligible_reviewer_row(
           AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM threads AS thread WHERE thread.company_id=$1 \
             AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)) \
         ORDER BY principal.id LIMIT 1 FOR SHARE OF member, principal, account")
-        .bind(scope.company.as_uuid()).bind(user).bind(scope.run.as_uuid()).fetch_optional(db).await?)
+        .bind(scope.company.as_uuid()).bind(principal).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
 
 #[derive(sqlx::FromRow)]
 struct DecisionHead {
     run_id: Uuid,
     execution_id: Uuid,
+    submitted_at: Option<DateTime<Utc>>,
 }
 #[derive(sqlx::FromRow)]
 struct DecisionRow {
@@ -352,15 +452,22 @@ struct Locked {
     run: waits::WaitRun,
     reviewer: authority::ReviewerAuthority,
 }
+enum DecisionPurpose {
+    Read,
+    Comment,
+    Submit,
+}
+
 async fn lock_decision(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     actor: WorkflowActor,
     decision: DecisionId,
+    purpose: DecisionPurpose,
 ) -> AppResult<Locked> {
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut **tx).await?;
     let head: DecisionHead = sqlx::query_as(
-        "SELECT run_id,execution_id FROM workflow_decisions WHERE company_id=$1 AND id=$2",
+        "SELECT run_id,execution_id,submitted_at FROM workflow_decisions WHERE company_id=$1 AND id=$2",
     )
     .bind(company.as_uuid())
     .bind(decision.0)
@@ -381,9 +488,11 @@ async fn lock_decision(
         execution: ExecutionId::new(head.execution_id),
         job: WorkflowJobId(job),
     };
-    if channel_reply_completion::root_on(tx, scope)
-        .await?
-        .is_some()
+    if matches!(purpose, DecisionPurpose::Submit)
+        && head.submitted_at.is_none()
+        && channel_reply_completion::root_on(tx, scope)
+            .await?
+            .is_some()
     {
         action_authority::prelock_accounts_on(
             tx,
@@ -395,6 +504,14 @@ async fn lock_decision(
             Some(actor),
         )
         .await?;
+    } else {
+        // Display, discussion and recorded replays depend only on the current viewer.
+        // Historical actor/policy/reviewer mappings are not current authorization facts.
+        let viewer: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(actor.user_id())
+            .fetch_optional(&mut **tx)
+            .await?;
+        viewer.ok_or_else(missing)?;
     }
     let reviewer = authority::authorize_reviewer_on(tx, company, actor).await?;
     // Run → execution → job, as `waits::lock`, but whatever the job's state: a settled
@@ -461,7 +578,14 @@ async fn submit_on(
         scope,
         run,
         reviewer,
-    } = lock_decision(tx, command.company, command.actor, command.decision).await?;
+    } = lock_decision(
+        tx,
+        command.company,
+        command.actor,
+        command.decision,
+        DecisionPurpose::Submit,
+    )
+    .await?;
     let wait = decision_wait(tx, scope, command.decision).await?;
     let row: DecisionRow = sqlx::query_as("SELECT reply_proposal_id,subject_kind,choice,revision,proposal_digest,submitted_by,command_key,command_fingerprint FROM workflow_decisions WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(command.decision.0).fetch_one(&mut **tx).await?;
@@ -559,6 +683,7 @@ async fn submit_business_on(
     sqlx::query("UPDATE workflow_decisions SET submitted_at=clock_timestamp(),submitted_by=$3,command_key=$4,command_fingerprint=$5,choice=$6,feedback=$7,data=$8,revision=revision+1 WHERE company_id=$1 AND id=$2 AND submitted_at IS NULL")
         .bind(scope.company.as_uuid()).bind(command.decision.0).bind(principal).bind(command.command_key.as_str()).bind(fingerprint).bind(&command.choice).bind(&command.feedback).bind(&command.data).execute(&mut **tx).await?;
     let revision = command.expected_revision + 1;
+    follow_reviewers::withdraw_on(tx, scope.company, command.decision.0, &[]).await?;
     waits::audit(tx, scope, "decision_submitted").await?;
     let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
     if activation.ordinal > max_steps
@@ -630,7 +755,14 @@ async fn comment_on(
 ) -> AppResult<DecisionComment> {
     let Locked {
         scope, reviewer, ..
-    } = lock_decision(tx, command.company, command.actor, command.decision).await?;
+    } = lock_decision(
+        tx,
+        command.company,
+        command.actor,
+        command.decision,
+        DecisionPurpose::Comment,
+    )
+    .await?;
     let saved: Option<(i64, String)> = sqlx::query_as("SELECT sequence,body FROM workflow_decision_comments WHERE company_id=$1 AND decision_id=$2 AND author_principal_id=$3 AND command_key=$4")
         .bind(scope.company.as_uuid()).bind(command.decision.0).bind(reviewer.principal).bind(command.command_key.as_str()).fetch_optional(&mut **tx).await?;
     if let Some((sequence, body)) = saved {

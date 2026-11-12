@@ -75,7 +75,7 @@ async fn channel_reply_e2e_protected_final_requires_exact_current_approval() {
         model(&mut selected);
         selected.approval_policy = Some(
             crate::application::workflow::channel_reply::ReplyApprovalPolicy::new(
-                vec![d.fixture.target.actor.user_id()],
+                vec![d.fixture.principal(d.fixture.target.actor.user_id()).await],
                 300,
             )
             .unwrap(),

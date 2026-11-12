@@ -1,0 +1,34 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.63s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 27 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_accepted_private_session_exchange_is_captured_for_its_creator ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_a_switched_on_target_is_provisioned_at_preparation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_details_and_timeline_stay_within_the_ceiling ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_operations_capture_and_delivery_logs_carry_ids_not_content ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_a_replacement_claim_fences_the_stale_saver_and_replays_one_intent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_agent_without_the_switch_captures_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_agent_memory_search_is_ceilinged_recorded_once_and_replayed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_nothing_is_captured_without_a_configured_service ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_forged_calls_and_fences_refuse_before_the_service ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_service_auth_refusals_are_controlled_and_raise_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_authoring_catalog_lists_memory_tools_only_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_memory_tools_publish_only_while_memory_is_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_pack_without_a_configured_service_is_unavailable ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_recall_past_its_deadline_continues_without_memory ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_attempt_replays_the_pack_and_validates_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_freezes_a_ceilinged_pack_into_the_untrusted_context ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_optional_unavailability_continues_and_refusal_fails_closed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_applies_only_to_memory_search_agents_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_resumed_attempts_revalidate_recorded_tool_items ... ok
+
+test result: ok. 27 passed; 0 failed; 0 ignored; 0 measured; 4175 filtered out; finished in 16.58s
+

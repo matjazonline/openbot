@@ -9,6 +9,7 @@ impl IntoResponse for AppError {
         // Error messages can contain provider responses, request URLs, or caller text. The
         // request span and response event supply correlation/status; log only a fixed category.
         let error_kind = match &self {
+            AppError::WorkflowRole(_) => "workflow_role",
             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
             AppError::KnowledgeRelease { .. } => "knowledge_release",
             AppError::Execution(_) => "execution",
@@ -30,6 +31,10 @@ impl IntoResponse for AppError {
 
         let knowledge_code = self.knowledge_code();
         match self {
+            AppError::WorkflowRole(refusal) => (
+                StatusCode::BAD_REQUEST,
+                axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
+            ).into_response(),
             AppError::KnowledgeTrigger { .. } => (
                 StatusCode::BAD_REQUEST,
                 axum::Json(serde_json::json!({"code":knowledge_code,"error":"The triggering message exceeds this audience's access level"})),
@@ -75,5 +80,32 @@ impl IntoResponse for AppError {
                 (StatusCode::INTERNAL_SERVER_ERROR, "Internal error").into_response()
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod role_tests {
+    use super::*;
+    use crate::domain::workflow::StepId;
+    use crate::entities::department::{DepartmentRole, RoleAdmissionRefusal, RoleRefusalKind};
+
+    #[tokio::test]
+    async fn workflow_role_http_refusal_is_a_bounded_named_bad_request() {
+        let refusal = RoleAdmissionRefusal::new(
+            StepId::parse("draft").unwrap(),
+            DepartmentRole::Lead,
+            RoleRefusalKind::NoHolder,
+        );
+        let response = AppError::WorkflowRole(refusal).into_response();
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let bytes = axum::body::to_bytes(response.into_body(), 1024)
+            .await
+            .unwrap();
+        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(value["code"], "workflow.role_no_holder");
+        assert_eq!(value["step"], "draft");
+        assert_eq!(value["role"], "lead");
+        assert_eq!(value.as_object().unwrap().len(), 4);
+        assert!(value["error"].as_str().unwrap().contains("draft"));
     }
 }

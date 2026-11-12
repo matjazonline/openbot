@@ -16,6 +16,7 @@ async fn doop_connection_verification_cannot_bind_another_companys_same_slug_con
         ..setup.target
     };
     let configured = setup.engine.services().bindings().configure(ConfigureBinding {
+        escalation: None,
         target, expected: None, association: RelatedAssociation::Company, version: setup.version,
         params: json!({"expected_bot_id":"user-bot-a","expected_workspace_id":"workspace-a","verification_canvas_id":"canvas-a"}),
         resources: BTreeMap::from([(ResourceName::parse("service").unwrap(), RuntimeResourceId::new(foreign.id))]),

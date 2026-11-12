@@ -1,0 +1,11 @@
+$ cargo test --locked --offline --lib run_list_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 3 tests
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... ignored, writes the query-plan script's input; run on demand
+test adapters::persistence::workflow::reads::tests::run_list_is_slow_only_past_the_threshold ... ok
+test adapters::persistence::workflow::reads::tests::run_list_query_binds_each_present_filter_once_in_placeholder_order ... ok
+
+test result: ok. 2 passed; 0 failed; 1 ignored; 0 measured; 4197 filtered out; finished in 0.00s
+

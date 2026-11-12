@@ -10,6 +10,45 @@ use crate::domain::entities::message::CanonicalMessageId;
 use crate::domain::entities::transport::RecipientRole;
 use chrono::{DateTime, Utc};
 
+struct OutcomeWrite {
+    name: &'static str,
+    run: Option<Uuid>,
+    reason: Option<&'static str>,
+    role_refusal: Option<serde_json::Value>,
+}
+
+impl TryFrom<BindingOutcome> for OutcomeWrite {
+    type Error = AppError;
+    fn try_from(outcome: BindingOutcome) -> AppResult<Self> {
+        Ok(match outcome {
+            BindingOutcome::Admitted(run) => Self {
+                name: "admitted",
+                run: Some(run.as_uuid()),
+                reason: None,
+                role_refusal: None,
+            },
+            BindingOutcome::Refused(reason) => Self {
+                name: "refused",
+                run: None,
+                reason: Some(reason),
+                role_refusal: None,
+            },
+            BindingOutcome::Failed(reason) => Self {
+                name: "failed",
+                run: None,
+                reason: Some(reason),
+                role_refusal: None,
+            },
+            BindingOutcome::RoleRefused(refusal) => Self {
+                name: "refused",
+                run: None,
+                reason: Some(refusal.kind.code()),
+                role_refusal: Some(serde_json::to_value(refusal).map_err(|_| invalid())?),
+            },
+        })
+    }
+}
+
 #[derive(sqlx::FromRow)]
 struct IntentRow {
     company_id: Uuid,
@@ -245,16 +284,12 @@ impl MessageIntentQueue for PostgresPersistence {
         binding: &CandidateBinding,
         outcome: BindingOutcome,
     ) -> AppResult<bool> {
-        let (name, run, reason) = match outcome {
-            BindingOutcome::Admitted(run) => ("admitted", Some(run.as_uuid()), None),
-            BindingOutcome::Refused(reason) => ("refused", None, Some(reason)),
-            BindingOutcome::Failed(reason) => ("failed", None, Some(reason)),
-        };
+        let outcome = OutcomeWrite::try_from(outcome)?;
         let written = sqlx::query(&format!(
             "WITH fence AS ({FENCE}) \
              INSERT INTO workflow_message_intent_bindings \
-               (company_id, intent_id, binding_id, binding_revision, outcome, run_id, reason) \
-             SELECT $1, fence.id, $5, $6, $7, $8, $9 FROM fence \
+               (company_id, intent_id, binding_id, binding_revision, outcome, run_id, reason, role_refusal) \
+             SELECT $1, fence.id, $5, $6, $7, $8, $9, $10 FROM fence \
              ON CONFLICT (company_id, intent_id, binding_id) DO NOTHING"
         ))
         .bind(claim.company.as_uuid())
@@ -263,9 +298,10 @@ impl MessageIntentQueue for PostgresPersistence {
         .bind(claim.generation)
         .bind(binding.id.as_uuid())
         .bind(revision(binding.revision.get())?)
-        .bind(name)
-        .bind(run)
-        .bind(reason)
+        .bind(outcome.name)
+        .bind(outcome.run)
+        .bind(outcome.reason)
+        .bind(outcome.role_refusal)
         .execute(&self.pool)
         .await?;
         if written.rows_affected() == 1 {

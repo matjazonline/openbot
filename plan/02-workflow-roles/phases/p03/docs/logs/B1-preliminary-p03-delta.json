@@ -1,0 +1,745 @@
+{
+  "base_artifact": "be7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba",
+  "changes": [
+    {
+      "path": "docs/agent-builder-context.md",
+      "before_sha256": "196115a2636314218020a2b1f46a126629254b8b46885cb595f04acb3392724f",
+      "after_sha256": "f89a50b47c79bfcfba03ee33587abfe734fc8de4726d6346ab2c86da06b1527c"
+    },
+    {
+      "path": "docs/doop-documents.md",
+      "before_sha256": "24946d2a2e9f67a7404aa3a87323664ff4dd9b88934f044535c3ff1f0bd57c2b",
+      "after_sha256": "df9f0211c396b88987afeb2005814b7f9a3d3c9387f145c81de8128adef32958"
+    },
+    {
+      "path": "docs/gmail-workflows.md",
+      "before_sha256": "a18fdb11e7abd9efdda5e039baf6283cef38424ba1e11723b453b5d83a198c78",
+      "after_sha256": "4661d88f39143d08d549c197f80e82ee47f68e28b3123f4d653d952cb7907f0d"
+    },
+    {
+      "path": "docs/workflow-language-v1.md",
+      "before_sha256": "cb3335e0bbac3c47c84810c93bf5f4f61cd241f95ae12ba9c6b73c8fdf40f189",
+      "after_sha256": "c5976001a2ea6f4b56575be6da6e899c006ce4e9739b439ae9bfed8101c7724e"
+    },
+    {
+      "path": "docs/workflow-operations.md",
+      "before_sha256": "5402adb249cb3547120d4b8dda7fbf106fa298c12765c34ed675aafa165742eb",
+      "after_sha256": "858e617daeb4a8686e29f303696768da19bef5499775d056d6f66c359f074eee"
+    },
+    {
+      "path": "integrations/doop/create-document.sample.json",
+      "before_sha256": "75f18a1c39eb1f45d55b456dae0236d6f8dde015e816e019c3bde622e76f8bcb",
+      "after_sha256": "5c75b9d7538ba73afb4781dd618aa0cae913ebaa7146e1f225e4f0da1ee6f05e"
+    },
+    {
+      "path": "integrations/doop/create-document.workflow.json",
+      "before_sha256": "10660048d3635c5106a47c877b732381112b00ab9eb3afa92a2d58765b156751",
+      "after_sha256": "334d6168431de1e09b9609c239a9e446e71bc27e8226194400b98af1475d2cb4"
+    },
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "before_sha256": "447017cf8b4d57c1871cf8e3ec73571f5a07a1c5d6138b1b4d80dc4d5f38a12b",
+      "after_sha256": "a524be768a9f5d5764f347045af3ce1e34006a61ddf3fe9fa8b3c8e7b66c12ff"
+    },
+    {
+      "path": "samples/gmail-reviewed-send.json",
+      "before_sha256": "bef4becb53ced5b34a1f14f249a1c604a109f5a390297730e768532e21d92203",
+      "after_sha256": "e0189a9608313f4030c292ece83d0133d085dcb28c7509094c49ca20238b2d11"
+    },
+    {
+      "path": "samples/jev-triage.json",
+      "before_sha256": "85c5d735a299a72b2d8ee13a86838b875ec33dab19a6a4cbd545afa0a028674c",
+      "after_sha256": "e01fd7bf47da78f944b88c0676058e42ba2910ae4bbd493fdbd27d3d5569a6e3"
+    },
+    {
+      "path": "scripts/tests/workflow-agent-picker-browser.mjs",
+      "before_sha256": "f502d88665c6d750b3d5697ef99c39c7d25d1cc4c542a908370bed72f245b8f2",
+      "after_sha256": "0cb08003bb7a15a8c3b225daed9254f3d0715dfe85769d68212eeb96611f6f4a"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/agent_picker.rs",
+      "before_sha256": "d497c1e9846b9ec56664e07ab03713a8e4e423a679fddb752428fc551dea768a",
+      "after_sha256": "4eb12c14dc3a9ced5018380c23ddc5da2315555c80de910b2102e36be412d7a5"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/channel_response.rs",
+      "before_sha256": "7f28eef5351598e1e5b50a5360471f436820d6aa72266f59a9881326210b99c2",
+      "after_sha256": "ee1f4c35b2400133a2390d8610750cd8ea8869aef173f1312153e3503a1fedd3"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/editor.rs",
+      "before_sha256": "1da6473762271abe2bbf1a4f16c007efeaadff0c2a49cba80ea2ccc7a26db17f",
+      "after_sha256": "3c728778de20d6008bda253845f6855a4c29bbc1b3aa0cf1eb184123dcc29b8a"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/mod.rs",
+      "before_sha256": "f221ba67728896fd992573a073b7298c326a961eb6e7171c85858bae7aee350e",
+      "after_sha256": "71d32d857f8cdfe09a94732f1b06670d3837146eab760bca902e43ee7ef82a34"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+      "before_sha256": null,
+      "after_sha256": "9df83b57259d2cf8eb07aeea477aac92a777964cc5bc92043029f1b92dd50a28"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "before_sha256": "e3b97daecd3c8d4eaebb3b090051818ae1173e35e4f800991cd54dcc2b2ce9ac",
+      "after_sha256": "356f632ccfda93d823c46c200065841d18e98998e7a75e22a15ce1554ec9d43d"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_decision/tests.rs",
+      "before_sha256": "13848167c5e50b099342e98df523adf289e19fe684c7853977c30a27dacc1789",
+      "after_sha256": "8a707ef2d24f43bc0fba8470f27bb86f26bb637e0ae023ccb0a95d9a9d77cca3"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/decision_tests.rs",
+      "before_sha256": "15fba78ab8e2c11e2bbae700e0d2d214ee6a6ee9d3ff4a688894a82abb47dff8",
+      "after_sha256": "5d5258e83bdde5e39a84f4da2563b510c2d68c1a4c812fdf32e04fef2bbde3b4"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/decisions.rs",
+      "before_sha256": "e03d9d618d44c6ed9ee094ac89aa4adc150c8d1c465c96a0e6fd24a2c5a7fc2f",
+      "after_sha256": "5c2c54616c941df559c23b46d03a407c5151c54b516b32b0e17b4f21f1d202c1"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker.rs",
+      "before_sha256": "13821ebaca086afc05cd53d1a8b9c59667d38745abe3e63ede071e396e20ce92",
+      "after_sha256": "790597b3c490d77d75840e136e0fbb3f19f249f2e2616b2a2b698c89e764be8f"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs",
+      "before_sha256": "4b5c7fa6e4a5626ba036a605c66eefbc0ea0e3889621752255b869b16d24cd99",
+      "after_sha256": "e003b5e93f1a3e3279a743eb0ccc4996969b17b9a3fbf5a5cb27a72742381fbe"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+      "before_sha256": "8781eaa19a53d57ce9170e5872e313d31c078770c2827f9dda42f532d37c6b7f",
+      "after_sha256": "39fe0bb6e6639b7e39c6f5f00b9a1305b122e7aad9ba7a8ded247c8729b925a5"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs",
+      "before_sha256": "23462fa8d0e75886cf8f25dd44e7d5c6adced2c62b7d9000008504f2d2ddb278",
+      "after_sha256": "58a7016b675bade94bf61ad2dd9d88db9d13a94956065426ac8e0d25d39747c3"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/mod.rs",
+      "before_sha256": "012b4ba096bea695120317af282dd8e66313fa50a89ab995f00ab2d17bf76e50",
+      "after_sha256": "b93a16b2156aef7712a18df4e3390d7aabab3674eb26be3916fc2e85889b6fbc"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+      "before_sha256": null,
+      "after_sha256": "5165ca6ee94922ae686d3fa8a3b28130c735b3a83c3d1158ee5f0905368a4ae7"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "c6f2fdca668655db481cc741746faa5153c2c3b10e3ee6a1f9c9d0563cd2b128"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "before_sha256": "2ccc359a48c377f950d2e75649dc7f6a76a8b11aa7581a615673e7502e1028ce",
+      "after_sha256": "a6391ad4a4651ef28ea4b258ff06711d66f3b0a409918ea475e37d9dd3c263be"
+    },
+    {
+      "path": "src/adapters/persistence/attention.rs",
+      "before_sha256": "6fd9d022b203c3cf5c681762629f5ff4f15aaf38e7be8993ed643cc52ff3373f",
+      "after_sha256": "8898060bce80662992ff057ea01676a73caa89c58a8dbaa9c8246c6197a4769d"
+    },
+    {
+      "path": "src/adapters/persistence/company_invite.rs",
+      "before_sha256": "6903c8531aac1441bab95c2485e0f3e271cc611d95254a7dd0c951d4d7bedf46",
+      "after_sha256": "0e77ffaa4eb9a7d70d9cf2510c6c7edfa7911e11bdea9a022933c3cab121fde4"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/cancellation.rs",
+      "before_sha256": "d50df51404780961908ea0fbc98c12f45058e9419734c7c316018e3f3f948f15",
+      "after_sha256": "a8d4cb0142c74e9eee87344ce500b9d4bd3a43f8ecd6f023879fc07e2e327b73"
+    },
+    {
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "before_sha256": "3c9d3bb4fcd67d316f2f425ccded876d3ed48d866a40be074ea0ffbcf7d1c567",
+      "after_sha256": "235e2724971cb19acf62606d736d309db3dc19b92d118af74e3a5008b4d983cc"
+    },
+    {
+      "path": "src/adapters/persistence/user_lifecycle.rs",
+      "before_sha256": "37e2871e8a612838be6cfc8093be5e6eb2cbf51e0703cc3698d6d921faa23008",
+      "after_sha256": "ef0bdb71cf5a98228c9ec1c71ac3e37340bac1e576493972abf1523236e65fef"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_approval_http_tests.rs",
+      "before_sha256": "67b396dab3e2ef58cc7fe93a971e9daca27d17ebe635ef2d21f9018870a83f82",
+      "after_sha256": "3b18de9d35d9d54b76a0528e3161f65af97228d9eb9389850a0dd51ae66e46cf"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_approval_mcp_tests.rs",
+      "before_sha256": "38a4f6dfb8ecf1ec2221bbda68fe40db39ca5d39867adc6c11038e37623dbb85",
+      "after_sha256": "e9050c633b9b5c733537d7bab91491bb921bacf44cea73194bf6954ed2110fcc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_approval_message_tests.rs",
+      "before_sha256": "36f0c3594c49457cf02de6b36bdb9920eba30265512fb785a9bc26bad2f27f53",
+      "after_sha256": "8523eebfcacb6ef233eb21409371b9ee03b5bcb7975aed47a1195e901e5d6aaf"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "before_sha256": "cf33f440fe11fb4c1d0a454fda5558ab997a6d6a54f915bbd386fb42db5f22c8",
+      "after_sha256": "2896341db22088cdcc11954488835a9ea32898e3bdc1ca64ad01a57ad9fa28fc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission.rs",
+      "before_sha256": "1f1daedf9f86176e02e5cd5cfd65a282632c076185e89e191eb77fb63e3f3040",
+      "after_sha256": "c4df5b7310214005e806064c79728dc94ebbbaa5b173a4cf7773708048661a21"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_token_tests.rs",
+      "before_sha256": "27d98e0f7728b68c2f61c209f6bf7e401a02c09d66ac5f95dfbfc3786e3bed7b",
+      "after_sha256": "8a3e169f1052301d94cb9f7dd415b08fde98d09282337f6d88ef08e861fa5059"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_driver_tests.rs",
+      "before_sha256": "90837f29f8fcf1f45c44b1780d58330d1382fc3dd771ef304366b13867eaac86",
+      "after_sha256": "d55ed5fbd32b1194c59521ec4eeaf665760f3d4c642f34c2fd76ffa0d61f89f1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_continuation_tests.rs",
+      "before_sha256": "f85408ae61023a3d191274935ec1520ffe449f9f1d20fcba3c9aa34cb8c07d07",
+      "after_sha256": "1ed1c8ac009232a3b07b70ae568a4a4e4af6e62892b899fb22bf51b5cf859377"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_human_cc_e2e_tests.rs",
+      "before_sha256": "7be68e62898b37829db479469c677f3678e183b7fae4583259eef2a0398bf597",
+      "after_sha256": "f08fb34523ccfc677e44236d7f3b0b1094d2328eca42229388ccc9ce7811d840"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+      "before_sha256": "8fdea948a51fee0587fb45b3b32ee7c70c5d9d16c930275cddda00e9b002b1d6",
+      "after_sha256": "0313d463453a351489629aa356cb8d4c69a3b4feedd7ff8542067b22e435cec5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "before_sha256": "e5ca6129e03c8a81337b66aa8007319484174cf95c8d60cff1208512e0141de7",
+      "after_sha256": "b4f41d02bd50d6235bdbe8aa6e78e6da610ca6e1e57dba8896d8705bffc1d725"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+      "before_sha256": "693f3e3e19f671d8d96d85afeb2dd6965a64ce5ed965353445a050a6d5796f57",
+      "after_sha256": "2ed718dd03012f37afa3f085bf2c57c97605cc6d2b5e5791fd132a18e74b180f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_recovery_tests.rs",
+      "before_sha256": "bb2e7fa26995e2e37460e5a3949200d2d1ffdec7d8528843640b12d3aaf0cd01",
+      "after_sha256": "2af00c174658b0b01b72bf690ce5b44829a89307193dabca51d80edecee9163e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "before_sha256": "c3308b3a9ed1abcf57045b75717d9eb2c32c43a7757f5932c13656cc43ad1c2b",
+      "after_sha256": "6f164a96c0445264640daa9d01682083119572168ec25c2296c879843740d735"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/approval_accounts.rs",
+      "before_sha256": null,
+      "after_sha256": "468d174c7efe77dafe05788fe9229f61d725d9085d77045f9ddfa0748bccfc33"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/authoring_reads.rs",
+      "before_sha256": "23c20e89d6ec1781b600c061106283d2827f66a7f53e3501aec5a62f6a632410",
+      "after_sha256": "e2bf5ffc0afc18852e0464fab6bb07ad3b64d052cf88bbf54056c9e136cf4d7e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/budget_schema_tests.rs",
+      "before_sha256": "509719d0f52d4c2dce3cfda974cc519a2855b349af7a27777c17390a1ee7caab",
+      "after_sha256": "3d32cad585e1202933cbe746310b2ab4e6356719e57e55d109496584ca53e40a"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_approval_tests.rs",
+      "before_sha256": "65037b70f06cead65cf0d64ca0b22055fb8c8e72e8d9ed5d91f17c34f866bcf2",
+      "after_sha256": "05a16d15677879349cd0aabe09b72370706a121d36393f318e9ebdb9b361c6a9"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_final_tests.rs",
+      "before_sha256": "b7be3cd7474a568247167c469a2c957ca768e29168e508db067dad240eed546a",
+      "after_sha256": "888c70bd34c13740444122b7babc97309edcaa20c1b4b92e8666b635ffb6947c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply.rs",
+      "before_sha256": "d1d8d4e5cf56c74f4be941b99773710d1f4c9a1cc5e0503f20e033acd3a8d1c6",
+      "after_sha256": "4a9322799913152cdcb48ff30acb8d2715500ab787d734e351c33b0f8260be92"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_approvals.rs",
+      "before_sha256": "5449d13eecc5141d1178d5b629c3932c0831c83f8784d5eedf0debb6566c6b3a",
+      "after_sha256": "e89727d49e50058e710a42ecca9856385271ba9f0a14d641f3888f7b87508cae"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_owner_tests.rs",
+      "before_sha256": "61818b9fef95faa5de854cbf45e8afc9b88c3eb9bd8b18383132735b286cbaeb",
+      "after_sha256": "a2f5829ae2c21baad3b0ccb323dc5a54df37e8031c50e30ebae02b7ce9583935"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_policy_runtime_tests.rs",
+      "before_sha256": "f1d2b96860d6889a61186a47a92dac2eeb12849690f5f36734c712172ee3be92",
+      "after_sha256": "d6ae71a44209195ffadf5154af8d44d432c746f52963e37cc94851df49736ceb"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_slot_tests.rs",
+      "before_sha256": "6cf3c47d2f4b7e278675197c815858ddd3126bd54076627c9fa7c09a84f87bc5",
+      "after_sha256": "3753e5dc8f5c3b1b52d4a36aaaf26e6cd73c20af7aaa136a8f9ed7b748b23560"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_tests.rs",
+      "before_sha256": "589931dd16f4a3933d8cce5864aff1ce11129043d0cd84a2ecaad6950e98ffaa",
+      "after_sha256": "90ca4e77ebb7ed761e382847128c284079dd357d3a40e9e71fafa43e6b0cacbe"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_continuation_views_test_support.rs",
+      "before_sha256": "c7681f4cad6a6e4a9a2378ab76ad4163868613274ca1e4002340fee6bd5e1250",
+      "after_sha256": "b0b7f18e1a7361e7b3fa3c08b88865b0a5a731402d3e8fbc1e164f5887e75948"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs",
+      "before_sha256": "672c0105033f723d31cba8179bd68ebd5ceab1037b2f6bbc95af24084e7f16c5",
+      "after_sha256": "6ac0d796fcfbb6b26d56014388f90892fe847e1c2a4874bcca65191fb514eca0"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_policy_tests.rs",
+      "before_sha256": "e94d29368dc7f77f7e81508726a15f63b8bc03641c1d0696d9759893394c6f98",
+      "after_sha256": "86dfbe1e09139a7ffde9afd7c2b4d5a321f72650f568c86b879369e7e267b2b9"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs",
+      "before_sha256": "87e97e8a9dc87542f21f6cd0cb1cef8f3ff810e1cf890132a9ee72f2bd218038",
+      "after_sha256": "e7b561bd31cf2a0c72fb6ba48cb63e96a8e448550780d0c8f2d56c2761ec8bd4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs",
+      "before_sha256": "6cae1448363757e81b16230e6cefa3e44b8a2dbef7219b584a7a6aa3ef7490f8",
+      "after_sha256": "8a19fb2bb0a286318a687030c9552ebf31ad5fea5fd536d4c0c1855b99dd91b6"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_tests.rs",
+      "before_sha256": "dda5692d470ee31eb67c3e520cbdb8b02a2168221ec7bd190b9663621f49e9e4",
+      "after_sha256": "8377f31f7c094d20c8646b88db9013c6245f5f59b800026280b2969d2a06854f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish_authority.rs",
+      "before_sha256": "b64f18f791a206740d7ce59da4260083e581e2dfe1f787d949714e05e05667ed",
+      "after_sha256": "2e68b1f4d58865310715bcb54e84e51e1efa39717c3a3de1c16346e870b329f1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/child_decision_round_tests.rs",
+      "before_sha256": "bcc80bdf1f10576abecbc947282cb1aa5976085d7f1cf291ea63fc1b2d326aa0",
+      "after_sha256": "468d7b49e2907690a49c4a16a41b356a5136a2c06c96aa25a2b7c2cdd96b1b89"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "before_sha256": "cfd2e2c9080d2911d63a50385c7283b4630f713518dcb65d9f1599355f9199b7",
+      "after_sha256": "c125b07eeae7c642334e3233c1700867cad6977b1244fc4b5fe8064db6594b94"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_authority_tests.rs",
+      "before_sha256": "58dfd54ace7816de16fcf2982a56aacc806b73f62ee3f33ba2a507b6f15e8146",
+      "after_sha256": "224f6a347d4f3945d437e1b6c9b2505fc9eb3b71655356ddba3d921227bf3cb8"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_lifecycle_tests.rs",
+      "before_sha256": "d8cc464bd1f9b46f9282a007904193a4c47ffc6433a5947db41b95395dd8c30f",
+      "after_sha256": "396d2d7403d2f78097fc83ebbc6887f25feda989528854be3da75954576a004d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "before_sha256": "0255b8e5ef70d49a461c630641bd97938cb8fdf3591973cae7fdb3321ac0934c",
+      "after_sha256": "a3eab1e8745621aef83dc24c779a7c9673b073d5714c423bb9eb90a060f6b66c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_sql_tests.rs",
+      "before_sha256": "bda8324246504bdd239c5c01a1b9d844507d84256a43bd8dfa8758011cd2a1af",
+      "after_sha256": "4681b55894dfef42aefcdcafa8026268f7b0afc0b28e3e733e45628ae3ccdff5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_tests.rs",
+      "before_sha256": "8fc107cf916a00d6ed53ce0f001e68235e8c8ed3a1d10f5ec803f4112461cbc0",
+      "after_sha256": "4c551e3146bfdb5327fed376769613d4f95ed8b7bedaab748008e6959a6109a6"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_tokens.rs",
+      "before_sha256": "faf5492812036f0d727c8535aabf4379068fa5300efa6c2dcdd2e10d699da6ff",
+      "after_sha256": "4e485ec24315ee24ead28e8a8b71da98139650461026553adbfccf2c4ead60c4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "before_sha256": "18d1bfc9714d1b2518de0bec2fb12ff91c18e8ee7718203d05bd69ad3ad988bc",
+      "after_sha256": "1d3511c777e6649c8b91c892d7d631dafccce9eb9811b27b357fd4dee00fe10d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "before_sha256": "00645c2ea81ff98537277913cae615184e0b37ef27e49841d546675bca89e1ab",
+      "after_sha256": "5a7f1df8033fbfae48f8af4de73ec063b84488210cffba6cb9fae17ab2432bd5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_live_setup.rs",
+      "before_sha256": "300af38360c45e2c4c023ecf56a5fe35e36d5f4d0a8b93bf9abceca763b0be7f",
+      "after_sha256": "4e24b28437c987c80f6140b5abc3c4df63e12ece5aab397b32b383ae14bff97f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_result_tests.rs",
+      "before_sha256": "a31d90553475390af0c1d2d8efd2a816b409a2d57ed429e1f493276af4aaf958",
+      "after_sha256": "856e3e8bf94746359c72ac4e3cbfb592d6b37dce435c12d2e017fe51ec717752"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_sample_tests.rs",
+      "before_sha256": "1d3160c41bff65d8a985ea6252e89a76f7371144305b3f05ffe0bd0c53f0950e",
+      "after_sha256": "8845d2aeab9c3c6b8396d245c4f6f3392583c7c9f338912ec4b8817bb71b0e83"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/doop_document_tests.rs",
+      "before_sha256": "257673d4374b8ae3acd8e05216ea25081b642c1693e17c48fb55798354dcf6cd",
+      "after_sha256": "6ebab01003d84f41a79b6b0277c76ab92e448456d1bcdad704dc8464ea34bb62"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/harness_token_tests.rs",
+      "before_sha256": "1ceb3bdfaeedcdbb4115ce2718750d95a30db51503faaba2e44b9ecbe310f791",
+      "after_sha256": "3339798ff615d5cc1e760d31b8b3365c3a16b759d9859e94acb2e22fb3bb16db"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_end_to_end_tests.rs",
+      "before_sha256": "4f4223c2af775d4c345e3290fc6618ccfbadf22b145f5c6cbd3ff42c5119f49c",
+      "after_sha256": "40077292cd4a3df04c627fac2a29ae75538961a6a8c0fd165674b246dc5978e3"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_runtime_tests.rs",
+      "before_sha256": "45383be4c4eeb3c04bd948d4c5cc6d8ff7a14f611f5713d97218bfa4f3b8726a",
+      "after_sha256": "436318fb3b3793a5508ffba823494b42d958e31ac267030e9a7383ad5fff1329"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_search_support.rs",
+      "before_sha256": "830b7fc60bfa62059c98469b9594dc4dc7fb5997d43edad86ecbe9b9a39677d8",
+      "after_sha256": "5a537268b13d5c72b8dca94b67dad3062375e8e64bf54cf179a64a432e27bd7f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_behavior_tests.rs",
+      "before_sha256": "c9d5e2bf63a04d326d0e47b6fd54d7f793c20566f4fd64a73267c27eb79ed0ff",
+      "after_sha256": "f27deece18cde3a459bf0f3e96ce82d88675185b95c6366a1cdf1ebe9e4bbb63"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+      "before_sha256": "ddc9497e13942c14a2e7b32dba77bbe4b0488a7f046ee66b22afc3a609688632",
+      "after_sha256": "02763363ef45207fb0d7d5611e992aee72727ce119f7272196b36f9c8e37e8b9"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs",
+      "before_sha256": "bf1e994b169bde757957031e9028448dc3b4d8f167b26df751983a019b0d240f",
+      "after_sha256": "135afa0c256ffc36a74314b62cbebaab6b033f3aba6c31c340ecfd8d59b31a05"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_retention_tests.rs",
+      "before_sha256": "8247ee4a44df110050beae9f141c0c63706805b7a2c1d118289c876add6c19e3",
+      "after_sha256": "39c35683f254c715de4c2a09f9c50e514d9b42d646b8517a14803d43b4a3c623"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_tests.rs",
+      "before_sha256": "5e983f3508a970942550d59e67ff8c33e8f65d8d4fcf169f16bcd3ba1bcef731",
+      "after_sha256": "717f3b68648e9069c454ef6bb81efd9a8d18e5d666eea18d755bdef32e78222e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "before_sha256": "d926a0aeb41800db7c6ddd4106c95c99fa37c75688b82d5e0f984348b95cce42",
+      "after_sha256": "61afaa34b57f1b5e0688d0e41aa828c9a574c3132c9f467e0d3d94b1f440eb02"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_test_support.rs",
+      "before_sha256": "880c13b4db5eb349b02138e1e3b9d4527f61e0741496c5727a533f55a89d9e7f",
+      "after_sha256": "7433bf8567e39dbfb94e4592d22d4a4cd19528a438befb8c070d7f949b5c3224"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "before_sha256": "1f5dc0b1bea0aa129fa79987f7f2a640341071cbaa3dec225a521b7eec0ce7f3",
+      "after_sha256": "55f13eb4438ff4ae710a073f2b190550d09930c5b164f2feb3270b78d1bc79ee"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "before_sha256": "26231cab3a09c8b6dc31e6a4ce130f80a69e3a52b6ba2c25593b718379d80220",
+      "after_sha256": "36cf735ad7e0ba1efdbbaddb2df0b86eba6112cf9d7ea0ef9782ab3369ccc0ea"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "before_sha256": "536de0562bf569abfa6bb3727459e58b42367aa89efed177b1f79c4e4a5b4a4d",
+      "after_sha256": "8f85926133c1d0a5947e558010bd8a329324d2e482cee6d2de8e8d63c2a816c4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_native.rs",
+      "before_sha256": "9c8d5400f0b69f66a47dc7f7a082b8e379988b782180fd25333b5b66fb425a2d",
+      "after_sha256": "a7bcc35e0592e3527a74d5cb1278fc83f49985d733d512294d6fd43c69b6725d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewed_delivery_tests.rs",
+      "before_sha256": "70c193341aec8f44a736437a60ae8882fafc0111dccad6284a78a0bda00e4497",
+      "after_sha256": "3f264bb47e20620b5fb75681e3fc1accbb012409b7de72e56ee586a997fcd461"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "0f43acf731ca163449dde9d5e25b72b6a32c11413a695a80a8a08aa38b0e1c67"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "4adb946291958a04db4e819027c44d9f2133355cda612eaa3ab6b62d68cad00e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "e00245a5ed6a023373212fe97de9127e705cf76f12460b52bb472ec9805e94eb"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewer_resolution.rs",
+      "before_sha256": null,
+      "after_sha256": "a45342b5766ca93b6b8dd737e957ded417651e37ab4447f487a3fbaac2078946"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_binding.rs",
+      "before_sha256": "db5aa618de760b4536d6c8743415406b538a008d2d97d8601b633d2688463647",
+      "after_sha256": "19f93e201f1b047feee579cbf69aa707152e77fd684e5838c4f9ebbe1b453c32"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "8fe53a4848e4d151a8cb8806ac4db4d9c215f1b293892c07e64b54f14269cba5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "ad7d15414462be445d7174397cc64025f5befbeb826657e79ac2875d77e37c0f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "before_sha256": "724a92d87ed9972d99386f6331d7745f83b6add9a122125ca1e33e45415269b8",
+      "after_sha256": "329f32a5fde310e5c56e5be0ccc2bfa8ecdda0ffd399e4ad39d31bd8b40d87ed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/run_views.rs",
+      "before_sha256": "74a1a7688c10843446a39fb51dd89aaba7521f979df180f67ccdcc391f09aa86",
+      "after_sha256": "3fb46e08885a19f15767fc3987ca59fd6cda65ee0a73309cb727808f5dfd4068"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/tests.rs",
+      "before_sha256": "38774201ee5104509896415eeea2b5a5c595832604b5c037faede67b4ca2d2aa",
+      "after_sha256": "9f1e987e4a446b29de1ee8c1a387ce3672d8e0d7eaed7e3bef73fb6a2fa74aed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/token_budget.rs",
+      "before_sha256": "a58c6a2d03ab1c04e0260a7a96ce78ec65be8bb28ae8367520dbc8b427e7e2d5",
+      "after_sha256": "a30c5eebb2dc9ef29114fd89b0d3d9477626df5ab8a3da27891abbf472f87040"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_current_authority_tests.rs",
+      "before_sha256": "6f12ed7e84fdcea2df5fed383102413204b07e7057b5e06c8da18953ff3185f5",
+      "after_sha256": "baf8782b55607d5ffe3fa9e32d7a9fa3cc94bd47003dd5033d45d3cad8fd5b15"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_reference_tests.rs",
+      "before_sha256": "214e97e09f1c2d7811965a144ef2edb9e334c1da7daadd82d126b8987f266a92",
+      "after_sha256": "331c7bfd9cbd2747c30a5b9d9ee7f1b48431cfddedacb7df3151890dbeda754e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "before_sha256": "927db6dda65055e5523ccd1c93beb2eeef8dae8daf308929734b9326fc14fd15",
+      "after_sha256": "40a8bd2bfb70f27b17eecd33ddb82819953aeec26da45bb5509e65c4a21b68c3"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "before_sha256": "9735348c3b3f9fdfbae69e0669fcd284691bd46a369dd59d2b7155d6d65b9b1e",
+      "after_sha256": "de13f6ff4de1162abda78423ad8a852d8caa4b75eb0a93a003a19650655c0f9c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_tests.rs",
+      "before_sha256": "bc1a8534bf60fc03988ed6921419e04401c3ed6eac3b776920bc526cfa83dc52",
+      "after_sha256": "63ef6f35ec03b85fe9d215efef8f993263a12f8dbcacfbb53afba1ea29abba44"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/approval.rs",
+      "before_sha256": "715b72daf92a402e7791a8784087ae0d54eb28047df288785ca0d0afa9dd6586",
+      "after_sha256": "7c3ff2c28c7a77664afa546549ffc163eb2b46aeae0a5b4ca2a44fb33f4fc19b"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/approval_tests.rs",
+      "before_sha256": "e48a0ab1e7f4255e16657e629159c95cfb99c966a5e4fc607f4bdbd3047ea2cf",
+      "after_sha256": "be9ba87ee95550cd9411a7e46976e764ba41663635568e8fbb08cea15d6a8196"
+    },
+    {
+      "path": "src/application/workflow/compiler/agent_selection.rs",
+      "before_sha256": "f274ead67bd0cd26dc49f95955239b6c4031f0443aafed272e9b67666c84a1bd",
+      "after_sha256": "65d496c833b736494e7d634aba8d07146fced3792ca418987fc31c1a5c55f5a0"
+    },
+    {
+      "path": "src/application/workflow/compiler/budget_tests.rs",
+      "before_sha256": "09d3b13f349462468c763fb9d4497aef158b0173db6527d444cbe700f6a55dd7",
+      "after_sha256": "93e8b7b15e541ab7e7291c65e6a641e7e05680d4f9cd00ff1ffdf5787e3ec7c3"
+    },
+    {
+      "path": "src/application/workflow/compiler/compile.rs",
+      "before_sha256": "f11f6bb28a1a82f421e8fddcd02d5000cd97b405dec365d198564b0e051a29c0",
+      "after_sha256": "50bc75566ea748a8e3fc0233fcdd2eaea5973ea6cf5e2cfdc846b0b8830860a2"
+    },
+    {
+      "path": "src/application/workflow/compiler/mod.rs",
+      "before_sha256": "005157f2102334fe3e6d9e8c5de314566a258402d7a137b37dd9b1a2a4dcc138",
+      "after_sha256": "243103344cd6d85661452e986556482289611f6f7fc7373d0ae6ff6922fa1f56"
+    },
+    {
+      "path": "src/application/workflow/compiler/role_selection.rs",
+      "before_sha256": null,
+      "after_sha256": "51b8b4360930a2d4aaa848c902a18629e44c3dabc5d00eda98a8a020506d120f"
+    },
+    {
+      "path": "src/application/workflow/compiler/role_selection_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "a5508db188516cd9ced4da1772b280189dadb81e56a7e11439b79cab193896af"
+    },
+    {
+      "path": "src/application/workflow/compiler/roles.rs",
+      "before_sha256": "d5a64c47736e1c9ca95cc091a4650d0d170cbb00dfa4b204a81f9e75d52ba4d5",
+      "after_sha256": "f8cfed02976792634ccdf325723c4f02b15c8a07949caf9d407edc3257fc178c"
+    },
+    {
+      "path": "src/application/workflow/compiler/selection_span.rs",
+      "before_sha256": null,
+      "after_sha256": "8fd9bb5956cf022e03285f5cc96b06c3645b817b89894c6afcc5e53ecdc1ebdd"
+    },
+    {
+      "path": "src/application/workflow/compiler/wire.rs",
+      "before_sha256": "89662383d065457fc672f518b281ce060c4c1c1ee28a57ee02c1f61051b3d18a",
+      "after_sha256": "4482d301edaa17035f191135191059762a6ef52aa0855a916c48201ff05daf1b"
+    },
+    {
+      "path": "src/application/workflow/decisions.rs",
+      "before_sha256": "c6d163b33ba309f38f64e6a24048fb6fb37aff70e3c4b9409e3fb47e1b6ba34a",
+      "after_sha256": "0919cb3a22d50b3ca9233ab2134668574653d607c7bec22503d571f277cb7809"
+    },
+    {
+      "path": "src/application/workflow/fixtures/human-revision-round.yaml",
+      "before_sha256": "c7bdbd0a4ce6547f468ef114aa7bc9ec47dbb5f70369e4b1643c83b9599ff573",
+      "after_sha256": "60168adc6c6da3962d378ce8091cae2b386cdcd8569345fd59f26d9f2bfee999"
+    },
+    {
+      "path": "src/application/workflow/fixtures/repeated-human-revision.yaml",
+      "before_sha256": "5bb8209a60452182220cfaaf9add9ed7148386bb765bf6729b07bb5c9a8e88e0",
+      "after_sha256": "659e01a63cb35a6988911f31696f6d31741f284886fd7269ab9eb4787b7d9c01"
+    },
+    {
+      "path": "src/application/workflow/fixtures/review-feedback-successor.yaml",
+      "before_sha256": "569f41937cc7eaa7736272fd4939643ccb79f8f033cb6fb5f07da19cd29c76e7",
+      "after_sha256": "bc4d80a4b820ec15d24946e2e6b7991d4c74d1bcbb01e3bf3f36da6c45dbc0a1"
+    },
+    {
+      "path": "src/application/workflow/fixtures/reviewed-support.yaml",
+      "before_sha256": "d0b87d05bd97ab7fcdd691c801e6e49bd079bd08e9c7690c3078cf0bbb631463",
+      "after_sha256": "2bbd8b20b7ca51512fa18e25306b5fdd19fedd7531e8710f9d5b7a2ade861060"
+    },
+    {
+      "path": "src/application/workflow/fixtures/tests.rs",
+      "before_sha256": "d75f29062911d21a029ece6944de29495a3dd50aba7cc9d3a358a29672d1e944",
+      "after_sha256": "b01a9bbb7533f813acbfd8cf23cba8ffae491e552563d23c7b2dc7e0360800c2"
+    },
+    {
+      "path": "src/application/workflow/mod.rs",
+      "before_sha256": "b0eeb66c6ee9a58d582ec7872654ac8c5a5a6ef895fb1f7f57d08bcbbc9fa8a8",
+      "after_sha256": "5acd282da505147105132e48e45e53d4e6848542b9de63768ec651e5ff2282f8"
+    },
+    {
+      "path": "src/application/workflow/publication/mod.rs",
+      "before_sha256": "30838bbd13296a5847baaa744e406bb0cf674eefbe5f44d95a4b62e2bb853901",
+      "after_sha256": "baf44e6b5296d1fa928f00caefa11f9ee5b7fe8a74c3914576597841b8ca30bd"
+    },
+    {
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "before_sha256": "9afb3515306c4d42f394854433e79b26d3b05f2afa1d658ced66d82eebd79618",
+      "after_sha256": "924639ddd586fc74ca40d6a551999f2505c5e5c926713793057d77e0266aa018"
+    },
+    {
+      "path": "src/application/workflow/publication/types.rs",
+      "before_sha256": "4bb6d21239405d510aadec2e09b2db0a940ad49b4d7acd974ae5b35849cdd6e2",
+      "after_sha256": "0300a434d393e1710a1fe03a3fbb167b07bf8bc2f159c484c4a3c7e8ccb2d365"
+    },
+    {
+      "path": "src/application/workflow/reads.rs",
+      "before_sha256": "55ff032089289dedca9098f551453dd70a8e63a6b921947ab3abec6cd0d6238c",
+      "after_sha256": "197e5db3f886dd698b1ca6916e062a82c50025ec597eb918b8dcc8ea425164e9"
+    },
+    {
+      "path": "src/application/workflow/registry/channel_reply_terminal_contract_tests.rs",
+      "before_sha256": "45300f210fbed6a48e19b2509f07df03fa6e88b54049276209f5b3e79ee39f37",
+      "after_sha256": "516e27d895569e865e617196cecc04442eab5edb517ebcd5fa76482943428b70"
+    },
+    {
+      "path": "src/application/workflow/registry/contract_tests.rs",
+      "before_sha256": "c8df4b0a83da51167c81690b2dd655b895e3d9b0416e6ea724e81ee22877f2a8",
+      "after_sha256": "a6373545353568b94c92a56e1e5cdcfefa35a93b1499cd342861c40d790227bc"
+    },
+    {
+      "path": "src/application/workflow/registry/decision_tests.rs",
+      "before_sha256": "e8a0053831b7bfe3f7cc5d991a5f77de71c30e02e3209d0121d404e87caa0373",
+      "after_sha256": "26489ce583e58ad94f849598f374bde2491c45a98961b8751843f47a3be0a147"
+    },
+    {
+      "path": "src/application/workflow/registry/examples.rs",
+      "before_sha256": "662c55eb9eae69b3e0c57bb3eebc7d9305b8703a4ffddb2dcd369f2d35d0b3a3",
+      "after_sha256": "63e80f8b4c8abf09db26ea3664ccd61d42b8d43c0b1addf6f52007146868194c"
+    },
+    {
+      "path": "src/application/workflow/registry/mod.rs",
+      "before_sha256": "08996d487f8efa02609119fe3690d1f9f33573dbc50742861f37c7eed6d07842",
+      "after_sha256": "a6e665942baae7d062aba13388b1ce49ad9d470859a3a33ef54e6bc3af617a1b"
+    },
+    {
+      "path": "src/application/workflow/registry/schemas.rs",
+      "before_sha256": "f5fba99ebdc0eeb5393f461ec06def76b04232d12fc789a6b0ff024947271078",
+      "after_sha256": "ebda78fa5ed958936100fa39fbde693715c67d35075e86165e2b1a0261a2e0ff"
+    },
+    {
+      "path": "src/application/workflow/registry/tests.rs",
+      "before_sha256": "b34fdfebd3dfd154b95ce173d2d913d18b064a1f97649e726928331d649bf0a4",
+      "after_sha256": "ccd1124a8d05d25d6de10715181826c72033490cd18fc72c90efe2527427d03d"
+    },
+    {
+      "path": "src/application/workflow/reviewers.rs",
+      "before_sha256": null,
+      "after_sha256": "3e85ac83142787866f47c3c8ab0084d257e008fd5ab2d1d2a7d29a45c0088ca7"
+    },
+    {
+      "path": "src/application/workflow/sample/channel_reply_preview_tests.rs",
+      "before_sha256": "a6fd0ee71f486c45dabbe6c784d90fc8625703a8c2482d7e776b8cbecaf3d998",
+      "after_sha256": "ce7921ab12de7068730a7c26ca8d462b5f96be9c19f1136cd494894763c7016a"
+    },
+    {
+      "path": "src/application/workflow/sample/dispatch.rs",
+      "before_sha256": "8b76dbfd7eba1f6d586ca8c6c0eaf9e518380938f7abb27d56ae7023b23c1b0a",
+      "after_sha256": "a4d07385fb64552a9187efa53ea297a5ec64dd54496770b71d002c03745ccdae"
+    },
+    {
+      "path": "src/application/workflow/sample/tests.rs",
+      "before_sha256": "0ebf1deaf92c4353f350b68c760903f00f7a26f822cfd3191f5f38706af6639f",
+      "after_sha256": "510f3e62c564d0f628b9cacdd72140df71e7270bd9fce2d50009e9d7858fb27b"
+    },
+    {
+      "path": "src/application/workflow/sample/tools_tests.rs",
+      "before_sha256": "fd3f12e81884e443b4dfd1fa176d2159ff32bb62c490f58b5066935765bae8e3",
+      "after_sha256": "5d53b9c496b9cd8284c6a647c85d52f457f504ae5f218c4531f6e34bc5e8c1f9"
+    },
+    {
+      "path": "src/application/workflow/templates/agent_workflow.rs",
+      "before_sha256": "95c8e343edaf10c3a8b5ee236a1ca4aa713af09ede393e63dd9be0c7e00c8c14",
+      "after_sha256": "4ee6b0698880a280b32cdbf1ac7cf64af10626b8c64ba0df0e6e556d005cbe45"
+    },
+    {
+      "path": "src/domain/entities/department.rs",
+      "before_sha256": "e4a53db3556ef1cdfea59b8a07016d1a9713fae6fbb2e178885b497a09add5b7",
+      "after_sha256": "bd17c4224a6056b05586b3fe7906a71a1a13da35e4184bb06afd7cf66cf01a0d"
+    },
+    {
+      "path": "src/domain/workflow/budget.rs",
+      "before_sha256": "351c746d1cb5c68e0d92e11bd321a73348a5c3d692f72ec24005325fb0ad3192",
+      "after_sha256": "6f699eb0597d18d6485e7a29bd09cb2d48b5e6835d50025bd1f08860b8cc2b92"
+    }
+  ]
+}

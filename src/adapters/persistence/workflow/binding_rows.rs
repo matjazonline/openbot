@@ -17,6 +17,7 @@ struct BindingRow {
     resources: Value,
     run_as_user_id: Uuid,
     message_trigger: Option<String>,
+    escalation: Option<Value>,
 }
 
 /// The stored message trigger column, refused rather than guessed when unreadable.
@@ -44,7 +45,7 @@ pub(super) async fn read_binding_at(
         "SELECT binding.company_id, binding.id, binding.state_revision, \
          configuration.revision AS configuration_revision, binding.active, binding.channel_id, binding.thread_id, \
          configuration.version_id, configuration.params, configuration.resources, \
-         configuration.run_as_user_id, configuration.message_trigger \
+         configuration.run_as_user_id, configuration.message_trigger, configuration.escalation \
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
            ON configuration.company_id = binding.company_id AND configuration.binding_id = binding.id \
            AND configuration.revision = COALESCE($3,binding.configuration_revision) \
@@ -57,6 +58,11 @@ pub(super) async fn read_binding_at(
     let association = association_from_columns(row.channel_id, row.thread_id)?;
     let configuration = ConfiguredBinding::new(
         BindingConfiguration {
+            escalation: row
+                .escalation
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|_| invalid())?,
             company_id: CompanyId::new(row.company_id),
             id: WorkflowBindingId::new(row.id),
             revision: BindingRevision::new(

@@ -1,0 +1,8 @@
+{
+  "plan/02-workflow-roles/02-admission-resolution-and-snapshots.md": "14f86f15303a4707ec29557e1cb8e0d0be44ff041e1535346d514b1bd0892aba",
+  "src/application/use_cases/thread/ingest/relay.rs": "103403df4b13c5dc4368ceae1a8039dcd0ad26f76438c17b0a51f99348824200",
+  "src/adapters/protocols/email/egress.rs": "40ba58253a5168ed66cebc691e310bd3093e083fa73da214d92452aacd564fed",
+  "src/application/workflow/message_admission.rs": "7ee39f6ef95ac2a4ec582b7e79f71a535e38b15041584362ed33e11148085f37",
+  "src/application/workflow/schedule_admission.rs": "495668195449ff5c6ec8f5a7114181ca0c0b2272b36e59b93cc64464ddeb90dc",
+  "docs/inter_channel_agent_communication.md": "6beb51d042e40063fb1c1fa1399d0dff5f07d1787007b5290308aa72d85e1559"
+}

@@ -56,12 +56,12 @@ impl Setup {
         Self::with_inputs(|_, _| {})
     }
     fn with_inputs(
-        customize: impl FnOnce(&mut Value, Uuid),
+        customize: impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId),
     ) -> impl std::future::Future<Output = Self> {
         Self::configured(customize, TestAssociation::Company)
     }
     async fn configured(
-        customize: impl FnOnce(&mut Value, Uuid),
+        customize: impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId),
         association: TestAssociation,
     ) -> Self {
         let local = MachineFixture::new()
@@ -108,7 +108,12 @@ impl Setup {
         };
         let mut inputs =
             json!({"profile_id":{"literal":profile.id},"prompt":{"literal":"bounded native task"}});
-        customize(&mut inputs, fixture.target.actor.user_id());
+        customize(
+            &mut inputs,
+            crate::domain::entities::transport::PrincipalId::new(
+                fixture.principal(fixture.target.actor.user_id()).await,
+            ),
+        );
         let version = publish_local(&fixture, inputs).await;
         let binding = bound(&fixture, version).await;
         let scope = admitted_as(&fixture, binding, association, "local-step").await;

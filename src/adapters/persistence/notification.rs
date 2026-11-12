@@ -81,39 +81,12 @@ impl NotificationEventDb {
     }
 }
 
-#[derive(Debug)]
-struct SourceSnapshot {
-    channel_id: Uuid,
-    thread_id: Option<Uuid>,
-    run_id: Option<Uuid>,
-    correlation_id: Option<Uuid>,
-    responsible_principal_id: Option<Uuid>,
-    lifecycle: SourceLifecycle,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SourceLifecycle {
-    Active,
-    Resolved,
-    Withdrawn,
-}
-
-#[derive(Debug, sqlx::FromRow)]
-struct DeliverySourceRow {
-    channel_id: Uuid,
-    thread_id: Uuid,
-    run_id: Uuid,
-    correlation_id: Uuid,
-    status: String,
-    actor_principal_id: Option<Uuid>,
-}
-
 #[derive(Debug, sqlx::FromRow)]
 struct NotificationRow {
     id: Uuid,
     company_id: Uuid,
     company_label: String,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
     channel_label: String,
     source_kind: String,
     source_id: Uuid,
@@ -216,38 +189,47 @@ impl NotificationPersistence for PostgresPersistence {
         NotificationProjectionResult,
     )> {
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
-        let Some(event) = locked_event(&mut tx, commit.fence).await? else {
-            return Ok((
-                NotificationProjectionCommitOutcome::LeaseLost,
-                NotificationProjectionResult::default(),
-            ));
+        let current = match control::owned_projection_on(&mut tx, &commit).await? {
+            control::OwnedProjection::Current(current) => current,
+            control::OwnedProjection::LeaseLost => {
+                return Ok((
+                    NotificationProjectionCommitOutcome::LeaseLost,
+                    NotificationProjectionResult::default(),
+                ));
+            }
+            control::OwnedProjection::Stale => {
+                release_stale_projection(&mut tx, commit.fence).await?;
+                tx.commit().await?;
+                return Ok((
+                    NotificationProjectionCommitOutcome::Stale,
+                    NotificationProjectionResult::default(),
+                ));
+            }
         };
-        let current = resolve_projection_on(&mut tx, &event).await?;
-        if current != *commit.expected {
-            release_stale_projection(&mut tx, commit.fence).await?;
-            tx.commit().await.map_err(AppError::from)?;
-            return Ok((
-                NotificationProjectionCommitOutcome::Stale,
-                NotificationProjectionResult::default(),
-            ));
-        }
-
-        let result = apply_projection_on(&mut tx, &current, commit.email).await?;
-        let completed = sqlx::query(
-            r#"UPDATE notification_events
-                  SET status = 'projected', projected_at = CURRENT_TIMESTAMP,
-                      execution_id = NULL, owner_worker_id = NULL,
-                      locked_at = NULL, lock_expires_at = NULL
-                WHERE id = $1 AND status = 'processing'
-                  AND execution_id = $2 AND owner_worker_id = $3"#,
-        )
-        .bind(commit.fence.row.as_uuid())
-        .bind(commit.fence.execution.as_uuid())
-        .bind(commit.fence.owner.as_uuid())
-        .execute(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-        if completed.rows_affected() != 1 {
+        let result = if current.disposition == NotificationDisposition::Control {
+            use super::workflow::escalations::{ControlProjection, control_on};
+            match control_on(&mut tx, &current.event, commit.escalation_ack_hours).await? {
+                ControlProjection::Complete => NotificationProjectionResult::default(),
+                ControlProjection::Deferred(deadline) => {
+                    if !control::defer_control_on(&mut tx, commit.fence, deadline).await? {
+                        return Ok((
+                            NotificationProjectionCommitOutcome::LeaseLost,
+                            NotificationProjectionResult::default(),
+                        ));
+                    }
+                    tx.commit().await?;
+                    return Ok((
+                        NotificationProjectionCommitOutcome::Deferred,
+                        NotificationProjectionResult::default(),
+                    ));
+                }
+            }
+        } else {
+            apply_projection_on(&mut tx, &current, commit.email).await?
+        };
+        reviewer_notice::record_receipt_on(&mut tx, &current).await?;
+        escalation_notice::record_receipt_on(&mut tx, &current).await?;
+        if !control::finish_event_on(&mut tx, commit.fence).await? {
             return Ok((
                 NotificationProjectionCommitOutcome::LeaseLost,
                 NotificationProjectionResult::default(),
@@ -331,7 +313,7 @@ impl NotificationPersistence for PostgresPersistence {
     ) -> AppResult<NotificationPage> {
         let rows = sqlx::query_as::<_, NotificationRow>(
             r#"SELECT notification.id, notification.company_id, company.name AS company_label,
-                      notification.channel_id, channel.name AS channel_label,
+                      notification.channel_id, COALESCE(channel.name,'Company workflow') AS channel_label,
                       notification.source_kind, notification.source_id,
                       notification.action_kind, notification.source_generation,
                       notification.state, notification.read_at, notification.created_at,
@@ -341,13 +323,13 @@ impl NotificationPersistence for PostgresPersistence {
                       ) OVER () AS unread_count
                  FROM notifications AS notification
                  JOIN companies AS company ON company.id = notification.company_id
-                 JOIN channels AS channel
+                 LEFT JOIN channels AS channel
                    ON channel.company_id = notification.company_id
                   AND channel.id = notification.channel_id
                 WHERE notification.company_id = $1
                   AND notification.recipient_user_id = $2
                   AND notification.recipient_principal_id = $3
-                  AND notification.channel_id = ANY($4)
+                  AND (notification.channel_id IS NULL OR notification.channel_id = ANY($4))
                   AND notification_principal_can_view(
                       notification.company_id, notification.channel_id,
                       notification.recipient_principal_id
@@ -414,7 +396,7 @@ impl NotificationPersistence for PostgresPersistence {
                 WHERE notification.id = $1 AND notification.company_id = $2
                   AND notification.recipient_user_id = $3
                   AND notification.recipient_principal_id = $4
-                  AND notification.channel_id = ANY($5)
+                  AND (notification.channel_id IS NULL OR notification.channel_id = ANY($5))
                   AND notification.state = 'active'"#
         ))
         .bind(notification_id.as_uuid())
@@ -455,7 +437,7 @@ impl NotificationPersistence for PostgresPersistence {
                 WHERE notification.id = $1 AND notification.company_id = $2
                   AND notification.recipient_user_id = $3
                   AND notification.recipient_principal_id = $4
-                  AND notification.channel_id = ANY($5)
+                  AND (notification.channel_id IS NULL OR notification.channel_id = ANY($5))
                   AND notification.state = 'active'"#
         ))
         .bind(notification_id.as_uuid())
@@ -468,12 +450,29 @@ impl NotificationPersistence for PostgresPersistence {
         .map_err(AppError::from)?
         .ok_or_else(|| AppError::NotFound("Notification not found.".into()))?;
         let event = event_row.event()?;
-        let projection = resolve_projection_on(&mut tx, &event).await?;
+        let projection_lock::LockedProjection::Current(projection) = projection_lock::lock_on(
+            &mut tx,
+            &event,
+            projection_lock::ProjectionPurpose::Open { user_id },
+        )
+        .await?
+        else {
+            return Err(AppError::Conflict(
+                "Notification authority changed; reopen it".into(),
+            ));
+        };
+        let found:Option<Uuid>=sqlx::query_scalar("SELECT id FROM notifications WHERE company_id=$1 AND id=$2 AND recipient_user_id=$3 AND recipient_principal_id=$4 AND state='active' FOR UPDATE")
+            .bind(company_id).bind(notification_id.as_uuid()).bind(user_id).bind(recipient_principal_id.as_uuid()).fetch_optional(&mut *tx).await?;
+        found.ok_or_else(|| AppError::NotFound("Notification not found.".into()))?;
+        let projection = *projection;
         let NotificationDisposition::Active(recipient) = projection.disposition else {
             let state = match projection.disposition {
                 NotificationDisposition::Resolved => "resolved",
                 NotificationDisposition::Withdrawn => "withdrawn",
                 NotificationDisposition::Active(_) => unreachable!(),
+                NotificationDisposition::Control => {
+                    return Err(AppError::NotFound("notification".into()));
+                }
             };
             sqlx::query(
                 r#"UPDATE notifications SET state = $2, state_changed_at = CURRENT_TIMESTAMP,
@@ -507,6 +506,17 @@ impl NotificationPersistence for PostgresPersistence {
     }
 }
 
+async fn read_claimed_event(
+    db: &mut PgConnection,
+    fence: &ExecutionLease<NotificationEventId>,
+) -> AppResult<Option<NotificationEvent>> {
+    let row=sqlx::query_as::<_,NotificationEventDb>(&format!(
+        "SELECT {EVENT_COLUMNS} FROM notification_events AS event WHERE event.id=$1 AND event.status='processing' \
+         AND event.execution_id=$2 AND event.owner_worker_id=$3 AND event.lock_expires_at>clock_timestamp()"))
+        .bind(fence.row.as_uuid()).bind(fence.execution.as_uuid()).bind(fence.owner.as_uuid()).fetch_optional(db).await?;
+    row.map(|row| row.event()).transpose()
+}
+
 async fn locked_event(
     tx: &mut Transaction<'_, Postgres>,
     fence: &ExecutionLease<NotificationEventId>,
@@ -515,7 +525,7 @@ async fn locked_event(
         r#"SELECT {EVENT_COLUMNS} FROM notification_events AS event
             WHERE event.id = $1 AND event.status = 'processing'
               AND event.execution_id = $2 AND event.owner_worker_id = $3
-              AND event.lock_expires_at > CURRENT_TIMESTAMP
+              AND event.lock_expires_at > clock_timestamp()
             FOR UPDATE"#
     ))
     .bind(fence.row.as_uuid())
@@ -569,285 +579,6 @@ async fn release_stale_projection(
     Ok(())
 }
 
-async fn resolve_projection_on(
-    connection: &mut PgConnection,
-    event: &NotificationEvent,
-) -> AppResult<NotificationProjection> {
-    let Some(source) = source_snapshot(connection, event).await? else {
-        return Ok(NotificationProjection {
-            event: event.clone(),
-            disposition: NotificationDisposition::Withdrawn,
-        });
-    };
-    let newer_exists: bool = sqlx::query_scalar(
-        r#"SELECT EXISTS (
-               SELECT 1 FROM notification_events AS newer
-                WHERE newer.company_id = $1 AND newer.source_kind = $2
-                  AND newer.source_id = $3 AND newer.action_kind = $4
-                  AND newer.source_generation > $5
-           )"#,
-    )
-    .bind(event.company_id)
-    .bind(event.source_kind.as_str())
-    .bind(event.source_id)
-    .bind(event.action_kind.as_str())
-    .bind(i64::try_from(event.source_generation).unwrap_or(i64::MAX))
-    .fetch_one(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
-    let disposition = if newer_exists {
-        NotificationDisposition::Withdrawn
-    } else {
-        match source.lifecycle {
-            SourceLifecycle::Resolved => NotificationDisposition::Resolved,
-            SourceLifecycle::Withdrawn => NotificationDisposition::Withdrawn,
-            SourceLifecycle::Active => match source.responsible_principal_id {
-                Some(principal_id) => recipient_for_source(connection, event, source, principal_id)
-                    .await?
-                    .map(NotificationDisposition::Active)
-                    .unwrap_or(NotificationDisposition::Withdrawn),
-                None => NotificationDisposition::Withdrawn,
-            },
-        }
-    };
-    Ok(NotificationProjection {
-        event: event.clone(),
-        disposition,
-    })
-}
-
-/// What a notification event is about (p08 D4.3). After B4 the only source is a workflow
-/// delivery: it resolves to its run through the destination, and its run actor is responsible
-/// while they are a person of the company. A delivery with no run (a person's mailbox send) is no
-/// source at all, so it notifies nobody.
-async fn source_snapshot(
-    connection: &mut PgConnection,
-    event: &NotificationEvent,
-) -> AppResult<Option<SourceSnapshot>> {
-    match (event.source_kind, event.action_kind) {
-        (NotificationSourceKind::Delivery, NotificationActionKind::DeliveryFailure) => {
-            let row = sqlx::query_as::<_, DeliverySourceRow>(
-                r#"SELECT delivery.channel_id, destination.thread_id, run.id AS run_id,
-                          delivery.correlation_id, delivery.status,
-                          actor.id AS actor_principal_id
-                     FROM message_deliveries AS delivery
-                     JOIN workflow_message_destinations AS destination
-                       ON destination.company_id = delivery.company_id
-                      AND destination.delivery_id = delivery.id
-                     JOIN workflow_runs AS run
-                       ON run.company_id = destination.company_id AND run.id = destination.run_id
-                     LEFT JOIN principals AS actor
-                       ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
-                      AND actor.kind = 'person'
-                    WHERE delivery.company_id = $1 AND delivery.id = $2
-                    FOR SHARE OF delivery"#,
-            )
-            .bind(event.company_id)
-            .bind(event.source_id)
-            .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: row.channel_id,
-                thread_id: Some(row.thread_id),
-                run_id: Some(row.run_id),
-                correlation_id: Some(row.correlation_id),
-                responsible_principal_id: row.actor_principal_id,
-                lifecycle: if matches!(row.status.as_str(), "dead_letter" | "outcome_unknown") {
-                    if row.actor_principal_id.is_some() {
-                        SourceLifecycle::Active
-                    } else {
-                        SourceLifecycle::Withdrawn
-                    }
-                } else {
-                    SourceLifecycle::Resolved
-                },
-            }))
-        }
-    }
-}
-
-async fn recipient_for_source(
-    connection: &mut PgConnection,
-    event: &NotificationEvent,
-    source: SourceSnapshot,
-    principal_id: Uuid,
-) -> AppResult<Option<NotificationRecipient>> {
-    #[derive(sqlx::FromRow)]
-    struct RecipientRow {
-        user_id: Uuid,
-        email: String,
-        company_label: String,
-        channel_label: String,
-        delivery_failure_email_enabled: bool,
-        decision_email_enabled: bool,
-    }
-    let row = sqlx::query_as::<_, RecipientRow>(
-        r#"SELECT principal.user_id, account.email,
-                  company.name AS company_label, channel.name AS channel_label,
-                  COALESCE(preference.delivery_failure_email_enabled, TRUE)
-                      AS delivery_failure_email_enabled,
-                  COALESCE(preference.decision_email_enabled, TRUE)
-                      AS decision_email_enabled
-             FROM principals AS principal
-             JOIN users AS account ON account.id = principal.user_id
-             JOIN company_members AS member
-               ON member.company_id = principal.company_id
-              AND member.user_id = principal.user_id
-             JOIN companies AS company ON company.id = principal.company_id
-             JOIN channels AS channel
-               ON channel.company_id = principal.company_id AND channel.id = $3
-             LEFT JOIN user_notification_preferences AS preference
-               ON preference.user_id = account.id
-            WHERE principal.company_id = $1 AND principal.id = $2
-              AND principal.kind = 'person'
-              AND notification_principal_can_view($1, $3, $2)
-            FOR SHARE OF principal, account, member, company, channel"#,
-    )
-    .bind(event.company_id)
-    .bind(principal_id)
-    .bind(source.channel_id)
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
-    Ok(row.map(|row| {
-        let preferences = NotificationPreferences {
-            delivery_failure_email_enabled: row.delivery_failure_email_enabled,
-            decision_email_enabled: row.decision_email_enabled,
-        };
-        NotificationRecipient {
-            principal_id: PrincipalId::new(principal_id),
-            user_id: row.user_id,
-            email: EmailAddress::from(row.email),
-            company_label: row.company_label,
-            channel_label: row.channel_label,
-            channel_id: source.channel_id,
-            thread_id: source.thread_id,
-            run_id: source.run_id,
-            correlation_id: source
-                .correlation_id
-                .map(Into::into)
-                .unwrap_or_else(|| event.id.as_uuid().into()),
-            email_enabled: event.action_kind.email_preference(preferences),
-        }
-    }))
-}
-
-async fn apply_projection_on(
-    tx: &mut Transaction<'_, Postgres>,
-    projection: &NotificationProjection,
-    email: Option<&NewStandaloneDelivery>,
-) -> AppResult<NotificationProjectionResult> {
-    let state = match projection.disposition {
-        NotificationDisposition::Active(_) => NotificationState::Withdrawn,
-        NotificationDisposition::Resolved => NotificationState::Resolved,
-        NotificationDisposition::Withdrawn => NotificationState::Withdrawn,
-    };
-    let active_identity = match &projection.disposition {
-        NotificationDisposition::Active(recipient) => Some(recipient.user_id),
-        NotificationDisposition::Resolved | NotificationDisposition::Withdrawn => None,
-    };
-    let settled: Vec<DateTime<Utc>> = sqlx::query_scalar(
-        r#"UPDATE notifications
-              SET state = $5, state_changed_at = CURRENT_TIMESTAMP,
-                  updated_at = CURRENT_TIMESTAMP
-            WHERE company_id = $1 AND source_kind = $2 AND source_id = $3
-              AND action_kind = $4 AND state = 'active'
-              AND ($6::uuid IS NULL OR recipient_user_id <> $6 OR source_generation <> $7)
-            RETURNING created_at"#,
-    )
-    .bind(projection.event.company_id)
-    .bind(projection.event.source_kind.as_str())
-    .bind(projection.event.source_id)
-    .bind(projection.event.action_kind.as_str())
-    .bind(state.as_str())
-    .bind(active_identity)
-    .bind(i64::try_from(projection.event.source_generation).unwrap_or(i64::MAX))
-    .fetch_all(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    let mut result = NotificationProjectionResult {
-        resolved: if state == NotificationState::Resolved {
-            settled.len() as u64
-        } else {
-            0
-        },
-        withdrawn: if state == NotificationState::Withdrawn {
-            settled.len() as u64
-        } else {
-            0
-        },
-        action_latency_seconds: settled
-            .into_iter()
-            .min()
-            .map(|created| (Utc::now() - created).num_milliseconds().max(0) as f64 / 1_000.0),
-        ..Default::default()
-    };
-
-    let NotificationDisposition::Active(recipient) = &projection.disposition else {
-        return Ok(result);
-    };
-    let inserted_id: Uuid = sqlx::query_scalar(
-        r#"INSERT INTO notifications (
-               id, company_id, recipient_user_id, recipient_principal_id, event_id,
-               source_kind, source_id, action_kind, source_generation, channel_id
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-           ON CONFLICT ON CONSTRAINT notifications_identity_key DO UPDATE
-             SET recipient_principal_id = EXCLUDED.recipient_principal_id,
-                 event_id = EXCLUDED.event_id, channel_id = EXCLUDED.channel_id,
-                 state = 'active', state_changed_at = CURRENT_TIMESTAMP,
-                 updated_at = CURRENT_TIMESTAMP
-           RETURNING id"#,
-    )
-    .bind(projection.event.notification_id.as_uuid())
-    .bind(projection.event.company_id)
-    .bind(recipient.user_id)
-    .bind(recipient.principal_id.as_uuid())
-    .bind(projection.event.id.as_uuid())
-    .bind(projection.event.source_kind.as_str())
-    .bind(projection.event.source_id)
-    .bind(projection.event.action_kind.as_str())
-    .bind(i64::try_from(projection.event.source_generation).unwrap_or(i64::MAX))
-    .bind(recipient.channel_id)
-    .fetch_one(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    result.created = 1;
-
-    if projection.should_email() {
-        let delivery = email.ok_or_else(|| {
-            AppError::Internal("Enabled notification email was not composed".into())
-        })?;
-        let creation =
-            super::delivery::enqueue::insert_standalone_delivery_on(tx, delivery).await?;
-        let delivery_id = match creation {
-            DeliveryCreation::Created(id) | DeliveryCreation::Absorbed(id) => id,
-        };
-        sqlx::query(
-            r#"UPDATE notifications SET email_delivery_id = $2, updated_at = CURRENT_TIMESTAMP
-                WHERE id = $1 AND email_delivery_id IS NULL"#,
-        )
-        .bind(inserted_id)
-        .bind(delivery_id.as_uuid())
-        .execute(&mut **tx)
-        .await
-        .map_err(AppError::from)?;
-    } else if email.is_some() {
-        return Err(AppError::Internal(
-            "A suppressed notification email was supplied for projection".into(),
-        ));
-    }
-    Ok(result)
-}
-
-fn source_href(event: &NotificationEvent, _recipient: &NotificationRecipient) -> String {
-    match event.action_kind {
-        NotificationActionKind::DeliveryFailure => {
-            format!("/ui/deliveries?company_id={}", event.company_id)
-        }
-    }
-}
-
 fn bounded_error_detail(value: &str) -> String {
     let mut end = value.len().min(512);
     while !value.is_char_boundary(end) {
@@ -863,3 +594,13 @@ fn nonnegative_u64(value: i64, label: &str) -> AppResult<u64> {
 #[cfg(test)]
 #[path = "notification_tests.rs"]
 mod tests;
+
+mod control;
+mod escalation_failures;
+mod escalation_notice;
+pub(crate) use escalation_failures::refresh_person_escalations_on;
+mod projection;
+mod projection_lock;
+mod reviewer_notice;
+pub(crate) use escalation_notice::close_assignment_on as close_escalation_assignment_on;
+use projection::{apply_projection_on, resolve_projection_on, source_href};

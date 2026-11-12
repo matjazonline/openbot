@@ -26,7 +26,7 @@ fn reviewed_source(reviewer: Uuid) -> Value {
         "untrusted_message":{"ref":"/input/message"},"classification":{"ref":"/steps/classify/output"},
         "history":{"ref":"/steps/history/output"}}});
     source["steps"]["review"]["with"]["reviewers"] =
-        json!({"literal":[{"kind":"user","id":reviewer}]});
+        json!({"literal":[{"kind":"principal","id":reviewer}]});
     source["steps"]["review"]["with"]["proposal"] = json!({"object":{
         "draft":{"ref":"/steps/draft/output"},"classification":{"ref":"/steps/classify/output"},
         "history":{"ref":"/steps/history/output"}}});
@@ -185,7 +185,7 @@ async fn workflow_cutover_reviewed_email_delivers_exact_accepted_artifact() {
     assert_eq!(empty.active_runs, 0.0);
     assert_eq!(empty.open_decisions, 0.0);
     let binding = Box::pin(d.bind(
-        reviewed_source(d.fixture.target.actor.user_id()),
+        reviewed_source(d.fixture.principal(d.fixture.target.actor.user_id()).await),
         Some(MessageTrigger::Direct),
     ))
     .await;

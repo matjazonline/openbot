@@ -114,9 +114,10 @@ pub(super) async fn save_manifest(f: &AdmissionFixture, value: &DependencyManife
     let manifest = Uuid::new_v4();
     let company = value.company_id.as_uuid();
     let mut tx = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("INSERT INTO agent_dependency_manifests(company_id,id,root_run_id,content,digest) VALUES($1,$2,$3,$4,$5)")
+    sqlx::query("INSERT INTO agent_dependency_manifests(company_id,id,root_run_id,content,digest,role_context_department_id) VALUES($1,$2,$3,$4,$5,$6)")
         .bind(company).bind(manifest).bind(value.root_run_id.as_uuid())
         .bind(String::from_utf8(value.canonical_content().unwrap()).unwrap()).bind(value.content_hash().unwrap().to_vec())
+        .bind(value.role_context_department_id.map(|department| department.as_uuid()))
         .execute(&mut *tx).await.unwrap();
     for selected in &value.agents {
         sqlx::query("INSERT INTO agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id) VALUES($1,$2,$3,$4)")
@@ -144,9 +145,10 @@ pub(super) async fn manifest_for(
     struct SelectedVersion {
         workflow_id: Uuid,
         version_id: Uuid,
+        role_context_department_id: Option<Uuid>,
     }
     let selected: SelectedVersion = sqlx::query_as(
-        "SELECT workflow_id,version_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
+        "SELECT run.workflow_id,run.version_id,channel.department_id AS role_context_department_id FROM workflow_runs AS run LEFT JOIN channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id WHERE run.company_id=$1 AND run.id=$2",
     )
     .bind(f.binding.target.company.as_uuid())
     .bind(run.as_uuid())
@@ -154,6 +156,10 @@ pub(super) async fn manifest_for(
     .await
     .unwrap();
     DependencyManifest {
+        role_context_department_id: selected
+            .role_context_department_id
+            .map(crate::entities::department::DepartmentId::new),
+        roles: vec![],
         company_id: f.binding.target.company,
         root_run_id: run,
         agents: vec![AgentRevisionSelection {

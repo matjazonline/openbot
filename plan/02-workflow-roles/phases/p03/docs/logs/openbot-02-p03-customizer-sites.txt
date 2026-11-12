@@ -1,0 +1,89 @@
+src/adapters/persistence/workflow/agent_history_sample_tests.rs:10:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_history_sample_tests.rs-11-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_history_sample_tests.rs-12-        None,
+src/adapters/persistence/workflow/agent_history_sample_tests.rs-13-        false,
+src/adapters/persistence/workflow/agent_history_sample_tests.rs-14-        |source, _| {
+--
+src/adapters/persistence/workflow/agent_runtime_tests.rs:83:    agent_setup_source(origin, skill, protected, |_, _| {}).await
+src/adapters/persistence/workflow/agent_runtime_tests.rs-84-}
+src/adapters/persistence/workflow/agent_runtime_tests.rs-85-
+src/adapters/persistence/workflow/agent_runtime_tests.rs-86-/// `skill` (its instructions) is created and linked to the agent before publication;
+src/adapters/persistence/workflow/agent_runtime_tests.rs-87-/// `protected` registers the tool as approval-required and gives the step an approval policy;
+--
+src/adapters/persistence/workflow/agent_runtime_tests.rs:89:async fn agent_setup_source(
+src/adapters/persistence/workflow/agent_runtime_tests.rs-90-    origin: &str,
+src/adapters/persistence/workflow/agent_runtime_tests.rs-91-    skill: Option<&str>,
+src/adapters/persistence/workflow/agent_runtime_tests.rs-92-    protected: bool,
+src/adapters/persistence/workflow/agent_runtime_tests.rs-93-    customize: impl FnOnce(&mut Value, Uuid),
+--
+src/adapters/persistence/workflow/agent_history_identity_tests.rs:64:        let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_history_identity_tests.rs-65-            "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_history_identity_tests.rs-66-            None,
+src/adapters/persistence/workflow/agent_history_identity_tests.rs-67-            false,
+src/adapters/persistence/workflow/agent_history_identity_tests.rs-68-            |source, _| {
+--
+src/adapters/persistence/workflow/agent_model_step_tests.rs:26:    Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_model_step_tests.rs-27-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_model_step_tests.rs-28-        None,
+src/adapters/persistence/workflow/agent_model_step_tests.rs-29-        false,
+src/adapters/persistence/workflow/agent_model_step_tests.rs-30-        |source, _| step(source),
+--
+src/adapters/persistence/workflow/agent_model_step_tests.rs:192:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_model_step_tests.rs-193-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_model_step_tests.rs-194-        Some(prompt),
+src/adapters/persistence/workflow/agent_model_step_tests.rs-195-        false,
+src/adapters/persistence/workflow/agent_model_step_tests.rs-196-        |source, _| classify(source),
+--
+src/adapters/persistence/workflow/agent_model_step_tests.rs:244:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_model_step_tests.rs-245-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_model_step_tests.rs-246-        None,
+src/adapters/persistence/workflow/agent_model_step_tests.rs-247-        false,
+src/adapters/persistence/workflow/agent_model_step_tests.rs-248-        |source, actor| {
+--
+src/adapters/persistence/workflow/agent_recovery_tests.rs:137:    let setup = Box::pin(agent_setup_source(&origin, None, false, tokens(20_000))).await;
+src/adapters/persistence/workflow/agent_recovery_tests.rs-138-    let llm = scripted_scenario(vec![
+src/adapters/persistence/workflow/agent_recovery_tests.rs-139-        exchange(costly(
+src/adapters/persistence/workflow/agent_recovery_tests.rs-140-            LlmTurn::tool_call(
+src/adapters/persistence/workflow/agent_recovery_tests.rs-141-                "registered__request",
+--
+src/adapters/persistence/workflow/agent_recovery_tests.rs:204:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_recovery_tests.rs-205-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_recovery_tests.rs-206-        None,
+src/adapters/persistence/workflow/agent_recovery_tests.rs-207-        false,
+src/adapters/persistence/workflow/agent_recovery_tests.rs-208-        tokens(100),
+--
+src/adapters/persistence/workflow/agent_driver_tests.rs:71:    let setup = Box::pin(agent_setup_source("http://127.0.0.1:1", None, false, |source, actor| {
+src/adapters/persistence/workflow/agent_driver_tests.rs-72-        source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
+src/adapters/persistence/workflow/agent_driver_tests.rs-73-            "tokens":{"max_tokens":100,"reviewers":[{"kind":"user","id":actor}]}});
+src/adapters/persistence/workflow/agent_driver_tests.rs-74-    }))
+src/adapters/persistence/workflow/agent_driver_tests.rs-75-    .await;
+--
+src/adapters/persistence/workflow/agent_history_storage_tests.rs:25:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-26-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-27-        None,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-28-        false,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-29-        |source, _| {
+--
+src/adapters/persistence/workflow/agent_history_storage_tests.rs:89:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-90-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-91-        None,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-92-        false,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-93-        |source, _| {
+--
+src/adapters/persistence/workflow/agent_history_storage_tests.rs:348:    let setup = Box::pin(agent_setup_source(
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-349-        "http://127.0.0.1:1",
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-350-        None,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-351-        false,
+src/adapters/persistence/workflow/agent_history_storage_tests.rs-352-        |source, _| {
+--
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs:190:    let s = Setup::configured(|_, _| {}, TestAssociation::PrivateConversation).await;
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs-191-    let p = &s.fixture.persistence;
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs-192-    let session = original(&s).await;
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs-193-    let actor = admin(&s).await;
+src/adapters/persistence/workflow/local_agent_continuation_tests.rs-194-    sqlx::query("UPDATE users SET email_verified_at=CURRENT_TIMESTAMP WHERE id=$1")
+--
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs:208:    let s = Setup::configured(|_, _| {}, TestAssociation::PrivateConversation).await;
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs-209-    let p = &s.fixture.persistence;
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs-210-    let claim = s.claim().await;
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs-211-    s.park(&claim).await;
+src/adapters/persistence/workflow/local_agent_behavior_tests.rs-212-    s.native_success().await;

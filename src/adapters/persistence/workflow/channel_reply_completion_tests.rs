@@ -100,7 +100,7 @@ impl FinalFixture {
         approval: bool,
     ) -> Self {
         let policy =
-            approval.then(|| ReplyApprovalPolicy::new(vec![s.owner().user_id()], 60).unwrap());
+            approval.then(|| ReplyApprovalPolicy::new(vec![s.owner_principal()], 60).unwrap());
         Box::pin(Self::from_case(
             s,
             FinalCase {

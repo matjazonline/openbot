@@ -68,7 +68,7 @@ impl ReplyApprovalPolicy {
             return Err(invalid());
         }
         Ok(
-            json!({"reviewers":self.reviewers.iter().map(|id|json!({"kind":"user","id":id})).collect::<Vec<_>>(),
+            json!({"reviewers":self.reviewers.iter().map(|id|json!({"kind":"principal","id":id})).collect::<Vec<_>>(),
             "deadline":deadline.to_rfc3339()}),
         )
     }
@@ -83,7 +83,7 @@ struct ApprovalWire {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 enum Reviewer {
-    User { id: Uuid },
+    Principal { id: Uuid },
 }
 impl TryFrom<ApprovalWire> for ReplyApprovalPolicy {
     type Error = AppError;
@@ -92,7 +92,7 @@ impl TryFrom<ApprovalWire> for ReplyApprovalPolicy {
             value
                 .reviewers
                 .into_iter()
-                .map(|Reviewer::User { id }| id)
+                .map(|Reviewer::Principal { id }| id)
                 .collect(),
             value.review_timeout_seconds.seconds(),
         )
@@ -104,7 +104,7 @@ impl From<ReplyApprovalPolicy> for ApprovalWire {
             reviewers: value
                 .reviewers
                 .into_iter()
-                .map(|id| Reviewer::User { id })
+                .map(|id| Reviewer::Principal { id })
                 .collect(),
             review_timeout_seconds: value.timeout,
         }

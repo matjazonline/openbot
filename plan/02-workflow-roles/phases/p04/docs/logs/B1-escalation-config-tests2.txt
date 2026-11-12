@@ -1,0 +1,16 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0308]: mismatched types
+  --> src/application/workflow/registry/decision_tests.rs:36:38
+   |
+36 |         assert_eq!(error.field_path, "/steps/start/with/reviewers_follow_role");
+   |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `Box<str>`, found `&str`
+   |
+   = note: expected struct `std::boxed::Box<str>`
+           found reference `&str`
+help: call `Into::into` on this expression to convert `&str` into `std::boxed::Box<str>`
+   |
+36 |         assert_eq!(error.field_path, "/steps/start/with/reviewers_follow_role".into());
+   |                                                                               +++++++
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

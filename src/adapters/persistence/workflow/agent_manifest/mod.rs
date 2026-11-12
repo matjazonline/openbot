@@ -10,12 +10,17 @@ use std::collections::BTreeMap;
 use std::time::{Duration, Instant};
 
 mod capture;
+mod roles;
 mod storage;
+pub(super) use roles::{
+    notification_department_recipients_on, notification_recipients_on, resolve_people_on,
+};
 #[cfg(test)]
 #[path = "capture_tests.rs"]
 mod tests;
 pub(super) use storage::{
-    attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
+    agent_for_step_on, attach_child_on, execution_selection_on, persist_on, selected_on,
+    workflow_bundle_on,
 };
 
 struct Closure {
@@ -25,6 +30,9 @@ struct Closure {
     agents: BTreeMap<AgentId, AgentRevisionId>,
     workflows: BTreeMap<VersionId, WorkflowId>,
     deadline: Instant,
+    association: RelatedAssociation,
+    role_facts: Option<roles::RoleFacts>,
+    roles: BTreeMap<roles::RoleCaptureKey, roles::RoleCapture>,
 }
 
 fn refused() -> AppError {
@@ -55,19 +63,31 @@ pub(super) async fn capture_on(
         agents: BTreeMap::new(),
         workflows: BTreeMap::new(),
         deadline: Instant::now() + Duration::from_secs(5),
+        association: command.association(),
+        role_facts: None,
+        roles: BTreeMap::new(),
     };
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
         .execute(&mut **tx).await?;
-    tokio::time::timeout(
+    let (roles, role_context_department_id) = tokio::time::timeout(
         Duration::from_secs(5),
-        closure.walk(
-            tx,
-            Node::Workflow(definition.workflow_id, definition.version_id),
-        ),
+        // Keep the bounded graph/capture query futures off the admission poll stack.
+        Box::pin(async {
+            let context = context_department_on(tx, command).await?;
+            closure
+                .walk(
+                    tx,
+                    Node::Workflow(definition.workflow_id, definition.version_id),
+                )
+                .await?;
+            let roles = closure.finish_roles_on(tx).await?;
+            Ok::<_, AppError>((roles, context))
+        }),
     )
     .await
     .map_err(|_| AppError::Timeout("Agent dependency capture exceeded five seconds".into()))??;
     let manifest = DependencyManifest {
+        role_context_department_id,
         company_id: closure.company,
         root_run_id: command.proposed_run_id(),
         agents: closure
@@ -86,9 +106,32 @@ pub(super) async fn capture_on(
                 version_id,
             })
             .collect(),
+        roles,
     };
     manifest.canonical_content()?;
     Ok(manifest)
+}
+
+async fn context_department_on(
+    tx: &mut PgConnection,
+    command: &PreparedAdmission,
+) -> AppResult<Option<crate::entities::department::DepartmentId>> {
+    let channel = match command.association() {
+        RelatedAssociation::Company => return Ok(None),
+        RelatedAssociation::Channel(channel)
+        | RelatedAssociation::Thread {
+            channel_id: channel,
+            ..
+        } => channel,
+    };
+    let department: Option<Uuid> =
+        sqlx::query_scalar("SELECT department_id FROM channels WHERE company_id=$1 AND id=$2")
+            .bind(command.company_id().as_uuid())
+            .bind(channel.as_uuid())
+            .fetch_optional(tx)
+            .await?
+            .ok_or_else(invalid)?;
+    Ok(department.map(crate::entities::department::DepartmentId::new))
 }
 
 impl Closure {
@@ -130,7 +173,10 @@ impl Closure {
         self.check_node_capacity(node)?;
         let children = match node {
             Node::Workflow(workflow, version) => self.workflow_edges(tx, workflow, version).await?,
-            Node::Agent(agent, mode) => self.agent_edges(tx, agent, mode).await?,
+            Node::Agent(agent, mode) => self
+                .agent_edges(tx, agent, mode)
+                .await
+                .map_err(|error| self.role_agent_error(agent, error))?,
         };
         self.within_bound()?;
         Ok(children)

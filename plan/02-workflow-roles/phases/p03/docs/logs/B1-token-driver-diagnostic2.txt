@@ -1,0 +1,15 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4223 filtered out; finished in 1.32s
+
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request' (48856439) panicked at src/adapters/persistence/workflow/agent_driver_tests.rs:83:5:
+Completed(Err(WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("agent.interrupted"), diagnostic: None }, safety: SafeToRetry }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

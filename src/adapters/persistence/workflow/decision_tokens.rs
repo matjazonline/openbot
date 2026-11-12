@@ -130,7 +130,7 @@ pub(super) async fn submit(
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .bind(command.actor.user_id().to_string())
+    .bind(principal.to_string())
     .fetch_one(&mut *db)
     .await?;
     if !listed {

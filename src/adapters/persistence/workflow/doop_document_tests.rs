@@ -42,11 +42,11 @@ fn final_canvas() -> Value {
     value
 }
 
-fn params(f: &Fixture) -> Value {
+async fn params(f: &Fixture) -> Value {
     json!({"expected_bot_id":"user-bot-a","expected_workspace_id":"workspace-a",
         "doop_origin":"https://doop.example.test",
         "result_destinations":[{"kind":"user","id":f.target.actor.user_id()}],
-        "action_approval":{"reviewers":[{"kind":"user","id":f.target.actor.user_id()}],
+        "action_approval":{"reviewers":[{"kind":"principal","id":f.principal(f.target.actor.user_id()).await}],
             "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}})
 }
 
@@ -223,11 +223,12 @@ impl Document {
         let bindings = engine.services().bindings();
         let configured = bindings
             .configure(ConfigureBinding {
+                escalation: None,
                 target,
                 expected: None,
                 association: RelatedAssociation::Channel(channel),
                 version,
-                params: params(&f),
+                params: params(&f).await,
                 resources: BTreeMap::from([(
                     ResourceName::parse("service").unwrap(),
                     RuntimeResourceId::new(connection.id),

@@ -132,7 +132,7 @@ fn protected_step_workflow_tool_needs_approval_and_executes_child() {
     let mut raw = source("tool.call");
     raw["steps"]["start"]["with"]["tool"] = json!({"literal":"memory.child"});
     raw["steps"]["start"]["with"]["arguments"] = json!({"literal":{}});
-    raw["steps"]["start"]["with"]["approval"] = json!({"literal":{"reviewers":[{"kind":"user","id":Uuid::from_u128(6)}],"deadline":"2030-01-01T00:00:00Z"}});
+    raw["steps"]["start"]["with"]["approval"] = json!({"literal":{"reviewers":[{"kind":"principal","id":Uuid::from_u128(6)}],"deadline":"2030-01-01T00:00:00Z"}});
     let bundle = build(
         &raw,
         DependencySnapshots {

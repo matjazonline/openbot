@@ -121,10 +121,34 @@ pub(crate) async fn cancel_workflow_deliveries_on(
 /// so no new notice for this member can commit after this statement's snapshot. Unsent notices are
 /// superseded; one a worker holds keeps its lease and gets only the intent, which that worker's
 /// next fenced write settles.
+/// Captured before lifecycle demotion clears a person's account link.
+pub(crate) struct MemberNoticeRecipient {
+    user_id: Uuid,
+    principal_id: Option<crate::entities::transport::PrincipalId>,
+}
+
+pub(crate) async fn member_notice_recipient_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    user: Uuid,
+) -> AppResult<MemberNoticeRecipient> {
+    let principal: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(company)
+    .bind(user)
+    .fetch_optional(db)
+    .await?;
+    Ok(MemberNoticeRecipient {
+        user_id: user,
+        principal_id: principal.map(crate::entities::transport::PrincipalId::new),
+    })
+}
+
 pub(crate) async fn cancel_member_notices_on(
     db: &mut PgConnection,
     company_id: Uuid,
-    user_id: Uuid,
+    recipient: MemberNoticeRecipient,
 ) -> AppResult<CancelledDeliveries> {
     let claimable = claimable_statuses_sql();
     let in_flight =
@@ -138,7 +162,7 @@ pub(crate) async fn cancel_member_notices_on(
                      AND notification.email_delivery_id IS NOT NULL
                   UNION
                   SELECT reviewer.notice_delivery_id FROM workflow_decision_reviewers AS reviewer
-                   WHERE reviewer.company_id = $1 AND reviewer.user_id = $2
+                   WHERE reviewer.company_id = $1 AND reviewer.principal_id = $3
                      AND reviewer.notice_delivery_id IS NOT NULL)
               AND delivery.status IN ({claimable}, {in_flight})
               AND delivery.cancellation_requested_at IS NULL
@@ -146,16 +170,16 @@ pub(crate) async fn cancel_member_notices_on(
               FOR UPDATE OF delivery"#
     ))
     .bind(company_id)
-    .bind(user_id)
+    .bind(recipient.user_id)
+    .bind(recipient.principal_id.map(|principal| principal.as_uuid()))
     .fetch_all(&mut *db)
     .await
     .map_err(AppError::from)?;
     cancel_locked_deliveries_on(db, &locked, DeliveryCancellationReason::RecipientRevoked).await
 }
 
-/// [`cancel_workflow_deliveries_on`]'s lock-then-settle, keyed by delivery id, for the worker-path
-/// tests that need a cancellation without a workflow run to own the deliveries.
-#[cfg(test)]
+/// Cancel an explicit tenant-scoped set while the caller owns its source transaction. Followed
+/// reviewer notices can outlive a current reviewer row and need the same lock-then-settle path.
 pub(crate) async fn cancel_deliveries_on(
     db: &mut PgConnection,
     company_id: Uuid,

@@ -43,19 +43,16 @@ pub(super) fn memory_item() -> Value {
         ],
     )
 }
-/// Explicit company-member reviewers: 1..16 unique `{"kind":"user","id":<uuid>}` items, the
-/// 04.11 destination shape. There are no groups or external reviewers (05-D2 §4.1).
+/// Authored principal/role selectors; the effective reviewer set is bounded after expansion.
 pub(super) fn reviewers() -> Value {
-    let mut list = array(
-        object(
-            json!({"kind":{"const":"user"},"id":uuid()}),
-            &["kind", "id"],
-        ),
+    array(
+        json!({"anyOf":[
+            object(json!({"kind":{"const":"principal"},"id":uuid()}), &["kind","id"]),
+            {"enum":["lead","reviewer"]}
+        ]}),
         1,
-        MAX_REVIEWERS,
-    );
-    list["uniqueItems"] = json!(true);
-    list
+        super::super::reviewers::MAX_REVIEWER_SELECTORS,
+    )
 }
 /// Code points are only a coarse bound: `InputCheck::Message` and `CanonicalContent::parse`
 /// enforce the canonical 998-byte subject at compilation (literals) and at resolution.

@@ -1,0 +1,8 @@
+{
+  "root": "/Users/mac02/openbot-workflow-roles-tjdv6uy3",
+  "port": 60242,
+  "database": "openbot_roles_p01",
+  "test_database": "openbot_roles_p01_test",
+  "owner": "/root 02-workflow-roles",
+  "postgres_version": "pg_ctl (PostgreSQL) 18.6 (Homebrew)"
+}

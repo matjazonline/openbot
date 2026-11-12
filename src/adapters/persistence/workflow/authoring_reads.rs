@@ -209,6 +209,38 @@ impl PostgresPersistence {
 
 #[async_trait]
 impl AuthoringReads for PostgresPersistence {
+    async fn reviewer_choice(
+        &self,
+        company: CompanyId,
+        principal: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<ReviewerChoice>> {
+        let label: Option<String> = sqlx::query_scalar("SELECT principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person'")
+            .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_optional(self.pool()).await?;
+        Ok(label.map(|label| ReviewerChoice { principal, label }))
+    }
+
+    async fn reviewer_choices(
+        &self,
+        company: CompanyId,
+        after: Option<crate::entities::transport::PrincipalId>,
+    ) -> AppResult<ReviewerChoices> {
+        let mut rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT principal.id,principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.kind='person' AND ($2::uuid IS NULL OR principal.id>$2) ORDER BY principal.id LIMIT 51")
+            .bind(company.as_uuid()).bind(after.map(|id| id.as_uuid())).fetch_all(self.pool()).await?;
+        let next =
+            (rows.len() > 50).then(|| crate::entities::transport::PrincipalId::new(rows[49].0));
+        rows.truncate(50);
+        Ok(ReviewerChoices {
+            items: rows
+                .into_iter()
+                .map(|(id, label)| ReviewerChoice {
+                    principal: crate::entities::transport::PrincipalId::new(id),
+                    label,
+                })
+                .collect(),
+            next,
+        })
+    }
+
     async fn version_source(
         &self,
         company: CompanyId,

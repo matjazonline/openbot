@@ -39,7 +39,7 @@ fn round() -> Value {
                 "routes":{"success":"review"}},
             "review": {"type":"decision.human","with":{
                 "proposal":{"ref":"/steps/draft/output"},
-                "reviewers":{"array":[{"object":{"kind":{"literal":"user"},"id":{"ref":"/params/reviewer"}}}]},
+                "reviewers":{"array":[{"object":{"kind":{"literal":"principal"},"id":{"ref":"/params/reviewer"}}}]},
                 "deadline":{"ref":"/params/deadline"},
                 "data_schema":{"literal":artifact()},
                 "feedback_required":{"literal":["revise"]}},
@@ -184,7 +184,8 @@ async fn count(f: &AdmissionFixture, query: &str, run: RunId) -> i64 {
 #[tokio::test]
 async fn workflow_revision_rounds_with_human_decisions_keep_old_rounds_and_load_context_once() {
     let fixture = Fixture::new().await;
-    let reviewer = member(&fixture, "admin").await;
+    let reviewer_user = member(&fixture, "admin").await;
+    let reviewer = fixture.principal(reviewer_user).await;
     let workflow = WorkflowId::new(Uuid::from_u128(0x0701));
     let version = fixture.publish_workflow(workflow, round()).await;
     let mut root = parent(workflow, version);
@@ -220,7 +221,7 @@ async fn workflow_revision_rounds_with_human_decisions_keep_old_rounds_and_load_
         active_jobs: None,
         monitoring: None,
     };
-    let actor = WorkflowActor::authenticated(reviewer).unwrap();
+    let actor = WorkflowActor::authenticated(reviewer_user).unwrap();
     let read = |decision| async move { p.read_decision(company, actor, decision).await.unwrap() };
     let submit = |view: &DecisionView, key, choice, body, feedback| {
         submission(

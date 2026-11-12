@@ -140,6 +140,7 @@ impl Frames {
 /// A deployment with no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        escalation_ack_hours: Default::default(),
         knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
         knowledge_search_limit:
             crate::application::knowledge::search::KnowledgeSearchLimit::default(),

@@ -109,6 +109,7 @@ struct Intents {
     thread: Uuid,
     version: VersionId,
     messages: AtomicUsize,
+    owner_principal: Uuid,
 }
 
 impl Intents {
@@ -132,7 +133,9 @@ impl Intents {
         service.save(fixture.save(None)).await.unwrap();
         let publication = fixture.publish();
         service.publish(publication.clone()).await.unwrap();
+        let owner_principal = fixture.principal(fixture.target.actor.user_id()).await;
         Self {
+            owner_principal,
             fixture,
             channel,
             thread,
@@ -147,6 +150,10 @@ impl Intents {
 
     fn pool(&self) -> &sqlx::PgPool {
         self.p().pool()
+    }
+
+    fn owner_principal(&self) -> Uuid {
+        self.owner_principal
     }
 
     fn owner(&self) -> WorkflowActor {
@@ -177,6 +184,7 @@ impl Intents {
         trigger: Option<MessageTrigger>,
     ) -> ConfigureBinding {
         ConfigureBinding {
+            escalation: None,
             target,
             expected,
             association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),
@@ -1478,6 +1486,7 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() 
                 assert!(!run.executions.is_empty(), "the admitted first step");
                 assert!(run.model_usage.is_empty());
             }
+            BindingOutcome::RoleRefused(_) => panic!("no role admission was configured"),
             BindingOutcome::Failed { .. } => panic!("no admission failed"),
         }
     }

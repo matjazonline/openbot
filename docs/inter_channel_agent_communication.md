@@ -27,6 +27,12 @@ The email sender reaches the internal relay (`InternalMailRelay::relay_internal`
   desk, an access policy), the refusal is definite. The delivery records it rather than
   retrying toward the same verdict.
 
+Workflow admission happens after the desk accepts the message. If a workflow cannot resolve a
+required department role, the message stays delivered and visible on the desk. Its admission
+intent records a definite workflow refusal naming the step and role, and no run starts. The
+message's workflow outcome shows that refusal; it does not cause another delivery attempt or
+change the completed relay delivery into a delivery failure.
+
 ## On the receiving desk
 
 A relayed message goes through the same ingress as mail:

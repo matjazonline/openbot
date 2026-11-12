@@ -191,6 +191,8 @@ fn autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts(
 #[test]
 fn autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content() {
     let mut manifest = DependencyManifest {
+        role_context_department_id: None,
+        roles: vec![],
         company_id: CompanyId::new(Uuid::new_v4()),
         root_run_id: RunId::new(Uuid::new_v4()),
         agents: (0..2)
@@ -206,6 +208,12 @@ fn autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_conte
     assert_eq!(digest, manifest.content_hash().unwrap());
     let restored = DependencyManifest::decode(&manifest.canonical_content().unwrap()).unwrap();
     assert_eq!(restored.content_hash().unwrap(), digest);
+    let mut missing_context = serde_json::to_value(&manifest).unwrap();
+    missing_context
+        .as_object_mut()
+        .unwrap()
+        .remove("role_context_department_id");
+    assert!(DependencyManifest::decode(&serde_json::to_vec(&missing_context).unwrap()).is_err());
     manifest.agents.push(manifest.agents[0].clone());
     assert!(manifest.validate().is_err());
     manifest.agents = (0..257)

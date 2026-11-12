@@ -55,7 +55,7 @@ async fn agent_history_e2e_real_search_human_wait_and_customer_cc_refuse_resume_
     let member = j.member(AccessLevel::L5).await;
     let mut source = answering_source();
     source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
-        "tokens":{"max_tokens":1000,"reviewers":[{"kind":"user","id":j.d.fixture.target.actor.user_id()}]}});
+        "tokens":{"max_tokens":1000,"reviewers":[{"kind":"principal","id":j.d.fixture.principal(j.d.fixture.target.actor.user_id()).await}]}});
     j.d.bind(source, Some(MessageTrigger::Direct)).await;
     let first =
         j.d.email(email(&j.d, member.email.as_str(), "p07-waiting-search"))

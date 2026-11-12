@@ -198,6 +198,12 @@ pub struct DecisionHistoryEntry {
     pub created_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct DecisionReviewer {
+    pub principal: Uuid,
+    pub label: String,
+}
+
 /// What a member with run visibility may see. Comments are internal discussion.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DecisionView {
@@ -220,6 +226,7 @@ pub struct DecisionView {
     /// The wait state: `waiting` is open; any other value is settled.
     pub state: String,
     pub reviewers: Vec<Uuid>,
+    pub reviewer_labels: Vec<DecisionReviewer>,
     /// What a submission may choose: a business decision's declared routes in order; an
     /// approval's `approve` or `reject`.
     pub choices: Vec<String>,
@@ -251,8 +258,9 @@ pub trait WorkflowDecisions: Send + Sync {
 /// The frozen assignment facts of one decision execution.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct DecisionSpecification {
-    /// User ids, in declared order.
-    pub reviewers: Vec<Uuid>,
+    /// Principal and literal role selectors, in declared order.
+    pub reviewers: Vec<super::reviewers::ReviewerSelector>,
+    pub reviewers_follow_role: bool,
     pub deadline: DateTime<Utc>,
     pub proposal_digest: String,
 }
@@ -274,6 +282,11 @@ pub(crate) fn specification(
     let (reviewers, deadline) = reviewer_deadline(&activation.inputs)?;
     let proposal = activation.inputs.get("proposal").ok_or_else(invalid)?;
     Ok(DecisionSpecification {
+        reviewers_follow_role: match step.inputs.get("reviewers_follow_role") {
+            None => false,
+            Some(crate::domain::workflow::Binding::Literal(Value::Bool(follow))) => *follow,
+            _ => return Err(invalid()),
+        },
         reviewers,
         deadline,
         proposal_digest: hex_digest(proposal)?,
@@ -283,35 +296,17 @@ pub(crate) fn specification(
 /// Validate a submission into the step's completion without settling anything. The choice must
 /// be declared; `{choice, data, feedback}` must satisfy the step's output contract (data
 /// schema, feedback rules and lengths) and the run's context limits (05-D2 §7.2).
-pub(crate) fn reviewer_deadline(inputs: &Value) -> AppResult<(Vec<Uuid>, DateTime<Utc>)> {
+pub(crate) fn reviewer_deadline(
+    inputs: &Value,
+) -> AppResult<(Vec<super::reviewers::ReviewerSelector>, DateTime<Utc>)> {
     let deadline = inputs
         .get("deadline")
         .and_then(Value::as_str)
         .and_then(|text| DateTime::parse_from_rfc3339(text).ok())
         .ok_or_else(invalid)?
         .with_timezone(&Utc);
-    let items = inputs
-        .get("reviewers")
-        .and_then(Value::as_array)
-        .ok_or_else(invalid)?;
-    if items.is_empty() || items.len() > super::registry::MAX_REVIEWERS {
-        return Err(invalid());
-    }
-    let mut reviewers = Vec::with_capacity(items.len());
-    for item in items {
-        if item.get("kind").and_then(Value::as_str) != Some("user") {
-            return Err(invalid());
-        }
-        let id = item
-            .get("id")
-            .and_then(Value::as_str)
-            .and_then(|text| Uuid::parse_str(text).ok())
-            .ok_or_else(invalid)?;
-        if reviewers.contains(&id) {
-            return Err(invalid());
-        }
-        reviewers.push(id);
-    }
+    let reviewers =
+        super::reviewers::parse_reviewers(inputs.get("reviewers").ok_or_else(invalid)?)?;
     Ok((reviewers, deadline))
 }
 

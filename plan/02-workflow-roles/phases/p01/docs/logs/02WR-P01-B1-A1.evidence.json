@@ -1,0 +1,351 @@
+{
+  "version": 1,
+  "round": "02WR-P01-B1-A1",
+  "artifact": "91741e066ae90284ca17ba5163cbc89561eef3ac1fb728daec3645392d1f473d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-3.txt",
+          "sha256": "5877ed251b856e5898ac7d73d6ae132e6c34f24a20973c5352aea0bab0a0baf7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib application::workflow::publication::",
+      "fixture": "Pure unit/fixture checks; frozen current source and offline lockfile.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-publication.txt",
+          "sha256": "71329a6dc3d5c9575c03a4d358da0938abf533616409f387d91a4aa94e917ce1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib application::workflow::registry::",
+      "fixture": "Pure unit/fixture checks; frozen current source and offline lockfile.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-registry.txt",
+          "sha256": "871e0c9f7ad8e06351753f6a8262cc2a710fd7edd5ec553ad6ffcd6998423aa4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib application::workflow::compiler::",
+      "fixture": "Pure unit/fixture checks; frozen current source and offline lockfile.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-compiler.txt",
+          "sha256": "2bb7260bc4cd0865a378e2f820ab1c2bbcee54a0e4db0511fcaee03983c8f67d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib application::workflow::fixtures::",
+      "fixture": "Pure unit/fixture checks; frozen current source and offline lockfile.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-fixtures.txt",
+          "sha256": "0e033a37b93c9a940ef8a6fc7e9811c60b2ef247f893b0c6b246da0e612e90cc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib entities::department::",
+      "fixture": "Pure unit/fixture checks; frozen current source and offline lockfile.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-department-enum.txt",
+          "sha256": "a7ca6ac6eea5d4233b795a0ce4a4ded7015aa0ccfd94ad77915d00aa14735455"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_agent_publication_refuses_forged_snapshot",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-forged-agent.txt",
+          "sha256": "3ec576f679d62ae820f0344bbc24bfdaefa0aae21987d0e81b341419802a793e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_binding_sql_",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-binding-regression.txt",
+          "sha256": "c1df66c8bec3b1b2fc0ff2c7c43c6db95cdbde66b0b3def452944acc72766999"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib department_write_assigns_replaces_and_clears_the_lead",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-lead-write.txt",
+          "sha256": "bfe67e950dabb399af895e9f350db76f53045b9aa1851a81582bb9ae495f19a1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib department_competing_lead_assignments_leave_one_holder",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-lead-competing.txt",
+          "sha256": "4dd1536aab821f511d47439f98eded4409672f7d93fd30b2e997a0e9acf32c88"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx migrate run",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migrations.txt",
+          "sha256": "e54643a071c38e2c7c727380c84a542254b75b98ca0788105ef61f850000244d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STRUCTURAL"
+      ],
+      "command": "cargo fmt --all --check",
+      "fixture": "Current worktree/offline lockfile; no shared fixtures.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-structural-results.json",
+          "sha256": "5cbcd4c0d451bdd99160fe3d8effbaa9ab95a9c9c8dfc8be63b501b9eb9be952"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STRUCTURAL"
+      ],
+      "command": "git diff --check",
+      "fixture": "Current worktree/offline lockfile; no shared fixtures.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-structural-results.json",
+          "sha256": "5cbcd4c0d451bdd99160fe3d8effbaa9ab95a9c9c8dfc8be63b501b9eb9be952"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STRUCTURAL"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "Current worktree/offline lockfile; no shared fixtures.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-reachability.txt",
+          "sha256": "0e123add9bea3cff841230489bf31f24a4c505d7afebba75e23f349ca7d96216"
+        },
+        {
+          "path": "logs/B1-structural-results.json",
+          "sha256": "5cbcd4c0d451bdd99160fe3d8effbaa9ab95a9c9c8dfc8be63b501b9eb9be952"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STRUCTURAL"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "Owned PG18.6 cluster openbot-workflow-roles-tjdv6uy3, localhost60242, migration/test DBs openbot_roles_p01/openbot_roles_p01_test; test-created unique databases are dropped by OwnDatabase.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "7fef4b0f90ba486f33c75f2e76b40c6da58303b556b6b0e2db9f6cb71bcc9f20"
+        },
+        {
+          "path": "logs/B1-structural-results.json",
+          "sha256": "5cbcd4c0d451bdd99160fe3d8effbaa9ab95a9c9c8dfc8be63b501b9eb9be952"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STRUCTURAL"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Current worktree/offline lockfile; no shared fixtures.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-offline-final.txt",
+          "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec"
+        },
+        {
+          "path": "logs/B1-structural-results.json",
+          "sha256": "5cbcd4c0d451bdd99160fe3d8effbaa9ab95a9c9c8dfc8be63b501b9eb9be952"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "HISTORICAL-ATTEMPT"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Unfrozen historical implementation before misplaced guard/import corrections; superseded by final offline PASS.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-1.txt",
+          "sha256": "8d4f2d93e97bb8b3ebe11ab5ce8820140015826c587abd6ff5dc90447af445bf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "HISTORICAL-ATTEMPT"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Unfrozen historical test fixture before LifecycleError formatting fix; no behavior exercised.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-1.txt",
+          "sha256": "696863436f731b124d8e620eed4e13c356e95fb73967c51f5c9ff5b96e643f1f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "HISTORICAL-ATTEMPT"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Historical test helper omitted the dependency node; 7/8 passed, helper fixed without weakening assertions; superseded by role-tests-3 PASS.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-2.txt",
+          "sha256": "dbbdab61ac2578ebd953fea76ae3d408d49405ae9dc9681aee1c6333a6e57f15"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "ACCEPTANCE"
+      ],
+      "command": "Root recomputes snapshot and validates retained evidence; independently confirms saved B PASS and note/finding dispositions",
+      "fixture": "Same frozen source, coordination revision1 and original requirements; this is acceptance inspection, not additional behavior execution.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-A1-snapshot.txt",
+          "sha256": "ec773151ffb692e4f0ecb971c8098309c46ea31160ae60ac1f9805b8201d9636"
+        },
+        {
+          "path": "logs/B1-A1-evidence-check.txt",
+          "sha256": "81828abe0d1c81b5e4eb916952f5b836602ea32b9d805bf8745e0afd442d4d62"
+        }
+      ]
+    }
+  ]
+}

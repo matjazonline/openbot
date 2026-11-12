@@ -132,7 +132,7 @@ async fn channel_reply_publication_policy_change_refuses_without_redirecting() {
     )
     .await;
     changed.approval_policy =
-        Some(ReplyApprovalPolicy::new(vec![f.s.owner().user_id()], 60).unwrap());
+        Some(ReplyApprovalPolicy::new(vec![f.s.owner_principal()], 60).unwrap());
     f.p.configure_channel_reply(changed).await.unwrap();
     let before = outbound_count(&f).await;
     assert_eq!(
@@ -186,13 +186,13 @@ async fn channel_reply_publication_write_failure_rolls_back_then_replays_origina
 async fn channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit()
  {
     let s = Intents::new().await;
-    let owner = s.owner().user_id();
+    let owner_principal = s.owner_principal();
     let f = FinalFixture::from_case(
         s,
         FinalCase {
             source: final_source("data.map"),
             contract: literal_contract("Done"),
-            policy: Some(ReplyApprovalPolicy::new(vec![owner], 2).unwrap()),
+            policy: Some(ReplyApprovalPolicy::new(vec![owner_principal], 2).unwrap()),
             run_as: None,
             publication: FinalPublication::Standard,
             delivery_policy: DeliveryPolicy::Deliver,

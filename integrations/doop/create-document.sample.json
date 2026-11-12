@@ -10,7 +10,7 @@
     "action_approval": {
       "reviewers": [
         {
-          "kind": "user",
+          "kind": "principal",
           "id": "00000000-0000-0000-0000-000000000006"
         }
       ],

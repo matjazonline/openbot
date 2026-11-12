@@ -1,0 +1,9 @@
+
+running 4 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_publication_approved_reviewer_must_retain_payload_clearance ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::workflow_decision_membership_delete_preserves_settled_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::workflow_admit_token_reviewers_current_authority_and_saved_replay ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4220 filtered out; finished in 2.00s
+

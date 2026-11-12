@@ -155,8 +155,8 @@ async fn workflow_decision_notice_cross_company_and_unique_link() {
         .execute(&mut *tx)
         .await
         .unwrap();
-    let error = sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,user_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,$4,0,$5)")
-        .bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(rows[0].principal_id).bind(f.users[0]).bind(rows[1].notice_delivery_id).execute(&mut *tx).await.unwrap_err();
+    let error = sqlx::query("INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id,reviewer_label) VALUES($1,$2,$3,0,$4,$5)")
+        .bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(rows[0].principal_id).bind(rows[1].notice_delivery_id).bind(&view.reviewer_labels[0].label).execute(&mut *tx).await.unwrap_err();
     constraint(error, "workflow_decision_reviewer_notice");
     tx.rollback().await.unwrap();
 }

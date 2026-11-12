@@ -1,0 +1,11 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.66s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 4 tests
+test application::workflow::publication::tests::role_tests::workflow_role_publication_rejects_whole_approval_role_defaults_including_nested_containers ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_mixed_steps_keep_only_the_pinned_agent ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_preserves_whole_approval_pinned_principal_defaults_and_params ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_has_requirements_without_agent_capture_and_restores_exactly ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4224 filtered out; finished in 0.11s
+

@@ -1194,6 +1194,7 @@ mod tests {
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -1418,6 +1419,7 @@ regis";
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -1542,6 +1544,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),

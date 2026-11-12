@@ -51,23 +51,25 @@ fn definition_summary(
     })
 }
 
-pub(super) type BindingRow = (
-    Uuid,
-    i64,
-    i64,
-    bool,
-    Option<Uuid>,
-    Option<Uuid>,
-    Uuid,
-    Uuid,
-    Value,
-    Uuid,
-    Option<String>,
-);
+#[derive(sqlx::FromRow)]
+pub(super) struct BindingRow {
+    id: Uuid,
+    state_revision: i64,
+    configuration_revision: i64,
+    active: bool,
+    channel_id: Option<Uuid>,
+    thread_id: Option<Uuid>,
+    workflow_id: Uuid,
+    version_id: Uuid,
+    params: Value,
+    run_as_user_id: Uuid,
+    message_trigger: Option<String>,
+    escalation: Option<Value>,
+}
 
 pub(super) const BINDING_COLUMNS: &str = "binding.id, binding.state_revision, binding.configuration_revision, \
     binding.active, binding.channel_id, binding.thread_id, version.workflow_id, revision.version_id, \
-    revision.params, revision.run_as_user_id, revision.message_trigger";
+    revision.params, revision.run_as_user_id, revision.message_trigger, revision.escalation";
 pub(super) const BINDING_FROM: &str = "FROM workflow_bindings AS binding \
     JOIN workflow_binding_revisions AS revision ON revision.company_id = binding.company_id \
       AND revision.binding_id = binding.id AND revision.revision = binding.configuration_revision \
@@ -75,30 +77,23 @@ pub(super) const BINDING_FROM: &str = "FROM workflow_bindings AS binding \
       AND version.id = revision.version_id";
 
 pub(super) fn binding_summary(row: BindingRow) -> AppResult<BindingSummary> {
-    let (
-        id,
-        state,
-        configuration,
-        active,
-        channel,
-        thread,
-        workflow,
-        version,
-        params,
-        run_as,
-        trigger,
-    ) = row;
     Ok(BindingSummary {
-        binding: WorkflowBindingId::new(id),
-        state_revision: revision_of(state)?,
-        configuration_revision: revision_of(configuration)?,
-        active,
-        association: association_from_columns(channel, thread)?,
-        workflow: WorkflowId::new(workflow),
-        version: VersionId::new(version),
-        params,
-        run_as,
-        message_trigger: trigger
+        escalation: row
+            .escalation
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(|_| invalid())?,
+        binding: WorkflowBindingId::new(row.id),
+        state_revision: revision_of(row.state_revision)?,
+        configuration_revision: revision_of(row.configuration_revision)?,
+        active: row.active,
+        association: association_from_columns(row.channel_id, row.thread_id)?,
+        workflow: WorkflowId::new(row.workflow_id),
+        version: VersionId::new(row.version_id),
+        params: row.params,
+        run_as: row.run_as_user_id,
+        message_trigger: row
+            .message_trigger
             .map(|trigger| trigger.parse().map_err(|_| invalid()))
             .transpose()?,
     })
@@ -130,6 +125,8 @@ pub(super) const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, c
 
 pub(super) fn run_summary(row: RunRow) -> AppResult<RunSummary> {
     Ok(RunSummary {
+        role_holders: Vec::new(),
+        role_holders_truncated: false,
         run: RunId::new(row.id),
         binding: WorkflowBindingId::new(row.binding_id),
         workflow: WorkflowId::new(row.workflow_id),
@@ -167,12 +164,19 @@ fn run_list_query(
 ) -> QueryBuilder<'static, Postgres> {
     let mut query = QueryBuilder::new("");
     let Some(agent) = filter.agent else {
-        push_run_page(&mut query, company, None, filter, cursor, limit);
+        push_run_page(
+            &mut query,
+            company,
+            RunPageSelection::All,
+            filter,
+            cursor,
+            limit,
+        );
         return query;
     };
     query
         .push(format!(
-            "SELECT {RUN_COLUMNS} FROM (SELECT version.id AS used_version \
+            "SELECT {RUN_COLUMNS} FROM ((SELECT {RUN_COLUMNS} FROM (SELECT version.id AS used_version \
              FROM workflow_versions AS version WHERE version.company_id = "
         ))
         .push_bind(company.as_uuid())
@@ -182,7 +186,7 @@ fn run_list_query(
     push_run_page(
         &mut query,
         company,
-        Some("agent_versions.used_version"),
+        RunPageSelection::Version("agent_versions.used_version"),
         filter,
         cursor,
         limit,
@@ -190,7 +194,54 @@ fn run_list_query(
     query
         .push(") AS run ORDER BY created_at DESC, id DESC LIMIT ")
         .push_bind(limit);
+    query.push(") UNION (");
+    push_run_page(
+        &mut query,
+        company,
+        RunPageSelection::RoleAgent(agent),
+        filter,
+        cursor,
+        limit,
+    );
     query
+        .push(")) AS matching_runs ORDER BY created_at DESC, id DESC LIMIT ")
+        .push_bind(limit);
+    query
+}
+
+enum RunPageSelection {
+    All,
+    Version(&'static str),
+    RoleAgent(Uuid),
+}
+
+pub(super) enum RoleAgentScope {
+    List,
+    BoardWindow,
+}
+
+/// Role selections belong to the root capture and are inherited by its child runs.
+pub(super) fn push_role_agent_scope(
+    query: &mut QueryBuilder<'static, Postgres>,
+    company: CompanyId,
+    agent: Uuid,
+    scope: RoleAgentScope,
+) {
+    query.push(match scope {
+        RoleAgentScope::List => "id IN (SELECT ownership.run_id ",
+        RoleAgentScope::BoardWindow => "EXISTS (SELECT 1 ",
+    });
+    query.push("FROM run_dependency_manifests AS ownership \
+        JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \
+          AND role_binding.run_id=ownership.root_run_id AND role_binding.manifest_id=ownership.manifest_id \
+        WHERE ownership.company_id=").push_bind(company.as_uuid())
+        .push(" AND role_binding.agent_id=").push_bind(agent).push(" AND role_binding.resolution_revision=0");
+    if matches!(scope, RoleAgentScope::BoardWindow) {
+        // The board already materialized its bounded window. Preserve correlation so a generic
+        // plan probes each visible run rather than rebuilding the agent's entire history six times.
+        query.push(" AND ownership.run_id=run_scope.id OFFSET 0");
+    }
+    query.push(")");
 }
 
 /// One newest-first page of the company's runs with the filters present — only those, because a
@@ -200,7 +251,7 @@ fn run_list_query(
 fn push_run_page(
     query: &mut QueryBuilder<'static, Postgres>,
     company: CompanyId,
-    version: Option<&'static str>,
+    selection: RunPageSelection,
     filter: &RunFilter,
     cursor: Option<(DateTime<Utc>, Uuid)>,
     limit: i64,
@@ -210,8 +261,15 @@ fn push_run_page(
             "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = "
         ))
         .push_bind(company.as_uuid());
-    if let Some(version) = version {
-        query.push(format!(" AND version_id = {version}"));
+    match selection {
+        RunPageSelection::All => {}
+        RunPageSelection::Version(version) => {
+            query.push(format!(" AND version_id = {version}"));
+        }
+        RunPageSelection::RoleAgent(agent) => {
+            query.push(" AND ");
+            push_role_agent_scope(query, company, agent, RoleAgentScope::List);
+        }
     }
     if let Some(binding) = filter.binding {
         query
@@ -450,16 +508,17 @@ impl WorkflowReads for PostgresPersistence {
             .build_query_as::<RunRow>()
             .fetch_all(self.pool())
             .await?;
-        warn_if_run_list_is_slow(company, filter, page.size, rows.len(), started.elapsed());
-        let rows = rows
+        let mut rows = rows
             .into_iter()
             .map(run_summary)
             .collect::<AppResult<Vec<_>>>()?;
+        super::role_views::populate(self, company, &mut rows).await?;
+        warn_if_run_list_is_slow(company, filter, page.size, rows.len(), started.elapsed());
         Ok(paged(rows, page.size))
     }
 
     async fn run_summary(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunSummary>> {
-        sqlx::query_as::<_, RunRow>(&format!(
+        let mut summary = sqlx::query_as::<_, RunRow>(&format!(
             "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = $1 AND id = $2"
         ))
         .bind(company.as_uuid())
@@ -467,7 +526,11 @@ impl WorkflowReads for PostgresPersistence {
         .fetch_optional(self.pool())
         .await?
         .map(run_summary)
-        .transpose()
+        .transpose()?;
+        if let Some(summary) = &mut summary {
+            super::role_views::populate(self, company, std::slice::from_mut(summary)).await?;
+        }
+        Ok(summary)
     }
 
     async fn run_board_counts(
@@ -501,13 +564,15 @@ impl WorkflowReads for PostgresPersistence {
         if visible.is_empty() {
             return Ok(Vec::new());
         }
-        board_reads::board_cards_query(company, scope, cutoff, visible)
+        let mut rows = board_reads::board_cards_query(company, scope, cutoff, visible)
             .build_query_as::<RunRow>()
             .fetch_all(self.pool())
             .await?
             .into_iter()
             .map(run_summary)
-            .collect()
+            .collect::<AppResult<Vec<_>>>()?;
+        super::role_views::populate(self, company, &mut rows).await?;
+        Ok(rows)
     }
 
     async fn child_rollup(

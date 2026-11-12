@@ -71,7 +71,7 @@ pub(super) fn decision_child() -> Value {
         "steps": {
             "review": {"type":"decision.human","with":{
                 "proposal":{"object":{"question":{"ref":"/input/question"}}},
-                "reviewers":{"array":[{"object":{"kind":{"literal":"user"},"id":{"ref":"/params/reviewer"}}}]},
+                "reviewers":{"array":[{"object":{"kind":{"literal":"principal"},"id":{"ref":"/params/reviewer"}}}]},
                 "deadline":{"literal":deadline},
                 "data_schema":{"literal":{"type":"string","maxLength":256}}},
                 "routes":{"choices":{"approve":"outcome","reject":"outcome"}}},
@@ -194,7 +194,7 @@ impl ToolSetup {
                 name: TypeName::parse(TOOL).unwrap(),
                 workflow: WorkflowId::new(Uuid::from_u128(CHILD)),
                 version: child,
-                params: json!({"reviewer": reviewer.to_string()}),
+                params: json!({"reviewer": fixture.principal(reviewer).await.to_string()}),
                 expected: None,
             },
         )

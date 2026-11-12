@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "round": "02WR-P02-B1-R1",
+  "artifact": "be7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Owned PG18.6 localhost60242; fresh openbot_roles_p02_review, isolated fixture databases; SQLX_OFFLINE=true, indexed migration database",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/02WR-P02-B1-R1-role-tests.txt",
+          "sha256": "0c399c8f919aeeadb26376ddd03cb6f57d4477e7b6f3c12c45256a7d07f12926"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib memory_capture_agent_delete",
+      "fixture": "Owned PG18.6 localhost60242; fresh openbot_roles_p02_review, isolated fixture databases; SQLX_OFFLINE=true, indexed migration database",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/02WR-P02-B1-R1-memory-delete.txt",
+          "sha256": "4708abf5e4a3eef54cb969d2dbdd1d632567a24f50637c77c89249e658de1f05"
+        }
+      ]
+    }
+  ]
+}

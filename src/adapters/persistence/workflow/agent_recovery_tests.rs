@@ -34,10 +34,12 @@ pub(super) async fn supervised(
     .await
 }
 
-pub(super) fn tokens(max_tokens: u64) -> impl FnOnce(&mut Value, Uuid) {
+pub(super) fn tokens(
+    max_tokens: u64,
+) -> impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId) {
     move |source, actor| {
         source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
-            "tokens":{"max_tokens":max_tokens,"reviewers":[{"kind":"user","id":actor}]}});
+            "tokens":{"max_tokens":max_tokens,"reviewers":[{"kind":"principal","id":actor}]}});
     }
 }
 
@@ -618,6 +620,7 @@ async fn workflow_agent_run_dynamic_selection_runs_the_bound_agent() {
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

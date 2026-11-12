@@ -29,6 +29,8 @@ pub struct NotificationProjectionCommit<'a> {
     pub fence: &'a ExecutionLease<NotificationEventId>,
     pub expected: &'a NotificationProjection,
     pub email: Option<&'a NewStandaloneDelivery>,
+    /// Captured only when an escalation control creates its first hop.
+    pub escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -36,6 +38,7 @@ pub enum NotificationProjectionCommitOutcome {
     Applied,
     Stale,
     LeaseLost,
+    Deferred,
 }
 
 #[derive(Debug, Clone, Copy)]

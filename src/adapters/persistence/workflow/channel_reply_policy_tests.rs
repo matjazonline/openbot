@@ -5,7 +5,7 @@ use crate::application::workflow::channel_reply::ReplyApprovalPolicy;
 async fn channel_reply_completion_policy_settings_freeze_duration_for_ingress() {
     let s = Intents::new().await;
     let binding = s.binding(MessageTrigger::Any, None).await;
-    let policy = ReplyApprovalPolicy::new(vec![s.owner().user_id()], 60).unwrap();
+    let policy = ReplyApprovalPolicy::new(vec![s.owner_principal()], 60).unwrap();
     let mut request = selection(&s, binding, None).await;
     request.approval_policy = Some(policy.clone());
     let selected = s.p().configure_channel_reply(request).await.unwrap();
@@ -20,7 +20,7 @@ async fn channel_reply_completion_policy_settings_freeze_duration_for_ingress() 
     assert_eq!(frozen, serde_json::to_value(&policy).unwrap());
     let mut changed = selection(&s, binding, Some(selected.revision)).await;
     changed.approval_policy =
-        Some(ReplyApprovalPolicy::new(vec![s.owner().user_id()], 120).unwrap());
+        Some(ReplyApprovalPolicy::new(vec![s.owner_principal()], 120).unwrap());
     s.p().configure_channel_reply(changed).await.unwrap();
     let retained: Value =
         sqlx::query_scalar("SELECT approval_policy FROM channel_reply_contexts WHERE intent_id=$1")
@@ -44,7 +44,7 @@ async fn channel_reply_completion_policy_rejects_unprivileged_reviewers_and_inva
     let s = Intents::new().await;
     let binding = s.binding(MessageTrigger::Any, None).await;
     let ordinary = member(&s.fixture, "member").await;
-    for reviewer in [ordinary, Uuid::new_v4()] {
+    for reviewer in [s.fixture.principal(ordinary).await, Uuid::new_v4()] {
         let mut request = selection(&s, binding, None).await;
         request.approval_policy = Some(ReplyApprovalPolicy::new(vec![reviewer], 60).unwrap());
         assert!(s.p().configure_channel_reply(request).await.is_err());
@@ -53,9 +53,9 @@ async fn channel_reply_completion_policy_rejects_unprivileged_reviewers_and_inva
     for policy in [
         json!({}),
         json!({"reviewers":[],"review_timeout_seconds":60}),
-        json!({"reviewers":[{"kind":"user","id":s.owner().user_id()}],"review_timeout_seconds":0}),
-        json!({"reviewers":[{"kind":"user","id":s.owner().user_id()}],"review_timeout_seconds":86401}),
-        json!({"reviewers":[{"kind":"user","id":Uuid::nil()}],"review_timeout_seconds":60}),
+        json!({"reviewers":[{"kind":"principal","id":s.owner().user_id()}],"review_timeout_seconds":0}),
+        json!({"reviewers":[{"kind":"principal","id":s.owner().user_id()}],"review_timeout_seconds":86401}),
+        json!({"reviewers":[{"kind":"principal","id":Uuid::nil()}],"review_timeout_seconds":60}),
     ] {
         assert!(sqlx::query("UPDATE channel_reply_settings SET revision=revision+1,approval_policy=$1 WHERE company_id=$2 AND channel_id=$3")
             .bind(policy).bind(s.fixture.target.company.as_uuid()).bind(s.channel).execute(s.pool()).await.is_err());

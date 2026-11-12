@@ -29,7 +29,7 @@ async fn protected() -> McpSetup {
         .unwrap();
     let mut source = source();
     source["steps"]["lookup"]["with"]["approval"] = json!({"literal":{
-        "reviewers":[{"kind":"user","id":fixture.target.actor.user_id()}],
+        "reviewers":[{"kind":"principal","id":fixture.principal(fixture.target.actor.user_id()).await}],
         "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()
     }});
     let version = Box::pin(published_source(&fixture, connection.id, source)).await;

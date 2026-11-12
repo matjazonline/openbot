@@ -70,6 +70,7 @@ struct RunRow {
     run_id: Option<Uuid>,
     run_state: Option<String>,
     refusal: Option<String>,
+    role_refusal: Option<serde_json::Value>,
     last_error: Option<String>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
@@ -86,6 +87,11 @@ impl RunRow {
             run_id: self.run_id,
             run_state: self.run_state,
             refusal: self.refusal,
+            role_refusal: self
+                .role_refusal
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|_| invalid())?,
             last_error: self.last_error,
             created_at: self.created_at,
             updated_at: self.updated_at,
@@ -96,7 +102,7 @@ impl RunRow {
 const RUNS: &str = "SELECT occurrence.id, occurrence.scheduled_for, \
        occurrence.command_key IS NOT NULL AS manual, occurrence.materialization_status, \
        occurrence.run_id, run.state AS run_state, occurrence.refusal, occurrence.last_error, \
-       occurrence.created_at, occurrence.updated_at \
+       occurrence.created_at, occurrence.updated_at, occurrence.role_refusal \
      FROM schedule_runs AS occurrence \
      LEFT JOIN workflow_runs AS run ON run.company_id = occurrence.company_id AND run.id = occurrence.run_id \
      WHERE occurrence.company_id = $1 AND occurrence.schedule_id = $2";
@@ -819,17 +825,35 @@ impl ScheduleOccurrences for PostgresPersistence {
         &self,
         claim: OccurrenceClaim,
         refusal: &'static str,
+        role: Option<&crate::entities::department::RoleAdmissionRefusal>,
     ) -> AppResult<bool> {
-        let error = format!("The workflow binding refused this occurrence ({refusal})");
-        Ok(self
+        let error = role
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("The workflow binding refused this occurrence ({refusal})"));
+        let role = role
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|_| invalid())?;
+        let recorded = self
             .record(
                 claim,
-                "refusal = $5, last_error = $6, materialization_status = 'failed'",
-                Outcome::Refusal(refusal, error.clone()),
+                "refusal = $5, last_error = $6, materialization_status = 'failed', role_refusal = $7",
+                Outcome::Refusal { code: refusal, message: error.clone(), role:role.clone() },
                 Some(&error),
             )
             .await?
-            .is_some())
+            .is_some();
+        if recorded {
+            return Ok(true);
+        }
+        let Some(role) = role else { return Ok(false) };
+        // Admission commits a definite role refusal with the occurrence. This is only a read
+        // of that terminal result, like record_run above; it grants no new lease or side effect.
+        Ok(sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM schedule_runs WHERE company_id=$1 AND id=$2 \
+             AND materialization_status='failed' AND run_id IS NULL AND refusal=$3 AND role_refusal=$4",
+        ).bind(claim.company.as_uuid()).bind(claim.occurrence).bind(refusal).bind(role)
+            .fetch_optional(&self.pool).await?.is_some())
     }
 
     async fn record_error(&self, claim: OccurrenceClaim, error: &str) -> AppResult<ErrorRecorded> {
@@ -860,7 +884,11 @@ const LEASE_EXPIRED_AT_LIMIT: &str = "Materialization lease expired at retry lim
 /// The values a fenced outcome write binds after the claim (`$5`, `$6`).
 enum Outcome {
     Run(Uuid),
-    Refusal(&'static str, String),
+    Refusal {
+        code: &'static str,
+        message: String,
+        role: Option<serde_json::Value>,
+    },
     Error(String),
 }
 
@@ -910,7 +938,11 @@ impl PostgresPersistence {
             .bind(claim.generation);
         let query = match outcome {
             Outcome::Run(run) => query.bind(run),
-            Outcome::Refusal(refusal, error) => query.bind(refusal).bind(error),
+            Outcome::Refusal {
+                code,
+                message,
+                role,
+            } => query.bind(code).bind(message).bind(role),
             Outcome::Error(error) => query.bind(error),
         };
         let status = query.fetch_optional(&mut *tx).await?;

@@ -1,0 +1,29 @@
+{
+  "before": 4202,
+  "after": 4224,
+  "added": [
+    "adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane",
+    "adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_preserves_unsaved_source",
+    "adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors",
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it",
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices",
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_missing_holder_refuses_before_run",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_agent",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission",
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_run_company_owner_lock_prefix_precedes_publication_company_gate",
+    "application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor",
+    "application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication",
+    "application::workflow::publication::tests::role_tests::workflow_role_model_and_people_requirements_coexist_on_one_step_without_selector_confusion"
+  ],
+  "removed": []
+}

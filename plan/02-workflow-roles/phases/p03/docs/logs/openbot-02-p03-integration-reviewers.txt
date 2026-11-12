@@ -1,0 +1,8 @@
+integrations/doop/create-document.sample.json:11:      "reviewers": [
+integrations/doop/create-document.sample.json:13:          "kind": "user",
+integrations/doop/create-document.sample.json:22:        "kind": "user",
+integrations/doop/create-document.sample.json:234:                  "kind": "user",
+integrations/doop/create-document.workflow.json:40:          "reviewers": {
+integrations/doop/create-document.workflow.json:48:                  "const": "user"
+integrations/doop/create-document.workflow.json:69:          "reviewers",
+integrations/doop/create-document.workflow.json:88:              "const": "user"

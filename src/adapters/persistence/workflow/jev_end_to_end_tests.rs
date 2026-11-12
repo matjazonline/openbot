@@ -107,7 +107,7 @@ async fn jev_end_to_end_mixed_thresholds_automatic_and_uncertain_human() {
             serde_json::from_str(include_str!("../../../../samples/jev-triage.json")).unwrap();
         let mut source = fixture["source"].clone();
         source["steps"]["review"]["with"]["reviewers"]["literal"][0]["id"] =
-            json!(f.target.actor.user_id());
+            json!(f.principal(f.target.actor.user_id()).await);
         let target = bound_source(&f, &c, source).await;
         let AdmissionResult::Created(run) = admit(&f, target, "mixed-scenario").await.unwrap()
         else {

@@ -676,6 +676,7 @@ mod tests {
 
     fn occurrence(status: OccurrenceStatus) -> ScheduleRun {
         ScheduleRun {
+            role_refusal: None,
             id: Uuid::new_v4(),
             scheduled_for: Utc::now(),
             manual: false,

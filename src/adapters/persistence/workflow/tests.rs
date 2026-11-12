@@ -21,6 +21,8 @@ mod http_tests;
 mod jev_tests;
 #[path = "projection_test_support.rs"]
 mod projection_test_support;
+#[path = "role_binding_tests.rs"]
+mod role_binding_tests;
 pub(crate) use http_tests::reconciliation_fixture;
 #[path = "local_agent_tests.rs"]
 mod local_agent_tests;
@@ -148,6 +150,17 @@ async fn recorded(
 }
 
 impl Fixture {
+    async fn principal(&self, user: Uuid) -> Uuid {
+        sqlx::query_scalar(
+            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+        )
+        .bind(self.target.company.as_uuid())
+        .bind(user)
+        .fetch_one(self.persistence.pool())
+        .await
+        .unwrap()
+    }
+
     async fn publish_agent(
         &self,
         agent: Uuid,

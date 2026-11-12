@@ -152,3 +152,6 @@ async fn channel_reply_publication_internal_source_never_falls_back_to_email() {
         json!({"audience":"internal_only","entry":"note","email":false})
     );
 }
+
+#[path = "reviewer_account_race_tests.rs"]
+mod reviewer_account_race_tests;

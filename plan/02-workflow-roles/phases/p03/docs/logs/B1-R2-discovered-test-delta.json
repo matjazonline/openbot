@@ -1,0 +1,11 @@
+{
+  "before": 4224,
+  "after": 4228,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::business_member_tests::workflow_reviewer_principal_visible_ordinary_member_parks_and_submits_business_decision",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_final_publication_rechecks_approved_reviewer_privilege",
+    "application::workflow::publication::tests::role_tests::workflow_role_publication_preserves_whole_approval_pinned_principal_defaults_and_params",
+    "application::workflow::publication::tests::role_tests::workflow_role_publication_rejects_whole_approval_role_defaults_including_nested_containers"
+  ],
+  "removed": []
+}

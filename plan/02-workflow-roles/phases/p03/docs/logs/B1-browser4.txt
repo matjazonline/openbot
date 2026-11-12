@@ -1,0 +1,10 @@
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (2743.903042ms)
+✔ reviewer roles and people update unsaved source with visible progress and stale-response protection (2530.118ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 5522.461209

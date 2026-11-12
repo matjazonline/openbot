@@ -1,0 +1,13 @@
+$ cargo test --locked --offline --lib agent_retire_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 5 tests
+test adapters::persistence::agent::retire_tests::agent_retire_keeps_messages_participants_and_threads ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_races_agent_principal_upsert ... ok
+test adapters::persistence::workflow::tests::admission_tests::model_usage_tests::agent_retire_with_usage_rows_reports_run_history ... ok
+test adapters::persistence::agent::retire_tests::agent_retire_company_delete_still_removes_everything ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::agent_retire_with_harness_runs_reports_run_history ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4195 filtered out; finished in 2.44s
+

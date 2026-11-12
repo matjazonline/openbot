@@ -1,0 +1,632 @@
+{
+  "minimum_saved_tokens": 3696360,
+  "scope": "Conservatively deduplicated retained graft header+query identities for plan02 task; indistinguishable repeated calls merged, copied output not counted twice; unretained direct calls omitted. No dollar estimates reported.",
+  "packs": 125,
+  "entries": [
+    {
+      "retained_output": "/tmp/openbot-02-relay-api.txt",
+      "identity": "graft skeleton \u2014 src/application/use_cases/thread/ingest/relay.rs",
+      "reported_tokens_saved": 2080
+    },
+    {
+      "retained_output": "/tmp/openbot-02-runsui-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/http/pages/workflow_runs/mod.rs",
+      "reported_tokens_saved": 6190
+    },
+    {
+      "retained_output": "/tmp/openbot-02-active-rev.txt",
+      "identity": "\"active_revision_id\" \u2014 1 hits in 1 symbols across 1 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 2213
+    },
+    {
+      "retained_output": "/tmp/openbot-02-discovery.txt",
+      "identity": "graft ask \u2014 \"compile workflow agent.run role agent requirements registry publication binding activate department\"  (lexical)",
+      "reported_tokens_saved": 18621
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-delete-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/agent.rs",
+      "reported_tokens_saved": 6128
+    },
+    {
+      "retained_output": "/tmp/openbot-02-run-summary-final-callers.txt",
+      "identity": "run_summary \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L131-L150",
+      "reported_tokens_saved": 12120
+    },
+    {
+      "retained_output": "/tmp/openbot-02-scenario-api.txt",
+      "identity": "graft skeleton \u2014 src/application/services/test_support/scenario.rs",
+      "reported_tokens_saved": 2742
+    },
+    {
+      "retained_output": "/tmp/openbot-02-admission-lock-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/admission_binding.rs",
+      "reported_tokens_saved": 1919
+    },
+    {
+      "retained_output": "/tmp/openbot-02-selected-summary.txt",
+      "identity": "\"SelectedAgentSummary\" \u2014 15 hits in 14 symbols across 7 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 17645
+    },
+    {
+      "retained_output": "/tmp/openbot-02-run-filter-callers.txt",
+      "identity": "run_list_query \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L162-L194",
+      "reported_tokens_saved": 10320
+    },
+    {
+      "retained_output": "/tmp/openbot-02-binding-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/message_ingress_binding_support.rs",
+      "reported_tokens_saved": 492
+    },
+    {
+      "retained_output": "/tmp/openbot-02-populate-callers.txt",
+      "identity": "populate \u00b7 function \u00b7 src/adapters/persistence/workflow/agent_history_capacity_prefix_fixture.rs:L81-L149",
+      "reported_tokens_saved": 5147
+    },
+    {
+      "retained_output": "/tmp/openbot-02-runviews-api.txt",
+      "identity": "graft skeleton \u2014 src/application/workflow/run_views.rs",
+      "reported_tokens_saved": 2060
+    },
+    {
+      "retained_output": "/tmp/openbot-02-admission-test-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/admission_tests.rs",
+      "reported_tokens_saved": 3685
+    },
+    {
+      "retained_output": "/tmp/openbot-02-bindingstate.txt",
+      "identity": "\"struct BindingState\" \u2014 1 hits in 1 symbols across 1 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 1238
+    },
+    {
+      "retained_output": "/tmp/openbot-02-bindings.txt",
+      "identity": "\"BindingConfiguration\" \u2014 20 hits in 18 symbols across 11 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 20344
+    },
+    {
+      "retained_output": "/tmp/openbot-02-dept-update-callers.txt",
+      "identity": "update_department_on \u00b7 function \u00b7 src/adapters/persistence/department.rs:L387-L440",
+      "reported_tokens_saved": 10453
+    },
+    {
+      "retained_output": "/tmp/openbot-02-roles-representation.txt",
+      "identity": "\"roles:\" \u2014 31 hits in 29 symbols across 22 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 110274
+    },
+    {
+      "retained_output": "/tmp/openbot-02-knowledge-selection-callers.txt",
+      "identity": "frozen_selection \u00b7 function \u00b7 src/adapters/persistence/workflow/knowledge_checkpoint.rs:L198-L256",
+      "reported_tokens_saved": 7927
+    },
+    {
+      "retained_output": "/tmp/openbot-02-intent-failures.txt",
+      "identity": "\"BindingOutcome::Failed\" \u2014 9 hits in 9 symbols across 6 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 39644
+    },
+    {
+      "retained_output": "/tmp/openbot-02-summary-callers.txt",
+      "identity": "selected_agent_summary \u00b7 function \u00b7 src/adapters/persistence/workflow/run_views.rs:L648-L682",
+      "reported_tokens_saved": 6414
+    },
+    {
+      "retained_output": "/tmp/openbot-02-dept-updated-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/department.rs",
+      "reported_tokens_saved": 9503
+    },
+    {
+      "retained_output": "/tmp/openbot-02-scripted-location.txt",
+      "identity": "\"struct ScriptedLlm\" \u2014 1 hits in 1 symbols across 1 files (searched 2013 indexed files)",
+      "reported_tokens_saved": 3276
+    },
+    {
+      "retained_output": "/tmp/openbot-02-capture-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/agent_manifest/capture.rs",
+      "reported_tokens_saved": 770
+    },
+    {
+      "retained_output": "/tmp/openbot-02-schedule-support-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/schedule_test_support.rs",
+      "reported_tokens_saved": 1065
+    },
+    {
+      "retained_output": "/tmp/openbot-02-checkpoint-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/knowledge_checkpoint.rs",
+      "reported_tokens_saved": 2503
+    },
+    {
+      "retained_output": "/tmp/openbot-02-version-wire.txt",
+      "identity": "\"VersionId\" \u2014 300 hits in 269 symbols across 131 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 395599
+    },
+    {
+      "retained_output": "/tmp/openbot-02-semantic-revision.txt",
+      "identity": "\"SEMANTIC_REVISION\" \u2014 7 hits in 7 symbols across 5 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 8195
+    },
+    {
+      "retained_output": "/tmp/openbot-02-schedule-runtime-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/schedule_runtime_tests.rs",
+      "reported_tokens_saved": 1255
+    },
+    {
+      "retained_output": "/tmp/openbot-02-dept-create-callers.txt",
+      "identity": "create_department_on \u00b7 function \u00b7 src/adapters/persistence/department.rs:L302-L320",
+      "reported_tokens_saved": 10465
+    },
+    {
+      "retained_output": "/tmp/openbot-02-binding-write.txt",
+      "identity": "\"binding_write\" \u2014 8 hits in 5 symbols across 1 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 9626
+    },
+    {
+      "retained_output": "/tmp/openbot-02-active-binding.txt",
+      "identity": "\"binding.active\" \u2014 18 hits in 18 symbols across 15 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 81312
+    },
+    {
+      "retained_output": "/tmp/openbot-02-roleviews-current.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_views.rs",
+      "reported_tokens_saved": 989
+    },
+    {
+      "retained_output": "/tmp/openbot-02-ingress-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "reported_tokens_saved": 5522
+    },
+    {
+      "retained_output": "/tmp/openbot-02-relay-refusal.txt",
+      "identity": "graft ask \u2014 \"message intent admission relay refused disabled channel notification sender\"  (lexical)",
+      "reported_tokens_saved": 80006
+    },
+    {
+      "retained_output": "/tmp/openbot-02-visibility-struct.txt",
+      "identity": "\"struct PayloadVisibility\" \u2014 1 hits in 1 symbols across 1 files (searched 2019 indexed files)",
+      "reported_tokens_saved": 50
+    },
+    {
+      "retained_output": "/tmp/openbot-02-http-error-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/http/app_error_impl.rs",
+      "reported_tokens_saved": 1000
+    },
+    {
+      "retained_output": "/tmp/openbot-02-board-params-callers.txt",
+      "identity": "board_parameters \u00b7 function \u00b7 src/adapters/persistence/workflow/reads_tests.rs:L204-L226",
+      "reported_tokens_saved": 3343
+    },
+    {
+      "retained_output": "/tmp/openbot-02-forstep-callers.txt",
+      "identity": "for_step \u00b7 function \u00b7 src/adapters/persistence/workflow/role_views.rs:L69-L87",
+      "reported_tokens_saved": 7675
+    },
+    {
+      "retained_output": "/tmp/openbot-02-role-child-final-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "reported_tokens_saved": 1609
+    },
+    {
+      "retained_output": "/tmp/openbot-02-knowledge-context-tests.txt",
+      "identity": "\"knowledge_context\" \u2014 4 hits in 4 symbols across 4 files (searched 2021 indexed files)",
+      "reported_tokens_saved": 7740
+    },
+    {
+      "retained_output": "/tmp/openbot-02-rolebindings-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_binding_tests.rs",
+      "reported_tokens_saved": 1895
+    },
+    {
+      "retained_output": "/tmp/openbot-02-dept-id-create-callers.txt",
+      "identity": "create_department_with_id_on \u00b7 function \u00b7 src/adapters/persistence/department.rs:L324-L384",
+      "reported_tokens_saved": 12735
+    },
+    {
+      "retained_output": "/tmp/openbot-02-resolve-agent.txt",
+      "identity": "\"resolve_agent\" \u2014 39 hits in 21 symbols across 11 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 22139
+    },
+    {
+      "retained_output": "/tmp/openbot-02-publication-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/agent_publication.rs",
+      "reported_tokens_saved": 1063
+    },
+    {
+      "retained_output": "/tmp/openbot-02-execution-callers.txt",
+      "identity": "execution_selection_on \u00b7 function \u00b7 src/adapters/persistence/workflow/agent_manifest/storage.rs:L107-L149",
+      "reported_tokens_saved": 29304
+    },
+    {
+      "retained_output": "/tmp/openbot-02-manifest-type.txt",
+      "identity": "\"struct DependencyManifest\" \u2014 1 hits in 1 symbols across 1 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 798
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-snapshot.txt",
+      "identity": "\"agent_snapshot\" \u2014 2 hits in 2 symbols across 1 files (searched 232 indexed files)",
+      "reported_tokens_saved": 1620
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-callers.txt",
+      "identity": "agent_reference \u00b7 function \u00b7 src/application/workflow/publication/capabilities.rs:L71-L86",
+      "reported_tokens_saved": 51599
+    },
+    {
+      "retained_output": "/tmp/openbot-02-schedule-test-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/schedule_tests.rs",
+      "reported_tokens_saved": 13363
+    },
+    {
+      "retained_output": "/tmp/openbot-02-board-scope.txt",
+      "identity": "\"RunBoardScope\" \u2014 42 hits in 29 symbols across 9 files (searched 2010 indexed files)",
+      "reported_tokens_saved": 31354
+    },
+    {
+      "retained_output": "/tmp/openbot-02-error-surfaces.txt",
+      "identity": "\"KnowledgeTrigger\" \u2014 10 hits in 9 symbols across 7 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 22253
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-key-parse.txt",
+      "identity": "\"AgentKey::parse\" \u2014 58 hits in 48 symbols across 32 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 80805
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-literals.txt",
+      "identity": "\"\"agent\"\" \u2014 227 hits in 166 symbols across 110 files (searched 1821 indexed files)",
+      "reported_tokens_saved": 448774
+    },
+    {
+      "retained_output": "/tmp/openbot-02-publish-helper.txt",
+      "identity": "\"publish_agent\" \u2014 144 hits in 107 symbols across 63 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 193356
+    },
+    {
+      "retained_output": "/tmp/openbot-02-deptuse-api.txt",
+      "identity": "graft skeleton \u2014 src/application/use_cases/department.rs",
+      "reported_tokens_saved": 3373
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-universe.txt",
+      "identity": "\"agent_universe\" \u2014 9 hits in 5 symbols across 4 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 8647
+    },
+    {
+      "retained_output": "/tmp/openbot-02-refusal-surfaces.txt",
+      "identity": "\"input_rejected\" \u2014 3 hits in 3 symbols across 2 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 8216
+    },
+    {
+      "retained_output": "/tmp/openbot-02-admit-import.txt",
+      "identity": "\"AdmitWorkflowRequest\" \u2014 74 hits in 65 symbols across 43 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 161539
+    },
+    {
+      "retained_output": "/tmp/openbot-02-delete-department-callers.txt",
+      "identity": "delete_department_on \u00b7 function \u00b7 src/adapters/persistence/department.rs:L444-L523",
+      "reported_tokens_saved": 10285
+    },
+    {
+      "retained_output": "/tmp/openbot-02-role-filter-scope-callers.txt",
+      "identity": "push_role_agent_scope \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L224-L234",
+      "reported_tokens_saved": 12648
+    },
+    {
+      "retained_output": "/tmp/openbot-02-lineage-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/run_lineage_tests.rs",
+      "reported_tokens_saved": 1531
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-ids.txt",
+      "identity": "\"agent_ids\" \u2014 63 hits in 48 symbols across 23 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 154807
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-reference.txt",
+      "identity": "\"AgentReference\" \u2014 42 hits in 31 symbols across 14 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 29297
+    },
+    {
+      "retained_output": "/tmp/openbot-02-childselection-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs",
+      "reported_tokens_saved": 1402
+    },
+    {
+      "retained_output": "/tmp/openbot-02-access-level-api.txt",
+      "identity": "graft skeleton \u2014 src/domain/entities/access_level.rs",
+      "reported_tokens_saved": 1265
+    },
+    {
+      "retained_output": "/tmp/openbot-02-board-scope-callers.txt",
+      "identity": "push_scope \u00b7 function \u00b7 src/adapters/persistence/workflow/board_reads.rs:L42-L84",
+      "reported_tokens_saved": 12037
+    },
+    {
+      "retained_output": "/tmp/openbot-02-save-binding-callers.txt",
+      "identity": "save_binding_on \u00b7 function \u00b7 src/adapters/persistence/workflow/bindings.rs:L41-L73",
+      "reported_tokens_saved": 35895
+    },
+    {
+      "retained_output": "/tmp/openbot-02-model-example.txt",
+      "identity": "\"agent.run\" \u2014 300 hits in 219 symbols across 105 files (searched 2013 indexed files)",
+      "reported_tokens_saved": 343398
+    },
+    {
+      "retained_output": "/tmp/openbot-02-modelonly-tests.txt",
+      "identity": "\"model_only\" \u2014 21 hits in 14 symbols across 13 files (searched 2016 indexed files)",
+      "reported_tokens_saved": 36894
+    },
+    {
+      "retained_output": "/tmp/openbot-02-dept-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/department.rs",
+      "reported_tokens_saved": 9352
+    },
+    {
+      "retained_output": "/tmp/openbot-02-readiness-callers.txt",
+      "identity": "check_readiness \u00b7 function \u00b7 src/adapters/persistence/workflow/resources.rs:L61-L147",
+      "reported_tokens_saved": 3117
+    },
+    {
+      "retained_output": "/tmp/openbot-02-provisioning-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "reported_tokens_saved": 7431
+    },
+    {
+      "retained_output": "/tmp/openbot-02-guard-type.txt",
+      "identity": "\"struct WorkflowGuardViolation\" \u2014 1 hits in 1 symbols across 1 files (searched 2017 indexed files)",
+      "reported_tokens_saved": 1546
+    },
+    {
+      "retained_output": "/tmp/openbot-02-storage-schema.txt",
+      "identity": "\"struct StoredBundle\" \u2014 1 hits in 1 symbols across 1 files (searched 2014 indexed files)",
+      "reported_tokens_saved": 1641
+    },
+    {
+      "retained_output": "/tmp/openbot-02-capture-callers.txt",
+      "identity": "capture_on \u00b7 function \u00b7 src/adapters/persistence/agent_publication/capture.rs:L43-L100",
+      "reported_tokens_saved": 8355
+    },
+    {
+      "retained_output": "/tmp/openbot-02-role-runtime-inputs.txt",
+      "identity": "\"inputs[\"agent\"]\" \u2014 13 hits in 11 symbols across 8 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 20975
+    },
+    {
+      "retained_output": "/tmp/openbot-02-bindingfixture-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/binding_tests.rs",
+      "reported_tokens_saved": 3723
+    },
+    {
+      "retained_output": "/tmp/openbot-02-channel-write-callers.txt",
+      "identity": "write_channel_settings_on \u00b7 function \u00b7 src/adapters/persistence/channel.rs:L482-L541",
+      "reported_tokens_saved": 25453
+    },
+    {
+      "retained_output": "/tmp/openbot-02-checkpoint-actual-tests.txt",
+      "identity": "\"checkpoint_\" \u2014 84 hits in 61 symbols across 35 files (searched 2021 indexed files)",
+      "reported_tokens_saved": 79509
+    },
+    {
+      "retained_output": "/tmp/openbot-02-markers-callers.txt",
+      "identity": "role_markers \u00b7 function \u00b7 src/adapters/http/pages/workflow_runs/provenance.rs:L48-L70",
+      "reported_tokens_saved": 19980
+    },
+    {
+      "retained_output": "/tmp/openbot-02-deployment-locations.txt",
+      "identity": "\"struct Deployment\" \u2014 2 hits in 2 symbols across 2 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 7997
+    },
+    {
+      "retained_output": "/tmp/openbot-02-query-final-callers.txt",
+      "identity": "run_list_query \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L164-L215",
+      "reported_tokens_saved": 10802
+    },
+    {
+      "retained_output": "/tmp/openbot-02-department-role.txt",
+      "identity": "\"DepartmentRole\" \u2014 106 hits in 76 symbols across 24 files (searched 2003 indexed files)",
+      "reported_tokens_saved": 117639
+    },
+    {
+      "retained_output": "/tmp/openbot-02-filter-type-callers.txt",
+      "identity": "RunFilter \u00b7 struct \u00b7 src/application/workflow/reads.rs:L265-L281",
+      "reported_tokens_saved": 4917
+    },
+    {
+      "retained_output": "/tmp/openbot-02-checkpoint-final-callers.txt",
+      "identity": "frozen_selection \u00b7 function \u00b7 src/adapters/persistence/workflow/knowledge_checkpoint.rs:L197-L258",
+      "reported_tokens_saved": 7914
+    },
+    {
+      "retained_output": "/tmp/openbot-02-role-sql-final-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "reported_tokens_saved": 3514
+    },
+    {
+      "retained_output": "/tmp/openbot-02-message-test-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/message_intent_tests.rs",
+      "reported_tokens_saved": 14017
+    },
+    {
+      "retained_output": "/tmp/openbot-02-query-parameters-callers.txt",
+      "identity": "parameters \u00b7 function \u00b7 src/adapters/persistence/workflow/reads_tests.rs:L15-L42",
+      "reported_tokens_saved": 3347
+    },
+    {
+      "retained_output": "/tmp/openbot-02-manual-admission.txt",
+      "identity": "graft ask \u2014 \"message admission service prepare manual AdmissionRequest production services admission\"  (lexical)",
+      "reported_tokens_saved": 49889
+    },
+    {
+      "retained_output": "/tmp/openbot-02-provenance-api.txt",
+      "identity": "graft skeleton \u2014 src/adapters/http/pages/workflow_runs/provenance.rs",
+      "reported_tokens_saved": 1410
+    },
+    {
+      "retained_output": "/tmp/openbot-02-store-bundle-callers.txt",
+      "identity": "store_bundle \u00b7 function \u00b7 src/application/workflow/publication/storage.rs:L75-L112",
+      "reported_tokens_saved": 48819
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/compile-resolved-callers.txt",
+      "identity": "compile_resolved \u00b7 function \u00b7 src/application/workflow/compiler/compile.rs:L678-L742",
+      "reported_tokens_saved": 11602
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/forged-snapshot-cases.txt",
+      "identity": "\"forged_snapshot\" \u2014 1 hits in 1 symbols across 1 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 8169
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/set-desk-ownership-callers.txt",
+      "identity": "set_desk_ownership_on \u00b7 function \u00b7 src/adapters/persistence/department_desks.rs:L350-L407",
+      "reported_tokens_saved": 44271
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/reference-uses-callers.txt",
+      "identity": "reference_uses \u00b7 function \u00b7 src/application/workflow/publication/capabilities.rs:L98-L153",
+      "reported_tokens_saved": 37307
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/department-context-consumers.txt",
+      "identity": "\"department_context\" \u2014 4 hits in 4 symbols across 3 files (searched 691 indexed files)",
+      "reported_tokens_saved": 12611
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/workflow-edge-callers.txt",
+      "identity": "workflow_edges \u00b7 function \u00b7 src/adapters/persistence/workflow/agent_manifest/capture.rs:L4-L46",
+      "reported_tokens_saved": 1918
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/board-card-callers.txt",
+      "identity": "board_card \u00b7 function \u00b7 src/adapters/http/pages/workflow_runs/board.rs:L121-L166",
+      "reported_tokens_saved": 19568
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/agent-snapshot-consumers.txt",
+      "identity": "\"snapshots().agents\" \u2014 10 hits in 8 symbols across 6 files (searched 1825 indexed files)",
+      "reported_tokens_saved": 27086
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/refusal-record-callers.txt",
+      "identity": "record_refusal \u00b7 function \u00b7 src/adapters/persistence/workflow/schedules.rs:L818-L833",
+      "reported_tokens_saved": 12643
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/run-summary-callers.txt",
+      "identity": "run_summary \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L131-L148",
+      "reported_tokens_saved": 11545
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/agent-delete-finish-callers.txt",
+      "identity": "finish_agent_delete_on \u00b7 function \u00b7 src/adapters/persistence/agent.rs:L465-L501",
+      "reported_tokens_saved": 23123
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/refusal-record-consumers.txt",
+      "identity": "\"record_refusal\" \u2014 8 hits in 8 symbols across 5 files (searched 2010 indexed files)",
+      "reported_tokens_saved": 33857
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/run-filter-callers-current.txt",
+      "identity": "run_list_query \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L164-L215",
+      "reported_tokens_saved": 10799
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+      "reported_tokens_saved": 1519
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "reported_tokens_saved": 1396
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_model_runtime_tests.rs",
+      "reported_tokens_saved": 762
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_binding.rs",
+      "reported_tokens_saved": 623
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "reported_tokens_saved": 2350
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+      "reported_tokens_saved": 1307
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "reported_tokens_saved": 2433
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_views.rs",
+      "reported_tokens_saved": 1065
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_runtime_race_support.rs",
+      "reported_tokens_saved": 666
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/workflow/role_runtime_tests.rs",
+      "reported_tokens_saved": 2573
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/application/workflow/roles.rs",
+      "reported_tokens_saved": 655
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/application/agent/manifest.rs",
+      "reported_tokens_saved": 1175
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/B1-function-spans.txt",
+      "identity": "graft skeleton \u2014 src/adapters/persistence/department/lifecycle.rs",
+      "reported_tokens_saved": 2035
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/selected-on-callers.txt",
+      "identity": "selected_on \u00b7 function \u00b7 src/adapters/persistence/workflow/agent_manifest/storage.rs:L50-L76",
+      "reported_tokens_saved": 65366
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/prepare-inputs-callers.txt",
+      "identity": "prepare_step_inputs \u00b7 function \u00b7 src/application/workflow/compiler/compile.rs:L147-L178",
+      "reported_tokens_saved": 9092
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/agent-authority-callers.txt",
+      "identity": "check_definition_on \u00b7 function \u00b7 src/adapters/persistence/workflow/agent_authority.rs:L49-L91",
+      "reported_tokens_saved": 24328
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/dependency-manifest-consumers.txt",
+      "identity": "\"DependencyManifest\" \u2014 46 hits in 34 symbols across 19 files (searched 2008 indexed files)",
+      "reported_tokens_saved": 37373
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/agent-delete-callers.txt",
+      "identity": "lock_agent_delete_on \u00b7 function \u00b7 src/adapters/persistence/agent.rs:L437-L462",
+      "reported_tokens_saved": 23059
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/run-page-callers.txt",
+      "identity": "push_run_page \u00b7 function \u00b7 src/adapters/persistence/workflow/reads.rs:L202-L255",
+      "reported_tokens_saved": 10420
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p02/docs/logs/snapshot-readers-exhaustive.txt",
+      "identity": "\"snapshots\" \u2014 89 hits in 57 symbols across 45 files (searched 692 indexed files)",
+      "reported_tokens_saved": 150866
+    }
+  ]
+}

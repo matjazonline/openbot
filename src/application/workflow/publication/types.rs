@@ -31,6 +31,33 @@ pub struct AgentReferenceUse {
     pub mode: AgentUseMode,
 }
 
+/// A requirement frozen with the procedure; holders are resolved only at admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleReference {
+    pub step: StepId,
+    pub role: crate::entities::department::DepartmentRole,
+    pub mode: RoleUseMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoleUseMode {
+    ModelOnly,
+    Tools,
+    People,
+}
+
+impl RoleUseMode {
+    pub fn agent_mode(self) -> Option<AgentUseMode> {
+        match self {
+            Self::ModelOnly => Some(AgentUseMode::ModelOnly),
+            Self::Tools => Some(AgentUseMode::Tools),
+            Self::People => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentUseMode {

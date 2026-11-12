@@ -1,0 +1,622 @@
+{
+  "method": "Lower bound: first tool-reported savings line per retained unique text pack; dedup full content hash; no prices estimated.",
+  "tokens_saved": 3277185,
+  "unique_packs": 123,
+  "packs": [
+    {
+      "path": "account-prelock-all-consumers.txt",
+      "sha256": "9ceb6ba6ec76c98745e2b01df40f770f98468bca4ebbddf196770924bfc1ad30",
+      "tokens_saved": 56606
+    },
+    {
+      "path": "admission-api.txt",
+      "sha256": "1646b5ac68cb2add9ae41870510e697fd56bc9ac50474d2d3d5120d2a6cc4992",
+      "tokens_saved": 2532
+    },
+    {
+      "path": "admission-create-calls-unscoped.txt",
+      "sha256": "902b8d88f328465755827194249d3d1d14644908b8b8c0d9b644d822a3986e98",
+      "tokens_saved": 283111
+    },
+    {
+      "path": "admission-write-api.txt",
+      "sha256": "02c866263575326451fe922522f835c6e11c88bbe869af5b6852a7af3bf6ffc2",
+      "tokens_saved": 2092
+    },
+    {
+      "path": "binding-api.txt",
+      "sha256": "c69606adadb2cfd5e0ce4803cd0ac9704a2f7aac942716753de08b20a4b51a39",
+      "tokens_saved": 1501
+    },
+    {
+      "path": "binding-bound-constants.txt",
+      "sha256": "fcba5e2b286179e461b31aaf266f5179abf408bf44448b9d1f38dc32b87edbc3",
+      "tokens_saved": 63665
+    },
+    {
+      "path": "binding-configuration-all-producers.txt",
+      "sha256": "95e56c2bf2e327d169c41b3168359176cdf315e3f3f2aab16db074b920b272e9",
+      "tokens_saved": 20344
+    },
+    {
+      "path": "binding-form-callers.txt",
+      "sha256": "f85fd4937d970113e44080dfdb1d4d27a6b4495943783644d7810d953b085028",
+      "tokens_saved": 41065
+    },
+    {
+      "path": "binding-form-producers.txt",
+      "sha256": "e302b74bedf159fe4984009753a2c49b7ca8c813c66dfbd835c40a2470f8d19a",
+      "tokens_saved": 14143
+    },
+    {
+      "path": "binding-policy-getter-callers.txt",
+      "sha256": "60dcb798ccb6ccba58a4318f0fe3fc4cd8135223ebc3beb0acf0b86f2569bd75",
+      "tokens_saved": 1711
+    },
+    {
+      "path": "binding-summary-callers.txt",
+      "sha256": "e07f883132c323c7d855562b05c988769726342dbf58b215663cddf61c2a4d33",
+      "tokens_saved": 12445
+    },
+    {
+      "path": "binding-summary-type-callers.txt",
+      "sha256": "61699b008114bb015741931b71eba982429db37b6651b81b82c15bd2f23d5b39",
+      "tokens_saved": 5081
+    },
+    {
+      "path": "binding-summary-types.txt",
+      "sha256": "9b48dba6206d97e454e55a1ba446728aeb0ac785d6190890d2f375127066954f",
+      "tokens_saved": 4928
+    },
+    {
+      "path": "bindingconfiguration-impact.txt",
+      "sha256": "239900d405d5d52b06bb93f4625c020d1adf0fc00c8f1d45249fee29157b2968",
+      "tokens_saved": 1709
+    },
+    {
+      "path": "capture-root-context-callers.txt",
+      "sha256": "058d952744c69d1edacd5f15dd8c30beb023190671a01c990d4e26c75137c23b",
+      "tokens_saved": 1287
+    },
+    {
+      "path": "catalogue-contract-revision-callers.txt",
+      "sha256": "49ce153b88076c61f25ecc6ce9e4568480fa7f8b1c85d153e51fe8f0a34e91aa",
+      "tokens_saved": 4478
+    },
+    {
+      "path": "catalogue-literal-version-context.txt",
+      "sha256": "7ab1dc41eddcbd8b8afe0f858a3c1a7e2d58f3d58a619d97a56f604f2fe40610",
+      "tokens_saved": 4503
+    },
+    {
+      "path": "commit-inbound-calls.txt",
+      "sha256": "e635890b0332a3f4d6452202451e8ac695d5f0413259d581ed4c1ac303a509ad",
+      "tokens_saved": 83420
+    },
+    {
+      "path": "compiled-role-serialization.txt",
+      "sha256": "d9ae68e26afb726961d6661ca3f72a53abd2bcf8dde6db3b577e0b2d04ff424a",
+      "tokens_saved": 7256
+    },
+    {
+      "path": "compiled-workflow-storage-type.txt",
+      "sha256": "d780ae94b77a665ed7380cdde635ae12bf554766d7ce8144c9c8420c790bb301",
+      "tokens_saved": 7249
+    },
+    {
+      "path": "compiler-role-references-callers.txt",
+      "sha256": "b4a9b96be23aa37d0df9d780b1b279434ff027743946af58deb15efc3af0cb7d",
+      "tokens_saved": 1409
+    },
+    {
+      "path": "config-maintenance-context.txt",
+      "sha256": "c880909092f63f7622ce874aa95f43b2c98eb83ae42d45aec07844e5a31f4c55",
+      "tokens_saved": 39218
+    },
+    {
+      "path": "config-message-trigger-readers.txt",
+      "sha256": "5a929c5e7050f3348d66fa5d3b9d7aa111c1c3d9e6620f8838b954ced1896aba",
+      "tokens_saved": 16634
+    },
+    {
+      "path": "config-type-impact.txt",
+      "sha256": "52c4f6a3b422cb35eaecce1a71ee5ed41196e277ecd546006483c46f856bbc5f",
+      "tokens_saved": 8400
+    },
+    {
+      "path": "configurebinding-all-producers.txt",
+      "sha256": "92e940b96cd2b08f8bf5ff03efeba5903db6327e392190bca17ad0b3d9b614a2",
+      "tokens_saved": 118198
+    },
+    {
+      "path": "configurebinding-callers.txt",
+      "sha256": "9eab1d0a02a0d40ac9f95fd57b39b1ed30cc9593245e0e86a4a56e63210b1eac",
+      "tokens_saved": 1207
+    },
+    {
+      "path": "decision-catalogue-source.txt",
+      "sha256": "230c543976818ccf232f7e315bae5407771322b84e374f7c773887497a7afb2b",
+      "tokens_saved": 21754
+    },
+    {
+      "path": "decision-contract-consumers.txt",
+      "sha256": "cde050438a1219f03ab7b91d6279a6c83cb1878f1c7d4df43f32fd3dc3ab4956",
+      "tokens_saved": 7662
+    },
+    {
+      "path": "decision-spec-callers.txt",
+      "sha256": "be51d4f21dd5f46debf98f4fe018ac52315e39fdd3c3459cb74ee34e026bcbcc",
+      "tokens_saved": 3913
+    },
+    {
+      "path": "decision-submit-literal.txt",
+      "sha256": "87f11f9e018b2583f795a215698d0740c6c98c94acf28a90eab7c3b02a8c4fef",
+      "tokens_saved": 15184
+    },
+    {
+      "path": "default-desk-key-callers.txt",
+      "sha256": "6bde2c3228a2949f7bb18e2656435094414c36a6e09b1bd8811b399bcee6c1d9",
+      "tokens_saved": 27172
+    },
+    {
+      "path": "dependency-manifest-callers.txt",
+      "sha256": "1c2c19284455790687bb722a99880bf1f03e9e01f3c683ac225b7bbb17873c80",
+      "tokens_saved": 1397
+    },
+    {
+      "path": "dependency-manifest-producers.txt",
+      "sha256": "fa1032ecbca6feb8b79e988793067246022c91bf7f090423211f57b68b80da66",
+      "tokens_saved": 41907
+    },
+    {
+      "path": "eligible-reviewer-all-callers.txt",
+      "sha256": "065a3c9109793a375161940e1c38a105e83ad04b92dc1f88a3f3b57a93c171c1",
+      "tokens_saved": 34566
+    },
+    {
+      "path": "escalation-native-tool-discovery.txt",
+      "sha256": "007255efc48ef1c1280fbb7c1c7701cd1244acd8273f8336c6c435fb6a33fe66",
+      "tokens_saved": 18196
+    },
+    {
+      "path": "expire-on-callers.txt",
+      "sha256": "4d3bb1bdf5616456ac0b2597e3e01b2731e1dff1fe9345814badab431b0a4b2a",
+      "tokens_saved": 3227
+    },
+    {
+      "path": "frozen-publication-storage-types.txt",
+      "sha256": "575099086bad623d00b03c65cb1be0d651e0736380dc42613b1a9e7b20a212d1",
+      "tokens_saved": 1603
+    },
+    {
+      "path": "graft-account-finish-d2-callers.txt",
+      "sha256": "06fd0886e388de133e7f3044ef9bfa8219630316ca8502a57e46972b4c9d6c28",
+      "tokens_saved": 13395
+    },
+    {
+      "path": "graft-account-lock-d2-callers.txt",
+      "sha256": "ec8a31e070dfc870ba932e52f7df329dd950fe2c28304f4d48cc6b0c465f24f7",
+      "tokens_saved": 13336
+    },
+    {
+      "path": "graft-activation-resolve-callers.txt",
+      "sha256": "7830da06cbb6aaed34384f106a68d04861707c6bec0c519bdb75d130cf07e141",
+      "tokens_saved": 48992
+    },
+    {
+      "path": "graft-binding-admin-audit-consumers.txt",
+      "sha256": "0b395fa1a2383ddeae0ffba6c553e63878313bc5fd1602b175992e47bb894034",
+      "tokens_saved": 41652
+    },
+    {
+      "path": "graft-cancel-reason-follow.txt",
+      "sha256": "8c62beb0d173796b150306107f793f95f7e603fa5ee168ab97ea487024ea65b0",
+      "tokens_saved": 10730
+    },
+    {
+      "path": "graft-channel-gate-callers-d3.txt",
+      "sha256": "921696cc72cffaa876ef6ece61af7bd0d789af47b375ea232a4cd3bbb885b4f9",
+      "tokens_saved": 95558
+    },
+    {
+      "path": "graft-clear-role-follow-callers.txt",
+      "sha256": "bde0a301dec10361084f096ccab2268c3e88eac2cc9b52e6607d64d532c696ca",
+      "tokens_saved": 8362
+    },
+    {
+      "path": "graft-decision-purpose-callers.txt",
+      "sha256": "d0b8322fb9be799f4510846a21b91eafa4a4e5d69e930625f6a976172faaac0b",
+      "tokens_saved": 9887
+    },
+    {
+      "path": "graft-decision-snapshot-guard.txt",
+      "sha256": "1e06050f28f9059ba87c99734f4239958e2889f007fd7fe209a573cc853d7999",
+      "tokens_saved": 2260
+    },
+    {
+      "path": "graft-department-sync-gates-d3.txt",
+      "sha256": "62b4c51479fd9a9935c5cb1bdb75417662108474dd1fc92c3df51a6bc61be81d",
+      "tokens_saved": 35266
+    },
+    {
+      "path": "graft-follow-decision-spec.txt",
+      "sha256": "5b22a3de01341ac637e38d5c3acff8bebe611e1e10de30be89e5f3d6ccad47ca",
+      "tokens_saved": 3966
+    },
+    {
+      "path": "graft-follow-notice-worker-fixtures.txt",
+      "sha256": "961ef5ac2061a5df5a97362366060fb53e1b82f1feb83539785731e99eaf5272",
+      "tokens_saved": 2477
+    },
+    {
+      "path": "graft-follow-notification-action-callers.txt",
+      "sha256": "5bf9a8aafb085c490182fa1b62b72360ff389dbf907d8fdacef7a7c42c0118af",
+      "tokens_saved": 2281
+    },
+    {
+      "path": "graft-follow-notification-source-callers.txt",
+      "sha256": "f122e039453117c11cf3b0932dcfc8c600b9546c4575bd3e27cc2cb36b37ee2a",
+      "tokens_saved": 2281
+    },
+    {
+      "path": "graft-follow-retirement-context.txt",
+      "sha256": "6dbd37dbaf725c4fb581e2673ebeb410235498f1ff2870307420a8d90ff63846",
+      "tokens_saved": 37747
+    },
+    {
+      "path": "graft-follow-schema-context.txt",
+      "sha256": "c0f9099c801eefc70029af2d87682a8b1f81ab2567639e9145270c7ffd0d342c",
+      "tokens_saved": 19864
+    },
+    {
+      "path": "graft-follow-stored-version.txt",
+      "sha256": "9f5a548cb203b9d13b267ab7273ac2d9b073e5a366e53afd250683c591e2d119",
+      "tokens_saved": 1574
+    },
+    {
+      "path": "graft-follow-submit-withdraw.txt",
+      "sha256": "53e6f18560870eb4f6f1625fbc19aacf680b488d6265adac8e74680bb88bea16",
+      "tokens_saved": 7515
+    },
+    {
+      "path": "graft-isolated-workflow-fixtures.txt",
+      "sha256": "cdecb6bfe32f3ac1b6d899bc9798b13d6edd42f16995b13073616639c89019b3",
+      "tokens_saved": 11790
+    },
+    {
+      "path": "graft-member-level-d2-callers.txt",
+      "sha256": "c0d817872233e25fa3dfaace487baa59ad1cb655cf86613af54b1c2e26ea38e9",
+      "tokens_saved": 14561
+    },
+    {
+      "path": "graft-member-remove-d2-callers.txt",
+      "sha256": "7c2015d99259094843ee9109d5d10da7e5b1eca0b9ebca0b52eb7f11f254d38d",
+      "tokens_saved": 46810
+    },
+    {
+      "path": "graft-member-role-d2-callers.txt",
+      "sha256": "9292490e5f11d5bb5863abafd957e2efcaad0f29eff453184a1462f4f1d9379c",
+      "tokens_saved": 28406
+    },
+    {
+      "path": "graft-notice-action-consumers.txt",
+      "sha256": "445f8b7e1a525d544663e11ec03ef91f572f1f08d169ad9910df0b4919b6062b",
+      "tokens_saved": 17352
+    },
+    {
+      "path": "graft-notice-recipient-consumers.txt",
+      "sha256": "080dc6eb57f6a4a17498e8cd129018722b30a882844e222d2753586d6776e70b",
+      "tokens_saved": 10919
+    },
+    {
+      "path": "graft-notice-view-consumers.txt",
+      "sha256": "00760f3f86f505d7252c4a19d1e4c651ef29ff2b6c1158f42ee41df97bc95243",
+      "tokens_saved": 12233
+    },
+    {
+      "path": "graft-park-callers-current.txt",
+      "sha256": "9731a6af421930ab8ffce96ffa6aff0a05b7c4b7ccb357d6755acda78af7ae2f",
+      "tokens_saved": 40516
+    },
+    {
+      "path": "graft-people-fixture-follow-callers.txt",
+      "sha256": "878e68b59a37359a5dccecc4ab295af4ee748eee7e25d7af83680e7ac106f0db",
+      "tokens_saved": 6453
+    },
+    {
+      "path": "graft-people-resolver-context.txt",
+      "sha256": "a5d6e4eba6c688ff83fcb681581940dde1c43855039ab6bfd5d837953b09f072",
+      "tokens_saved": 25017
+    },
+    {
+      "path": "graft-placement-follow-callers.txt",
+      "sha256": "e51393c358648b166e7cde4da4e9d6801d3cbde2089394c41fcd1c9e14bd08f3",
+      "tokens_saved": 24493
+    },
+    {
+      "path": "graft-principal-mutators-d2.txt",
+      "sha256": "f9b9507c6213bb6c7140d5c162a34f9a244cfe8eb722c095b3902decc1e4f501",
+      "tokens_saved": 80610
+    },
+    {
+      "path": "graft-remove-member-follow-callers.txt",
+      "sha256": "9fab67d37ebb2dd035780278b7af65dce9ee7212411c395d525c67c59752dae7",
+      "tokens_saved": 8347
+    },
+    {
+      "path": "graft-retirement-admin-audit.txt",
+      "sha256": "95ad40b5e71b7b28c56fbe93feacf742b919bd2d50a22e8a191a108e5d7dc484",
+      "tokens_saved": 27891
+    },
+    {
+      "path": "graft-reviewer-assignment.txt",
+      "sha256": "3eb179c08933ab6b0fa4e13c116727b6e96aa39cfae7808f617b523368e4688b",
+      "tokens_saved": 1797
+    },
+    {
+      "path": "graft-role-delete-producers.txt",
+      "sha256": "5aec10b3c4ed36be165a62fd597eaef44dd26d3529ac39e7e4803c0caac94a6c",
+      "tokens_saved": 8400
+    },
+    {
+      "path": "graft-role-facts-callers.txt",
+      "sha256": "d640869ea3d50e0874594fcbe1e4f58d0719202fa6632be81f23341380d2aa7c",
+      "tokens_saved": 3541
+    },
+    {
+      "path": "graft-role-writer-follow-callers.txt",
+      "sha256": "62c4dbac860fd47ec702ce63f1e192fed0bd1ad94c6950743f78e685731a6416",
+      "tokens_saved": 12746
+    },
+    {
+      "path": "graft-saved-binding-follow.txt",
+      "sha256": "afc723a717c1d3491124b86297ff3645fb2ee457a8ef9deb3b03a020d0d38571",
+      "tokens_saved": 72552
+    },
+    {
+      "path": "graft-wait-lock-callers.txt",
+      "sha256": "918ae798c422c982ee7c7cc4ee0df56da7ce0e90a472e235a332e7cfc524a0e0",
+      "tokens_saved": 49242
+    },
+    {
+      "path": "graft-wait-lock-uses.txt",
+      "sha256": "38e8e8d9401363d14d15d4c33d8d07a0a759c94998621e441f7c17cb30056333",
+      "tokens_saved": 16052
+    },
+    {
+      "path": "guard-retirement-producers.txt",
+      "sha256": "fc8bbcdd506cd2dfb7c1179d13fd3b480647340a4c6146f7469082ebd9144cd9",
+      "tokens_saved": 53569
+    },
+    {
+      "path": "http-binding-literal-producers.txt",
+      "sha256": "b0888879fd606cc7a0cd54775bfd3f06f95db4ec095e2cb77cddcf83d7d1ff2d",
+      "tokens_saved": 42641
+    },
+    {
+      "path": "inbound-commit-on-callers.txt",
+      "sha256": "a992a1af901841f2148d6635d036881a3ea21055dd738e8a7ef2aaa61fe533cb",
+      "tokens_saved": 8642
+    },
+    {
+      "path": "insert-run-callers.txt",
+      "sha256": "51086c0329ececd7aadd2cf074d0b1aa27d08462df88999129c1bc50a88d859e",
+      "tokens_saved": 5892
+    },
+    {
+      "path": "internal-ingestion-source.txt",
+      "sha256": "3cb47e320e08e738565114b70e829c572ee143f1e3e51eecaaf23c3bfd84962c",
+      "tokens_saved": 59694
+    },
+    {
+      "path": "internal-relay-context.txt",
+      "sha256": "d9d5d7f11ff4f35717fff971a414d84d7771d5827887ed416bbb8560847d42a8",
+      "tokens_saved": 6703
+    },
+    {
+      "path": "manifest-row-insert-consumers.txt",
+      "sha256": "9b88e95cd4ed833b96447b665e3058d2ba9139d222c62363aabd079e470ad5f1",
+      "tokens_saved": 6459
+    },
+    {
+      "path": "native-admin-tools.txt",
+      "sha256": "4ee644a330934d481935f861c31f352ef98cd1c88a8cc4993764e9dba080773c",
+      "tokens_saved": 22866
+    },
+    {
+      "path": "notification-delivery-seam.txt",
+      "sha256": "70607af6d26aa4add03decebfa10153ed56a8094196578b971a660b2cadb48bc",
+      "tokens_saved": 44377
+    },
+    {
+      "path": "notification-domain-api.txt",
+      "sha256": "e29354161ba410f3c02b6f599eeda1ff9cd1680320ca4a75039fbc391060636b",
+      "tokens_saved": 1736
+    },
+    {
+      "path": "notification-settings-impact.txt",
+      "sha256": "cd9e09a3ba2c5626fc2578699be720f5f45bb4fc6dd2c9ad28b7187ddc59d9be",
+      "tokens_saved": 13
+    },
+    {
+      "path": "notification-settings-producers.txt",
+      "sha256": "6bc25090ea6016b63f505d61d70c5b9e772d22853e6b3b120810d38e903ac77a",
+      "tokens_saved": 12763
+    },
+    {
+      "path": "notification-worker-api.txt",
+      "sha256": "6bc361ccec18b79e313fbe09e16f0b85f52454d0f022e2f46253ff1793263d80",
+      "tokens_saved": 2219
+    },
+    {
+      "path": "openbot-02-p04-agent-default-desk-context.txt",
+      "sha256": "c914a6d19df68aabf768d4d4ace6b018b678ca5d4241b8dda81f5ecd4b59bbb7",
+      "tokens_saved": 43993
+    },
+    {
+      "path": "openbot-02-p04-assign-helper-calls.txt",
+      "sha256": "0baed5357fc9c6b3ea6423bcf8b51e6d11f13aba456a029cc712c47110071d55",
+      "tokens_saved": 176248
+    },
+    {
+      "path": "openbot-02-p04-assign-role-context.txt",
+      "sha256": "f2de504894412af183fa22e1de48186c374aa391d939d46f37eb40f9c287f542",
+      "tokens_saved": 88080
+    },
+    {
+      "path": "openbot-02-p04-decision-subject-context.txt",
+      "sha256": "f469dfdccdb3ef8bd8a0b1279a31c8b1ab53782c117fd8fe829a22d97c9aa685",
+      "tokens_saved": 12317
+    },
+    {
+      "path": "openbot-02-p04-discovery.txt",
+      "sha256": "f3944b273e27b75ba1911b8d0800a58935f4493fa3c535266a77587604a0d4ff",
+      "tokens_saved": 52179
+    },
+    {
+      "path": "openbot-02-p04-failure-hooks.txt",
+      "sha256": "a7e936a04b1188a2510b3ad2abbfd5de3a92baeb1800de5691a38f34179b848e",
+      "tokens_saved": 31767
+    },
+    {
+      "path": "openbot-02-p04-notification-api.txt",
+      "sha256": "1bbdfa9d83af01082873b6be67089e0525daf1190c1f31a93778c5cec3e5b4f4",
+      "tokens_saved": 8198
+    },
+    {
+      "path": "openbot-02-p04-notification-context.txt",
+      "sha256": "cb98cacffed8a11995dbe2a0c0bd7ae9dad12a6d11497ff857920d9c08be8198",
+      "tokens_saved": 34253
+    },
+    {
+      "path": "openbot-02-p04-notification-kind-context.txt",
+      "sha256": "1d4d9ff664b5f952d3b3a898178db0293e01663c3a873120a9c7c67128b60769",
+      "tokens_saved": 17429
+    },
+    {
+      "path": "openbot-02-p04-resume-context.txt",
+      "sha256": "261731779674e316a08ebb3513d3055f68e4503d858b60b4555f62e216114d13",
+      "tokens_saved": 57373
+    },
+    {
+      "path": "openbot-02-p04-sweeper-calls.txt",
+      "sha256": "081ec09b3feee00407c0f4bfa9ed32c023a15dfd4c79eb2526027e3f521363c6",
+      "tokens_saved": 12156
+    },
+    {
+      "path": "openbot-02-p04-waits-api.txt",
+      "sha256": "543688d209da49f3765f381f9fd8ac4387fd5e5b91112064b32523b43c86c1bc",
+      "tokens_saved": 4041
+    },
+    {
+      "path": "persist-root-context-callers.txt",
+      "sha256": "048652af1fc25216a8d0e29624ecacf9cb852f67a50aed05135d3895ad54c362",
+      "tokens_saved": 2509
+    },
+    {
+      "path": "principal-retirement-producers.txt",
+      "sha256": "ee80d9a63e5b2532482c4efb227c4a9a4dd315fbc631850684a08579d02eb888",
+      "tokens_saved": 56197
+    },
+    {
+      "path": "reviewer-all-consumers.txt",
+      "sha256": "1b9341572b0e369a9661e6e01f0fcccef3d97dde0506ca7d3542a5b1d926ccb7",
+      "tokens_saved": 44506
+    },
+    {
+      "path": "reviewer-selector-parts-callers.txt",
+      "sha256": "06810f3208504e8fc53a1905be9d34dd705a47d300958dd8ccd0d0ebb5b57bcc",
+      "tokens_saved": 925
+    },
+    {
+      "path": "revision-newtype-macro-context.txt",
+      "sha256": "5386e15571c81f5228406c49ca4595b63d5def1973a9f44685ead53f9661af0b",
+      "tokens_saved": 1155
+    },
+    {
+      "path": "role-binding-check-callers.txt",
+      "sha256": "62f2ae1d6ab7a4a07718abc20de2a8a03946bb8fea69d7b0033fc73744da25c3",
+      "tokens_saved": 36996
+    },
+    {
+      "path": "role-helper-context.txt",
+      "sha256": "deac4d27c4f32b7a12b7cf955a0edaf75382a9536cf434da3514f5ecc93e3464",
+      "tokens_saved": 10445
+    },
+    {
+      "path": "role-refusal-kind-context.txt",
+      "sha256": "d5f1bb0f12163cc3682d9731b21183a2898490cce2681eb07b248934dcb5b84e",
+      "tokens_saved": 2923
+    },
+    {
+      "path": "role-row-insert-consumers.txt",
+      "sha256": "a740a7813ca388e7f4674017e7285262422f28afaf1d1c138532739729d475f6",
+      "tokens_saved": 20454
+    },
+    {
+      "path": "route-parked-failure-callers.txt",
+      "sha256": "e497fbce630c71ded80ff7f32836c53779b513a72c137f2660e78b62625a8e6e",
+      "tokens_saved": 21096
+    },
+    {
+      "path": "semantic-revision-consumers.txt",
+      "sha256": "584849f909f1b3d6c1da5e95e9eff99dbffd9ac12c8709d5262854dd06ffabb3",
+      "tokens_saved": 419
+    },
+    {
+      "path": "smtp-config-context.txt",
+      "sha256": "cf281da55378ef3de1d9ef744ee510fdba610a413e554d3d20947292f9c0aa8d",
+      "tokens_saved": 16905
+    },
+    {
+      "path": "storage-test-manifest-producer-callers.txt",
+      "sha256": "0224d78c4bbbd8a6436f3e3e1e089fb2040eb576721b9b314f7dac4f4723fd9c",
+      "tokens_saved": 4827
+    },
+    {
+      "path": "stream-config-context.txt",
+      "sha256": "baafaa5de1325c46595db07db672416683a98ed775b85095032c6d6854646294",
+      "tokens_saved": 4826
+    },
+    {
+      "path": "submit-decision-callers.txt",
+      "sha256": "75dc986828346d921f8de668531d38d886ba97e3dfc42abd4716d08b2398d5cd",
+      "tokens_saved": 10786
+    },
+    {
+      "path": "submit-decision-consumers.txt",
+      "sha256": "eae148c17d17403bc089a1673353f8396a818d4c69c18880a899fcc00e1dc7bc",
+      "tokens_saved": 155347
+    },
+    {
+      "path": "sweep-waits-production2.txt",
+      "sha256": "0906e78c82464b5cf02b8d893bfd2ed24eebe0d3c524e7bd6324f880332b8b59",
+      "tokens_saved": 33670
+    },
+    {
+      "path": "terminal-deadline-producers.txt",
+      "sha256": "c0b6f04cd1500c094f9bec0cb9afaba1b4bbff54a112fec8c53747708917d3a3",
+      "tokens_saved": 11545
+    },
+    {
+      "path": "token-prelock-all-callers.txt",
+      "sha256": "b9cca48fe188e955360e5e97309cb263cc07aea12776a938638685786cf3c05f",
+      "tokens_saved": 4916
+    },
+    {
+      "path": "uuid-id-macro-context.txt",
+      "sha256": "2d455d058f15ed3071124ec3a66642afa06bf071af1d188d4d00526607b557c0",
+      "tokens_saved": 12112
+    },
+    {
+      "path": "workflow-config-literals.txt",
+      "sha256": "edd9a50eb1d12f9d48c5fcedf6d20fb5dd44983ba92bc6fb7c07267230b0630e",
+      "tokens_saved": 9026
+    },
+    {
+      "path": "workflow-config-symbols.txt",
+      "sha256": "22c06fb1e65ff3eba5c2aad9323bb743557e06751c238d001976718d6954dcb3",
+      "tokens_saved": 152348
+    }
+  ]
+}

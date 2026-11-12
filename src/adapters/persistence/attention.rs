@@ -114,8 +114,7 @@ WITH params AS (
            decision.created_at, decision.created_at AS updated_at
     FROM principals AS viewer
     JOIN workflow_decision_reviewers AS reviewer
-      ON reviewer.company_id = viewer.company_id AND reviewer.user_id = viewer.user_id
-     AND reviewer.principal_id = viewer.id
+      ON reviewer.company_id = viewer.company_id AND reviewer.principal_id = viewer.id
     JOIN workflow_decisions AS decision
       ON decision.company_id = reviewer.company_id AND decision.id = reviewer.decision_id
     JOIN workflow_waits AS wait

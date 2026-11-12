@@ -93,6 +93,7 @@ fn configured(
     Arc::new(
         binding::ConfiguredBinding::new(
             binding::BindingConfiguration {
+                escalation: None,
                 id: WorkflowBindingId::new(version_id.as_uuid()),
                 revision: BindingRevision::new(1).unwrap(),
                 company_id,

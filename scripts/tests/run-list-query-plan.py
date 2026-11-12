@@ -27,6 +27,8 @@ SEED = r"""
 SET client_min_messages = warning;
 CREATE TEMP TABLE workflow_versions (LIKE public.workflow_versions INCLUDING ALL);
 CREATE TEMP TABLE workflow_runs (LIKE public.workflow_runs INCLUDING ALL);
+CREATE TEMP TABLE run_dependency_manifests (LIKE public.run_dependency_manifests INCLUDING ALL);
+CREATE TEMP TABLE workflow_run_role_bindings (LIKE public.workflow_run_role_bindings INCLUDING ALL);
 -- 100 tenants x 40 workflows x 20 published versions. Agent k of tenant t is md5('agent'||t||'-'||k).
 -- Agent 0 is dense (every even version of every workflow); agent 63 is sparse (workflow 0's first
 -- version only); every version also uses one of agents 1..62.
@@ -52,7 +54,7 @@ FROM generate_series(1, 100) AS tenants(t), generate_series(0, 39) AS workflows(
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
      correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
-     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling)
+     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling, content_exact)
 SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || w)::uuid, 1,
        md5('workflow' || t || '-' || w)::uuid, md5('version' || t || '-' || w || '-' || v)::uuid,
        md5('actor' || t)::uuid, md5('trigger' || t || '-' || n)::uuid,
@@ -64,7 +66,7 @@ SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || 
        CASE WHEN w < 32 THEN md5('channel' || t || '-' || w)::uuid END,
        CASE WHEN state IN ('succeeded', 'failed', 'cancelled')
             THEN created + interval '10 minutes' END,
-       CASE WHEN state IN ('succeeded','failed') THEN md5('terminal' || t || '-' || n)::uuid END, 9
+       CASE WHEN state IN ('succeeded','failed') THEN md5('terminal' || t || '-' || n)::uuid END, 9, true
 FROM (SELECT t, n, n % 40 AS w, 20 * n / total AS v, md5('company' || t)::uuid AS company,
              now() - interval '2 years' + (n::double precision / total) * interval '2 years' AS created,
              CASE WHEN n % 20 = 0 THEN (ARRAY['queued', 'running', 'waiting'])[1 + (n / 20) % 3]
@@ -72,8 +74,27 @@ FROM (SELECT t, n, n % 40 AS w, 20 * n / total AS v, md5('company' || t)::uuid A
       FROM (SELECT t, CASE WHEN t <= 4 THEN 250000 ELSE 1000 END AS total
             FROM generate_series(1, 100) AS tenants(t)) AS tenant,
            generate_series(0, total - 1) AS runs(n)) AS seed;
+-- Every run owns or inherits a root manifest. Some roots have a role-only agent64;
+-- children inherit their parent's capture. No published version pins that agent.
+INSERT INTO run_dependency_manifests(company_id,run_id,root_run_id,manifest_id)
+SELECT company_id,id,coalesce(parent_run_id,id),md5('manifest'||coalesce(parent_run_id,id)::text)::uuid
+FROM workflow_runs;
+INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,
+    department_id,principal_id,agent_id,agent_revision_id)
+SELECT run.company_id,run.id,md5('manifest'||run.id::text)::uuid,run.version_id,'start','lead',
+    md5('department'||tenant.t)::uuid,md5('principal'||tenant.t)::uuid,
+    md5('agent'||tenant.t||'-64')::uuid,md5('revision'||tenant.t)::uuid
+FROM generate_series(1,100) AS tenant(t)
+JOIN workflow_runs AS run ON run.company_id=md5('company'||tenant.t)::uuid
+WHERE run.parent_run_id IS NULL AND run.channel_id IN (
+    md5('channel'||tenant.t||'-0')::uuid,md5('channel'||tenant.t||'-4')::uuid,
+    md5('channel'||tenant.t||'-10')::uuid,md5('channel'||tenant.t||'-14')::uuid,
+    md5('channel'||tenant.t||'-20')::uuid,md5('channel'||tenant.t||'-24')::uuid,
+    md5('channel'||tenant.t||'-30')::uuid);
 ANALYZE workflow_versions;
 ANALYZE workflow_runs;
+ANALYZE run_dependency_manifests;
+ANALYZE workflow_run_role_bindings;
 \echo '== Table and index sizes (temporary clones)'
 SELECT class.relname, class.reltuples::bigint AS rows, pg_size_pretty(pg_relation_size(class.oid)) AS size
   FROM pg_class AS class
@@ -96,7 +117,8 @@ VALUES = {
 # (`LIST_PAGE`), and 200 (`MAX_LISTED`), the JSON route's default and the UI's refresh of a list
 # that "Load more" has grown.
 LIMITS = {"page 50": "51", "page 200": "201"}
-AGENTS = {"dense": "md5('agent1-0')::uuid", "sparse": "md5('agent1-63')::uuid"}
+AGENTS = {"dense": "md5('agent1-0')::uuid", "sparse": "md5('agent1-63')::uuid",
+          "role_only": "md5('agent1-64')::uuid"}
 # A common terminal state (a third of runs) and a rare open one (under 2%), which no keyset index
 # serves: a range that holds fewer matches than a page is read to its end.
 STATES = {"failed": "'failed'", "queued": "'queued'"}
@@ -122,9 +144,14 @@ def cursor_lookup(agent: str, name: str) -> str:
     """psql that stores the (created_at, id) of the agent list's row at CURSOR_DEPTH in :name_*."""
     return (
         "SELECT created_at, id FROM workflow_runs "
-        f"WHERE company_id = {VALUES['company']} AND version_id IN (SELECT version.id FROM "
+        f"WHERE company_id = {VALUES['company']} AND (version_id IN (SELECT version.id FROM "
         f"workflow_versions AS version WHERE version.company_id = {VALUES['company']} AND "
-        f"{agent} = ANY(version.agent_ids)) ORDER BY created_at DESC, id DESC "
+        f"{agent} = ANY(version.agent_ids)) OR id IN (SELECT ownership.run_id "
+        "FROM run_dependency_manifests AS ownership JOIN workflow_run_role_bindings AS role_binding "
+        "ON role_binding.company_id=ownership.company_id AND role_binding.run_id=ownership.root_run_id "
+        "AND role_binding.manifest_id=ownership.manifest_id "
+        f"WHERE ownership.company_id={VALUES['company']} AND role_binding.agent_id={agent} "
+        "AND role_binding.resolution_revision=0)) ORDER BY created_at DESC, id DESC "
         f"OFFSET {CURSOR_DEPTH - 1} LIMIT 1 \\gset {name}_\n")
 
 
@@ -266,20 +293,22 @@ def board_measurements(shapes: list) -> str:
 # (run n is a child when n % 10 = 5), and its version 18 uses the dense agent. Run last, after the
 # main measurements, because it changes the data.
 CHILD_HISTORY = r"""
+SET statement_timeout = '120s';
 INSERT INTO workflow_runs
     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
      correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
-     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling)
+     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling, content_exact)
 SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
        md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
        md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, sha256('\x00'::bytea),
        '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
        md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid, md5('channel1-5')::uuid,
-       created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid, 9
+       created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid, 9, true
 FROM (SELECT n, now() - interval '30 days' + n * interval '1 second' AS created
       FROM generate_series(1, 100000) AS extra(n)) AS seed;
 ANALYZE workflow_runs;
 SET plan_cache_mode = force_generic_plan;
+SET statement_timeout = '15s';
 """
 # The temporary clone of `workflow_runs_version_top_level`, dropped to show what it saves.
 DROP_TOP_LEVEL_INDEX = r"""
@@ -314,7 +343,9 @@ def main() -> int:
     args = parser.parse_args()
     shapes = json.loads(pathlib.Path(args.shapes).read_text()) if args.shapes else dump_shapes()
     # The board runs before the child-only history, which changes the data.
-    script = SEED + measurements(shapes) + board_measurements(shapes) + child_history(shapes)
+    script = ("SET statement_timeout = '120s';\n" + SEED
+              + "SET statement_timeout = '15s';\n" + measurements(shapes)
+              + board_measurements(shapes) + child_history(shapes))
     result = subprocess.run(["psql", args.database_url, "-X", "-q", "-v", "ON_ERROR_STOP=1"],
                             input=script, text=True, capture_output=True)
     # psql pads its column headers; strip the padding so the committed evidence passes

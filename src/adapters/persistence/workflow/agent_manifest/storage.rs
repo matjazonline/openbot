@@ -7,10 +7,12 @@ pub(in crate::adapters::persistence::workflow) async fn persist_on(
     let id = DependencyManifestId::new(Uuid::new_v4());
     let company = manifest.company_id.as_uuid();
     let root = manifest.root_run_id.as_uuid();
-    sqlx::query("INSERT INTO agent_dependency_manifests(company_id,id,root_run_id,content,digest) VALUES($1,$2,$3,$4,$5)")
+    sqlx::query("INSERT INTO agent_dependency_manifests(company_id,id,root_run_id,content,digest,role_context_department_id) VALUES($1,$2,$3,$4,$5,$6)")
         .bind(company).bind(id.as_uuid()).bind(root)
         .bind(String::from_utf8(manifest.canonical_content()?).map_err(|_| invalid())?)
-        .bind(manifest.content_hash()?.as_slice()).execute(&mut *db).await?;
+        .bind(manifest.content_hash()?.as_slice())
+        .bind(manifest.role_context_department_id.map(|department| department.as_uuid()))
+        .execute(&mut *db).await?;
     for agent in &manifest.agents {
         sqlx::query("INSERT INTO agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id) VALUES($1,$2,$3,$4)")
             .bind(company).bind(id.as_uuid()).bind(agent.agent_id.as_uuid()).bind(agent.revision_id.as_uuid())
@@ -22,7 +24,16 @@ pub(in crate::adapters::persistence::workflow) async fn persist_on(
             .execute(&mut *db).await?;
     }
     sqlx::query("INSERT INTO run_dependency_manifests(company_id,run_id,root_run_id,manifest_id) VALUES($1,$2,$2,$3)")
-        .bind(company).bind(root).bind(id.as_uuid()).execute(db).await?;
+        .bind(company).bind(root).bind(id.as_uuid()).execute(&mut *db).await?;
+    for role in &manifest.roles {
+        for principal in &role.principals {
+            sqlx::query("INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
+                .bind(company).bind(root).bind(id.as_uuid()).bind(role.version_id.as_uuid())
+                .bind(role.step.as_str()).bind(role.role.as_str()).bind(role.department_id.as_uuid())
+                .bind(principal.principal_id.as_uuid()).bind(principal.agent_id.map(|agent| agent.as_uuid()))
+                .bind(principal.revision_id.map(|revision| revision.as_uuid())).execute(&mut *db).await?;
+        }
+    }
     Ok(id)
 }
 
@@ -129,21 +140,74 @@ pub(in crate::adapters::persistence::workflow) async fn execution_selection_on(
     } else {
         AgentUseMode::ModelOnly
     };
-    let key = inputs["agent"]
-        .as_str()
-        .and_then(crate::application::agent::AgentKey::parse)
-        .ok_or_else(missing)?;
-    let reference = bundle.agent_reference(scope.company, &key)?;
-    if !reference
-        .uses
-        .iter()
-        .any(|usage| usage.step == step && usage.mode == mode)
-    {
-        return Err(missing());
-    }
-    let selection = selected_on(db, scope.company, scope.run, actor, reference.agent_id).await?;
+    let agent = agent_for_step_on(db, scope.company, scope.run, bundle, &step, &inputs).await?;
+    let selection = selected_on(db, scope.company, scope.run, actor, agent).await?;
     Ok(match mode {
         AgentUseMode::Tools => selection,
         AgentUseMode::ModelOnly => selection.model_only(),
     })
+}
+
+/// One selector for execution, checkpoints and inspection. Role authority is the sealed root
+/// capture, indexed by version as well as step; current department tables are never read here.
+pub(in crate::adapters::persistence::workflow) async fn agent_for_step_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    bundle: &PublishedBundle,
+    step: &StepId,
+    inputs: &serde_json::Value,
+) -> AppResult<AgentId> {
+    let definition = bundle.compiled().graph().definition();
+    let kind = definition
+        .steps
+        .get(step)
+        .and_then(|step| {
+            crate::application::workflow::registry::ModelStep::of(step.step_type.as_str())
+        })
+        .ok_or_else(missing)?;
+    let mode = if kind.uses_capabilities() {
+        AgentUseMode::Tools
+    } else {
+        AgentUseMode::ModelOnly
+    };
+    if let Some(reference) = bundle
+        .compiled()
+        .role_references()
+        .iter()
+        .find(|reference| &reference.step == step && reference.mode.agent_mode().is_some())
+    {
+        if reference.mode.agent_mode() != Some(mode)
+            || inputs["role"].as_str() != Some(reference.role.as_str())
+            || inputs.get("agent").is_some()
+        {
+            return Err(missing());
+        }
+        let agent: Uuid = sqlx::query_scalar(
+            "SELECT role_binding.agent_id FROM run_dependency_manifests AS ownership \
+             JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \
+               AND role_binding.run_id=ownership.root_run_id AND role_binding.manifest_id=ownership.manifest_id \
+             JOIN agent_manifest_revisions AS selection ON selection.company_id=role_binding.company_id \
+               AND selection.manifest_id=role_binding.manifest_id AND selection.agent_id=role_binding.agent_id \
+               AND selection.revision_id=role_binding.agent_revision_id \
+             WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND role_binding.version_id=$3 \
+               AND role_binding.step=$4 AND role_binding.role=$5 AND role_binding.resolution_revision=0 \
+               AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection",
+        ).bind(company.as_uuid()).bind(run.as_uuid()).bind(definition.version_id.as_uuid())
+            .bind(step.as_str()).bind(reference.role.as_str()).fetch_optional(db).await?.ok_or_else(missing)?;
+        return Ok(AgentId::new(agent));
+    }
+    let key = inputs["agent"]
+        .as_str()
+        .and_then(crate::application::agent::AgentKey::parse)
+        .ok_or_else(missing)?;
+    let reference = bundle.agent_reference(company, &key)?;
+    if !reference
+        .uses
+        .iter()
+        .any(|usage| &usage.step == step && usage.mode == mode)
+    {
+        return Err(missing());
+    }
+    Ok(reference.agent_id)
 }

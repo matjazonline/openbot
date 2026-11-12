@@ -16,6 +16,9 @@ async fn autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_
             .map(|_| (VersionId::new(Uuid::new_v4()), workflow))
             .collect(),
         deadline: Instant::now() + Duration::from_secs(5),
+        association: RelatedAssociation::Company,
+        role_facts: None,
+        roles: BTreeMap::new(),
     };
     let new_workflow = Node::Workflow(workflow, VersionId::new(Uuid::new_v4()));
     let new_agent = Node::Agent(AgentId::new(Uuid::new_v4()), AgentUseMode::Tools);

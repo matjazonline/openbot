@@ -1,0 +1,1 @@
+error: while executing migration 20260817000000: error returned from database: syntax error at or near "IS"

@@ -1,0 +1,42 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0599]: no method named `clone` found for struct `application::workflow::registry::examples::AuthoringExample` in the current scope
+  --> src/application/workflow/registry/decision_tests.rs:14:36
+   |
+14 |         let mut source = unchanged.clone();
+   |                                    ^^^^^ method not found in `application::workflow::registry::examples::AuthoringExample`
+   |
+  ::: src/application/workflow/registry/examples.rs:6:1
+   |
+ 6 | pub struct AuthoringExample {
+   | --------------------------- method `clone` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `clone`, perhaps you need to implement it:
+           candidate #1: `Clone`
+
+error[E0599]: no method named `clone` found for struct `application::workflow::registry::examples::AuthoringExample` in the current scope
+  --> src/application/workflow/registry/decision_tests.rs:29:36
+   |
+29 |         let mut source = unchanged.clone();
+   |                                    ^^^^^ method not found in `application::workflow::registry::examples::AuthoringExample`
+   |
+  ::: src/application/workflow/registry/examples.rs:6:1
+   |
+ 6 | pub struct AuthoringExample {
+   | --------------------------- method `clone` not found for this struct
+   |
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `clone`, perhaps you need to implement it:
+           candidate #1: `Clone`
+
+error[E0609]: no field `path` on type `application::workflow::compiler::source::Diagnostic`
+  --> src/application/workflow/registry/decision_tests.rs:36:26
+   |
+36 |         assert_eq!(error.path, "/steps/start/with/reviewers_follow_role");
+   |                          ^^^^ unknown field
+   |
+   = note: available fields are: `code`, `message`, `field_path`, `span`, `instance_path`, `schema_path`
+
+Some errors have detailed explanations: E0599, E0609.
+For more information about an error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

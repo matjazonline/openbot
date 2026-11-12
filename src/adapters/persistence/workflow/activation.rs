@@ -170,6 +170,51 @@ async fn resolve(
     })
 }
 
+/// Discovery for ordered account locking. This uses the execution evaluator without
+/// freezing inputs, charging activation budget, or taking authority/row locks.
+pub(super) async fn preview_on(
+    db: &mut PgConnection,
+    request: ActivationRequest,
+) -> AppResult<Option<ActivatedExecution>> {
+    let Some(run) = sqlx::query_as::<_, RunRow>(
+        "SELECT binding_id,input,max_context_bytes,max_steps,state,deadline<=clock_timestamp() AS expired \
+         FROM workflow_runs WHERE company_id=$1 AND id=$2",
+    ).bind(request.company.as_uuid()).bind(request.run.as_uuid()).fetch_optional(&mut *db).await? else {
+        return Ok(None);
+    };
+    let Some(row) = sqlx::query_as::<_, ExecutionRow>(
+        "SELECT step_id,activation,frozen_inputs,frozen_choice FROM workflow_executions \
+         WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(request.company.as_uuid())
+    .bind(request.run.as_uuid())
+    .bind(request.execution.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    else {
+        return Ok(None);
+    };
+    let step = StepId::parse(row.step_id).map_err(|_| invalid())?;
+    let prepared = match row.frozen_inputs {
+        Some(inputs) => FrozenActivation {
+            inputs,
+            choice: row.frozen_choice,
+        },
+        None => resolve(db, request, &run, &step, row.activation).await?,
+    };
+    Ok(Some(ActivatedExecution {
+        execution: request.execution,
+        step,
+        ordinal: u64::try_from(row.activation).map_err(|_| invalid())?,
+        inputs: prepared.inputs,
+        choice: prepared
+            .choice
+            .map(ChoiceName::parse)
+            .transpose()
+            .map_err(|_| invalid())?,
+    }))
+}
+
 /// The parent context a `flow.repeat` round is decided in (07-D1 §D1.1): the activation's
 /// input, parameters, run metadata and earlier step outputs, with the step's provisional output
 /// in place of any earlier activation of the same step.

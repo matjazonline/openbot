@@ -495,6 +495,9 @@ pub(super) async fn write_channel_settings_on(
         .ownership
         .map_or(current, |edit| current.merged(&edit));
     let access_mode = ownership.stored_mode(access_mode)?;
+    if current.department_id.is_some() && ownership.department_id.is_none() {
+        super::workflow::role_binding::check_detach_on(tx, CompanyId::new(company_id), id).await?;
+    }
     sqlx::query(
         r#"UPDATE channels
                SET name = $1, description = $2, access_mode = $3, enabled = $4,

@@ -1,0 +1,5 @@
+src/adapters/persistence/workflow/admission_token_tests.rs:146:    assert_eq!(reviewers, json!([{"kind":"user","id":reviewer}]));
+src/adapters/persistence/workflow/decision_provenance_tests.rs:27:    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'Foreign')")
+src/adapters/persistence/workflow/decision_approvals.rs:112:        let privileged: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_members AS member JOIN companies AS company ON company.id=member.company_id JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND principal.id=$2 AND principal.kind='person' AND (member.role IN ('admin','owner') OR company.user_id=member.user_id))")
+src/adapters/persistence/workflow/decision_authority_tests.rs:354:        "UPDATE principals SET kind='external',user_id=NULL WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/workflow/decision_authority_tests.rs:463:            sqlx::query("UPDATE principals SET kind='external',user_id=NULL WHERE company_id=$1 AND user_id=$2")

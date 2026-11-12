@@ -1,0 +1,82 @@
+src/application/services/harness/runs/state.rs:96:    WorkflowTokenPause,
+src/application/services/harness/runs/state.rs:492:            Mutation::WorkflowTokenPause => {
+src/adapters/persistence/workflow/decision_tokens.rs:10:pub(in crate::adapters::persistence::workflow) struct TokenPause<'a> {
+src/adapters/persistence/workflow/decision_tokens.rs:31:    pause: TokenPause<'_>,
+src/adapters/persistence/workflow/decision_tokens.rs:72:    let (checkpoint, _) = pause.checkpoint.apply(Mutation::WorkflowTokenPause)?;
+src/adapters/persistence/workflow/decision_tokens.rs:77:        checkpoints::CheckpointOwnership::TokenPause(decision),
+src/application/services/delivery_worker_lifecycle_tests.rs:242:    assert!(!result.interrupted);
+src/application/services/delivery_worker_lifecycle_tests.rs:271:        !result.interrupted,
+src/application/services/delivery_worker.rs:338:        if result.interrupted {
+src/application/services/delivery_worker.rs:602:    interrupted: bool,
+src/application/services/delivery_worker.rs:612:        return interrupted_provider();
+src/application/services/delivery_worker.rs:617:        outcome = sender.send(record, part) => ProviderResult { outcome, interrupted: false },
+src/application/services/delivery_worker.rs:618:        _ = shutdown.recv() => interrupted_provider(),
+src/application/services/delivery_worker.rs:621:            interrupted: false,
+src/application/services/delivery_worker.rs:626:fn interrupted_provider() -> ProviderResult {
+src/application/services/delivery_worker.rs:628:        outcome: uncertain_provider("Shutdown interrupted a provider call"),
+src/application/services/delivery_worker.rs:629:        interrupted: true,
+src/adapters/persistence/workflow/action_reconciliation_high_bounds_source.rs:39:                &format!("site={site} interrupted=lapsed_window"),
+src/adapters/persistence/workflow/mcp_recovery_tests.rs:146:            "workflow.interrupted",
+src/adapters/persistence/workflow/mcp_recovery_tests.rs:179:            "workflow.interrupted",
+src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs:93:        RemoteDispatchObservation::Interrupted => "interrupted",
+src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs:252:            settled.unwrap() == "interrupted",
+src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs:377:        assert_eq!(settled.unwrap(), "interrupted");
+src/adapters/persistence/workflow/action_cancellation_receipt_tests.rs:564:    interrupted(
+src/adapters/persistence/workflow/action_cancellation_hung_reconciliation_tests.rs:115:    let ((interrupted, dropped), ()) = tokio::time::timeout(Duration::from_secs(10), async {
+src/adapters/persistence/workflow/action_cancellation_hung_reconciliation_tests.rs:120:    assert!(interrupted.unwrap(), "the hung invocation ends Interrupted");
+src/adapters/persistence/workflow/memory_steps_tests.rs:716:async fn memory_integration_interrupted_save_without_an_intent_retries() {
+src/adapters/persistence/workflow/local_agent_early_e2e_tests.rs:103:        "the interrupted admission did not commit an operation"
+src/adapters/persistence/workflow/checkpoints.rs:499:    TokenPause(Uuid),
+src/adapters/persistence/workflow/checkpoints.rs:530:        CheckpointOwnership::TokenPause(decision) => Fields {
+src/adapters/persistence/workflow/action_reconciliation_late_truth_tests.rs:250:            "inert dispatch: refused or interrupted before the provider"
+src/adapters/persistence/workflow/recovery.rs:181:    // predicate overrides this default whenever a marker exists). Every other interrupted
+src/adapters/persistence/workflow/recovery.rs:201:        Retirement::Interrupted(_) => (FailureClass::Retryable, "workflow.interrupted"),
+src/adapters/persistence/workflow/vault_tests/renewal/strict.rs:90:async fn integration_renewal_strict_active_pending_is_not_an_interrupted_claimant() {
+src/adapters/persistence/workflow/recovery_tests.rs:247:async fn workflow_failure_interrupted_and_expired_effects_cannot_replay() {
+src/adapters/persistence/workflow/checkpoint_models.rs:70:            decisions::tokens::TokenPause {
+src/adapters/persistence/workflow/checkpoint_models.rs:198:            decisions::tokens::TokenPause {
+src/adapters/persistence/workflow/action_uncertainty_tests.rs:134:                ("workflow.interrupted", "retryable")
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:375:fn interrupted(result: AppResult<RemoteDispatchObservation>) {
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:448:fn ownership_interrupted(
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:556:        interrupted(run.result);
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:557:        ownership_interrupted(&seen, run.cancelled_at, run.returned_at).unwrap();
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:594:    interrupted(run.result);
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:601:    let verdict = ownership_interrupted(&seen, run.cancelled_at, run.returned_at);
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:627:        ownership_interrupted(
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:659:            ownership_interrupted(&seen(probes), cancelled, returned).is_err(),
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:733:    interrupted(
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:803:    interrupted(
+src/adapters/persistence/workflow/action_cancellation_boundary_tests.rs:840:    interrupted(result);
+src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs:76:            uncaptured("BACKSTOP prior_bounds interrupted=lapsed_exact_fence; no receipt/effect");
+src/adapters/persistence/workflow/local_agent_native_e2e_tests.rs:279:            .any(|item| item["turn"] == executing["turn"] && item["status"] == "interrupted")
+src/adapters/persistence/workflow/action_reconciliation_live_boundary_tests.rs:269:        assert_eq!(row["workflow_failure_code"], "workflow.interrupted");
+src/adapters/persistence/workflow/message_intent_tests.rs:827:/// stops between iterations and mid-page, and leaves interrupted intents for lease recovery.
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:311:        return Err("the token, not the expired window, interrupted".into());
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:511:    interrupted: Instant,
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:518:fn interrupted_by(loss: Loss, seen: &Seen, run: &PendingRun) -> Result<(), String> {
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:526:        .filter(|(started, _)| *started >= run.interrupted)
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:602:    interrupted_by(loss, &outcome.seen, &outcome.run)
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:607:/// judges with `interrupted_by`.
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:689:        let interrupted = Instant::now();
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:695:            interrupted,
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:711:        "{loss:?}: polled={}ms interrupted={}ms returned={}ms {}",
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:713:        ms(run.interrupted),
+src/adapters/persistence/workflow/action_dispatch_remote_tests.rs:768:    let verdict = interrupted_by(Loss::RunDeadline, &outcome.seen, &outcome.run);
+src/adapters/persistence/workflow/doop_document_lifecycle_tests.rs:154:                "workflow.interrupted",
+src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs:143:    assert_eq!(closed["workflow_failure_code"], "workflow.interrupted");
+src/adapters/persistence/workflow/action_reconciliation_runtime_mixed_truth_assertions.rs:259:        assert_eq!(observation["failure_code"], "workflow.interrupted");
+src/adapters/persistence/workflow/http_tests.rs:252:            "workflow.interrupted",
+src/adapters/persistence/workflow/http_tests.rs:282:            "workflow.interrupted",
+src/adapters/persistence/workflow/doop_document_recovery_tests.rs:77:            "workflow.interrupted",
+src/application/transport/queue.rs:404:    /// interrupted the work before the provider was called.
+src/application/memory/lifecycle.rs:37:/// provisioner or an interrupted pass is not poison: it retries without limit, backing off to
+src/application/memory/lifecycle.rs:52:            | "interrupted"
+src/application/memory/lifecycle.rs:304:            _ = stop.cancelled() => Step::Retry("interrupted", None),
+src/application/memory/delivery.rs:226:            // MEM-P05-B2-F16): a claim released as `interrupted` would spend a transient retry.
+src/application/memory/delivery.rs:241:            _ = stop.cancelled() => DeliveryResult::Retry { code: "interrupted", retry_after: None },
+src/application/workflow/actions/failure.rs:18:/// for this execution" proves "no effect", and an interrupted attempt without a marker may
+src/application/workflow/actions/failure.rs:33:/// interrupted before that commit has no intent, so it sent nothing and may retry.
+src/application/workflow/actions/failure.rs:123:        P::Cancelled => (FailureClass::Retryable, "interrupted"),
+src/application/workflow/actions/failure.rs:176:        Interrupted => (Retryable, "interrupted"),
+src/application/workflow/actions/failure.rs:300:                (format!("{p}.interrupted"), Retryable)
+src/application/workflow/worker.rs:87:    /// future; an interrupted committed claim expires through the existing ledger.

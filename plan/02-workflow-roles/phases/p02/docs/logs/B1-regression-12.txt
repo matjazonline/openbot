@@ -1,0 +1,69 @@
+$ cargo test --locked --offline --lib run_board_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 26 tests
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_reports_a_cut_option_list ... ok
+test adapters::http::pages::tests::department_ui::department_views_run_board_filters_by_department_and_waits_on_people ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_answers_the_board_not_a_run_and_refuses_an_unknown_window ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_hides_channels_the_caller_cannot_see ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_escapes_a_hostile_workflow_title ... ok
+test adapters::http::routes::workflows::tests::run_filter_tests::run_board_view_filter_json_routes_take_a_workflow_of_the_company ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope ... FAILED
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined ... FAILED
+test adapters::persistence::workflow::reads::tests::run_board_queries_bind_each_scope_filter_once_in_placeholder_order ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_moves_a_finished_run_out_of_the_window_on_a_later_read ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_cut_column_links_to_the_list_with_its_scope ... ok
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members ... FAILED
+test adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children ... FAILED
+test adapters::http::routes::workflows::ui::authoring::tests::run_board_view_filter_workflow_pages_link_to_the_board ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_refuses_another_tenants_ids ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_reconciles_a_change_before_subscribing_on_the_first_resync ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_live_sends_no_wake_up_for_a_hidden_channel ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_refuses_plain_members_and_other_tenants ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_counts_a_run_that_arrives_between_its_reads_on_the_next_read ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_shows_six_columns_in_order_with_their_totals ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_leaves_out_children_other_bindings_and_other_tenants ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_cuts_each_column_one_past_the_cap ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_moves_a_retried_run_back_to_its_open_column ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_reads_cards_only_from_the_visible_channels ... ok
+test adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_opens_the_pane_answers_its_region_and_leaves_the_list_alone ... ok
+test adapters::persistence::workflow::tests::admission_tests::run_board_tests::run_board_read_windows_finished_columns_by_finished_at ... ok
+
+failures:
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope' (48394695) panicked at src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:672:10:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"id\" does not exist")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined stdout ----
+
+thread 'adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined' (48394694) panicked at src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:568:14:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"id\" does not exist")
+
+---- adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members stdout ----
+
+thread 'adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members' (48394686) panicked at src/adapters/http/routes/workflows/run_board_tests.rs:17:9:
+assertion `left == right` failed: "Database error"
+  left: 500
+ right: 200
+
+---- adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children stdout ----
+
+thread 'adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children' (48394687) panicked at src/adapters/http/routes/workflows/run_board_tests.rs:17:9:
+assertion `left == right` failed: "Database error"
+  left: 500
+ right: 200
+
+
+failures:
+    adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_refuses_other_tenants_and_plain_members
+    adapters::http::routes::workflows::tests::run_board_tests::run_board_read_route_scopes_to_an_agent_and_counts_children
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_scopes_both_views_alone_and_combined
+    adapters::http::routes::workflows::ui::runs::tests::board_view_tests::run_board_view_filter_switch_and_links_keep_the_scope
+
+test result: FAILED. 22 passed; 4 failed; 0 ignored; 0 measured; 4174 filtered out; finished in 11.44s
+
+error: test failed, to rerun pass `--lib`

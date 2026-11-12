@@ -169,6 +169,7 @@ async fn knowledge_view_notification_email_and_in_app_projection_never_quote_cla
         store.clone(),
         DeliveryComposer::new(renderers, store),
         NotificationMailSettings {
+            escalation_ack_hours: Default::default(),
             mail_domain: APP_DOMAIN.into(),
             public_base_url: "https://agents.test".into(),
         },

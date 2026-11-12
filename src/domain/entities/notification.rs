@@ -14,18 +14,24 @@ use crate::entities::{correlation::CorrelationId, transport::uuid_id};
 uuid_id!(NotificationId);
 uuid_id!(NotificationEventId);
 
-/// What a notification points at. A delivery is the only source (p08 D4.3): workflow decisions
-/// notify by email, never with an in-app row.
+/// Durable operational sources. Ordinary pinned decisions keep their synchronous email proof;
+/// followed reviewer assignments use a source-bound in-app and optional email projection.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum NotificationSourceKind {
     Delivery,
+    DecisionReviewer,
+    EscalationControl,
+    EscalationNotice,
 }
 
 impl NotificationSourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Delivery => "delivery",
+            Self::DecisionReviewer => "decision_reviewer",
+            Self::EscalationControl => "escalation_control",
+            Self::EscalationNotice => "escalation_notice",
         }
     }
 }
@@ -36,6 +42,9 @@ impl FromStr for NotificationSourceKind {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "delivery" => Ok(Self::Delivery),
+            "decision_reviewer" => Ok(Self::DecisionReviewer),
+            "escalation_control" => Ok(Self::EscalationControl),
+            "escalation_notice" => Ok(Self::EscalationNotice),
             _ => Err(format!("invalid notification source kind '{value}'")),
         }
     }
@@ -51,26 +60,42 @@ impl fmt::Display for NotificationSourceKind {
 #[serde(rename_all = "snake_case")]
 pub enum NotificationActionKind {
     DeliveryFailure,
+    DecisionReview,
+    EscalationControl,
+    EscalationReview,
 }
 
 impl NotificationActionKind {
-    pub const ALL: [Self; 1] = [Self::DeliveryFailure];
+    pub const ALL: [Self; 4] = [
+        Self::DeliveryFailure,
+        Self::DecisionReview,
+        Self::EscalationControl,
+        Self::EscalationReview,
+    ];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::DeliveryFailure => "delivery_failure",
+            Self::DecisionReview => "decision_review",
+            Self::EscalationControl => "escalation_control",
+            Self::EscalationReview => "escalation_review",
         }
     }
 
     pub const fn label(self) -> &'static str {
         match self {
             Self::DeliveryFailure => "Delivery needs failure recovery",
+            Self::DecisionReview => "Workflow decision needs your review",
+            Self::EscalationControl => "Advance workflow escalation",
+            Self::EscalationReview => "Workflow escalation needs your attention",
         }
     }
 
     pub const fn email_preference(self, preferences: NotificationPreferences) -> bool {
         match self {
             Self::DeliveryFailure => preferences.delivery_failure_email_enabled,
+            Self::DecisionReview | Self::EscalationReview => preferences.decision_email_enabled,
+            Self::EscalationControl => false,
         }
     }
 }
@@ -81,6 +106,9 @@ impl FromStr for NotificationActionKind {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "delivery_failure" => Ok(Self::DeliveryFailure),
+            "decision_review" => Ok(Self::DecisionReview),
+            "escalation_control" => Ok(Self::EscalationControl),
+            "escalation_review" => Ok(Self::EscalationReview),
             _ => Err(format!("invalid notification action kind '{value}'")),
         }
     }
@@ -146,7 +174,7 @@ pub struct ActionableNotification {
     pub id: NotificationId,
     pub company_id: Uuid,
     pub company_label: String,
-    pub channel_id: Uuid,
+    pub channel_id: Option<Uuid>,
     pub channel_label: String,
     pub source_kind: NotificationSourceKind,
     pub source_id: Uuid,
@@ -179,24 +207,33 @@ pub struct NotificationEvent {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub enum NotificationTarget {
+    DeliveryRecovery,
+    WorkflowDecision { decision_id: Uuid },
+    WorkflowEscalation { decision_id: Uuid },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NotificationRecipient {
     pub principal_id: crate::entities::transport::PrincipalId,
     pub user_id: Uuid,
     pub email: crate::entities::value_objects::EmailAddress,
     pub company_label: String,
     pub channel_label: String,
-    pub channel_id: Uuid,
+    pub channel_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
     pub run_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
     pub email_enabled: bool,
+    pub target: NotificationTarget,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotificationDisposition {
-    Active(NotificationRecipient),
+    Active(Box<NotificationRecipient>),
     Resolved,
     Withdrawn,
+    Control,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -249,18 +286,19 @@ mod tests {
                 actor_principal_id: Some(principal),
                 occurred_at: Utc::now(),
             },
-            disposition: NotificationDisposition::Active(NotificationRecipient {
+            disposition: NotificationDisposition::Active(Box::new(NotificationRecipient {
                 principal_id: principal,
                 user_id: Uuid::new_v4(),
                 email: "person@example.com".into(),
                 company_label: "Example".into(),
                 channel_label: "Support".into(),
-                channel_id: Uuid::new_v4(),
+                channel_id: Some(Uuid::new_v4()),
                 thread_id: None,
                 run_id: None,
                 correlation_id: CorrelationId::new(),
                 email_enabled: true,
-            }),
+                target: NotificationTarget::DeliveryRecovery,
+            })),
         };
         assert!(!projection.should_email());
         assert!(matches!(
@@ -276,10 +314,9 @@ mod tests {
             delivery_failure_email_enabled: false,
             ..enabled
         };
-        for kind in NotificationActionKind::ALL {
-            assert!(kind.email_preference(enabled), "{kind:?}");
-            assert!(!kind.email_preference(disabled), "{kind:?}");
-        }
+        let kind = NotificationActionKind::DeliveryFailure;
+        assert!(kind.email_preference(enabled), "{kind:?}");
+        assert!(!kind.email_preference(disabled), "{kind:?}");
     }
 
     /// The legacy runtime's sources and actions went with it (p08 D4.3).
@@ -307,5 +344,35 @@ mod tests {
                 "{retired}"
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod followed_notice_tests {
+    use super::*;
+    #[test]
+    fn workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference() {
+        for delivery in [false, true] {
+            for decision in [false, true] {
+                let preferences = NotificationPreferences {
+                    delivery_failure_email_enabled: delivery,
+                    decision_email_enabled: decision,
+                };
+                for action in NotificationActionKind::ALL {
+                    let expected = match action {
+                        NotificationActionKind::DeliveryFailure => delivery,
+                        NotificationActionKind::DecisionReview
+                        | NotificationActionKind::EscalationReview => decision,
+                        NotificationActionKind::EscalationControl => false,
+                    };
+                    assert_eq!(action.email_preference(preferences), expected);
+                    assert_eq!(action.as_str().parse(), Ok(action));
+                }
+            }
+        }
+        assert_eq!(
+            "decision_reviewer".parse(),
+            Ok(NotificationSourceKind::DecisionReviewer)
+        );
     }
 }

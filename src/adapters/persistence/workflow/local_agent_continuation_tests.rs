@@ -56,7 +56,7 @@ async fn cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_app
     let p = &s.fixture.persistence;
     let session = original(&s).await;
     let mut with = inputs(s.profile.id, session);
-    with["approval"] = json!({"literal":{"reviewers":[{"kind":"user","id":s.fixture.target.actor.user_id()}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
+    with["approval"] = json!({"literal":{"reviewers":[{"kind":"principal","id":s.fixture.principal(s.fixture.target.actor.user_id()).await}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
     let scope = s
         .activate(s.fixture.target.actor, with, RelatedAssociation::Company)
         .await;

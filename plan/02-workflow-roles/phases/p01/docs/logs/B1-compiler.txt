@@ -1,0 +1,40 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 33 tests
+test application::workflow::compiler::compile::review1_tests::concat_charges_final_json_once_with_exact_and_one_over_limits ... ok
+test application::workflow::compiler::compile::review1_tests::aggregate_input_budget_charges_siblings_and_exact_json_size ... ok
+test application::workflow::compiler::compile::aggregate_tests::workflow_expanded_schema_work_is_bounded_before_serialization ... ok
+test application::workflow::compiler::compile::review1_tests::malformed_ordered_rule_descriptor_returns_diagnostic ... ok
+test application::workflow::compiler::compile::review1_tests::escaped_unicode_names_preserve_source_location_and_runtime_error ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_freezes_defaults_and_authored_limits ... ok
+test application::workflow::compiler::compile::review1_tests::dependency_edge_limit_and_unrelated_facts_do_not_affect_identity ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_policy ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_boundary_and_invalid_values_are_located ... ok
+test application::workflow::compiler::compile::review1_tests::static_checks_reject_bad_operators_and_impossible_input_roots ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_rejects_malformed_language_and_includes_descriptor_facts_in_hash ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_rejects_error_edge_and_diamond_output_gaps ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_reports_exact_reference_and_route_locations ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_round_trip_identity_and_runtime_snapshot ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_preserves_local_ref_sibling_constraints ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_ordered_rules_are_checked ... ok
+test application::workflow::compiler::compile::tests::workflow_compiler_parses_every_binding_operator ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_child_dependencies_and_repeat_bounds_are_checked ... ok
+test application::workflow::compiler::compile::review1_tests::union_absence_allows_default_on_both_runtime_branches ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_selects_escaped_and_unicode_destination_names ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_rejects_impossible_descriptor_bindings ... ok
+test application::workflow::compiler::compile::review1_tests::serialized_facts_have_an_exact_byte_ceiling ... ok
+test application::workflow::compiler::compile::review1_tests::dependency_preflight_limits_and_iterative_long_chain ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_validates_known_nested_literals_with_local_refs ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_checks_nested_schema_and_literal_types ... ok
+test application::workflow::compiler::compile::aggregate_tests::workflow_explicit_descriptor_reuse_is_rejected_before_clones_and_validators ... ok
+test application::workflow::compiler::compile::aggregate_tests::workflow_expanded_descriptor_serialization_matches_exact_byte_limit ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_checks_root_local_ref_properties_and_required_inputs ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_validates_literals_in_original_reference_scopes ... ok
+test application::workflow::compiler::schema::projection_tests::workflow_schema_allof_preserves_branch_and_sibling_restrictions ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_distinguishes_equal_fragments_under_different_ids ... ok
+test application::workflow::compiler::schema::projection_tests::workflow_schema_allof_keeps_sibling_required_properties ... ok
+test application::workflow::compiler::compile::validation_tests::workflow_compiler_projects_local_refs_unions_and_array_bounds ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 4143 filtered out; finished in 0.12s
+

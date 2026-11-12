@@ -52,17 +52,23 @@ fn suspended(outcome: WorkflowHandlerOutcome) -> crate::domain::workflow::WaitId
 }
 
 fn protected() -> impl std::future::Future<Output = Setup> {
-    setup_with_owner(|_, _, user, owner| {
-        (
-            "message.send",
-            json!({
-                "content":{"literal":{"subject":"Approved message","body":"Send after approval"}},
-                "destinations":{"literal":[{"kind":"user","id":user}]},
-                "approval":{"literal":{"reviewers":[{"kind":"user","id":owner}],
-                    "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}}
-            }),
-        )
-    })
+    setup_with_owner(
+        |MessageSetup {
+             user,
+             owner_principal,
+             ..
+         }| {
+            (
+                "message.send",
+                json!({
+                    "content":{"literal":{"subject":"Approved message","body":"Send after approval"}},
+                    "destinations":{"literal":[{"kind":"user","id":user}]},
+                    "approval":{"literal":{"reviewers":[{"kind":"principal","id":owner_principal}],
+                        "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}}
+                }),
+            )
+        },
+    )
 }
 
 fn approval_runtime(

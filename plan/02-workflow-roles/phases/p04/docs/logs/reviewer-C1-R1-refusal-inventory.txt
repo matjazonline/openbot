@@ -1,0 +1,30 @@
+src/application/services/inbound_event_worker.rs:660:        AppError::WorkflowRole(_)
+src/application/workflow/roles_tests.rs:188:            matches!(error, crate::app_error::AppError::WorkflowRole(ref refusal)
+src/application/workflow/roles_tests.rs:197:    let refusal = RoleAdmissionRefusal::new(
+src/application/workflow/message_admission.rs:453:        Err(AppError::WorkflowRole(refusal)) => {
+src/application/workflow/roles.rs:43:        return Err(crate::app_error::AppError::WorkflowRole(
+src/application/workflow/roles.rs:44:            crate::entities::department::RoleAdmissionRefusal::new(
+src/adapters/persistence/agent_publication/commands.rs:110:        AppError::WorkflowRole(_) => "role_resolution_refused",
+src/adapters/http/app_error_impl.rs:12:            AppError::WorkflowRole(_) => "workflow_role",
+src/adapters/http/app_error_impl.rs:34:            AppError::WorkflowRole(refusal) => (
+src/adapters/http/app_error_impl.rs:94:        let refusal = RoleAdmissionRefusal::new(
+src/adapters/http/app_error_impl.rs:99:        let response = AppError::WorkflowRole(refusal).into_response();
+src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:24:    RoleAdmissionRefusal::new(
+src/adapters/persistence/workflow/reviewer_accounts.rs:96:        Ok(None) | Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => {
+src/adapters/persistence/workflow/reviewer_accounts.rs:113:        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => return Ok(Some(hints)),
+src/adapters/persistence/workflow/reviewer_accounts.rs:129:        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => {
+src/adapters/http/routes/workflows/ui/authoring/bindings.rs:182:        WorkflowError::App(AppError::WorkflowRole(refusal)) => Some(refusal.to_string()),
+src/adapters/persistence/workflow/decisions.rs:267:        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => {
+src/adapters/persistence/workflow/decision_approvals.rs:76:        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => return Ok(None),
+src/adapters/persistence/workflow/agent_manifest/roles.rs:34:    AppError::WorkflowRole(RoleAdmissionRefusal::new(
+src/adapters/persistence/workflow/reviewer_resolution.rs:54:            |kind| AppError::WorkflowRole(RoleAdmissionRefusal::new(step_id.clone(), role, kind));
+src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:25:            let payload = serde_json::to_value(RoleAdmissionRefusal::new(
+src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:307:        matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind == RoleRefusalKind::WrongKind && refusal.role == DepartmentRole::Lead)
+src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:329:        matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind == RoleRefusalKind::Ambiguous && refusal.role == DepartmentRole::Reviewer)
+src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs:110:        matches!(failure,AppError::WorkflowRole(refusal) if refusal.role==DepartmentRole::Reviewer && refusal.kind==RoleRefusalKind::NoHolder)
+src/adapters/persistence/workflow/admission.rs:57:            if let AppError::WorkflowRole(refusal) = &error {
+src/adapters/persistence/workflow/admission.rs:146:            Err(AppError::WorkflowRole(refusal))
+src/adapters/persistence/workflow/role_reviewer_tests.rs:214:        matches!(f.role.p().admit(&command).await,Err(AppError::WorkflowRole(refusal)) if refusal.kind==RoleRefusalKind::NoHolder && refusal.role==DepartmentRole::Reviewer)
+src/adapters/persistence/workflow/role_reviewer_tests.rs:315:                matches!(admitted,Err(AppError::WorkflowRole(refusal)) if refusal.kind==RoleRefusalKind::TooMany)
+src/adapters/persistence/workflow/role_snapshot_tests.rs:241:        matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind==RoleRefusalKind::NoHolder && refusal.step.as_str()=="start" && refusal.role==DepartmentRole::Lead)
+src/adapters/persistence/workflow/escalation_refusal_tests.rs:37:        matches!(result,Err(AppError::WorkflowRole(RoleAdmissionRefusal {

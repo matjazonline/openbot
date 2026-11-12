@@ -1,0 +1,31 @@
+{
+  "round": "02WR-P04-C1-R1",
+  "stage": "coverage/architecture premise clarification only",
+  "decision": "02WR-P04-C1/r1",
+  "base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "head": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "digest": "d6afad07875439fc5bdf12f3e5ceac1fb7c396e0fe9a214a19e070b231528038",
+  "exclusions": [
+    "plan/02-workflow-roles/phases/p01/docs",
+    "plan/02-workflow-roles/phases/p02/docs",
+    "plan/02-workflow-roles/phases/p03/docs",
+    "plan/02-workflow-roles/phases/p04/docs",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/03-principal-addresses/COORDINATION.md"
+  ],
+  "plan02_coordination": 29,
+  "plan03_coordination": 5,
+  "inputs": {
+    "C1-r1.md": "a57d61c00258b37dd936bdb301f6c85c4936686257d730182b4f65e5094d4b2e",
+    "C1-R1-plan02-coordination.md": "5475768cff707ae9451df5254d46cc579f03ef4192e5e00c6278fdcaecb4e131",
+    "C1-R1-plan03-coordination.md": "768e2f973178e5e8e680b120e54d388e3cb47bc98bab5c59b69fd508f5c0adfd",
+    "C1-R1-source-bytes.json": "2b4463b001b4a4740c3d1b96ebdad3c1d1c30eb739851ea1b31dea44fd18b64f",
+    "B1-preparation-role-errors-app.txt": "61f0f9f24bb508cb5e371dd33a75963d8e3fc7f87542e189f66caa92ea81ad26",
+    "B1-preparation-role-constructors-app.txt": "90842b5239063317ecddb0dc2bffb14ffa32bf2460ec88cf314001ef55663b7c",
+    "B1-preparation-bounded-snapshots-callers.txt": "68260d089b8802ec332077a8997b18ef926265a790b6968e7715bb15aefeef1c",
+    "B1-preparation-sample-refusal-callers.txt": "8b5e931fa164d8992dc5bd76c2ef4a8c89e0436045146c2c96d16d8f61ed80fb",
+    "B1-preparation-refusal-persistence-all.txt": "d422964d874c8250f667dc2db23d52f98dbbcb2d364e8ff04c8455ca5562e66f",
+    "B1-preparation-capture-error-callers.txt": "7c4fa511c2caa93329454a62bee71e308ce3525fc6f29f5bbc535ccf5fbc1861"
+  },
+  "status": "source frozen for independent C1 review; full B1 partial and unaccepted; no active Cargo/SQLx/native/fixture jobs"
+}

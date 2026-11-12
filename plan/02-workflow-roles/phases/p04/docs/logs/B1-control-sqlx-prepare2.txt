@@ -1,0 +1,24 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+warning: method `content_hash` is never used
+   --> src/application/workflow/people_resolution.rs:111:12
+    |
+ 69 | impl PeopleResolution {
+    | --------------------- method in this implementation
+...
+111 |     pub fn content_hash(&self) -> AppResult<[u8; 32]> {
+    |            ^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: method `content_hash` is never used
+   --> src/application/workflow/reviewer_assignment.rs:198:12
+    |
+141 | impl ReviewerAssignment {
+    | ----------------------- method in this implementation
+...
+198 |     pub fn content_hash(&self) -> AppResult<[u8; 32]> {
+    |            ^^^^^^^^^^^^
+
+warning: `open_bots` (lib) generated 2 warnings
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 41.93s
+query data written to .sqlx in the current directory; please check this into version control

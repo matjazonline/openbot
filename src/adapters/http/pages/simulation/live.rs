@@ -63,6 +63,13 @@ fn binding_outcome_card(outcome: &MessageBindingOutcome) -> String {
             ),
             admitted_run_detail(run),
         ),
+        BindingOutcome::RoleRefused(refusal) => (
+            r##"<span class="badge badge-sm badge-ghost">Refused</span>"##.to_string(),
+            format!(
+                r##"<div class="text-xs font-mono">{}</div>"##,
+                escape_html_text(&refusal.to_string())
+            ),
+        ),
         BindingOutcome::Refused { reason } => (
             r##"<span class="badge badge-sm badge-ghost">Refused</span>"##.to_string(),
             format!(

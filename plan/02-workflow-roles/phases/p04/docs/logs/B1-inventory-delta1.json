@@ -1,0 +1,20 @@
+{
+  "baseline": "plan/02-workflow-roles/phases/p03/docs/logs/B1-R2-static-inventory1.txt",
+  "current": "plan/02-workflow-roles/phases/p04/docs/logs/B1-unit-inventory1.txt",
+  "before": 4228,
+  "after": 4239,
+  "removed": [],
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_is_original_desk_not_chosen_ancestor",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_rejects_forged_missing_and_mutated_snapshot",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree",
+    "application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds",
+    "application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration",
+    "application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops",
+    "application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_reject_partial_or_ambiguous_documents",
+    "application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_sets_are_stable_and_explicitly_empty",
+    "application::workflow::registry::decision_tests::workflow_reviewer_follow_flag_is_static_and_compiled"
+  ]
+}

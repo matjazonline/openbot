@@ -74,10 +74,12 @@ async fn protected_with_operation(
             .await
             .unwrap();
     }
-    let mut reviewers = vec![json!({"kind":"user","id":fixture.target.actor.user_id()})];
+    let mut reviewers = vec![
+        json!({"kind":"principal","id":fixture.principal(fixture.target.actor.user_id()).await}),
+    ];
     for _ in 1..count {
         let id = super::super::message_tests::support::member(&fixture, "admin").await;
-        reviewers.push(json!({"kind":"user","id":id}));
+        reviewers.push(json!({"kind":"principal","id":fixture.principal(id).await}));
     }
     let approval = json!({
         "reviewers":reviewers,
@@ -432,14 +434,16 @@ async fn workflow_action_approval_competing_reviewers_settle_once() {
     let p = &setup.fixture.persistence;
     let approve = submission(&setup, &decision, "approve");
     let mut reject = submission(&setup, &decision, "reject");
-    reject.actor = WorkflowActor::authenticated(
-        *decision
-            .reviewers
-            .iter()
-            .find(|id| **id != setup.fixture.target.actor.user_id())
-            .unwrap(),
+    let other: Uuid = sqlx::query_scalar(
+        "SELECT user_id FROM principals WHERE company_id=$1 AND id=ANY($2) AND user_id<>$3",
     )
+    .bind(setup.fixture.target.company.as_uuid())
+    .bind(&decision.reviewers)
+    .bind(setup.fixture.target.actor.user_id())
+    .fetch_one(p.pool())
+    .await
     .unwrap();
+    reject.actor = WorkflowActor::authenticated(other).unwrap();
     let barrier = tokio::sync::Barrier::new(2);
     let (a, b) = tokio::join!(
         async {
@@ -529,3 +533,6 @@ mod review_tests;
 
 #[path = "vault_tests/approval.rs"]
 mod vault_approval_tests;
+
+#[path = "reviewer_action_tests.rs"]
+mod role_tests;

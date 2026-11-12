@@ -42,6 +42,7 @@ impl<A: WorkflowAuthorization, P: BindingLifecycle, V: WorkflowDefinitions, R: R
         }
         let configuration = Arc::new(ConfiguredBinding::new(
             BindingConfiguration {
+                escalation: request.escalation,
                 id: request.target.binding,
                 revision: BindingRevision::new(configuration_revision).unwrap(),
                 company_id: request.target.company,

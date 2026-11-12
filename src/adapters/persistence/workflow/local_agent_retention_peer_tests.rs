@@ -168,7 +168,7 @@ async fn cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and
  {
     let s = Setup::new().await;
     let p = &s.fixture.persistence;
-    let approval = json!({"reviewers":[{"kind":"user","id":s.fixture.target.actor.user_id()}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
+    let approval = json!({"reviewers":[{"kind":"principal","id":s.fixture.principal(s.fixture.target.actor.user_id()).await}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
     let a = waiting_root(&s, Some(approval)).await;
     let b = waiting_root(&s, None).await;
     let follow = target(&s, &a, b.session).await;

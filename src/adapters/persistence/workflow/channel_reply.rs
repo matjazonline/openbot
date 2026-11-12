@@ -134,8 +134,17 @@ pub(super) async fn configure_reply_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ConfigureChannelReply,
 ) -> AppResult<ChannelReplySettings> {
-    lock_settings_accounts(tx, request).await?;
+    let approval_accounts = lock_settings_accounts(tx, request).await?;
     authorize_settings(tx, request.company, request.channel, request.actor).await?;
+    let reviewer_ids = request
+        .approval_policy
+        .as_ref()
+        .map_or(&[][..], |policy| policy.reviewers());
+    if super::approval_accounts::resolve_on(tx, request.company, reviewer_ids).await?
+        != approval_accounts
+    {
+        return Err(missing());
+    }
     sqlx::query("SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(request.company.as_uuid())
         .bind(request.channel.as_uuid())
@@ -183,11 +192,15 @@ pub(super) fn native_contract() -> ChannelReplyContract {
 async fn lock_settings_accounts(
     db: &mut PgConnection,
     request: &ConfigureChannelReply,
-) -> AppResult<()> {
+) -> AppResult<Vec<super::approval_accounts::PrincipalAccount>> {
     let mut accounts = vec![request.actor.user_id()];
-    if let Some(policy) = &request.approval_policy {
-        accounts.extend_from_slice(policy.reviewers());
-    }
+    let reviewer_ids = request
+        .approval_policy
+        .as_ref()
+        .map_or(&[][..], |policy| policy.reviewers());
+    let approval_accounts =
+        super::approval_accounts::resolve_on(db, request.company, reviewer_ids).await?;
+    accounts.extend(approval_accounts.iter().map(|mapping| mapping.user_id));
     if let Some(responder) = &request.responder {
         let run_as: Option<Uuid> = sqlx::query_scalar("SELECT revision.run_as_user_id FROM workflow_bindings AS binding \
             JOIN workflow_binding_revisions AS revision ON revision.company_id=binding.company_id AND revision.binding_id=binding.id \
@@ -197,11 +210,15 @@ async fn lock_settings_accounts(
     }
     accounts.sort_unstable();
     accounts.dedup();
-    sqlx::query("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
-        .bind(accounts)
-        .execute(db)
-        .await?;
-    Ok(())
+    let locked: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+            .bind(&accounts)
+            .fetch_all(db)
+            .await?;
+    if locked != accounts {
+        return Err(missing());
+    }
+    Ok(approval_accounts)
 }
 
 async fn authorize_settings(
@@ -228,8 +245,16 @@ async fn validate_reviewers(
     let Some(policy) = &request.approval_policy else {
         return Ok(());
     };
-    for user in policy.reviewers() {
-        let actor = WorkflowActor::authenticated(*user)?;
+    for principal in policy.reviewers() {
+        let user: Uuid = sqlx::query_scalar(
+            "SELECT user_id FROM principals WHERE company_id=$1 AND id=$2 AND kind='person'",
+        )
+        .bind(request.company.as_uuid())
+        .bind(principal)
+        .fetch_optional(&mut **db)
+        .await?
+        .ok_or_else(missing)?;
+        let actor = WorkflowActor::authenticated(user)?;
         let reviewer = authority::authorize_reviewer_on(db, request.company, actor).await?;
         if !reviewer.privileged {
             return Err(AppError::BadRequest(

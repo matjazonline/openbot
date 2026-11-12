@@ -1,0 +1,7 @@
+{
+  "reason": "Keep test modules below 500 lines; exact bodies/assertions retained in child module.",
+  "replacements": {
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_account_retirement_clears_all_roles_and_preserves_snapshot_history": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_account_retirement_clears_all_roles_and_preserves_snapshot_history"
+  }
+}

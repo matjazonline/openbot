@@ -45,7 +45,7 @@
               "type": "object",
               "properties": {
                 "kind": {
-                  "const": "user"
+                  "const": "principal"
                 },
                 "id": {
                   "type": "string",

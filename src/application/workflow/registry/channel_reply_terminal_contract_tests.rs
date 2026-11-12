@@ -14,7 +14,7 @@ fn channel_reply_terminal_contract_roundtrip_and_identity() {
     )
     .unwrap();
     assert_eq!(roundtrip.representation(), compiled.representation());
-    assert_eq!(compiler::SEMANTIC_REVISION, 9);
+    assert_eq!(compiler::SEMANTIC_REVISION, 11);
     assert_eq!(
         compiled.representation()["descriptors"]["start"]["registration"]["revision"],
         CONTRACT_REVISION

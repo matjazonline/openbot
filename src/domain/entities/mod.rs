@@ -37,6 +37,7 @@ pub mod unicode_sanitization;
 pub mod upload;
 pub mod user;
 pub mod value_objects;
+pub mod workflow_escalation;
 
 pub mod mcp;
 

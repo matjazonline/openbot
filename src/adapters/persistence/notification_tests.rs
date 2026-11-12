@@ -227,6 +227,7 @@ async fn commit_stale(
             fence: &claimed.lease,
             expected: &expected,
             email: None,
+            escalation_ack_hours: Default::default(),
         })
         .await
         .unwrap()

@@ -161,7 +161,7 @@ fn workflow_registry_agent_action_approval_uses_shared_static_policy() {
     let mut sample = example("agent.run").unwrap();
     changed(&mut sample, |source| {
         source["steps"]["start"]["with"]["approval"] = json!({"literal":{
-            "reviewers":[{"kind":"user","id":Uuid::new_v4()}],
+            "reviewers":[{"kind":"principal","id":Uuid::new_v4()}],
             "deadline":"2099-01-01T00:00:00Z"}});
     });
     compile_example(&sample).unwrap();

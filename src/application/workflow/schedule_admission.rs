@@ -120,6 +120,7 @@ pub trait ScheduleOccurrences: Send + Sync {
         &self,
         claim: OccurrenceClaim,
         refusal: &'static str,
+        role: Option<&crate::entities::department::RoleAdmissionRefusal>,
     ) -> AppResult<bool>;
     /// Pending again after backoff, or failed after the last attempt; either way the schedule's
     /// `last_error` names it.
@@ -200,7 +201,7 @@ where
         let mut current = self.queue.schedule_binding(claim.company, binding).await?;
         for _ in 0..MAX_STALE_RETRIES {
             let Some(binding) = current else {
-                return self.refuse(claim, "unavailable").await;
+                return self.refuse(claim, "unavailable", None).await;
             };
             let result = self
                 .admitter
@@ -219,7 +220,10 @@ where
                 }
                 Classified::Settled(
                     BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason),
-                ) => return self.refuse(claim, reason).await,
+                ) => return self.refuse(claim, reason, None).await,
+                Classified::Settled(BindingOutcome::RoleRefused(refusal)) => {
+                    return self.refuse(claim, refusal.kind.code(), Some(refusal)).await;
+                }
                 Classified::Transient => {
                     let error = error.unwrap_or_else(|| "transient admission failure".into());
                     return self.defer(claim, &error).await;
@@ -240,6 +244,7 @@ where
         &self,
         claim: OccurrenceClaim,
         reason: &'static str,
+        role: Option<crate::entities::department::RoleAdmissionRefusal>,
     ) -> AppResult<Materialized> {
         tracing::warn!(
             company_id = %claim.company.as_uuid(),
@@ -254,11 +259,17 @@ where
                 &[("reason", reason)],
             );
         }
-        Ok(if self.queue.record_refusal(claim, reason).await? {
-            Materialized::Refused(reason)
-        } else {
-            self.lost(claim)
-        })
+        Ok(
+            if self
+                .queue
+                .record_refusal(claim, reason, role.as_ref())
+                .await?
+            {
+                Materialized::Refused(reason)
+            } else {
+                self.lost(claim)
+            },
+        )
     }
 
     async fn defer(&self, claim: OccurrenceClaim, error: &str) -> AppResult<Materialized> {

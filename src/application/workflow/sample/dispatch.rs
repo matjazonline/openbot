@@ -19,6 +19,7 @@ impl Session {
         activation: &ActivatedExecution,
         path: &SamplePath,
     ) -> AppResult<PureCompletion> {
+        super::super::roles::refuse_unresolved_sample_role(bundle, &activation.step)?;
         if let Some(done) = execute_pure(bundle, activation)? {
             return Ok(done);
         }
@@ -232,13 +233,14 @@ fn human(
             "Human responses contain exactly choice, data and feedback",
         ));
     }
-    let (reviewers, deadline) = reviewer_deadline(&activation.inputs)?;
+    super::super::roles::refuse_unresolved_sample_role(bundle, &activation.step)?;
+    let (_, deadline) = reviewer_deadline(&activation.inputs)?;
     if deadline <= chrono::Utc::now() {
         return Err(refused("The scripted human decision deadline has passed"));
     }
     let command = SubmitDecision {
         company: bundle.company_id(),
-        actor: WorkflowActor::authenticated(reviewers[0])?,
+        actor: WorkflowActor::authenticated(Uuid::new_v4())?,
         decision: DecisionId(Uuid::new_v4()),
         command_key: DecisionCommandKey::parse("sample")?,
         expected_revision: 1,

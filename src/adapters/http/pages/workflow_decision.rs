@@ -72,7 +72,7 @@ pub fn workflow_decision_section(
         r##"<section id="workflow-decision" class="space-y-6">
         <header class="space-y-1"><h1 class="text-xl font-bold">{subject}</h1>
         <p class="text-sm">{title} · step {step}</p><p class="text-xs opacity-70">Decision {decision} · deadline {deadline}</p></header>
-        {banner}{context}
+        {banner}{context}<p class="text-sm">Reviewers: {reviewers}</p>
         <section class="space-y-2"><h2 class="font-semibold">Reviewed artifact</h2>
             <p class="break-all font-mono text-xs">SHA-256 {digest}</p>
             <pre class="overflow-x-auto whitespace-pre-wrap rounded-box bg-base-200 p-3 text-sm">{proposal}</pre></section>
@@ -83,6 +83,12 @@ pub fn workflow_decision_section(
         step = escape_html_text(view.step.as_str()),
         deadline = escape_html_text(&view.deadline.to_rfc3339()),
         context = context(view),
+        reviewers = view
+            .reviewer_labels
+            .iter()
+            .map(|reviewer| escape_html_text(&reviewer.label))
+            .collect::<Vec<_>>()
+            .join(", "),
         digest = escape_html_text(&view.artifact_digest),
         proposal = pretty(&view.proposal),
         form = if view.can_submit && open {

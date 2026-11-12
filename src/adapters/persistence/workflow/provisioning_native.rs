@@ -192,7 +192,17 @@ async fn provision_binding_on(
     let binding = WorkflowBindingId::new(key.id("binding"));
     let params = match provisioning.reply_mode {
         ReplyMode::Autonomous => json!({}),
-        ReplyMode::Reviewed => json!({"reviewer": requester.user_id().to_string()}),
+        ReplyMode::Reviewed => {
+            let principal: Uuid = sqlx::query_scalar(
+                "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+            )
+            .bind(company.as_uuid())
+            .bind(requester.user_id())
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or_else(missing)?;
+            json!({"reviewer": principal.to_string()})
+        }
     };
     let changes = provisioned_binding(
         BindingTarget {

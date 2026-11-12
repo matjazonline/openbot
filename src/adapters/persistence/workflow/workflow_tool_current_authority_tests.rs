@@ -48,7 +48,7 @@ async fn workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_
             name: TypeName::parse(TOOL).unwrap(),
             workflow: child_workflow(),
             version: setup.child,
-            params: json!({"reviewer":setup.reviewer.to_string()}),
+            params: json!({"reviewer":setup.fixture.principal(setup.reviewer).await.to_string()}),
             expected: None,
         },
     )
@@ -102,7 +102,7 @@ async fn autonomous_agent_authority_workflow_repoint_requires_new_binding_public
     let pin = WorkflowToolPin {
         workflow_id: child_workflow(),
         version_id: v2,
-        params: json!({"reviewer":setup.reviewer.to_string()}),
+        params: json!({"reviewer":setup.fixture.principal(setup.reviewer).await.to_string()}),
     };
     let call = setup
         .call(pin, json!({"question":"new-version"}), &claim)
@@ -138,7 +138,7 @@ async fn publish_new_binding(setup: &ToolSetup, version: VersionId) {
             registration: TypeName::parse(TOOL).unwrap(),
             workflow: child_workflow(),
             version,
-            params: json!({"reviewer":setup.reviewer.to_string()}),
+            params: json!({"reviewer":setup.fixture.principal(setup.reviewer).await.to_string()}),
         },
     };
     AgentPersistence::update(

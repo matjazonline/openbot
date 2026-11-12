@@ -286,6 +286,7 @@ async fn channel_reply_publication_approved_reviewer_must_retain_payload_clearan
     let s = Intents::new().await;
     super::super::policy_runtime_tests::verified_recipient(&s).await;
     let reviewer = member(&s.fixture, "admin").await;
+    let reviewer_principal = s.fixture.principal(reviewer).await;
     sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(reviewer)
@@ -297,7 +298,7 @@ async fn channel_reply_publication_approved_reviewer_must_retain_payload_clearan
         FinalCase {
             source: final_source("data.map"),
             contract: literal_contract("Classified"),
-            policy: Some(ReplyApprovalPolicy::new(vec![reviewer], 60).unwrap()),
+            policy: Some(ReplyApprovalPolicy::new(vec![reviewer_principal], 60).unwrap()),
             run_as: None,
             publication: FinalPublication::Standard,
             delivery_policy: DeliveryPolicy::Deliver,

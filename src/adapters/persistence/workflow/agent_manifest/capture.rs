@@ -40,9 +40,9 @@ impl Closure {
             },
         )
         .await?;
-        Ok(crate::application::agent::dependency::workflow_edges(
-            &bundle,
-        ))
+        let mut edges = crate::application::agent::dependency::workflow_edges(&bundle);
+        edges.extend(self.role_edges_on(tx, &bundle).await?);
+        Ok(edges)
     }
 
     pub(super) async fn agent_edges(

@@ -242,7 +242,7 @@ fn repeated_human_revision_carries_edited_artifact_feedback_and_captures_reply()
         script(4, "reply", vec![message_result()]),
     ]);
     req.input = json!({"message":"help","source_message":Uuid::from_u128(700)});
-    req.params = json!({"reviewer":Uuid::from_u128(6),"deadline":"2030-01-01T00:00:00Z"});
+    req.params = json!({"reviewer":Uuid::from_u128(6),"recipient":Uuid::from_u128(7),"deadline":"2030-01-01T00:00:00Z"});
     let report = execute(fixture(Fixture::RepeatedHumanRevision), req).unwrap();
     complete(&report);
     assert_eq!(report.usage.repetitions, 2);
@@ -359,7 +359,7 @@ fn descendants_cannot_replenish_root_budgets_and_report_size_is_bounded() {
         vec![json!({"items":[],"token_count":0,"omitted":0})],
     )]);
     req.input = json!({"message":"help","source_message":Uuid::from_u128(700)});
-    req.params = json!({"reviewer":Uuid::from_u128(6),"deadline":"2030-01-01T00:00:00Z"});
+    req.params = json!({"reviewer":Uuid::from_u128(6),"recipient":Uuid::from_u128(7),"deadline":"2030-01-01T00:00:00Z"});
     let report = execute(bundle, req).unwrap();
     assert_eq!(report.usage.activations, 2);
     assert!(

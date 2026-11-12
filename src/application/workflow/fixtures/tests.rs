@@ -55,6 +55,8 @@ fn prepare(
         json!({})
     } else if bundle.compiled().source() == Fixture::ReviewedSupport.source() {
         json!({"reviewer":"00000000-0000-0000-0000-0000000000b1"})
+    } else if bundle.compiled().source() == Fixture::RepeatedHumanRevision.source() {
+        json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","recipient":"00000000-0000-0000-0000-0000000000b2","deadline":"2030-01-01T00:00:00Z"})
     } else {
         json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","deadline":"2030-01-01T00:00:00Z"})
     };
@@ -384,7 +386,7 @@ fn workflow_fixtures_revision_rounds_carry_feedback_and_never_approve_on_exhaust
         child,
     };
     let input = json!({"message":"Help","source_message":"00000000-0000-0000-0000-0000000000c1"});
-    let params = json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","deadline":"2030-01-01T00:00:00Z"});
+    let params = json!({"reviewer":"00000000-0000-0000-0000-0000000000b1","recipient":"00000000-0000-0000-0000-0000000000b2","deadline":"2030-01-01T00:00:00Z"});
     let history = json!({"items":[],"token_count":0,"omitted":0});
     let limits = parent.compiled().graph().context_limits();
     let decide = |choice: &str, round: u32| {

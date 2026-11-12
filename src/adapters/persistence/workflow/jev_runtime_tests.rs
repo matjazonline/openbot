@@ -369,7 +369,7 @@ async fn jev_runtime_token_allowance_blocks_entry_and_preserves_accounting() {
     let c = create(&f).await;
     let mut source: Value =
         serde_json::from_str(&registry::example("jev.evaluate").unwrap().source).unwrap();
-    source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,"tokens":{"max_tokens":100,"reviewers":[{"kind":"user","id":f.target.actor.user_id()}]}});
+    source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,"tokens":{"max_tokens":100,"reviewers":[{"kind":"principal","id":f.principal(f.target.actor.user_id()).await}]}});
     let target = bound_source(&f, &c, source).await;
     let first = claim(&f, target).await;
     let request = JevRequest::prepare(&first.activation.inputs).unwrap();

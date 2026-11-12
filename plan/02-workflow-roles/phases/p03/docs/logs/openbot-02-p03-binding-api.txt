@@ -1,0 +1,3 @@
+graft skeleton — src/domain/workflow/binding.rs
+
+no definitions indexed for this file

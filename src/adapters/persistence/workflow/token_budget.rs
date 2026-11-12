@@ -215,15 +215,24 @@ pub(super) async fn prelock_reviewers(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<bool> {
-    let users: Vec<Uuid> = sqlx::query_scalar("SELECT (reviewer->>'id')::uuid FROM workflow_run_budgets AS link
+    let principals: Vec<Uuid> = sqlx::query_scalar("SELECT (reviewer->>'id')::uuid FROM workflow_run_budgets AS link
         JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
         CROSS JOIN LATERAL jsonb_array_elements(COALESCE(budget.token_policy->'reviewers','[]'::jsonb)) AS reviewer
         WHERE link.company_id=$1 AND link.run_id=$2 ORDER BY (reviewer->>'id')::uuid")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_all(&mut *db).await?;
-    for user in users {
-        let actor = WorkflowActor::authenticated(user).map_err(|_| invalid())?;
+    let mut mappings =
+        match super::approval_accounts::resolve_on(db, scope.company, &principals).await {
+            Ok(mappings) => mappings,
+            Err(AppError::NotFound(_)) => return Ok(false),
+            Err(error) => return Err(error),
+        };
+    // Preserve the existing company/member/principal authorization order. The unlocked
+    // account lookup is only a hint; the locked authority must name the same principal.
+    mappings.sort_unstable_by_key(|mapping| mapping.user_id);
+    for mapping in mappings {
+        let actor = WorkflowActor::authenticated(mapping.user_id).map_err(|_| invalid())?;
         match authority::authorize_reviewer_on(db, scope.company, actor).await {
-            Ok(reviewer) if reviewer.privileged => {}
+            Ok(reviewer) if reviewer.privileged && reviewer.principal == mapping.principal_id => {}
             Ok(_) | Err(AppError::NotFound(_)) => return Ok(false),
             Err(error) => return Err(error),
         }

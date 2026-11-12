@@ -551,7 +551,12 @@ async fn schedule_outcome_writes_are_fenced_by_the_claim() {
         },
     ] {
         assert!(!s.p().record_run(stale, run).await.unwrap());
-        assert!(!s.p().record_refusal(stale, "unavailable").await.unwrap());
+        assert!(
+            !s.p()
+                .record_refusal(stale, "unavailable", None)
+                .await
+                .unwrap()
+        );
         assert_eq!(
             s.p().record_error(stale, "lost").await.unwrap(),
             ErrorRecorded::Lost
@@ -802,6 +807,7 @@ async fn binding_reconfiguration_is_refused_by_an_incompatible_schedule() {
         .unwrap()
         .unwrap();
     let reconfigure = |version: VersionId, run_as: Option<Uuid>| ConfigureBinding {
+        escalation: None,
         target,
         expected: Some(current.revision),
         association: RelatedAssociation::Company,
@@ -1364,7 +1370,12 @@ async fn a_lapsed_but_unreclaimed_claim_still_records_its_outcome() {
         worker,
         generation: claimed[0].materialization_generation,
     };
-    assert!(s.p().record_refusal(claim, "unavailable").await.unwrap());
+    assert!(
+        s.p()
+            .record_refusal(claim, "unavailable", None)
+            .await
+            .unwrap()
+    );
     let (_, status, _, refusal, _) = s.occurrences(schedule.id).await[0].clone();
     assert_eq!(
         (status.as_str(), refusal.as_deref()),

@@ -1,0 +1,14 @@
+$ cargo test --locked --offline --lib autonomous_agent_views_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 6 tests
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::view_tests::autonomous_agent_views_bound_agent_and_workflow_dependencies_with_explicit_truncation ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4194 filtered out; finished in 2.75s
+

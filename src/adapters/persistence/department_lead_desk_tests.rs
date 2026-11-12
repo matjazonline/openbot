@@ -561,11 +561,19 @@ async fn department_lead_desk_refuses_lead_changes_it_cannot_follow() {
     assert_eq!(bound(&f, binding).await.agent.as_deref(), Some("closer"));
 
     // An approval policy on the desk's replies.
+    let owner_principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company)
+    .bind(f.owner)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     sqlx::query("UPDATE channel_reply_settings SET approval_policy = $3, revision = revision + 1 WHERE company_id = $1 AND channel_id = $2")
         .bind(f.company)
         .bind(desk)
         .bind(serde_json::to_value(
-            crate::application::workflow::channel_reply::ReplyApprovalPolicy::new(vec![f.owner], 3600).unwrap(),
+            crate::application::workflow::channel_reply::ReplyApprovalPolicy::new(vec![owner_principal], 3600).unwrap(),
         ).unwrap())
         .execute(f.pool())
         .await
@@ -796,6 +804,7 @@ async fn department_lead_desk_leaves_a_users_own_responder_alone() {
     };
     let configured = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Channel(RelatedChannelId::new(desk)),

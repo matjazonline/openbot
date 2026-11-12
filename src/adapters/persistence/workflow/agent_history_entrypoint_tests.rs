@@ -40,6 +40,7 @@ async fn choose(d: &Deployment, binding: BindingTarget, key: crate::application:
         .services()
         .bindings()
         .configure(ConfigureBinding {
+            escalation: None,
             target: binding,
             expected: Some(state.revision),
             association: state.association,
@@ -156,6 +157,7 @@ async fn configure_actor(d: &Deployment, binding: BindingTarget, admin: Uuid) {
         .services()
         .bindings()
         .configure(ConfigureBinding {
+            escalation: None,
             target: binding,
             expected: Some(state.revision),
             association: state.association,

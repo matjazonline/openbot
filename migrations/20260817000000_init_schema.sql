@@ -970,8 +970,16 @@ CREATE TABLE public.principals (
 --
 
 CREATE FUNCTION public.notification_principal_can_view(checked_company uuid, checked_channel uuid, checked_principal uuid) RETURNS boolean
-    LANGUAGE sql STABLE
-    RETURN (EXISTS (SELECT 1 FROM ((public.principals principal JOIN public.company_members member ON (((member.company_id = principal.company_id) AND (member.user_id = principal.user_id)))) JOIN public.channels channel ON (((channel.company_id = principal.company_id) AND (channel.id = notification_principal_can_view.checked_channel)))) WHERE ((principal.company_id = notification_principal_can_view.checked_company) AND (principal.id = notification_principal_can_view.checked_principal) AND (principal.kind = 'person'::text) AND ((member.role = 'owner'::text) OR (channel.access_mode = ANY (ARRAY['team'::text, 'public'::text])) OR (EXISTS (SELECT 1 FROM public.channel_principal_grants permission WHERE ((permission.company_id = notification_principal_can_view.checked_company) AND (permission.channel_id = notification_principal_can_view.checked_channel) AND (permission.principal_id = notification_principal_can_view.checked_principal) AND (permission.capability = 'view'::text))))))));
+    LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.principals AS principal
+        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+        LEFT JOIN public.channels AS channel ON channel.company_id=principal.company_id AND channel.id=checked_channel
+        WHERE principal.company_id=checked_company AND principal.id=checked_principal AND principal.kind='person'
+          AND ((checked_channel IS NULL AND member.role IN ('owner','admin')) OR (channel.id IS NOT NULL AND (
+            member.role='owner' OR channel.access_mode IN ('team','public') OR EXISTS (
+                SELECT 1 FROM public.channel_principal_grants AS permission WHERE permission.company_id=checked_company
+                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view')))))
+$$;
 
 
 --
@@ -3074,11 +3082,11 @@ CREATE FUNCTION public.workflow_decision_reviewer_guard() RETURNS trigger
     AS $$
 DECLARE snapshot_user uuid;
 BEGIN
+    IF NEW.notice_event_id IS NOT NULL THEN RETURN public.workflow_follow_pending_reviewer(NEW); END IF;
     snapshot_user := workflow_decision_person_snapshot(NEW.company_id, NEW.principal_id);
-    IF NEW.user_id IS NOT NULL AND NEW.user_id <> snapshot_user THEN
-        RAISE EXCEPTION 'workflow decision reviewer user snapshot mismatches principal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:workflow_decision_reviewer_guard';
-    END IF;
-    NEW.user_id := snapshot_user;
+    -- The person is already SHARE locked. Preserve a bounded display fact after retirement.
+    SELECT left(principal.display_label,256) INTO NEW.reviewer_label FROM principals AS principal
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id;
     -- Every reviewer was provably notified, or provably opted out of decision email (P08-D4 F076).
     IF NEW.notice_opted_out THEN
         IF NOT EXISTS (SELECT 1 FROM user_notification_preferences AS preference
@@ -5047,6 +5055,7 @@ CREATE TABLE public.workflow_binding_events (
 --
 
 CREATE TABLE public.workflow_binding_revisions (
+    escalation jsonb,
     company_id uuid NOT NULL,
     binding_id uuid NOT NULL,
     revision bigint NOT NULL,
@@ -5181,7 +5190,7 @@ CREATE TABLE public.workflow_decision_comments (
 
 CREATE TABLE public.workflow_decision_reviewers (
     company_id uuid NOT NULL,
-    user_id uuid NOT NULL,
+    reviewer_label text NOT NULL CHECK (octet_length(reviewer_label)<=1024),
     decision_id uuid NOT NULL,
     ordinal smallint NOT NULL,
     principal_id uuid NOT NULL,
@@ -5702,7 +5711,7 @@ BEGIN
        OR jsonb_array_length(policy->'reviewers') NOT BETWEEN 1 AND 16 THEN RETURN false; END IF;
     FOR reviewer IN SELECT value FROM jsonb_array_elements(policy->'reviewers') LOOP
         IF jsonb_typeof(reviewer) IS DISTINCT FROM 'object'
-           OR reviewer->>'kind' IS DISTINCT FROM 'user'
+           OR reviewer->>'kind' IS DISTINCT FROM 'principal'
            OR NOT reviewer ?& ARRAY['kind','id']
            OR reviewer - ARRAY['kind','id'] <> '{}'::jsonb
            OR jsonb_typeof(reviewer->'id') IS DISTINCT FROM 'string' THEN RETURN false; END IF;
@@ -5819,6 +5828,7 @@ CREATE TRIGGER workflow_bundle_immutable BEFORE UPDATE OR DELETE ON public.workf
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_bundle();
 
 CREATE TABLE public.workflow_runs (
+    escalation jsonb,
     knowledge_ceiling public.access_level NOT NULL,
     content_level public.access_level DEFAULT 0 NOT NULL,
     -- Whether content_level is a complete account of what the run consumed (phase 05 E3).
@@ -11258,7 +11268,8 @@ ALTER TABLE public.workflow_action_intents ADD CONSTRAINT workflow_action_approv
     UNIQUE(company_id,run_id,execution_id,id,argument_digest,operation_digest);
 ALTER TABLE public.workflow_decisions ADD CONSTRAINT workflow_decisions_action_identity
     FOREIGN KEY(company_id,run_id,execution_id,action_invocation_id,argument_digest,operation_digest)
-    REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest);
+    REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest)
+    DEFERRABLE INITIALLY DEFERRED;
 
 
 -- Payload-free model usage; reservation and settlement commit with the execution checkpoint.
@@ -11719,7 +11730,7 @@ END $$;
 CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
     binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
-    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy, knowledge_ceiling
+    created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy, knowledge_ceiling, escalation
     ON public.workflow_runs
     FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_snapshot();
 
@@ -12363,6 +12374,7 @@ CREATE TABLE public.agent_skill_grants (
 );
 
 CREATE TABLE public.agent_dependency_manifests (
+    role_context_department_id uuid,
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL,
     root_run_id uuid NOT NULL,
@@ -12705,7 +12717,7 @@ BEGIN
     FOR reviewer IN SELECT value FROM jsonb_array_elements(policy->'reviewers') LOOP
         IF jsonb_typeof(reviewer)<>'object' THEN RETURN false; END IF;
         IF (SELECT count(*) FROM jsonb_object_keys(reviewer))<>2
-            OR reviewer->>'kind' IS DISTINCT FROM 'user'
+            OR reviewer->>'kind' IS DISTINCT FROM 'principal'
             OR jsonb_typeof(reviewer->'id') IS DISTINCT FROM 'string'
             OR (reviewer->>'id') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
         THEN RETURN false; END IF;
@@ -15443,7 +15455,7 @@ CREATE TABLE public.department_roles (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT department_roles_pkey PRIMARY KEY (department_id, role, principal_id),
     -- Widened by later plans; the string is always `DepartmentRole::as_str`.
-    CONSTRAINT department_roles_role_check CHECK ((role = 'lead'::text)),
+    CONSTRAINT department_roles_role_check CHECK ((role IN ('lead', 'reviewer'))),
     CONSTRAINT department_roles_department_fk FOREIGN KEY (company_id, department_id)
         REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
     CONSTRAINT department_roles_principal_fk FOREIGN KEY (company_id, principal_id)
@@ -15536,6 +15548,7 @@ CREATE TRIGGER guard_department_role_holder_kind BEFORE INSERT OR UPDATE ON publ
 -- `external` rather than deleting it; it leaves every department with it.
 CREATE FUNCTION public.department_principal_demoted() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
+    PERFORM public.record_department_role_retirement(OLD,'demoted',NEW.display_label);
     DELETE FROM public.department_members AS member
      WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
     DELETE FROM public.department_roles AS holder
@@ -15753,3 +15766,1700 @@ CREATE TABLE public.workflow_memory_consumptions (
     FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE,
     CHECK (exposed_level <= read_ceiling)
 );
+
+
+-- Admission role requirements and complete principal sets are sealed in the immutable root
+-- dependency manifest (02WR-P02-D1/r2). These rows index that fact; they are not live role lookups.
+ALTER TABLE public.agent_dependency_manifests ADD CONSTRAINT agent_manifest_roles_shape CHECK (
+    (jsonb_typeof(content::jsonb->'roles') = 'array') IS TRUE
+);
+CREATE TABLE public.workflow_run_role_bindings (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    step text NOT NULL CHECK (octet_length(step) BETWEEN 1 AND 128 AND step ~ '^[A-Za-z_][A-Za-z0-9_-]*$'),
+    role text NOT NULL CHECK (role IN ('lead','reviewer')),
+    resolution_revision bigint NOT NULL DEFAULT 0 CHECK (resolution_revision >= 0),
+    human_resolution_revision bigint GENERATED ALWAYS AS (CASE WHEN resolution_revision>0 THEN resolution_revision END) STORED,
+    department_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    agent_id uuid,
+    agent_revision_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id,version_id,step,role,resolution_revision,principal_id),
+    CHECK ((agent_id IS NULL) = (agent_revision_id IS NULL)),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY (company_id,run_id,manifest_id)
+        REFERENCES public.run_dependency_manifests(company_id,run_id,manifest_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,manifest_id,run_id)
+        REFERENCES public.agent_dependency_manifests(company_id,id,root_run_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,manifest_id,version_id)
+        REFERENCES public.agent_manifest_workflows(company_id,manifest_id,version_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,principal_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,agent_id,agent_revision_id)
+        REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY (company_id,manifest_id,agent_id,agent_revision_id)
+        REFERENCES public.agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE UNIQUE INDEX workflow_role_binding_one_agent ON public.workflow_run_role_bindings
+    (company_id,run_id,version_id,step,role,resolution_revision) WHERE agent_id IS NOT NULL;
+-- Agent filters join captured roots to all their children. Without these leading keys a
+-- generic prepared plan repeatedly scans a company's entire ownership index per role root.
+CREATE INDEX workflow_role_bindings_by_agent ON public.workflow_run_role_bindings
+    (company_id,agent_id,run_id,manifest_id) WHERE resolution_revision=0 AND agent_id IS NOT NULL;
+CREATE INDEX run_dependency_manifests_by_root ON public.run_dependency_manifests
+    (company_id,root_run_id,manifest_id,run_id);
+COMMENT ON TABLE public.workflow_run_role_bindings IS
+    'Index of canonical admission role resolutions. Resolution0 is sealed by the root manifest; later human resolutions require their own immutable canonical record and complete membership guard before enabling nonzero revisions.';
+
+CREATE FUNCTION public.guard_workflow_role_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE holder_kind text; holder_agent uuid; canonical jsonb;
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
+            THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'captured role binding is immutable'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
+    ELSIF TG_OP = 'UPDATE' THEN
+        IF NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;
+        RAISE EXCEPTION 'captured role binding is immutable'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
+    END IF;
+    -- Same order as admission/deletion, including for a caller bypassing the adapter.
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    IF NEW.resolution_revision>0 THEN
+        IF NEW.agent_id IS NOT NULL OR NEW.agent_revision_id IS NOT NULL THEN
+            RAISE EXCEPTION 'later role resolutions are People only'
+                USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
+        END IF;
+        SELECT resolution.content INTO canonical FROM public.workflow_people_role_resolutions AS resolution
+            WHERE resolution.company_id=NEW.company_id AND resolution.root_run_id=NEW.run_id
+              AND resolution.manifest_id=NEW.manifest_id AND resolution.version_id=NEW.version_id
+              AND resolution.step=NEW.step AND resolution.role=NEW.role
+              AND resolution.resolution_revision=NEW.resolution_revision;
+        IF canonical IS NULL OR NOT(canonical->'principals' @> jsonb_build_array(NEW.principal_id))
+            OR (canonical->>'department_id')::uuid IS DISTINCT FROM NEW.department_id THEN
+            RAISE EXCEPTION 'role member lacks its exact canonical People resolution'
+                USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
+        END IF;
+    END IF;
+    IF NEW.agent_id IS NOT NULL THEN
+        PERFORM 1 FROM public.agents WHERE company_id=NEW.company_id AND id=NEW.agent_id FOR SHARE;
+    END IF;
+    SELECT principal.kind,principal.agent_id INTO holder_kind,holder_agent
+        FROM public.principals AS principal
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id FOR KEY SHARE;
+    IF (NEW.agent_id IS NOT NULL AND (holder_kind IS DISTINCT FROM 'agent' OR holder_agent IS DISTINCT FROM NEW.agent_id))
+        OR (NEW.agent_id IS NULL AND holder_kind IS DISTINCT FROM 'person') THEN
+        RAISE EXCEPTION 'captured role principal kind or agent does not match'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_role_binding_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_role_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_role_binding();
+
+-- Validate before expansion: an absent or malformed array must never silently become no roles.
+CREATE FUNCTION public.workflow_publication_role_requirements(payload bytea, selected_version uuid)
+RETURNS jsonb LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+DECLARE document jsonb; stored jsonb; requirements jsonb := '[]';
+BEGIN
+    document := convert_from(payload,'UTF8')::jsonb;
+    IF document->>'root' IS DISTINCT FROM selected_version::text
+        OR jsonb_typeof(document->'versions') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'invalid frozen publication role source'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(document->'versions') AS member(item)
+        WHERE member.item->>'version'=selected_version::text) THEN
+        RAISE EXCEPTION 'missing frozen publication role source'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+    END IF;
+    FOR stored IN SELECT item FROM jsonb_array_elements(document->'versions') AS member(item) LOOP
+        IF jsonb_typeof(stored->'compiled'->'roles') IS DISTINCT FROM 'array' THEN
+            RAISE EXCEPTION 'invalid frozen publication role requirements'
+                USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+        END IF;
+        SELECT requirements || coalesce(jsonb_agg(jsonb_build_object(
+            'version_id',stored->'version','step',item->'step','role',item->'role',
+            'need',CASE WHEN item->>'mode' IN ('tools','model_only') THEN 'agent'
+                WHEN item->>'mode'='people' THEN 'people' ELSE 'unknown' END)),'[]')
+            INTO requirements FROM jsonb_array_elements(stored->'compiled'->'roles') AS requirement(item);
+    END LOOP;
+    RETURN requirements;
+END $$;
+
+CREATE FUNCTION public.check_workflow_role_manifest() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner_company uuid; manifest uuid; saved jsonb; root uuid; expected jsonb; actual jsonb;
+BEGIN
+    owner_company := NEW.company_id;
+    IF TG_TABLE_NAME='agent_dependency_manifests' THEN manifest:=NEW.id; ELSE manifest:=NEW.manifest_id; END IF;
+    SELECT content::jsonb,root_run_id INTO saved,root FROM public.agent_dependency_manifests
+        WHERE company_id=owner_company AND id=manifest FOR UPDATE;
+    IF saved IS NULL THEN RETURN NULL; END IF;
+    IF jsonb_typeof(saved->'roles') IS DISTINCT FROM 'array' OR EXISTS (
+        SELECT 1 FROM jsonb_array_elements(saved->'roles') AS resolution(item)
+        WHERE jsonb_typeof(resolution.item->'principals') IS DISTINCT FROM 'array'
+           OR jsonb_array_length(resolution.item->'principals') NOT BETWEEN 1 AND 16
+    ) THEN
+        RAISE EXCEPTION 'invalid canonical role resolutions'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+    END IF;
+    -- A stored publication is immutable and was rebuilt/validated by capture. Read its complete
+    -- pinned closure so an omitted child/requirement cannot turn an incomplete capture into a pass.
+    WITH sources AS (
+        SELECT workflow_id,version_id FROM public.workflow_runs WHERE company_id=owner_company AND id=root
+        UNION SELECT workflow_id,version_id FROM public.agent_manifest_workflows
+            WHERE company_id=owner_company AND manifest_id=manifest
+    ), requirements AS (
+        SELECT DISTINCT (requirement.item->>'version_id')::uuid AS version_id,
+            requirement.item->>'step' AS step, requirement.item->>'role' AS role,
+            requirement.item->>'need' AS need
+        FROM sources AS selected
+        JOIN public.workflow_versions AS publication ON publication.company_id=owner_company
+            AND publication.workflow_id=selected.workflow_id AND publication.id=selected.version_id
+        CROSS JOIN LATERAL jsonb_array_elements(public.workflow_publication_role_requirements(
+            publication.bundle,selected.version_id)) AS requirement(item)
+    ) SELECT coalesce(jsonb_agg(jsonb_build_object('version_id',version_id,'step',step,'role',role,'need',need)
+        ORDER BY version_id,step,role),'[]') INTO expected FROM requirements;
+    SELECT coalesce(jsonb_agg(jsonb_build_object('version_id',item->'version_id','step',item->'step','role',item->'role',
+        'need',CASE WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(item->'principals') AS holder(value)
+                        WHERE holder.value->>'agent_id' IS NULL OR holder.value->>'revision_id' IS NULL) THEN 'agent'
+                    WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(item->'principals') AS holder(value)
+                        WHERE holder.value->>'agent_id' IS NOT NULL OR holder.value->>'revision_id' IS NOT NULL) THEN 'people'
+                    ELSE 'mixed' END)
+        ORDER BY item->>'version_id',item->>'step',item->>'role'),'[]') INTO actual
+        FROM jsonb_array_elements(saved->'roles') AS captured(item);
+    IF expected IS DISTINCT FROM actual THEN
+        RAISE EXCEPTION 'captured roles must exactly cover frozen workflow requirements'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+    END IF;
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+        'version_id',resolution.item->'version_id','step',resolution.item->'step','role',resolution.item->'role',
+        'department_id',resolution.item->'department_id','principal_id',holder.item->'principal_id',
+        'agent_id',holder.item->'agent_id','revision_id',holder.item->'revision_id')
+        ORDER BY resolution.item->>'version_id',resolution.item->>'step',resolution.item->>'role',holder.item->>'principal_id'),'[]')
+        INTO expected FROM jsonb_array_elements(saved->'roles') AS resolution(item)
+        CROSS JOIN LATERAL jsonb_array_elements(resolution.item->'principals') AS holder(item);
+    SELECT coalesce(jsonb_agg(jsonb_build_object(
+        'version_id',version_id,'step',step,'role',role,'department_id',department_id,
+        'principal_id',principal_id,'agent_id',agent_id,'revision_id',agent_revision_id)
+        ORDER BY version_id,step,role,principal_id),'[]') INTO actual
+        FROM public.workflow_run_role_bindings WHERE company_id=owner_company AND manifest_id=manifest
+            AND run_id=root AND resolution_revision=0;
+    IF expected IS DISTINCT FROM actual THEN
+        RAISE EXCEPTION 'role members must exactly match immutable canonical resolution'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_role_manifest_complete AFTER INSERT ON public.agent_dependency_manifests
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_role_manifest();
+CREATE CONSTRAINT TRIGGER workflow_role_members_complete AFTER INSERT ON public.workflow_run_role_bindings
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_role_manifest();
+
+
+-- Preserve the existing64-byte refusal code limit. Bounded typed context is a separate fact.
+CREATE FUNCTION public.workflow_role_refusal_code(value jsonb) RETURNS text LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT CASE value->>'kind'
+        WHEN 'no_holder' THEN 'workflow.role_no_holder'
+        WHEN 'wrong_kind' THEN 'workflow.role_wrong_kind'
+        WHEN 'ambiguous' THEN 'workflow.role_ambiguous'
+        WHEN 'depth_bound' THEN 'workflow.role_depth_bound'
+        WHEN 'too_many' THEN 'workflow.role_too_many'
+        WHEN 'unavailable' THEN 'workflow.role_unavailable'
+        WHEN 'missing_department' THEN 'workflow.role_needs_department'
+    END
+$$;
+CREATE FUNCTION public.valid_workflow_role_refusal(value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT (jsonb_typeof(value)='object' AND octet_length(value::text)<=512
+        AND value->>'format'='workflow-role-refusal-v1'
+        AND jsonb_typeof(value->'step')='string' AND octet_length(value->>'step') BETWEEN 1 AND 128
+        AND value->>'step' ~ '^[A-Za-z_][A-Za-z0-9_-]*$'
+        AND value->>'role' IN ('lead','reviewer')
+        AND public.workflow_role_refusal_code(value) IS NOT NULL
+        AND (value-ARRAY['format','step','role','kind'])='{}'::jsonb) IS TRUE
+$$;
+ALTER TABLE public.workflow_message_intent_bindings ADD COLUMN role_refusal jsonb,
+    ADD CONSTRAINT workflow_message_role_refusal CHECK ((role_refusal IS NULL OR (
+        public.valid_workflow_role_refusal(role_refusal) AND outcome='refused'
+        AND reason=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
+    ADD CONSTRAINT workflow_schedule_role_refusal CHECK ((role_refusal IS NULL OR (
+        public.valid_workflow_role_refusal(role_refusal) AND materialization_status='failed'
+        AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
+    ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
+        OR refusal IN ('unavailable','input_rejected','key_conflict')
+        OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
+            AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+
+
+-- Workflow roles p04: opt-in immutable escalation configuration. Fresh databases only.
+CREATE FUNCTION public.workflow_escalation_policy_valid(value jsonb) RETURNS boolean
+    LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT coalesce(jsonb_typeof(value)='object'
+       AND value ?& ARRAY['notify','hops']
+       AND (value - ARRAY['notify','hops'])='{}'::jsonb
+       AND jsonb_typeof(value->'notify')='string'
+       AND jsonb_typeof(value->'hops')='number'
+       AND value->>'notify' IN ('lead','reviewer')
+       AND value->>'hops' IN ('1','2'), false)
+$$;
+ALTER TABLE public.workflow_binding_revisions ADD CONSTRAINT workflow_binding_escalation_policy
+    CHECK (escalation IS NULL OR public.workflow_escalation_policy_valid(escalation));
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_run_escalation_policy
+    CHECK (escalation IS NULL OR public.workflow_escalation_policy_valid(escalation));
+
+
+-- The original desk context is sealed independently of the nearest chosen ancestor.
+ALTER TABLE public.agent_dependency_manifests ADD CONSTRAINT agent_manifest_role_context_department
+    FOREIGN KEY(company_id,role_context_department_id)
+    REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED;
+CREATE FUNCTION public.guard_workflow_role_context() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE saved jsonb; expected uuid; captured uuid;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    saved := NEW.content::jsonb;
+    IF NOT(saved ? 'role_context_department_id')
+        OR jsonb_typeof(saved->'role_context_department_id') NOT IN ('null','string') THEN
+        RAISE EXCEPTION 'canonical role context is missing or invalid'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_context';
+    END IF;
+    BEGIN
+        captured := (saved->>'role_context_department_id')::uuid;
+    EXCEPTION WHEN invalid_text_representation THEN
+        RAISE EXCEPTION 'canonical role context is invalid'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_context';
+    END;
+    SELECT channel.department_id INTO expected FROM public.workflow_runs AS run
+        LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+        WHERE run.company_id=NEW.company_id AND run.id=NEW.root_run_id;
+    IF NEW.role_context_department_id IS DISTINCT FROM captured
+        OR captured IS DISTINCT FROM expected
+        OR (jsonb_array_length(saved->'roles')>0 AND captured IS NULL) THEN
+        RAISE EXCEPTION 'role context must exactly match the admitted desk department'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_context';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_role_context_guard BEFORE INSERT ON public.agent_dependency_manifests
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_role_context();
+
+
+-- People follow-role captures extend admission history without touching agent resolution zero.
+CREATE INDEX agent_manifest_role_context_lookup ON public.agent_dependency_manifests
+    (company_id,role_context_department_id) WHERE role_context_department_id IS NOT NULL;
+CREATE TABLE public.workflow_people_role_resolutions (
+    company_id uuid NOT NULL,
+    root_run_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    step text NOT NULL CHECK (octet_length(step) BETWEEN 1 AND 128 AND step ~ '^[A-Za-z_][A-Za-z0-9_-]*$'),
+    role text NOT NULL CHECK (role IN ('lead','reviewer')),
+    resolution_revision bigint NOT NULL CHECK (resolution_revision>0),
+    context_department_id uuid NOT NULL,
+    department_id uuid,
+    refusal text CHECK (refusal IN ('no_holder','wrong_kind','ambiguous','depth_bound','too_many','unavailable','missing_department')),
+    content jsonb NOT NULL CHECK (octet_length(content::text)<=16384),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,root_run_id,manifest_id,version_id,step,role,resolution_revision),
+    FOREIGN KEY(company_id,manifest_id,root_run_id)
+        REFERENCES public.agent_dependency_manifests(company_id,id,root_run_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,manifest_id,version_id)
+        REFERENCES public.agent_manifest_workflows(company_id,manifest_id,version_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,context_department_id)
+        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,department_id)
+        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+ALTER TABLE public.workflow_run_role_bindings ADD CONSTRAINT workflow_role_human_resolution
+    FOREIGN KEY(company_id,run_id,manifest_id,version_id,step,role,human_resolution_revision)
+    REFERENCES public.workflow_people_role_resolutions(company_id,root_run_id,manifest_id,version_id,step,role,resolution_revision)
+    DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_run_role_bindings ADD CONSTRAINT workflow_role_agent_resolution_zero
+    CHECK (agent_id IS NULL OR resolution_revision=0);
+
+CREATE FUNCTION public.guard_workflow_people_resolution() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE saved jsonb; expected_context uuid; member uuid; member_ids uuid[];
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    saved := NEW.content;
+    IF jsonb_typeof(saved) IS DISTINCT FROM 'object'
+        OR saved - 'principals' IS DISTINCT FROM jsonb_build_object(
+            'format','workflow-human-role-resolution-v1','company_id',NEW.company_id,
+            'root_run_id',NEW.root_run_id,'manifest_id',NEW.manifest_id,'version_id',NEW.version_id,
+            'step',NEW.step,'role',NEW.role,'resolution_revision',NEW.resolution_revision,
+            'context_department_id',NEW.context_department_id,'department_id',NEW.department_id,'refusal',NEW.refusal)
+        OR saved->>'resolution_revision' IS DISTINCT FROM NEW.resolution_revision::text
+        OR jsonb_typeof(saved->'principals') IS DISTINCT FROM 'array' THEN
+        RAISE EXCEPTION 'invalid canonical People role resolution identity'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+    END IF;
+    IF jsonb_array_length(saved->'principals')>16
+        OR (NEW.refusal IS NULL AND (jsonb_array_length(saved->'principals')=0 OR NEW.department_id IS NULL))
+        OR (NEW.refusal IS NOT NULL AND jsonb_array_length(saved->'principals')<>0) THEN
+        RAISE EXCEPTION 'invalid canonical People role resolution members'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+    END IF;
+    SELECT ownership.role_context_department_id INTO expected_context
+        FROM public.agent_dependency_manifests AS ownership
+        WHERE ownership.company_id=NEW.company_id AND ownership.id=NEW.manifest_id AND ownership.root_run_id=NEW.root_run_id;
+    -- Admission's complete canonical set already proves the source requirement is People.
+    -- Reuse that sealed indexed fact; never reparse a whole publication per member/historical row.
+    IF expected_context IS DISTINCT FROM NEW.context_department_id OR NOT EXISTS (
+        SELECT 1 FROM public.workflow_run_role_bindings AS original
+        WHERE original.company_id=NEW.company_id AND original.run_id=NEW.root_run_id
+          AND original.manifest_id=NEW.manifest_id AND original.version_id=NEW.version_id
+          AND original.step=NEW.step AND original.role=NEW.role AND original.resolution_revision=0
+          AND original.agent_id IS NULL AND original.agent_revision_id IS NULL
+    ) THEN
+        RAISE EXCEPTION 'later resolution must name its frozen People requirement and context'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+    END IF;
+    member_ids := '{}';
+    FOR member IN SELECT (holder.value #>> '{}')::uuid FROM jsonb_array_elements(saved->'principals') AS holder(value) LOOP
+        IF member IS NULL OR member=ANY(member_ids) THEN
+            RAISE EXCEPTION 'duplicate or null canonical People role member'
+                USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+        END IF;
+        member_ids := array_append(member_ids,member);
+    END LOOP;
+    IF saved->'principals' IS DISTINCT FROM (
+        SELECT coalesce(jsonb_agg(id ORDER BY id),'[]') FROM unnest(member_ids) AS principal(id)
+    ) THEN
+        RAISE EXCEPTION 'canonical People member identities must be sorted UUID strings'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+    END IF;
+    RETURN NEW;
+EXCEPTION WHEN invalid_text_representation THEN
+    RAISE EXCEPTION 'invalid canonical People role member identity'
+        USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_people_resolution';
+END $$;
+CREATE TRIGGER workflow_people_resolution_guard BEFORE INSERT ON public.workflow_people_role_resolutions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_people_resolution();
+CREATE TRIGGER workflow_people_resolution_immutable BEFORE UPDATE OR DELETE ON public.workflow_people_role_resolutions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_agent_manifest();
+
+CREATE FUNCTION public.check_workflow_people_members_complete() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE saved jsonb; actual jsonb; owner_root uuid;
+BEGIN
+    IF NEW.resolution_revision=0 THEN RETURN NULL; END IF;
+    IF TG_TABLE_NAME='workflow_people_role_resolutions' THEN owner_root:=NEW.root_run_id;
+    ELSE owner_root:=NEW.run_id; END IF;
+    SELECT resolution.content INTO saved FROM public.workflow_people_role_resolutions AS resolution
+        WHERE resolution.company_id=NEW.company_id AND resolution.root_run_id=owner_root
+          AND resolution.manifest_id=NEW.manifest_id AND resolution.version_id=NEW.version_id
+          AND resolution.step=NEW.step AND resolution.role=NEW.role AND resolution.resolution_revision=NEW.resolution_revision;
+    IF saved IS NULL THEN
+        IF NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=owner_root) THEN RETURN NULL; END IF;
+        RAISE EXCEPTION 'missing canonical People role resolution'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_people_members_complete';
+    END IF;
+    SELECT coalesce(jsonb_agg(member.principal_id ORDER BY member.principal_id),'[]') INTO actual
+        FROM public.workflow_run_role_bindings AS member
+        WHERE member.company_id=NEW.company_id AND member.run_id=owner_root AND member.manifest_id=NEW.manifest_id
+          AND member.version_id=NEW.version_id AND member.step=NEW.step AND member.role=NEW.role
+          AND member.resolution_revision=NEW.resolution_revision;
+    IF actual IS DISTINCT FROM saved->'principals' THEN
+        RAISE EXCEPTION 'normalized People role members must exactly match their immutable canonical set'
+            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_people_members_complete';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_people_resolution_complete AFTER INSERT ON public.workflow_people_role_resolutions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_people_members_complete();
+CREATE CONSTRAINT TRIGGER workflow_people_role_members_complete AFTER INSERT ON public.workflow_run_role_bindings
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_people_members_complete();
+
+-- Follow-role selectors and assignments are separate from immutable proposal revisions.
+CREATE FUNCTION public.workflow_follow_selection(value jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE item jsonb; principal uuid; pins uuid[]:='{}'; roles text[]:='{}'; role_name text;
+BEGIN
+    IF jsonb_typeof(value) IS DISTINCT FROM 'array' OR jsonb_array_length(value) NOT BETWEEN 1 AND 18 THEN RETURN NULL; END IF;
+    FOR item IN SELECT member.value FROM jsonb_array_elements(value) AS member(value) LOOP
+        IF jsonb_typeof(item)='string' THEN
+            role_name:=item #>> '{}';
+            IF role_name NOT IN ('lead','reviewer') THEN RETURN NULL; END IF;
+            IF NOT role_name=ANY(roles) THEN roles:=array_append(roles,role_name); END IF;
+        ELSIF jsonb_typeof(item)='object' AND item->>'kind'='principal'
+            AND item - ARRAY['kind','id']='{}' AND jsonb_typeof(item->'id')='string' THEN
+            principal:=(item->>'id')::uuid;
+            IF principal='00000000-0000-0000-0000-000000000000' THEN RETURN NULL; END IF;
+            IF NOT principal=ANY(pins) THEN pins:=array_append(pins,principal); END IF;
+        ELSE RETURN NULL;
+        END IF;
+    END LOOP;
+    IF cardinality(pins)>16 THEN RETURN NULL; END IF;
+    RETURN jsonb_build_object('principals',pins,'roles',roles);
+EXCEPTION WHEN invalid_text_representation THEN RETURN NULL;
+END $$;
+
+ALTER TABLE public.run_dependency_manifests ADD CONSTRAINT workflow_follow_manifest_ownership
+    UNIQUE(company_id,run_id,root_run_id,manifest_id);
+CREATE TABLE public.workflow_follow_decisions (
+    company_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    execution_id uuid NOT NULL,
+    root_run_id uuid NOT NULL,
+    manifest_id uuid NOT NULL,
+    version_id uuid NOT NULL,
+    step text NOT NULL,
+    context_department_id uuid NOT NULL,
+    selectors jsonb NOT NULL CHECK (octet_length(selectors::text)<=4096),
+    selection jsonb NOT NULL,
+    assignment_revision bigint NOT NULL CHECK (assignment_revision>0),
+    PRIMARY KEY(company_id,decision_id),
+    FOREIGN KEY(company_id,run_id,execution_id,decision_id)
+        REFERENCES public.workflow_decisions(company_id,run_id,execution_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,run_id,root_run_id,manifest_id)
+        REFERENCES public.run_dependency_manifests(company_id,run_id,root_run_id,manifest_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,manifest_id,version_id)
+        REFERENCES public.agent_manifest_workflows(company_id,manifest_id,version_id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,context_department_id)
+        REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX workflow_follow_decision_run ON public.workflow_follow_decisions(company_id,run_id);
+CREATE TABLE public.workflow_reviewer_assignments (
+    company_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    assignment_revision bigint NOT NULL CHECK (assignment_revision>0),
+    content jsonb NOT NULL CHECK (octet_length(content::text)<=32768),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,decision_id,assignment_revision),
+    FOREIGN KEY(company_id,decision_id) REFERENCES public.workflow_follow_decisions(company_id,decision_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+ALTER TABLE public.workflow_follow_decisions ADD CONSTRAINT workflow_follow_selected_assignment
+    FOREIGN KEY(company_id,decision_id,assignment_revision)
+    REFERENCES public.workflow_reviewer_assignments(company_id,decision_id,assignment_revision) DEFERRABLE INITIALLY DEFERRED;
+CREATE TABLE public.workflow_pending_follow_decisions (
+    company_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    PRIMARY KEY(company_id,decision_id),
+    FOREIGN KEY(company_id,decision_id) REFERENCES public.workflow_follow_decisions(company_id,decision_id) ON DELETE CASCADE
+);
+
+-- Notice source identity is immutable even after a reviewer leaves the current set.
+CREATE TABLE public.workflow_reviewer_notices (
+    company_id uuid NOT NULL,
+    id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    assignment_revision bigint NOT NULL CHECK (assignment_revision>0),
+    event_id uuid NOT NULL,
+    source_kind text GENERATED ALWAYS AS ('decision_reviewer') STORED,
+    action_kind text GENERATED ALWAYS AS ('decision_review') STORED,
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,decision_id,principal_id,assignment_revision),
+    UNIQUE(company_id,decision_id,principal_id,assignment_revision,event_id),
+    FOREIGN KEY(company_id,decision_id,assignment_revision)
+        REFERENCES public.workflow_reviewer_assignments(company_id,decision_id,assignment_revision)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,event_id,source_kind,id,action_kind,assignment_revision)
+        REFERENCES public.notification_events(company_id,id,source_kind,source_id,action_kind,source_generation)
+        DEFERRABLE INITIALLY DEFERRED
+);
+ALTER TABLE public.workflow_decision_reviewers
+    ADD COLUMN notice_event_id uuid,
+    ADD COLUMN notice_assignment_revision bigint,
+    DROP CONSTRAINT workflow_decision_reviewers_notice_check,
+    ADD CONSTRAINT workflow_decision_reviewers_notice_check CHECK (
+        (notice_event_id IS NULL AND notice_assignment_revision IS NULL AND ((notice_delivery_id IS NULL)=notice_opted_out))
+        OR (notice_event_id IS NOT NULL AND notice_assignment_revision IS NOT NULL AND notice_assignment_revision>0 AND notice_delivery_id IS NULL AND NOT notice_opted_out)),
+    ADD CONSTRAINT workflow_reviewer_pending_notice FOREIGN KEY(company_id,decision_id,principal_id,notice_assignment_revision,notice_event_id)
+        REFERENCES public.workflow_reviewer_notices(company_id,decision_id,principal_id,assignment_revision,event_id)
+        DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.notification_events
+    DROP CONSTRAINT notification_events_source_kind_check,
+    DROP CONSTRAINT notification_events_action_kind_check,
+    ADD CONSTRAINT notification_events_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer')),
+    ADD CONSTRAINT notification_events_action_kind_check CHECK (
+        (source_kind='delivery' AND action_kind='delivery_failure')
+        OR (source_kind='decision_reviewer' AND action_kind='decision_review'));
+
+CREATE FUNCTION public.workflow_follow_is_open(company uuid, decision uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.workflow_decisions AS current_decision
+        JOIN public.workflow_waits AS wait ON wait.company_id=current_decision.company_id AND wait.id=current_decision.wait_id
+        JOIN public.workflow_runs AS run ON run.company_id=current_decision.company_id AND run.id=current_decision.run_id
+        WHERE current_decision.company_id=company AND current_decision.id=decision AND current_decision.subject_kind='business'
+          AND current_decision.submitted_at IS NULL AND wait.state='waiting' AND run.state IN ('queued','running','waiting'))
+$$;
+CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_identity uuid, person uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.principals AS principal
+        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+        JOIN public.users AS account ON account.id=principal.user_id
+        JOIN public.companies AS tenant ON tenant.id=principal.company_id
+        JOIN public.workflow_runs AS run ON run.company_id=principal.company_id AND run.id=run_identity
+        LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+        WHERE principal.company_id=company AND principal.id=person AND principal.kind='person'
+          AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND member.role IN ('owner','admin'))
+            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+              OR EXISTS (SELECT 1 FROM public.channel_principal_grants AS access_grant WHERE access_grant.company_id=company
+                AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
+                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view'))))
+          AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM public.threads AS thread WHERE thread.company_id=company
+            AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)))
+$$;
+
+CREATE FUNCTION public.guard_workflow_follow_spec() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE actual record; canonical jsonb; expected jsonb;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    IF TG_OP='UPDATE' THEN
+        IF to_jsonb(NEW)-'assignment_revision' IS DISTINCT FROM to_jsonb(OLD)-'assignment_revision'
+            OR OLD.assignment_revision=9223372036854775807 OR NEW.assignment_revision<>OLD.assignment_revision+1
+            OR NOT public.workflow_follow_is_open(NEW.company_id,NEW.decision_id) THEN
+            RAISE EXCEPTION 'follow selectors are immutable and selected assignment must advance once on an open decision'
+                USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_follow_spec';
+        END IF;
+        RETURN NEW;
+    END IF;
+    SELECT run.version_id,execution.step_id,execution.frozen_inputs,ownership.root_run_id,ownership.manifest_id,
+        manifest.role_context_department_id,convert_from(stored.bundle,'UTF8')::jsonb AS publication INTO actual
+        FROM public.workflow_runs AS run
+        JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id AND execution.id=NEW.execution_id
+        JOIN public.run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id
+        JOIN public.agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id
+        JOIN public.workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest
+        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id;
+    SELECT version.value->'compiled'->'definition'->'steps'->NEW.step INTO canonical
+        FROM jsonb_array_elements(actual.publication->'versions') AS version(value)
+        WHERE version.value->>'version'=NEW.version_id::text;
+    expected:=public.workflow_follow_selection(NEW.selectors);
+    IF actual IS NULL OR (NEW.root_run_id,NEW.manifest_id,NEW.version_id,NEW.step,NEW.context_department_id)
+        IS DISTINCT FROM (actual.root_run_id,actual.manifest_id,actual.version_id,actual.step_id,actual.role_context_department_id)
+        OR NEW.selectors IS DISTINCT FROM actual.frozen_inputs->'reviewers'
+        OR expected IS NULL OR NEW.selection IS DISTINCT FROM expected OR jsonb_array_length(expected->'roles')=0
+        OR NEW.assignment_revision<>1 OR canonical->>'type' IS DISTINCT FROM 'decision.human'
+        OR canonical->'with'->'reviewers_follow_role' IS DISTINCT FROM '{"literal":true}'::jsonb
+        OR NOT public.workflow_follow_is_open(NEW.company_id,NEW.decision_id) THEN
+        RAISE EXCEPTION 'follow decision must match the actual flagged Business step and frozen root context'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_follow_spec';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_follow_spec_guard BEFORE INSERT OR UPDATE ON public.workflow_follow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_follow_spec();
+
+CREATE FUNCTION public.guard_workflow_pending_follow() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF public.workflow_follow_is_open(OLD.company_id,OLD.decision_id) THEN
+            RAISE EXCEPTION 'an open followed decision cannot leave the bounded pending set'
+                USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_pending_follow';
+        END IF;
+        RETURN OLD;
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    IF NOT public.workflow_follow_is_open(NEW.company_id,NEW.decision_id)
+        OR (SELECT count(*) FROM public.workflow_pending_follow_decisions WHERE company_id=NEW.company_id)>=256 THEN
+        RAISE EXCEPTION 'workflow.pending_follow_limit: at most 256 pending followed decisions'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_pending_follow';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_pending_follow_guard BEFORE INSERT OR DELETE ON public.workflow_pending_follow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_pending_follow();
+
+-- Select precisely one sealed People revision per authored role; admission zero stays fixed.
+CREATE FUNCTION public.workflow_follow_role_members(spec public.workflow_follow_decisions, refs jsonb)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE reference jsonb; names text[]:='{}'; role_name text; revision bigint; captured jsonb; members uuid[]:='{}'; person uuid; refused boolean:=false;
+BEGIN
+    IF jsonb_typeof(refs) IS DISTINCT FROM 'array' OR jsonb_array_length(refs) NOT BETWEEN 1 AND 2 THEN RETURN NULL; END IF;
+    FOR reference IN SELECT item.value FROM jsonb_array_elements(refs) AS item(value) LOOP
+        role_name:=reference->>'role'; revision:=(reference->>'resolution_revision')::bigint;
+        IF reference IS DISTINCT FROM jsonb_build_object('role',role_name,'resolution_revision',revision)
+            OR role_name IS NULL OR role_name=ANY(names) OR revision<0 OR revision IS NULL
+            OR NOT spec.selection->'roles' ? role_name THEN RETURN NULL; END IF;
+        names:=array_append(names,role_name);
+        IF revision=0 THEN
+            SELECT jsonb_build_object('principals',jsonb_agg(holder.principal_id ORDER BY holder.principal_id),'refusal',NULL) INTO captured
+                FROM public.workflow_run_role_bindings AS holder
+                WHERE holder.company_id=spec.company_id AND holder.run_id=spec.root_run_id AND holder.manifest_id=spec.manifest_id
+                  AND holder.version_id=spec.version_id AND holder.step=spec.step AND holder.role=role_name
+                  AND holder.resolution_revision=0 AND holder.agent_id IS NULL AND holder.agent_revision_id IS NULL;
+        ELSE
+            SELECT content INTO captured FROM public.workflow_people_role_resolutions
+                WHERE company_id=spec.company_id AND root_run_id=spec.root_run_id AND manifest_id=spec.manifest_id
+                  AND version_id=spec.version_id AND step=spec.step AND role=role_name AND resolution_revision=revision;
+        END IF;
+        IF captured IS NULL OR jsonb_typeof(captured->'principals') IS DISTINCT FROM 'array' THEN RETURN NULL; END IF;
+        IF captured->'refusal'<>'null'::jsonb THEN refused:=true; END IF;
+        FOR person IN SELECT (holder.value #>> '{}')::uuid FROM jsonb_array_elements(captured->'principals') AS holder(value) LOOP
+            IF NOT person=ANY(members) THEN members:=array_append(members,person); END IF;
+        END LOOP;
+    END LOOP;
+    IF cardinality(names)<>jsonb_array_length(spec.selection->'roles') THEN RETURN NULL; END IF;
+    IF refused THEN RETURN jsonb_build_object('refusal','role_unavailable','principals','[]'::jsonb); END IF;
+    FOR person IN SELECT (holder.value #>> '{}')::uuid FROM jsonb_array_elements(spec.selection->'principals') AS holder(value) LOOP
+        IF NOT person=ANY(members) THEN members:=array_append(members,person); END IF;
+    END LOOP;
+    IF cardinality(members)>16 THEN RETURN jsonb_build_object('refusal','too_many','principals','[]'::jsonb); END IF;
+    IF EXISTS (SELECT 1 FROM unnest(members) AS principal(id)
+        WHERE NOT public.workflow_follow_reviewer_eligible(spec.company_id,spec.run_id,principal.id)) THEN
+        RETURN jsonb_build_object('refusal','reviewer_unavailable','principals','[]'::jsonb);
+    END IF;
+    RETURN jsonb_build_object('refusal',NULL,'principals',(SELECT jsonb_agg(id ORDER BY id) FROM unnest(members) AS principal(id)));
+EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN RETURN NULL;
+END $$;
+
+CREATE FUNCTION public.guard_workflow_reviewer_assignment() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE spec public.workflow_follow_decisions; saved jsonb; expected jsonb; member jsonb; ids uuid[]:='{}'; ordinals smallint[]:='{}'; events uuid[]:='{}';
+    person uuid; ordinal smallint; event uuid; origin bigint; label text; prior_label text;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    SELECT company_id,decision_id,run_id,execution_id,root_run_id,manifest_id,version_id,step,context_department_id,selectors,selection,assignment_revision
+        INTO spec FROM public.workflow_follow_decisions WHERE company_id=NEW.company_id AND decision_id=NEW.decision_id;
+    saved:=NEW.content;
+    IF spec IS NULL OR NEW.assignment_revision<>spec.assignment_revision
+        OR saved - ARRAY['roles','reviewers','refusal'] IS DISTINCT FROM jsonb_build_object(
+            'format','workflow-reviewer-assignment-v1','company_id',spec.company_id,'decision_id',spec.decision_id,
+            'root_run_id',spec.root_run_id,'manifest_id',spec.manifest_id,'version_id',spec.version_id,
+            'step',spec.step,'context_department_id',spec.context_department_id,'assignment_revision',NEW.assignment_revision)
+        OR jsonb_typeof(saved->'reviewers') IS DISTINCT FROM 'array' OR NOT(saved ? 'refusal') THEN
+        RAISE EXCEPTION 'reviewer assignment identity must exactly match its flagged source'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+    END IF;
+    IF saved->'roles' IS DISTINCT FROM (SELECT jsonb_agg(value ORDER BY value->>'role') FROM jsonb_array_elements(saved->'roles') AS role(value))
+        OR saved->'reviewers' IS DISTINCT FROM (SELECT coalesce(jsonb_agg(value ORDER BY (value->>'ordinal')::smallint),'[]')
+            FROM jsonb_array_elements(saved->'reviewers') AS member(value)) THEN
+        RAISE EXCEPTION 'canonical assignment arrays must be ordered'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+    END IF;
+    expected:=public.workflow_follow_role_members(spec,saved->'roles');
+    IF expected IS NULL OR saved->'refusal' IS DISTINCT FROM expected->'refusal' OR jsonb_array_length(saved->'reviewers')>16 THEN
+        RAISE EXCEPTION 'reviewer assignment must select complete sealed People facts'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+    END IF;
+    FOR member IN SELECT item.value FROM jsonb_array_elements(saved->'reviewers') AS item(value) LOOP
+        person:=(member->>'principal_id')::uuid; ordinal:=(member->>'ordinal')::smallint;
+        event:=(member->>'notice_event_id')::uuid; origin:=(member->>'notice_assignment_revision')::bigint; label:=member->>'reviewer_label';
+        IF member IS DISTINCT FROM jsonb_build_object('principal_id',person,'ordinal',ordinal,'notice_event_id',event,
+            'notice_assignment_revision',origin,'reviewer_label',label)
+            OR num_nonnulls(person,ordinal,event,origin,label)<>5 OR person=ANY(ids) OR ordinal=ANY(ordinals) OR event=ANY(events)
+            OR ordinal NOT BETWEEN 0 AND 15 OR origin NOT BETWEEN 1 AND NEW.assignment_revision OR octet_length(label)>1024 THEN
+            RAISE EXCEPTION 'invalid reviewer assignment member or notice identity'
+                USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+        END IF;
+        IF origin=NEW.assignment_revision THEN
+            SELECT left(principal.display_label,256) INTO prior_label FROM public.principals AS principal
+                WHERE principal.company_id=NEW.company_id AND principal.id=person AND principal.kind='person';
+            IF label IS DISTINCT FROM prior_label THEN
+                RAISE EXCEPTION 'new reviewer label must match the current person'
+                    USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+            END IF;
+        ELSIF NOT EXISTS (SELECT 1 FROM public.workflow_reviewer_assignments AS original
+            WHERE original.company_id=NEW.company_id AND original.decision_id=NEW.decision_id AND original.assignment_revision=origin
+              AND original.content->'reviewers' @> jsonb_build_array(member)) THEN
+            RAISE EXCEPTION 'retained reviewer proof must match its immutable origin'
+                USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+        END IF;
+        ids:=array_append(ids,person); ordinals:=array_append(ordinals,ordinal); events:=array_append(events,event);
+    END LOOP;
+    IF (SELECT coalesce(jsonb_agg(id ORDER BY id),'[]') FROM unnest(ids) AS principal(id)) IS DISTINCT FROM expected->'principals' THEN
+        RAISE EXCEPTION 'reviewer assignment must contain the exact effective current set'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+    END IF;
+    RETURN NEW;
+EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range THEN
+    RAISE EXCEPTION 'invalid typed reviewer assignment identity'
+        USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_assignment';
+END $$;
+CREATE TRIGGER workflow_reviewer_assignment_guard BEFORE INSERT ON public.workflow_reviewer_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_reviewer_assignment();
+
+CREATE FUNCTION public.workflow_follow_fact_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.workflow_decisions AS decision
+        JOIN public.workflow_runs AS run ON run.company_id=decision.company_id AND run.id=decision.run_id
+        WHERE decision.company_id=OLD.company_id AND decision.id=OLD.decision_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'reviewer assignment and notice history are immutable'
+        USING ERRCODE='23514',CONSTRAINT='workflow_guard:workflow_follow_fact_immutable';
+END $$;
+CREATE TRIGGER workflow_reviewer_assignment_immutable BEFORE UPDATE OR DELETE ON public.workflow_reviewer_assignments
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
+CREATE TRIGGER workflow_reviewer_notice_immutable BEFORE UPDATE OR DELETE ON public.workflow_reviewer_notices
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
+CREATE TRIGGER workflow_follow_spec_delete BEFORE DELETE ON public.workflow_follow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
+
+CREATE FUNCTION public.check_workflow_follow_current() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE company uuid; decision uuid; selected bigint; saved jsonb; actual jsonb;
+BEGIN
+    IF TG_OP='DELETE' THEN company:=OLD.company_id; decision:=OLD.decision_id;
+    ELSE company:=NEW.company_id; decision:=NEW.decision_id; END IF;
+    SELECT assignment_revision INTO selected FROM public.workflow_follow_decisions WHERE company_id=company AND decision_id=decision;
+    IF selected IS NULL THEN RETURN NULL; END IF;
+    SELECT content INTO saved FROM public.workflow_reviewer_assignments WHERE company_id=company AND decision_id=decision AND assignment_revision=selected;
+    SELECT coalesce(jsonb_agg(jsonb_build_object('principal_id',principal_id,'ordinal',ordinal,'reviewer_label',reviewer_label,
+        'notice_event_id',notice_event_id,'notice_assignment_revision',notice_assignment_revision) ORDER BY ordinal),'[]') INTO actual
+        FROM public.workflow_decision_reviewers WHERE company_id=company AND decision_id=decision;
+    IF saved IS NULL OR actual IS DISTINCT FROM saved->'reviewers' THEN
+        RAISE EXCEPTION 'current reviewers must exactly match the selected immutable assignment'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:check_workflow_follow_current';
+    END IF;
+    IF public.workflow_follow_is_open(company,decision) AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_pending_follow_decisions WHERE company_id=company AND decision_id=decision) THEN
+        RAISE EXCEPTION 'open follow decision must retain its bounded pending identity'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:check_workflow_follow_current';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_follow_current_complete AFTER INSERT OR UPDATE ON public.workflow_follow_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_follow_current();
+CREATE CONSTRAINT TRIGGER workflow_follow_reviewer_complete AFTER INSERT OR DELETE ON public.workflow_decision_reviewers
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_follow_current();
+
+CREATE FUNCTION public.guard_workflow_reviewer_notice() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    IF NOT EXISTS (SELECT 1 FROM public.notification_events AS event WHERE event.company_id=NEW.company_id AND event.id=NEW.event_id
+        AND event.source_kind='decision_reviewer' AND event.action_kind='decision_review' AND event.source_id=NEW.id
+        AND event.source_generation=NEW.assignment_revision AND event.actor_principal_id IS NULL) OR NOT EXISTS (
+        SELECT 1 FROM public.workflow_reviewer_assignments AS origin
+        CROSS JOIN LATERAL jsonb_array_elements(origin.content->'reviewers') AS member(value)
+        WHERE origin.company_id=NEW.company_id AND origin.decision_id=NEW.decision_id AND origin.assignment_revision=NEW.assignment_revision
+          AND member.value->>'principal_id'=NEW.principal_id::text AND member.value->>'notice_event_id'=NEW.event_id::text
+          AND member.value->>'notice_assignment_revision'=NEW.assignment_revision::text) THEN
+        RAISE EXCEPTION 'notice must name its exact original reviewer assignment'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_notice';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_reviewer_notice_guard BEFORE INSERT ON public.workflow_reviewer_notices
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_reviewer_notice();
+
+CREATE FUNCTION public.workflow_follow_pending_reviewer(member public.workflow_decision_reviewers)
+RETURNS public.workflow_decision_reviewers LANGUAGE plpgsql AS $$
+DECLARE expected jsonb; run_identity uuid;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=member.company_id FOR NO KEY UPDATE;
+    SELECT run_id INTO run_identity FROM public.workflow_follow_decisions
+        WHERE company_id=member.company_id AND decision_id=member.decision_id;
+    SELECT original.value INTO expected FROM public.workflow_reviewer_assignments AS assignment
+        CROSS JOIN LATERAL jsonb_array_elements(assignment.content->'reviewers') AS original(value)
+        WHERE assignment.company_id=member.company_id AND assignment.decision_id=member.decision_id
+          AND assignment.assignment_revision=member.notice_assignment_revision
+          AND original.value->>'principal_id'=member.principal_id::text;
+    IF expected IS NULL OR expected->>'notice_event_id' IS DISTINCT FROM member.notice_event_id::text
+        OR expected->>'ordinal' IS DISTINCT FROM member.ordinal::text
+        OR expected->>'notice_assignment_revision' IS DISTINCT FROM member.notice_assignment_revision::text
+        OR NOT public.workflow_follow_reviewer_eligible(member.company_id,run_identity,member.principal_id)
+        OR NOT public.workflow_follow_is_open(member.company_id,member.decision_id) THEN
+        RAISE EXCEPTION 'pending reviewer requires exact source-bound notice proof and current person authority'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:workflow_follow_pending_reviewer';
+    END IF;
+    -- The sealed fact supplies the immutable display snapshot; no account lock is taken here.
+    member.reviewer_label:=expected->>'reviewer_label';
+    RETURN member;
+END $$;
+
+CREATE FUNCTION public.cleanup_workflow_pending_follow() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME='workflow_decisions' THEN
+        IF NEW.submitted_at IS NULL THEN RETURN NULL; END IF;
+        DELETE FROM public.workflow_pending_follow_decisions WHERE company_id=NEW.company_id AND decision_id=NEW.id;
+    ELSIF TG_TABLE_NAME='workflow_waits' THEN
+        IF NEW.state='waiting' THEN RETURN NULL; END IF;
+        DELETE FROM public.workflow_pending_follow_decisions AS pending USING public.workflow_decisions AS decision
+            WHERE pending.company_id=NEW.company_id AND decision.company_id=pending.company_id
+              AND decision.id=pending.decision_id AND decision.wait_id=NEW.id;
+    ELSE
+        IF NEW.state IN ('queued','running','waiting') THEN RETURN NULL; END IF;
+        DELETE FROM public.workflow_pending_follow_decisions AS pending USING public.workflow_follow_decisions AS decision
+            WHERE pending.company_id=NEW.company_id AND decision.company_id=pending.company_id
+              AND decision.decision_id=pending.decision_id AND decision.run_id=NEW.id;
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_follow_submission_cleanup AFTER UPDATE OF submitted_at ON public.workflow_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.cleanup_workflow_pending_follow();
+CREATE TRIGGER workflow_follow_wait_cleanup AFTER UPDATE OF state ON public.workflow_waits
+    FOR EACH ROW EXECUTE FUNCTION public.cleanup_workflow_pending_follow();
+CREATE TRIGGER workflow_follow_run_cleanup AFTER UPDATE OF state ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.cleanup_workflow_pending_follow();
+
+
+-- Company-level child decisions have no desk; visibility remains current owner/admin scope.
+ALTER TABLE public.notifications
+    ALTER COLUMN channel_id DROP NOT NULL,
+    DROP CONSTRAINT notifications_source_kind_check,
+    DROP CONSTRAINT notifications_action_kind_check,
+    ADD CONSTRAINT notifications_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer')),
+    ADD CONSTRAINT notifications_action_kind_check CHECK (
+        (source_kind='delivery' AND action_kind='delivery_failure')
+        OR (source_kind='decision_reviewer' AND action_kind='decision_review'));
+CREATE FUNCTION public.guard_notification_event_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.company_id,NEW.id,NEW.notification_id,NEW.source_kind,NEW.source_id,NEW.action_kind,
+        NEW.source_generation,NEW.occurred_at)
+        IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.notification_id,OLD.source_kind,OLD.source_id,OLD.action_kind,
+        OLD.source_generation,OLD.occurred_at) THEN
+        RAISE EXCEPTION 'notification event source identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_notification_event_identity';
+    END IF;
+    -- The existing FK clears a physically deleted actor. It cannot rebind a live actor.
+    IF NEW.actor_principal_id IS DISTINCT FROM OLD.actor_principal_id AND NOT (
+        NEW.actor_principal_id IS NULL AND OLD.actor_principal_id IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.actor_principal_id)) THEN
+        RAISE EXCEPTION 'notification event actor can only be cleared by retirement'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_notification_event_identity';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER notification_event_identity_guard BEFORE UPDATE ON public.notification_events
+    FOR EACH ROW EXECUTE FUNCTION public.guard_notification_event_identity();
+
+ALTER TABLE public.workflow_reviewer_notices ADD CONSTRAINT workflow_reviewer_notice_receipt_identity
+    UNIQUE(company_id,id,decision_id,event_id);
+CREATE TABLE public.workflow_reviewer_notice_receipts (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    outcome text NOT NULL CHECK (outcome IN ('delivered','opted_out','withdrawn','resolved')),
+    email_delivery_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,notice_id),
+    CHECK ((outcome='delivered')=(email_delivery_id IS NOT NULL)),
+    FOREIGN KEY(company_id,notice_id,decision_id,event_id)
+        REFERENCES public.workflow_reviewer_notices(company_id,id,decision_id,event_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,email_delivery_id) REFERENCES public.message_deliveries(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE FUNCTION public.guard_workflow_reviewer_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source public.workflow_reviewer_notices; viewer uuid; actual_delivery uuid; is_open boolean; is_current boolean; eligible boolean;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    SELECT company_id,id,decision_id,principal_id,assignment_revision,event_id,source_kind,action_kind INTO source
+        FROM public.workflow_reviewer_notices WHERE company_id=NEW.company_id AND id=NEW.notice_id;
+    SELECT recipient_user_id,email_delivery_id INTO viewer,actual_delivery FROM public.notifications
+        WHERE company_id=NEW.company_id AND event_id=NEW.event_id;
+    is_open:=public.workflow_follow_is_open(NEW.company_id,NEW.decision_id);
+    SELECT EXISTS (SELECT 1 FROM public.workflow_decision_reviewers AS reviewer WHERE reviewer.company_id=NEW.company_id
+        AND reviewer.decision_id=NEW.decision_id AND reviewer.principal_id=source.principal_id AND reviewer.notice_event_id=NEW.event_id) INTO is_current;
+    SELECT public.workflow_follow_reviewer_eligible(NEW.company_id,decision.run_id,source.principal_id) INTO eligible
+        FROM public.workflow_decisions AS decision WHERE decision.company_id=NEW.company_id AND decision.id=NEW.decision_id;
+    IF source IS NULL OR source.event_id IS DISTINCT FROM NEW.event_id OR source.decision_id IS DISTINCT FROM NEW.decision_id
+        OR NOT EXISTS (SELECT 1 FROM public.notification_events AS event WHERE event.company_id=NEW.company_id AND event.id=NEW.event_id
+            AND event.status IN ('processing','projected') AND event.actor_principal_id IS NULL)
+        OR (NEW.outcome IN ('delivered','opted_out') AND (NOT is_open OR NOT is_current OR NOT eligible OR viewer IS NULL OR NOT EXISTS (
+            SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND kind='person' AND user_id=viewer)))
+        OR (NEW.outcome='resolved' AND is_open)
+        OR (NEW.outcome='withdrawn' AND (NOT is_open OR (is_current AND eligible))) THEN
+        RAISE EXCEPTION 'reviewer receipt must prove the actual projected source outcome'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_receipt';
+    END IF;
+    IF NEW.outcome='delivered' THEN
+        IF NEW.email_delivery_id IS DISTINCT FROM actual_delivery OR EXISTS (
+            SELECT 1 FROM public.user_notification_preferences WHERE user_id=viewer AND NOT decision_email_enabled) OR NOT EXISTS (
+            SELECT 1 FROM public.message_deliveries AS delivery WHERE delivery.company_id=NEW.company_id AND delivery.id=NEW.email_delivery_id
+              AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+              AND delivery.source_binding_id IS NULL AND delivery.destination_binding_id IS NULL AND delivery.external_destination IS NOT NULL
+              AND starts_with(delivery.idempotency_key,'notification:actionable-notification:event:'||NEW.event_id||':user:'||viewer||':')) THEN
+            RAISE EXCEPTION 'reviewer receipt lacks exact durable notification delivery proof'
+                USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_receipt';
+        END IF;
+    ELSIF NEW.outcome='opted_out' AND (actual_delivery IS NOT NULL OR NOT EXISTS (
+        SELECT 1 FROM public.user_notification_preferences WHERE user_id=viewer AND NOT decision_email_enabled)) THEN
+        RAISE EXCEPTION 'reviewer receipt lacks a real current decision email opt-out'
+            USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_reviewer_receipt';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_reviewer_receipt_guard BEFORE INSERT ON public.workflow_reviewer_notice_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_reviewer_receipt();
+CREATE TRIGGER workflow_reviewer_receipt_immutable BEFORE UPDATE OR DELETE ON public.workflow_reviewer_notice_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_follow_fact_immutable();
+
+-- Historical retirement facts do not hold live principals or departments in existence (D2/r2).
+CREATE FUNCTION public.department_audit_label(name text) RETURNS jsonb LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT jsonb_build_object('prefix',left(name,128),'truncated',char_length(left(name,129))>128)
+$$;
+CREATE TABLE public.department_administration_events (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL DEFAULT gen_random_uuid(),
+    operation_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    principal_kind text NOT NULL CHECK (principal_kind IN ('person','agent')),
+    principal_label text NOT NULL CHECK (octet_length(principal_label)<=255),
+    department_id uuid NOT NULL,
+    department_label jsonb NOT NULL CHECK (octet_length(department_label::text)<=1024),
+    role text NOT NULL CHECK (role IN ('lead','reviewer')),
+    transition_kind text NOT NULL CHECK (transition_kind IN ('demoted','deleted')),
+    actor_kind text NOT NULL DEFAULT 'system' CHECK (actor_kind='system'),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,operation_id,principal_id,department_id,role)
+);
+CREATE FUNCTION public.guard_department_retirement_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    -- Only the installed principal boundary produces these observations; no late company/account lock.
+    IF pg_trigger_depth()<2 OR octet_length(to_jsonb(NEW)::text)>4096 OR NOT EXISTS (
+        SELECT 1 FROM public.department_roles AS holder
+        JOIN public.departments AS department ON department.company_id=holder.company_id AND department.id=holder.department_id
+        JOIN public.principals AS principal ON principal.company_id=holder.company_id AND principal.id=holder.principal_id
+        WHERE holder.company_id=NEW.company_id AND holder.department_id=NEW.department_id
+          AND holder.principal_id=NEW.principal_id AND holder.role=NEW.role
+          AND NEW.principal_label=principal.display_label
+          AND NEW.department_label=public.department_audit_label(department.name)) THEN
+        RAISE EXCEPTION 'retirement audit must snapshot an actual same-company held role at the principal boundary'
+            USING ERRCODE='23514',CONSTRAINT='department_retirement_audit_source';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER department_retirement_audit_guard BEFORE INSERT ON public.department_administration_events
+    FOR EACH ROW EXECUTE FUNCTION public.guard_department_retirement_audit();
+CREATE FUNCTION public.department_retirement_audit_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'department retirement history is immutable'
+        USING ERRCODE='23514',CONSTRAINT='department_retirement_audit_immutable';
+END $$;
+CREATE TRIGGER department_retirement_audit_immutable BEFORE UPDATE OR DELETE ON public.department_administration_events
+    FOR EACH ROW EXECUTE FUNCTION public.department_retirement_audit_immutable();
+CREATE FUNCTION public.check_department_retirement_role_cleared() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.companies WHERE id=NEW.company_id) AND EXISTS (
+        SELECT 1 FROM public.department_roles WHERE company_id=NEW.company_id AND department_id=NEW.department_id
+          AND principal_id=NEW.principal_id AND role=NEW.role) THEN
+        RAISE EXCEPTION 'retirement audit requires material role clearing in its insertion transaction'
+            USING ERRCODE='23514',CONSTRAINT='department_retirement_role_cleared';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER department_retirement_role_cleared AFTER INSERT ON public.department_administration_events
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_department_retirement_role_cleared();
+CREATE FUNCTION public.record_department_role_retirement(previous public.principals, change_kind text, snapshot_label text)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE operation uuid:=gen_random_uuid();
+BEGIN
+    -- Company cascade order is unspecified: never recreate a child after its tenant disappeared.
+    IF previous.kind NOT IN ('person','agent') OR NOT EXISTS (SELECT 1 FROM public.companies WHERE id=previous.company_id) THEN RETURN; END IF;
+    INSERT INTO public.department_administration_events(company_id,operation_id,principal_id,principal_kind,principal_label,
+        department_id,department_label,role,transition_kind)
+        SELECT holder.company_id,operation,previous.id,previous.kind,snapshot_label,
+            department.id,public.department_audit_label(department.name),holder.role,change_kind
+        FROM public.department_roles AS holder
+        JOIN public.departments AS department ON department.company_id=holder.company_id AND department.id=holder.department_id
+        WHERE holder.company_id=previous.company_id AND holder.principal_id=previous.id;
+END $$;
+CREATE FUNCTION public.department_principal_deleted_audit() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM public.record_department_role_retirement(OLD,'deleted',OLD.display_label);
+    RETURN OLD;
+END $$;
+CREATE TRIGGER department_principal_deleted_audit BEFORE DELETE ON public.principals
+    FOR EACH ROW EXECUTE FUNCTION public.department_principal_deleted_audit();
+
+-- Workflow roles p04: a definite refusal is a canonical outcome, never a synthetic run.
+CREATE TABLE public.workflow_admission_refusals (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL CHECK (binding_revision>0),
+    source_key text NOT NULL CHECK (octet_length(source_key) BETWEEN 1 AND 512),
+    request_fingerprint text NOT NULL CHECK (request_fingerprint ~ '^[0-9a-f]{64}$'),
+    channel_id uuid,
+    thread_id uuid,
+    role_refusal jsonb NOT NULL CHECK (public.valid_workflow_role_refusal(role_refusal)),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,binding_id,source_key),
+    UNIQUE(company_id,id,binding_id,binding_revision),
+    CHECK (thread_id IS NULL OR channel_id IS NOT NULL),
+    FOREIGN KEY(company_id,binding_id,binding_revision)
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision),
+    FOREIGN KEY(company_id,channel_id) REFERENCES public.channels(company_id,id),
+    FOREIGN KEY(company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id)
+);
+ALTER TABLE public.workflow_admission_commands
+    ALTER COLUMN run_id DROP NOT NULL,
+    ADD COLUMN refusal_id uuid,
+    ADD CONSTRAINT workflow_admission_command_outcome CHECK ((run_id IS NULL)<>(refusal_id IS NULL)),
+    ADD CONSTRAINT workflow_admission_command_refusal FOREIGN KEY(company_id,refusal_id)
+        REFERENCES public.workflow_admission_refusals(company_id,id) ON DELETE CASCADE;
+
+CREATE FUNCTION public.guard_workflow_admission_outcome() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE selected_binding uuid; selected_source text;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    selected_binding=NEW.binding_id; selected_source=NEW.source_key;
+    IF TG_TABLE_NAME='workflow_admission_refusals' THEN
+        IF EXISTS (SELECT 1 FROM public.workflow_admissions WHERE company_id=NEW.company_id
+            AND binding_id=selected_binding AND source_key=selected_source)
+        THEN
+            RAISE EXCEPTION 'invalid definite admission refusal'
+                USING ERRCODE='23514',CONSTRAINT='workflow_admission_outcome_guard';
+        END IF;
+    ELSIF EXISTS (SELECT 1 FROM public.workflow_admission_refusals WHERE company_id=NEW.company_id
+        AND binding_id=selected_binding AND source_key=selected_source) THEN
+        RAISE EXCEPTION 'a refused source cannot also admit a run'
+            USING ERRCODE='23514',CONSTRAINT='workflow_admission_outcome_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_admission_refusal_source BEFORE INSERT ON public.workflow_admission_refusals
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_admission_outcome();
+CREATE TRIGGER workflow_admission_success_source BEFORE INSERT ON public.workflow_admissions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_admission_outcome();
+
+CREATE FUNCTION public.workflow_admission_refusal_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'definite admission refusals are immutable'
+        USING ERRCODE='23514',CONSTRAINT='workflow_admission_refusal_immutable';
+END $$;
+CREATE TRIGGER workflow_admission_refusal_immutable BEFORE UPDATE OR DELETE ON public.workflow_admission_refusals
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_admission_refusal_immutable();
+
+-- Case identity/reason/policy are immutable. Later hop/settlement facts do not rewrite the source.
+CREATE TABLE public.workflow_escalation_cases (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    source_kind text NOT NULL CHECK (source_kind IN ('run','admission','empty_reviewers')),
+    run_id uuid,
+    execution_id uuid,
+    admission_refusal_id uuid,
+    empty_decision_id uuid,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL CHECK (binding_revision>0),
+    origin_department_id uuid,
+    policy jsonb NOT NULL CHECK (public.workflow_escalation_policy_valid(policy)),
+    reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
+    step_id text CHECK (step_id ~ '^[A-Za-z_][A-Za-z0-9_-]{0,127}$'),
+    role text CHECK (role IN ('lead','reviewer')),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    CHECK ((source_kind='admission' AND admission_refusal_id IS NOT NULL AND run_id IS NULL
+               AND execution_id IS NULL AND empty_decision_id IS NULL)
+        OR (source_kind='run' AND run_id IS NOT NULL AND admission_refusal_id IS NULL AND empty_decision_id IS NULL)
+        OR (source_kind='empty_reviewers' AND run_id IS NOT NULL AND admission_refusal_id IS NULL AND empty_decision_id IS NOT NULL)),
+    FOREIGN KEY(company_id,run_id,binding_id) REFERENCES public.workflow_runs(company_id,id,binding_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,run_id,execution_id) REFERENCES public.workflow_executions(company_id,run_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,admission_refusal_id,binding_id,binding_revision)
+        REFERENCES public.workflow_admission_refusals(company_id,id,binding_id,binding_revision) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,empty_decision_id) REFERENCES public.workflow_decisions(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,origin_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,binding_id,binding_revision)
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision)
+);
+CREATE UNIQUE INDEX workflow_escalation_one_run ON public.workflow_escalation_cases(company_id,run_id) WHERE run_id IS NOT NULL;
+CREATE UNIQUE INDEX workflow_escalation_one_refusal ON public.workflow_escalation_cases(company_id,admission_refusal_id) WHERE admission_refusal_id IS NOT NULL;
+
+CREATE FUNCTION public.guard_workflow_escalation_case() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE actual record;
+BEGIN
+    IF TG_OP='DELETE' THEN
+        IF NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR (OLD.run_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'escalation case identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
+    ELSIF TG_OP='UPDATE' THEN
+        RAISE EXCEPTION 'escalation case identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
+    END IF;
+    IF NEW.source_kind='admission' THEN
+        SELECT refusal.binding_id,refusal.binding_revision,revision.escalation AS policy,channel.department_id,
+            public.workflow_role_refusal_code(refusal.role_refusal) AS reason_code,
+            refusal.role_refusal->>'step' AS step_id,refusal.role_refusal->>'role' AS role INTO actual
+        FROM public.workflow_admission_refusals AS refusal
+        JOIN public.workflow_binding_revisions AS revision ON revision.company_id=refusal.company_id
+            AND revision.binding_id=refusal.binding_id AND revision.revision=refusal.binding_revision
+        LEFT JOIN public.channels AS channel ON channel.company_id=refusal.company_id AND channel.id=refusal.channel_id
+        WHERE refusal.company_id=NEW.company_id AND refusal.id=NEW.admission_refusal_id;
+        IF NOT FOUND OR actual.policy IS NULL OR NEW.binding_id IS DISTINCT FROM actual.binding_id
+            OR NEW.binding_revision IS DISTINCT FROM actual.binding_revision OR NEW.policy IS DISTINCT FROM actual.policy
+            OR NEW.origin_department_id IS DISTINCT FROM actual.department_id OR NEW.reason_code IS DISTINCT FROM actual.reason_code
+            OR NEW.step_id IS DISTINCT FROM actual.step_id OR NEW.role IS DISTINCT FROM actual.role THEN
+            RAISE EXCEPTION 'escalation case must match its authoritative refusal'
+                USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
+        END IF;
+    ELSE
+        SELECT run.binding_id,run.binding_revision,run.escalation AS policy,run.state,manifest.role_context_department_id AS department_id INTO actual
+        FROM public.workflow_runs AS run
+        JOIN public.run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id
+        JOIN public.agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id
+        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id;
+        IF NOT FOUND OR actual.policy IS NULL OR NEW.binding_id IS DISTINCT FROM actual.binding_id
+            OR NEW.binding_revision IS DISTINCT FROM actual.binding_revision OR NEW.policy IS DISTINCT FROM actual.policy
+            OR NEW.origin_department_id IS DISTINCT FROM actual.department_id
+            OR (NEW.source_kind='run' AND actual.state<>'failed')
+            OR (NEW.source_kind='empty_reviewers' AND (actual.state<>'waiting' OR NOT EXISTS (
+                SELECT 1 FROM public.workflow_pending_follow_decisions AS pending
+                JOIN public.workflow_decisions AS decision ON decision.company_id=pending.company_id AND decision.id=pending.decision_id
+                WHERE pending.company_id=NEW.company_id AND pending.decision_id=NEW.empty_decision_id AND decision.run_id=NEW.run_id
+                    AND NOT EXISTS (SELECT 1 FROM public.workflow_decision_reviewers AS reviewer
+                        WHERE reviewer.company_id=NEW.company_id AND reviewer.decision_id=NEW.empty_decision_id)))) THEN
+            RAISE EXCEPTION 'escalation case must match its authoritative run'
+                USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_case_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_cases
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_case();
+
+ALTER TABLE public.notification_events
+    DROP CONSTRAINT notification_events_source_kind_check,
+    DROP CONSTRAINT notification_events_action_kind_check,
+    ADD CONSTRAINT notification_events_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_control')),
+    ADD CONSTRAINT notification_events_action_kind_check CHECK (
+        (source_kind='delivery' AND action_kind='delivery_failure')
+        OR (source_kind='decision_reviewer' AND action_kind='decision_review')
+        OR (source_kind='escalation_control' AND action_kind='escalation_control' AND source_generation BETWEEN 1 AND 3));
+CREATE TABLE public.workflow_escalation_control_events (
+    company_id uuid NOT NULL,
+    case_id uuid NOT NULL,
+    phase bigint NOT NULL CHECK (phase BETWEEN 1 AND 3),
+    event_id uuid NOT NULL,
+    source_kind text GENERATED ALWAYS AS ('escalation_control') STORED,
+    action_kind text GENERATED ALWAYS AS ('escalation_control') STORED,
+    PRIMARY KEY(company_id,case_id,phase),
+    UNIQUE(company_id,event_id),
+    FOREIGN KEY(company_id,case_id) REFERENCES public.workflow_escalation_cases(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,event_id,source_kind,case_id,action_kind,phase)
+        REFERENCES public.notification_events(company_id,id,source_kind,source_id,action_kind,source_generation) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE FUNCTION public.guard_workflow_escalation_control() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME='workflow_escalation_control_events' THEN
+        IF TG_OP='DELETE' AND (NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_cases WHERE company_id=OLD.company_id AND id=OLD.case_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'escalation control identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_control_guard';
+    END IF;
+    IF NEW.source_kind='escalation_control' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_escalation_control_events AS control
+        WHERE control.company_id=NEW.company_id AND control.case_id=NEW.source_id
+            AND control.phase=NEW.source_generation AND control.event_id=NEW.id
+    ) THEN
+        RAISE EXCEPTION 'escalation control event requires its exact source'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_control_guard';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_escalation_control_immutable BEFORE UPDATE OR DELETE ON public.workflow_escalation_control_events
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_control();
+CREATE CONSTRAINT TRIGGER workflow_escalation_control_source AFTER INSERT ON public.notification_events
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_control();
+
+-- Administrative escalation assignments are independent of run execution/wait decisions.
+CREATE TABLE public.workflow_escalation_decisions (
+    company_id uuid NOT NULL,
+    case_id uuid NOT NULL,
+    id uuid NOT NULL,
+    assignment_ordinal smallint NOT NULL CHECK (assignment_ordinal BETWEEN 1 AND 34),
+    assignment_kind text NOT NULL CHECK (assignment_kind IN ('automatic','manual')),
+    hop smallint,
+    manual_ordinal smallint,
+    manual_principal_id uuid,
+    manual_principal_kind text,
+    manual_principal_label text,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    deadline timestamptz,
+    settled_at timestamptz,
+    settlement text,
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,case_id,id),
+    UNIQUE(company_id,case_id,assignment_ordinal),
+    FOREIGN KEY(company_id,case_id) REFERENCES public.workflow_escalation_cases(company_id,id) ON DELETE CASCADE,
+    CHECK (((assignment_kind='automatic' AND hop BETWEEN 1 AND 2 AND assignment_ordinal=hop
+        AND manual_ordinal IS NULL AND manual_principal_id IS NULL AND manual_principal_kind IS NULL
+        AND manual_principal_label IS NULL AND deadline>created_at)
+      OR (assignment_kind='manual' AND hop IS NULL AND manual_ordinal BETWEEN 1 AND 32
+        AND assignment_ordinal=manual_ordinal+2 AND manual_principal_id IS NOT NULL
+        AND manual_principal_kind IN ('person','agent') AND octet_length(manual_principal_label) BETWEEN 1 AND 255
+        AND deadline IS NULL)) IS TRUE),
+    CHECK (((settled_at IS NULL AND settlement IS NULL) OR (settled_at>=created_at
+        AND settlement IN ('acknowledged','reassigned','cancelled','already_terminal','advanced','withdrawn'))) IS TRUE)
+);
+CREATE TABLE public.workflow_escalation_progress (
+    company_id uuid NOT NULL,
+    case_id uuid NOT NULL,
+    state text NOT NULL DEFAULT 'pending' CHECK (state IN ('pending','waiting','owner_waiting','manual','settled','withdrawn')),
+    current_hop smallint NOT NULL DEFAULT 0 CHECK (current_hop BETWEEN 0 AND 2),
+    current_decision_id uuid,
+    ack_hours smallint CHECK (ack_hours BETWEEN 1 AND 168),
+    manual_assignments smallint NOT NULL DEFAULT 0 CHECK (manual_assignments BETWEEN 0 AND 32),
+    updated_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,case_id),
+    FOREIGN KEY(company_id,case_id) REFERENCES public.workflow_escalation_cases(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,case_id,current_decision_id) REFERENCES public.workflow_escalation_decisions(company_id,case_id,id)
+        DEFERRABLE INITIALLY DEFERRED,
+    CHECK ((state='pending' AND current_hop=0 AND current_decision_id IS NULL AND ack_hours IS NULL AND manual_assignments=0)
+        OR (state IN ('waiting','owner_waiting') AND current_hop BETWEEN 1 AND 2 AND current_decision_id IS NOT NULL
+            AND ack_hours IS NOT NULL AND manual_assignments=0)
+        OR (state='manual' AND current_hop BETWEEN 1 AND 2 AND current_decision_id IS NOT NULL AND ack_hours IS NOT NULL AND manual_assignments>0)
+        OR (state IN ('settled','withdrawn') AND ((current_hop=0 AND current_decision_id IS NULL AND ack_hours IS NULL)
+            OR (current_hop BETWEEN 1 AND 2 AND current_decision_id IS NOT NULL AND ack_hours IS NOT NULL))))
+);
+CREATE FUNCTION public.create_workflow_escalation_progress() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_escalation_progress(company_id,case_id) VALUES (NEW.company_id,NEW.id);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_escalation_progress_created AFTER INSERT ON public.workflow_escalation_cases
+    FOR EACH ROW EXECUTE FUNCTION public.create_workflow_escalation_progress();
+
+CREATE FUNCTION public.workflow_escalation_recipient_facts_valid(value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+    SELECT CASE WHEN jsonb_typeof(value)<>'array' THEN false ELSE
+        jsonb_array_length(value)<=16 AND octet_length(value::text)<=32768
+        AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(value) AS recipient(fact)
+            WHERE jsonb_typeof(fact)<>'object' OR NOT fact ?& ARRAY['principal','kind','label']
+                OR (fact-ARRAY['principal','kind','label'])<>'{}'::jsonb
+                OR jsonb_typeof(fact->'principal') IS DISTINCT FROM 'string'
+                OR (fact->>'principal') !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+                OR jsonb_typeof(fact->'kind') IS DISTINCT FROM 'string' OR fact->>'kind' NOT IN ('person','agent','external','system')
+                OR jsonb_typeof(fact->'label') IS DISTINCT FROM 'string' OR octet_length(fact->>'label') NOT BETWEEN 1 AND 255)
+        AND (SELECT count(DISTINCT fact->>'principal') FROM jsonb_array_elements(value) AS recipient(fact))=jsonb_array_length(value)
+        AND value=coalesce((SELECT jsonb_agg(fact ORDER BY fact->>'principal') FROM jsonb_array_elements(value) AS recipient(fact)),'[]'::jsonb)
+    END
+$$;
+
+-- The same neutral truth table is independently checked here against the current role facts.
+-- Scope 'department' is used only for hop2's direct parent lead; it cannot create a hidden third hop.
+CREATE FUNCTION public.workflow_escalation_role_selection(company uuid, context uuid, selected_role text, scope text)
+RETURNS jsonb LANGUAGE plpgsql STABLE AS $$
+DECLARE chosen uuid; invalid boolean; found_context boolean; selected jsonb;
+BEGIN
+    IF scope IS NULL OR selected_role IS NULL OR scope NOT IN ('ancestry','department') OR selected_role NOT IN ('lead','reviewer') THEN
+        RAISE EXCEPTION 'invalid escalation role selection scope' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_hop_guard';
+    END IF;
+    WITH RECURSIVE ancestry AS (
+        SELECT id,parent_id,1 AS depth,ARRAY[id] AS visited,false AS cycle FROM public.departments
+            WHERE company_id=company AND id=context
+        UNION ALL SELECT parent.id,parent.parent_id,ancestry.depth+1,ancestry.visited||parent.id,parent.id=ANY(ancestry.visited)
+            FROM public.departments AS parent JOIN ancestry ON ancestry.parent_id=parent.id
+            WHERE parent.company_id=company AND ancestry.depth<9 AND NOT ancestry.cycle AND scope='ancestry'
+    ) SELECT EXISTS (SELECT 1 FROM ancestry),EXISTS (SELECT 1 FROM ancestry WHERE depth>8 OR cycle),
+        (SELECT id FROM ancestry WHERE EXISTS (SELECT 1 FROM public.department_roles AS holder
+            WHERE holder.company_id=company AND holder.department_id=ancestry.id AND holder.role=selected_role)
+            ORDER BY depth LIMIT 1)
+        INTO found_context,invalid,chosen;
+    IF NOT found_context THEN
+        RETURN jsonb_build_object('department',NULL,'resolution','missing_context','recipients','[]'::jsonb);
+    ELSIF invalid THEN
+        RETURN jsonb_build_object('department',NULL,'resolution','invalid_ancestry','recipients','[]'::jsonb);
+    ELSIF chosen IS NULL THEN
+        RETURN jsonb_build_object('department',NULL,'resolution','no_holder','recipients','[]'::jsonb);
+    END IF;
+    SELECT coalesce(jsonb_agg(jsonb_build_object('principal',selected.principal_id,'kind',selected.kind,'label',selected.label)
+        ORDER BY selected.principal_id),'[]'::jsonb) INTO selected FROM (
+        SELECT holder.principal_id,principal.kind,principal.display_label AS label
+        FROM public.department_roles AS holder JOIN public.principals AS principal
+            ON principal.company_id=holder.company_id AND principal.id=holder.principal_id
+        WHERE holder.company_id=company AND holder.department_id=chosen AND holder.role=selected_role
+        ORDER BY holder.principal_id LIMIT 17
+    ) AS selected;
+    IF jsonb_array_length(selected)>16 THEN
+        RETURN jsonb_build_object('department',chosen,'resolution','recipient_limit','recipients','[]'::jsonb);
+    END IF;
+    RETURN jsonb_build_object('department',chosen,'resolution','holders','recipients',selected);
+END $$;
+
+ALTER TABLE public.workflow_escalation_control_events ADD CONSTRAINT workflow_escalation_control_exact
+    UNIQUE(company_id,case_id,phase,event_id);
+
+CREATE TABLE public.workflow_run_escalations (
+    company_id uuid NOT NULL,
+    case_id uuid NOT NULL,
+    hop smallint NOT NULL CHECK (hop BETWEEN 1 AND 2),
+    run_id uuid,
+    decision_id uuid NOT NULL,
+    origin_department_id uuid,
+    chosen_department_id uuid,
+    role text NOT NULL CHECK (role IN ('lead','reviewer')),
+    reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
+    resolution text NOT NULL CHECK (resolution IN ('holders','no_holder','missing_context','recipient_limit','invalid_ancestry','invalid_identity')),
+    recipient_facts jsonb NOT NULL CHECK (public.workflow_escalation_recipient_facts_valid(recipient_facts)),
+    control_event_id uuid NOT NULL,
+    control_phase bigint GENERATED ALWAYS AS (hop::bigint) STORED,
+    created_at timestamptz NOT NULL,
+    deadline timestamptz NOT NULL CHECK (deadline>created_at),
+    PRIMARY KEY(company_id,case_id,hop),
+    UNIQUE(company_id,case_id,decision_id),
+    FOREIGN KEY(company_id,case_id) REFERENCES public.workflow_escalation_cases(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,case_id,decision_id) REFERENCES public.workflow_escalation_decisions(company_id,case_id,id),
+    FOREIGN KEY(company_id,origin_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,chosen_department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,case_id,control_phase,control_event_id)
+        REFERENCES public.workflow_escalation_control_events(company_id,case_id,phase,event_id),
+    CHECK ((resolution='holders' AND chosen_department_id IS NOT NULL AND jsonb_array_length(recipient_facts) BETWEEN 1 AND 16)
+        OR (resolution<>'holders' AND recipient_facts='[]'::jsonb))
+);
+CREATE FUNCTION public.guard_workflow_escalation_hop() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source record; expected jsonb; context uuid;
+BEGIN
+    IF TG_OP<>'INSERT' THEN
+        IF TG_OP='DELETE' AND (NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_cases WHERE company_id=OLD.company_id AND id=OLD.case_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'escalation hops are immutable' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_hop_guard';
+    END IF;
+    SELECT escalation.run_id,escalation.policy,escalation.origin_department_id,escalation.reason_code,progress.ack_hours,
+        decision.hop,decision.created_at,decision.deadline INTO source
+        FROM public.workflow_escalation_cases AS escalation
+        JOIN public.workflow_escalation_progress AS progress ON progress.company_id=escalation.company_id AND progress.case_id=escalation.id
+        JOIN public.workflow_escalation_decisions AS decision ON decision.company_id=escalation.company_id AND decision.case_id=escalation.id AND decision.id=NEW.decision_id
+        WHERE escalation.company_id=NEW.company_id AND escalation.id=NEW.case_id AND decision.assignment_kind='automatic';
+    IF NOT FOUND OR NEW.run_id IS DISTINCT FROM source.run_id OR NEW.hop IS DISTINCT FROM source.hop
+        OR NEW.origin_department_id IS DISTINCT FROM source.origin_department_id OR NEW.reason_code IS DISTINCT FROM source.reason_code
+        OR NEW.created_at IS DISTINCT FROM source.created_at OR NEW.deadline IS DISTINCT FROM source.deadline
+        OR source.ack_hours IS NULL OR NEW.deadline IS DISTINCT FROM NEW.created_at+make_interval(hours=>source.ack_hours::integer)
+        OR (NEW.hop=2 AND source.policy->>'hops'<>'2')
+        OR NEW.role IS DISTINCT FROM (CASE WHEN NEW.hop=1 THEN source.policy->>'notify' ELSE 'lead' END)
+        OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_control_events AS control
+            WHERE control.company_id=NEW.company_id AND control.case_id=NEW.case_id AND control.phase=NEW.hop AND control.event_id=NEW.control_event_id) THEN
+        RAISE EXCEPTION 'escalation hop must match its case, window and control' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_hop_guard';
+    END IF;
+    context=source.origin_department_id;
+    IF NEW.hop=2 THEN SELECT parent_id INTO context FROM public.departments WHERE company_id=NEW.company_id AND id=context; END IF;
+    expected=public.workflow_escalation_role_selection(NEW.company_id,context,NEW.role,CASE WHEN NEW.hop=1 THEN 'ancestry' ELSE 'department' END);
+    IF expected IS DISTINCT FROM jsonb_build_object('department',NEW.chosen_department_id,'resolution',NEW.resolution,'recipients',NEW.recipient_facts) THEN
+        RAISE EXCEPTION 'escalation hop must capture the complete nearest neutral holder set'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_hop_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_hop_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_escalations
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_hop();
+CREATE FUNCTION public.guard_workflow_escalation_decision() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND (NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_cases WHERE company_id=OLD.company_id AND id=OLD.case_id)) THEN RETURN OLD; END IF;
+    IF TG_OP<>'UPDATE' OR OLD.settled_at IS NOT NULL OR NEW.settled_at IS NULL
+        OR (to_jsonb(NEW)-ARRAY['settled_at','settlement']) IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['settled_at','settlement']) THEN
+        RAISE EXCEPTION 'escalation assignment identity and completed settlement are immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_decision_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_decision_immutable BEFORE UPDATE OR DELETE ON public.workflow_escalation_decisions
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_decision();
+CREATE FUNCTION public.guard_workflow_escalation_progress() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.state IN ('settled','withdrawn') OR (OLD.ack_hours IS NOT NULL AND NEW.ack_hours IS DISTINCT FROM OLD.ack_hours)
+        OR NEW.current_hop NOT IN (OLD.current_hop,OLD.current_hop+1)
+        OR NEW.manual_assignments NOT IN (OLD.manual_assignments,OLD.manual_assignments+1)
+        OR (NEW.current_hop<>OLD.current_hop AND (OLD.state NOT IN ('pending','waiting') OR NEW.state<>'waiting'))
+        OR (NEW.manual_assignments<>OLD.manual_assignments AND (NEW.current_hop<>OLD.current_hop OR NEW.state<>'manual')) THEN
+        RAISE EXCEPTION 'invalid escalation progression or changed acknowledgement window'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_progress_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_progress_guard BEFORE UPDATE ON public.workflow_escalation_progress
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_progress();
+
+ALTER TABLE public.notification_events DROP CONSTRAINT notification_events_source_kind_check,
+    DROP CONSTRAINT notification_events_action_kind_check,
+    ADD CONSTRAINT notification_events_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_control','escalation_notice')),
+    ADD CONSTRAINT notification_events_action_kind_check CHECK (
+        (source_kind='delivery' AND action_kind='delivery_failure')
+        OR (source_kind='decision_reviewer' AND action_kind='decision_review')
+        OR (source_kind='escalation_control' AND action_kind='escalation_control' AND source_generation BETWEEN 1 AND 3)
+        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1));
+CREATE TABLE public.workflow_escalation_notices (
+    company_id uuid NOT NULL,
+    id uuid NOT NULL,
+    case_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    principal_kind text NOT NULL CHECK (principal_kind IN ('person','agent','external','system')),
+    principal_label text NOT NULL CHECK (octet_length(principal_label) BETWEEN 1 AND 255),
+    event_id uuid NOT NULL,
+    source_kind text GENERATED ALWAYS AS ('escalation_notice') STORED,
+    action_kind text GENERATED ALWAYS AS ('escalation_review') STORED,
+    source_generation bigint GENERATED ALWAYS AS (1::bigint) STORED,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    UNIQUE(company_id,decision_id,principal_id),
+    UNIQUE(company_id,event_id),
+    UNIQUE(company_id,id,event_id),
+    FOREIGN KEY(company_id,case_id,decision_id) REFERENCES public.workflow_escalation_decisions(company_id,case_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,event_id,source_kind,id,action_kind,source_generation)
+        REFERENCES public.notification_events(company_id,id,source_kind,source_id,action_kind,source_generation) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE TABLE public.workflow_escalation_recipient_failures (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    failure_kind text NOT NULL CHECK (failure_kind IN ('route','retired')),
+    reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,notice_id,failure_kind),
+    FOREIGN KEY(company_id,notice_id) REFERENCES public.workflow_escalation_notices(company_id,id) ON DELETE CASCADE
+);
+CREATE FUNCTION public.guard_workflow_escalation_notice() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE assignment record; facts jsonb;
+BEGIN
+    IF TG_OP<>'INSERT' THEN
+        IF TG_OP='DELETE' AND (NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_decisions WHERE company_id=OLD.company_id AND id=OLD.decision_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'escalation notice identity is immutable' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notice_guard';
+    END IF;
+    SELECT assignment_kind,manual_principal_id,manual_principal_kind,manual_principal_label INTO assignment
+        FROM public.workflow_escalation_decisions WHERE company_id=NEW.company_id AND case_id=NEW.case_id AND id=NEW.decision_id;
+    IF NOT FOUND THEN RAISE EXCEPTION 'unknown escalation assignment' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notice_guard'; END IF;
+    IF assignment.assignment_kind='manual' THEN
+        IF NEW.principal_id IS DISTINCT FROM assignment.manual_principal_id OR NEW.principal_kind IS DISTINCT FROM assignment.manual_principal_kind
+            OR NEW.principal_label IS DISTINCT FROM assignment.manual_principal_label THEN
+            RAISE EXCEPTION 'manual escalation notice must match the explicit assignment' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notice_guard';
+        END IF;
+    ELSE
+        SELECT recipient_facts INTO facts FROM public.workflow_run_escalations
+            WHERE company_id=NEW.company_id AND case_id=NEW.case_id AND decision_id=NEW.decision_id;
+        IF facts IS NULL OR NOT facts @> jsonb_build_array(jsonb_build_object('principal',NEW.principal_id,'kind',NEW.principal_kind,'label',NEW.principal_label)) THEN
+            RAISE EXCEPTION 'automatic escalation notice must match the captured complete set' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notice_guard';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_notice_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_notices
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_notice();
+CREATE FUNCTION public.check_workflow_escalation_assignment() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE assignment record; expected_count integer; actual_count integer; decision_identity uuid;
+BEGIN
+    IF TG_TABLE_NAME='workflow_escalation_decisions' THEN decision_identity=NEW.id; ELSE decision_identity=NEW.decision_id; END IF;
+    SELECT assignment_kind,case_id,id INTO assignment FROM public.workflow_escalation_decisions
+        WHERE company_id=NEW.company_id AND id=decision_identity;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    IF assignment.assignment_kind='automatic' THEN
+        SELECT jsonb_array_length(recipient_facts) INTO expected_count FROM public.workflow_run_escalations
+            WHERE company_id=NEW.company_id AND case_id=assignment.case_id AND decision_id=assignment.id;
+    ELSE expected_count=1; END IF;
+    SELECT count(*) INTO actual_count FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id AND decision_id=assignment.id;
+    IF expected_count IS NULL OR actual_count<>expected_count THEN
+        RAISE EXCEPTION 'escalation assignment must include every captured recipient notice exactly once'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_assignment_complete';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_escalation_assignment_complete AFTER INSERT ON public.workflow_escalation_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_assignment();
+CREATE CONSTRAINT TRIGGER workflow_escalation_hop_complete AFTER INSERT ON public.workflow_run_escalations
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_assignment();
+CREATE FUNCTION public.check_workflow_escalation_notice_event() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.source_kind='escalation_notice' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_notices AS notice
+        WHERE notice.company_id=NEW.company_id AND notice.id=NEW.source_id AND notice.event_id=NEW.id) THEN
+        RAISE EXCEPTION 'escalation notice event requires its exact recipient source'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notice_guard';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_escalation_notice_source AFTER INSERT ON public.notification_events
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_notice_event();
+
+-- Person projection proof is separate from canonical agent message/intent receipts.
+ALTER TABLE public.notifications DROP CONSTRAINT notifications_source_kind_check,
+    DROP CONSTRAINT notifications_action_kind_check,
+    ADD CONSTRAINT notifications_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_notice')),
+    ADD CONSTRAINT notifications_action_kind_check CHECK (
+        (source_kind='delivery' AND action_kind='delivery_failure')
+        OR (source_kind='decision_reviewer' AND action_kind='decision_review')
+        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1));
+
+-- The same fail-closed source classification as SourceKey::payload_source; tested for equivalence.
+CREATE FUNCTION public.workflow_source_uuid(source text) RETURNS uuid LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+BEGIN
+    IF char_length(source)=45 AND left(source,9)='urn:uuid:' THEN source=substring(source FROM 10);
+    ELSIF char_length(source)=38 AND left(source,1)='{' AND right(source,1)='}' THEN source=substring(source FROM 2 FOR 36);
+    END IF;
+    IF source ~ '^[0-9a-fA-F]{32}$' OR source ~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$' THEN
+        RETURN source::uuid;
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE FUNCTION public.workflow_refusal_content_level(checked_company uuid, source_key text) RETURNS smallint
+    LANGUAGE plpgsql STABLE AS $$
+DECLARE source jsonb; source_id uuid; second_id uuid; stamp smallint;
+BEGIN
+    IF octet_length(source_key)>512 OR left(source_key,3)<>'v1:' THEN RETURN NULL; END IF;
+    source=substring(source_key FROM 4)::jsonb;
+    IF jsonb_typeof(source)<>'array' OR jsonb_typeof(source->0)<>'string'
+        OR jsonb_typeof(source->1)<>'string' THEN RETURN NULL; END IF;
+    source_id=public.workflow_source_uuid(source->>1);
+    IF source_id IS NULL THEN RETURN NULL; END IF;
+    IF source->>0='message' AND jsonb_array_length(source)=2 THEN
+        SELECT access_level INTO stamp FROM public.messages WHERE company_id=checked_company AND id=source_id;
+        RETURN stamp;
+    ELSIF source->>0='manual' AND jsonb_array_length(source)=2 THEN RETURN 0;
+    ELSIF source->>0='schedule' AND jsonb_array_length(source)=3 AND jsonb_typeof(source->2)='string' THEN
+        second_id=public.workflow_source_uuid(source->>2);
+        IF second_id IS NULL THEN RETURN NULL; END IF;
+        RETURN 0;
+    END IF;
+    RETURN NULL;
+EXCEPTION WHEN invalid_text_representation THEN RETURN NULL;
+END $$;
+
+CREATE FUNCTION public.workflow_escalation_notice_active(checked_company uuid, checked_notice uuid) RETURNS boolean
+    LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.workflow_escalation_notices AS notice
+        JOIN public.workflow_escalation_progress AS progress ON progress.company_id=notice.company_id AND progress.case_id=notice.case_id
+        JOIN public.workflow_escalation_decisions AS decision ON decision.company_id=notice.company_id AND decision.id=notice.decision_id
+        WHERE notice.company_id=checked_company AND notice.id=checked_notice AND decision.settled_at IS NULL
+          AND progress.state IN ('waiting','owner_waiting','manual') AND progress.current_decision_id=notice.decision_id)
+$$;
+
+CREATE FUNCTION public.workflow_escalation_person_eligible(checked_company uuid, checked_notice uuid) RETURNS boolean
+    LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (SELECT 1 FROM public.workflow_escalation_notices AS notice
+        JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
+        JOIN public.principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id
+        JOIN public.users AS account ON account.id=principal.user_id
+        JOIN public.company_members AS member ON member.company_id=principal.company_id AND member.user_id=account.id
+        JOIN public.companies AS company ON company.id=notice.company_id
+        LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+        LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
+        WHERE notice.company_id=checked_company AND notice.id=checked_notice AND notice.principal_kind='person' AND principal.kind='person'
+          AND (member.role='owner')=(company.user_id=account.id)
+          AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),principal.id)
+          AND (CASE WHEN escalation.source_kind='admission'
+                THEN public.workflow_refusal_content_level(checked_company,refusal.source_key)
+                ELSE run.content_level END)<=member.access_level)
+$$;
+
+CREATE FUNCTION public.guard_escalation_notification() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source record;
+BEGIN
+    IF TG_OP='UPDATE' AND (OLD.source_kind='escalation_notice' OR NEW.source_kind='escalation_notice') THEN
+        IF (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id)
+            IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id)
+            OR (NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+                NEW.recipient_principal_id IS NULL AND NOT EXISTS (SELECT 1 FROM public.principals
+                    WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id))) THEN
+            RAISE EXCEPTION 'escalation notification identity is immutable'
+                USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notification_guard';
+        END IF;
+    END IF;
+    IF TG_OP='UPDATE' AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN NEW; END IF;
+    IF NEW.source_kind<>'escalation_notice' THEN RETURN NEW; END IF;
+    SELECT notice.principal_id,notice.principal_kind,notice.event_id,COALESCE(run.channel_id,refusal.channel_id) AS channel_id
+        INTO source FROM public.workflow_escalation_notices AS notice
+        JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
+        LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+        LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
+        WHERE notice.company_id=NEW.company_id AND notice.id=NEW.source_id;
+    IF NOT FOUND OR source.principal_kind<>'person' OR source.event_id IS DISTINCT FROM NEW.event_id
+        OR source.channel_id IS DISTINCT FROM NEW.channel_id OR NEW.action_kind<>'escalation_review' OR NEW.source_generation<>1
+        OR (NEW.recipient_principal_id IS NOT NULL AND source.principal_id IS DISTINCT FROM NEW.recipient_principal_id)
+        OR (NEW.state='active' AND (NEW.recipient_principal_id IS NULL
+            OR NOT public.workflow_escalation_notice_active(NEW.company_id,NEW.source_id)
+            OR NOT public.workflow_escalation_person_eligible(NEW.company_id,NEW.source_id)
+            OR EXISTS (SELECT 1 FROM public.workflow_escalation_recipient_failures WHERE company_id=NEW.company_id AND notice_id=NEW.source_id)
+            OR NOT EXISTS (SELECT 1 FROM public.principals WHERE company_id=NEW.company_id
+                AND id=source.principal_id AND kind='person' AND user_id=NEW.recipient_user_id))) THEN
+        RAISE EXCEPTION 'escalation notification must prove the exact current person/source'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_notification_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_notification_guard BEFORE INSERT OR UPDATE ON public.notifications
+    FOR EACH ROW EXECUTE FUNCTION public.guard_escalation_notification();
+
+CREATE TABLE public.workflow_escalation_person_receipts (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    outcome text NOT NULL CHECK (outcome IN ('email_queued','opted_out','self_suppressed','failed','withdrawn','resolved')),
+    email_delivery_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,notice_id),
+    CHECK ((outcome='email_queued')=(email_delivery_id IS NOT NULL)),
+    FOREIGN KEY(company_id,notice_id,event_id) REFERENCES public.workflow_escalation_notices(company_id,id,event_id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,email_delivery_id) REFERENCES public.message_deliveries(company_id,id) DEFERRABLE INITIALLY DEFERRED
+);
+CREATE FUNCTION public.guard_workflow_escalation_person_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source public.workflow_escalation_notices; projected public.notifications; active boolean; eligible boolean; resolved boolean; actor uuid;
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    SELECT company_id,id,case_id,decision_id,principal_id,principal_kind,principal_label,event_id,source_kind,action_kind,source_generation,created_at
+        INTO source FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id AND id=NEW.notice_id;
+    SELECT id,company_id,recipient_user_id,recipient_principal_id,event_id,source_kind,source_id,action_kind,source_generation,channel_id,
+        state,read_at,state_changed_at,email_delivery_id,created_at,updated_at INTO projected
+        FROM public.notifications WHERE company_id=NEW.company_id AND event_id=NEW.event_id;
+    SELECT actor_principal_id INTO actor FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status IN ('processing','projected');
+    IF NOT FOUND OR source IS NULL OR source.principal_kind<>'person' OR source.event_id IS DISTINCT FROM NEW.event_id THEN
+        RAISE EXCEPTION 'person escalation receipt requires its exact projected person source'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_receipt_guard';
+    END IF;
+    active=public.workflow_escalation_notice_active(NEW.company_id,NEW.notice_id);
+    eligible=public.workflow_escalation_person_eligible(NEW.company_id,NEW.notice_id);
+    SELECT state='settled' INTO resolved FROM public.workflow_escalation_progress WHERE company_id=NEW.company_id AND case_id=source.case_id;
+    IF (NEW.outcome IN ('email_queued','opted_out','self_suppressed') AND (NOT active OR NOT eligible OR projected.id IS NULL
+        OR projected.recipient_principal_id IS DISTINCT FROM source.principal_id OR projected.state<>'active'
+        OR NOT EXISTS (SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND user_id=projected.recipient_user_id)
+        OR EXISTS (SELECT 1 FROM public.workflow_escalation_recipient_failures WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id)))
+        OR (NEW.outcome='failed' AND (NOT active OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_recipient_failures
+            WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id)))
+        OR (NEW.outcome='withdrawn' AND (active OR resolved)) OR (NEW.outcome='resolved' AND NOT resolved) THEN
+        RAISE EXCEPTION 'person escalation receipt does not prove its source outcome'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_receipt_guard';
+    END IF;
+    IF NEW.outcome='email_queued' AND (actor IS NOT DISTINCT FROM source.principal_id
+        OR NEW.email_delivery_id IS DISTINCT FROM projected.email_delivery_id
+        OR EXISTS (SELECT 1 FROM public.user_notification_preferences WHERE user_id=projected.recipient_user_id AND NOT decision_email_enabled)
+        OR NOT EXISTS (SELECT 1 FROM public.message_deliveries AS delivery WHERE delivery.company_id=NEW.company_id AND delivery.id=NEW.email_delivery_id
+            AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+            AND delivery.source_binding_id IS NULL AND delivery.destination_binding_id IS NULL AND delivery.external_destination IS NOT NULL
+            AND starts_with(delivery.idempotency_key,'notification:actionable-notification:event:'||NEW.event_id||':user:'||projected.recipient_user_id||':'))) THEN
+        RAISE EXCEPTION 'email_queued requires exact durable outbox proof'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_receipt_guard';
+    ELSIF NEW.outcome='opted_out' AND (projected.email_delivery_id IS NOT NULL OR actor IS NOT DISTINCT FROM source.principal_id
+        OR NOT EXISTS (SELECT 1 FROM public.user_notification_preferences WHERE user_id=projected.recipient_user_id AND NOT decision_email_enabled)) THEN
+        RAISE EXCEPTION 'opted_out requires the current person email preference'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_receipt_guard';
+    ELSIF NEW.outcome='self_suppressed' AND (projected.email_delivery_id IS NOT NULL OR actor IS DISTINCT FROM source.principal_id) THEN
+        RAISE EXCEPTION 'self_suppressed requires the authenticated event actor'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_receipt_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_person_receipt_guard BEFORE INSERT ON public.workflow_escalation_person_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_person_receipt();
+CREATE FUNCTION public.workflow_escalation_recipient_fact_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=OLD.company_id AND id=OLD.notice_id) THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'escalation recipient outcomes are immutable'
+        USING ERRCODE='23514',CONSTRAINT='workflow_escalation_recipient_fact_immutable';
+END $$;
+CREATE TRIGGER workflow_escalation_person_receipt_immutable BEFORE UPDATE OR DELETE ON public.workflow_escalation_person_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_escalation_recipient_fact_immutable();
+CREATE TRIGGER workflow_escalation_recipient_failure_immutable BEFORE UPDATE OR DELETE ON public.workflow_escalation_recipient_failures
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_escalation_recipient_fact_immutable();
+
+CREATE FUNCTION public.guard_workflow_escalation_person_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id AND id=NEW.notice_id AND principal_kind='person')
+        AND public.workflow_escalation_person_eligible(NEW.company_id,NEW.notice_id) THEN
+        RAISE EXCEPTION 'a currently capable person cannot be marked unavailable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_person_failure_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_person_failure_guard BEFORE INSERT ON public.workflow_escalation_recipient_failures
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_person_failure();
+
+-- Receipts precede the final lease fence. Neither source can commit a receipt for unfinished work.
+CREATE FUNCTION public.check_notification_receipt_completion() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_TABLE_NAME='workflow_reviewer_notice_receipts' AND NOT EXISTS (SELECT 1 FROM public.workflow_reviewer_notice_receipts
+        WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id AND event_id=NEW.event_id) THEN RETURN NULL; END IF;
+    IF TG_TABLE_NAME='workflow_escalation_person_receipts' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_person_receipts
+        WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id AND event_id=NEW.event_id) THEN RETURN NULL; END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status='projected') THEN
+        RAISE EXCEPTION 'notification receipts require fenced completion in the same transaction'
+            USING ERRCODE='23514',CONSTRAINT='notification_receipt_completion';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_reviewer_receipt_completion AFTER INSERT ON public.workflow_reviewer_notice_receipts
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();
+CREATE CONSTRAINT TRIGGER workflow_escalation_person_receipt_completion AFTER INSERT ON public.workflow_escalation_person_receipts
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();

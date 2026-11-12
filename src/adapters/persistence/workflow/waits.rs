@@ -99,11 +99,19 @@ impl WorkflowWaits for PostgresPersistence {
     }
 }
 
+pub(super) enum LockPurpose {
+    Transition,
+    BusinessPark,
+}
+
 pub(super) async fn lock(
     db: &mut PgConnection,
     scope: ActivationRequest,
+    purpose: LockPurpose,
 ) -> AppResult<Option<WaitRun>> {
-    channel_reply_completion::prelock_on(db, scope).await?;
+    if matches!(purpose, LockPurpose::Transition) {
+        channel_reply_completion::prelock_on(db, scope).await?;
+    }
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *db).await?;
     let run=sqlx::query_as::<_,WaitRun>("SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *db).await?;
@@ -173,7 +181,7 @@ async fn park_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<ParkedWorkflow>> {
-    let Some(run) = lock(db, scope).await? else {
+    let Some(run) = lock(db, scope, LockPurpose::Transition).await? else {
         return Ok(None);
     };
     if let Some(wait) = row(db, scope, WaitSelection::Execution).await? {

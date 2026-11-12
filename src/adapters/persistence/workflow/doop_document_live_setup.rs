@@ -97,7 +97,7 @@ impl Environment {
             McpErrorPolicy::FailStep,
         ))
         .await;
-        let mut parameters = params(&fixture);
+        let mut parameters = params(&fixture).await;
         parameters["expected_bot_id"] = json!(input.bot);
         parameters["expected_workspace_id"] = json!(input.workspace);
         parameters["doop_origin"] = json!(origin);
@@ -310,6 +310,7 @@ impl Environment {
         let bindings = self.engine.services().bindings();
         let configured = bindings
             .configure(ConfigureBinding {
+                escalation: None,
                 target,
                 expected: None,
                 association: RelatedAssociation::Channel(document.channel),
@@ -351,6 +352,7 @@ async fn bind(
     let bindings = engine.services().bindings();
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Channel(channel),

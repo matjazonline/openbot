@@ -11,6 +11,7 @@ pub mod jev;
 pub(crate) mod mcp;
 pub(crate) use mcp::tool_result as mcp_tool_result;
 mod metadata;
+mod roles;
 mod schemas;
 pub use examples::{AuthoringExample, example};
 
@@ -31,7 +32,7 @@ use schemas::*;
 use serde_json::{Value, json};
 use std::collections::{BTreeMap, BTreeSet};
 
-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.9";
+pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.12";
 pub const MAX_FACTS: usize = 256;
 pub const MAX_SELECTIONS: usize = 128;
 /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
@@ -346,12 +347,16 @@ impl<'a> Registration<'a> {
                     .unwrap_or(self.parsed.locations[""]),
             ));
         }
-        let contract = match self.name() {
+        let selector = self.agent_or_role()?;
+        let mut contract = match self.name() {
             "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply"
             | "message.ask" | "local_agent.run" => self.action()?,
             "workflow.call" | "flow.repeat" => self.child()?,
             _ => self.basic()?,
         };
+        if let Some(selector) = selector {
+            roles::selector_contract(&mut contract, selector);
+        }
         let name = self.name();
         let choices = if name.starts_with("decision.") {
             Some(self.choices()?)

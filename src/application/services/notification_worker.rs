@@ -125,6 +125,7 @@ impl NotificationWorker {
                 fence: &claimed.lease,
                 expected: &projection,
                 email: email.as_ref(),
+                escalation_ack_hours: self.settings.escalation_ack_hours,
             })
             .await
         {
@@ -151,7 +152,11 @@ impl NotificationWorker {
                     );
                 }
             }
-            Ok((NotificationProjectionCommitOutcome::Stale, _)) => {}
+            Ok((
+                NotificationProjectionCommitOutcome::Stale
+                | NotificationProjectionCommitOutcome::Deferred,
+                _,
+            )) => {}
             Ok((NotificationProjectionCommitOutcome::LeaseLost, _)) => warn!(
                 event_id = %claimed.event.id,
                 "Notification projection lost its execution fence"

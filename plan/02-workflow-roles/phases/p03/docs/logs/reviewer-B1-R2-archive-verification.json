@@ -1,0 +1,13 @@
+{
+  "R1_archive_paths": 205,
+  "R2_archive_paths": 206,
+  "changed_paths": [
+    "src/adapters/persistence/workflow/decision_authority_tests.rs",
+    "src/adapters/persistence/workflow/decision_business_member_tests.rs",
+    "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+    "src/application/workflow/compiler/roles.rs",
+    "src/application/workflow/publication/role_tests.rs"
+  ],
+  "matches_declared_delta": true,
+  "archive_current_mismatches": []
+}

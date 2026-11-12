@@ -71,6 +71,7 @@ fn parse_smtp_allow_plaintext_local(value: Option<&str>) -> bool {
 }
 
 pub struct AppConfig {
+    pub escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
     pub knowledge_model_dir: std::path::PathBuf,
     pub knowledge_search_limit: crate::application::knowledge::search::KnowledgeSearchLimit,
     pub jwt_secret: String,
@@ -606,6 +607,10 @@ impl AppConfig {
         let gcs = GcsConfig::from_env(&app_domain_name);
 
         Self {
+            escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours::parse(
+                env::var("ESCALATION_ACK_HOURS").ok().as_deref(),
+            )
+            .unwrap_or_else(|message| panic!("{message}")),
             knowledge_model_dir: crate::adapters::embedding::model_directory_from_env(),
             knowledge_search_limit: knowledge_search_limit_from_env(),
             jwt_secret,
@@ -665,6 +670,7 @@ impl AppConfig {
     }
     pub fn notification_settings(&self) -> crate::application::settings::NotificationMailSettings {
         crate::application::settings::NotificationMailSettings {
+            escalation_ack_hours: self.escalation_ack_hours,
             mail_domain: self.app_domain_name.clone().into(),
             public_base_url: self.public_base_url().into(),
         }
@@ -690,6 +696,7 @@ impl AppConfig {
     /// twenty-seven-file change; `..AppConfig::for_test()` keeps the next one to this function.
     pub fn for_test() -> Self {
         Self {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),

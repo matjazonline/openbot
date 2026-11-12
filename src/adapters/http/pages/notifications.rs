@@ -105,7 +105,7 @@ mod tests {
             id: NotificationId::random(),
             company_id: Uuid::new_v4(),
             company_label: "<company>".into(),
-            channel_id: Uuid::new_v4(),
+            channel_id: Some(Uuid::new_v4()),
             channel_label: "support & sales".into(),
             source_kind: NotificationSourceKind::Delivery,
             source_id: Uuid::new_v4(),

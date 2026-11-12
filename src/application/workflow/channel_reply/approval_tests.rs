@@ -10,9 +10,9 @@ fn channel_reply_completion_policy_roundtrips_only_static_user_reviewers() {
     );
     for edit in [
         json!({"reviewers":[{"kind":"agent","id":Uuid::new_v4()}],"review_timeout_seconds":60}),
-        json!({"reviewers":[{"kind":"user","id":Uuid::new_v4()}],"deadline":"2099-01-01T00:00:00Z"}),
+        json!({"reviewers":[{"kind":"principal","id":Uuid::new_v4()}],"deadline":"2099-01-01T00:00:00Z"}),
         json!({"reviewers":[],"review_timeout_seconds":60}),
-        json!({"reviewers":[{"kind":"user","id":Uuid::nil()}],"review_timeout_seconds":60}),
+        json!({"reviewers":[{"kind":"principal","id":Uuid::nil()}],"review_timeout_seconds":60}),
     ] {
         assert!(serde_json::from_value::<ReplyApprovalPolicy>(edit).is_err());
     }

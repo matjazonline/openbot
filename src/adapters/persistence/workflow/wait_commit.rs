@@ -12,7 +12,7 @@ pub(super) async fn resume_on(
     if maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
     }
-    let Some(run) = waits::lock(db, scope).await? else {
+    let Some(run) = waits::lock(db, scope, waits::LockPurpose::Transition).await? else {
         return Ok(WaitProgress::Refused);
     };
     let Some(wait) = waits::row(db, scope, waits::WaitSelection::Execution).await? else {

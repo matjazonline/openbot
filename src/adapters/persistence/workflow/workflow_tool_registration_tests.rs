@@ -374,7 +374,7 @@ async fn workflow_tool_pins_and_grants_stay_within_the_agents_company() {
         Some(WorkflowToolPin {
             workflow_id: child_workflow(),
             version_id: setup.child,
-            params: json!({"reviewer":setup.reviewer.to_string()})
+            params: json!({"reviewer":setup.fixture.principal(setup.reviewer).await.to_string()})
         })
     );
     assert_eq!(bundle.snapshots().agents[0].agent_id.as_uuid(), setup.agent);
