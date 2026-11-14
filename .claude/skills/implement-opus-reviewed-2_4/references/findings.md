@@ -15,7 +15,7 @@ decision actually examined, not a later correction. Ordinary open design questio
 are not defects by default. Use one Markdown section per finding with:
 
 - **ID and context:** stable plan/phase/task-prefixed ID, date, workflow
-  (`implement-opus-reviewed-2_3`), task/review record links, batch, review stage,
+  (`implement-opus-reviewed-2_4`), task/review record links, batch, review stage,
   review-round note ID, reviewer model/effort, phase ID, worktree, and reviewed
   commit/digest or decision revision.
 - **Classification:** actionable defect or optional suggestion, severity, and category

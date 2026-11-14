@@ -14,7 +14,7 @@ frozen implementation snapshot.
 Each entry records:
 
 - **Identity:** stable plan/phase/task-prefixed review-round ID, date, workflow
-  (`implement-opus-reviewed-2_3`), task/review record links, batch and stage, actual
+  (`implement-opus-reviewed-2_4`), task/review record links, batch and stage, actual
   reviewer model/effort, phase ID, worktree, review-base commit, HEAD, artifact
   digest, and gated decision IDs.
   Include the authoritative plan coordination path, applicable notice IDs/revisions,

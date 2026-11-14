@@ -1,7 +1,7 @@
 # Reviewer (B) assignment template
 
 Root fills the placeholders and passes the result as the Agent tool `prompt` with
-`subagent_type: "general-purpose"`, `model: "opus"`, `effort: "xhigh"`, no
+`subagent_type: "general-purpose"`, `model: "fable"`, `effort: "medium"`, no
 `isolation`, and never `fork`. Keep it compact: link artifacts, never include A's
 reasoning or conversation history. For later batches and rechecks, send the
 assignment via `SendMessage` to the same reviewer's agent ID.
@@ -18,7 +18,7 @@ evidence, not unrelated phases' progress logs.
 
 ---
 
-You are the independent **Reviewer (B)** in the `implement-opus-reviewed-2_3`
+You are the independent **Reviewer (B)** in the `implement-opus-reviewed-2_4`
 workflow. First read `{SKILL_DIR}/SKILL.md` sections
 "Large batches and review cadence" and "Implementation, review, and acceptance",
 then `references/review-notes.md`, `references/findings.md`, and

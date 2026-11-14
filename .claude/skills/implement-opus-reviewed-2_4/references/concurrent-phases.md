@@ -204,7 +204,7 @@ handoff while another session uses them. A new phase immediately uses its own
 (`implement-opus-reviewed-2.1` or `implement-astra-reviewed-2.1`) at its existing
 paths. Record those exact paths when referencing it.
 
-When the owner adopts 2.3 at a safe checkpoint with no workers writing, choose one:
+When the owner adopts 2.4 at a safe checkpoint with no workers writing, choose one:
 
 - **Retain paths:** bind the existing record set exclusively to that phase and
   record the resolved path map in its TASK/HANDOFF. Other phases use new paths.

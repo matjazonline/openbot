@@ -1,9 +1,9 @@
 ---
-name: implement-opus-reviewed-2_3
-description: "Execute complex implementation in Claude Code with an Opus 5.5/xhigh author and an independent Opus 5.5/xhigh reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
+name: implement-opus-reviewed-2_4
+description: "Execute complex implementation in Claude Code with an Opus 5.5/xhigh author and an independent Fable 5.2/medium reviewer subagent, using large cohesive batches, selective architecture gates, phase-local progress and review evidence, isolated concurrent workstreams, and context continuity with 75% auto-compaction. Use when an implementation request selects this workflow; not for standalone planning or review."
 ---
 
-# Implement Opus Reviewed 2.3
+# Implement Opus Reviewed 2.4
 
 Claude Code adaptation of `implement-astra-reviewed-2.3` and successor to
 `implement-opus-reviewed-2.1`, retaining its Opus roles, large review batches,
@@ -17,7 +17,7 @@ measured, not assumed. User preferences override these defaults.
 | Role | Model / effort | Ownership |
 | --- | --- | --- |
 | Author (A) | Opus 5.5 / `xhigh` | Investigation, consequential decisions, implementation, fixtures, tests, and every correction. |
-| Reviewer (B) | Opus 5.5 / `xhigh` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
+| Reviewer (B) | Fable 5.2 / `medium` | Independent review of requirements, architecture, code, and verification; review notes and findings. Does not edit project files or author the design. |
 | Root | Actual session settings | Scope, assignments, resources, acceptance, and user updates. |
 
 - When authoritative session information or the user confirms root runs Opus 5.5
@@ -34,9 +34,10 @@ measured, not assumed. User preferences override these defaults.
   technical review. Keep and record root's actual settings; never infer them from
   a role label or claim instructions changed them.
 - After resolving root's role, spawn B and, only if needed, A with the Agent tool:
-  `subagent_type: "general-purpose"`, `model: "opus"`, `effort: "xhigh"`. Do not
-  pass `isolation`; phase worktrees are set up explicitly. This workflow explicitly
-  requests delegation and those worker settings, so passing them is authorized.
+  `subagent_type: "general-purpose"`; B uses `model: "fable"`, `effort: "medium"`;
+  A uses `model: "opus"`, `effort: "xhigh"`. Do not pass `isolation`; phase
+  worktrees are set up explicitly. This workflow explicitly requests delegation
+  and those worker settings, so passing them is authorized.
 - **Start workers without inherited conversation.** Never spawn a worker, least of
   all B, with `subagent_type: "fork"`: a fork inherits root's history and A's
   reasoning. Claude Code subagents can spawn agents, so every assignment states
@@ -48,10 +49,10 @@ measured, not assumed. User preferences override these defaults.
   completion notification before reporting results, never predict or summarize a
   pending result, and keep user updates flowing. Stop a worker that is still
   running but no longer needed with `TaskStop`.
-- Record actual model/effort when reported. If Opus 5.5, xhigh effort, independent
-  context, or delegation is unavailable, disclose the limitation and obtain an
-  authorized alternative before substituting another workflow. Honor alternatives
-  already authorized in the session.
+- Record actual model/effort when reported. If Opus 5.5/xhigh for A, Fable
+  5.2/medium for B, independent context, or delegation is unavailable, disclose
+  the limitation and obtain an authorized alternative before substituting another
+  workflow. Honor alternatives already authorized in the session.
 
 Give workers compact assignments: original requirements and artifact paths,
 applicable `AGENTS.md`/`CLAUDE.md` files, scope, acceptance criteria, and resolved
@@ -140,8 +141,7 @@ resolve routine implementation choices from the system.
 
 ## Large batches and review cadence
 
-Review is expensive at Opus/xhigh; spend it on fewer, larger artifacts that remain
-reviewable.
+Review is expensive; spend it on fewer, larger artifacts that remain reviewable.
 
 - **Batch size.** A batch is a whole plan phase, milestone, or cohesive feature
   spanning its domain, application, persistence, HTTP, migration, and test changes.

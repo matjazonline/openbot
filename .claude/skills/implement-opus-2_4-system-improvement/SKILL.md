@@ -1,25 +1,33 @@
 ---
-name: implement-2.2-system-improvement
-description: "Distill implement-astra-reviewed-2-2 phase records from a supplied directory into scoped AGENTS.md rules and evidence-backed 2.2 workflow improvements. Use for retrospective lesson extraction and instruction consolidation, with bounded cleanup of analyzed phase artifacts; not for implementation or ordinary code review."
+name: implement-opus-2_4-system-improvement
+description: "Distill implement-opus-reviewed-2_4 phase records from a supplied directory into scoped AGENTS.md/CLAUDE.md rules and evidence-backed Opus 2.4 workflow improvements in Claude Code. Use for retrospective lesson extraction and instruction consolidation, with bounded cleanup of analyzed phase artifacts; not for implementation or ordinary code review."
 ---
 
-# Implement 2.2 System Improvement
+# Implement Opus 2.4 System Improvement
 
-Turn demonstrated implementation, architecture, review, and coordination failures
-into concise instructions for future work. Invocation authorizes justified
-instruction edits and the bounded cleanup below, unless the user requests analysis
-only. A justified no-op is preferable to redundant rules. Do not run implementation
-agents, change application code, alter role settings, or modify other workflow
-variants. This skill is self-contained; do not load the v3 retrospective workflow.
+Claude Code adaptation of `implement-2.3-system-improvement` for records produced
+by `implement-opus-reviewed-2_4`. Turn demonstrated implementation, architecture,
+review, and coordination failures into concise instructions for future work.
+Invocation authorizes justified instruction edits and the bounded cleanup below,
+unless the user requests analysis only. A justified no-op is preferable to
+redundant rules. Do not spawn agents, change application code, alter role
+settings, or modify other workflow variants. This skill is self-contained; do not
+load the v3 retrospective workflow.
 
 ## Resolve the supplied directory
 
-Accept the records directory passed by the user from `implement-astra-reviewed-2-2`,
+Accept the records directory passed by the user from `implement-opus-reviewed-2_4`,
 normally `<plan-dir>/phases/<phase-id>/docs/`. Also accept its containing phase
 directory when it identifies exactly one records directory. Use the resolved paths
 in TASK/HANDOFF for adopted legacy layouts; do not assume all phases use the
 default layout. Resolve the canonical directory, phase ID, owning worktree, and
-plan identity before editing.
+plan identity before editing. Records whose entries name another workflow, such as
+`implement-astra-reviewed-2.3`, still yield technical lessons; report their
+workflow lessons for that variant instead of editing it.
+
+Use absolute paths: Claude Code may reset the shell's cwd between Bash calls, and
+a records directory or worktree outside the session's working directory may need
+`/add-dir` before edits or cleanup.
 
 If given a plan root containing multiple phases, ask which phase directories to
 analyze unless the user explicitly selected all of them. If the directory is absent
@@ -65,22 +73,30 @@ conclusions, not private reasoning transcripts or copied archives.
 
 ## Select ownership and edit
 
-- Technical obligations belong in the narrowest applicable `AGENTS.md`. Inspect
-  effective ancestors, overrides, relevant sibling instructions, and actual
-  implementation/caller/test paths. Filesystem ancestry determines coverage:
-  `feature/AGENTS.md` does not cover sibling `feature.rs` or tests elsewhere.
-  Keep caller obligations where callers load them; root rules must apply broadly.
-- Workflow obligations belong in the globally installed
-  `implement-astra-reviewed-2-2` skill or its responsible reference. Resolve its
-  directory from the skill catalog or `$CODEX_HOME/skills/implement-astra-reviewed-2-2`
-  (default `~/.codex/skills/implement-astra-reviewed-2-2`).
-  Read the current affected instructions before editing. Improve author/reviewer
-  assignments, gate selection, evidence capture, verification, acceptance, or
-  concurrent-phase ownership only where the evidence supports a reusable change.
-  Preserve separate Astra author/reviewer ownership, independent reviewer context,
-  artifact-bound acceptance, and focused verification. Do not create a senior role
-  or import v3's guidance model. Surface consequential policy conflicts rather than
-  silently changing role settings or weakening acceptance.
+- Technical obligations belong in the narrowest applicable instruction file that
+  Claude Code actually loads for the affected paths. It reads `AGENTS.md` only
+  where no `CLAUDE.md`, `CLAUDE.local.md` or `.claude/CLAUDE.md` takes precedence
+  (unless that file imports `@AGENTS.md` or the project loads both), and loads a
+  subdirectory's file only when a file in that subtree is read. Write to the file
+  already serving that scope; never add a `CLAUDE.md` that would hide an existing
+  `AGENTS.md`. Inspect effective ancestors, overrides, relevant sibling
+  instructions, and actual implementation/caller/test paths. Filesystem ancestry
+  determines coverage: `feature/AGENTS.md` does not cover sibling `feature.rs` or
+  tests elsewhere. Keep caller obligations where callers load them; root rules must
+  apply broadly.
+- Workflow obligations belong in the installed
+  [Opus 2.4 skill](../implement-opus-reviewed-2_4/SKILL.md) or its responsible
+  reference. If several copies are installed, edit the one the user names or ask,
+  and report copies left unsynchronized. Read the current affected instructions
+  before editing. Improve author/reviewer assignments, gate selection, evidence
+  capture, verification, acceptance, or concurrent-phase ownership only where the
+  evidence supports a reusable change. Preserve separate Opus author/reviewer
+  ownership, independent (never forked) reviewer context, artifact-bound
+  acceptance, and focused verification. Change its Claude Code mechanics (Agent
+  tool settings, compaction setting, worktree and cwd rules) only on evidence they
+  are wrong, after checking current Claude Code documentation. Do not create a
+  senior role or import v3's guidance model. Surface consequential policy conflicts
+  rather than silently changing role settings or weakening acceptance.
 - Refine an existing rule before adding another. Repeated violations of a clear,
   visible rule do not justify duplication or stronger wording. Investigate
   visibility, ambiguity, or missing enforcement; report gaps prose cannot solve.
@@ -109,10 +125,11 @@ and an unrelated sibling, including inherited text and mandatory reference reads
 Report a small path/count comparison; use word counts when token measurements are
 unavailable. Shorter text alone does not prove improved behavior or token savings.
 
-Validate changed skills with the available skill-creator validator; otherwise
-check frontmatter and links directly and report the limitation. Run only checks
-affected by instruction changes; documentation-only edits need no application
-build or test suite. Leave confirmed unrelated failures unchanged and report them.
+Validate changed skills with the skill-creator skill's validator when available;
+otherwise check frontmatter and links directly and report the limitation. Run only
+checks affected by instruction changes; documentation-only edits need no
+application build or test suite. Leave confirmed unrelated failures unchanged and
+report them.
 
 After edits and validation succeed, save or update
 `<phase-docs>/system-improvement.md`, preserving previous entries. Record analyzed
@@ -128,8 +145,8 @@ After successful analysis and validation, automatically clean up only fully
 analyzed, disposable review artifacts unnecessary for further phase progression.
 Candidates are review notes, resolved findings, superseded decision copies, and
 their dedicated supporting logs. A validated no-op extraction can qualify. This
-is an exception to 2.2's normal retention, never permission for cleanup during
-implementation. Analysis-only requests authorize neither edits nor cleanup.
+is an exception to Opus 2.4's normal retention, never permission for cleanup
+during implementation. Analysis-only requests authorize neither edits nor cleanup.
 
 - Never delete original requirements, implementation plans, TASK.md, REVIEW.md,
   HANDOFF.md, checkpoints, dependency tracking, active decisions, extraction
@@ -142,8 +159,9 @@ implementation. Analysis-only requests authorize neither edits nor cleanup.
   the extraction record before deletion. Both the named path and resolved target
   must be inside a selected phase records directory. Use path-component
   containment, inspect symlinked parents, and recheck boundaries before deletion.
-  Never delete external symlink targets, sibling phase files, or directories
-  recursively. Do not broaden cleanup to the containing plan or phase directory.
+  Delete each file by its absolute path; never use globs, `rm -r`, external
+  symlink targets, or sibling phase files. Do not broaden cleanup to the
+  containing plan or phase directory.
 - Preserve targets of retained links. Only retrospective references in the
   extraction record may be redirected to sufficient retained evidence; do not
   rewrite progression files or outside references to make deletion eligible.
