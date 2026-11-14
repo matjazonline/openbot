@@ -1,4 +1,5 @@
 //! Case creation participates in the authoritative source transaction; controls use the existing queue.
+use super::admission_binding::SourceKey;
 use super::*;
 use crate::application::workflow::escalation::{NotificationRecipients, NotificationRoleRefusal};
 use crate::entities::department::{DepartmentId, DepartmentRole};
@@ -13,6 +14,14 @@ pub(crate) use controls::{ControlProjection, control_on};
 #[path = "escalation_access.rs"]
 mod access;
 pub(crate) use access::{CasePayloadAccess, case_scope_on, payload_access_on};
+#[path = "escalation_follow.rs"]
+mod follow;
+pub(super) use follow::assignment_changed_on;
+#[path = "escalation_decisions.rs"]
+mod decisions;
+pub(super) use decisions::{
+    CommandTarget, ReadPurpose, read_prelocked_on, submit_prelocked_on, target_hint_on,
+};
 
 pub(super) async fn recipients_on(
     db: &mut PgConnection,
@@ -34,6 +43,20 @@ pub(super) async fn admission_refused_on(
     company: CompanyId,
     refusal: AdmissionRefusalId,
 ) -> AppResult<Option<EscalationId>> {
+    let source: Option<String> = sqlx::query_scalar(
+        "SELECT source_key FROM workflow_admission_refusals WHERE company_id=$1 AND id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(refusal.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(message) = source.as_deref().and_then(SourceKey::message)
+        && super::escalation_handling::has_message_on(db, company, message).await?
+    {
+        // The original intent owner records its handling refusal. Never create
+        // a fresh escalation case while trying to deliver an escalation notice.
+        return Ok(None);
+    }
     let case: Option<Uuid> = sqlx::query_scalar(
         "INSERT INTO workflow_escalation_cases \
          (company_id,id,source_kind,admission_refusal_id,binding_id,binding_revision, \
@@ -68,6 +91,57 @@ pub(super) async fn admission_refused_on(
         enqueue_control_on(db, company, EscalationId::new(case), 1, chrono::Utc::now()).await?;
     }
     Ok(case.map(EscalationId::new))
+}
+
+/// The authoritative terminal writer already owns company and run. A child leaves its failure
+/// to parent propagation, where an authored handler can still consume it. Existing cases retain
+/// their first cause, including a previously withdrawn empty-reviewer escalation.
+pub(super) async fn run_failed_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::activation::ActivationRequest,
+    reason: &FailureCode,
+) -> AppResult<()> {
+    if super::escalation_handling::run_failed_on(db, scope).await? {
+        return Ok(());
+    }
+    let suppressed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_run_notification_origins WHERE company_id=$1 AND run_id=$2)",
+    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+    if suppressed {
+        return Ok(());
+    }
+    let case: Option<Uuid> = sqlx::query_scalar(
+        "INSERT INTO workflow_escalation_cases \
+         (company_id,id,source_kind,run_id,execution_id,binding_id,binding_revision, \
+          origin_department_id,policy,reason_code,step_id) \
+         SELECT run.company_id,gen_random_uuid(),'run',run.id,execution.id,run.binding_id,run.binding_revision, \
+                manifest.role_context_department_id,run.escalation,$4,execution.step_id \
+         FROM workflow_runs AS run \
+         JOIN workflow_executions AS execution ON execution.company_id=run.company_id \
+           AND execution.run_id=run.id AND execution.id=$3 \
+         JOIN run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id \
+         JOIN agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id \
+         WHERE run.company_id=$1 AND run.id=$2 AND run.state='failed' AND run.escalation IS NOT NULL \
+           AND run.terminal_execution_id=execution.id AND run.parent_run_id IS NULL \
+         ON CONFLICT (company_id,run_id) WHERE run_id IS NOT NULL DO NOTHING RETURNING id",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(reason.as_str())
+    .fetch_optional(&mut *db)
+    .await?;
+    if let Some(case) = case {
+        enqueue_control_on(
+            db,
+            scope.company,
+            EscalationId::new(case),
+            1,
+            chrono::Utc::now(),
+        )
+        .await?;
+    }
+    Ok(())
 }
 
 async fn enqueue_control_on(

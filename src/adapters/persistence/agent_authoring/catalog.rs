@@ -253,6 +253,8 @@ pub(super) fn builtins(memory_enabled: bool) -> AppResult<AgentToolPage> {
         AgentBuiltinTool::MessageReply,
         AgentBuiltinTool::MessageSend,
         AgentBuiltinTool::SearchKnowledge,
+        AgentBuiltinTool::ReadEscalation,
+        AgentBuiltinTool::RespondToEscalation,
     ]
     .into_iter()
     .chain(memory.into_iter().filter(|_| memory_enabled))

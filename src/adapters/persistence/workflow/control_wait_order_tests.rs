@@ -92,7 +92,9 @@ async fn compete(
         // Always release the second future, including observer failure paths.
         next.notify_one();
         let observed = match first_wait {
-            Ok(pid) => exact_wait(&mut observer, pid, "workflow_runs")
+            // The first owner still holds its run while blocked on execution. The
+            // contender now waits earlier at company, before taking any run rows.
+            Ok(pid) => exact_wait(&mut observer, pid, "FROM companies")
                 .await
                 .map(|_| ()),
             Err(error) => Err(error),

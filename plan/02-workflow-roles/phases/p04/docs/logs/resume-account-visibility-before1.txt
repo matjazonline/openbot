@@ -1,0 +1,30 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7', '::visibility::accounts::', '--nocapture', '--test-threads=2']
+
+running 3 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof' (324804) panicked at src/adapters/persistence/workflow/follow_account_visibility_tests.rs:112:5:
+assertion `left == right` failed: only a current verified login repairs visibility
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility' (324803) panicked at src/adapters/persistence/workflow/follow_account_visibility_tests.rs:69:5:
+assertion `left == right` failed: the real verified link must repair the assignment
+  left: 0
+ right: 1
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility' (325231) panicked at src/adapters/persistence/workflow/follow_account_visibility_tests.rs:45:5:
+the actual profile writer must refresh lost proof/visibility
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 4309 filtered out; finished in 3.28s
+

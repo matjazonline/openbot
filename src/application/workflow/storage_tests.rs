@@ -8,6 +8,7 @@ use uuid::Uuid;
 
 struct Port {
     cursors: Mutex<Vec<Option<RetentionRoot>>>,
+    origin_cursors: Mutex<Vec<Option<NotificationOriginCursor>>>,
     visits: AtomicUsize,
     pending: bool,
     entered: tokio::sync::Notify,
@@ -23,6 +24,7 @@ impl Port {
     fn new(pending: bool) -> Self {
         Self {
             cursors: Mutex::new(Vec::new()),
+            origin_cursors: Mutex::new(Vec::new()),
             visits: AtomicUsize::new(0),
             pending,
             entered: Default::default(),
@@ -51,6 +53,21 @@ impl Drop for PendingWrite<'_> {
 }
 #[async_trait]
 impl WorkflowStorageMaintenance for Port {
+    async fn sweep_notification_origins(
+        &self,
+        after: Option<NotificationOriginCursor>,
+        limit: u16,
+    ) -> AppResult<NotificationOriginSweep> {
+        assert_eq!(limit, STORAGE_SWEEP_LIMIT);
+        self.origin_cursors.lock().unwrap().push(after);
+        Ok(NotificationOriginSweep {
+            deleted: u64::from(after.is_some()),
+            next: after.is_none().then_some(NotificationOriginCursor {
+                company: CompanyId::new(Uuid::from_u128(1)),
+                origin: Uuid::from_u128(1),
+            }),
+        })
+    }
     async fn sweep_obsolete_witnesses(&self, _: u16) -> AppResult<u64> {
         Ok(0)
     }
@@ -148,6 +165,17 @@ async fn workflow_storage_cursor_advances_past_full_error_and_protected_page_wit
     sweep(&port, &monitor, &mut cursor).await;
     assert_eq!(cursor.root, None);
     assert_eq!(*port.cursors.lock().unwrap(), vec![None, Some(root(4))]);
+    assert_eq!(
+        *port.origin_cursors.lock().unwrap(),
+        vec![
+            None,
+            Some(NotificationOriginCursor {
+                company: CompanyId::new(Uuid::from_u128(1)),
+                origin: Uuid::from_u128(1),
+            })
+        ],
+        "zero-deletion origin pages still advance past protected prefixes"
+    );
     assert_eq!(port.visits.load(Ordering::SeqCst), 5);
 }
 #[tokio::test]

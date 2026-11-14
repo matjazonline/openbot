@@ -1,0 +1,25 @@
+
+running 8 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt_paths ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_replay_contract_cannot_override_terminal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_cancel_competes_with_child_creation ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation' (2057945) panicked at src/adapters/persistence/workflow/control_guard_tests.rs:62:37:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42P16", message: "constraints on temporary tables may reference only temporary tables", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("tablecmds.c"), line: Some(10795), routine: Some("ATAddForeignKeyConstraint") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 4350 filtered out; finished in 9.92s
+

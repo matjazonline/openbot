@@ -150,6 +150,12 @@ impl WorkflowServices {
         &self.persistence
     }
 
+    pub fn escalations(
+        &self,
+    ) -> &dyn crate::application::workflow::escalation::WorkflowEscalations {
+        &self.persistence
+    }
+
     pub fn http_connections(&self) -> &dyn crate::application::workflow::http::HttpConnections {
         &self.persistence
     }

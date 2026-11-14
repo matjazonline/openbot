@@ -1,0 +1,21 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case stdout ----
+DEBUGRESULT Err(Database("error returned from database: DEBUG {\"new\": {\"rev\": 2, \"dept\": \"237d6581-ba44-456e-9ff0-91c699720abf\", \"role\": null, \"step\": \"start\", \"policy\": {\"hops\": 1, \"notify\": \"reviewer\"}, \"reason\": \"workflow.activation_limit\", \"binding\": \"ff88260f-40e2-4991-ad70-cc9100f635b1\", \"execution\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\"}, \"run\": {\"id\": \"9e619c3c-e054-4d0e-a81b-cff1c9097770\", \"state\": \"failed\", \"actor_id\": \"93f1cb97-a003-4fc3-9408-830041b4638c\", \"deadline\": \"2026-11-15T01:10:38.51952+00:00\", \"revision\": 11, \"max_steps\": 1, \"thread_id\": null, \"binding_id\": \"ff88260f-40e2-4991-ad70-cc9100f635b1\", \"channel_id\": \"ae363046-47fe-4eab-af33-dcfeadd07615\", \"company_id\": \"4b1b156c-4cd5-4529-8219-31c00a8a01f2\", \"created_at\": \"2026-11-14T01:10:38.51952+00:00\", \"escalation\": {\"hops\": 1, \"notify\": \"reviewer\"}, \"trigger_id\": \"09ee167a-562d-45ac-800b-c40ee4b71efa\", \"version_id\": \"c3a3779e-7460-4ec7-8216-e66ab8e8f217\", \"finished_at\": \"2026-11-14T01:10:38.596409+00:00\", \"workflow_id\": \"00000000-0000-0000-0000-000000000001\", \"bundle_digest\": \"\\\\x1d4e3a7701a8dc1ecde0dcdab1993c5f9f129ca84e003c78e03445bae18aa83a\", \"content_exact\": false, \"content_level\": 0, \"parent_run_id\": null, \"correlation_id\": \"341ab431-4cd0-43a6-b225-6fe99d9bfc20\", \"waiting_reason\": null, \"delivery_policy\": \"deliver\", \"rerun_of_run_id\": null, \"binding_revision\": 2, \"knowledge_ceiling\": 9, \"max_context_bytes\": 65536, \"parent_execution_id\": null, \"terminal_execution_id\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\", \"terminal_wakeup_sequence\": null}, \"valid\": false, \"waits\": [{\"x\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\", \"code\": \"activation_limit\", \"state\": \"failed\"}], \"events\": [{\"a\": \"93f1cb97-a003-4fc3-9408-830041b4638c\", \"k\": \"admitted\", \"s\": 1, \"x\": null}, {\"a\": \"93f1cb97-a003-4fc3-9408-830041b4638c\", \"k\": \"wait_parked\", \"s\": 2, \"x\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\"}, {\"a\": \"93f1cb97-a003-4fc3-9408-830041b4638c\", \"k\": \"wait_failed\", \"s\": 3, \"x\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\"}], \"manifest\": \"237d6581-ba44-456e-9ff0-91c699720abf\", \"execution\": {\"id\": \"7d60326f-d4f2-4bc3-a8e5-5248d11f0ed7\", \"step\": \"start\", \"route\": null}}"))
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case' (6107211) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:68:5:
+debug only
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4473 filtered out; finished in 1.71s
+
+EXIT 101

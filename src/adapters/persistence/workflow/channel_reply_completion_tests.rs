@@ -41,6 +41,7 @@ struct FinalCase {
 enum FinalPublication {
     Standard,
     Messaging,
+    AgentMessaging,
 }
 enum FinalIngress {
     Email,
@@ -164,6 +165,11 @@ impl FinalFixture {
             }
         };
         s.drain(&s.admissions(admission(s.p()))).await;
+        // Resource-specific cases use the same admission result and scope reader.
+        Box::pin(Self::from_intent(s, intent)).await
+    }
+
+    async fn from_intent(s: Intents, intent: Uuid) -> Self {
         assert_eq!(
             shape(&s, intent).await,
             (1, 1),
@@ -222,6 +228,27 @@ async fn publish_root(s: &Intents, source: Value, publication: FinalPublication)
                 crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
                     persistence: s.p().clone(),
                 };
+            let definitions =
+                DefinitionService::new(Preflight, s.p().clone(), WorkflowSourceDecoder, directory);
+            let version = VersionId::new(Uuid::new_v4());
+            s.fixture
+                .publish_source(
+                    &definitions,
+                    s.fixture.target.workflow,
+                    source.to_string(),
+                    version,
+                )
+                .await
+                .unwrap();
+            version
+        }
+        FinalPublication::AgentMessaging => {
+            let directory = crate::adapters::persistence::workflow::agent_publication::AgentPublicationDirectory {
+                persistence: s.p().clone(),
+                inner: crate::adapters::persistence::workflow::step_builtins::StepBuiltinPublicationDirectory {
+                    persistence: s.p().clone(),
+                },
+            };
             let definitions =
                 DefinitionService::new(Preflight, s.p().clone(), WorkflowSourceDecoder, directory);
             let version = VersionId::new(Uuid::new_v4());

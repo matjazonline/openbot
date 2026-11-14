@@ -8,6 +8,7 @@
 mod email_metadata;
 mod external;
 mod inbound;
+pub(in crate::adapters::persistence) use inbound::commit_platform_on;
 mod internal_note;
 mod message;
 mod views;

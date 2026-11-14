@@ -16,14 +16,14 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, ChannelSelector, ExternalMessageKey, ExternalThreadKey,
+            ChannelBindingId, ChannelSelector, DeliveryId, ExternalMessageKey, ExternalThreadKey,
             TransportKind, UnsupportedTransport,
         },
         value_objects::{EmailAddress, MessageId},
     },
     transport::{
         delivery::{
-            DeliveryEnvelope, DeliveryIntent, DeliveryPlanRequest, ProviderSendOutcome,
+            DeliveryEnvelope, DeliveryIntent, DeliveryPlanRequest, PartIndex, ProviderSendOutcome,
             RenderedPart, StandaloneDeliveryEnvelope,
         },
         ingress::{InboundCommitOutcome, InboundCommitRequest},
@@ -199,6 +199,60 @@ pub struct InternalRelayMail<'a> {
     pub hop_count: u32,
     pub trace: Vec<Uuid>,
     pub correlation_id: CorrelationId,
+    /// Which frozen delivery part this mail is. The receiving commit proves it against the stored
+    /// part, so a hop inherits its source message's provenance only through a real delivery.
+    pub proof: InternalRelayProof,
+}
+
+/// The claimed delivery part one internal hop carries, as the delivery worker handed it over.
+///
+/// Server-internal by construction: neither serializable nor parsed from a header, so no inbound
+/// adapter can state it. It is a claim, not a verdict -- the receiving commit checks every field
+/// against the persisted delivery, its frozen part and the stored message before accepting it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InternalRelayProof {
+    company_id: Uuid,
+    delivery_id: DeliveryId,
+    part_index: PartIndex,
+}
+
+impl InternalRelayProof {
+    /// The proof of the part a sender is posting, from the record and part it was handed.
+    pub fn of(delivery: &DeliveryRecord, part: &RenderedPart) -> Self {
+        Self {
+            company_id: delivery.company_id,
+            delivery_id: delivery.id,
+            part_index: part.index,
+        }
+    }
+
+    /// A claim naming a delivery part outright: for a test whose commit is a double that records
+    /// it, or whose claim the real commit is meant to refuse. Production proofs come only from
+    /// [`Self::of`].
+    #[cfg(test)]
+    pub(crate) const fn claiming(
+        company_id: Uuid,
+        delivery_id: DeliveryId,
+        part_index: PartIndex,
+    ) -> Self {
+        Self {
+            company_id,
+            delivery_id,
+            part_index,
+        }
+    }
+
+    pub const fn company_id(self) -> Uuid {
+        self.company_id
+    }
+
+    pub const fn delivery_id(self) -> DeliveryId {
+        self.delivery_id
+    }
+
+    pub const fn part_index(self) -> PartIndex {
+        self.part_index
+    }
 }
 
 /// What the internal relay did with a mail.

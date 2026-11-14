@@ -279,6 +279,24 @@ struct PublicationWrite<'a> {
 }
 
 impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
+    async fn authorize_publication_on(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        plan: &MessagePlan,
+        bound: &WriteBound,
+    ) -> AppResult<AuthorizedAction> {
+        let actor = super::super::action_authority::prelock_message_on(
+            tx,
+            request,
+            plan,
+            self.decision_notices.as_ref(),
+        )
+        .await?;
+        self.authorize_prelocked_on(tx, request, bound.server_timeout(), actor)
+            .await
+    }
+
     async fn publish_on(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -292,7 +310,10 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             action,
             current_policy,
             approval_required,
-        } = match self.authorize_on(tx, request, bound.server_timeout()).await {
+        } = match self
+            .authorize_publication_on(tx, request, plan, bound)
+            .await
+        {
             Ok(authorized) => authorized,
             Err(error) => {
                 return Self::rejected_on(tx, request, error)

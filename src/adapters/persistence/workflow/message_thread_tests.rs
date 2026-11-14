@@ -558,11 +558,13 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
         let setup = &conversation.setup;
         let trace = vec![Uuid::new_v4(), Uuid::new_v4()];
         if recorded {
+            // An external hop: another deployment's relay headers. An `internal` intent must name
+            // the delivery part that carried it (D4.3), which this source message never had.
             sqlx::query(
                 "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
                    thread_id, role, mentioned, admissible, origin, hop_count, trace_channels, \
                    delivery_policy, correlation_id) \
-                 VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'internal', 2, $6, 'deliver', $2)",
+                 VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'external', 2, $6, 'deliver', $2)",
             )
             .bind(setup.scope().company.as_uuid())
             .bind(Uuid::new_v4())

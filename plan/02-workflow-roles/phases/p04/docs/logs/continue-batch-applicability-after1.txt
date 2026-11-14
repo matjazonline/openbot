@@ -1,0 +1,12 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_final_batch_replanning_commits_one_activation_and_proposal ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_final_batch_rolls_back_company_before_retiring_reviewer_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_fresh_final_pure_batch_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_io_boundary_batch_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_later_final_refusal_rolls_back_all_pure_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_nonfinal_pure_batch_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::batch_hints::workflow_reviewer_follow_suppressed_pure_batch_ignores_unused_retired_final_reviewers ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4367 filtered out; finished in 4.16s
+

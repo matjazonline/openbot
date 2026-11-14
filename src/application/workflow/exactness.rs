@@ -115,7 +115,9 @@ pub fn tool_accounting(target: &AgentToolTarget) -> ToolAccounting {
             _ => ToolAccounting::RaisingRead,
         },
         AgentToolTarget::Message { .. } => ToolAccounting::Receipt,
-        AgentToolTarget::Provisioning { .. } => ToolAccounting::Configuration,
+        AgentToolTarget::Provisioning { .. } | AgentToolTarget::Escalation { .. } => {
+            ToolAccounting::Configuration
+        }
         AgentToolTarget::Workflow { .. } => ToolAccounting::ChildControl,
         AgentToolTarget::Http { .. } | AgentToolTarget::Mcp { .. } => ToolAccounting::Unaccounted,
     }

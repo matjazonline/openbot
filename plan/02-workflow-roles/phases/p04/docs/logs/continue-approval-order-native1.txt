@@ -1,0 +1,21 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24', '::approval_tests::account_order_tests::', '--nocapture', '--test-threads=2']
+
+running 4 tests
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_park_first_serializes_retirement_and_cancels_the_retired_notice ... ok
+
+thread 'adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_recorded_approval_does_not_require_a_retired_reviewer_account' (1065020) panicked at src/adapters/persistence/workflow/approval_account_order_tests.rs:273:5:
+assertion `left == right` failed
+  left: ActionCounts { dispatches: 1, entries: 1, receipts: 0 }
+ right: ActionCounts { dispatches: 1, entries: 0, receipts: 0 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_recorded_approval_does_not_require_a_retired_reviewer_account ... FAILED
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_retirement_first_refuses_without_partial_park_or_deadlock ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_recorded_approval_does_not_require_a_retired_reviewer_account
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 4317 filtered out; finished in 3.13s
+

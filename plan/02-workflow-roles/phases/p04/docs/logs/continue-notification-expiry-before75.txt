@@ -1,0 +1,35 @@
+
+running 4 tests
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... FAILED
+test adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes ... FAILED
+test adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership ... FAILED
+
+failures:
+
+---- adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping stdout ----
+
+thread 'adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping' (3342355) panicked at src/adapters/persistence/notification_lease_tests.rs:35:5:
+expiry alone revokes ownership; a reaper need not have replaced the execution yet
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes stdout ----
+
+thread 'adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes' (3342506) panicked at src/adapters/persistence/notification_lease_tests.rs:92:9:
+assertion failed: !p.fail_notification_projection(failure(&claims[0])).await.unwrap()
+
+---- adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership stdout ----
+
+thread 'adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership' (3342550) panicked at src/adapters/persistence/notification_lease_tests.rs:120:5:
+assertion `left == right` failed
+  left: Object {"action_kind": String("delivery_failure"), "actor_principal_id": Null, "attempt_count": Number(1), "available_at": String("2026-11-13T11:43:27.020546+00:00"), "company_id": String("335363e6-d435-4976-b5f3-d714901ba77a"), "execution_id": Null, "id": String("6b9c5e02-3f62-4aa6-aa0a-95e0c4e8935a"), "last_error_class": String("stale_projection"), "last_error_detail": String("Notification projection changed before commit"), "lock_expires_at": Null, "locked_at": Null, "max_attempts": Number(10), "notification_id": String("5f9bcb24-377e-4bca-9a47-1aa96a84d460"), "occurred_at": String("2026-11-13T11:43:23.012388+00:00"), "owner_worker_id": Null, "projected_at": Null, "source_generation": Number(1), "source_id": String("7d41b8ec-d96f-4b48-83af-e82c8f47e286"), "source_kind": String("delivery"), "status": String("pending")}
+ right: Object {"action_kind": String("delivery_failure"), "actor_principal_id": Null, "attempt_count": Number(1), "available_at": String("2000-01-01T00:00:00+00:00"), "company_id": String("335363e6-d435-4976-b5f3-d714901ba77a"), "execution_id": String("bffbf759-f30d-471c-95c8-2019b15e3e42"), "id": String("6b9c5e02-3f62-4aa6-aa0a-95e0c4e8935a"), "last_error_class": Null, "last_error_detail": Null, "lock_expires_at": String("2026-11-13T11:43:22.01842+00:00"), "locked_at": String("2026-11-13T11:43:21.01842+00:00"), "max_attempts": Number(10), "notification_id": String("5f9bcb24-377e-4bca-9a47-1aa96a84d460"), "occurred_at": String("2026-11-13T11:43:23.012388+00:00"), "owner_worker_id": String("b107180a-5e96-4082-98c9-43d9babccddc"), "projected_at": Null, "source_generation": Number(1), "source_id": String("7d41b8ec-d96f-4b48-83af-e82c8f47e286"), "source_kind": String("delivery"), "status": String("processing")}
+
+
+failures:
+    adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping
+    adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes
+    adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership
+
+test result: FAILED. 1 passed; 3 failed; 0 ignored; 0 measured; 4405 filtered out; finished in 2.51s
+

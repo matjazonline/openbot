@@ -12,6 +12,12 @@ struct RoleAction {
 }
 
 async fn role_action() -> RoleAction {
+    Box::pin(role_action_with(None)).await
+}
+
+async fn role_action_with(
+    escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
+) -> RoleAction {
     let original = Box::pin(protected("http://127.0.0.1:1", Entrance::Http)).await;
     let fixture = Fixture {
         _db: original.fixture._db.clone(),
@@ -30,12 +36,13 @@ async fn role_action() -> RoleAction {
     let association =
         RelatedAssociation::Channel(crate::application::workflow::RelatedChannelId::new(channel));
     let version = role_version(&fixture, &original.connection).await;
-    let target = Box::pin(bound(
+    let target = Box::pin(bound_escalating(
         &fixture,
         &original.connection,
         version,
         Entrance::Http,
         association,
+        escalation,
     ))
     .await;
     let claim = Box::pin(claimed_with_key(
@@ -217,3 +224,6 @@ async fn workflow_role_reviewer_protected_action_uses_frozen_people_and_current_
         .unwrap();
     assert_eq!(view(&f.setup).await.state, "completed");
 }
+
+#[path = "reviewer_action_escalation_tests.rs"]
+mod escalation;

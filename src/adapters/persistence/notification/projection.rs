@@ -33,6 +33,12 @@ pub(super) async fn resolve_projection_on(
     connection: &mut PgConnection,
     event: &NotificationEvent,
 ) -> AppResult<NotificationProjection> {
+    if let Some(disposition) = escalation_notice::agent_disposition_on(connection, event).await? {
+        return Ok(NotificationProjection {
+            event: event.clone(),
+            disposition,
+        });
+    }
     if event.source_kind == NotificationSourceKind::EscalationControl {
         return Ok(NotificationProjection {
             event: event.clone(),
@@ -225,7 +231,7 @@ pub(super) async fn apply_projection_on(
         NotificationDisposition::Active(_) => NotificationState::Withdrawn,
         NotificationDisposition::Resolved => NotificationState::Resolved,
         NotificationDisposition::Withdrawn => NotificationState::Withdrawn,
-        NotificationDisposition::Control => {
+        NotificationDisposition::Control | NotificationDisposition::Agent { .. } => {
             return Err(AppError::BadRequest(
                 "A control event has no recipient state".into(),
             ));
@@ -235,6 +241,7 @@ pub(super) async fn apply_projection_on(
         NotificationDisposition::Active(recipient) => Some(recipient.user_id),
         NotificationDisposition::Resolved
         | NotificationDisposition::Withdrawn
+        | NotificationDisposition::Agent { .. }
         | NotificationDisposition::Control => None,
     };
     let settled: Vec<DateTime<Utc>> = sqlx::query_scalar(

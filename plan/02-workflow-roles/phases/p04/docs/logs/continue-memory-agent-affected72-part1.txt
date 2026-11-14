@@ -1,0 +1,133 @@
+
+running 100 tests
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_cancelled_owner_never_spends ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_child_ignores_held_ancestor_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_competing_descendants_replay_and_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_mid_batch_refusal_commits_prior_results ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_deferred_commit_failure_preserves_freeze_and_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_rollback_and_fresh_handle_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_successful_io_and_wait_replay_charge_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_pure_io_wait_refusal_no_hot_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_completion_before_conflict_preserves_committed_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_usage_wait_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_conflict_after_return_before_completion_retires_exact_attempt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::conflict_tests::workflow_action_reconciliation_runtime_conflicted_sibling_vetoes_all_receipt_continuation ... ok
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=4 owner=true attempt=2 lease_remaining_ms=2987 run_remaining_ms=86399178 db_now=2026-11-13 10:40:26.045271+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=26 owner=true attempt=2 lease_remaining_ms=2966 run_remaining_ms=86399156 db_now=2026-11-13 10:40:26.066524+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=26 owner=true attempt=2 lease_remaining_ms=2965 run_remaining_ms=86399156 db_now=2026-11-13 10:40:26.067059+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=29 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399153 db_now=2026-11-13 10:40:26.069994+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=48 owner=true attempt=2 lease_remaining_ms=2981 run_remaining_ms=86399135 db_now=2026-11-13 10:40:26.088234+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=54 owner=true attempt=2 lease_remaining_ms=2975 run_remaining_ms=86399129 db_now=2026-11-13 10:40:26.094252+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=54 owner=true attempt=2 lease_remaining_ms=2974 run_remaining_ms=86399128 db_now=2026-11-13 10:40:26.094764+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=57 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399125 db_now=2026-11-13 10:40:26.097858+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=98 owner=true attempt=2 lease_remaining_ms=2959 run_remaining_ms=86399085 db_now=2026-11-13 10:40:26.13819+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=105 owner=true attempt=2 lease_remaining_ms=2951 run_remaining_ms=86399077 db_now=2026-11-13 10:40:26.145585+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=105 owner=true attempt=2 lease_remaining_ms=2951 run_remaining_ms=86399077 db_now=2026-11-13 10:40:26.145923+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=109 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399073 db_now=2026-11-13 10:40:26.149876+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=110 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399072 db_now=2026-11-13 10:40:26.150652+00
+PHASE scenario=mixed phase=completed elapsed_ms=125 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399057 db_now=2026-11-13 10:40:26.165427+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_invalid_then_same_genuine_result ... ok
+PHASE scenario=mixed phase=claimed_snapshot elapsed_ms=4 owner=true attempt=2 lease_remaining_ms=2987 run_remaining_ms=86399319 db_now=2026-11-13 10:40:26.50783+00
+PHASE scenario=mixed phase=live_recovery elapsed_ms=29 owner=true attempt=2 lease_remaining_ms=2963 run_remaining_ms=86399294 db_now=2026-11-13 10:40:26.532268+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renew elapsed_ms=29 owner=true attempt=2 lease_remaining_ms=2962 run_remaining_ms=86399294 db_now=2026-11-13 10:40:26.53281+00
+PHASE scenario=mixed phase=receipt_only_dispatches:renewed elapsed_ms=32 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399291 db_now=2026-11-13 10:40:26.535357+00
+PHASE scenario=mixed phase=receipt_only_dispatches elapsed_ms=51 owner=true attempt=2 lease_remaining_ms=2980 run_remaining_ms=86399273 db_now=2026-11-13 10:40:26.55415+00
+PHASE scenario=mixed phase=receipt_only_snapshot elapsed_ms=57 owner=true attempt=2 lease_remaining_ms=2974 run_remaining_ms=86399267 db_now=2026-11-13 10:40:26.559872+00
+PHASE scenario=mixed phase=supported_dispatch:renew elapsed_ms=57 owner=true attempt=2 lease_remaining_ms=2974 run_remaining_ms=86399266 db_now=2026-11-13 10:40:26.56039+00
+PHASE scenario=mixed phase=supported_dispatch:renewed elapsed_ms=60 owner=true attempt=2 lease_remaining_ms=2999 run_remaining_ms=86399263 db_now=2026-11-13 10:40:26.563508+00
+PHASE scenario=mixed phase=supported_dispatch elapsed_ms=101 owner=true attempt=2 lease_remaining_ms=2958 run_remaining_ms=86399223 db_now=2026-11-13 10:40:26.6041+00
+PHASE scenario=mixed phase=applied_snapshot elapsed_ms=108 owner=true attempt=2 lease_remaining_ms=2951 run_remaining_ms=86399215 db_now=2026-11-13 10:40:26.611331+00
+PHASE scenario=mixed phase=completion:renew elapsed_ms=109 owner=true attempt=2 lease_remaining_ms=2951 run_remaining_ms=86399215 db_now=2026-11-13 10:40:26.611635+00
+PHASE scenario=mixed phase=completion:renewed elapsed_ms=112 owner=true attempt=2 lease_remaining_ms=2998 run_remaining_ms=86399211 db_now=2026-11-13 10:40:26.615415+00
+PHASE scenario=mixed phase=before_completion elapsed_ms=113 owner=true attempt=2 lease_remaining_ms=2997 run_remaining_ms=86399210 db_now=2026-11-13 10:40:26.61629+00
+PHASE scenario=mixed phase=completed elapsed_ms=130 owner=false attempt=2 lease_remaining_ms=0 run_remaining_ms=86399193 db_now=2026-11-13 10:40:26.63341+00
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::truth_tests::workflow_action_reconciliation_runtime_mixed_missing_then_same_genuine_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::mixed_tests::workflow_action_reconciliation_runtime_receipt_final_supported_siblings_continue_exactly ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ignored, needs the live memory service: scripts/memory-integration.sh
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::runtime_tests::workflow_action_reconciliation_runtime_supported_positive_veto_then_genuine_valid_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_output_never_precedes_its_committed_observation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_lower_destination ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_disable_and_run_cancel_overlapping_in_id_order_never_deadlock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_interrupted_save_without_an_intent_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_competing_disable_and_run_cancel_settle_every_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancel_during_an_in_flight_delivery_loses_its_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_save_and_load_steps_round_trip_through_the_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_steps_fail_terminally_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_operations_settled_save_intents_outlive_every_run_that_can_replay_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_terminal_intent_wakes_and_fails_the_parked_save ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::memory_access_level_event_wake_lowers_exactness ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_publication_native_output_is_data_and_direct_followup_cannot_reopen_workflow ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_approval_parks_before_native_admission_and_grants_one_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_private_run_output_and_every_direct_control_require_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_offline_operation_expires_at_frozen_deadline_without_native_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_withdrawn_original_private_access ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_park_commit_ack_proves_atomic_saved_owner_or_no_operation ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_result_commit_ack_resolves_authorized_saved_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... ok
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_aborted_park_commit_has_no_receipt_and_retries_same_frozen_activation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_cancelled_queued_turn_never_releases_owner_or_blocks_next_position ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_unknown_final_ack_keeps_turn_until_commit_and_completed_replay_cannot_release_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_conversation_limit_refuses_atomically_then_admits_after_cancel ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_safe_retry_at_capacity_is_atomic_and_old_position_cannot_steal_new_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_guards_refuse_pointer_theft_nonowner_activation_and_wait_retag ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_pointer_cannot_reference_another_tenants_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_deferred_companion_pin_blocks_exchange_only_delete_at_commit ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_invalid_model_settlement_releases_without_accepting_an_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_queued_deadline_vs_resume_settles_once_without_releasing_another_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_context_frozen_preparation_replays_the_department_it_froze ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_company_limit_spans_streams_and_rolls_back_new_identity ... ok
+
+test result: ok. 96 passed; 0 failed; 4 ignored; 0 measured; 4304 filtered out; finished in 137.47s
+

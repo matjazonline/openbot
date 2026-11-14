@@ -1,0 +1,20 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case' (6241426) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:1028:9:
+the reply to hop 91b8702e-f426-4044-adc4-3f0fe9854043 was never queued: {"attempts":[{"code":null,"status":"completed","stop":"completed"},{"code":null,"status":"completed","stop":"completed"},{"code":null,"status":"completed","stop":"completed"},{"code":null,"status":"completed","stop":"effect_parked"},{"code":null,"status":"completed","stop":"completed"},{"code":null,"status":"completed","stop":"completed"},{"code":null,"status":"completed","stop":"completed"}],"destinations":[{"delivery":"fb66c612-c0aa-46e8-ba51-57ba9d0a726d","kind":"reply","replied":"59c65675-7097-4fdd-b651-641cdfea5ba7"}],"intents":[{"channel":"f50b85af-7170-802c-992f-a2fc3bda9d16","hop":0,"message":"3411e2a0-ee18-4d1b-a372-fb36f54648a4","origin":"application","outcome":"admitted"},{"channel":"f50b85af-7170-802c-992f-a2fc3bda9d16","hop":0,"message":"59c65675-7097-4fdd-b651-641cdfea5ba7","origin":"external","outcome":null},{"channel":"18cb9a01-ab32-4e0f-a1b7-6c4f0d96bec2","hop":1,"message":"91b8702e-f426-4044-adc4-3f0fe9854043","origin":"internal","outcome":"admitted"}],"outcomes":[{"binding_id":"691c6746-c8a0-84af-a4ae-701abcda4c73","binding_revision":1,"created_at":"2026-11-14T01:46:24.831754+00:00","intent_id":"5ab05d7b-69f7-4f4c-a1f7-809e0358b610","outcome":"admitted","reason":null,"role_refusal":null,"run_id":"50eca561-1c14-4921-92ee-8d146124b050"},{"binding_id":"ed4318ac-a887-4e60-a5d5-306d55a8dd8b","binding_revision":1,"created_at":"2026-11-14T01:46:32.836207+00:00","intent_id":"d7f1b404-27f3-44b1-9929-4463ebab5a75","outcome":"admitted","reason":null,"role_refusal":null,"run_id":"b4b104e3-50a2-43a2-9bb6-ba2d1894922e"}],"runs":[{"binding":"691c6746-c8a0-84af-a4ae-701abcda4c73","channel":"f50b85af-7170-802c-992f-a2fc3bda9d16","id":"50eca561-1c14-4921-92ee-8d146124b050","state":"succeeded"},{"binding":"6a983459-dbfa-453b-9d20-bde252b600ed","channel":"18cb9a01-ab32-4e0f-a1b7-6c4f0d96bec2","id":"8ef2b419-02ae-4d96-83c6-7eeff6e264a4","state":"failed"},{"binding":"ed4318ac-a887-4e60-a5d5-306d55a8dd8b","channel":"18cb9a01-ab32-4e0f-a1b7-6c4f0d96bec2","id":"b4b104e3-50a2-43a2-9bb6-ba2d1894922e","state":"succeeded"},{"binding":"691c6746-c8a0-84af-a4ae-701abcda4c73","channel":"f50b85af-7170-802c-992f-a2fc3bda9d16","id":"f1b25464-29d4-4c7e-827a-6711674c2766","state":"succeeded"}]}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 40.65s
+
+EXIT 101

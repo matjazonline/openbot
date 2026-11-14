@@ -1,0 +1,10 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7', '::escalations::visibility::', '--nocapture', '--test-threads=2']
+
+running 4 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_desk_ownership_writer_refreshes_derived_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_repairs_without_changing_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_competing_channel_writers_commit_matching_visibility_and_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_refresh_failure_rolls_back_channel_settings_grants_and_assignments ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4305 filtered out; finished in 3.77s
+

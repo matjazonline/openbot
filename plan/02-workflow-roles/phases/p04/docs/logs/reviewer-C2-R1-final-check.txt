@@ -1,0 +1,52 @@
+base:   2bbe2649024aa6a4617b74b0c0c7868b14590b5f
+digest: bde774d4d637e671804ffa5ace3a4331178be0d07861c52cc3a05b0db87ddbf7
+files:
+  .claude/helpers/graft-hooks.cjs
+  .claude/helpers/graft-statusline.cjs
+  .claude/settings.json
+  .claude/skills/graft/SKILL.md
+  .mcp.json
+  .trail/.gitignore
+  .trail/README.md
+  .trail/hook.cjs
+  AGENTS.md
+  migrations/20260817000000_init_schema.sql
+  src/adapters/persistence/account_identity.rs
+  src/adapters/persistence/channel_edit.rs
+  src/adapters/persistence/department_desks.rs
+  src/adapters/persistence/user.rs
+  src/adapters/persistence/workflow/action_approval_sql_tests.rs
+  src/adapters/persistence/workflow/decisions.rs
+  src/adapters/persistence/workflow/escalation_deadline_tests.rs
+  src/adapters/persistence/workflow/escalation_decision_deadline_tests.rs
+  src/adapters/persistence/workflow/escalation_follow.rs
+  src/adapters/persistence/workflow/escalation_guard_tests.rs
+  src/adapters/persistence/workflow/escalation_source_guard_tests.rs
+  src/adapters/persistence/workflow/escalation_wait_deadline_tests.rs
+  src/adapters/persistence/workflow/escalations.rs
+  src/adapters/persistence/workflow/follow_account_visibility_tests.rs
+  src/adapters/persistence/workflow/follow_escalation_tests.rs
+  src/adapters/persistence/workflow/follow_retirement_tests.rs
+  src/adapters/persistence/workflow/follow_reviewer_tests.rs
+  src/adapters/persistence/workflow/follow_reviewers/mod.rs
+  src/adapters/persistence/workflow/follow_visibility_tests.rs
+  src/adapters/persistence/workflow/guard_failure.rs
+  src/adapters/persistence/workflow/maintenance.rs
+  src/adapters/persistence/workflow/member_dependents.rs
+  src/adapters/persistence/workflow/mod.rs
+  src/adapters/persistence/workflow/people_resolution_tests.rs
+  src/adapters/persistence/workflow/reconciliation_fixture.rs
+  src/adapters/persistence/workflow/reviewer_account_race_tests.rs
+  src/adapters/persistence/workflow/role_reviewer_tests.rs
+  src/adapters/persistence/workflow/wait_commit.rs
+  src/application/workflow/actions/reconciliation/contracts.rs
+  src/application/workflow/people_resolution.rs
+  src/application/workflow/reviewer_assignment.rs
+
+C2-r1.md: SHA256 MATCH
+C2-r1-coordination.md: SHA256 MATCH
+C2-r1-snapshot.txt: SHA256 MATCH
+resume-account-visibility-native1.txt: SHA256 MATCH
+resume-account-visibility-before1.txt: SHA256 MATCH
+coordination: revision32 pin byte-identical
+branch: room/check-last-handoff-md-under-plan-02-work-qc8d

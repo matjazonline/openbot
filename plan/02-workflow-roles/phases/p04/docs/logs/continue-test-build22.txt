@@ -1,0 +1,20 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+time: command terminated abnormally
+      217.02 real         0.14 user         0.19 sys
+           132628480  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                9594  page reclaims
+                  12  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   0  signals received
+                3202  voluntary context switches
+                1384  involuntary context switches
+          2845044550  instructions retired
+          1112969147  cycles elapsed
+           108725064  peak memory footprint

@@ -1,0 +1,46 @@
+==> Downloading Homebrew API data
+✔︎ JSON API packages.arm64_golden_gate.jws.json
+==> Downloading bottle manifests
+✔︎ Bottle Manifest node@24 (24.22.3)
+==> Would install 1 formula:
+node@24 24.22.3
+==> Would install 2 dependencies for node@24:
+libnghttp3  1.19.0
+libngtcp2   1.26.0
+==> Fetching downloads for: node@24
+✔︎ Bottle Manifest libnghttp3 (1.19.0)
+✔︎ Bottle Manifest libngtcp2 (1.26.0)
+✔︎ Bottle libnghttp3 (1.19.0)
+✔︎ Bottle libngtcp2 (1.26.0)
+✔︎ Bottle node@24 (24.22.3)
+==> Installing dependencies for node@24: libnghttp3 and libngtcp2
+==> Installing node@24 dependency: libnghttp3 (1.19.0)
+==> Pouring libnghttp3--1.19.0.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/libnghttp3/1.19.0: 20 files, 611.2KB
+==> Installing node@24 dependency: libngtcp2 (1.26.0)
+==> Pouring libngtcp2--1.26.0.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/libngtcp2/1.26.0: 21 files, 1.5MB
+==> Installing node@24
+==> Pouring node@24--24.22.3.arm64_golden_gate.bottle.tar.gz
+Warning: node@24 was installed but not linked because node is already linked.
+To link this version, run:
+  brew link node@24
+🍺  /opt/homebrew/Cellar/node@24/24.22.3: 2,103 files, 83MB
+==> Caveats
+==> node@24
+node@24 is keg-only, which means it was not symlinked into /opt/homebrew,
+because this is an alternate version of another formula.
+
+If you need to have node@24 first in your PATH, run:
+  printf '%s\n' export\ PATH\=/opt/homebrew/opt/node@24/bin:\$PATH >> ~/.zshrc
+
+For compilers to find node@24 you may need to set:
+  export LDFLAGS=-L/opt/homebrew/opt/node@24/lib
+  export CPPFLAGS=-I/opt/homebrew/opt/node@24/include
+
+The following node@24 executables are shadowed by linked node commands in /opt/homebrew/bin:
+node
+Running these by name will not invoke the version provided by this formula.
+Run `brew link node@24` to switch the active version to this keg.
+Disable this behaviour by setting `HOMEBREW_NO_PATH_SHADOW_CHECK=1`.
+Hide these hints with `HOMEBREW_NO_ENV_HINTS=1` (see `man brew`).

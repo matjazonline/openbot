@@ -6,6 +6,9 @@ use crate::application::workflow::{
 };
 use crate::domain::workflow::WaitId;
 
+#[path = "reviewer_agent_turn_hint_tests.rs"]
+mod reviewer_turn_hints;
+
 fn policy() -> LeasePolicy {
     LeasePolicy::new(Duration::from_secs(60)).unwrap()
 }

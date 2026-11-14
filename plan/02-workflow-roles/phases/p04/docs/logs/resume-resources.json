@@ -1,0 +1,18 @@
+{
+  "owner": "thr_jt43h4qc8d",
+  "phase": "02WR-P04",
+  "postgres_data": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pgdata",
+  "host": "127.0.0.1",
+  "port": 52471,
+  "database": "openbot_roles_p04_resume3",
+  "test_database": "openbot_roles_p04_resume3_test",
+  "cargo_target_dir": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target",
+  "postgres_version": "18.7",
+  "status": "owned cluster running; no application worker",
+  "prior_databases_retained": [
+    "openbot_roles_p04_resume1",
+    "openbot_roles_p04_resume1_test",
+    "openbot_roles_p04_resume2",
+    "openbot_roles_p04_resume2_test"
+  ]
+}

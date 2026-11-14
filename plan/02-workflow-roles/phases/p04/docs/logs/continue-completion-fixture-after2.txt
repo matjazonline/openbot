@@ -1,0 +1,12 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_finalization_replay_ignores_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_fenced_replay_ignores_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_pure_replay_ignores_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_wait_replay_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completion_replay_company_precedes_run_during_actual_retirement ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_nonterminal_pure_replay_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_uncompleted_finalization_requires_current_final_reviewers ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4351 filtered out; finished in 4.40s
+

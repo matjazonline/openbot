@@ -1,0 +1,14 @@
+{"runner": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/source_modules-55eef8c710a0bfc2", "runner_sha256": "8c4dd85f7d52fa2fba78af3b8a9bcc6674432ffe5190bf47825993eb02e159b5", "source_sha256": "ace9b7a36c5a93992941fd09dac217be773ac8021b21fb3d7dedc5b185679379", "source_matches_HEAD": true, "current_tree": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot", "note": "unchanged compiled runner reads Cargo metadata and source files at execution; no production library APIs used"}
+
+running 8 tests
+test comments_and_strings_do_not_declare_modules ... ok
+test conditional_inline_paths_keep_the_ordinary_directory_reachable ... ok
+test cfg_attr_paths_and_literal_includes_are_connected ... ok
+test included_files_resolve_nested_modules_and_includes_like_rustc ... ok
+test inline_path_and_conditional_modules_are_connected ... ok
+test removed_module_and_removed_ancestor_leave_detectable_orphans ... ok
+test unresolved_forms_and_recursive_includes_fail_explicitly ... ok
+test every_rust_source_is_connected_to_a_cargo_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.86s
+

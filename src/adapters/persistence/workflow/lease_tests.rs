@@ -747,7 +747,7 @@ mod resolution_tests;
 mod completion_tests;
 
 #[path = "memory_steps_tests.rs"]
-mod memory_steps_tests;
+pub(in crate::adapters::persistence::workflow::tests) mod memory_steps_tests;
 #[path = "wait_tests.rs"]
 mod wait_tests;
 

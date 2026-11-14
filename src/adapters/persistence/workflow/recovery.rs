@@ -86,15 +86,34 @@ pub(super) async fn retire_on(
         settle_run(db, scope, decision).await?;
     }
     finish_job(db, fence, decision, &reason).await?;
+    record_retirement_on(
+        db,
+        scope,
+        decision,
+        (!routed).then_some(report.failure.code()),
+    )
+    .await
+}
+
+async fn record_retirement_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    decision: RecoveryDecision,
+    failure: Option<&FailureCode>,
+) -> AppResult<()> {
+    let Some(code) = failure else {
+        return Ok(());
+    };
     if decision == RecoveryDecision::Reconcile {
-        action_uncertainty::record(
-            db,
-            scope.company,
-            scope.run,
-            Some(scope.execution),
-            report.failure.code(),
-        )
-        .await?;
+        action_uncertainty::record(db, scope.company, scope.run, Some(scope.execution), code)
+            .await?;
+    } else if matches!(
+        decision,
+        RecoveryDecision::FinalError | RecoveryDecision::FailRun(_)
+    ) {
+        // The actual attempt and failed job now prove the sealed terminal cause.
+        // Box notification bookkeeping off the lease-worker debug stack.
+        Box::pin(escalations::run_failed_on(db, scope, code)).await?;
     }
     Ok(())
 }

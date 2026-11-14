@@ -1,0 +1,40 @@
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_expired_final_io_result_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_fresh_final_io_completion_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_invalid_io_result_retires_without_unused_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_nonterminal_io_completion_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_stale_final_io_result_ignores_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_expired_final_io_result_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_expired_final_io_result_ignores_unused_retired_final_reviewers' (2058341) panicked at src/adapters/persistence/workflow/reviewer_fresh_completion_hint_tests.rs:158:54:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_invalid_io_result_retires_without_unused_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_invalid_io_result_retires_without_unused_final_reviewers' (2058525) panicked at src/adapters/persistence/workflow/reviewer_fresh_completion_hint_tests.rs:90:54:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_nonterminal_io_completion_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_nonterminal_io_completion_ignores_unused_retired_final_reviewers' (2058531) panicked at src/adapters/persistence/workflow/reviewer_fresh_completion_hint_tests.rs:58:42:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_stale_final_io_result_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_stale_final_io_result_ignores_unused_retired_final_reviewers' (2058549) panicked at src/adapters/persistence/workflow/reviewer_fresh_completion_hint_tests.rs:132:42:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_expired_final_io_result_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_invalid_io_result_retires_without_unused_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_nonterminal_io_completion_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_stale_final_io_result_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 4353 filtered out; finished in 3.03s
+

@@ -198,8 +198,8 @@ pub(super) async fn insert_admission(
     sqlx::query(
         "INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, $3, $4)",
     ).bind(company.as_uuid()).bind(binding.as_uuid())
-        .bind(source.as_str()).bind(run.as_uuid()).execute(db).await?;
-    Ok(())
+        .bind(source.as_str()).bind(run.as_uuid()).execute(&mut *db).await?;
+    super::escalation_handling::capture_root_on(db, company, source, run).await
 }
 
 pub(super) async fn insert_admitted(

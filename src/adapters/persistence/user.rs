@@ -477,9 +477,10 @@ impl UserPersistence for PostgresPersistence {
                 "An external login requires a verified provider email claim.".into(),
             ));
         }
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         // The row lock from UPDATE serializes with an address change. The provider's proof
         // installs a marker only while it names the address currently stored on this row.
-        sqlx::query_as::<_, UserDb>(
+        let user = sqlx::query_as::<_, UserDb>(
             r#"UPDATE users AS account
                SET email_verified_at = CASE
                    WHEN account.email = $3::citext THEN COALESCE(account.email_verified_at, CURRENT_TIMESTAMP)
@@ -492,10 +493,20 @@ impl UserPersistence for PostgresPersistence {
         .bind(identity.provider.as_str())
         .bind(identity.subject)
         .bind(identity.email.as_str())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *transaction)
         .await
-        .map(|user| user.map(Into::into))
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+        if let Some(user) = &user {
+            let companies =
+                super::workflow::prelock_account_companies_on(&mut transaction, user.id).await?;
+            Box::pin(super::workflow::refresh_account_dependents_on(
+                &mut transaction,
+                &companies,
+            ))
+            .await?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(user.map(Into::into))
     }
 
     async fn link_external_identity(
@@ -509,6 +520,13 @@ impl UserPersistence for PostgresPersistence {
             ));
         }
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        // Take the exclusive account owner before the login-method FK's key-share lock,
+        // so competing links cannot each hold a weaker account lock and then upgrade it.
+        sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
         sqlx::query(
             "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)",
         )
@@ -531,6 +549,13 @@ impl UserPersistence for PostgresPersistence {
                 "The verified provider email no longer matches this account.".into(),
             ));
         }
+        let companies =
+            super::workflow::prelock_account_companies_on(&mut transaction, user_id).await?;
+        Box::pin(super::workflow::refresh_account_dependents_on(
+            &mut transaction,
+            &companies,
+        ))
+        .await?;
         transaction.commit().await.map_err(AppError::from)?;
         Ok(())
     }

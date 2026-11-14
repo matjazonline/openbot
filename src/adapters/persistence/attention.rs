@@ -159,6 +159,43 @@ WITH params AS (
 
     UNION ALL
 
+    -- One current assignment in Team work; assigned people (or the final company owner)
+    -- also see it in My work. Historical/settled assignments never reappear.
+    SELECT 'escalation_decision', assignment.id, assignment.company_id,
+           COALESCE(run.channel_id, refusal.channel_id), COALESCE(run.thread_id, refusal.thread_id),
+           run.id, run.correlation_id, progress.state,
+           CASE WHEN $4='my_work' THEN viewer.id ELSE NULL::uuid END,
+           CASE WHEN $4='my_work' THEN 'principal' ELSE 'channel_team' END,
+           CASE WHEN $4='my_work' THEN viewer.display_label
+                WHEN progress.state='owner_waiting' THEN 'Company owner'
+                ELSE 'Assigned recipients' END,
+           'Workflow escalation', 'Review the escalation', 'normal', assignment.deadline,
+           NULL::timestamptz, progress.manual_assignments::bigint,
+           assignment.created_at, assignment.created_at
+    FROM workflow_escalation_progress AS progress
+    JOIN workflow_escalation_decisions AS assignment
+      ON assignment.company_id=progress.company_id AND assignment.id=progress.current_decision_id
+    JOIN workflow_escalation_cases AS escalation
+      ON escalation.company_id=progress.company_id AND escalation.id=progress.case_id
+    JOIN companies AS company ON company.id=progress.company_id
+    JOIN principals AS viewer ON viewer.company_id=company.id AND viewer.id=$3 AND viewer.kind='person'
+    JOIN company_members AS member ON member.company_id=viewer.company_id AND member.user_id=viewer.user_id
+    LEFT JOIN workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+    LEFT JOIN workflow_admission_refusals AS refusal
+      ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
+    WHERE progress.company_id=$1 AND progress.state IN ('waiting','manual','owner_waiting')
+      AND assignment.settled_at IS NULL AND $4 IN ('my_work','team_work')
+      AND (COALESCE(run.channel_id,refusal.channel_id)=ANY($2)
+           OR (COALESCE(run.channel_id,refusal.channel_id) IS NULL AND $14))
+      AND ($4='team_work'
+           OR (progress.state='owner_waiting' AND viewer.user_id=company.user_id AND member.role='owner')
+           OR (progress.state<>'owner_waiting' AND EXISTS (
+               SELECT 1 FROM workflow_escalation_notices AS notice
+               WHERE notice.company_id=assignment.company_id AND notice.decision_id=assignment.id
+                 AND notice.principal_id=viewer.id AND notice.principal_kind='person')))
+
+    UNION ALL
+
     SELECT 'run_reconciliation', run.id, run.company_id, run.channel_id, run.thread_id, run.id,
            run.correlation_id, run.state, NULL::uuid, 'channel_team',
            CASE WHEN run.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
@@ -361,6 +398,10 @@ fn bind_attention<'q>(
 fn item_href(item: &AttentionItem) -> Option<String> {
     match item.source_kind {
         AttentionSourceKind::Decision => Some(format!("/ui/workflow-decisions/{}", item.source_id)),
+        AttentionSourceKind::EscalationDecision => Some(format!(
+            "/ui/workflow-decisions/escalations/{}",
+            item.source_id
+        )),
         AttentionSourceKind::DeliveryFailure => {
             Some(format!("/ui/deliveries?company_id={}", item.company_id))
         }
@@ -470,7 +511,21 @@ impl AttentionPersistence for PostgresPersistence {
                    ON run.company_id = decision.company_id AND run.id = decision.run_id
                  WHERE decision.company_id = $1 AND decision.submitted_at IS NULL
                    AND wait.state = 'waiting'
-                   AND (run.channel_id = ANY($2) OR run.channel_id IS NULL)
+                    AND (run.channel_id = ANY($2) OR run.channel_id IS NULL)
+                  UNION ALL
+                  SELECT assignment.created_at
+                  FROM workflow_escalation_progress AS progress
+                  JOIN workflow_escalation_decisions AS assignment
+                    ON assignment.company_id=progress.company_id AND assignment.id=progress.current_decision_id
+                  JOIN workflow_escalation_cases AS escalation
+                    ON escalation.company_id=progress.company_id AND escalation.id=progress.case_id
+                  LEFT JOIN workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+                  LEFT JOIN workflow_admission_refusals AS refusal
+                    ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
+                  WHERE progress.company_id=$1 AND progress.state IN ('waiting','manual','owner_waiting')
+                    AND assignment.settled_at IS NULL
+                    AND (COALESCE(run.channel_id,refusal.channel_id)=ANY($2)
+                         OR COALESCE(run.channel_id,refusal.channel_id) IS NULL)
                )
                SELECT clock.as_of,
                  (SELECT COUNT(*) FROM open_decisions) AS open_decision_count,

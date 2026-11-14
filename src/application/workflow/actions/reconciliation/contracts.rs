@@ -304,7 +304,7 @@ pub struct ReconciliationResult {
     pub replayed: bool,
 }
 
-pub(crate) fn invalid() -> AppError {
+pub(super) fn invalid() -> AppError {
     AppError::BadRequest("Invalid workflow reconciliation evidence".into())
 }
 pub(crate) fn hash(value: &Value) -> AppResult<String> {

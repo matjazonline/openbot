@@ -2,6 +2,11 @@ use super::*;
 use crate::application::workflow::reviewer_assignment::ReviewerAssignment;
 use std::collections::BTreeSet;
 
+#[path = "follow_bound_tests.rs"]
+mod bounds;
+#[path = "follow_escalation_tests.rs"]
+mod escalations;
+
 struct FollowFixture {
     people: PeopleFixture,
     scope: ActivationRequest,

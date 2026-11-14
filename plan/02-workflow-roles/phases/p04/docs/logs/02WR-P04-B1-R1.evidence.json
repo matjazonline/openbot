@@ -1,0 +1,144 @@
+{
+ "version": 1,
+ "round": "02WR-P04-B1-R1",
+ "artifact": "89ccc0fdf4f94faa1205ad866db87e9306acfbf895d7e237ada13c47996ba099",
+ "checks": [
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "sqlx migrate run on fresh openbot_roles_p04_resume19 and openbot_roles_p04_resume19_test",
+   "fixture": "owned disposable PostgreSQL 127.0.0.1:52471 databases openbot_roles_p04_resume19 and _test (fresh init schema); isolated own_database per workflow fixture",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-migrations19.txt",
+     "sha256": "9e502cb90b65ad1661983d520b3bb7c1e2da865933e779e9bfb8a64ff8029689"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "cargo test --locked --offline --lib --no-run --jobs 4 --config profile.test.package.open_bots.debug=0 (build127)",
+   "fixture": "SQLX_OFFLINE=true CARGO_INCREMENTAL=0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-build-focused127.txt",
+     "sha256": "20315306c80b64f12013983dd63384876216b14ebc6544930c13bbd759035d34"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D4.3"
+   ],
+   "command": "open_bots-<build127> relays::workflow_escalation_origin_actual_email_relay (RUST_MIN_STACK=2097152)",
+   "fixture": "owned disposable PostgreSQL 127.0.0.1:52471 databases openbot_roles_p04_resume19 and _test (fresh init schema); isolated own_database per workflow fixture",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-relay126.txt",
+     "sha256": "4b4fe110fbb9238650ae7f96f75c0be3622526616b6b3758a2ec63a3b0e8b25d"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D4.3",
+    "AC2",
+    "AC3",
+    "D4.1",
+    "D4.2",
+    "D4.4"
+   ],
+   "command": "open_bots-<build127> adapters::persistence::thread:: use_cases::thread:: protocols::email:: message_tests::thread_tests agent_notices delivery_worker adapters::persistence::delivery:: message_ingress_tests (294 selected; 1 pre-existing ignore)",
+   "fixture": "owned disposable PostgreSQL 127.0.0.1:52471 databases openbot_roles_p04_resume19 and _test (fresh init schema); isolated own_database per workflow fixture",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-focused127.txt",
+     "sha256": "8519eebcebb4b727ebcd9b2ded377d9469ae68e7e78aa57e2b39ff6e0c6029a8"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "AC1",
+    "AC2",
+    "AC3",
+    "AC4",
+    "AC5",
+    "AC6",
+    "AC7",
+    "D1",
+    "D2",
+    "D3",
+    "C1",
+    "C2",
+    "D4"
+   ],
+   "command": "open_bots-<build127> --exact <all 242 p04-added tests listed in logs/B1-R1-p04-added-names.txt> (241 PASS, 1 ignored manual browser journey)",
+   "fixture": "owned disposable PostgreSQL 127.0.0.1:52471 databases openbot_roles_p04_resume19 and _test (fresh init schema); isolated own_database per workflow fixture",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-p04-added127.txt",
+     "sha256": "490c9ac1eff8f86de08e117720a0ab7ee130f583e2bc3b9be930c00d54b0ff7b"
+    },
+    {
+     "path": "logs/B1-R1-p04-added-names.txt",
+     "sha256": "99d042524e6836c1bfb3d2f6231dbce4de9e9057c25c57ae367bc37f09eadc92"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "inventory delta vs p03 baseline phases/p03/docs/logs/B1-R2-static-inventory1.txt (4228 -> 4470, 0 removed)",
+   "fixture": "open_bots-<build127> --list",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-test-inventory127.json",
+     "sha256": "2147322887fdb5fb957ca6bdecab9b8e67c0314893b5d4c28991c66a62c19a25"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "cargo test --locked --offline --test source_modules",
+   "fixture": "SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-source-modules127.txt",
+     "sha256": "6381cf89a1684744c868d94951975e6a4a7dd7ebaac2d91fbf9198384dba0c54"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "AC4"
+   ],
+   "command": "workflow_escalation_browser_actual_submissions (manual browser journey) in this round",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "ignored manual browser journey; prior actual runs retained by earlier rounds (chrome-escalation98/99), not rerun on this artifact"
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "clippy, full database suite, SQLx prepare, network isolation, stack/lease budgets",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "plan02 p05 final gate (I003/r1)"
+  }
+ ]
+}

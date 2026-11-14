@@ -1,0 +1,16 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24', 'workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership', '--nocapture', '--test-threads=2']
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership' (998011) panicked at src/adapters/persistence/workflow/approval_account_order_tests.rs:100:10:
+all sixteen synchronous reviewer accounts must precede company ownership: Database(PgDatabaseError { severity: Error, code: "55P03", message: "could not obtain lock on row in relation \"companies\"", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("heapam.c"), line: Some(5252), routine: Some("heap_lock_tuple") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4317 filtered out; finished in 1.27s
+

@@ -4,7 +4,6 @@
 //! after the marker, so the outcome is unknown and retiring the job parks the run. Also one the
 //! server accepted, for the run pages.
 use super::super::action_outcome_support::retire;
-use super::support::*;
 use super::*;
 
 /// How the operation was published: under a slot (`Connection { http }`) or as a registered tool

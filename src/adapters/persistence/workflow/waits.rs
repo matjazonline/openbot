@@ -104,17 +104,26 @@ pub(super) enum LockPurpose {
     BusinessPark,
 }
 
+pub(super) fn bounds_on(
+    db: &mut PgConnection,
+) -> impl std::future::Future<Output = Result<sqlx::postgres::PgQueryResult, sqlx::Error>> + '_ {
+    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
+        .execute(db)
+}
+
 pub(super) async fn lock(
     db: &mut PgConnection,
     scope: ActivationRequest,
     purpose: LockPurpose,
 ) -> AppResult<Option<WaitRun>> {
+    bounds_on(db).await?;
     if matches!(purpose, LockPurpose::Transition) {
-        channel_reply_completion::prelock_on(db, scope).await?;
+        // Registration/child creation has no final-response effect. Resume owns its
+        // applicable completion accounts before entering this shared row lock.
+        lease::lock_lease_company_on(db, scope.company).await?;
     }
-    sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *db).await?;
-    let run=sqlx::query_as::<_,WaitRun>("SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *db).await?;
+    // Box the shared observer/owner reader instead of adding a large future frame.
+    let run = Box::pin(read_run_on(db, scope, WaitRead::Lock)).await?;
     if run.is_none() {
         return Ok(None);
     }
@@ -133,14 +142,45 @@ pub(super) async fn lock(
         .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
     Ok(execution.and(run))
 }
+#[derive(Clone, Copy)]
+pub(super) enum WaitRead {
+    Observe,
+    Lock,
+}
+
+pub(super) async fn read_run_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    read: WaitRead,
+) -> AppResult<Option<WaitRun>> {
+    const SELECT: &str = "SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2";
+    let query = match read {
+        WaitRead::Observe => SELECT.to_owned(),
+        WaitRead::Lock => format!("{SELECT} FOR UPDATE"),
+    };
+    Ok(sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_optional(db)
+        .await?)
+}
+
 pub(super) enum WaitSelection {
     Execution,
     Decision,
 }
-pub(super) async fn row(
+pub(super) fn row(
     db: &mut PgConnection,
     scope: ActivationRequest,
     selection: WaitSelection,
+) -> impl std::future::Future<Output = AppResult<Option<WaitRow>>> + '_ {
+    read_row_on(db, scope, selection, WaitRead::Lock)
+}
+pub(super) async fn read_row_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    selection: WaitSelection,
+    read: WaitRead,
 ) -> AppResult<Option<WaitRow>> {
     let selection = match selection {
         WaitSelection::Execution => "execution",
@@ -149,8 +189,18 @@ pub(super) async fn row(
     // A completed approval, model-tool delivery or workflow tool call (07-D2 §D2.5) does not
     // complete its execution. Only the active wait or the actual terminal step wait can answer
     // execution resume/replay; a workflow tool call's failed or cancelled wait is terminal.
-    Ok(sqlx::query_as::<_,WaitRow>("SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR (NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval') AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=wait.company_id AND action.wait_id=wait.id AND action.origin='model_tool') AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call WHERE call.company_id=wait.company_id AND call.wait_id=wait.id AND wait.state='completed') AND (wait.child_tool_call_id IS NULL OR wait.state<>'completed') AND (wait.reason<>'agent_turn' OR wait.state<>'completed'))))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1 FOR UPDATE")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(selection).fetch_optional(db).await?)
+    const SELECT: &str = "SELECT id,deadline,reason,state,event_name,correlation,failure_code FROM workflow_waits AS wait WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND (($4='decision' AND reason='decision') OR ($4='execution' AND (state='waiting' OR (NOT EXISTS(SELECT 1 FROM workflow_decisions AS decision WHERE decision.company_id=wait.company_id AND decision.wait_id=wait.id AND decision.subject_kind='action_approval') AND NOT EXISTS(SELECT 1 FROM workflow_message_actions AS action WHERE action.company_id=wait.company_id AND action.wait_id=wait.id AND action.origin='model_tool') AND NOT EXISTS(SELECT 1 FROM workflow_local_agent_calls AS call WHERE call.company_id=wait.company_id AND call.wait_id=wait.id AND wait.state='completed') AND (wait.child_tool_call_id IS NULL OR wait.state<>'completed') AND (wait.reason<>'agent_turn' OR wait.state<>'completed'))))) ORDER BY (state='waiting') DESC,created_at DESC LIMIT 1";
+    let query = match read {
+        WaitRead::Observe => SELECT.to_owned(),
+        WaitRead::Lock => format!("{SELECT} FOR UPDATE"),
+    };
+    Ok(sqlx::query_as::<_, WaitRow>(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .bind(selection)
+        .fetch_optional(db)
+        .await?)
 }
 pub(super) async fn now(db: &mut PgConnection) -> AppResult<DateTime<Utc>> {
     Ok(sqlx::query_scalar("SELECT clock_timestamp()")

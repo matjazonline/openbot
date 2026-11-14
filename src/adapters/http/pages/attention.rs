@@ -243,6 +243,7 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
     // up.
     let source = match item.source_kind {
         AttentionSourceKind::Decision => "Decision",
+        AttentionSourceKind::EscalationDecision => "Escalation decision",
         AttentionSourceKind::RunReconciliation => "Needs reconciliation",
         AttentionSourceKind::RunFailure => "Failed run",
         AttentionSourceKind::BindingRefusal => "Refused messages",

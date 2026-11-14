@@ -198,6 +198,18 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
             provisioning::ProvisioningKind::CreateAgentChannel,
         ),
         AgentBuiltinTool::SearchKnowledge => knowledge::builtin_knowledge_snapshot(company),
+        AgentBuiltinTool::ReadEscalation => {
+            crate::application::workflow::escalation::tools::snapshot(
+                company,
+                crate::application::workflow::escalation::tools::EscalationTool::Read,
+            )
+        }
+        AgentBuiltinTool::RespondToEscalation => {
+            crate::application::workflow::escalation::tools::snapshot(
+                company,
+                crate::application::workflow::escalation::tools::EscalationTool::Respond,
+            )
+        }
         AgentBuiltinTool::SearchMemory
         | AgentBuiltinTool::MemoryTimeline
         | AgentBuiltinTool::MemoryDetails

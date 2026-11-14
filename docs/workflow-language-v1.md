@@ -100,7 +100,7 @@ for **resolved values**; every `with` field still needs a binding wrapper.
 | `ai.classify` | `agent`, `context`, literal `output_schema` | Tool-free call with the agent's instructions and model; direct schema result; finite string enum, or required `label` enum property |
 | `agent.run` | `agent`, `context`, literal `output_schema` | Runs with exactly the agent's saved tools and skills; direct schema result |
 | `decision.rule` | `data`, literal `data_schema` | Top-level ordered `rule`; result `{choice, data}` |
-| `decision.human` | `proposal`, `reviewer`, `deadline`, literal `data_schema` | Optional literal `feedback_required` choice list; result `{choice, feedback, data}` |
+| `decision.human` | `proposal`, `reviewers`, `deadline`, literal `data_schema` | Optional literal `feedback_required` choice list and literal `reviewers_follow_role`; result `{choice, feedback, data}` |
 | `decision.agent` | `agent`, `context`, literal `data_schema` | Result `{choice, data}` |
 | `data.map` | `value`, literal `output_schema` | Direct constructed value, validated against the schema |
 | `http.request` | literal `connection`, `method`, `path` | Optional `headers`, `body`; result `{status, headers, body}` |
@@ -121,7 +121,7 @@ finite `label` enum; scalar alternatives are rejected. There is no second
 `config` authority.
 
 Registration-owned objects reject unknown fields. Scope is `{kind, id?}` where
-kind is company/agent/user and agent/user require an ID. A reviewer is a person principal `{kind: principal, id: UUID}` or a literal department role string (`lead` or `reviewer`). Human and action-review roles are frozen at admission; parameter-selected reviewers use pinned principal objects. Effective reviewers are deduplicated and limited to16 after role expansion. Token allowance and final-response policies use pinned person principals. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
+kind is company/agent/user and agent/user require an ID. A reviewer is a person principal `{kind: principal, id: UUID}` or a literal department role string (`lead` or `reviewer`). Human and action-review roles are frozen at admission; parameter-selected reviewers use pinned principal objects. Effective reviewers are deduplicated and limited to 16 after role expansion. Token allowance and final-response policies use pinned person principals. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
 Content is `{subject?, body}`. MCP content accepts bounded text (including empty text), image/audio base64, embedded
 text/blob resources and resource links, with protocol annotations, icons and `_meta`.
 Resource links and icon URIs remain data and are never automatically fetched. These fields follow
@@ -478,6 +478,18 @@ workflows. Informational department framing (roster, current lead and charter) f
 agent is first prepared; it cannot select another agent or grant capabilities. Run inspection
 and board cards label captured holders with “via role”. Agent filters include the root's frozen
 role selections for its children as well as the published pinned-agent universe.
+
+A `decision.human` whose `reviewers` name a role asks that role's person holders frozen at
+admission. With `reviewers_follow_role: {literal: true}` (default `false`) a parked decision follows
+the role instead: when the role's holders change (assigned, cleared, or removed from the company)
+or the department tree above the desk changes, its role reviewers are replaced in the same commit
+and the new holders are notified. Pinned
+principal reviewers stay. The proposal, its digest and earlier submissions are unchanged, and a
+settled decision is not affected. A decision left with no reviewers stays parked until its
+deadline and, on a binding with `escalation`, escalates (see
+[departments](departments.md#escalation)). A company can have at most 256 parked decisions that
+follow their role; parking another is refused with `workflow.pending_follow_limit` and the job
+retries later.
 
 See `src/application/workflow/fixtures/role-lead-response.yaml` for the reusable
 `context.history` → role-based `agent.run` → reply example.

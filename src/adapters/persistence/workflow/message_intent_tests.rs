@@ -117,7 +117,12 @@ impl Intents {
         Self::in_fixture(Fixture::new().await).await
     }
 
-    async fn in_fixture(fixture: Fixture) -> Self {
+    fn in_fixture(fixture: Fixture) -> impl std::future::Future<Output = Self> {
+        let draft = fixture.save(None);
+        Self::from_draft(fixture, draft)
+    }
+
+    async fn from_draft(fixture: Fixture, draft: SaveDraft) -> Self {
         let channel = new_channel(&fixture, "runs").await;
         let thread = fixture
             .persistence
@@ -130,7 +135,7 @@ impl Intents {
             .unwrap()
             .id;
         let service = fixture.service();
-        service.save(fixture.save(None)).await.unwrap();
+        service.save(draft).await.unwrap();
         let publication = fixture.publish();
         service.publish(publication.clone()).await.unwrap();
         let owner_principal = fixture.principal(fixture.target.actor.user_id()).await;
@@ -278,12 +283,14 @@ impl Intents {
         message: CanonicalMessageId,
     ) -> Uuid {
         let id = Uuid::new_v4();
+        // An internal-audience message is a member's in-app post, which production records as
+        // `application`; `internal` belongs only to a hop that proved its delivery part (D4.3).
         sqlx::query(
             "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
                thread_id, role, mentioned, admissible, origin, responder_principal_id, hop_count, \
                trace_channels, delivery_policy, correlation_id) \
              SELECT $1, $2, message.id, $3, $4, $5, $6, $7, \
-               CASE WHEN message.audience='internal_only' THEN 'internal' ELSE 'external' END, message.author_principal_id, \
+               CASE WHEN message.audience='internal_only' THEN 'application' ELSE 'external' END, message.author_principal_id, \
                0, '{}', $9, $2 \
              FROM messages AS message WHERE message.company_id = $1 AND message.id = $8",
         )

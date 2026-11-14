@@ -32,6 +32,7 @@ mod board;
 mod channel_replies;
 mod decisions;
 mod definitions;
+mod escalations;
 mod history;
 mod jev;
 mod reconciliations;
@@ -108,6 +109,22 @@ pub fn router() -> Router<AppState> {
             post(decisions::comment),
         )
         .route("/ui/workflow-decisions/{decision_id}", get(decisions::page))
+        .route(
+            &format!("{company}/workflow-escalations/{{decision_id}}"),
+            get(escalations::read),
+        )
+        .route(
+            &format!("{company}/workflow-escalations/{{decision_id}}/submit"),
+            post(escalations::submit),
+        )
+        .route(
+            "/ui/workflow-decisions/escalations/{decision_id}",
+            get(escalations::page),
+        )
+        .route(
+            "/ui/workflow-decisions/escalations/{decision_id}/submit",
+            post(escalations::ui_submit),
+        )
         .route(
             "/ui/workflow-decisions/{decision_id}/submit",
             post(decisions::ui_submit),

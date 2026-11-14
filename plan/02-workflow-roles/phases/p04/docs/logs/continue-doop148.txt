@@ -1,0 +1,8 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 52.12s
+
+RUST_MIN_STACK=2097152 timeout 900 $B --exact    56.32s user 2.97s system 113% cpu 52.140 total

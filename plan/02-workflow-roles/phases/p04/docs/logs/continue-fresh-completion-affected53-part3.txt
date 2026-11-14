@@ -1,0 +1,38 @@
+
+running 33 tests
+test application::workflow::budget::tests::workflow_budget_keys_are_bounded_ascii_identities ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_freezes_defaults_and_authored_limits ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_boundary_and_invalid_values_are_located ... ok
+test application::workflow::completion::tests::workflow_completion_declared_choice_and_terminal_schema ... ok
+test application::workflow::jev::assets::tests::jev_assets_aggregate_wire_bound_is_still_64_kib ... ok
+test application::workflow::jev::assets::tests::jev_assets_forbid_inline_url_mutable_and_excess_references ... ok
+test application::workflow::jev::assets::tests::jev_assets_identity_opaque_wire_and_pixel_reservation ... ok
+test application::workflow::jev::assets::tests::jev_assets_jpeg_and_animation_are_explicitly_validated ... ok
+test application::workflow::jev::assets::tests::jev_assets_reject_changed_unsupported_oversized_and_invalid_dimensions ... ok
+test application::workflow::registry::decision_tests::workflow_decision_digest_survives_jsonb_numeric_normalization ... ok
+test application::workflow::registry::jev_box_tests::jev_box_mixed_output_coordinates_confidence_and_static_paths ... ok
+test application::workflow::publication::storage::tests::workflow_root_budget_storage_roundtrip_and_old_semantics_refusal ... ok
+test application::workflow::registry::jev_box_tests::jev_box_requires_declared_asset_version_and_no_criteria ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_runtime_never_coerces_probability_to_boolean ... ok
+test application::workflow::registry::jev_tests::jev_contract_duplicate_keys_and_nonfinite_source_rejected ... ok
+test application::workflow::registry::jev_tests::jev_contract_downstream_paths_are_exact_and_typed ... ok
+test application::workflow::registry::jev_tests::jev_contract_dynamic_state_checks_and_workflow_context_budget ... ok
+test application::workflow::registry::jev_tests::jev_contract_mixed_exact_schema_and_metadata ... ok
+test application::workflow::registry::jev_tests::jev_contract_noul_criteria_and_escaped_question_paths ... ok
+test application::workflow::registry::jev_tests::jev_contract_frozen_semantics_change_hash ... ok
+test application::workflow::registry::jev_tests::jev_contract_probability_sum_tolerance ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_invalid_question_shapes ... ok
+test application::workflow::registry::jev_tests::jev_contract_rejects_malformed_outputs ... ok
+test application::workflow::registry::jev_tests::jev_contract_primitive_limits_fail_at_next_item ... ok
+test application::workflow::registry::jev_tests::jev_contract_request_budget_counts_envelope_and_escaping ... ok
+test application::workflow::registry::jev_tests::jev_contract_response_byte_limit_and_aggregate_questions ... ok
+test application::workflow::registry::jev_tests::jev_contract_static_fields_models_and_resources ... ok
+test application::workflow::registry::jev_tests::jev_contract_text_and_identifier_limits_count_utf8_bytes ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_rejects_tools_tokens_and_invalid_box ... ok
+test application::workflow::sample::tests::jev_tests::jev_box_sample_uses_only_scripted_answers_and_inert_metadata ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test domain::workflow::budget::tests::workflow_root_budget_boundaries_and_checked_debits ... ok
+test application::workflow::sample::tests::jev_tests::workflow_sample_jev_mixed_thresholds_automatic_and_human_paths ... ok
+
+test result: ok. 33 passed; 0 failed; 0 ignored; 0 measured; 4325 filtered out; finished in 0.38s
+

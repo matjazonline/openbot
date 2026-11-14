@@ -1,0 +1,19 @@
+base worktree 103004a8ac2fd643cf14bde7e09022ae79f72053
+For more information about this error, try `rustc --explain E0659`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 61 previous errors; 1 warning emitted
+BIN 
+=== adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+EXIT 127
+=== adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+EXIT 127
+=== adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+EXIT 127
+=== adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it
+EXIT 127
+=== adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest
+EXIT 127
+=== adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading
+EXIT 127
+=== adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline
+EXIT 127

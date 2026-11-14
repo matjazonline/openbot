@@ -96,6 +96,8 @@ pub enum ToolKind<'a> {
     /// A trusted built-in provisioning tool (p08 D2.1). Only a name-only snapshot carries a
     /// provisioning name this way; an MCP tool of the same name stays a slot tool.
     Provisioning,
+    /// Explicitly granted administrative escalation capabilities.
+    Escalation,
     /// A name-only, exactly verified local knowledge search built-in.
     Knowledge,
     /// A name-only, exactly verified memory service built-in (phase 05 E5).
@@ -129,6 +131,14 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::Provisioning;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::escalation::tools::EscalationTool::parse(
+                self.contract.name.as_str(),
+            )
+            .is_some()
+        {
+            return ToolKind::Escalation;
         }
         if self.contract.connection.is_none()
             && crate::application::workflow::knowledge::is_builtin_knowledge_tool(

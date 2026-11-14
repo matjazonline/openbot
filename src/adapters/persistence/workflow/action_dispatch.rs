@@ -88,7 +88,9 @@ impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
         request: &ActionDispatchRequest,
         server: Duration,
     ) -> AppResult<AuthorizedAction> {
-        let actor = action_authority::prelock_on(tx, request.scope()).await?;
+        let actor =
+            action_authority::prelock_dispatch_on(tx, request, self.decision_notices.as_ref())
+                .await?;
         self.authorize_prelocked_on(tx, request, server, actor)
             .await
     }
@@ -100,7 +102,7 @@ impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
         server: Duration,
         actor: Option<WorkflowActor>,
     ) -> AppResult<AuthorizedAction> {
-        if !lease::lock_fence(tx, request.fence, server).await? {
+        if !lease::lock_prelocked_fence(tx, request.fence, server).await? {
             return Err(conflict());
         }
         // The existing attempt remains the sole ownership ledger.

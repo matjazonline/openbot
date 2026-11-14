@@ -18,6 +18,9 @@ use crate::{
     },
 };
 
+#[path = "notification_lease_tests.rs"]
+mod lease_tests;
+
 /// A company for the queue tests: the sources themselves are workflow deliveries, tested beside
 /// their fixture (`workflow::tests`).
 struct Fixture {
@@ -227,6 +230,7 @@ async fn commit_stale(
             fence: &claimed.lease,
             expected: &expected,
             email: None,
+            agent_message_key: None,
             escalation_ack_hours: Default::default(),
         })
         .await

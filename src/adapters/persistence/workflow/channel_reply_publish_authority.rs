@@ -19,7 +19,7 @@ pub(super) async fn lock_run_on(
     db: &mut PgConnection,
     row: &PublicationRow,
 ) -> AppResult<RunAuthority> {
-    let actor = action_authority::prelock_accounts_on(db, row.scope(), None).await?;
+    let actor = action_authority::prelock_reply_on(db, row.scope(), None).await?;
     let succeeded: Option<bool> = sqlx::query_scalar(
         "SELECT state='succeeded' AND terminal_execution_id=$3 AND parent_run_id IS NULL \
          FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",

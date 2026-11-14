@@ -26,7 +26,7 @@ use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
-pub const PREPARED_AGENT_VERSION: u8 = 6;
+pub const PREPARED_AGENT_VERSION: u8 = 7;
 
 #[path = "agent_mcp_policy.rs"]
 mod mcp_policy;
@@ -64,6 +64,9 @@ pub enum AgentToolTarget {
     },
     /// Local, read-only retrieval with an atomic canonical observation and classification rise.
     Knowledge,
+    Escalation {
+        tool: super::escalation::tools::EscalationTool,
+    },
     /// A memory service tool (phase 05 E5): reads commit like knowledge search; a save commits
     /// its delivery intent under the run's classification lock.
     Memory {
@@ -92,6 +95,12 @@ impl AgentToolTarget {
                 Self::Provisioning { name: name()? }
             }
             AgentBuiltinTool::SearchKnowledge => Self::Knowledge,
+            AgentBuiltinTool::ReadEscalation => Self::Escalation {
+                tool: super::escalation::tools::EscalationTool::Read,
+            },
+            AgentBuiltinTool::RespondToEscalation => Self::Escalation {
+                tool: super::escalation::tools::EscalationTool::Respond,
+            },
             AgentBuiltinTool::SearchMemory
             | AgentBuiltinTool::MemoryTimeline
             | AgentBuiltinTool::MemoryDetails
@@ -458,6 +467,9 @@ fn prepared_tool(
         (AgentToolTarget::Provisioning { name }, AgentBindingSource::Builtin { tool }) => {
             super::provisioning::ProvisioningKind::parse(tool.name()).is_some()
                 && name == &snapshot.contract.name
+        }
+        (AgentToolTarget::Escalation { tool: kind }, AgentBindingSource::Builtin { tool }) => {
+            kind.name() == tool.name() && kind.name() == snapshot.contract.name.as_str()
         }
         (AgentToolTarget::Knowledge, AgentBindingSource::Builtin { tool }) => {
             *tool == crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge

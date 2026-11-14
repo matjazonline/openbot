@@ -1,0 +1,27 @@
+{
+  "build": 113,
+  "selected": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal"
+  ],
+  "exit": 101,
+  "seconds": 44.71,
+  "fixture": "owned resume17/_test and isolated test databases",
+  "RUST_MIN_STACK": 2097152,
+  "source_sha256_before": "86db63ab07a65a8a9a7b0a60ae07fa9c1c156bcb5f88a51771f81c246168d852",
+  "source_sha256_after": "86db63ab07a65a8a9a7b0a60ae07fa9c1c156bcb5f88a51771f81c246168d852"
+}

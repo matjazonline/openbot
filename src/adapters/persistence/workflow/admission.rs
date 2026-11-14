@@ -246,6 +246,9 @@ async fn verify_current(
     tx: &mut Transaction<'_, Postgres>,
     command: &PreparedAdmission,
 ) -> AppResult<bool> {
+    if !super::escalation_handling::binding_matches_on(tx, command).await? {
+        return Ok(false);
+    }
     // The company lock serializes lifecycle edits; the row lock additionally
     // closes direct head deletion/update races until this admission commits.
     let exists = sqlx::query_scalar::<_, Uuid>(

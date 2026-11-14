@@ -31,7 +31,7 @@ impl WorkflowBudgets for PostgresPersistence {
                         let mut conn = bound.acquire(&self.pool).await?;
                         let mut tx = bound.begin(&mut conn).await?;
                         let saved = async {
-                            channel_reply_completion::prelock_on(&mut tx, request.fence.scope)
+                            lease::lock_lease_company_on(&mut tx, request.fence.scope.company)
                                 .await?;
                             lock_run(&mut tx, &request).await?;
                             saved(&mut tx, &request).await
@@ -55,7 +55,9 @@ pub(super) async fn reserve_on(
     request: &BudgetReservation,
     server: std::time::Duration,
 ) -> AppResult<BudgetReservationResult> {
-    channel_reply_completion::prelock_on(db, request.fence.scope).await?;
+    // A receipt writes no final response and needs no historical approval accounts.
+    // Its company prefix must precede even the first run lock, including non-reply owners.
+    lease::lock_lease_company_on(db, request.fence.scope.company).await?;
     // Scope verification precedes replay, even for terminal owners. Lock only
     // this run; the receipt trigger then locks the shared usage, never its root.
     let scoped = lock_run(db, request).await?;

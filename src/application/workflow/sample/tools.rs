@@ -119,6 +119,7 @@ impl Session {
                 (output, SampleEffectKind::WorkflowChild)
             }
             ToolKind::Message
+            | ToolKind::Escalation
             | ToolKind::Provisioning
             | ToolKind::Knowledge
             | ToolKind::Memory

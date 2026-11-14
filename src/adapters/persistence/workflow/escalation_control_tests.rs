@@ -164,6 +164,7 @@ async fn workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_ever
             fence: &claimed.lease,
             expected: &expected,
             email: None,
+            agent_message_key: None,
             escalation_ack_hours: EscalationAckHours::parse(Some("1")).unwrap(),
         })
         .await

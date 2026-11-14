@@ -294,7 +294,28 @@ pub(super) async fn lock_scope(
     timeout: std::time::Duration,
 ) -> AppResult<Option<(LeaseRun, LeaseJob)>> {
     set_server_timeouts(db, timeout).await?;
-    channel_reply_completion::prelock_on(db, scope).await?;
+    // Any lease operation can retire failed or expired work. Its transaction must own
+    // company before run/job, including non-reply work, like role/account writers do.
+    // Successful completion owns its applicable final-response accounts at its own entry.
+    lock_lease_company_on(db, scope.company).await?;
+    lock_scope_rows_on(db, scope).await
+}
+
+pub(super) async fn lock_lease_company_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+) -> AppResult<()> {
+    sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+        .bind(company.as_uuid())
+        .execute(&mut *db)
+        .await?;
+    Ok(())
+}
+
+async fn lock_scope_rows_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> AppResult<Option<(LeaseRun, LeaseJob)>> {
     // Run-first ordering serializes claims, renewals, cancellation and progression.
     let run = sqlx::query_as::<_, LeaseRun>("SELECT binding_id, max_context_bytes FROM workflow_runs WHERE company_id=$1 AND id=$2 AND state IN ('queued','running') FOR UPDATE")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *db).await?;
@@ -325,10 +346,28 @@ pub(super) async fn lock_fence(
     let Some((_, job)) = lock_scope(db, fence.scope, timeout).await? else {
         return Ok(false);
     };
-    Ok(job.status == "processing"
+    Ok(matches_fence(&job, fence))
+}
+
+/// The caller already owns its complete applicable account union and company. This acquires
+/// only the unchanged run/execution/job fence, without discovering unrelated reply accounts.
+pub(super) async fn lock_prelocked_fence(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+    timeout: std::time::Duration,
+) -> AppResult<bool> {
+    set_server_timeouts(db, timeout).await?;
+    let Some((_, job)) = lock_scope_rows_on(db, fence.scope).await? else {
+        return Ok(false);
+    };
+    Ok(matches_fence(&job, fence))
+}
+
+fn matches_fence(job: &LeaseJob, fence: WorkflowFence) -> bool {
+    job.status == "processing"
         && job.worker_id == Some(fence.worker.0)
         && job.execution_generation == Some(fence.generation.0)
-        && job.attempt_ordinal == fence.attempt.0)
+        && job.attempt_ordinal == fence.attempt.0
 }
 
 #[derive(sqlx::FromRow)]

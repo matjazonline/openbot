@@ -9,7 +9,6 @@ use crate::entities::department::{DepartmentId, DepartmentRole};
 use crate::entities::notification::NotificationEventId;
 use crate::entities::transport::PrincipalId;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const MAX_REVIEWER_ASSIGNMENT_BYTES: usize = 32 * 1024;
@@ -194,10 +193,6 @@ impl ReviewerAssignment {
         }
         Ok(bytes)
     }
-
-    pub fn content_hash(&self) -> AppResult<[u8; 32]> {
-        Ok(Sha256::digest(self.canonical_content()?).into())
-    }
 }
 
 mod decision_identity {
@@ -260,12 +255,12 @@ mod tests {
     #[test]
     fn workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof() {
         let mut value = assignment();
-        let hash = value.content_hash().unwrap();
+        let canonical = value.canonical_content().unwrap();
         value.reviewers.reverse();
-        assert_eq!(value.content_hash().unwrap(), hash);
+        assert_eq!(value.canonical_content().unwrap(), canonical);
         let restored = ReviewerAssignment::decode(&value.canonical_content().unwrap()).unwrap();
         assert_eq!(restored.reviewers[0].notice_assignment_revision.get(), 1);
-        assert_eq!(restored.content_hash().unwrap(), hash);
+        assert_eq!(restored.canonical_content().unwrap(), canonical);
         value.reviewers[0].notice_assignment_revision =
             ReviewerAssignmentRevision::try_from(3).unwrap();
         assert!(value.validate().is_err());

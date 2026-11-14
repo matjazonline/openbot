@@ -35,9 +35,16 @@ impl WorkflowBatch for PostgresPersistence {
         // continue progressing in detached work. SQLx rolls back dropped txs.
         tokio::time::timeout(budget.transaction_timeout(), async {
             let mut tx = self.pool.begin().await?;
-            let result = advance_on(&mut tx, request, budget, self.channel_reply_notices()).await?;
-            tx.commit().await?;
-            Ok(result)
+            match advance_on(&mut tx, request, budget, self.channel_reply_notices()).await {
+                Ok(result) => {
+                    tx.commit().await?;
+                    Ok(result)
+                }
+                Err(error) => {
+                    tx.rollback().await?;
+                    Err(error)
+                }
+            }
         })
         .await
         .map_err(|_| AppError::Conflict("Workflow batch transaction timed out".into()))?
@@ -62,7 +69,94 @@ pub(super) async fn advance_on(
     if let Some(saved) = finalization_result(request, progress) {
         return Ok(saved);
     }
-    channel_reply_completion::prelock_on(db, request).await?;
+    // Preparation may discover a final response after several pure steps. Roll
+    // that entire preparation back before acquiring any newly required account.
+    sqlx::query("SAVEPOINT workflow_batch_accounts")
+        .execute(&mut *db)
+        .await?;
+    let prepared = Box::pin(run_attempt(
+        db,
+        request,
+        budget,
+        started,
+        BatchAccounts::Company,
+        notices,
+    ))
+    .await?;
+    let result = match prepared {
+        BatchProgress::Finished(result) => *result,
+        BatchProgress::ReplyRequired => {
+            sqlx::query("ROLLBACK TO SAVEPOINT workflow_batch_accounts")
+                .execute(&mut *db)
+                .await?;
+            // The account prefix and the second actual attempt stay boxed on stock stacks.
+            let unavailable = Box::pin(reply_accounts_on(db, request)).await?;
+            let accounts = if unavailable.is_some() {
+                BatchAccounts::Company
+            } else {
+                BatchAccounts::Reply
+            };
+            match Box::pin(run_attempt(db, request, budget, started, accounts, notices)).await? {
+                BatchProgress::Finished(result) => *result,
+                BatchProgress::ReplyRequired => return Err(unavailable.unwrap_or_else(invalid)),
+            }
+        }
+    };
+    sqlx::query("RELEASE SAVEPOINT workflow_batch_accounts")
+        .execute(db)
+        .await?;
+    Ok(result)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BatchAccounts {
+    Company,
+    Reply,
+}
+
+enum BatchProgress {
+    Finished(Box<BatchResult>),
+    ReplyRequired,
+}
+
+impl BatchProgress {
+    fn finished(result: BatchResult) -> Self {
+        Self::Finished(Box::new(result))
+    }
+}
+
+async fn reply_accounts_on(
+    db: &mut PgConnection,
+    request: ActivationRequest,
+) -> AppResult<Option<AppError>> {
+    let result = action_authority::prelock_reply_on(
+        db,
+        crate::application::workflow::actions::ActionScope {
+            company: request.company,
+            run: request.run,
+            execution: request.execution,
+        },
+        None,
+    )
+    .await;
+    match result {
+        Ok(_) => Ok(None),
+        // Under company, the actual second pass may now yield or replay instead
+        // of publishing. Only a still-required final effect returns this refusal.
+        Err(error @ AppError::NotFound(_)) => Ok(Some(error)),
+        Err(error) => Err(error),
+    }
+}
+
+async fn run_attempt(
+    db: &mut PgConnection,
+    request: ActivationRequest,
+    budget: BatchBudget,
+    started: Instant,
+    accounts: BatchAccounts,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<BatchProgress> {
+    lease::lock_lease_company_on(db, request.company).await?;
     let run = sqlx::query_as::<_, BatchRun>(
         "SELECT binding_id, state, max_steps, deadline <= clock_timestamp() AS expired \
          FROM workflow_runs WHERE company_id = $1 AND id = $2 FOR UPDATE",
@@ -74,7 +168,9 @@ pub(super) async fn advance_on(
     .ok_or_else(missing)?;
     let first = lock_execution(db, request).await?;
     if first.completed_at.is_some() {
-        return replay(db, request, &first).await;
+        return replay(db, request, &first)
+            .await
+            .map(BatchProgress::finished);
     }
     if run.expired || !matches!(run.state.as_str(), "queued" | "running") {
         return Err(ineligible());
@@ -94,6 +190,7 @@ pub(super) async fn advance_on(
             budget,
             started,
             max_steps: run.max_steps,
+            accounts,
             notices,
         },
         binding.bundle(),
@@ -142,6 +239,7 @@ struct BatchContext<'a> {
     budget: BatchBudget,
     started: Instant,
     max_steps: i32,
+    accounts: BatchAccounts,
 }
 
 async fn run_steps(
@@ -149,80 +247,116 @@ async fn run_steps(
     context: BatchContext<'_>,
     bundle: &PublishedBundle,
     first: BatchExecution,
-) -> AppResult<BatchResult> {
-    let BatchContext {
-        request,
-        budget,
-        started,
-        max_steps,
-        notices,
-    } = context;
-    let mut current = request;
+) -> AppResult<BatchProgress> {
+    let mut current = context.request;
     let mut row = first;
     let mut completed = 0;
     loop {
         let step = StepId::parse(row.step_id.clone()).map_err(|_| invalid())?;
         if !is_pure(bundle, &step)? {
-            batch_commit::check_deadline(db, request).await?;
-            return Ok(BatchResult {
+            batch_commit::check_deadline(db, context.request).await?;
+            return Ok(BatchProgress::finished(BatchResult {
                 disposition: BatchDisposition::Boundary,
                 response_disposition: None,
                 completed,
                 last: current,
                 continuation: Some(current),
-            });
+            }));
         }
-        let (activated, completion) =
-            match pending_recovery::prepare_pure(db, current, bundle, max_steps).await? {
-                pending_recovery::Pending::Ready(prepared) => prepared,
-                pending_recovery::Pending::Settled => return Ok(failed(current, completed)),
-                pending_recovery::Pending::Deferred => {
-                    return Ok(deferred(current, completed));
-                }
-            };
-        let next = batch_commit::complete(
-            db,
-            current,
-            batch_commit::CompletedStep {
-                activated: &activated,
-                graph: bundle.compiled().graph(),
-            },
-            &completion,
-            max_steps,
-            completion_job::CompletionOwner::Pure,
-            notices,
-        )
-        .await?;
-        if matches!(next, batch_commit::CompletionProgress::Refused) {
-            return Ok(failed(current, completed));
-        }
-        let batch_commit::CompletionProgress::Advanced(next) = next else {
-            return Ok(deferred(current, completed));
+        // Box the actual preparation/commit phase; the account guard runs before final effects.
+        let (response, next) = match Box::pin(advance_step(db, current, bundle, &context)).await? {
+            StepProgress::Advanced { response, next } => (response, next),
+            StepProgress::Failed => return Ok(BatchProgress::finished(failed(current, completed))),
+            StepProgress::Deferred => {
+                return Ok(BatchProgress::finished(deferred(current, completed)));
+            }
+            StepProgress::ReplyRequired => return Ok(BatchProgress::ReplyRequired),
         };
         completed += 1;
-        let Some(next) = next else {
-            batch_commit::check_deadline(db, request).await?;
-            return Ok(BatchResult {
-                disposition: BatchDisposition::Completed,
-                response_disposition: Some(completion.response_disposition),
-                completed,
-                last: current,
-                continuation: None,
-            });
-        };
-        if completed >= budget.steps() || started.elapsed() >= budget.work() {
-            batch_commit::check_deadline(db, request).await?;
-            return Ok(BatchResult {
-                disposition: BatchDisposition::Yielded,
-                response_disposition: None,
-                completed,
-                last: current,
-                continuation: Some(next),
-            });
+        if let Some(result) = progression_result(&context, current, completed, response, next) {
+            batch_commit::check_deadline(db, context.request).await?;
+            return Ok(BatchProgress::finished(result));
         }
-        current = next;
+        current = next.ok_or_else(invalid)?;
         row = lock_execution(db, current).await?;
     }
+}
+
+enum StepProgress {
+    Advanced {
+        response: crate::domain::workflow::ResponseDisposition,
+        next: Option<ActivationRequest>,
+    },
+    Failed,
+    Deferred,
+    ReplyRequired,
+}
+
+async fn advance_step(
+    db: &mut PgConnection,
+    current: ActivationRequest,
+    bundle: &PublishedBundle,
+    context: &BatchContext<'_>,
+) -> AppResult<StepProgress> {
+    let (activated, completion) =
+        match pending_recovery::prepare_pure(db, current, bundle, context.max_steps).await? {
+            pending_recovery::Pending::Ready(prepared) => prepared,
+            pending_recovery::Pending::Settled => return Ok(StepProgress::Failed),
+            pending_recovery::Pending::Deferred => return Ok(StepProgress::Deferred),
+        };
+    if context.accounts == BatchAccounts::Company
+        && channel_reply_completion::final_response_disposition(&completion)
+            == Some(crate::domain::workflow::ResponseDisposition::Automatic)
+        && channel_reply_completion::pending_reply_on(db, current).await?
+    {
+        return Ok(StepProgress::ReplyRequired);
+    }
+    let progress = batch_commit::complete(
+        db,
+        current,
+        batch_commit::CompletedStep {
+            activated: &activated,
+            graph: bundle.compiled().graph(),
+        },
+        &completion,
+        context.max_steps,
+        completion_job::CompletionOwner::Pure,
+        context.notices,
+    )
+    .await?;
+    Ok(match progress {
+        batch_commit::CompletionProgress::Refused => StepProgress::Failed,
+        batch_commit::CompletionProgress::Parked => StepProgress::Deferred,
+        batch_commit::CompletionProgress::Advanced(next) => StepProgress::Advanced {
+            response: completion.response_disposition,
+            next,
+        },
+    })
+}
+
+fn progression_result(
+    context: &BatchContext<'_>,
+    current: ActivationRequest,
+    completed: u8,
+    response: crate::domain::workflow::ResponseDisposition,
+    next: Option<ActivationRequest>,
+) -> Option<BatchResult> {
+    let disposition = if next.is_none() {
+        BatchDisposition::Completed
+    } else if completed >= context.budget.steps()
+        || context.started.elapsed() >= context.budget.work()
+    {
+        BatchDisposition::Yielded
+    } else {
+        return None;
+    };
+    Some(BatchResult {
+        disposition,
+        response_disposition: next.is_none().then_some(response),
+        completed,
+        last: current,
+        continuation: next,
+    })
 }
 
 async fn lock_execution(

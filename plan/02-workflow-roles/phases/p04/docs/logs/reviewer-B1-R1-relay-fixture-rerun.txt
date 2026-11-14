@@ -1,0 +1,28 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+CMD RUST_MIN_STACK=2097152 $B --exact <2 tests> (fixture TEST_DATABASE_URL openbot_roles_p04_resume19_test @127.0.0.1:52471)
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email' (5926083) panicked at src/adapters/persistence/workflow/message_intent_tests.rs:306:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "internal message must retain its exact delivery proof through creation", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_message_internal_relay_proved() line 6 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer' (5926084) panicked at src/adapters/persistence/workflow/message_reply_tests.rs:276:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "internal message must retain its exact delivery proof through creation", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_message_internal_relay_proved() line 6 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email
+    adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4468 filtered out; finished in 1.58s
+
+EXIT 101

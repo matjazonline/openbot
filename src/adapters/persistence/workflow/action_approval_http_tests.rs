@@ -536,3 +536,6 @@ mod vault_approval_tests;
 
 #[path = "reviewer_action_tests.rs"]
 mod role_tests;
+
+#[path = "approval_account_order_tests.rs"]
+mod account_order_tests;

@@ -1,0 +1,25 @@
+
+running 3 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_reservation_does_not_lock_unused_reviewer' (1673326) panicked at src/adapters/persistence/workflow/harness_token_account_order_tests.rs:285:13:
+a reservation within allowance must not wait for an unused token reviewer
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer' (1673325) panicked at src/adapters/persistence/workflow/harness_token_account_order_tests.rs:342:13:
+settlement without a notification composer must retain truth without reviewer locks
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_reservation_does_not_lock_unused_reviewer ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer ... FAILED
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_settlement_does_not_lock_unused_reviewer' (1673456) panicked at src/adapters/persistence/workflow/harness_token_account_order_tests.rs:313:13:
+received usage within allowance must not wait for an unused token reviewer
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_settlement_does_not_lock_unused_reviewer ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_reservation_does_not_lock_unused_reviewer
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_settlement_does_not_lock_unused_reviewer
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 4328 filtered out; finished in 2.49s
+

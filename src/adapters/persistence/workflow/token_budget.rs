@@ -31,6 +31,16 @@ pub(super) struct RootTokens {
     pub model_exhausted: bool,
 }
 impl RootTokens {
+    pub(super) fn progression(self) -> AppResult<Progression> {
+        Ok(if let Some(reason) = self.refusal {
+            Progression::Refused(reason)
+        } else if self.requires_approval(0)? {
+            Progression::AwaitingAllowance
+        } else {
+            Progression::Open
+        })
+    }
+
     pub fn requires_approval(&self, additional: u64) -> AppResult<bool> {
         Ok(self.original.is_some()
             && self
@@ -81,21 +91,52 @@ struct RootRow {
     model_exhausted: bool,
 }
 
-pub(super) async fn lock_on(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<RootTokens> {
-    lock_scope(db, fence.scope).await
+pub(super) fn lock_on(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+) -> impl std::future::Future<Output = AppResult<RootTokens>> + '_ {
+    lock_scope(db, fence.scope)
 }
 
-pub(super) async fn lock_scope(
+pub(super) fn lock_scope(
     db: &mut PgConnection,
     scope: ActivationRequest,
+) -> impl std::future::Future<Output = AppResult<RootTokens>> + '_ {
+    read_scope(db, scope, RootRead::Lock)
+}
+
+pub(super) fn observe_scope(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> impl std::future::Future<Output = AppResult<RootTokens>> + '_ {
+    read_scope(db, scope, RootRead::Observe)
+}
+
+enum RootRead {
+    Observe,
+    Lock,
+}
+
+async fn read_scope(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    purpose: RootRead,
 ) -> AppResult<RootTokens> {
-    let root: RootRow = sqlx::query_as("SELECT usage.root_run_id,(budget.token_policy->>'max_tokens')::bigint AS original,
+    const ROOT: &str = "SELECT usage.root_run_id,(budget.token_policy->>'max_tokens')::bigint AS original,
         GREATEST(usage.authorized_tokens,COALESCE((budget.token_policy->>'max_tokens')::bigint,0)) AS allowance,usage.token_refusal,
         (usage.model_calls>=budget.model_calls) AS model_exhausted
         FROM workflow_run_budgets AS link JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
         JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
-        WHERE link.company_id=$1 AND link.run_id=$2 FOR UPDATE OF usage")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+        WHERE link.company_id=$1 AND link.run_id=$2";
+    let query = match purpose {
+        RootRead::Observe => ROOT.to_owned(),
+        RootRead::Lock => format!("{ROOT} FOR UPDATE OF usage"),
+    };
+    let root: RootRow = sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_one(&mut *db)
+        .await?;
     let usage: TokenUsage = sqlx::query_as("SELECT
         COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='reported'),0)::bigint AS reported,
         COALESCE(sum(input_tokens+output_tokens) FILTER(WHERE usage_source='estimated'),0)::bigint AS estimated,
@@ -169,14 +210,7 @@ pub(super) async fn progression_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Progression> {
-    let root = lock_scope(db, scope).await?;
-    Ok(if let Some(reason) = root.refusal {
-        Progression::Refused(reason)
-    } else if root.requires_approval(0)? {
-        Progression::AwaitingAllowance
-    } else {
-        Progression::Open
-    })
+    lock_scope(db, scope).await?.progression()
 }
 
 pub(super) async fn pending_gate(
@@ -211,31 +245,75 @@ pub(super) async fn pending_gate(
 }
 
 /// Called before local owner/checkpoint/root locks, in the existing authority order.
-pub(super) async fn prelock_reviewers(
+#[derive(PartialEq, Eq)]
+pub(super) struct TokenReviewerAccounts {
+    root: Uuid,
+    policy: Option<Value>,
+    principals: Vec<Uuid>,
+    mappings: Vec<super::approval_accounts::PrincipalAccount>,
+}
+
+impl TokenReviewerAccounts {
+    pub(super) fn users(&self) -> impl Iterator<Item = Uuid> + '_ {
+        self.mappings.iter().map(|mapping| mapping.user_id)
+    }
+
+    /// The model owner has already acquired this complete account union and company.
+    pub(super) async fn available_on(
+        &self,
+        db: &mut PgConnection,
+        company: CompanyId,
+    ) -> AppResult<bool> {
+        if self.mappings.len() != self.principals.len() {
+            return Ok(false);
+        }
+        for mapping in &self.mappings {
+            let actor = WorkflowActor::authenticated(mapping.user_id).map_err(|_| invalid())?;
+            match authority::authorize_reviewer_on(db, company, actor).await {
+                Ok(reviewer)
+                    if reviewer.privileged && reviewer.principal == mapping.principal_id => {}
+                Ok(_) | Err(AppError::NotFound(_)) => return Ok(false),
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(true)
+    }
+}
+
+pub(super) async fn reviewer_accounts_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
-) -> AppResult<bool> {
-    let principals: Vec<Uuid> = sqlx::query_scalar("SELECT (reviewer->>'id')::uuid FROM workflow_run_budgets AS link
-        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
-        CROSS JOIN LATERAL jsonb_array_elements(COALESCE(budget.token_policy->'reviewers','[]'::jsonb)) AS reviewer
-        WHERE link.company_id=$1 AND link.run_id=$2 ORDER BY (reviewer->>'id')::uuid")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_all(&mut *db).await?;
-    let mut mappings =
-        match super::approval_accounts::resolve_on(db, scope.company, &principals).await {
-            Ok(mappings) => mappings,
-            Err(AppError::NotFound(_)) => return Ok(false),
-            Err(error) => return Err(error),
-        };
-    // Preserve the existing company/member/principal authorization order. The unlocked
-    // account lookup is only a hint; the locked authority must name the same principal.
-    mappings.sort_unstable_by_key(|mapping| mapping.user_id);
-    for mapping in mappings {
-        let actor = WorkflowActor::authenticated(mapping.user_id).map_err(|_| invalid())?;
-        match authority::authorize_reviewer_on(db, scope.company, actor).await {
-            Ok(reviewer) if reviewer.privileged && reviewer.principal == mapping.principal_id => {}
-            Ok(_) | Err(AppError::NotFound(_)) => return Ok(false),
-            Err(error) => return Err(error),
-        }
+) -> AppResult<TokenReviewerAccounts> {
+    use crate::application::workflow::reviewer_assignment::ReviewerSelection;
+    #[derive(sqlx::FromRow)]
+    struct Policy {
+        root_run_id: Uuid,
+        token_policy: Option<Value>,
     }
-    Ok(true)
+    let saved: Policy = sqlx::query_as("SELECT link.root_run_id,budget.token_policy FROM workflow_run_budgets AS link \
+        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id) WHERE link.company_id=$1 AND link.run_id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+    let principals: Vec<Uuid> = if let Some(policy) = &saved.token_policy {
+        let selectors = crate::application::workflow::reviewers::parse_reviewers(
+            policy.get("reviewers").ok_or_else(invalid)?,
+        )?;
+        let selected = ReviewerSelection::from_selectors(&selectors);
+        if !selected.roles.is_empty() {
+            return Err(invalid());
+        }
+        selected
+            .principals
+            .iter()
+            .map(|principal| principal.as_uuid())
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let mappings = super::approval_accounts::mapped_on(db, scope.company, &principals).await?;
+    Ok(TokenReviewerAccounts {
+        root: saved.root_run_id,
+        policy: saved.token_policy,
+        principals,
+        mappings,
+    })
 }

@@ -184,7 +184,16 @@ async fn replace_on(
         reviewers,
         refusal,
     };
-    storage::persist_on(db, current, &assignment, previous.as_ref()).await
+    storage::persist_on(db, current, &assignment, previous.as_ref()).await?;
+    if previous.is_some() {
+        Box::pin(escalations::assignment_changed_on(
+            db,
+            current.company(),
+            current.decision_id,
+        ))
+        .await?;
+    }
+    Ok(())
 }
 
 fn effective_principals(

@@ -1,0 +1,281 @@
+
+running 141 tests
+test adapters::harness::rig::workflow::guard_tests::workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable ... ok
+test adapters::persistence::workflow::escalations::access::tests::workflow_escalation_payload_source_validates_identity_before_using_a_public_stamp ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+probe run=43996cd5-ede2-4189-ac3b-e12d82b816a6 company=f31a54d1-1bef-4929-9795-53c9698d6bd6 phase=query_and_drain elapsed_us=0
+probe run=43996cd5-ede2-4189-ac3b-e12d82b816a6 company=f31a54d1-1bef-4929-9795-53c9698d6bd6 phase=done elapsed_us=772 sqlstate=None
+probe run=1da829f1-8ef5-4f9d-ba09-18ecd28b75af company=f31a54d1-1bef-4929-9795-53c9698d6bd6 phase=query_and_drain elapsed_us=0
+probe run=1da829f1-8ef5-4f9d-ba09-18ecd28b75af company=f31a54d1-1bef-4929-9795-53c9698d6bd6 phase=done elapsed_us=109 sqlstate=None
+probe controls unlocked_rejected=true missing_rejected=true observer_pid=44366 clean=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::contention::workflow_action_reconciliation_control_serialization_probe_negative_controls ... ok
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=query_and_drain elapsed_us=0
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=done elapsed_us=427 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44383 pid=44371 elapsed_ms=8 hang_guard=10s
+held probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 first_pid=44371 gate_pid=44383 observer_pid=44384
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=query_and_drain elapsed_us=0
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=done elapsed_us=187 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44371 pid=44382 elapsed_ms=8 hang_guard=10s
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=query_and_drain elapsed_us=0
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=done elapsed_us=246 sqlstate=None
+probe run=59b0dd58-2215-40d2-bc04-fde281c8160c company=c943594d-15c1-4f3f-9c1a-414597bbddb3 phase=quiescent first_pid=44371 second_pid=44382 observer_pid=44384 inspector_pid=44383 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_cancellation_competes_without_silent_failure ... ok
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=query_and_drain elapsed_us=0
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=done elapsed_us=431 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44405 pid=44402 elapsed_ms=8 hang_guard=10s
+held probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe first_pid=44402 gate_pid=44405 observer_pid=44398
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=query_and_drain elapsed_us=0
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=done elapsed_us=210 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44402 pid=44403 elapsed_ms=7 hang_guard=10s
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=query_and_drain elapsed_us=0
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=done elapsed_us=257 sqlstate=None
+probe run=6152a988-be4a-4be2-8140-3e3871e245a3 company=5e53e6de-d295-4d4b-bd1c-5245b0a4e5fe phase=quiescent first_pid=44402 second_pid=44403 observer_pid=44398 inspector_pid=44405 drain_ms=1 first_busy=null
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=query_and_drain elapsed_us=0
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=done elapsed_us=512 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44411 pid=44401 elapsed_ms=1 hang_guard=10s
+held probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 first_pid=44401 gate_pid=44411 observer_pid=44410
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=query_and_drain elapsed_us=0
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=done elapsed_us=178 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44401 pid=44408 elapsed_ms=7 hang_guard=10s
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=query_and_drain elapsed_us=0
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=done elapsed_us=209 sqlstate=None
+probe run=0bfc7a2c-22ff-410f-8465-1f8f3d95a3b3 company=d74d864b-dbba-49ac-a682-f44b71e33238 phase=quiescent first_pid=44401 second_pid=44408 observer_pid=44410 inspector_pid=44411 drain_ms=1 first_busy=null
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=query_and_drain elapsed_us=0
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=done elapsed_us=429 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44420 pid=44414 elapsed_ms=8 hang_guard=10s
+held probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 first_pid=44414 gate_pid=44420 observer_pid=44422
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=query_and_drain elapsed_us=0
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=done elapsed_us=210 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44414 pid=44419 elapsed_ms=8 hang_guard=10s
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=query_and_drain elapsed_us=0
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=done elapsed_us=251 sqlstate=None
+probe run=048dfbef-5ce2-41c5-b9b8-4031b69e17b8 company=e2a95be3-4f82-448c-83b7-d282f9f80120 phase=quiescent first_pid=44414 second_pid=44419 observer_pid=44422 inspector_pid=44420 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command ... ok
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=query_and_drain elapsed_us=0
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=done elapsed_us=449 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44428 pid=44426 elapsed_ms=1 hang_guard=10s
+held probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 first_pid=44426 gate_pid=44428 observer_pid=44418
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=query_and_drain elapsed_us=0
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=done elapsed_us=186 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44426 pid=44427 elapsed_ms=8 hang_guard=10s
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=query_and_drain elapsed_us=0
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=done elapsed_us=253 sqlstate=None
+probe run=efd6af88-647e-4618-b43e-8f6794556504 company=656f922c-1616-419a-8fe7-152aa3426227 phase=quiescent first_pid=44426 second_pid=44427 observer_pid=44418 inspector_pid=44428 drain_ms=1 first_busy=null
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=query_and_drain elapsed_us=0
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=done elapsed_us=452 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44438 pid=44437 elapsed_ms=1 hang_guard=10s
+held probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 first_pid=44437 gate_pid=44438 observer_pid=44430
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=query_and_drain elapsed_us=0
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=done elapsed_us=221 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=44437 pid=44435 elapsed_ms=8 hang_guard=10s
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=query_and_drain elapsed_us=0
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=done elapsed_us=273 sqlstate=None
+probe run=71d11493-f394-4317-99da-47b3b1ec94b2 company=c5f33361-81ce-4d65-8985-2e2639486c25 phase=quiescent first_pid=44437 second_pid=44435 observer_pid=44430 inspector_pid=44438 drain_ms=1 first_busy=null
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=query_and_drain elapsed_us=0
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=done elapsed_us=399 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44444 pid=44439 elapsed_ms=1 hang_guard=10s
+held probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c first_pid=44439 gate_pid=44444 observer_pid=44445
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=query_and_drain elapsed_us=0
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=done elapsed_us=162 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44439 pid=44443 elapsed_ms=8 hang_guard=10s
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=query_and_drain elapsed_us=0
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=done elapsed_us=210 sqlstate=None
+probe run=04855af8-6af2-41b2-be7f-48697baefe9e company=e986f129-5d23-4111-9661-ac4415c63b9c phase=quiescent first_pid=44439 second_pid=44443 observer_pid=44445 inspector_pid=44444 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel ... ok
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=query_and_drain elapsed_us=0
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=done elapsed_us=430 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44447 pid=44452 elapsed_ms=1 hang_guard=10s
+held probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 first_pid=44452 gate_pid=44447 observer_pid=44454
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=query_and_drain elapsed_us=0
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=done elapsed_us=209 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=44452 pid=44451 elapsed_ms=8 hang_guard=10s
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=query_and_drain elapsed_us=0
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=done elapsed_us=245 sqlstate=None
+probe run=fdc085f5-f651-49ed-b544-dc77cc9be555 company=7de3aa6e-c408-4191-95e1-f66ddc7fa795 phase=quiescent first_pid=44452 second_pid=44451 observer_pid=44454 inspector_pid=44447 drain_ms=1 first_busy=null
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=query_and_drain elapsed_us=0
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=done elapsed_us=410 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44461 pid=44460 elapsed_ms=9 hang_guard=10s
+held probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a first_pid=44460 gate_pid=44461 observer_pid=44455
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=query_and_drain elapsed_us=0
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=done elapsed_us=180 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44460 pid=44459 elapsed_ms=9 hang_guard=10s
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=query_and_drain elapsed_us=0
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=done elapsed_us=275 sqlstate=None
+probe run=3a402164-83be-4db6-a3a3-b3e3014f76bc company=11b219d0-f523-4964-a39f-eab1f61a8f1a phase=quiescent first_pid=44460 second_pid=44459 observer_pid=44455 inspector_pid=44461 drain_ms=1 first_busy=null
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=query_and_drain elapsed_us=0
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=done elapsed_us=455 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44472 pid=44473 elapsed_ms=1 hang_guard=10s
+held probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 first_pid=44473 gate_pid=44472 observer_pid=44465
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=query_and_drain elapsed_us=0
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=done elapsed_us=179 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=44473 pid=44471 elapsed_ms=8 hang_guard=10s
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=query_and_drain elapsed_us=0
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=done elapsed_us=247 sqlstate=None
+probe run=bb4e74f5-cf7a-4918-a54d-175192bebbac company=fc86d60a-af93-4b36-b4fb-9282febf3604 phase=quiescent first_pid=44473 second_pid=44471 observer_pid=44465 inspector_pid=44472 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_expire ... ok
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=query_and_drain elapsed_us=0
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=done elapsed_us=402 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44476 pid=44479 elapsed_ms=9 hang_guard=10s
+held probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 first_pid=44479 gate_pid=44476 observer_pid=44480
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=query_and_drain elapsed_us=0
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=done elapsed_us=214 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44479 pid=44481 elapsed_ms=8 hang_guard=10s
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=query_and_drain elapsed_us=0
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=done elapsed_us=237 sqlstate=None
+probe run=37a48c75-3c45-48b3-aa26-a8c4c3f4ace2 company=43283ecb-bea8-47d9-9b86-65d2acd87f49 phase=quiescent first_pid=44479 second_pid=44481 observer_pid=44480 inspector_pid=44476 drain_ms=1 first_busy=null
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=query_and_drain elapsed_us=0
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=done elapsed_us=503 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=44501 pid=44498 elapsed_ms=9 hang_guard=10s
+held probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 first_pid=44498 gate_pid=44501 observer_pid=44494
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=query_and_drain elapsed_us=0
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=done elapsed_us=225 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=44498 pid=44499 elapsed_ms=7 hang_guard=10s
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=query_and_drain elapsed_us=0
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=done elapsed_us=256 sqlstate=None
+probe run=2485a550-2aaa-4096-9262-b84172a34fdc company=71daf642-2899-474c-bbb6-fc4267be0c06 phase=quiescent first_pid=44498 second_pid=44499 observer_pid=44494 inspector_pid=44501 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_claim_cannot_cross_deadline_or_wait_forever ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_contended_renewal_never_resurrects_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_claim_rejects_pure_wait_due_terminal_and_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_pure_boundary_claim_freeze_supervised_result_integration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_real_renew_reclaim_cancel_contenders_serialize_run_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::adversarial_tests::workflow_io_existing_mismatched_scope_and_run_states_reject_all_fenced_operations ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::guard_tests::workflow_maintenance_wait_deadline_crossing_uses_run_expiry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_commit_fault_rolls_back_every_fact ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_competes_with_expiry_completion_and_heartbeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_deadline_retirement_survives_lease_crossing_at_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::guard_tests::workflow_maintenance_forged_retirement_is_rejected_and_rolled_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_full_pages_drain_without_time_advance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_live_expired_and_spent_attempts_debit_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_preserves_existing_ambiguous_attempt_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_scope_and_predeadline_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_discovers_all_active_states_and_future_jobs ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_database_error_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_wait_sweeper_competes_and_preserves_notification ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_guard_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_cancel_and_guard_failure_compete_for_one_terminal_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_completion_never_reexecutes_the_handler ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_ordinary_connection_error_is_retried ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pending_job_is_never_control_retry_safe ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_retirement_first_keeps_the_competing_owners_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_run_expiry_handles_processing_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_transient_completion_confirmation_keeps_one_handler_execution ... ok
+SETTLE repoll op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 attempt=1 not_applied=pair, no winner
+SETTLE loser op=competing at=src/adapters/persistence/workflow/lease_tests.rs:266:14 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_competing_pair_repolls_only_when_nothing_was_written ... ok
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=1 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+SETTLE repoll op=scripted at=src/adapters/persistence/workflow/lease_tests.rs:253:30 attempt=2 not_applied=Workflow lease.claim not applied: persistence bound elapsed before commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_repolls_only_a_definite_not_applied ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_unknown_setup_still_fails' (1916968) panicked at src/adapters/persistence/workflow/lease_tests.rs:300:17:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lease.claim commit outcome unknown")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::settle_tests::workflow_io_settle_unknown_setup_still_fails - should panic ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::maintenance_worker_tests::workflow_maintenance_worker_drains_full_unsupported_pages_without_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_claim_rolls_back_at_each_write_boundary ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_exact_scope_fence_and_run_state_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_external_handler_has_no_transaction_and_returns_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_real_competing_claims_lost_ack_crash_backoff_and_frozen_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_competing_deadline_owners_create_one_terminal_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_case_failure_rolls_back_expiry_and_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_requires_actual_expiry_and_delivers_one_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_competing_decision_sweepers_commit_one_failure_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_deadline_fails_real_wait_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_authored_handler_suppresses_ladder_even_at_end ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_case_failure_rolls_back_run_and_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_preserves_real_source_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_competing_actual_workers_commit_one_receipt_and_email_per_person ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_one_retired_recipient_preserves_the_capable_recipients_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_projection_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_post_projection_retirement_cancels_email_and_expedites_without_rewriting_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipt_cannot_commit_without_fenced_event_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipts_reject_forged_opt_out_and_source_rebinding ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_source_uuid_and_public_stamp_validation_agree_in_rust_and_sql ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_control_real_repair_seals_sixteen_maximum_escaped_labels ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_eighth_expired_claim_is_terminal ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::intent_schema_tests::channel_reply_intent_schema_expired_lease_has_one_new_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::knowledge_tests::channel_reply_knowledge_commit_abort_and_lost_receipt_preserve_exact_owner_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_approved_content_survives_elapsed_review_deadline_and_contract_edit ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_composition_and_releases_claim ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::lifecycle::channel_reply_recovery_shutdown_cancels_actual_publication_transaction ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_publication_and_delivery_survive_original_execution_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_deferred_commit_expiry_rolls_back_all_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness ... ok
+observed gated transaction pids=[46094] blocker=46097 elapsed_ms=147
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_expired_child_review_advances_parent_without_stale_wait_label ... ok
+observed resolution pids=[46086] blocker=46094 elapsed_ms=1931
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_retired_frozen_address_is_refused ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test application::services::delivery_worker::tests::lifecycle::channel_reply_delivery_provider_deadline_cancels_actual_call ... ok
+test application::workflow::actions::failure::tests::workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_does_not_change_agent_or_people_modes ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_drops_actual_future_on_every_stop ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_heartbeats_and_returns_only_fenced_bounded_result ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_ready_result_loses_to_cancel_expiry_and_run_deadline ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renewal_settling_inside_its_deadline_continues ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_renews_at_once_after_a_full_deadline_claim ... ok
+test application::workflow::supervise::tests::workflow_io_supervision_stops_renewing_a_deadline_capped_window ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+
+test result: ok. 141 passed; 0 failed; 0 ignored; 0 measured; 4199 filtered out; finished in 111.39s
+

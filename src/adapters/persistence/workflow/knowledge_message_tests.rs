@@ -3,6 +3,11 @@ use crate::adapters::persistence::workflow::knowledge;
 use crate::application::workflow::{actions::*, message::*};
 use crate::entities::access_level::AccessLevel;
 
+#[path = "knowledge_account_order_tests.rs"]
+mod account_orders;
+#[path = "knowledge_account_race_support.rs"]
+mod account_support;
+
 async fn raise(setup: &Setup, level: AccessLevel) {
     let scope = setup.scope();
     let mut tx = setup.pool().begin().await.unwrap();
@@ -214,58 +219,68 @@ async fn member_route_wait(observer: &mut PgConnection, blocker: i32) {
 async fn knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient()
  {
     let setup = Box::pin(send(&[To::User])).await;
-    let old = verified_route_recipient(&setup).await;
+    verified_route_recipient(&setup).await;
     raise(&setup, AccessLevel::L5).await;
-    let mut gate = setup.pool().begin().await.unwrap();
-    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
-        .fetch_one(&mut *gate)
-        .await
-        .unwrap();
-    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
-        .bind(setup.scope().company.as_uuid())
-        .bind(setup.user)
-        .execute(&mut *gate)
-        .await
-        .unwrap();
-    let runtime = setup.runtime();
-    let publish = runtime.execute(&setup.kind, &setup.claim);
-    tokio::pin!(publish);
-    let mut observer = setup.pool().acquire().await.unwrap();
-    tokio::select! {
-        _=member_route_wait(&mut observer,blocker)=>{},
-        _=publish.as_mut()=>panic!("publication must not escape its actual member route gate"),
+    let prepared = Box::pin(account_support::prepare(&setup)).await;
+    let gate = account_support::member_gate(&setup).await;
+    let mut evaluation = setup.pool().begin().await.unwrap();
+    {
+        // Deliberately exercise the real release seam without publication's company prefix.
+        // A raw storage mutation can invalidate proof during this old MVCC route observation;
+        // the separate full-runtime cases prove the actual application's stronger ordering.
+        let routes = crate::adapters::persistence::workflow::message::writer::recheck_routes_on(
+            &mut evaluation,
+            setup.scope().company,
+            &prepared.plan,
+        );
+        tokio::pin!(routes);
+        let mut observer = setup.pool().acquire().await.unwrap();
+        tokio::select! {
+            _=member_route_wait(&mut observer,gate.backend)=>{},
+            _=routes.as_mut()=>panic!("route observation must reach the real member gate"),
+        }
+        account_support::adversarial_proof_change(&setup).await;
+        gate.transaction.rollback().await.unwrap();
+        routes.await.unwrap();
     }
-    // The confirmed-address writer's real atomic mutations: account row, old-identity
-    // retirement, new verified identity and historic adoption. It does not lock company/member.
-    let replacement = format!("replacement-{}@example.test", Uuid::new_v4().simple());
-    tokio::time::timeout(std::time::Duration::from_secs(2), async {
-        let mut change = setup.pool().begin().await.unwrap();
-        sqlx::query("UPDATE users SET email=$2,email_verified_at=clock_timestamp() WHERE id=$1")
-            .bind(setup.user)
-            .bind(&replacement)
-            .execute(&mut *change)
-            .await
-            .unwrap();
-        crate::adapters::persistence::account_identity::rekey_account_identity_on(
-            &mut change,
-            setup.user,
-            &old,
-            &replacement,
-        )
-        .await
-        .unwrap();
-        change.commit().await.unwrap();
-    })
+    let current = crate::adapters::persistence::workflow::knowledge_release::evaluate_on(
+        &mut evaluation,
+        &prepared.action,
+        crate::adapters::persistence::workflow::knowledge_release::MessageRecipients::Current,
+    )
     .await
-    .expect("address writer commits while publication is paused on the recipient member");
-    gate.rollback().await.unwrap();
-    // The route query keeps its earlier MVCC snapshot/address; the release query must check
-    // that exact prepared recipient against current proof rather than bless the new address.
-    refused(publish.await);
-    let counts = rows(setup.pool(), setup.scope().run).await;
-    assert_eq!(counts.markers, 0);
-    assert_eq!(counts.deliveries, 0);
-    assert_eq!(counts.messages, 0);
+    .unwrap();
+    assert_eq!(
+        (current.content, current.destination),
+        (AccessLevel::L5, AccessLevel::L5),
+        "the newly verified current address is eligible; only the old frozen one is retired"
+    );
+    let recipients =
+        crate::adapters::persistence::workflow::knowledge_release::publication_recipients(
+            &prepared.plan,
+        )
+        .unwrap();
+    let frozen = crate::adapters::persistence::workflow::knowledge_release::evaluate_on(
+        &mut evaluation,
+        &prepared.action,
+        crate::adapters::persistence::workflow::knowledge_release::MessageRecipients::Frozen(
+            &recipients,
+        ),
+    )
+    .await;
+    match frozen {
+        Err(AppError::KnowledgeRelease {
+            content,
+            destination,
+        }) => assert_eq!(
+            (content, destination),
+            (AccessLevel::L5, AccessLevel::PUBLIC)
+        ),
+        Err(error) => panic!("expected the exact frozen-recipient knowledge refusal: {error:?}"),
+        Ok(_) => panic!("current-address proof must never authorize the retired frozen address"),
+    }
+    evaluation.rollback().await.unwrap();
+    account_support::assert_no_effects(&setup).await;
 }
 
 async fn recovery_setup() -> Setup {

@@ -1,0 +1,4 @@
+$ git diff HEAD --check
+EXIT 0
+$ cargo fmt --check
+EXIT 0

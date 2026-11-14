@@ -1,0 +1,6 @@
+Sat Nov 14 07:14:33 CET 2026
+artifact c3ababd836dafa6d285e16e7d4f884254439f50cdc6b30e7efc1ba39b9a8035e; rg ripgrep 14.1.1 (rev 0ae49f8b6e)
+transport boundary check failed:
+src/adapters/persistence/workflow/escalation_agent_guard_tests.rs:145:        "'<escalation-'||receipt.notice_id::text||'@openbot.invalid>'",
+synthetic email identity escaped the email adapter
+EXIT 1

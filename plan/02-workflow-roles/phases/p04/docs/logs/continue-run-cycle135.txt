@@ -1,0 +1,21 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case stdout ----
+CYCLE {"intents":[{"hop":0,"origin":"application","outcome":"admitted"},{"hop":0,"origin":"external","outcome":null},{"hop":1,"origin":"internal","outcome":"admitted"}],"refused":null,"relays":[{"channel":"22d90b98-c5bd-4977-89a1-8e5127a698d2","hop":1,"origin":"3f9efad8-281d-4b05-a696-bdd5961cc741"}],"runs":[{"binding":"403a3ad7-15d1-8c7b-afc1-5295e2502593","origin":"3f9efad8-281d-4b05-a696-bdd5961cc741","state":"succeeded"},{"binding":"403a3ad7-15d1-8c7b-afc1-5295e2502593","origin":"3f9efad8-281d-4b05-a696-bdd5961cc741","state":"succeeded"},{"binding":"2de4146a-700d-4fa5-8815-b6577f0181ce","origin":null,"state":"failed"},{"binding":"45870d23-2ac5-4db5-91c0-4e1cea9d6eba","origin":"3f9efad8-281d-4b05-a696-bdd5961cc741","state":"succeeded"}]} rerun=RunId(0c29e578-350f-47c9-969f-29371a3fd685) origin=3f9efad8-281d-4b05-a696-bdd5961cc741
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case' (6174695) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:1054:5:
+observe only
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 19.80s
+
+EXIT 101

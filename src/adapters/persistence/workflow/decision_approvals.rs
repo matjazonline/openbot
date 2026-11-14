@@ -43,6 +43,15 @@ pub(in crate::adapters::persistence::workflow) async fn consumed(
         .bind(request.fence.attempt.0).fetch_one(db).await?)
 }
 
+pub(in crate::adapters::persistence::workflow) async fn already_recorded_on(
+    db: &mut PgConnection,
+    request: &ActionDispatchRequest,
+) -> AppResult<bool> {
+    let scope = request.fence.scope;
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2 AND action_invocation_id=$3) OR EXISTS(SELECT 1 FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2 AND invocation_id=$3)")
+        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).bind(request.subject.invocation.as_uuid()).fetch_one(db).await?)
+}
+
 pub(in crate::adapters::persistence::workflow) async fn park(
     tx: &mut Transaction<'_, Postgres>,
     request: &ActionDispatchRequest,
@@ -66,9 +75,7 @@ pub(in crate::adapters::persistence::workflow) async fn park(
         return Ok(None);
     }
     // One approval per immutable invocation; unrelated completed actions retain their history.
-    let used: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$1 AND execution_id=$2 AND action_invocation_id=$3) OR EXISTS(SELECT 1 FROM workflow_action_dispatches WHERE company_id=$1 AND execution_id=$2 AND invocation_id=$3)")
-        .bind(scope.company.as_uuid()).bind(scope.execution.as_uuid()).bind(request.subject.invocation.as_uuid()).fetch_one(&mut **tx).await?;
-    if used {
+    if already_recorded_on(tx, request).await? {
         return Ok(None);
     }
     let principals = match super::reviewer_resolution::resolve_on(tx, scope, &selectors).await {
@@ -216,7 +223,11 @@ pub(in crate::adapters::persistence::workflow) async fn fail(
     )
     .map_err(|_| invalid())?;
     audit(db, scope, decision, &code).await?;
-    recovery::route_parked_failure(db, scope, &failure).await?;
+    // A rejected or expired approval that no authored route consumes fails the root and starts
+    // the default ladder, as a refused token allowance does (D1.3).
+    if !recovery::route_parked_failure(db, scope, &failure).await? {
+        Box::pin(super::escalations::run_failed_on(db, scope, failure.code())).await?;
+    }
     Ok(())
 }
 

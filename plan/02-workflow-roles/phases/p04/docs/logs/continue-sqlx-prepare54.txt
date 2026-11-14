@@ -1,0 +1,44 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0364]: `commit_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/notification/escalation_notice.rs:16:16
+   |
+16 | pub(super) use agent::commit_on as commit_agent_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `commit_on` as `pub` in the imported module
+  --> src/adapters/persistence/notification/escalation_notice.rs:16:16
+   |
+16 | pub(super) use agent::commit_on as commit_agent_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function import `commit_agent_on` is private
+   --> src/adapters/persistence/notification.rs:197:48
+    |
+197 |             return Box::pin(escalation_notice::commit_agent_on(self, commit)).await;
+    |                                                ^^^^^^^^^^^^^^^ private function import
+    |
+note: the function import `commit_agent_on` is defined here...
+   --> src/adapters/persistence/notification/escalation_notice.rs:16:16
+    |
+ 16 | pub(super) use agent::commit_on as commit_agent_on;
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `commit_on` which is defined here
+   --> src/adapters/persistence/notification/agent_notice.rs:40:1
+    |
+ 40 | / pub(super) async fn commit_on(
+ 41 | |     p: &PostgresPersistence,
+ 42 | |     commit: NotificationProjectionCommit<'_>,
+ 43 | | ) -> AppResult<CommitResult> {
+...   |
+ 79 | | }
+    | |_^
+help: import `commit_agent_on` directly
+    |
+197 -             return Box::pin(escalation_notice::commit_agent_on(self, commit)).await;
+197 +             return Box::pin(agent::commit_agent_on(self, commit)).await;
+    |
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+error: could not compile `open_bots` (lib) due to 2 previous errors
+error: `cargo check` failed with status: exit status: 101

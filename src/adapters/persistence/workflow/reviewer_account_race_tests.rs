@@ -14,6 +14,79 @@ enum ReviewerOwnership {
 }
 
 #[tokio::test]
+async fn workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action() {
+    use crate::application::ports::department::DepartmentWrite;
+
+    let prepared = Box::pin(prepared(ReviewerOwnership::RunCompany)).await;
+    let f = &prepared.fixture;
+    let company = f.scope.company.as_uuid();
+    let owner = prepared.retiring_user;
+    let departments = crate::adapters::persistence::test_support::department_use_cases(&f.p);
+    let department = departments
+        .create_department(
+            owner,
+            company,
+            DepartmentWrite {
+                name: "Owner retirement".into(),
+                slug: "owner-retirement".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    departments
+        .add_member(owner, company, department.id, prepared.retiring_principal)
+        .await
+        .unwrap();
+    departments
+        .assign_role(
+            owner,
+            company,
+            department.id,
+            crate::entities::department::DepartmentRole::Reviewer,
+            prepared.retiring_principal,
+        )
+        .await
+        .unwrap();
+    let protected: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_decisions AS decision \
+         JOIN workflow_action_intents AS intent ON intent.company_id=decision.company_id \
+           AND intent.id=decision.action_invocation_id \
+         WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.subject_kind='action_approval')",
+    )
+    .bind(company)
+    .bind(f.scope.run.as_uuid())
+    .fetch_one(f.p.pool())
+    .await
+    .unwrap();
+    assert!(
+        protected,
+        "the actual approved action and its intent exist before teardown"
+    );
+
+    f.p.delete_user_account(owner).await.unwrap();
+
+    let removed: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS(SELECT 1 FROM users WHERE id=$1) \
+           AND NOT EXISTS(SELECT 1 FROM companies WHERE id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_decisions WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_action_intents WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM department_roles WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM department_administration_events WHERE company_id=$2)",
+    )
+    .bind(owner)
+    .bind(company)
+    .fetch_one(f.p.pool())
+    .await
+    .unwrap();
+    assert!(
+        removed,
+        "the real account-deletion transaction committed its full owned-tenant cascade"
+    );
+}
+
+#[tokio::test]
 async fn workflow_reviewer_principal_final_publication_rechecks_approved_reviewer_privilege() {
     let PreparedPublication {
         fixture: f,

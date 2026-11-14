@@ -81,8 +81,8 @@ async fn workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_cha
             .await
             .unwrap();
     assert_eq!(
-        restored.content_hash().unwrap(),
-        value.content_hash().unwrap()
+        restored.canonical_content().unwrap(),
+        value.canonical_content().unwrap()
     );
     value.principals.clear();
     value.refusal = Some(RoleRefusalKind::NoHolder);

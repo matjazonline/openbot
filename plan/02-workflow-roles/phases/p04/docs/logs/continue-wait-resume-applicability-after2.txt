@@ -1,0 +1,11 @@
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_cancelled_wait_resume_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_arrival_replans_before_new_actor_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_fresh_final_timer_resume_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_future_timer_resume_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_nonfinal_timer_resume_ignores_unused_retired_final_reviewers ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4365 filtered out; finished in 3.71s
+

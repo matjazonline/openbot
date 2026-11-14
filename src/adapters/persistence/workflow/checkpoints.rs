@@ -15,7 +15,7 @@ use serde_json::Value;
 
 type Outcome = WriteOutcome<RunCheckpoint>;
 
-#[derive(sqlx::FromRow)]
+#[derive(PartialEq, Eq, sqlx::FromRow)]
 struct Saved {
     id: Uuid,
     checkpoint: Value,
@@ -159,9 +159,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
         let attempt = bound
             .attempt(Box::pin(async {
                 let mut conn = bound.acquire(&self.pool).await?;
-                let mut tx = bound.begin(&mut conn).await?;
-                let result = models::reserve_on(&mut tx, write, &request, notices, &bound).await;
-                bound.end(tx, result).await
+                models::reserve(&mut conn, write, &request, notices, &bound).await
             }))
             .await;
         match attempt {
@@ -182,9 +180,7 @@ impl WorkflowCheckpointStore for PostgresPersistence {
         let attempt = bound
             .attempt(Box::pin(async {
                 let mut conn = bound.acquire(&self.pool).await?;
-                let mut tx = bound.begin(&mut conn).await?;
-                let result = models::settle_on(&mut tx, write, &turn, notices, &bound).await;
-                bound.end(tx, result).await
+                models::settle(&mut conn, write, &turn, notices, &bound).await
             }))
             .await;
         match attempt {
@@ -300,16 +296,26 @@ pub(super) async fn lock_owner(
         run: fence.scope.run,
         execution: fence.scope.execution,
     };
-    let Some(actor) = action_authority::prelock_on(tx, scope).await? else {
+    let actor = action_authority::prelock_on(tx, scope).await?;
+    lock_prelocked_owner(tx, fence, bound, actor).await
+}
+
+async fn lock_prelocked_owner(
+    tx: &mut Transaction<'_, Postgres>,
+    fence: WorkflowFence,
+    bound: &WriteBound,
+    actor: Option<WorkflowActor>,
+) -> AppResult<bool> {
+    let Some(actor) = actor else {
         return Ok(false);
     };
-    if !lease::lock_fence(tx, fence, bound.server_timeout()).await? {
+    if !lease::lock_prelocked_fence(tx, fence, bound.server_timeout()).await? {
         return Ok(false);
     }
     let current: Uuid =
         sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
-            .bind(scope.company.as_uuid())
-            .bind(scope.run.as_uuid())
+            .bind(fence.scope.company.as_uuid())
+            .bind(fence.scope.run.as_uuid())
             .fetch_one(&mut **tx)
             .await?;
     Ok(current == actor.user_id()
@@ -336,6 +342,20 @@ async fn authorize_on(
     tx: &mut PgConnection,
     fence: WorkflowFence,
 ) -> AppResult<Option<WorkflowActor>> {
+    let scope = ActionScope {
+        company: fence.scope.company,
+        run: fence.scope.run,
+        execution: fence.scope.execution,
+    };
+    let actor = action_authority::prelock_on(tx, scope).await?;
+    authorize_prelocked_on(tx, fence, actor).await
+}
+
+async fn authorize_prelocked_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+    actor: Option<WorkflowActor>,
+) -> AppResult<Option<WorkflowActor>> {
     let prepared: Value = sqlx::query_scalar(
         "SELECT workflow_prepared FROM task_harness_runs WHERE company_id=$1
           AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4",
@@ -352,28 +372,53 @@ async fn authorize_on(
         run: fence.scope.run,
         execution: fence.scope.execution,
     };
-    // The saved read holds no row lock. Publication owns account/company before
-    // agent rows; keep that order, then let callers take the local owner fence.
-    let Some(actor) = action_authority::prelock_on(tx, scope).await? else {
+    // The model owner already holds its applicable account union and company.
+    let Some(actor) = actor else {
         return Ok(None);
     };
     super::agent_preparation::current_on(tx, scope, &prepared).await?;
     Ok(Some(actor))
 }
 
-async fn load_on(tx: &mut PgConnection, fence: WorkflowFence) -> AppResult<Option<Saved>> {
-    sqlx::query_as(
-        "SELECT id,checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
-        WHERE company_id=$1 AND workflow_run_id=$2
-          AND workflow_execution_id=$3 AND task_id=$4 FOR UPDATE",
-    )
-    .bind(fence.scope.company.as_uuid())
-    .bind(fence.scope.run.as_uuid())
-    .bind(fence.scope.execution.as_uuid())
-    .bind(fence.scope.job.0)
-    .fetch_optional(tx)
-    .await
-    .map_err(Into::into)
+const SAVED_SELECT: &str = "SELECT id,checkpoint,workflow_prepared,model_blocked_decision,model_request_id,model_generation,model_worker_id,model_attempt FROM task_harness_runs
+    WHERE company_id=$1 AND workflow_run_id=$2 AND workflow_execution_id=$3 AND task_id=$4";
+
+enum CheckpointRead {
+    Observe,
+    Lock,
+}
+
+fn load_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+) -> impl std::future::Future<Output = AppResult<Option<Saved>>> + '_ {
+    saved_on(tx, fence, CheckpointRead::Lock)
+}
+
+fn observe_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+) -> impl std::future::Future<Output = AppResult<Option<Saved>>> + '_ {
+    saved_on(tx, fence, CheckpointRead::Observe)
+}
+
+async fn saved_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+    purpose: CheckpointRead,
+) -> AppResult<Option<Saved>> {
+    let sql = match purpose {
+        CheckpointRead::Observe => SAVED_SELECT.to_owned(),
+        CheckpointRead::Lock => format!("{SAVED_SELECT} FOR UPDATE"),
+    };
+    sqlx::query_as(&sql)
+        .bind(fence.scope.company.as_uuid())
+        .bind(fence.scope.run.as_uuid())
+        .bind(fence.scope.execution.as_uuid())
+        .bind(fence.scope.job.0)
+        .fetch_optional(tx)
+        .await
+        .map_err(Into::into)
 }
 
 fn matching(saved: Saved, spec: &WorkflowCheckpointSpec) -> AppResult<RunCheckpoint> {

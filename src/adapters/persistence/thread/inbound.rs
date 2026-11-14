@@ -90,9 +90,32 @@ impl InboundMessageCommitter for PostgresPersistence {
 
 /// The commit body, on a caller-supplied transaction so a failure at any statement rolls the whole
 /// set back rather than part of it.
-pub(super) async fn commit_on(
+pub(super) fn commit_on<'a, 'c>(
+    tx: &'a mut Transaction<'c, Postgres>,
+    request: &'a InboundCommitRequest,
+) -> impl Future<Output = AppResult<InboundCommitOutcome>> + 'a {
+    commit_as_on(tx, request, InboundAuthor::Observed)
+}
+
+/// Only persistence-owned producers can author a private platform message. The
+/// public transport commit has no author/origin flag that can select this path.
+pub(in crate::adapters::persistence) fn commit_platform_on<'a, 'c>(
+    tx: &'a mut Transaction<'c, Postgres>,
+    request: &'a InboundCommitRequest,
+) -> impl Future<Output = AppResult<InboundCommitOutcome>> + 'a {
+    commit_as_on(tx, request, InboundAuthor::Platform)
+}
+
+#[derive(Clone, Copy)]
+enum InboundAuthor {
+    Observed,
+    Platform,
+}
+
+async fn commit_as_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
+    author: InboundAuthor,
 ) -> AppResult<InboundCommitOutcome> {
     if request.associations.is_empty() {
         return Err(AppError::BadRequest(
@@ -108,14 +131,15 @@ pub(super) async fn commit_on(
     // empty conversation behind and then failed associating the message it already held.
     let existing = existing_message_mappings(tx, request, &binding_ids).await?;
     if !existing.is_empty() {
-        return recognise_redelivery(tx, request, existing).await;
+        return recognise_redelivery(tx, request, existing, author).await;
     }
 
     let threads = resolve_threads(tx, request).await?;
     bind_conversations(tx, request, &threads).await?;
 
-    let write = message_write(request, threads[0].thread_id)?;
+    let write = message_write(request, threads[0].thread_id, author)?;
     let stored = store_canonical(tx, request, &write).await?;
+    prove_internal_relay(tx, request, stored.id).await?;
 
     associate_threads(tx, request, &threads, stored.id).await?;
     map_provider_message(tx, request, &threads, &stored).await?;
@@ -204,6 +228,7 @@ async fn recognise_redelivery(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
     existing: Vec<(ChannelBindingId, external::ExistingExternalMessage)>,
+    author: InboundAuthor,
 ) -> AppResult<InboundCommitOutcome> {
     let message_id = existing[0].1.message_id;
     for (binding_id, mapping) in &existing[1..] {
@@ -221,7 +246,7 @@ async fn recognise_redelivery(
         AppError::Internal(format!("Stored message {message_id} belongs to no thread"))
     })?;
 
-    let write = message_write(request, first_thread)?;
+    let write = message_write(request, first_thread, author)?;
     let author = message::resolve_author(tx, request.company_id, &write.author).await?;
     let participants = message::resolve_participants(tx, request.company_id, &write).await?;
     let attachments = message::encode_attachments(&write.attachments)?;
@@ -235,6 +260,7 @@ async fn recognise_redelivery(
             &content_hash,
         )?;
     }
+    redelivered_relay_matches(tx, request, message_id).await?;
 
     let intent_ids = intents_for_message(tx, request.company_id, message_id, &thread_ids).await?;
     complete_claimed_event(tx, request).await?;
@@ -246,6 +272,83 @@ async fn recognise_redelivery(
         // A redelivery fans out nothing: the first delivery's intents are already durable.
         delivery_ids: Vec::new(),
     })
+}
+
+/// The refusal every unproved internal hop reads as, whichever check caught it.
+fn relay_refused() -> AppError {
+    AppError::Forbidden(
+        "The internal hop does not match the delivery part it claims to be, so nothing was stored"
+            .into(),
+    )
+}
+
+/// Record which delivery part an internal hop is (D4.3), proved where the claim is written.
+///
+/// The guard on `message_internal_relays` checks the claim against the stored delivery, its frozen
+/// part and the message just written: company, source channel, RFC id, recipient and body digest.
+/// The message inherits its source message's provenance from that row and from nothing else, so
+/// a claim the guard refuses aborts the whole commit and is reported as a definite refusal.
+async fn prove_internal_relay(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    message_id: CanonicalMessageId,
+) -> AppResult<()> {
+    let Some(proof) = request.origin.relay_proof() else {
+        return Ok(());
+    };
+    let Some(source_channel_id) = request.envelope.directives.source_channel_id else {
+        return Err(relay_refused());
+    };
+    if proof.company_id() != request.company_id {
+        return Err(relay_refused());
+    }
+    sqlx::query(
+        "INSERT INTO message_internal_relays (company_id, message_id, delivery_id, part_index, \
+         source_channel_id) VALUES ($1, $2, $3, $4, $5)",
+    )
+    .bind(request.company_id)
+    .bind(message_id.as_uuid())
+    .bind(proof.delivery_id().as_uuid())
+    .bind(i32::from(proof.part_index().get()))
+    .bind(source_channel_id)
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| {
+        match error
+            .as_database_error()
+            .and_then(|database| database.constraint())
+        {
+            Some("message_internal_relay_guard") => relay_refused(),
+            _ => AppError::from(error),
+        }
+    })?;
+    Ok(())
+}
+
+/// A repeated internal hop is the same delivery part, or it is not a redelivery at all.
+///
+/// The provider key alone would let any proof replay onto a stored hop; the stored relay row is
+/// what says which part delivered it.
+async fn redelivered_relay_matches(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    message_id: CanonicalMessageId,
+) -> AppResult<()> {
+    let Some(proof) = request.origin.relay_proof() else {
+        return Ok(());
+    };
+    let same: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM message_internal_relays WHERE company_id = $1 \
+           AND message_id = $2 AND delivery_id = $3 AND part_index = $4)",
+    )
+    .bind(request.company_id)
+    .bind(message_id.as_uuid())
+    .bind(proof.delivery_id().as_uuid())
+    .bind(i32::from(proof.part_index().get()))
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if same { Ok(()) } else { Err(relay_refused()) }
 }
 
 /// The conversations a stored message already belongs to, in the order it joined them.
@@ -813,6 +916,7 @@ async fn complete_claimed_event(
 fn message_write(
     request: &InboundCommitRequest,
     primary_thread_id: Uuid,
+    source: InboundAuthor,
 ) -> AppResult<MessageWrite> {
     let envelope = &request.envelope;
     let author = envelope.author.clone();
@@ -831,7 +935,7 @@ fn message_write(
     // A relayed message is delegated evidence: another channel talking, kept private.
     let is_delegation = envelope.directives.source_channel_id.is_some();
     let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
-    Ok(MessageWrite {
+    let mut write = MessageWrite {
         structured: None,
         id: CanonicalMessageId::random(),
         thread_id: primary_thread_id,
@@ -862,7 +966,23 @@ fn message_write(
         participants,
         correlation: correlation_of(envelope),
         created_at: Utc::now(),
-    })
+    };
+    if matches!(source, InboundAuthor::Platform) {
+        if request.origin != crate::transport::InboundOrigin::Application
+            || request.reply_delivery != ReplyDelivery::InAppOnly
+            || !request.deliveries.is_empty()
+        {
+            return Err(AppError::BadRequest(
+                "A platform ingress must stay private".into(),
+            ));
+        }
+        write.author = MessageAuthorWrite::Platform;
+        write.role = MessageRole::System;
+        write.audience = crate::entities::message::MessageAudience::InternalOnly;
+        // Platform notices resolve no observed identities or member accounts.
+        write.participants.clear();
+    }
+    Ok(write)
 }
 
 fn correlation_of(envelope: &InboundEnvelope) -> MessageCorrelation {

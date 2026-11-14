@@ -1,0 +1,21 @@
+{
+  "build": 112,
+  "selected": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention"
+  ],
+  "exit": 101,
+  "seconds": 29.06,
+  "fixture": "owned resume17/_test and isolated test databases",
+  "RUST_MIN_STACK": 2097152,
+  "source_sha256_before": "235c8050a84f062bcc6265bad843d25d2d1e04f4a10354fe4d97b50dc4b48de2",
+  "source_sha256_after": "235c8050a84f062bcc6265bad843d25d2d1e04f4a10354fe4d97b50dc4b48de2"
+}

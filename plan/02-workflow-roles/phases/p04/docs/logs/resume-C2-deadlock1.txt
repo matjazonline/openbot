@@ -1,0 +1,19 @@
+2026-11-12 22:06:18.573 CET [25055] ERROR:  deadlock detected
+2026-11-12 22:06:18.573 CET [25055] DETAIL:  Process 25055 waits for ShareLock on transaction 22612; blocked by process 25057.
+	Process 25057 waits for ShareLock on transaction 22614; blocked by process 25055.
+	Process 25055: SELECT company.id FROM companies AS company WHERE company.user_id=$1 OR EXISTS (SELECT 1 FROM company_members AS member WHERE member.company_id=company.id AND member.user_id=$1) OR EXISTS (SELECT 1 FROM principals AS principal WHERE principal.company_id=company.id AND principal.user_id=$1 AND principal.kind='person') ORDER BY company.id FOR NO KEY UPDATE
+	Process 25057: INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+2026-11-12 22:06:18.573 CET [25055] HINT:  See server log for query details.
+2026-11-12 22:06:18.573 CET [25055] CONTEXT:  while locking tuple (0,1) in relation "companies"
+2026-11-12 22:06:18.573 CET [25055] STATEMENT:  SELECT company.id FROM companies AS company WHERE company.user_id=$1 OR EXISTS (SELECT 1 FROM company_members AS member WHERE member.company_id=company.id AND member.user_id=$1) OR EXISTS (SELECT 1 FROM principals AS principal WHERE principal.company_id=company.id AND principal.user_id=$1 AND principal.kind='person') ORDER BY company.id FOR NO KEY UPDATE
+2026-11-12 22:06:18.715 CET [25055] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:18.715 CET [25052] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:18.715 CET [25054] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:18.715 CET [25057] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:18.715 CET [25056] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:18.818 CET [19162] LOG:  checkpoint starting: immediate force wait
+2026-11-12 22:06:18.882 CET [19162] LOG:  checkpoint complete: wrote 1771 buffers (10.8%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=0.030 s, sync=0.034 s, total=0.065 s; sync files=1327, longest=0.001 s, average=0.001 s; distance=14784 kB, estimate=24981 kB; lsn=3/17FF7268, redo lsn=3/17C90B88
+2026-11-12 22:06:19.265 CET [25073] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:19.265 CET [25070] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:19.265 CET [25076] FATAL:  terminating connection due to administrator command
+2026-11-12 22:06:19.265 CET [25074] FATAL:  terminating connection due to administrator command

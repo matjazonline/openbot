@@ -126,6 +126,12 @@ pub(super) async fn settle(
             crate::domain::workflow::FailureCode::parse(failure.code()).map_err(|_| invalid())?;
         action_uncertainty::record(db, scope.company, scope.run, Some(scope.execution), &code)
             .await?;
+    } else if !routed {
+        let code =
+            crate::domain::workflow::FailureCode::parse(failure.code()).map_err(|_| invalid())?;
+        // This terminal owner has already sealed the job and actual typed cause.
+        // Box notification bookkeeping off the pure/activation debug stack.
+        Box::pin(escalations::run_failed_on(db, scope, &code)).await?;
     }
     Ok(())
 }

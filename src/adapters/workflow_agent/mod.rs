@@ -6,13 +6,15 @@
 //! without actions.
 use crate::{
     adapters::{
-        workflow_http::HttpRuntime, workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
+        workflow_escalation::EscalationRuntime, workflow_http::HttpRuntime,
+        workflow_mcp::McpRuntime, workflow_message::MessageRuntime,
         workflow_provisioning::ProvisioningRuntime,
     },
     app_error::{AppError, AppResult, ExecutionFailure},
     application::workflow::{
         actions::{ModelToolCallId, RemoteDispatchObservation},
         agent::{AgentToolDispatch, AgentToolObservation, AgentToolTarget, PreparedTool},
+        escalation::tools::EscalationToolCall,
         http::HttpToolCall,
         knowledge::{KnowledgeToolCall, KnowledgeToolDispatch},
         lease::WorkflowFence,
@@ -39,6 +41,7 @@ pub struct AgentActionTools {
     /// The built-in provisioning tools (p08 D2.2a); without them a frozen provisioning tool
     /// fails closed.
     provisioning: Option<Arc<ProvisioningRuntime>>,
+    escalation: Option<Arc<EscalationRuntime>>,
     knowledge: Option<Arc<dyn KnowledgeToolDispatch>>,
     /// The memory tools (phase 05 E5), composed only while the memory service is configured;
     /// without them a published memory tool fails closed.
@@ -52,6 +55,7 @@ impl AgentActionTools {
             message,
             workflow: None,
             provisioning: None,
+            escalation: None,
             knowledge: None,
             memory: None,
         }
@@ -63,6 +67,15 @@ impl AgentActionTools {
     pub fn with_provisioning(mut self, provisioning: Arc<ProvisioningRuntime>) -> Self {
         self.provisioning = Some(provisioning);
         self
+    }
+    pub fn with_escalations(mut self, runtime: Arc<EscalationRuntime>) -> Self {
+        self.escalation = Some(runtime);
+        self
+    }
+    fn escalation_runtime(&self) -> AppResult<&EscalationRuntime> {
+        self.escalation.as_deref().ok_or_else(|| {
+            AppError::ServiceUnavailable("Escalation tools are unavailable to this worker".into())
+        })
     }
     pub fn with_knowledge(mut self, knowledge: Arc<dyn KnowledgeToolDispatch>) -> Self {
         self.knowledge = Some(knowledge);
@@ -83,6 +96,7 @@ enum ToolInvocation {
     Mcp(Box<McpToolCall>),
     Workflow(Box<WorkflowToolCall>),
     Provisioning(Box<ProvisioningToolCall>),
+    Escalation(Box<EscalationToolCall>),
     Message(Box<MessageToolCall>),
     Knowledge(Box<KnowledgeToolCall>),
     Memory(Box<MemoryToolCall>),
@@ -125,6 +139,14 @@ fn invocation(
                 kind: tool
                     .provisioning_kind()
                     .ok_or_else(|| AppError::BadRequest("Unknown provisioning tool".into()))?,
+                arguments,
+                call,
+            }))
+        }
+        AgentToolTarget::Escalation { tool: kind } => {
+            ToolInvocation::Escalation(Box::new(EscalationToolCall {
+                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),
+                kind: *kind,
                 arguments,
                 call,
             }))
@@ -186,6 +208,9 @@ impl AgentToolDispatch for AgentActionTools {
                         )
                     })?;
                     Box::pin(provisioning.call_tool(fence, *call)).await
+                }
+                ToolInvocation::Escalation(call) => {
+                    Box::pin(self.escalation_runtime()?.call_tool(fence, *call)).await
                 }
                 ToolInvocation::Message(call) => {
                     message(Box::pin(self.message.call_tool(fence, *call)).await?)

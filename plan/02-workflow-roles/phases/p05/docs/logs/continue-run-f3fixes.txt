@@ -1,0 +1,20 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 13 tests
+test adapters::http::routes::workflows::tests::decision_tests::decision_routes_and_page_drive_a_parked_decision ... ok
+test adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading ... ok
+test adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_lead_desk_answers_through_its_current_lead ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4466 filtered out; finished in 72.36s
+
+EXIT 0

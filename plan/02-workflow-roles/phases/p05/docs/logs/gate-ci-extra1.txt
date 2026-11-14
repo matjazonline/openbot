@@ -1,0 +1,652 @@
+NOTICE:  database "openbot_roles_p05_ciextra" does not exist, skipping
+
+==> Verify local-agent plugin and build counted test peers
+npm warn EBADENGINE Unsupported engine {
+npm warn EBADENGINE   package: 'bb-plugin-openbot-local@0.2.0',
+npm warn EBADENGINE   required: { node: '24.21.0', bbPluginSdk: '=0.6.50' },
+npm warn EBADENGINE   current: { node: 'v26.13.1', npm: '11.20.0' }
+npm warn EBADENGINE }
+npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+
+added 54 packages, and audited 55 packages in 4s
+
+10 packages are looking for funding
+  run `npm fund` for details
+
+found 0 vulnerabilities
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+
+> bb-plugin-openbot-local@0.2.0 build
+> node scripts/build.mjs
+
+built 1 plugin entry
+
+> bb-plugin-openbot-local@0.2.0 test
+> node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+
+built 1 plugin entry
+built 11 test entries
+✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1151.765958ms)
+✔ authorization rejection stops reconnect attempts and never enters the SDK (6.650084ms)
+✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (15.983458ms)
+✔ real WSS rejects stale_identity before journal receipt or SDK entry (26.622208ms)
+✔ real WSS rejects changed_digest before journal receipt or SDK entry (25.324ms)
+✔ real WSS rejects binary before journal receipt or SDK entry (25.930833ms)
+✔ real WSS rejects unknown_field before journal receipt or SDK entry (27.635625ms)
+✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (318.276583ms)
+✔ configuration refuses non-origin URL http:// (0.51575ms)
+✔ configuration refuses non-origin URL https:// (0.059166ms)
+✔ configuration refuses non-origin URL https://path (0.046ms)
+✔ configuration refuses non-origin URL https:// (0.065292ms)
+✔ configuration refuses non-origin URL https:// (0.064333ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (0.622667ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (4.413167ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.334333ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (15.869833ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (0.950917ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (11.164459ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (3.26025ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (3.080458ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (2.733625ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (4.0955ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (1916.59925ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (184.570875ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (152.309417ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (163.364792ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (313.963459ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (167.033333ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (165.41925ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (165.081792ms)
+✔ changed origin never receives a saved pending credential or pairing claim (2.595833ms)
+✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (4.361833ms)
+✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (4.753417ms)
+✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (4.193583ms)
+✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (4.683416ms)
+✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (3.488166ms)
+✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (3.676166ms)
+✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (162.715459ms)
+✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (160.172125ms)
+✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (2.964125ms)
+✔ real competing connector processes exclude each other and OS releases graceful and killed owners (862.06525ms)
+✔ native idle admission preserves prompt order, queue identity and separate originating turns (22.653ms)
+✔ native human admission preserves prompt order, queue identity and separate originating turns (8.559167ms)
+✔ native openbot admission preserves prompt order, queue identity and separate originating turns (7.97025ms)
+✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (4.558875ms)
+✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (4.15375ms)
+✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (5.353541ms)
+✔ bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history (217.425667ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (4096) (6087.892666ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (205) (9220.008ms)
+✔ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (10.8975ms)
+✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (5.642583ms)
+✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (3.785125ms)
+✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (51.413667ms)
+✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (75.935333ms)
+✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (64.839875ms)
+✔ full mapping history pauses new creates while existing native work completes and ACKs drain (646.81925ms)
+✔ lost read-only deliveries reconcile without poisoning native admission (19.655292ms)
+✔ native startup error before turn acceptance stays uncertain across restart without resubmission (8.148042ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (5.079ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (4.70425ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (4.8705ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (5.6255ms)
+✔ persistent missing native thread coalesces evidence and retains effect capacity (10.4505ms)
+✔ resolved matching permission updates running without item event across journal reopen (7.697291ms)
+✔ preflight model refusal is durable before any SDK mutation (2.941125ms)
+✔ preflight provider refusal is durable before any SDK mutation (2.528291ms)
+✔ preflight project refusal is durable before any SDK mutation (2.462667ms)
+✔ preflight expired refusal is durable before any SDK mutation (2.197125ms)
+✔ preflight gate refusal is durable before any SDK mutation (2.385042ms)
+✔ preflight foreign refusal is durable before any SDK mutation (2.399959ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (14.825875ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (6.22725ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (11.477334ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (2.480458ms)
+✔ compacted sparse native replay survives restart and uses completed snapshots (3.464834ms)
+✔ sparse native replay never invents missing request correlation (2.4425ms)
+✔ sparse native replay never invents missing acceptance correlation (2.679959ms)
+✔ prunable partial or started text cannot become final output without a completed snapshot (2.762166ms)
+✔ startup paired selectedProjects change prevents connector and native admission (14.751417ms)
+✔ startup paired openbotOrigin change prevents connector and native admission (2.748292ms)
+✔ startup paired enrollment change prevents connector and native admission (2.819875ms)
+✔ startup enrolling selectedProjects change prevents connector and native admission (13.348458ms)
+✔ startup enrolling openbotOrigin change prevents connector and native admission (2.632625ms)
+✔ startup enrolling enrollment change prevents connector and native admission (2.407667ms)
+✔ legitimate internal Pending to Paired secret writes do not cancel connector startup (2.347333ms)
+✔ profile ownership excludes competing processes and refuses unsafe directory/symlink (223.212291ms)
+✔ supervisor observes failure, stops siblings and joins real children (110.186333ms)
+✔ shutdown escalates a child which ignores TERM and joins it within the fixed drain (5112.761542ms)
+ℹ tests 90
+ℹ suites 0
+ℹ pass 90
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16567.081833
+
+> bb-plugin-openbot-local@0.2.0 test:guards
+> node --test compatibility/check-source.test.mjs scripts/install-local.test.mjs
+
+✔ bundled public SDK declarations match the pinned source and both approved patches (2.793542ms)
+✔ multiple source patches validate all inputs before mutation and accept partial preparation (447.366625ms)
+✔ source verification rejects changed tracked GUI source before any build, from any cwd (175.480917ms)
+✔ prepared source accepts only the exact approved patch and rejects tampering (532.373042ms)
+✔ options require separate absolute directories and distinct unprivileged ports (2.83175ms)
+✔ preflight reports every missing or mismatched prerequisite together (0.1115ms)
+✔ the plugin directory must be absent or empty because Cloudroom runs it in place (1.188375ms)
+✔ the archive must match its own integrity file and any trusted copy (1.604375ms)
+✔ Cloudroom CLI calls address only the installed profile (0.129541ms)
+✔ readiness follows the wrapper status lines (315.769333ms)
+✔ shell quoting keeps printed commands copyable (0.2115ms)
+✔ the command line refuses bad options before running anything (111.58125ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1279.244125
+
+==> Reproducible local-agent package and locked runtime installation
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs
+
+node:internal/modules/run_main:111
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: use the pinned Node runtime
++ actual - expected
+
++ 'v26.13.1'
+- 'v24.21.0'
+     ^
+
+    at file:///Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/integrations/cloudroom-plugin/scripts/package.mjs:10:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:569:25)
+    at async node:internal/modules/esm/loader:650:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:105:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'v26.13.1',
+  expected: 'v24.21.0',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v26.13.1
+
+==> Run counts browser protocol
+
+> openbots@1.0.0 test:run-counts
+> node --test scripts/tests/run-counts.mjs
+
+✔ channel: snapshot before pane, OOB list, competing reads, reconnect and navigation (1600.233458ms)
+✔ channel: pane before first snapshot stays uninitialized and then hydrates (395.311333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2310.087292
+
+==> SSE navigation lifecycle (CI file list)
+✔ library payload carries the agent's own fields and no retired runtime fields (1.142584ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.564584ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (304.007667ms)
+✔ ordinary page links release every stream before navigation (1.896084ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (1.77475ms)
+✔ anchors and non-document protocols keep streams (1.226583ms)
+✔ native filter submissions release all streams on every navigation (4.115042ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.407917ms)
+✔ late attribution and reconnect keep both replies, composer and stream owner (749.803583ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (636.24225ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (1197.167333ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (950.36525ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (653.322458ms)
+✔ board: two window reads completing out of order show the later choice (671.250709ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (1361.755959ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (916.872834ms)
+✔ board: a filter change while a wake-up read is in flight wins (616.363708ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (7188.746458ms)
+✔ board: constant change still reads every two seconds and never starves (10892.462417ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1341.01125ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (12269.662958ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (5787.342542ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (2871.715917ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (713.758625ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (196.605167ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 46990.880667
+
+==> Knowledge artifact preparation tests
+..
+----------------------------------------------------------------------
+Ran 2 tests in 0.009s
+
+OK
+
+==> Disposable Doop test runner boundaries
+...................Managed package ready: a22dcf8218963a4acd790c8edb87c5257ffb079e9f22fbd71f4663cbbffbafda
+...Managed source ready: 0856f426a453c3fa277558a75e51948bb9ebe8e64bda86747624fb7d9e000650
+........................
+----------------------------------------------------------------------
+Ran 46 tests in 6.698s
+
+OK
+✔ document fresh readback accepts the actual expected replacement and parent identities (0.542709ms)
+✔ document fresh readback rejects a stale saved pre-edit snapshot (0.405542ms)
+✔ document fresh readback rejects a partial replacement retaining old text (0.075875ms)
+✔ document fresh readback rejects a foreign frame identity (0.262791ms)
+✔ document fresh readback rejects a foreign canvas identity (0.099792ms)
+✔ document fresh readback rejects a foreign workspace identity (0.084042ms)
+✔ document fresh readback rejects a frame missing from its parent (3.044ms)
+✔ document fresh readback rejects a missing HTML observation (0.094541ms)
+✔ competing browser launches create one process with the existing profile and sandbox (23.095375ms)
+✔ failed browser shutdown retains its created receipt for authoritative recovery (10.616167ms)
+✔ browser with no positive process identity cannot claim confirmed removal (5.366417ms)
+✔ lifecycle helper rejects an old executable that exits successfully without its exact marker (262.223125ms)
+✔ shared native launcher refuses oversized stdin before starting any executable (0.237584ms)
+✔ e2e helper rejects an old executable with zero selected document workflow tests (149.560166ms)
+✔ native helper diagnostics redact retired and replacement keys (267.094209ms)
+✔ compatibility report accepts the controlled positive (133.588917ms)
+✔ compatibility report rejects list_canvases-error (127.534458ms)
+✔ compatibility report rejects get_frame-error (132.994291ms)
+✔ compatibility report rejects get_canvas-error (131.938042ms)
+✔ compatibility report rejects wrong-workspace (133.284833ms)
+✔ compatibility report rejects unpersisted-edit (130.035792ms)
+✔ compatibility report rejects wrong-frame (132.05175ms)
+✔ compatibility report rejects wrong-canvas (129.733875ms)
+✔ compatibility report rejects helper-zero-matches (400.161625ms)
+✔ compatibility report rejects helper-nonzero (388.855875ms)
+✔ compatibility report rejects helper-unavailable (135.660375ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2821.8535
+
+==> Transport abstraction boundary (CI extra scripts)
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.055s
+
+OK
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/workflow/sample/dispatch.rs: forbidden sample dependency crate::application::workflow::roles::refuse_unresolved_sample_role
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/workflow/sample/dispatch.rs: forbidden sample dependency crate::application::workflow::roles::refuse_unresolved_sample_role
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/workflow/sample/history.rs: forbidden sample dependency crate::application::workflow::roles::refuse_unresolved_sample_role
+
+==> Workflow evidence retention (CI tracked mode)
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 2, "PASS": 6}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 10}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 11}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 11}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final-v2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 65}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 3, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json: retained evidence valid {"FAIL": 6, "NOT EXERCISED": 1, "PASS": 55}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 11}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-RELEASE.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/integration/final/docs/logs/AH-FINAL-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 20}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/integration/publication/docs/logs/AH-PUBLISH-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 18}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-AG1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 5, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/.archived/04-autonomous-agent-history/phases/p07/docs/logs/AH-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 10, "NOT EXERCISED": 1, "PASS": 24}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 4}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B3-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B3-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-A1.evidence.json: retained evidence valid {"FAIL": 19, "NOT EXERCISED": 0, "PASS": 85}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 7, "NOT EXERCISED": 3, "PASS": 56}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R2.evidence.json: retained evidence valid {"FAIL": 8, "NOT EXERCISED": 3, "PASS": 61}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R3.evidence.json: retained evidence valid {"FAIL": 14, "NOT EXERCISED": 0, "PASS": 75}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R4.evidence.json: retained evidence valid {"FAIL": 19, "NOT EXERCISED": 0, "PASS": 84}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-A1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-R1-reviewer.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs/logs/02WR-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs/logs/B1-R1.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 3, "PASS": 28}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs/logs/CP1-final.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 4, "PASS": 26}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs/logs/CP1.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 4, "PASS": 26}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-A1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R1-schema.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 2, "PASS": 16}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 14}
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p04/docs/logs/C1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 1}
+62 evidence manifest(s) validated; declared results are not acceptance
+
+==> Integration conformance families are registered
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 31s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.60s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+==> Vault authoring browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.86s
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 1.32s
+
+✔ vault dark: native picker progress, escaped private metadata and recoverable consent (788.897791ms)
+✔ vault light: native picker progress, escaped private metadata and recoverable consent (549.879209ms)
+✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (462.133958ms)
+✔ vault light: owner secrets start blank and reconnect failures remain recoverable (476.137166ms)
+ℹ tests 4
+ℹ suites 0
+ℹ pass 4
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2574.089375
+
+==> HTML rendering and team autocomplete browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.00s
+
+✔ form feedback and another member’s team autocomplete stay text under production CSP (766.191625ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (213.209125ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1026.860791
+
+==> Knowledge library native form browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.00s
+
+✔ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (583.08025ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 836.958708
+
+==> Memory settings capture forms browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::pages::company_memory::browser_fixtures::dump_memory_settings_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.00s
+
+✔ capture forms are labelled, refuse a blank reason, post the policy and swap in the saved section (606.965541ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 857.166
+
+==> Agent authoring browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 1.24s
+
+✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (1810.837875ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2063.708292
+
+==> Local agent management browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.97s
+
+✔ local profile and session forms escape native output and acknowledge accepted writes (705.20375ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 955.926334
+
+==> Workflow agent selection browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 1.86s
+
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (1192.818ms)
+✔ reviewer roles and people update unsaved source with visible progress and stale-response protection (1161.570375ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2607.663792
+
+==> Session revocation browser protocol
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.74s
+
+✔ failed password change preserves the browser; a committed change clears its cookie and navigates to login (488.156292ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 742.195375
+
+==> Decision browser forms
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.00s
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7)
+
+running 1 test
+test adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.38s
+
+✔ comment preserves the unfinished exact decision; queued submission settles without stale replacement (1427.063792ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1685.273084
+
+==> Summary
+PASS 25s   Verify local-agent plugin and build counted test peers
+FAIL 0s    Reproducible local-agent package and locked runtime installation
+PASS 3s    Run counts browser protocol
+PASS 47s   SSE navigation lifecycle (CI file list)
+PASS 0s    Knowledge artifact preparation tests
+PASS 10s   Disposable Doop test runner boundaries
+FAIL 0s    Transport abstraction boundary (CI extra scripts)
+PASS 36s   Workflow evidence retention (CI tracked mode)
+PASS 96s   Integration conformance families are registered
+PASS 5s    Vault authoring browser protocol
+PASS 2s    HTML rendering and team autocomplete browser protocol
+PASS 1s    Knowledge library native form browser protocol
+PASS 1s    Memory settings capture forms browser protocol
+PASS 4s    Agent authoring browser protocol
+PASS 2s    Local agent management browser protocol
+PASS 5s    Workflow agent selection browser protocol
+PASS 2s    Session revocation browser protocol
+PASS 3s    Decision browser forms
+bash $S/ci-extra.sh  220.18s user 37.06s system 106% cpu 4:01.96 total
+EXIT 0

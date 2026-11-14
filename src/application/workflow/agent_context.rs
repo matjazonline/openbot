@@ -85,6 +85,7 @@ impl PreparedTool {
                     super::super::provisioning::LIST_COMPANY_AGENTS_DESCRIPTION.into()
                 }
                 AgentToolTarget::Memory { tool } => tool.description().into(),
+                AgentToolTarget::Escalation { tool } => tool.description().into(),
                 _ => format!("Workflow tool {}", self.name),
             },
             parameters: self.input_schema.clone(),

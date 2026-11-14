@@ -142,7 +142,10 @@ async fn reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact()
 }
 
 async fn start_review(f: &Fixture) -> Uuid {
-    let (child, version) = f.published(f.owner, f.company, child_source(f.owner)).await;
+    let reviewer = owner_principal(f).await;
+    let (child, version) = f
+        .published(f.owner, f.company, child_source(reviewer))
+        .await;
     let (_, version) = f
         .published(f.owner, f.company, parent_source(child, version))
         .await;

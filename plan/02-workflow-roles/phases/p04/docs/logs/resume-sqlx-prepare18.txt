@@ -1,0 +1,30 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0373]: async block may outlive the current function, but it borrows `subject`, which is owned by the current function
+   --> src/adapters/persistence/workflow/follow_account_visibility_tests.rs:127:26
+    |
+127 |     let link = |subject| async {
+    |                          ^^^^^ may outlive borrowed value `subject`
+...
+132 |             .link_external_identity(f.people.users[0], claim(subject, &email))
+    |                                                              ------- `subject` is borrowed here
+    |
+note: async block is returned here
+   --> src/adapters/persistence/workflow/follow_account_visibility_tests.rs:127:26
+    |
+127 |       let link = |subject| async {
+    |  __________________________^
+128 | |         barrier.wait().await;
+129 | |         f.people
+130 | |             .role
+...   |
+133 | |             .await
+134 | |     };
+    | |_____^
+help: to force the async block to take ownership of `subject` (and any other referenced variables), use the `move` keyword
+    |
+127 |     let link = |subject| async move {
+    |                                ++++
+
+For more information about this error, try `rustc --explain E0373`.
+error: could not compile `open_bots` (lib test) due to 1 previous error
+error: `cargo check` failed with status: exit status: 101

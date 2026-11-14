@@ -1,0 +1,39 @@
+
+running 4 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_former_run_actor_retirement_preserves_owner_history_and_vote ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_ignore_retired_former_run_actor ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_former_run_actor_retirement_preserves_owner_history_and_vote stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_former_run_actor_retirement_preserves_owner_history_and_vote' (1966012) panicked at src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:75:47:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"users\" violates foreign key constraint \"channel_reply_contexts_actor_id_fkey\" on table \"channel_reply_contexts\"")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_ignore_retired_former_run_actor stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_ignore_retired_former_run_actor' (1966013) panicked at src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:150:53:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: update or delete on table \"users\" violates foreign key constraint \"channel_reply_contexts_actor_id_fkey\" on table \"channel_reply_contexts\"")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers' (1966047) panicked at src/adapters/persistence/workflow/tests.rs:270:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/output_schema", span: SourceSpan { start: 753, end: 754, line: 1, column: 754 }, instance_path: None, schema_path: None })
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers' (1966051) panicked at src/adapters/persistence/workflow/tests.rs:270:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/output_schema", span: SourceSpan { start: 691, end: 692, line: 1, column: 692 }, instance_path: None, schema_path: None })
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_former_run_actor_retirement_preserves_owner_history_and_vote
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_ignore_retired_former_run_actor
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers
+
+test result: FAILED. 0 passed; 4 failed; 0 ignored; 0 measured; 4341 filtered out; finished in 2.53s
+

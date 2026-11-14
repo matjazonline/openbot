@@ -1,0 +1,40 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 7 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_authored_parent_route_consumes_child_failure_without_a_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case' (6087394) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:56:45:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: escalation case must match its authoritative run")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent' (6087393) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:162:5:
+assertion `left == right` failed
+  left: Number(2)
+ right: 1
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit' (6087391) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:190:45:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: escalation case must match its authoritative run")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 4467 filtered out; finished in 6.27s
+
+EXIT 101

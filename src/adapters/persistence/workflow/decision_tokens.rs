@@ -165,5 +165,14 @@ pub(in crate::adapters::persistence::workflow) async fn fail(
         return Err(closed());
     }
     approvals::audit(db, scope, decision, event).await?;
+    // The same unhandled root refusal a token reservation reports starts the default ladder.
+    let refusal = match event {
+        "token_allowance_rejected" => crate::domain::workflow::TokenRefusal::Rejected,
+        "token_allowance_expired" => crate::domain::workflow::TokenRefusal::Expired,
+        _ => return Err(closed()),
+    };
+    let reason = crate::domain::workflow::FailureCode::parse(refusal.failure_code())
+        .map_err(|_| closed())?;
+    Box::pin(super::escalations::run_failed_on(db, scope, &reason)).await?;
     Ok(())
 }

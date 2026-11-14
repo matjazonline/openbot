@@ -1,0 +1,12 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 5 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_authored_parent_route_consumes_child_failure_without_a_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 3.81s
+
+EXIT 0

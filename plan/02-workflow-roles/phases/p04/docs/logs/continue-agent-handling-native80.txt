@@ -1,0 +1,28 @@
+
+running 9 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout' (3963755) panicked at src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:246:5:
+assertion `left == right` failed
+  left: None
+ right: Some("workflow_escalation_intent_identity_guard")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout
+
+test result: FAILED. 8 passed; 1 failed; 0 ignored; 0 measured; 4409 filtered out; finished in 8.97s
+

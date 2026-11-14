@@ -1,0 +1,73 @@
+artifact bd5279a566cdffd7b50e30277160ecb512e6cc9f3871b431422b695391a01da7; Sat Nov 14 08:33:34 CET 2026
+== git diff HEAD --check
+EXIT 0
+== rustfmt --edition 2024 --check (changed file)
+EXIT 0
+== .invalid literals outside email adapter
+EXIT 1 (1 = none found)
+
+== boundary scripts (rg on PATH)
+Sat Nov 14 08:33:34 CET 2026
+rg: /private/tmp/claude-501/-Users-mac02--gui-cloudroom-plugins-environment-git-worktree-host-data-worktrees-thr-jt43h4qc8d-1-openbot/d139d6f0-976b-419b-b64a-47335b295a58/scratchpad/bin/rg ripgrep 14.1.1 (rev 0ae49f8b6e)
+== python3 scripts/tests/workflow-sample-boundary.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.051s
+
+OK
+EXIT 0
+== python3 scripts/workflow-sample-boundary.py
+workflow sample capability boundary passed
+EXIT 0
+== python3 scripts/tests/integration-boundary.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.034s
+
+OK
+EXIT 0
+== python3 scripts/integration-boundary.py
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS
+EXIT 0
+== python3 scripts/check-integration-docs.py
+integration docs: 3 link sets, 164 startup reset notices, configuration and CI inventory PASS
+EXIT 0
+== bash scripts/tests/transport-boundary.sh
+runtime boundary gate regression tests passed
+EXIT 0
+== bash scripts/transport-boundary-check.sh
+transport boundary check passed
+EXIT 0
+
+== focused tests: BIN copy of /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24 (sha256 3d55886c61c358fc4c3e53464120442971a47125b9310a4d663536ae9f055b5d, built 08:29:08, newer than every src file); DB openbot_roles_p05_b3 fresh, track_utility=off; RUST_MIN_STACK=2097152; --test-threads=2
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 24 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_expiry_keeps_one_bounded_mixed_page_and_ordinary_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_competing_expiry_owners_record_one_exhausted_handling_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_origin_policy_stays_private_without_a_reply_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_notice_before_real_role_writer_commits_captured_root_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_account_update_role_writer_and_notice_all_finish ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown ... ok
+
+test result: ok. 24 passed; 0 failed; 0 ignored; 0 measured; 4456 filtered out; finished in 122.03s
+
+EXIT 0 at Sat Nov 14 08:35:53 CET 2026

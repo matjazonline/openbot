@@ -133,6 +133,7 @@ const CANDIDATES: &str = "SELECT binding.id, configuration.revision AS configura
        configuration.run_as_user_id, configuration.message_trigger \
      FROM workflow_bindings AS binding \
      JOIN workflow_message_intents AS intent ON intent.company_id = binding.company_id AND intent.id = $2 \
+     LEFT JOIN workflow_escalation_notice_targets AS notice_target ON notice_target.company_id=intent.company_id AND notice_target.message_id=intent.message_id \
      LEFT JOIN channel_reply_contexts AS response ON response.company_id=intent.company_id \
        AND response.intent_id=intent.id AND response.binding_id=binding.id \
      JOIN workflow_binding_revisions AS configuration ON configuration.company_id = binding.company_id \
@@ -144,6 +145,10 @@ const CANDIDATES: &str = "SELECT binding.id, configuration.revision AS configura
        AND binding.channel_id = intent.channel_id \
        AND (binding.thread_id IS NULL OR binding.thread_id = intent.thread_id) \
        AND ($3::uuid IS NULL OR binding.id = $3) \
+       AND (notice_target.intent_id IS NULL OR (notice_target.intent_id=intent.id \
+         AND binding.id=notice_target.binding_id AND binding.active \
+         AND binding.configuration_revision=notice_target.binding_revision AND configuration.revision=notice_target.binding_revision \
+         AND workflow_escalation_target_admissible(notice_target))) \
        AND NOT EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS outcome \
          WHERE outcome.company_id = binding.company_id AND outcome.intent_id = intent.id \
            AND outcome.binding_id = binding.id) \
@@ -154,36 +159,76 @@ const FENCE: &str = "SELECT id FROM workflow_message_intents WHERE company_id = 
      AND state = 'claimed' AND worker_id = $3 AND claim_generation = $4 \
      AND lease_expires_at > clock_timestamp() FOR UPDATE";
 
+const EXPIRE_SET: &str = "state=CASE WHEN EXISTS(SELECT 1 FROM workflow_message_intent_bindings AS binding \
+    WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id AND binding.outcome='admitted') \
+      OR workflow_escalation_intent_source_retired(intent.company_id,intent.id) THEN 'done' ELSE 'failed' END, \
+    outcome=CASE WHEN EXISTS(SELECT 1 FROM workflow_message_intent_bindings AS binding \
+    WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id AND binding.outcome='admitted') THEN 'admitted' \
+      WHEN workflow_escalation_intent_source_retired(intent.company_id,intent.id) THEN 'notification_source_retired' ELSE NULL END, \
+    worker_id=NULL,claim_generation=NULL,lease_expires_at=NULL,updated_at=clock_timestamp()";
+
+#[derive(sqlx::FromRow)]
+struct ExpiryTarget {
+    company_id: Uuid,
+    id: Uuid,
+    notice: bool,
+}
+
+#[derive(sqlx::FromRow)]
+pub(super) struct ExpiredRow {
+    company_id: Uuid,
+    id: Uuid,
+    state: String,
+}
+
+impl ExpiredRow {
+    pub(super) fn failure(self) -> Option<FailedIntent> {
+        (self.state == "failed").then_some(FailedIntent {
+            company: CompanyId::new(self.company_id),
+            intent: self.id,
+        })
+    }
+}
+
 #[async_trait]
 impl MessageIntentQueue for PostgresPersistence {
     async fn fail_expired_intents(&self, page: u16) -> AppResult<Vec<FailedIntent>> {
-        let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(
-            "UPDATE workflow_message_intents AS intent SET \
-               state = CASE WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS binding \
-                   WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id \
-                     AND binding.outcome='admitted') THEN 'done' ELSE 'failed' END, \
-               outcome = CASE WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS binding \
-                   WHERE binding.company_id=intent.company_id AND binding.intent_id=intent.id \
-                     AND binding.outcome='admitted') THEN 'admitted' ELSE NULL END, \
-               worker_id = NULL, claim_generation = NULL, lease_expires_at = NULL, \
-               updated_at = clock_timestamp() \
-             WHERE ctid IN (SELECT ctid FROM workflow_message_intents WHERE state = 'claimed' \
-               AND attempts >= $1 AND lease_expires_at <= clock_timestamp() LIMIT $2 \
-               FOR UPDATE SKIP LOCKED) \
-             RETURNING intent.company_id, intent.id, intent.state",
-        )
-        .bind(MAX_INTENT_ATTEMPTS)
-        .bind(i64::from(page))
-        .fetch_all(&self.pool)
-        .await?;
-        Ok(rows
-            .into_iter()
-            .filter(|(_, _, state)| state == "failed")
-            .map(|(company, intent, _)| FailedIntent {
-                company: CompanyId::new(company),
-                intent,
-            })
-            .collect())
+        // Discover one bounded mixed page. Never hold an intent row and then
+        // acquire company/case ownership to publish its handling failure.
+        let targets:Vec<ExpiryTarget>=sqlx::query_as("SELECT intent.company_id,intent.id,target.intent_id IS NOT NULL AS notice \
+            FROM workflow_message_intents AS intent LEFT JOIN workflow_escalation_notice_targets AS target \
+              ON target.company_id=intent.company_id AND target.message_id=intent.message_id \
+            WHERE intent.state='claimed' AND intent.attempts>=$1 AND intent.lease_expires_at<=clock_timestamp() \
+            ORDER BY intent.lease_expires_at,intent.company_id,intent.id LIMIT $2")
+            .bind(MAX_INTENT_ATTEMPTS).bind(i64::from(page)).fetch_all(&self.pool).await?;
+        let mut failures = Vec::new();
+        let mut companies = Vec::new();
+        let mut intents = Vec::new();
+        for target in targets {
+            if target.notice {
+                if let Some(failed) = escalation_handling::expire_intent(
+                    self,
+                    CompanyId::new(target.company_id),
+                    target.id,
+                )
+                .await?
+                {
+                    failures.push(failed);
+                }
+            } else {
+                companies.push(target.company_id);
+                intents.push(target.id);
+            }
+        }
+        if !intents.is_empty() {
+            failures.extend(
+                expire_ordinary_on(&self.pool, &companies, &intents)
+                    .await?
+                    .into_iter()
+                    .filter_map(ExpiredRow::failure),
+            );
+        }
+        Ok(failures)
     }
 
     async fn claim_intents(
@@ -329,25 +374,12 @@ impl MessageIntentQueue for PostgresPersistence {
     }
 
     async fn finish_intent(&self, claim: IntentClaim, matched: Option<RunId>) -> AppResult<bool> {
-        let finished = sqlx::query(&format!(
-            "WITH fence AS ({FENCE}) \
-             UPDATE workflow_message_intents AS intent SET state = 'done', worker_id = NULL, \
-               claim_generation = NULL, lease_expires_at = NULL, updated_at = clock_timestamp(), \
-               matched_run_id = $5, \
-               outcome = CASE WHEN $5::uuid IS NOT NULL THEN 'matched' \
-                 WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS outcome \
-                   WHERE outcome.company_id = intent.company_id AND outcome.intent_id = intent.id \
-                     AND outcome.outcome = 'admitted') THEN 'admitted' ELSE 'none' END \
-             FROM fence WHERE intent.company_id = $1 AND intent.id = fence.id"
-        ))
-        .bind(claim.company.as_uuid())
-        .bind(claim.intent)
-        .bind(claim.worker.0)
-        .bind(claim.generation)
-        .bind(matched.map(RunId::as_uuid))
-        .execute(&self.pool)
-        .await?;
-        Ok(finished.rows_affected() == 1)
+        let mut db = self.pool.acquire().await?;
+        if escalation_handling::has_intent_on(&mut db, claim).await? {
+            drop(db);
+            return escalation_handling::finish_intent(self, claim, matched).await;
+        }
+        finish_on(&mut db, claim, matched).await
     }
 
     async fn defer_intent(&self, claim: IntentClaim, deferral: IntentDeferral) -> AppResult<bool> {
@@ -390,6 +422,59 @@ impl MessageIntentQueue for PostgresPersistence {
         .await?;
         Ok(deferred.rows_affected() == 1)
     }
+}
+
+pub(super) async fn finish_on(
+    db: &mut PgConnection,
+    claim: IntentClaim,
+    matched: Option<RunId>,
+) -> AppResult<bool> {
+    let finished = sqlx::query(&format!(
+        "WITH fence AS ({FENCE}) \
+         UPDATE workflow_message_intents AS intent SET state = 'done', worker_id = NULL, \
+           claim_generation = NULL, lease_expires_at = NULL, updated_at = clock_timestamp(), \
+           matched_run_id = $5, \
+           outcome = CASE WHEN $5::uuid IS NOT NULL THEN 'matched' \
+             WHEN EXISTS (SELECT 1 FROM workflow_message_intent_bindings AS outcome \
+               WHERE outcome.company_id = intent.company_id AND outcome.intent_id = intent.id \
+                 AND outcome.outcome = 'admitted') THEN 'admitted' \
+             WHEN workflow_escalation_intent_source_retired(intent.company_id,intent.id) THEN 'notification_source_retired' ELSE 'none' END \
+         FROM fence WHERE intent.company_id = $1 AND intent.id = fence.id"
+    ))
+    .bind(claim.company.as_uuid())
+    .bind(claim.intent)
+    .bind(claim.worker.0)
+    .bind(claim.generation)
+    .bind(matched.map(RunId::as_uuid))
+    .execute(db)
+    .await?;
+    Ok(finished.rows_affected() == 1)
+}
+
+async fn expire_ordinary_on(
+    pool: &sqlx::PgPool,
+    companies: &[Uuid],
+    intents: &[Uuid],
+) -> AppResult<Vec<ExpiredRow>> {
+    Ok(sqlx::query_as(&format!("UPDATE workflow_message_intents AS intent SET {EXPIRE_SET} \
+        WHERE ctid IN(SELECT current.ctid FROM workflow_message_intents AS current \
+          JOIN unnest($2::uuid[],$3::uuid[]) AS selected(company_id,intent_id) \
+            ON selected.company_id=current.company_id AND selected.intent_id=current.id \
+          WHERE current.state='claimed' AND current.attempts>=$1 AND current.lease_expires_at<=clock_timestamp() \
+            AND NOT EXISTS(SELECT 1 FROM workflow_escalation_notice_targets WHERE company_id=current.company_id AND message_id=current.message_id) \
+          FOR UPDATE OF current SKIP LOCKED) RETURNING intent.company_id,intent.id,intent.state"))
+        .bind(MAX_INTENT_ATTEMPTS).bind(companies).bind(intents).fetch_all(pool).await?)
+}
+
+pub(super) async fn expire_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    intent: Uuid,
+) -> AppResult<Option<ExpiredRow>> {
+    Ok(sqlx::query_as(&format!("UPDATE workflow_message_intents AS intent SET {EXPIRE_SET} \
+        WHERE intent.company_id=$1 AND intent.id=$2 AND intent.state='claimed' AND intent.attempts>=$3 \
+          AND intent.lease_expires_at<=clock_timestamp() RETURNING intent.company_id,intent.id,intent.state"))
+        .bind(company.as_uuid()).bind(intent).bind(MAX_INTENT_ATTEMPTS).fetch_optional(db).await?)
 }
 
 async fn fence_holds(pool: &sqlx::PgPool, claim: IntentClaim) -> AppResult<bool> {

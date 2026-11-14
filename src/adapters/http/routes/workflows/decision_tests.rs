@@ -15,6 +15,18 @@ fn decision_source(workflow: Uuid, reviewer: Uuid) -> Value {
     source
 }
 
+/// A reviewer is a person principal, not an account: the owner's.
+async fn owner_principal(f: &Fixture) -> Uuid {
+    sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company)
+    .bind(f.owner)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap()
+}
+
 /// The decision a review notice links to, through the production engine: the page and the API
 /// show the decision's own choices; comments and the submission replay by key; a stale revision
 /// is a conflict; a stranger is refused everywhere; the submission continues the run.
@@ -23,14 +35,7 @@ async fn decision_routes_and_page_drive_a_parked_decision() {
     let Some(f) = Fixture::new().await else {
         return;
     };
-    let reviewer: Uuid = sqlx::query_scalar(
-        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
-    )
-    .bind(f.company)
-    .bind(f.owner)
-    .fetch_one(f.persistence.pool())
-    .await
-    .unwrap();
+    let reviewer = owner_principal(&f).await;
     let (_, version) = f
         .published(
             f.owner,

@@ -1,7 +1,7 @@
-//! Human decisions (05-D1 amended by D2–D4). Lock order, the controls' order:
-//! company `FOR SHARE` → member ⋈ principal `FOR SHARE` → run `FOR UPDATE` → association rows
-//! `FOR SHARE` → execution → job → wait → decision. Workers take the run first and read
-//! authority without locks at park; submission rechecks it under the locks.
+//! Human decisions (05-D1 amended by D2–D4). Current caller accounts and applicable effect
+//! accounts precede company → member/principal → run → association → execution → job → wait
+//! → decision. History and discussion require only current viewer authority; a fresh submission
+//! collects final-response accounts only when its actual completion can create that effect.
 use super::*;
 use crate::application::workflow::{
     activation::*,
@@ -205,6 +205,7 @@ async fn write_park_on(
         proposal_digest,
         reviewers,
     } = write;
+    let followed = matches!(&reviewers, PreparedReviewers::Follow);
     let wait = Uuid::new_v4();
     let intent = json!({"version":1,"kind":"wait_registered","wait_id":wait,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()});
     let deadline: DateTime<Utc> = sqlx::query_scalar("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,created_at,notification_intent) VALUES($1,$2,$3,$4,'decision',$5,clock_timestamp(),$6) RETURNING deadline")
@@ -224,6 +225,14 @@ async fn write_park_on(
     sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='decision' WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;
     waits::audit(tx, scope, "decision_opened").await?;
+    if followed {
+        Box::pin(escalations::assignment_changed_on(
+            tx,
+            scope.company,
+            decision,
+        ))
+        .await?;
+    }
     Ok(Some(ParkedWorkflow {
         wait: WaitId::new(wait),
         deadline,
@@ -426,7 +435,6 @@ async fn eligible_reviewer_row(
 struct DecisionHead {
     run_id: Uuid,
     execution_id: Uuid,
-    submitted_at: Option<DateTime<Utc>>,
 }
 #[derive(sqlx::FromRow)]
 struct DecisionRow {
@@ -452,10 +460,85 @@ struct Locked {
     run: waits::WaitRun,
     reviewer: authority::ReviewerAuthority,
 }
-enum DecisionPurpose {
+#[derive(Clone, Copy)]
+enum DecisionPurpose<'a> {
     Read,
     Comment,
-    Submit,
+    Submit(&'a SubmitDecision),
+}
+
+#[derive(PartialEq, Eq)]
+enum DecisionAccounts {
+    Viewer,
+    Reply,
+}
+
+#[derive(sqlx::FromRow)]
+struct SubmissionSource {
+    subject_kind: String,
+    submitted_at: Option<DateTime<Utc>>,
+}
+
+async fn account_purpose_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    purpose: DecisionPurpose<'_>,
+) -> AppResult<DecisionAccounts> {
+    let DecisionPurpose::Submit(command) = purpose else {
+        return Ok(DecisionAccounts::Viewer);
+    };
+    let source: SubmissionSource = sqlx::query_as(
+        "SELECT subject_kind,submitted_at FROM workflow_decisions \
+         WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND id=$4",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(command.decision.0)
+    .fetch_one(&mut *db)
+    .await?;
+    if source.submitted_at.is_some() || source.subject_kind != "business" {
+        return Ok(DecisionAccounts::Viewer);
+    }
+    let run: waits::WaitRun = sqlx::query_as(
+        "SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2",
+    )
+    .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut *db).await?;
+    let wait = decision_wait_on(db, scope, command.decision, DecisionWaitRead::Observe).await?;
+    if !decision_is_open(&run, &wait, waits::now(db).await?)
+        || channel_reply_completion::root_on(db, scope)
+            .await?
+            .is_none()
+    {
+        return Ok(DecisionAccounts::Viewer);
+    }
+    let binding = admission_binding::read_saved_binding(
+        db,
+        scope.company,
+        WorkflowBindingId::new(run.binding_id),
+        scope.run.as_uuid(),
+    )
+    .await?;
+    let Some(activation) = activation::preview_on(db, scope).await? else {
+        return Ok(DecisionAccounts::Viewer);
+    };
+    let completion = match prepare_submission(binding.bundle(), &activation, command) {
+        Ok(completion) => completion,
+        // Invalid submissions retain their ordinary validation after current reviewer authority.
+        Err(AppError::BadRequest(_)) => return Ok(DecisionAccounts::Viewer),
+        Err(error) => return Err(error),
+    };
+    let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
+    Ok(
+        if activation.ordinal <= max_steps
+            && channel_reply_completion::final_response_disposition(&completion)
+                == Some(crate::domain::workflow::ResponseDisposition::Automatic)
+        {
+            DecisionAccounts::Reply
+        } else {
+            DecisionAccounts::Viewer
+        },
+    )
 }
 
 async fn lock_decision(
@@ -463,11 +546,11 @@ async fn lock_decision(
     company: CompanyId,
     actor: WorkflowActor,
     decision: DecisionId,
-    purpose: DecisionPurpose,
+    purpose: DecisionPurpose<'_>,
 ) -> AppResult<Locked> {
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut **tx).await?;
     let head: DecisionHead = sqlx::query_as(
-        "SELECT run_id,execution_id,submitted_at FROM workflow_decisions WHERE company_id=$1 AND id=$2",
+        "SELECT run_id,execution_id FROM workflow_decisions WHERE company_id=$1 AND id=$2",
     )
     .bind(company.as_uuid())
     .bind(decision.0)
@@ -488,13 +571,9 @@ async fn lock_decision(
         execution: ExecutionId::new(head.execution_id),
         job: WorkflowJobId(job),
     };
-    if matches!(purpose, DecisionPurpose::Submit)
-        && head.submitted_at.is_none()
-        && channel_reply_completion::root_on(tx, scope)
-            .await?
-            .is_some()
-    {
-        action_authority::prelock_accounts_on(
+    let accounts = account_purpose_on(tx, scope, purpose).await?;
+    if matches!(accounts, DecisionAccounts::Reply) {
+        action_authority::prelock_reply_on(
             tx,
             crate::application::workflow::actions::ActionScope {
                 company,
@@ -514,6 +593,13 @@ async fn lock_decision(
         viewer.ok_or_else(missing)?;
     }
     let reviewer = authority::authorize_reviewer_on(tx, company, actor).await?;
+    // A concurrent settlement can reduce this to replay under the accounts already owned.
+    // A newly applicable final effect requires a fresh transaction with its full account union.
+    if account_purpose_on(tx, scope, purpose).await? != accounts
+        && matches!(accounts, DecisionAccounts::Viewer)
+    {
+        return Err(stale());
+    }
     // Run → execution → job, as `waits::lock`, but whatever the job's state: a settled
     // decision still answers reads and replays.
     let run: waits::WaitRun = sqlx::query_as("SELECT binding_id,state,deadline,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
@@ -583,7 +669,7 @@ async fn submit_on(
         command.company,
         command.actor,
         command.decision,
-        DecisionPurpose::Submit,
+        DecisionPurpose::Submit(command),
     )
     .await?;
     let wait = decision_wait(tx, scope, command.decision).await?;
@@ -619,12 +705,7 @@ async fn submit_on(
         };
     }
     let now = waits::now(tx).await?;
-    if wait.reason != "decision"
-        || wait.state != "waiting"
-        || run.state != "waiting"
-        || wait.deadline <= now
-        || run.deadline <= now
-    {
+    if !decision_is_open(&run, &wait, now) {
         return Err(closed());
     }
     let listed: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 AND principal_id=$3)")
@@ -802,13 +883,46 @@ use read::read_on;
 #[path = "decision_approvals.rs"]
 pub(super) mod approvals;
 
-async fn decision_wait(
+fn decision_is_open(run: &waits::WaitRun, wait: &waits::WaitRow, now: DateTime<Utc>) -> bool {
+    wait.reason == "decision"
+        && wait.state == "waiting"
+        && run.state == "waiting"
+        && wait.deadline > now
+        && run.deadline > now
+}
+
+enum DecisionWaitRead {
+    Observe,
+    Lock,
+}
+
+fn decision_wait(
     db: &mut PgConnection,
     scope: ActivationRequest,
     decision: DecisionId,
+) -> impl std::future::Future<Output = AppResult<waits::WaitRow>> + '_ {
+    decision_wait_on(db, scope, decision, DecisionWaitRead::Lock)
+}
+
+async fn decision_wait_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    decision: DecisionId,
+    purpose: DecisionWaitRead,
 ) -> AppResult<waits::WaitRow> {
-    sqlx::query_as("SELECT wait.id,wait.deadline,wait.reason,wait.state,wait.event_name,wait.correlation,wait.failure_code FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.id=$4 FOR UPDATE OF wait")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(decision.0).fetch_optional(db).await?.ok_or_else(missing)
+    const SELECT: &str = "SELECT wait.id,wait.deadline,wait.reason,wait.state,wait.event_name,wait.correlation,wait.failure_code FROM workflow_decisions AS decision JOIN workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id WHERE decision.company_id=$1 AND decision.run_id=$2 AND decision.execution_id=$3 AND decision.id=$4";
+    let query = match purpose {
+        DecisionWaitRead::Observe => SELECT.to_owned(),
+        DecisionWaitRead::Lock => format!("{SELECT} FOR UPDATE OF wait"),
+    };
+    sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .bind(decision.0)
+        .fetch_optional(db)
+        .await?
+        .ok_or_else(missing)
 }
 
 #[path = "decision_tokens.rs"]

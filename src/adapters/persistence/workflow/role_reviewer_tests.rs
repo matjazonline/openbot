@@ -1,4 +1,6 @@
 use super::*;
+#[path = "escalation_guard_tests.rs"]
+mod escalation_guards;
 #[path = "escalation_recipient_storage_tests.rs"]
 mod escalation_recipients;
 use crate::adapters::persistence::workflow::tests::approval_test_support::notices;

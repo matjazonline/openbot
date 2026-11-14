@@ -5,7 +5,6 @@ use crate::entities::agent_capability::DependencyManifestId;
 use crate::entities::department::{DepartmentId, DepartmentRole, RoleRefusalKind};
 use crate::entities::transport::PrincipalId;
 use serde::{Deserialize, Serialize};
-use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 
 pub const MAX_PEOPLE_RESOLUTION_BYTES: usize = 16 * 1024;
@@ -107,10 +106,6 @@ impl PeopleResolution {
         }
         Ok(bytes)
     }
-
-    pub fn content_hash(&self) -> AppResult<[u8; 32]> {
-        Ok(Sha256::digest(self.canonical_content()?).into())
-    }
 }
 
 fn invalid() -> AppError {
@@ -145,11 +140,11 @@ mod tests {
     #[test]
     fn workflow_reviewer_follow_canonical_people_sets_are_stable_and_explicitly_empty() {
         let mut value = resolution();
-        let digest = value.content_hash().unwrap();
+        let canonical = value.canonical_content().unwrap();
         value.principals.reverse();
-        assert_eq!(value.content_hash().unwrap(), digest);
+        assert_eq!(value.canonical_content().unwrap(), canonical);
         let restored = PeopleResolution::decode(&value.canonical_content().unwrap()).unwrap();
-        assert_eq!(restored.content_hash().unwrap(), digest);
+        assert_eq!(restored.canonical_content().unwrap(), canonical);
         value.principals.clear();
         assert!(value.canonical_content().is_err());
         value.refusal = Some(RoleRefusalKind::NoHolder);
@@ -158,7 +153,7 @@ mod tests {
         let restored = PeopleResolution::decode(&empty).unwrap();
         assert!(restored.principals.is_empty());
         assert_eq!(restored.refusal, Some(RoleRefusalKind::NoHolder));
-        assert_ne!(restored.content_hash().unwrap(), digest);
+        assert_ne!(restored.canonical_content().unwrap(), canonical);
     }
 
     #[test]

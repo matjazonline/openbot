@@ -74,6 +74,7 @@ mod team_settings;
 mod thread_activity;
 mod workflow_authoring;
 mod workflow_decision;
+mod workflow_escalation;
 mod workflow_runs;
 
 pub use agent_authoring::*;
@@ -114,6 +115,7 @@ pub use team_settings::*;
 pub use thread_activity::*;
 pub use workflow_authoring::*;
 pub use workflow_decision::*;
+pub use workflow_escalation::*;
 pub use workflow_runs::*;
 
 /// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic

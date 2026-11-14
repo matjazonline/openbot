@@ -48,7 +48,7 @@ pub(crate) async fn refresh_person_escalations_on(
     wake_failed_assignments_on(db, company, None).await
 }
 
-pub(super) async fn wake_failed_assignments_on(
+pub(in crate::adapters::persistence) async fn wake_failed_assignments_on(
     db: &mut PgConnection,
     company: CompanyId,
     case: Option<EscalationId>,

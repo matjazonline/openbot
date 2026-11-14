@@ -403,7 +403,8 @@ pub(crate) async fn set_desk_ownership_on(
     .bind(mode.as_str())
     .execute(&mut **tx)
     .await?;
-    sync_desk_grants_on(tx, company, desk).await
+    sync_desk_grants_on(tx, company, desk).await?;
+    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
 
 #[cfg(test)]

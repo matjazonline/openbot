@@ -17,6 +17,9 @@ mod atomic;
 #[path = "harness_checkpoint_update_tests.rs"]
 mod updates;
 
+#[path = "harness_token_account_order_tests.rs"]
+mod account_orders;
+
 struct TokenFixture {
     model: ModelFixture,
     reviewer: WorkflowActor,

@@ -231,6 +231,12 @@ pub struct NotificationRecipient {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotificationDisposition {
     Active(Box<NotificationRecipient>),
+    /// A private platform notice, routed without inventing a recipient account. `company`
+    /// qualifies the message key the worker mints for it.
+    Agent {
+        principal_id: Uuid,
+        company: crate::entities::value_objects::CompanySlug,
+    },
     Resolved,
     Withdrawn,
     Control,

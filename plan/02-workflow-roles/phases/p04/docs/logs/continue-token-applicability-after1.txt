@@ -1,0 +1,93 @@
+
+running 82 tests
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_cancelled_owner_never_spends ... ok
+test adapters::persistence::workflow::tests::admission_tests::admission_token_tests::root_budget_admission_token_policy_equals_the_compiled_policy ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_child_ignores_held_ancestor_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_competing_descendants_replay_and_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_mid_batch_refusal_commits_prior_results ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_deferred_commit_failure_preserves_freeze_and_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_rollback_and_fresh_handle_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_successful_io_and_wait_replay_charge_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_pure_io_wait_refusal_no_hot_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_child_links_to_root_without_its_own_budget ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_activation_tests::workflow_budget_activation_usage_wait_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_matches_compiled_limits_and_starts_at_zero ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::root_budget_admission_raw_root_without_budget_is_refused ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_current_compiler_admission_activates ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_schema_competing_descendants_and_exact_duplicate_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_schema_consumption_never_locks_root_run_or_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_schema_duplicate_first_claim_and_replay_with_remaining_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_schema_rollback_scope_mutation_and_owner_cascade ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::wakeup_tests::budget_schema_tests::workflow_budget_token_policy_sql_shape_matches_compiler_contract ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_root_budget_overrides_read_handler_default ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_descendants_share_without_locking_root_or_parent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_deferred_commit_failure_rolls_back_grant_and_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_unknown_effect_exhaustion_reconciles ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_reservation_competes_with_cancel_and_completion ... ok
+observed gated transaction pids=[46766] blocker=46779 elapsed_ms=14
+observed resolution pids=[46767] blocker=46766 elapsed_ms=1992
+observed reservation resolution and second reservation pids=[46767, 46764] blocker=46766 elapsed_ms=7
+observed gated transaction pids=[47038] blocker=47050 elapsed_ms=16
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::race_tests::workflow_budget_runtime_usage_wait_crossing_lease_or_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_conflicting_competitors_debit_one_payload ... ok
+observed resolution pids=[47036] blocker=47038 elapsed_ms=1989
+observed reservation resolution and second reservation pids=[47036, 47039] blocker=47038 elapsed_ms=6
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::resolution_tests::workflow_budget_resolution_stalled_reservation_debits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_rollback_restart_and_safe_retry_preserve_charge ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_duplicate_conflict_exact_and_exhausted_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::budget_runtime_tests::workflow_budget_runtime_scope_fence_expiry_and_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_nonreply_terminal_company_ownership_precedes_run_ownership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_park_first_blocks_retirement_before_the_company ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_retirement_first_refuses_without_model_admission_or_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_reviewer_account_precedes_company_ownership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_settlement_retirement_keeps_received_truth_without_review_or_duplicate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_and_recorded_reservation_ignore_retired_reviewers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_reservation_does_not_lock_unused_reviewer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_settlement_does_not_lock_unused_reviewer ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_approval_commit_failure_rolls_back_allowance_and_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_notification_commit_failure_rolls_back_pause ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_reviewer_revocation_wins_before_approval_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_sql_cannot_change_proposal_or_grant_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_approved_request_reparks_when_usage_itself_exceeds_allowance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_cancel_and_approval_contend_without_late_resurrection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_inflight_settlement_retains_truth_after_sibling_denial ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_refusal_stops_admitted_descendants_and_inflight_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_sibling_usage_reparks_exact_request_without_debit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::final_knowledge::channel_reply_knowledge_pending_owner_keeps_cause_after_real_token_denial ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_competing_deferred_claims_do_not_lock_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_deferral_is_capped_by_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_deferred_sibling_retires_after_denial ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pause_cannot_replace_hard_model_budget_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pause_last_attempt_terminalizes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pending_pause_preserves_attempts_and_approval_releases ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_processing_pause_charges_one_failure_only ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::scheduling::workflow_harness_token_pure_pending_reports_deferral_and_resumes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_rejection_preserves_zero_usage_and_cannot_reopen ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_settlement_records_excess_before_parking ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_unavailable_review_replay_cannot_grant_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_competing_admission_and_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_lost_request_stays_charged_and_cannot_reenter ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::workflow_harness_model_store_projection_failure_rolls_back_all_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_competing_admissions_keep_one_slot ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_new_claim_releases_slot_without_refunding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::workflow_harness_model_owner_requires_reservation_and_exact_settlement ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_park_first_serializes_retirement_and_cancels_the_retired_notice ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_recorded_approval_does_not_require_a_retired_reviewer_account ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_retirement_first_refuses_without_partial_park_or_deadlock ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_history_and_replays_do_not_require_unused_retired_reply_policy_accounts ... ok
+test application::workflow::budget::tests::workflow_budget_keys_are_bounded_ascii_identities ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_boundary_and_invalid_values_are_located ... ok
+test application::workflow::compiler::compile::budget_tests::workflow_root_budget_compiler_freezes_defaults_and_authored_limits ... ok
+test application::workflow::publication::storage::tests::workflow_root_budget_storage_roundtrip_and_old_semantics_refusal ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_roundtrip_and_identity ... ok
+test application::workflow::sample::tests::bounded_root_budget_and_external_kinds_never_fall_back ... ok
+test domain::workflow::budget::tests::workflow_root_budget_boundaries_and_checked_debits ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_ordinary_effect_hints_ignore_unused_retired_reply_policy_accounts ... ok
+
+test result: ok. 82 passed; 0 failed; 0 ignored; 0 measured; 4250 filtered out; finished in 52.52s
+

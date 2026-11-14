@@ -560,8 +560,9 @@ impl ThreadPrincipalIntent {
 pub enum InboundOrigin {
     /// Mail from outside the platform.
     External,
-    /// One channel's mail relayed in-process to another.
-    Internal,
+    /// One channel's mail relayed in-process to another, carrying the delivery part the commit
+    /// must prove it is.
+    Internal(crate::transport::InternalRelayProof),
     /// Posted by a signed-in member through the application.
     Application,
 }
@@ -570,8 +571,15 @@ impl InboundOrigin {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::External => "external",
-            Self::Internal => "internal",
+            Self::Internal(_) => "internal",
             Self::Application => "application",
+        }
+    }
+
+    pub const fn relay_proof(self) -> Option<crate::transport::InternalRelayProof> {
+        match self {
+            Self::Internal(proof) => Some(proof),
+            Self::External | Self::Application => None,
         }
     }
 }

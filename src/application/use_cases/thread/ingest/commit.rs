@@ -176,7 +176,7 @@ const fn inbound_origin(origin: IngressOrigin) -> InboundOrigin {
     match origin {
         IngressOrigin::ExternalTransport => InboundOrigin::External,
         IngressOrigin::TrustedApplication => InboundOrigin::Application,
-        IngressOrigin::InternalChannel { .. } => InboundOrigin::Internal,
+        IngressOrigin::InternalChannel { proof, .. } => InboundOrigin::Internal(proof),
     }
 }
 

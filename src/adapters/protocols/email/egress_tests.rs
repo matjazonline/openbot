@@ -310,7 +310,7 @@ fn the_internal_relay_and_the_wire_agree_on_the_hop_budget() {
             .unwrap(),
     );
     let mail = relayed
-        .as_relay_mail()
+        .as_relay_mail(crate::transport::test_support::relay_proof(Uuid::new_v4()))
         .expect("a channel's mail addressed to one of our channels can be relayed");
     assert_eq!(
         mail.target,
@@ -347,7 +347,11 @@ fn a_mail_addressed_outside_this_deployment_carries_no_internal_target() {
             .unwrap(),
     );
     assert!(external.internal_target.is_none());
-    assert!(external.as_relay_mail().is_none());
+    assert!(
+        external
+            .as_relay_mail(crate::transport::test_support::relay_proof(Uuid::new_v4()))
+            .is_none()
+    );
 }
 
 /// A fan-out or context-only address selects no single channel, so it is not a direct relay.
@@ -486,19 +490,26 @@ async fn an_unreadable_payload_is_terminal() {
 #[tokio::test]
 async fn a_recipient_of_our_own_is_relayed_rather_than_posted() {
     let transport = Arc::new(RecordingTransport::default());
-    let relay = Arc::new(NeverInternal {
-        disposition: Mutex::new(RelayDisposition::Relayed),
-    });
-    let sender = EmailSender::new(DeploymentMailTransports::only(transport.clone()), relay);
+    let relay = Arc::new(NeverInternal::answering(RelayDisposition::Relayed));
+    let sender = EmailSender::new(
+        DeploymentMailTransports::only(transport.clone()),
+        relay.clone(),
+    );
     let parts = renderer()
         .render(&envelope(context("other@acme.mailagents.test")))
         .unwrap();
+    let record = record();
 
-    let outcome = sender.send(&record(), &parts[0]).await;
+    let outcome = sender.send(&record, &parts[0]).await;
     assert!(matches!(outcome, ProviderSendOutcome::Delivered { .. }));
     assert!(
         transport.sent().is_empty(),
         "an internal hop must not leave the building"
+    );
+    assert_eq!(
+        *relay.claimed.lock().unwrap(),
+        vec![crate::transport::InternalRelayProof::of(&record, &parts[0])],
+        "the hop names exactly the claimed delivery and the part being sent"
     );
 }
 
@@ -506,15 +517,11 @@ async fn a_recipient_of_our_own_is_relayed_rather_than_posted() {
 /// next time, so it goes terminal rather than spending an attempt budget on it.
 #[tokio::test]
 async fn an_internal_refusal_is_terminal() {
-    let relay = Arc::new(NeverInternal {
-        disposition: Mutex::new(RelayDisposition::Refused(
-            "Max inter-channel hop count reached".into(),
-        )),
-    });
-    let sender = EmailSender::new(
-        DeploymentMailTransports::only(Arc::new(RecordingTransport::default())),
-        relay,
-    );
+    let relay = Arc::new(NeverInternal::answering(RelayDisposition::Refused(
+        "Max inter-channel hop count reached".into(),
+    )));
+    let transport = Arc::new(RecordingTransport::default());
+    let sender = EmailSender::new(DeploymentMailTransports::only(transport.clone()), relay);
     let parts = renderer()
         .render(&envelope(context("other@acme.mailagents.test")))
         .unwrap();
@@ -529,6 +536,10 @@ async fn an_internal_refusal_is_terminal() {
             }
         ),
         "{outcome:?}"
+    );
+    assert!(
+        transport.sent().is_empty(),
+        "a refused internal hop is never washed through SMTP"
     );
 }
 
@@ -554,22 +565,32 @@ fn record() -> DeliveryRecord {
     }
 }
 
-/// A relay that answers however the test told it to, defaulting to "not one of ours".
+/// A relay that answers however the test told it to, defaulting to "not one of ours", and
+/// records the delivery part each hop claimed to be.
 struct NeverInternal {
     disposition: Mutex<RelayDisposition>,
+    claimed: Mutex<Vec<crate::transport::InternalRelayProof>>,
+}
+
+impl NeverInternal {
+    fn answering(disposition: RelayDisposition) -> Self {
+        Self {
+            disposition: Mutex::new(disposition),
+            claimed: Mutex::default(),
+        }
+    }
 }
 
 impl Default for NeverInternal {
     fn default() -> Self {
-        Self {
-            disposition: Mutex::new(RelayDisposition::NotInternal),
-        }
+        Self::answering(RelayDisposition::NotInternal)
     }
 }
 
 #[async_trait]
 impl InternalMailRelay for NeverInternal {
-    async fn relay_internal(&self, _mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition> {
+    async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition> {
+        self.claimed.lock().unwrap().push(mail.proof);
         Ok(self.disposition.lock().unwrap().clone())
     }
 }

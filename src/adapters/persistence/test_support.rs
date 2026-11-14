@@ -732,6 +732,39 @@ pub fn company_agents(
     ))
 }
 
+/// The key the notification worker mints for an agent notice, with the renderer
+/// [`notification_worker`] registers, for tests that commit a projection by hand.
+pub(crate) fn minted_agent_notice_key(
+    projection: &crate::entities::notification::NotificationProjection,
+) -> Option<crate::entities::transport::ExternalMessageKey> {
+    let renderer = crate::adapters::protocols::email::EmailRenderer::new("example.test");
+    crate::application::notification::agent_notice_key(projection, || Ok(&renderer)).unwrap()
+}
+
+pub(crate) fn notification_worker(
+    persistence: &super::PostgresPersistence,
+    escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
+) -> crate::application::services::notification_worker::NotificationWorker {
+    use crate::application::transport::{DeliveryComposer, TransportRenderers};
+    use std::sync::Arc;
+    let store = Arc::new(persistence.clone());
+    let renderers = TransportRenderers::new()
+        .register(Arc::new(
+            crate::adapters::protocols::email::EmailRenderer::new("example.test"),
+        ))
+        .unwrap();
+    crate::application::services::notification_worker::NotificationWorker::new(
+        store.clone(),
+        DeliveryComposer::new(Arc::new(renderers), store),
+        crate::application::settings::NotificationMailSettings {
+            escalation_ack_hours,
+            mail_domain: "example.test".into(),
+            public_base_url: "https://example.test".into(),
+        },
+        Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -862,28 +895,4 @@ mod tests {
             "postgres://localhost:5432/"
         );
     }
-}
-
-pub(crate) fn notification_worker(
-    persistence: &super::PostgresPersistence,
-    escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
-) -> crate::application::services::notification_worker::NotificationWorker {
-    use crate::application::transport::{DeliveryComposer, TransportRenderers};
-    use std::sync::Arc;
-    let store = Arc::new(persistence.clone());
-    let renderers = TransportRenderers::new()
-        .register(Arc::new(
-            crate::adapters::protocols::email::EmailRenderer::new("example.test"),
-        ))
-        .unwrap();
-    crate::application::services::notification_worker::NotificationWorker::new(
-        store.clone(),
-        DeliveryComposer::new(Arc::new(renderers), store),
-        crate::application::settings::NotificationMailSettings {
-            escalation_ack_hours,
-            mail_domain: "example.test".into(),
-            public_base_url: "https://example.test".into(),
-        },
-        Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
-    )
 }

@@ -89,7 +89,7 @@ async fn select_on(
     .await
 }
 
-async fn enqueue_notices_on(
+pub(in crate::adapters::persistence::workflow::escalations) async fn enqueue_notices_on(
     db: &mut PgConnection,
     company: Uuid,
     case: Uuid,

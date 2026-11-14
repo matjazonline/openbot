@@ -39,9 +39,14 @@ pub(super) async fn settle_on(
                 )
                 .map_err(|_| invalid())?,
             };
-            recovery::route_parked_failure(db, scope, &failure).await?;
-            if refusal.is_some() {
+            let routed = recovery::route_parked_failure(db, scope, &failure).await?;
+            // An unrouted refusal fails the root; its own typed audit is what the default
+            // ladder's case proves its reason against (D1.3).
+            if refusal.is_some() || !routed {
                 waits::audit(db, scope, failure.code().as_str()).await?;
+            }
+            if !routed {
+                Box::pin(super::escalations::run_failed_on(db, scope, failure.code())).await?;
             }
         }
         completion_job::CompletionOwner::Recovered => return Err(invalid()),

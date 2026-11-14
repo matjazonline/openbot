@@ -2,6 +2,7 @@
 use super::*;
 use crate::application::workflow::actions::ActionScope;
 use crate::application::workflow::channel_reply::ReplyApprovalPolicy;
+use crate::application::workflow::decisions::{DecisionNotices, reviewer_deadline};
 use serde_json::Value;
 
 #[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
@@ -51,6 +52,18 @@ pub(super) async fn resolve_on(
     company: CompanyId,
     principals: &[Uuid],
 ) -> AppResult<Vec<PrincipalAccount>> {
+    let mappings = mapped_on(db, company, principals).await?;
+    if mappings.len() != principals.len() {
+        return Err(missing());
+    }
+    Ok(mappings)
+}
+
+pub(super) async fn mapped_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    principals: &[Uuid],
+) -> AppResult<Vec<PrincipalAccount>> {
     if principals.is_empty() {
         return Ok(Vec::new());
     }
@@ -65,8 +78,72 @@ pub(super) async fn resolve_on(
     .bind(principals)
     .fetch_all(db)
     .await?;
-    if mappings.len() != principals.len() {
-        return Err(missing());
-    }
     Ok(mappings)
+}
+
+#[derive(PartialEq, Eq)]
+pub(super) enum ActionApprovalAccounts {
+    NotApplicable,
+    Recorded,
+    Unavailable(Value),
+    Pending {
+        configuration: Value,
+        principals: Vec<Uuid>,
+        mappings: Vec<PrincipalAccount>,
+    },
+}
+
+impl ActionApprovalAccounts {
+    pub(super) fn users(&self) -> impl Iterator<Item = Uuid> + '_ {
+        let mappings = match self {
+            Self::Pending { mappings, .. } => mappings.as_slice(),
+            _ => &[],
+        };
+        mappings.iter().map(|mapping| mapping.user_id)
+    }
+}
+
+/// Read only typed selectors. Missing reviewers remain the actual park's unavailable outcome;
+/// all still-present accounts are hinted so even a refused park cannot acquire one late.
+pub(super) async fn action_on(
+    db: &mut PgConnection,
+    request: &crate::application::workflow::actions::ActionDispatchRequest,
+    notices: Option<&DecisionNotices>,
+) -> AppResult<ActionApprovalAccounts> {
+    if decisions::approvals::already_recorded_on(db, request).await? {
+        return Ok(ActionApprovalAccounts::Recorded);
+    }
+    if notices.is_none() {
+        return Ok(ActionApprovalAccounts::NotApplicable);
+    }
+    let scope = request.fence.scope;
+    let configuration: Option<Value> = sqlx::query_scalar::<_, Option<Value>>(
+        "SELECT frozen_inputs->'approval' FROM workflow_executions \
+         WHERE company_id=$1 AND run_id=$2 AND id=$3",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .flatten();
+    let Some(configuration) = configuration else {
+        return Ok(ActionApprovalAccounts::NotApplicable);
+    };
+    let Ok((selectors, _)) = reviewer_deadline(&configuration) else {
+        return Ok(ActionApprovalAccounts::Unavailable(configuration));
+    };
+    let principals = match reviewer_resolution::resolve_on(db, scope, &selectors).await {
+        Ok(principals) => principals,
+        Err(AppError::BadRequest(_) | AppError::WorkflowRole(_)) => {
+            return Ok(ActionApprovalAccounts::Unavailable(configuration));
+        }
+        Err(error) => return Err(error),
+    };
+    let mappings = mapped_on(db, scope.company, &principals).await?;
+    Ok(ActionApprovalAccounts::Pending {
+        configuration,
+        principals,
+        mappings,
+    })
 }

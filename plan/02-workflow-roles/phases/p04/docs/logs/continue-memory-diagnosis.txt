@@ -1,0 +1,9 @@
+Cloudroom host daemon memory guard, 2026-11-12.
+Thread thr_c7pja4f7ef; daemon event time1794522234779.
+usedBytes18442354688 (17.175 GiB); totalBytes34359738368 (32 GiB); limitBytes17179869184 (16 GiB).
+Installed host-daemon/dist/start-host-daemon.js:startMemoryGuard uses os.totalmem()/2 with no ordinary setting.
+It probes compressed-memory pressure before summing per-thread process footprints; subprocesses count.
+Current exposed settings have no memory limit key. Test-only guard override was not changed.
+Retry: cargo test --locked --offline --lib --no-run --jobs1 --config profile.test.package.open_bots.debug=0, SQLX_OFFLINE=true, existing target.
+No repository limits increased or persistent build settings changed.
+Build22 stopped deliberately before reaching the cap; build23 also disables incremental compilation (CARGO_INCREMENTAL=0).

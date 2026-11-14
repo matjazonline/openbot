@@ -1,0 +1,20 @@
+{
+  "build": 117,
+  "selected": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "--test-threads=1",
+    "--nocapture",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement"
+  ],
+  "exit": 0,
+  "seconds": 2.58,
+  "fixture": "owned openbot_roles_p04_resume18 and isolated test databases",
+  "RUST_MIN_STACK": 2097152,
+  "source_sha256_before": "ce403744604560f7dd2eb7a1fcbcdb9cf18f7aac06d1c085487ba467b698eeca",
+  "source_sha256_after": "ce403744604560f7dd2eb7a1fcbcdb9cf18f7aac06d1c085487ba467b698eeca",
+  "source_hash_scope": "all src Rust/SQL and init schema"
+}

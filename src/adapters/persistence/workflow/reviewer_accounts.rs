@@ -26,6 +26,23 @@ struct ReviewerAccountHints {
     mappings: Vec<AccountMapping>,
 }
 
+/// D1.8's aggregate union remains bounded independently of each typed source's own bound.
+pub(super) async fn lock_users_on(
+    db: &mut PgConnection,
+    accounts: &mut Vec<Uuid>,
+) -> AppResult<Vec<Uuid>> {
+    accounts.sort_unstable();
+    accounts.dedup();
+    if accounts.len() > registry::MAX_REVIEWERS * 5 + 3 {
+        return Err(invalid());
+    }
+    sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+        .bind(accounts.as_slice())
+        .fetch_all(db)
+        .await
+        .map_err(Into::into)
+}
+
 pub(super) async fn prelock_business_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -41,11 +58,7 @@ pub(super) async fn prelock_business_on(
     if accounts.len() > registry::MAX_REVIEWERS + 1 {
         return Err(invalid());
     }
-    let locked: Vec<Uuid> =
-        sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
-            .bind(&accounts)
-            .fetch_all(&mut *db)
-            .await?;
+    let locked = lock_users_on(db, &mut accounts).await?;
     if locked != accounts {
         return Err(changed());
     }

@@ -240,6 +240,24 @@ pub(super) async fn bound(
     entrance: Entrance,
     association: RelatedAssociation,
 ) -> BindingTarget {
+    Box::pin(bound_escalating(
+        fixture,
+        connection,
+        version,
+        entrance,
+        association,
+        None,
+    ))
+    .await
+}
+pub(super) async fn bound_escalating(
+    fixture: &Fixture,
+    connection: &HttpConnection,
+    version: VersionId,
+    entrance: Entrance,
+    association: RelatedAssociation,
+    escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
+) -> BindingTarget {
     let p = &fixture.persistence;
     let company = fixture.target.company;
     let actor = fixture.target.actor;
@@ -252,7 +270,7 @@ pub(super) async fn bound(
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
-            escalation: None,
+            escalation,
             target,
             expected: None,
             association,

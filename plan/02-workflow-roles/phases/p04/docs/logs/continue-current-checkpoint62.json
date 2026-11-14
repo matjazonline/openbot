@@ -1,0 +1,39 @@
+{
+  "status": "PARTIAL_B1_UNREVIEWED",
+  "coordination_revision": 34,
+  "HEAD": "2bbe2649024aa6a4617b74b0c0c7868b14590b5f",
+  "branch": "room/check-last-handoff-md-under-plan-02-work-qc8d",
+  "latest_build": 62,
+  "inventory": 4376,
+  "latest_focused_totals": {
+    "passed": 167,
+    "failed": 0,
+    "ignored": 3
+  },
+  "compiled_runtime_hashes": {
+    "src/adapters/persistence/workflow/batch.rs": "0d2244c1e4ab85a8890f706621e1f741db9db66f2239efa074c9c45d9b89cdc9",
+    "src/adapters/persistence/workflow/channel_reply_completion.rs": "05f57a88433ca121a74af2891a2c088438983e436834a8fc53bd448392229fe5",
+    "src/adapters/persistence/workflow/wait_commit.rs": "db912e9476435e9bd12a23d154124297f7009e074cf704c3f949c4ee263b5546",
+    "src/adapters/persistence/workflow/wait_account_hints.rs": "2e8364ade5cb079906f22d08a6a980ee1e156705d9a45f8786b0e0dc7160acdc",
+    "src/adapters/persistence/workflow/waits.rs": "f45060c2d2cdab3167084f05f93b830ff08596e72f06e4fe87edc4d329665be9",
+    "src/adapters/persistence/workflow/child_waits.rs": "5818ad4b2a5df34f598a8e8753c231d383e89951b0b58a29857b7dc007076a20"
+  },
+  "evidence_sha256": {
+    "continue-pending-child-native62-manifest.json": "d06e89392d979c862beab3ac3e2d2d4f3253b101f715d624fc47b396c9edc479",
+    "continue-pending-child-selection62.json": "7414c59e92422df575df8adabe0aa8b63f801c90aa1f471bd4c1f12bc14ca348",
+    "continue-test-inventory62.json": "0080507d8b46bc26e50bdc465b410881bc2ec6ce0c1f54522faa6906bab8a238",
+    "continue-offline-alltargets9.txt": "3050f7fd923ccb2127e5d071aafbaa71354a58220060f529a9f0f4b58bdbbbc4",
+    "continue-source-modules9.txt": "77f47dab52fc4cf1f3c30f1d1889895ded936bfde6ef2e0c56679c9d5837c656",
+    "continue-source-modules9-inputs.json": "dd66aa0020887f3f9d6e7910954224dc1226b97f058249dcace487c07316dc28",
+    "continue-fmt-check11.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "continue-whitespace11.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "continue-cache-lockfiles11.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "continue-trail-build8.txt": "3f360046abbd343474d6502fa9aef7df4bfa1d1495c08330bb020daf099c66e8"
+  },
+  "limitations": [
+    "No whole F1/B1/p04/p05 acceptance",
+    "Three native-provider acceptance tests ignored",
+    "Terminal-child/effect/agent applicability and original p04 administrative/escalation/UI/browser obligations remain",
+    "Known unchanged Clippy failures retained in resume-clippy1.txt; no whole final suite claimed"
+  ]
+}

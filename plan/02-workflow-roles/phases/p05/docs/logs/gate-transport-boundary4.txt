@@ -1,0 +1,4 @@
+rg: /private/tmp/claude-501/-Users-mac02--gui-cloudroom-plugins-environment-git-worktree-host-data-worktrees-thr-jt43h4qc8d-1-openbot/d139d6f0-976b-419b-b64a-47335b295a58/scratchpad/bin/rg -> Claude Code bundled ripgrep (no system rg on this host)
+runtime boundary gate regression tests passed
+transport boundary check passed
+EXIT 0

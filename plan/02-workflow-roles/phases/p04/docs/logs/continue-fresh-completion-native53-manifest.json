@@ -1,0 +1,62 @@
+{
+  "build": 53,
+  "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+  "inventory": 4358,
+  "runs": [
+    {
+      "label": "continue-fresh-completion-applicability-after1",
+      "selected": 43,
+      "exit": 0,
+      "seconds": 25.41,
+      "stats": {
+        "passed": 43,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-order-after3",
+      "selected": 10,
+      "exit": 0,
+      "seconds": 11.07,
+      "stats": {
+        "passed": 10,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-fresh-completion-affected53-part1",
+      "selected": 160,
+      "exit": 0,
+      "seconds": 119.67,
+      "stats": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-fresh-completion-affected53-part2",
+      "selected": 160,
+      "exit": 0,
+      "seconds": 102.57,
+      "stats": {
+        "passed": 160,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-fresh-completion-affected53-part3",
+      "selected": 33,
+      "exit": 0,
+      "seconds": 0.4,
+      "stats": {
+        "passed": 33,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ]
+}

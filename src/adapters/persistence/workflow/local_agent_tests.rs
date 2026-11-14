@@ -30,10 +30,10 @@ mod continuation;
 #[path = "local_agent_correction_tests.rs"]
 mod corrections;
 
-struct Setup {
-    fixture: Fixture,
-    profile: LocalAgentProfile,
-    scope: ActivationRequest,
+pub(in crate::adapters::persistence::workflow::tests) struct Setup {
+    pub(in crate::adapters::persistence::workflow::tests) fixture: Fixture,
+    pub(in crate::adapters::persistence::workflow::tests) profile: LocalAgentProfile,
+    pub(in crate::adapters::persistence::workflow::tests) scope: ActivationRequest,
     paired: Paired,
     journal_id: Uuid,
 }
@@ -52,7 +52,8 @@ enum TestAssociation {
 }
 
 impl Setup {
-    fn new() -> impl std::future::Future<Output = Self> {
+    pub(in crate::adapters::persistence::workflow::tests) fn new()
+    -> impl std::future::Future<Output = Self> {
         Self::with_inputs(|_, _| {})
     }
     fn with_inputs(
@@ -125,7 +126,9 @@ impl Setup {
             journal_id: Uuid::new_v4(),
         }
     }
-    fn handler(&self) -> LocalAgentHandler<local_agents::PostgresLocalAgentWorkflow> {
+    pub(in crate::adapters::persistence::workflow::tests) fn handler(
+        &self,
+    ) -> LocalAgentHandler<local_agents::PostgresLocalAgentWorkflow> {
         LocalAgentHandler::new(
             local_agents::PostgresLocalAgentWorkflow::new(
                 self.fixture.persistence.clone(),
@@ -352,7 +355,9 @@ impl Setup {
         }
     }
 
-    async fn native_success(&self) -> ConnectionFence {
+    pub(in crate::adapters::persistence::workflow::tests) async fn native_success(
+        &self,
+    ) -> ConnectionFence {
         let native = self.native_started().await;
         self.native_complete(&native).await;
         native.fence

@@ -804,8 +804,16 @@ pub(super) async fn insert_canonical_message(
             &crate::adapters::response_schema::JsonResponseValidator,
         )?;
     }
+    let producer = match &stamp {
+        MessageStampSource::Public => None,
+        MessageStampSource::Workflow { run, .. } => Some(run.as_uuid()),
+    };
     let stamp = stamp.stamp_on(connection, company_id, write.role).await?;
     let id = write.id;
+    if let Some(producer) = producer {
+        sqlx::query("INSERT INTO workflow_message_producer_seals(company_id,message_id,producer_run_id) VALUES($1,$2,$3)")
+            .bind(company_id).bind(id.as_uuid()).bind(producer).execute(&mut *connection).await?;
+    }
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,

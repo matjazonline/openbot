@@ -1,0 +1,15 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_and_active_consumer_keep_origin_after_actual_producer_retention ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_and_active_consumer_keep_origin_after_actual_producer_retention' (4964009) panicked at src/adapters/persistence/workflow/tests.rs:270:14:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/value", span: SourceSpan { start: 283, end: 284, line: 1, column: 284 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_and_active_consumer_keep_origin_after_actual_producer_retention
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4465 filtered out; finished in 6.47s
+

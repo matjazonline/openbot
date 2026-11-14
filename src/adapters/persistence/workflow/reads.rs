@@ -699,15 +699,14 @@ impl WorkflowReads for PostgresPersistence {
     }
 
     async fn decision_company(&self, decision: Uuid) -> AppResult<Option<CompanyId>> {
-        Ok(
-            sqlx::query_scalar::<_, Uuid>(
-                "SELECT company_id FROM workflow_decisions WHERE id = $1",
-            )
-            .bind(decision)
-            .fetch_optional(self.pool())
-            .await?
-            .map(CompanyId::new),
+        Ok(sqlx::query_scalar::<_, Uuid>(
+            "SELECT company_id FROM workflow_decisions WHERE id = $1 \
+                 UNION SELECT company_id FROM workflow_escalation_decisions WHERE id = $1",
         )
+        .bind(decision)
+        .fetch_optional(self.pool())
+        .await?
+        .map(CompanyId::new))
     }
 }
 

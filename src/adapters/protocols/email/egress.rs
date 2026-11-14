@@ -32,8 +32,9 @@ use crate::{
     transport::{
         CanonicalContentV1, ContentDigest, ConversationAnchor, DeliveryEnvelope, DeliveryRecord,
         EmailDeliveryContext, EmailThreading, FailureDetail, InternalMailRelay, InternalRelayMail,
-        PartIndex, PartKey, ProviderSendOutcome, RelayDisposition, RenderedPart,
-        StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer, TransportSender,
+        InternalRelayProof, PartIndex, PartKey, ProviderSendOutcome, RelayDisposition,
+        RenderedPart, StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer,
+        TransportSender,
     },
 };
 
@@ -155,7 +156,7 @@ impl OutboundEmailV1 {
     /// because the relay is a transport and what a transport delivers is what it would have sent.
     /// Handing over the pre-increment values instead would make an internal hop free, and the
     /// inter-channel loop budget would never be spent.
-    fn as_relay_mail(&self) -> Option<InternalRelayMail<'_>> {
+    fn as_relay_mail(&self, proof: InternalRelayProof) -> Option<InternalRelayMail<'_>> {
         let (hop_count, _) = self.wire_relay()?;
         Some(InternalRelayMail {
             target: self.internal_target.as_ref()?,
@@ -170,6 +171,7 @@ impl OutboundEmailV1 {
             hop_count,
             trace: self.wire_relay()?.1,
             correlation_id: self.correlation_id,
+            proof,
         })
     }
 
@@ -485,12 +487,16 @@ impl EmailSender {
     ///
     /// A mail with no relay trace is never internal: a platform notice comes from the deployment
     /// rather than from a channel, so it has no source channel to authenticate the hop against.
+    ///
+    /// The hop names the part this call is sending, and only this call can say that: the receiving
+    /// commit proves the claim against the stored part before the message inherits anything.
     async fn relay_internally(
         &self,
         email: &OutboundEmailV1,
         delivery: &DeliveryRecord,
+        part: &RenderedPart,
     ) -> Option<ProviderSendOutcome> {
-        let mail = email.as_relay_mail()?;
+        let mail = email.as_relay_mail(InternalRelayProof::of(delivery, part))?;
         match self.internal.relay_internal(&mail).await {
             Ok(RelayDisposition::Relayed) => Some(ProviderSendOutcome::Delivered {
                 provider_key: provider_key(&email.message_id, delivery),
@@ -535,7 +541,7 @@ impl TransportSender for EmailSender {
                 };
             }
         };
-        if let Some(outcome) = self.relay_internally(&email, delivery).await {
+        if let Some(outcome) = self.relay_internally(&email, delivery, part).await {
             return outcome;
         }
         let message_id = email.message_id.clone();

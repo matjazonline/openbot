@@ -25,6 +25,8 @@ PURE = {
     'publication::ToolKind::Workflow', 'publication::ActionEffect::Read', 'publication::ActionEffect::Write',
     'registry::ModelStep', 'registry::mcp_tool_result', 'mcp::mcp_result_is_error',
     'agent::McpErrorPolicy', 'agent::McpResultSource',
+    # A scripted sample has no admitted department, so a role step is refused, not resolved.
+    'roles::refuse_unresolved_sample_role',
 }
 EXTERNAL = {'serde', 'serde_json', 'uuid', 'chrono', 'sha2'}
 SAMPLE = 'crate::application::workflow::sample'

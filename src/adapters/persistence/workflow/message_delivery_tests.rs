@@ -428,6 +428,7 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
             fence: &claimed.lease,
             expected: &projection,
             email: None,
+            agent_message_key: None,
             escalation_ack_hours: Default::default(),
         })
         .await

@@ -104,11 +104,35 @@ pub fn ladder_action(
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EscalationChoice {
     Acknowledge,
     Reassign { principal: PrincipalId },
     Cancel { expected_run_revision: RunRevision },
+}
+
+// An empty struct variant rejects extra acknowledgement fields. Serde's internally
+// tagged unit variant otherwise discards them even with deny_unknown_fields.
+impl<'de> Deserialize<'de> for EscalationChoice {
+    fn deserialize<D: serde::Deserializer<'de>>(decoder: D) -> Result<Self, D::Error> {
+        #[derive(Deserialize)]
+        #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
+        enum WireChoice {
+            Acknowledge {},
+            Reassign { principal: PrincipalId },
+            Cancel { expected_run_revision: RunRevision },
+        }
+        Ok(match WireChoice::deserialize(decoder)? {
+            WireChoice::Acknowledge {} => Self::Acknowledge,
+            WireChoice::Reassign { principal } => Self::Reassign { principal },
+            WireChoice::Cancel {
+                expected_run_revision,
+            } => Self::Cancel {
+                expected_run_revision,
+            },
+        })
+    }
 }
 
 impl EscalationChoice {
@@ -154,7 +178,7 @@ pub enum EscalationSubmission {
     Replayed,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EscalationReason {
     /// A bounded typed failure code, never text parsed from an exception.
     pub code: crate::domain::workflow::FailureCode,
@@ -162,20 +186,22 @@ pub struct EscalationReason {
     pub role: Option<DepartmentRole>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
 pub enum EscalationSourceView {
-    Run(RunId),
+    Run { run: RunId },
     Admission { binding: WorkflowBindingId },
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct EscalationRecipientView {
     pub principal: PrincipalId,
     pub label: String,
     pub delivery: EscalationRecipientState,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
 pub enum EscalationRecipientState {
     Pending,
     Delivered,
@@ -183,7 +209,35 @@ pub enum EscalationRecipientState {
     Withdrawn,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationState {
+    Pending,
+    Waiting,
+    OwnerWaiting,
+    Manual,
+    Settled,
+    Withdrawn,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EscalationSettlement {
+    Acknowledged,
+    Reassigned,
+    Cancelled,
+    AlreadyTerminal,
+    Advanced,
+    Withdrawn,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct EscalationAssignee {
+    pub principal: PrincipalId,
+    pub label: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct EscalationView {
     pub company: CompanyId,
     pub escalation: EscalationId,
@@ -192,12 +246,32 @@ pub struct EscalationView {
     pub reason: EscalationReason,
     pub hop: EscalationHop,
     pub created_at: DateTime<Utc>,
-    pub deadline: DateTime<Utc>,
+    pub deadline: Option<DateTime<Utc>>,
+    pub state: EscalationState,
+    pub settlement: Option<EscalationSettlement>,
+    pub current_decision: EscalationDecisionId,
+    pub manual_assignment: bool,
     pub recipients: Vec<EscalationRecipientView>,
     pub settled_at: Option<DateTime<Utc>>,
+    pub command: Option<EscalationCommandView>,
+    pub payload_restricted: bool,
+    pub inspect_run: bool,
     pub can_acknowledge: bool,
     pub can_reassign: bool,
+    pub assignment_options: Vec<EscalationAssignee>,
+    pub assignment_options_truncated: bool,
     pub cancel_revision: Option<RunRevision>,
+}
+
+/// Immutable command facts; displaying history never resolves a retired account.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct EscalationCommandView {
+    pub actor_user: uuid::Uuid,
+    pub actor_principal: PrincipalId,
+    pub choice: EscalationChoice,
+    pub created_at: DateTime<Utc>,
+    pub next_decision: Option<EscalationDecisionId>,
 }
 
 #[async_trait]
@@ -316,3 +390,6 @@ mod tests {
         }
     }
 }
+
+#[path = "escalation_tools.rs"]
+pub mod tools;

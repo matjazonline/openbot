@@ -19,20 +19,62 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
     )
     .await
     .unwrap();
-    let result = f
-        .persistence()
-        .settled()
-        .complete_io(FencedWorkflowResult {
-            policy: crate::application::workflow::lease::LeasePolicy::new(
-                std::time::Duration::from_secs(3),
-            )
-            .unwrap(),
-            fence: claim.fence,
-            output: json!({"items":[],"token_count":0,"omitted":0}),
-        })
+    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
+        .fetch_one(&mut *tx)
         .await
         .unwrap();
-    assert!(result.is_some());
+    authority_fk_and_mutation_probes(&f, scope).await;
+    let completion = f.persistence().complete_io(FencedWorkflowResult {
+        policy: crate::application::workflow::lease::LeasePolicy::new(
+            std::time::Duration::from_secs(3),
+        )
+        .unwrap(),
+        fence: claim.fence,
+        output: json!({"items":[],"token_count":0,"omitted":0}),
+    });
+    tokio::pin!(completion);
+    tokio::select! {
+        result = completion.as_mut() => panic!("runtime completion bypassed company authority: {result:?}"),
+        () = completion_company_wait(&f, blocker) => {},
+    }
+    sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE NOWAIT")
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .execute(&mut *tx)
+        .await
+        .expect("completion must await company before taking run ownership");
+    tx.rollback().await.unwrap();
+    let result = completion
+        .await
+        .unwrap()
+        .expect("actual completion commits after authority releases");
+    assert_eq!(
+        result.output,
+        json!({"items":[],"token_count":0,"omitted":0})
+    );
+}
+
+async fn authority_fk_and_mutation_probes(f: &AdmissionFixture, scope: ActivationRequest) {
+    // A real PostgreSQL FK against the held production company retains KEY SHARE
+    // compatibility. Full completion is a company writer and now serializes separately.
+    let mut probe = f.persistence().pool().begin().await.unwrap();
+    let table = format!("workflow_control_fk_{}", Uuid::new_v4().simple());
+    // PostgreSQL rejects a TEMP-to-permanent FK. This ordinary relation and its
+    // inserted row exist only in this transaction and disappear on rollback.
+    let definition =
+        format!("CREATE TABLE {table}(company_id uuid NOT NULL REFERENCES public.companies(id))");
+    sqlx::raw_sql(&definition)
+        .execute(&mut *probe)
+        .await
+        .unwrap();
+    let insert = format!("INSERT INTO {table}(company_id) VALUES($1) RETURNING company_id");
+    let inserted: Uuid = sqlx::query_scalar(&insert)
+        .bind(scope.company.as_uuid())
+        .fetch_one(&mut *probe)
+        .await
+        .unwrap();
+    assert_eq!(inserted, scope.company.as_uuid());
+    probe.rollback().await.unwrap();
     for sql in [
         "UPDATE companies SET name=name WHERE id=$1",
         "DELETE FROM companies WHERE id=$1",
@@ -53,7 +95,19 @@ async fn workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_muta
         );
         contender.rollback().await.unwrap();
     }
-    tx.rollback().await.unwrap();
+}
+
+async fn completion_company_wait(f: &AdmissionFixture, blocker: i32) {
+    let mut observer = f.persistence().pool().acquire().await.unwrap();
+    tokio::time::timeout(Duration::from_millis(300), async {
+        loop {
+            sqlx::query("SELECT pg_stat_clear_snapshot()").execute(&mut *observer).await.unwrap();
+            let waiting: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE activity.datname=current_database() AND activity.state='active' AND activity.wait_event_type='Lock' AND activity.query LIKE '%FROM companies%FOR NO KEY UPDATE%' AND $1=ANY(pg_blocking_pids(activity.pid)))")
+                .bind(blocker).fetch_one(&mut *observer).await.unwrap();
+            if waiting { break; }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    }).await.expect("exact company authority wait must be observed");
 }
 
 #[tokio::test]

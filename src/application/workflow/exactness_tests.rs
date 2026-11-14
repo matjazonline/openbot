@@ -17,6 +17,8 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
         AgentBuiltinTool::MemoryTimeline,
         AgentBuiltinTool::MemoryDetails,
         AgentBuiltinTool::SaveMemory,
+        AgentBuiltinTool::ReadEscalation,
+        AgentBuiltinTool::RespondToEscalation,
     ];
     for tool in all {
         match tool {
@@ -28,7 +30,9 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
             | AgentBuiltinTool::SearchMemory
             | AgentBuiltinTool::MemoryTimeline
             | AgentBuiltinTool::MemoryDetails
-            | AgentBuiltinTool::SaveMemory => (),
+            | AgentBuiltinTool::SaveMemory
+            | AgentBuiltinTool::ReadEscalation
+            | AgentBuiltinTool::RespondToEscalation => (),
         }
     }
     all.to_vec()
@@ -66,6 +70,18 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
             ToolAccounting::Configuration,
         ),
         (AgentToolTarget::Knowledge, ToolAccounting::RaisingRead),
+        (
+            AgentToolTarget::Escalation {
+                tool: crate::application::workflow::escalation::tools::EscalationTool::Read,
+            },
+            ToolAccounting::Configuration,
+        ),
+        (
+            AgentToolTarget::Escalation {
+                tool: crate::application::workflow::escalation::tools::EscalationTool::Respond,
+            },
+            ToolAccounting::Configuration,
+        ),
     ];
     for tool in crate::application::workflow::memory_tools::MemoryTool::ALL {
         let accounting = match tool {
@@ -85,6 +101,7 @@ fn every_target() -> Vec<(AgentToolTarget, ToolAccounting)> {
             AgentToolTarget::Http { .. }
             | AgentToolTarget::Mcp { .. }
             | AgentToolTarget::Message { .. }
+            | AgentToolTarget::Escalation { .. }
             | AgentToolTarget::Provisioning { .. }
             | AgentToolTarget::Knowledge
             | AgentToolTarget::Memory { .. }
@@ -138,10 +155,10 @@ fn memory_access_level_every_step_kind_and_tool_target_is_classified() {
     assert!(!step_output_exact("future.kind", &json!({})));
 
     let targets = every_target();
-    // Six single-sample variants plus `Memory` once per memory tool.
+    // Six single-sample variants, four memory tools, and both escalation operations.
     assert_eq!(
         targets.len(),
-        10,
+        12,
         "every AgentToolTarget variant has a sample"
     );
     for (target, accounting) in &targets {

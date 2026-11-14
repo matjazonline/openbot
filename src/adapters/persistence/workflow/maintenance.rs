@@ -5,7 +5,18 @@ use crate::application::workflow::activation::ActivationRequest;
 pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<bool> {
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
         .execute(&mut *db).await?;
-    channel_reply_completion::prelock_on(db, scope).await?;
+    // Expiry cannot create a final response and needs no historical approval recipients.
+    // This is also the first transition owner entered by wait resume. Keep company before
+    // run even when the deadline is still in the future; a later expiry in that transaction
+    // then reuses the same lock instead of acquiring it after the wait/run locks.
+    let company: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+            .bind(scope.company.as_uuid())
+            .fetch_optional(&mut *db)
+            .await?;
+    if company.is_none() {
+        return Ok(false);
+    }
     // Lock first, then consult the clock: waiting for another transition can cross expiry.
     let run: Option<Uuid> =
         sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
@@ -48,6 +59,7 @@ pub(super) async fn expire_on(db: &mut PgConnection, scope: ActivationRequest) -
     let code = crate::domain::workflow::FailureCode::parse("workflow.run_deadline")
         .map_err(|_| invalid())?;
     action_uncertainty::record(db, scope.company, scope.run, None, &code).await?;
+    Box::pin(escalations::run_failed_on(db, scope, &code)).await?;
     Ok(true)
 }
 

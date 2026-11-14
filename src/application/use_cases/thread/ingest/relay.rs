@@ -15,7 +15,14 @@ impl InternalMailRelay for ThreadUseCases {
         };
 
         let message = self.internal_inbound_message(mail, &selector, company_id)?;
-        let ingest = self.ingest(message).await?;
+        let ingest = match self.ingest(message).await {
+            Ok(ingest) => ingest,
+            // The commit refused the hop's delivery proof. A claim that does not match the stored
+            // part reads the same way on every attempt, and nothing was stored: definite, and
+            // never handed to SMTP, which would deliver the same mail back as unmarked work.
+            Err(AppError::Forbidden(reason)) => return Ok(RelayDisposition::Refused(reason)),
+            Err(error) => return Err(error),
+        };
         if ingest.accepted {
             return Ok(RelayDisposition::Relayed);
         }
@@ -177,6 +184,7 @@ impl ThreadUseCases {
             IngressOrigin::InternalChannel {
                 company_id,
                 channel_id: mail.source_channel_id,
+                proof: mail.proof,
             },
         ))
     }

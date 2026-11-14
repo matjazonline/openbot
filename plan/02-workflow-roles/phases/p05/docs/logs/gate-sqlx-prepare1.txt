@@ -1,0 +1,4 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 51s
+query data written to .sqlx in the current directory; please check this into version control
+SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets  136.73s user 8.91s system 129% cpu 1:52.05 total

@@ -1,5 +1,10 @@
 use super::*;
-use crate::application::workflow::{activation::*, completion::*, waits::*};
+use crate::application::workflow::message::MessageOrigin;
+use message::receipts::wait_origin_on;
+
+#[path = "wait_account_hints.rs"]
+mod account_hints;
+use crate::application::workflow::{activation::*, batch::PureCompletion, completion::*, waits::*};
 use serde_json::{Value, json};
 
 pub(super) async fn resume_on(
@@ -7,8 +12,10 @@ pub(super) async fn resume_on(
     scope: ActivationRequest,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
+    waits::bounds_on(db).await?;
     local_agents::prelock_wait_on(db, scope).await?;
-    channel_reply_completion::prelock_on(db, scope).await?;
+    // Keep account planning/observations behind a boxed seam on the stock test stack.
+    let accounts = Box::pin(account_hints::prelock_on(db, scope)).await?;
     if maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
     }
@@ -48,7 +55,7 @@ pub(super) async fn resume_on(
         _ => return Err(invalid()),
     }
     // Keep the wait continuation behind a boxed seam rather than growing the worker frame.
-    Box::pin(resume_waiting(db, scope, run, wait, notices)).await
+    Box::pin(resume_waiting(db, scope, run, wait, accounts, notices)).await
 }
 
 async fn resume_waiting(
@@ -56,8 +63,13 @@ async fn resume_waiting(
     scope: ActivationRequest,
     run: waits::WaitRun,
     wait: waits::WaitRow,
+    accounts: account_hints::Accounts,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
+    Box::pin(account_hints::ensure_wait_on(
+        db, scope, &run, &wait, accounts,
+    ))
+    .await?;
     let now = waits::now(db).await?;
     if run.deadline <= now && maintenance::expire_on(db, scope).await? {
         return Ok(WaitProgress::Expired(CommitDisposition::Committed));
@@ -79,7 +91,17 @@ async fn resume_waiting(
     }
     if wait.reason == "child_run" {
         // Box the child continuation: it may start the next round's child (07-D1 §D1.4).
-        return Box::pin(child_waits::resume_on(db, scope, run, wait.id, notices)).await;
+        let purpose = if accounts == account_hints::Accounts::Company
+            && channel_reply_completion::pending_reply_on(db, scope).await?
+        {
+            child_waits::ResumePurpose::WithoutReplyAccounts
+        } else {
+            child_waits::ResumePurpose::Continue
+        };
+        return Box::pin(child_waits::resume_on(
+            db, scope, run, wait.id, purpose, notices,
+        ))
+        .await;
     }
     if wait.reason == "decision" {
         // Submission settles a decision in its own command; a worker only times it out.
@@ -88,6 +110,43 @@ async fn resume_waiting(
         }
         return Box::pin(decision_timed_out(db, scope, wait.id)).await;
     }
+    // Box the existing receipt/event continuation rather than stacking another large future.
+    Box::pin(resume_ready(
+        db,
+        scope,
+        ReadyWait {
+            run,
+            wait,
+            accounts,
+            now,
+            event_due,
+        },
+        notices,
+    ))
+    .await
+}
+
+struct ReadyWait {
+    run: waits::WaitRun,
+    wait: waits::WaitRow,
+    accounts: account_hints::Accounts,
+    now: chrono::DateTime<chrono::Utc>,
+    event_due: bool,
+}
+
+async fn resume_ready(
+    db: &mut Transaction<'_, Postgres>,
+    scope: ActivationRequest,
+    ready: ReadyWait,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<WaitProgress> {
+    let ReadyWait {
+        run,
+        wait,
+        accounts,
+        now,
+        event_due,
+    } = ready;
     let memory = if wait.reason == "effect" {
         memory_steps::effect_resume_on(db, scope, wait.id).await?
     } else {
@@ -119,7 +178,7 @@ async fn resume_waiting(
             // truth for the agent, not this step's result: continue the parked agent job.
             message::receipts::EffectResume::Failed
             | message::receipts::EffectResume::Accepted(_)
-                if message::receipts::model_tool_wait_on(db, scope, wait.id).await? =>
+                if wait_origin_on(db, scope, wait.id, MessageOrigin::ModelTool).await? =>
             {
                 return Box::pin(continue_delivery(db, scope, wait.id)).await;
             }
@@ -138,15 +197,21 @@ async fn resume_waiting(
         // arrived (05-D2 §11). Decision waits have no name, so they never match.
         // Past the deadline only an event recorded in time may complete it (checked above).
         let recorded_by = event_due.then_some(wait.deadline);
-        let event:Option<ReceivedEvent>=sqlx::query_as("SELECT id,payload FROM workflow_wait_events WHERE company_id=$1 AND run_id=$2 AND event_name=$3 AND correlation=$4 AND consumed_execution_id IS NULL AND ($5::timestamptz IS NULL OR created_at<=$5) ORDER BY created_at,id LIMIT 1 FOR UPDATE")
-            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(&wait.event_name).bind(&wait.correlation).bind(recorded_by).fetch_optional(&mut **db).await?;
+        let event = Box::pin(account_hints::event_on(
+            db,
+            scope,
+            &wait,
+            recorded_by,
+            waits::WaitRead::Lock,
+        ))
+        .await?;
         let Some(event) = event else {
             return Ok(WaitProgress::Pending);
         };
         Wake::Event(event)
     };
     // Box the transactional continuation to keep the debug async stack shallow.
-    Box::pin(advance(db, scope, run, wake, notices)).await
+    Box::pin(advance(db, scope, run, wake, accounts, notices)).await
 }
 
 /// Complete the exact delivery wait and reopen the agent job it parked (continuation
@@ -219,7 +284,9 @@ async fn decision_timed_out(
         None,
     )
     .map_err(|_| invalid())?;
-    recovery::route_parked_failure(db, scope, &failure).await?;
+    if !recovery::route_parked_failure(db, scope, &failure).await? {
+        Box::pin(escalations::run_failed_on(db, scope, failure.code())).await?;
+    }
     Ok(WaitProgress::Expired(CommitDisposition::Committed))
 }
 pub(super) const DECISION_TIMED_OUT: &str = "decision.timed_out";
@@ -232,8 +299,11 @@ async fn effect_failed(db: &mut PgConnection, scope: ActivationRequest) -> AppRe
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     let failure = crate::application::workflow::message::message_delivery_failed().failure;
-    recovery::route_parked_failure(db, scope, &failure).await?;
+    let routed = recovery::route_parked_failure(db, scope, &failure).await?;
     waits::audit(db, scope, "message_delivery_failed").await?;
+    if !routed {
+        Box::pin(escalations::run_failed_on(db, scope, failure.code())).await?;
+    }
     saved(db, scope, CommitDisposition::Committed, true).await
 }
 
@@ -252,8 +322,11 @@ async fn memory_effect_failed(
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
     let failure = crate::application::workflow::memory::save_failed(outcome).failure;
-    recovery::route_parked_failure(db, scope, &failure).await?;
+    let routed = recovery::route_parked_failure(db, scope, &failure).await?;
     waits::audit(db, scope, "memory_delivery_failed").await?;
+    if !routed {
+        Box::pin(escalations::run_failed_on(db, scope, failure.code())).await?;
+    }
     saved(db, scope, CommitDisposition::Committed, true).await
 }
 
@@ -262,6 +335,7 @@ async fn advance(
     scope: ActivationRequest,
     run: waits::WaitRun,
     wake: Wake,
+    accounts: account_hints::Accounts,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
     let binding = admission_binding::read_saved_binding(
@@ -274,30 +348,7 @@ async fn advance(
     let activation = activation::activate_on(db, scope)
         .await?
         .ok_or_else(invalid)?;
-    let (prepared, event) = match wake {
-        Wake::Timer => (
-            prepare(
-                binding.bundle(),
-                &activation,
-                json!({"deadline":activation.inputs["deadline"]}),
-            ),
-            None,
-        ),
-        Wake::Event(event) => {
-            let question = binding.bundle().compiled().graph().definition().steps[&activation.step]
-                .step_type
-                .as_str()
-                == "message.ask";
-            let prepared = if question {
-                prepare_io(binding.bundle(), &activation, event.payload.clone())
-            } else {
-                prepare(binding.bundle(), &activation, event.payload.clone())
-            };
-            (prepared, Some(event.id))
-        }
-        // A parked message step completes as the I/O step it is, with its receipt as output.
-        Wake::Effect(result) => (prepare_io(binding.bundle(), &activation, result), None),
-    };
+    let (prepared, event) = account_hints::prepare_wake(binding.bundle(), &activation, wake);
     let completion = match prepared {
         Ok(completion) => completion,
         Err(AppError::BadRequest(_)) => {
@@ -305,11 +356,30 @@ async fn advance(
         }
         Err(error) => return Err(error),
     };
+    Box::pin(account_hints::ensure_completion_on(
+        db,
+        scope,
+        accounts,
+        &completion,
+        &activation,
+        run.max_steps,
+    ))
+    .await?;
     let step = batch_commit::CompletedStep {
         activated: &activation,
         graph: binding.bundle().compiled().graph(),
     };
     commit_wake(db, scope, &run, step, completion, event, notices).await
+}
+
+pub(super) fn activation_limited(
+    ordinal: u64,
+    completion: &PureCompletion,
+    max_steps: i32,
+) -> AppResult<bool> {
+    let max_steps = u64::try_from(max_steps).map_err(|_| invalid())?;
+    Ok(ordinal > max_steps
+        || (ordinal >= max_steps && matches!(completion.target, TransitionTarget::Step(_))))
 }
 
 /// Complete the parked step with its wake output: the activation limit, the consumed event (if
@@ -323,12 +393,8 @@ pub(super) async fn commit_wake(
     event: Option<Uuid>,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
 ) -> AppResult<WaitProgress> {
-    let max_steps = u64::try_from(run.max_steps).map_err(|_| invalid())?;
     let activation = step.activated;
-    if activation.ordinal > max_steps
-        || (activation.ordinal >= max_steps
-            && matches!(completion.target, TransitionTarget::Step(_)))
-    {
+    if activation_limited(activation.ordinal, &completion, run.max_steps)? {
         return fail(db, scope, WaitFailureReason::ActivationLimit).await;
     }
     if let Some(event) = event {
@@ -389,6 +455,11 @@ async fn expire(
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).execute(&mut *db).await?;
     }
     waits::audit(db, scope, "wait_expired").await?;
+    if run_state == "waiting" {
+        let reason = crate::domain::workflow::FailureCode::parse("workflow.wait_deadline")
+            .map_err(|_| invalid())?;
+        Box::pin(escalations::run_failed_on(db, scope, &reason)).await?;
+    }
     Ok(WaitProgress::Expired(CommitDisposition::Committed))
 }
 #[derive(sqlx::FromRow)]
@@ -495,6 +566,10 @@ pub(super) async fn fail(
     .execute(&mut *db)
     .await?;
     waits::audit(db, scope, "wait_failed").await?;
+    // A failed wait is never routed: an unhandled root failure starts the default ladder (D1.3).
+    let cause = crate::domain::workflow::FailureCode::parse(format!("workflow.{code}").as_str())
+        .map_err(|_| invalid())?;
+    Box::pin(escalations::run_failed_on(db, scope, &cause)).await?;
     Ok(WaitProgress::Failed {
         disposition: CommitDisposition::Committed,
         reason,

@@ -1,0 +1,21 @@
+
+running 1 test
+test adapters::http::routes::workflows::tests::escalation_tests::browser::workflow_escalation_browser_actual_submissions has been running for over 60 seconds
+test adapters::http::routes::workflows::tests::escalation_tests::browser::workflow_escalation_browser_actual_submissions ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::tests::escalation_tests::browser::workflow_escalation_browser_actual_submissions stdout ----
+
+thread 'adapters::http::routes::workflows::tests::escalation_tests::browser::workflow_escalation_browser_actual_submissions' (6290628) panicked at src/adapters/http/routes/workflows/escalation_browser.rs:91:5:
+assertion `left == right` failed: the browser must submit both real commands
+  left: Object {"ack": Number(0), "commands": Number(1), "reassign": Number(1)}
+ right: Object {"ack": Number(1), "commands": Number(2), "reassign": Number(1)}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::escalation_tests::browser::workflow_escalation_browser_actual_submissions
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 126.41s
+

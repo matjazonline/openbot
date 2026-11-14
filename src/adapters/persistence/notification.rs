@@ -188,6 +188,14 @@ impl NotificationPersistence for PostgresPersistence {
         NotificationProjectionCommitOutcome,
         NotificationProjectionResult,
     )> {
+        if matches!(
+            commit.expected.disposition,
+            NotificationDisposition::Agent { .. }
+        ) {
+            // Canonical ingress owns a larger future; box this substantive seam
+            // instead of adding its state to every person/control projection.
+            return Box::pin(escalation_notice::commit_agent_on(self, commit)).await;
+        }
         let mut tx = self.pool.begin().await.map_err(AppError::from)?;
         let current = match control::owned_projection_on(&mut tx, &commit).await? {
             control::OwnedProjection::Current(current) => current,
@@ -198,7 +206,13 @@ impl NotificationPersistence for PostgresPersistence {
                 ));
             }
             control::OwnedProjection::Stale => {
-                release_stale_projection(&mut tx, commit.fence).await?;
+                if !release_stale_projection(&mut tx, commit.fence).await? {
+                    tx.rollback().await?;
+                    return Ok((
+                        NotificationProjectionCommitOutcome::LeaseLost,
+                        NotificationProjectionResult::default(),
+                    ));
+                }
                 tx.commit().await?;
                 return Ok((
                     NotificationProjectionCommitOutcome::Stale,
@@ -244,6 +258,13 @@ impl NotificationPersistence for PostgresPersistence {
         failure: NotificationProjectionFailure<'_>,
     ) -> AppResult<bool> {
         let detail = bounded_error_detail(failure.detail);
+        let mut tx = self.pool.begin().await?;
+        // A row-lock wait can outlive the lease. Own the row before checking expiry
+        // in the failure write, just as successful projection does at completion.
+        if locked_event(&mut tx, failure.fence).await?.is_none() {
+            tx.rollback().await?;
+            return Ok(false);
+        }
         let result = sqlx::query(
             r#"UPDATE notification_events
                   SET status = CASE WHEN attempt_count >= max_attempts
@@ -254,16 +275,18 @@ impl NotificationPersistence for PostgresPersistence {
                       execution_id = NULL, owner_worker_id = NULL,
                       locked_at = NULL, lock_expires_at = NULL
                 WHERE id = $1 AND status = 'processing'
-                  AND execution_id = $2 AND owner_worker_id = $3"#,
+                  AND execution_id = $2 AND owner_worker_id = $3
+                  AND lock_expires_at > clock_timestamp()"#,
         )
         .bind(failure.fence.row.as_uuid())
         .bind(failure.fence.execution.as_uuid())
         .bind(failure.fence.owner.as_uuid())
         .bind(failure.class)
         .bind(detail)
-        .execute(&self.pool)
+        .execute(&mut *tx)
         .await
         .map_err(AppError::from)?;
+        tx.commit().await?;
         Ok(result.rows_affected() == 1)
     }
 
@@ -470,7 +493,7 @@ impl NotificationPersistence for PostgresPersistence {
                 NotificationDisposition::Resolved => "resolved",
                 NotificationDisposition::Withdrawn => "withdrawn",
                 NotificationDisposition::Active(_) => unreachable!(),
-                NotificationDisposition::Control => {
+                NotificationDisposition::Control | NotificationDisposition::Agent { .. } => {
                     return Err(AppError::NotFound("notification".into()));
                 }
             };
@@ -546,7 +569,7 @@ async fn locked_event(
 async fn release_stale_projection(
     tx: &mut Transaction<'_, Postgres>,
     fence: &ExecutionLease<NotificationEventId>,
-) -> AppResult<()> {
+) -> AppResult<bool> {
     let released: Option<(String, i32)> = sqlx::query_as(
         r#"UPDATE notification_events
               SET status = CASE WHEN attempt_count >= max_attempts
@@ -559,6 +582,7 @@ async fn release_stale_projection(
                   locked_at = NULL, lock_expires_at = NULL
             WHERE id = $1 AND status = 'processing'
               AND execution_id = $2 AND owner_worker_id = $3
+              AND lock_expires_at > clock_timestamp()
         RETURNING status, attempt_count"#,
     )
     .bind(fence.row.as_uuid())
@@ -567,6 +591,7 @@ async fn release_stale_projection(
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;
+    let owned = released.is_some();
     if let Some((status, attempts)) = released
         && status == "dead_letter"
     {
@@ -576,7 +601,7 @@ async fn release_stale_projection(
             "A notification event went stale on its last attempt and was dead-lettered"
         );
     }
-    Ok(())
+    Ok(owned)
 }
 
 fn bounded_error_detail(value: &str) -> String {
@@ -599,6 +624,7 @@ mod control;
 mod escalation_failures;
 mod escalation_notice;
 pub(crate) use escalation_failures::refresh_person_escalations_on;
+pub(in crate::adapters::persistence) use escalation_failures::wake_failed_assignments_on;
 mod projection;
 mod projection_lock;
 mod reviewer_notice;

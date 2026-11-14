@@ -596,7 +596,11 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
     .await
     .unwrap();
     assert!(expires_with_run);
-    assert_eq!(reviewer, json!(admin.to_string()));
+    // The reviewer is the requester's person principal, which the decision resolves.
+    assert_eq!(
+        reviewer,
+        json!(d.fixture.principal(admin).await.to_string())
+    );
     assert_eq!(d.llm.finish().await.unwrap(), 3);
 }
 

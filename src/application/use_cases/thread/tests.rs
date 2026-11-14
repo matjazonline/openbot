@@ -128,6 +128,9 @@ struct InternalHop {
     hop_count: u32,
     trace_channels: Vec<Uuid>,
     correlation_id: CorrelationId,
+    /// The delivery part the hop claims. These tests commit through a recording double, which
+    /// stores the claim without proving it; the stored-part proof is exercised against Postgres.
+    proof: crate::transport::InternalRelayProof,
 }
 
 impl InternalHop {
@@ -144,6 +147,7 @@ impl InternalHop {
             hop_count: 0,
             trace_channels: Vec::new(),
             correlation_id: CorrelationId::new(),
+            proof: crate::transport::test_support::relay_proof(Uuid::new_v4()),
         }
     }
 }
@@ -173,6 +177,7 @@ async fn relay_hop(
             hop_count: hop.hop_count,
             trace: hop.trace_channels.clone(),
             correlation_id: hop.correlation_id,
+            proof: hop.proof,
         })
         .await
         .expect("the relay reached a verdict")
@@ -2258,6 +2263,7 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
         IngressOrigin::InternalChannel {
             company_id: hop.company_id,
             channel_id: hop.channel_id,
+            proof: crate::transport::test_support::relay_proof(hop.company_id),
         },
         "Max inter-channel hop count reached",
     )
@@ -2275,6 +2281,7 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
         IngressOrigin::InternalChannel {
             company_id: cycle.company_id,
             channel_id: cycle.channel_id,
+            proof: crate::transport::test_support::relay_proof(cycle.company_id),
         },
         "Inter-channel loop cycle detected",
     )
@@ -3428,6 +3435,7 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
             IngressOrigin::InternalChannel {
                 company_id,
                 channel_id: source_channel_id,
+                proof: crate::transport::test_support::relay_proof(company_id),
             },
             ReplyDelivery::Send,
         ))

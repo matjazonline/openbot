@@ -1,0 +1,59 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+CMD RUST_MIN_STACK=2097152 $B --exact adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact (x3 sequential)
+
+running 1 test
+test adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact stdout ----
+
+thread 'adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact' (5936925) panicked at src/adapters/http/routes/workflows/tests.rs:361:9:
+the engine never reached: first review
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 31.83s
+
+RUN 1 EXIT 101
+
+running 1 test
+test adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact stdout ----
+
+thread 'adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact' (5941215) panicked at src/adapters/http/routes/workflows/tests.rs:361:9:
+the engine never reached: first review
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 32.09s
+
+RUN 2 EXIT 101
+
+running 1 test
+test adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact stdout ----
+
+thread 'adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact' (5945459) panicked at src/adapters/http/routes/workflows/tests.rs:361:9:
+the engine never reached: first review
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 31.98s
+
+RUN 3 EXIT 101

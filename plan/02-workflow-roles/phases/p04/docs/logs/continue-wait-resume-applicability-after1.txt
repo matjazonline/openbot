@@ -1,0 +1,29 @@
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_cancelled_wait_resume_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_arrival_replans_before_new_actor_accounts ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_fresh_final_timer_resume_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_future_timer_resume_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_nonfinal_timer_resume_ignores_unused_retired_final_reviewers ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_arrival_replans_before_new_actor_accounts stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_arrival_replans_before_new_actor_accounts' (2190518) panicked at src/adapters/persistence/workflow/reviewer_wait_resume_hint_tests.rs:234:39:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid workflow event payload")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers' (2190715) panicked at src/adapters/persistence/workflow/reviewer_wait_resume_hint_tests.rs:148:47:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid workflow event payload")
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_arrival_replans_before_new_actor_accounts
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 4361 filtered out; finished in 3.58s
+

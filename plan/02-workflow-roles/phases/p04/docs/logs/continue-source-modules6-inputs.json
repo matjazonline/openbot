@@ -1,0 +1,8 @@
+{
+  "runner": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/source_modules-55eef8c710a0bfc2",
+  "runner_sha256": "8c4dd85f7d52fa2fba78af3b8a9bcc6674432ffe5190bf47825993eb02e159b5",
+  "source_sha256": "ace9b7a36c5a93992941fd09dac217be773ac8021b21fb3d7dedc5b185679379",
+  "source_matches_HEAD": true,
+  "current_tree": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot",
+  "note": "unchanged runner dynamically checks current source tree including reviewer_terminal_hint_tests.rs"
+}

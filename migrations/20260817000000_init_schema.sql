@@ -4157,7 +4157,7 @@ CREATE TABLE public.notification_events (
     CONSTRAINT notification_events_action_kind_check CHECK ((action_kind = 'delivery_failure'::text)),
     CONSTRAINT notification_events_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
     CONSTRAINT notification_events_error_check CHECK (
-        (last_error_class IS NULL OR last_error_class IN ('database','composition','invalid_source','lease_expired','internal','stale_projection'))
+        (last_error_class IS NULL OR last_error_class IN ('database','composition','invalid_source','lease_expired','internal','stale_projection','route_busy','route_stale'))
         AND (last_error_detail IS NULL OR (octet_length(last_error_detail) <= 512 AND last_error_class IS NOT NULL))
         AND (status <> 'dead_letter' OR last_error_class IS NOT NULL)),
     CONSTRAINT notification_events_lease_check CHECK ((((status = 'processing'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
@@ -5611,7 +5611,7 @@ CREATE TABLE public.workflow_message_intents (
     CONSTRAINT workflow_message_intent_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
     CONSTRAINT workflow_message_intent_hops CHECK (((hop_count >= 0) AND (hop_count <= 64) AND (cardinality(trace_channels) <= 5))),
     CONSTRAINT workflow_message_intent_origin CHECK ((origin = ANY (ARRAY['external'::text, 'internal'::text, 'application'::text]))),
-    CONSTRAINT workflow_message_intent_outcome CHECK ((((outcome IS NULL) OR (outcome = ANY (ARRAY['matched'::text, 'admitted'::text, 'none'::text]))) AND ((outcome = 'matched'::text) = (matched_run_id IS NOT NULL)))),
+    CONSTRAINT workflow_message_intent_outcome CHECK ((((outcome IS NULL) OR (outcome = ANY (ARRAY['matched'::text, 'admitted'::text, 'none'::text, 'notification_source_retired'::text]))) AND ((outcome = 'matched'::text) = (matched_run_id IS NOT NULL)))),
     CONSTRAINT workflow_message_intent_role CHECK ((role = ANY (ARRAY['to'::text, 'cc'::text]))),
     CONSTRAINT workflow_message_intent_reply_settled CHECK (((NOT reply_settled) OR ((reply_to_message_id IS NOT NULL) AND (outcome IS DISTINCT FROM 'matched'::text)))),
     CONSTRAINT workflow_message_intent_state CHECK ((((state = 'pending'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts < 5)) OR ((state = 'claimed'::text) AND (worker_id IS NOT NULL) AND (claim_generation IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (outcome IS NULL) AND (attempts >= 1)) OR ((state = 'done'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NOT NULL)) OR ((state = 'failed'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts = 5))))
@@ -12260,7 +12260,7 @@ CREATE TABLE public.agent_capability_bindings (
     CHECK(company_id IS NOT NULL OR kind='builtin'),
     CONSTRAINT agent_binding_target_shape CHECK (
         (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent_channel','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory')
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation')
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=2)
@@ -12270,7 +12270,7 @@ CREATE TABLE public.agent_capability_bindings (
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
     CONSTRAINT agent_binding_reserved_alias CHECK (
         NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent_channel','search_knowledge',
-            'search_memory','memory_timeline','memory_details','save_memory'))
+            'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation'))
         OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply' ELSE builtin END))
 );
 CREATE TABLE public.agent_draft_bindings (
@@ -14600,7 +14600,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='6'
+            AND checkpoint.workflow_prepared->>'version'='7'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14672,7 +14672,7 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '6'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '7'
         OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
         OR document->>'mcp_error_policy' IS DISTINCT FROM
             (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
@@ -15797,7 +15797,6 @@ CREATE TABLE public.workflow_run_role_bindings (
     FOREIGN KEY (company_id,manifest_id,version_id)
         REFERENCES public.agent_manifest_workflows(company_id,manifest_id,version_id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
-    FOREIGN KEY (company_id,principal_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,agent_id,agent_revision_id)
         REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,manifest_id,agent_id,agent_revision_id)
@@ -15813,6 +15812,8 @@ CREATE INDEX run_dependency_manifests_by_root ON public.run_dependency_manifests
     (company_id,root_run_id,manifest_id,run_id);
 COMMENT ON TABLE public.workflow_run_role_bindings IS
     'Index of canonical admission role resolutions. Resolution0 is sealed by the root manifest; later human resolutions require their own immutable canonical record and complete membership guard before enabling nonzero revisions.';
+COMMENT ON COLUMN public.workflow_run_role_bindings.principal_id IS
+    'Historical tenant principal identity, proven against the live principal and canonical manifest on insertion and immutable thereafter. Principal retirement must not erase or block this captured resolution.';
 
 CREATE FUNCTION public.guard_workflow_role_binding() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE holder_kind text; holder_agent uuid; canonical jsonb;
@@ -16851,6 +16852,67 @@ CREATE TABLE public.workflow_escalation_cases (
 CREATE UNIQUE INDEX workflow_escalation_one_run ON public.workflow_escalation_cases(company_id,run_id) WHERE run_id IS NOT NULL;
 CREATE UNIQUE INDEX workflow_escalation_one_refusal ON public.workflow_escalation_cases(company_id,admission_refusal_id) WHERE admission_refusal_id IS NOT NULL;
 
+-- Validate a run case at birth against the terminal owner's latest audit, not an older
+-- attempt or a caller-provided reason. Later retries do not rewrite the historical case.
+CREATE FUNCTION public.workflow_escalation_run_source_valid(
+    company uuid, source_run uuid, source_execution uuid, reason text, step text
+) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.workflow_runs AS run
+        JOIN public.workflow_executions AS execution ON execution.company_id=run.company_id
+            AND execution.run_id=run.id AND execution.id=run.terminal_execution_id
+        JOIN LATERAL (
+            SELECT event.event_kind,event.actor_id FROM public.workflow_run_events AS event
+            WHERE event.company_id=run.company_id AND event.run_id=run.id
+                AND event.execution_id=execution.id
+            ORDER BY event.sequence DESC LIMIT 1
+        ) AS audit ON audit.actor_id=run.actor_id
+        WHERE run.company_id=company AND run.id=source_run AND run.state='failed'
+            AND run.parent_run_id IS NULL AND execution.id=source_execution AND execution.step_id=step
+            AND CASE
+                WHEN starts_with(audit.event_kind,'guard_violation:') THEN reason='workflow.guard_violation'
+                WHEN audit.event_kind='run_deadline_expired' THEN reason='workflow.run_deadline'
+                ELSE execution.committed_route IS DISTINCT FROM 'final_error' AND CASE
+                    WHEN audit.event_kind='wait_expired' THEN reason='workflow.wait_deadline' AND EXISTS (
+                        SELECT 1 FROM public.workflow_waits AS wait WHERE wait.company_id=run.company_id
+                            AND wait.run_id=run.id AND wait.execution_id=execution.id AND wait.state='expired')
+                    WHEN audit.event_kind='decision.timed_out' THEN reason=audit.event_kind AND EXISTS (
+                        SELECT 1 FROM public.workflow_decisions AS decision
+                        JOIN public.workflow_waits AS wait ON wait.company_id=decision.company_id AND wait.id=decision.wait_id
+                        WHERE decision.company_id=run.company_id AND decision.run_id=run.id
+                            AND decision.execution_id=execution.id AND decision.subject_kind='business' AND wait.state='expired')
+                    WHEN starts_with(audit.event_kind,'attempt_failed:') THEN EXISTS (
+                        SELECT 1 FROM public.background_tasks AS job
+                        JOIN public.task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=job.attempt_ordinal-1
+                        WHERE job.company_id=run.company_id AND job.workflow_execution_id=execution.id AND job.status='failed'
+                            AND attempt.status='failed' AND audit.event_kind='attempt_failed:' || attempt.attempt_number
+                            AND attempt.workflow_failure_code=reason)
+                    -- Qualified: workflow_waits has its own `reason` column, which an unqualified
+                    -- name inside this subquery would silently compare instead.
+                    WHEN audit.event_kind='wait_failed' THEN EXISTS (
+                        SELECT 1 FROM public.workflow_waits AS wait WHERE wait.company_id=run.company_id
+                            AND wait.run_id=run.id AND wait.execution_id=execution.id AND wait.state='failed'
+                            AND workflow_escalation_run_source_valid.reason='workflow.' || wait.failure_code)
+                    -- Parked effect and token-decision owners audit their own event, then the
+                    -- typed failure that no authored route consumed.
+                    WHEN audit.event_kind='message_delivery_failed' THEN reason='message.delivery_failed'
+                    WHEN audit.event_kind='memory_delivery_failed' THEN reason IN (
+                        'memory.not_enabled','memory.save_expired','memory.save_cancelled','memory.save_failed')
+                    WHEN audit.event_kind='token_allowance_rejected' THEN reason='workflow.tokens_rejected'
+                    WHEN audit.event_kind='token_allowance_expired' THEN reason='workflow.tokens_expired'
+                    ELSE audit.event_kind=reason AND audit.event_kind IN (
+                        'workflow.invalid_input','workflow.invalid_output','knowledge.audience_below_content',
+                        'workflow.activation_limit','workflow.attempts_exhausted','workflow.root_budget_exhausted',
+                        'workflow.tokens_rejected','workflow.tokens_expired','decision.reviewer_unavailable',
+                        'workflow.child_failed','workflow.child_cancelled','message.final_response_refused',
+                        'local_agent.refused','http.approval_expired','http.approval_rejected',
+                        'mcp.approval_expired','mcp.approval_rejected','message.approval_expired',
+                        'message.approval_rejected')
+                END
+            END
+    );
+$$;
+
 CREATE FUNCTION public.guard_workflow_escalation_case() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE actual record;
 BEGIN
@@ -16861,6 +16923,14 @@ BEGIN
             USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
     ELSIF TG_OP='UPDATE' THEN
         RAISE EXCEPTION 'escalation case identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
+    END IF;
+    IF EXISTS(SELECT 1 FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=NEW.run_id)
+        OR EXISTS(SELECT 1 FROM public.workflow_admission_refusals AS refusal
+            JOIN public.workflow_message_notification_origins AS origin
+              ON origin.company_id=refusal.company_id AND origin.message_id=public.workflow_escalation_source_message(refusal.source_key)
+            WHERE refusal.company_id=NEW.company_id AND refusal.id=NEW.admission_refusal_id) THEN
+        RAISE EXCEPTION 'notification-origin work cannot create another automatic case'
             USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
     END IF;
     IF NEW.source_kind='admission' THEN
@@ -16888,11 +16958,16 @@ BEGIN
         IF NOT FOUND OR actual.policy IS NULL OR NEW.binding_id IS DISTINCT FROM actual.binding_id
             OR NEW.binding_revision IS DISTINCT FROM actual.binding_revision OR NEW.policy IS DISTINCT FROM actual.policy
             OR NEW.origin_department_id IS DISTINCT FROM actual.department_id
-            OR (NEW.source_kind='run' AND actual.state<>'failed')
-            OR (NEW.source_kind='empty_reviewers' AND (actual.state<>'waiting' OR NOT EXISTS (
+            OR (NEW.source_kind='run' AND (NEW.role IS NOT NULL OR NOT public.workflow_escalation_run_source_valid(
+                NEW.company_id,NEW.run_id,NEW.execution_id,NEW.reason_code,NEW.step_id)))
+            OR (NEW.source_kind='empty_reviewers' AND (actual.state<>'waiting'
+                OR NEW.reason_code<>'decision.empty_reviewers' OR NEW.role IS NOT NULL OR NOT EXISTS (
                 SELECT 1 FROM public.workflow_pending_follow_decisions AS pending
                 JOIN public.workflow_decisions AS decision ON decision.company_id=pending.company_id AND decision.id=pending.decision_id
+                JOIN public.workflow_follow_decisions AS follow ON follow.company_id=decision.company_id AND follow.decision_id=decision.id
                 WHERE pending.company_id=NEW.company_id AND pending.decision_id=NEW.empty_decision_id AND decision.run_id=NEW.run_id
+                    AND NEW.execution_id IS NOT DISTINCT FROM follow.execution_id AND NEW.step_id IS NOT DISTINCT FROM follow.step
+                    AND public.workflow_follow_is_open(pending.company_id,pending.decision_id)
                     AND NOT EXISTS (SELECT 1 FROM public.workflow_decision_reviewers AS reviewer
                         WHERE reviewer.company_id=NEW.company_id AND reviewer.decision_id=NEW.empty_decision_id)))) THEN
             RAISE EXCEPTION 'escalation case must match its authoritative run'
@@ -17188,7 +17263,7 @@ CREATE TABLE public.workflow_escalation_notices (
 CREATE TABLE public.workflow_escalation_recipient_failures (
     company_id uuid NOT NULL,
     notice_id uuid NOT NULL,
-    failure_kind text NOT NULL CHECK (failure_kind IN ('route','retired')),
+    failure_kind text NOT NULL CHECK (failure_kind IN ('route','retired','handling')),
     reason_code text NOT NULL CHECK (reason_code ~ '^[a-z][a-z0-9_.]{0,63}$'),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,notice_id,failure_kind),
@@ -17426,6 +17501,11 @@ CREATE TRIGGER workflow_escalation_person_receipt_guard BEFORE INSERT ON public.
 CREATE FUNCTION public.workflow_escalation_recipient_fact_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP='DELETE' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=OLD.company_id AND id=OLD.notice_id) THEN RETURN OLD; END IF;
+    IF TG_OP='DELETE' AND TG_TABLE_NAME='workflow_escalation_agent_receipts' THEN
+        IF NOT EXISTS(SELECT 1 FROM public.workflow_message_intents WHERE company_id=OLD.company_id AND id=OLD.intent_id)
+            OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id)
+            THEN RETURN OLD; END IF;
+    END IF;
     RAISE EXCEPTION 'escalation recipient outcomes are immutable'
         USING ERRCODE='23514',CONSTRAINT='workflow_escalation_recipient_fact_immutable';
 END $$;
@@ -17453,6 +17533,8 @@ BEGIN
         WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id AND event_id=NEW.event_id) THEN RETURN NULL; END IF;
     IF TG_TABLE_NAME='workflow_escalation_person_receipts' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_person_receipts
         WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id AND event_id=NEW.event_id) THEN RETURN NULL; END IF;
+    IF TG_TABLE_NAME='workflow_escalation_agent_receipts' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_agent_receipts
+        WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id AND event_id=NEW.event_id) THEN RETURN NULL; END IF;
     IF NOT EXISTS (SELECT 1 FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status='projected') THEN
         RAISE EXCEPTION 'notification receipts require fenced completion in the same transaction'
             USING ERRCODE='23514',CONSTRAINT='notification_receipt_completion';
@@ -17463,3 +17545,837 @@ CREATE CONSTRAINT TRIGGER workflow_reviewer_receipt_completion AFTER INSERT ON p
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();
 CREATE CONSTRAINT TRIGGER workflow_escalation_person_receipt_completion AFTER INSERT ON public.workflow_escalation_person_receipts
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();
+
+-- This one reader is shared by lock-free hints, postlock route revalidation and
+-- origin guards. A notification never chooses an arbitrary matching desk binding.
+CREATE FUNCTION public.workflow_escalation_agent_route(checked_company uuid, checked_principal uuid)
+RETURNS TABLE(agent_id uuid,desk_id uuid,binding_id uuid,binding_revision bigint,run_as_user_id uuid,
+    settings_revision bigint,transport_binding_id uuid,address text) LANGUAGE sql STABLE AS $$
+    SELECT agent.id,desk.id,binding.id,configuration.revision,configuration.run_as_user_id,
+        desk.settings_revision,endpoint.id,endpoint.external_endpoint_key
+    FROM public.principals AS principal
+    JOIN public.agents AS agent ON agent.company_id=principal.company_id AND agent.id=principal.agent_id
+    JOIN public.agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id
+    JOIN public.workflow_provisioning_commands AS provision ON provision.company_id=agent.company_id
+        AND provision.command_key='agent:'||agent.id::text AND provision.result->'agent'->>'id'=agent.id::text
+    JOIN public.channels AS desk ON desk.company_id=provision.company_id
+        AND desk.id::text=provision.result->'channel'->>'id' AND desk.enabled
+    JOIN public.workflow_bindings AS binding ON binding.company_id=desk.company_id AND binding.channel_id=desk.id
+        AND binding.id::text=provision.result->>'binding_id' AND binding.active AND binding.thread_id IS NULL
+    JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id
+        AND configuration.binding_id=binding.id AND configuration.revision=binding.configuration_revision
+        AND configuration.message_trigger IS NOT NULL
+    JOIN public.channel_bindings AS endpoint ON endpoint.company_id=desk.company_id AND endpoint.channel_id=desk.id
+        AND endpoint.transport='email' AND endpoint.installation_id IS NULL AND endpoint.status='active'
+    WHERE principal.company_id=checked_company AND principal.id=checked_principal AND principal.kind='agent'
+$$;
+
+CREATE FUNCTION public.workflow_escalation_agent_eligible(checked_company uuid, checked_notice uuid) RETURNS boolean
+LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_escalation_notices AS notice
+        JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
+        CROSS JOIN LATERAL public.workflow_escalation_agent_route(notice.company_id,notice.principal_id) AS route
+        JOIN public.principals AS actor ON actor.company_id=notice.company_id AND actor.user_id=route.run_as_user_id AND actor.kind='person'
+        JOIN public.company_members AS member ON member.company_id=actor.company_id AND member.user_id=actor.user_id
+        JOIN public.companies AS company ON company.id=notice.company_id
+        LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+        LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
+        WHERE notice.company_id=checked_company AND notice.id=checked_notice AND notice.principal_kind='agent'
+          AND member.role IN ('owner','admin') AND (member.role='owner')=(company.user_id=actor.user_id)
+          AND public.notification_principal_can_view(checked_company,route.desk_id,actor.id)
+          AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),actor.id)
+          AND (CASE WHEN escalation.source_kind='admission'
+                THEN public.workflow_refusal_content_level(checked_company,refusal.source_key)
+                ELSE run.content_level END)<=member.access_level)
+$$;
+
+ALTER TABLE public.workflow_escalation_notices ADD UNIQUE(company_id,id,event_id,principal_id,principal_kind);
+ALTER TABLE public.workflow_message_intents ADD UNIQUE(company_id,id,message_id,channel_id);
+CREATE TABLE public.workflow_escalation_agent_receipts (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    event_id uuid NOT NULL,
+    principal_id uuid NOT NULL,
+    principal_kind text GENERATED ALWAYS AS ('agent') STORED,
+    agent_id uuid NOT NULL,
+    desk_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL CHECK(binding_revision>0),
+    message_id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,notice_id),
+    UNIQUE(company_id,message_id),
+    UNIQUE(company_id,intent_id),
+    FOREIGN KEY(company_id,notice_id,event_id,principal_id,principal_kind)
+        REFERENCES public.workflow_escalation_notices(company_id,id,event_id,principal_id,principal_kind) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,intent_id,message_id,desk_id)
+        REFERENCES public.workflow_message_intents(company_id,id,message_id,channel_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+COMMENT ON TABLE public.workflow_escalation_agent_receipts IS
+    'Immutable authenticated notification origin. Agent/default-binding identity and revision are historical snapshots validated against the actual tenant default route on insertion; live route retirement must not rewrite causality.';
+
+CREATE FUNCTION public.workflow_escalation_agent_route_matches(receipt public.workflow_escalation_agent_receipts)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_escalation_agent_route(receipt.company_id,receipt.principal_id) AS route
+        WHERE (route.agent_id,route.desk_id,route.binding_id,route.binding_revision)=
+              (receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision))
+$$;
+
+CREATE FUNCTION public.guard_workflow_escalation_agent_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
+    IF NOT public.workflow_escalation_notice_active(NEW.company_id,NEW.notice_id)
+        OR NOT public.workflow_escalation_agent_eligible(NEW.company_id,NEW.notice_id)
+        OR EXISTS(SELECT 1 FROM public.workflow_escalation_recipient_failures WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id)
+        OR NOT public.workflow_escalation_agent_route_matches(NEW)
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_message_intents AS intent
+            JOIN public.messages AS message ON message.company_id=intent.company_id AND message.id=intent.message_id
+            JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+            JOIN public.email_message_metadata AS metadata ON metadata.company_id=message.company_id AND metadata.message_id=message.id
+            WHERE intent.company_id=NEW.company_id AND intent.id=NEW.intent_id AND intent.message_id=NEW.message_id
+                AND intent.channel_id=NEW.desk_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
+                AND intent.admissible AND intent.role='to' AND intent.mentioned AND intent.reply_to_message_id IS NULL
+                AND intent.state='pending' AND intent.attempts=0
+                AND message.audience='internal_only' AND message.role='system' AND author.kind='system'
+                AND split_part(metadata.rfc_message_id,'@',1)='<'||NEW.notice_id::text) THEN
+        RAISE EXCEPTION 'agent notice origin must prove its exact current private source and default route'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_agent_receipt_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_agent_receipt_guard BEFORE INSERT ON public.workflow_escalation_agent_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_agent_receipt();
+CREATE TRIGGER workflow_escalation_agent_receipt_immutable BEFORE UPDATE OR DELETE ON public.workflow_escalation_agent_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.workflow_escalation_recipient_fact_immutable();
+CREATE CONSTRAINT TRIGGER workflow_escalation_agent_receipt_completion AFTER INSERT ON public.workflow_escalation_agent_receipts
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();
+
+CREATE FUNCTION public.guard_workflow_escalation_agent_failure() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.failure_kind='handling' THEN
+        IF NEW.reason_code IS DISTINCT FROM public.workflow_escalation_agent_handling_failure(NEW.company_id,NEW.notice_id) THEN
+            RAISE EXCEPTION 'handling failure requires the exact intended admission or terminal root outcome'
+                USING ERRCODE='23514',CONSTRAINT='workflow_escalation_agent_handling_failure_guard';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF EXISTS(SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id AND id=NEW.notice_id AND principal_kind='agent')
+        AND public.workflow_escalation_agent_eligible(NEW.company_id,NEW.notice_id) THEN
+        RAISE EXCEPTION 'a currently capable agent cannot be marked unavailable'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_agent_failure_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_agent_failure_guard BEFORE INSERT ON public.workflow_escalation_recipient_failures
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_agent_failure();
+
+-- Delivery audit may retire with its source tree. These facts are instead owned by
+-- the canonical notice message, so source retention cannot turn private work into fan-out.
+CREATE TABLE public.workflow_notification_origins (
+    company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
+    id uuid NOT NULL,
+    notice_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,id),
+    CHECK(notice_id IS NULL OR notice_id=id),
+    FOREIGN KEY(company_id,notice_id) REFERENCES public.workflow_escalation_notices(company_id,id)
+        ON DELETE SET NULL(notice_id)
+);
+CREATE INDEX workflow_notification_origins_retired ON public.workflow_notification_origins(company_id,id)
+    WHERE notice_id IS NULL;
+CREATE TABLE public.workflow_escalation_notice_targets (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    live_intent_id uuid,
+    principal_id uuid NOT NULL,
+    agent_id uuid NOT NULL,
+    desk_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL CHECK(binding_revision>0),
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,message_id),
+    UNIQUE(company_id,notice_id),
+    UNIQUE(company_id,intent_id),
+    UNIQUE(company_id,notice_id,message_id,intent_id,binding_id,binding_revision),
+    CHECK(live_intent_id IS NULL OR live_intent_id=intent_id),
+    FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,notice_id) REFERENCES public.workflow_notification_origins(company_id,id),
+    FOREIGN KEY(company_id,live_intent_id) REFERENCES public.workflow_message_intents(company_id,id)
+        ON DELETE SET NULL(live_intent_id)
+);
+COMMENT ON TABLE public.workflow_escalation_notice_targets IS
+    'Immutable private-notice discriminator and exact original route. Historical IDs are proven from the authentic fenced receipt at insertion; only the canonical message owns deletion. Source audit, original intent and former run retention never reopen admission.';
+
+CREATE TABLE public.workflow_message_notification_origins (
+    company_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    origin_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,message_id),
+    FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,origin_id) REFERENCES public.workflow_notification_origins(company_id,id)
+);
+CREATE INDEX workflow_message_notification_origins_token ON public.workflow_message_notification_origins(company_id,origin_id);
+CREATE TABLE public.workflow_run_notification_origins (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    origin_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,run_id),
+    FOREIGN KEY(company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,origin_id) REFERENCES public.workflow_notification_origins(company_id,id)
+);
+CREATE INDEX workflow_run_notification_origins_token ON public.workflow_run_notification_origins(company_id,origin_id);
+
+-- Every canonical message seals whether it was directly written by a workflow.
+-- The workflow writer reserves its explicit producer before INSERT; ordinary
+-- insertion seals NULL automatically. An existing public message can therefore
+-- never acquire a producer later through a fabricated destination/publication.
+CREATE TABLE public.workflow_message_producer_seals (
+    company_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    producer_run_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,message_id),
+    FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+);
+CREATE INDEX workflow_message_producer_seals_run ON public.workflow_message_producer_seals(company_id,producer_run_id)
+    WHERE producer_run_id IS NOT NULL;
+COMMENT ON COLUMN public.workflow_message_producer_seals.producer_run_id IS
+    'Immutable historical producer, proven against the current same-tenant run and exact normalized output at creation commit. It does not pin source run retention or authorize any read/effect.';
+CREATE FUNCTION public.guard_workflow_message_producer_seal() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id)
+        THEN RETURN OLD; END IF;
+    IF TG_OP='INSERT' THEN
+        IF NEW.producer_run_id IS NULL THEN
+            IF EXISTS(SELECT 1 FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id)
+                THEN RETURN NEW; END IF;
+        ELSIF EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.producer_run_id) THEN
+            RETURN NEW;
+        END IF;
+    END IF;
+    RAISE EXCEPTION 'canonical workflow producer is immutable and must prove its tenant source' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_message_producer_seal_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_message_producer_seals
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_message_producer_seal();
+CREATE FUNCTION public.seal_ordinary_message_producer() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_message_producer_seals(company_id,message_id,producer_run_id)
+        VALUES(NEW.company_id,NEW.id,NULL) ON CONFLICT(company_id,message_id) DO NOTHING;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_message_producer_seal_default AFTER INSERT ON public.messages
+    FOR EACH ROW EXECUTE FUNCTION public.seal_ordinary_message_producer();
+
+CREATE FUNCTION public.guard_workflow_notification_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='INSERT' THEN
+        IF NEW.notice_id IS DISTINCT FROM NEW.id OR NOT EXISTS (
+            SELECT 1 FROM public.workflow_escalation_agent_receipts
+            WHERE company_id=NEW.company_id AND notice_id=NEW.id) THEN
+            RAISE EXCEPTION 'notification origin requires its authentic fenced receipt' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.notice_id IS NULL AND OLD.notice_id IS NOT NULL
+        AND to_jsonb(NEW)-'notice_id'=to_jsonb(OLD)-'notice_id'
+        AND NOT EXISTS(SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=OLD.company_id AND id=OLD.notice_id)
+        THEN RETURN NEW; END IF;
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR (OLD.notice_id IS NULL
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets WHERE company_id=OLD.company_id AND notice_id=OLD.id)
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_message_notification_origins WHERE company_id=OLD.company_id AND origin_id=OLD.id)
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_run_notification_origins WHERE company_id=OLD.company_id AND origin_id=OLD.id)))
+        THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'notification origin is immutable and retained while in use' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_notification_origin_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_notification_origins
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_notification_origin();
+
+CREATE FUNCTION public.guard_workflow_escalation_notice_target() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='INSERT' THEN
+        IF NEW.live_intent_id IS DISTINCT FROM NEW.intent_id OR NOT EXISTS (
+            SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
+            WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
+                   receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision)=
+                  (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
+                   NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision)) THEN
+            RAISE EXCEPTION 'private target requires its exact authentic receipt' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF TG_OP='UPDATE' AND NEW.live_intent_id IS NULL AND OLD.live_intent_id IS NOT NULL
+        AND to_jsonb(NEW)-'live_intent_id'=to_jsonb(OLD)-'live_intent_id'
+        AND NOT EXISTS(SELECT 1 FROM public.workflow_message_intents WHERE company_id=OLD.company_id AND id=OLD.live_intent_id)
+        THEN RETURN NEW; END IF;
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id))
+        THEN RETURN OLD; END IF;
+    RAISE EXCEPTION 'private notice targeting is immutable through the canonical message lifetime' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_escalation_notice_target_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_notice_targets
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_notice_target();
+
+CREATE FUNCTION public.workflow_escalation_target_source_live(target public.workflow_escalation_notice_targets)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT COALESCE(target.live_intent_id=target.intent_id,false) AND EXISTS (
+        SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
+        WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
+               receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision)=
+              (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
+               target.agent_id,target.desk_id,target.binding_id,target.binding_revision))
+$$;
+
+CREATE FUNCTION public.workflow_escalation_intent_source_retired(checked_company uuid,checked_intent uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_message_intents AS intent
+        JOIN public.workflow_escalation_notice_targets AS target
+          ON target.company_id=intent.company_id AND target.message_id=intent.message_id AND target.intent_id=intent.id
+        WHERE intent.company_id=checked_company AND intent.id=checked_intent
+          AND public.workflow_escalation_target_source_live(target) IS NOT TRUE)
+$$;
+
+CREATE FUNCTION public.guard_workflow_message_notification_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id))
+        THEN RETURN OLD; END IF;
+    IF TG_OP='INSERT' AND (EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets
+            WHERE company_id=NEW.company_id AND message_id=NEW.message_id AND notice_id=NEW.origin_id)
+        OR EXISTS(SELECT 1 FROM public.workflow_message_producer_seals AS producer
+            JOIN public.workflow_run_notification_origins AS source
+              ON source.company_id=producer.company_id AND source.run_id=producer.producer_run_id
+            WHERE producer.company_id=NEW.company_id AND producer.message_id=NEW.message_id AND source.origin_id=NEW.origin_id
+              AND (EXISTS(SELECT 1 FROM public.workflow_message_destinations AS destination
+                    WHERE destination.company_id=producer.company_id AND destination.message_id=producer.message_id
+                      AND destination.run_id=producer.producer_run_id)
+                OR EXISTS(SELECT 1 FROM public.channel_reply_decisions AS response
+                    WHERE response.company_id=producer.company_id AND response.message_id=producer.message_id
+                      AND response.run_id=producer.producer_run_id AND response.state='published')))
+        OR EXISTS(SELECT 1 FROM public.message_internal_relays AS relay
+            JOIN public.message_deliveries AS delivery ON delivery.company_id=relay.company_id AND delivery.id=relay.delivery_id
+            JOIN public.workflow_message_notification_origins AS source
+              ON source.company_id=delivery.company_id AND source.message_id=delivery.message_id
+            WHERE relay.company_id=NEW.company_id AND relay.message_id=NEW.message_id AND source.origin_id=NEW.origin_id))
+        THEN RETURN NEW; END IF;
+    RAISE EXCEPTION 'message notification origin requires its exact canonical producer and is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_message_notification_origin_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_message_notification_origins
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_message_notification_origin();
+
+CREATE FUNCTION public.seal_workflow_escalation_notice_target() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_notification_origins(company_id,id,notice_id) VALUES(NEW.company_id,NEW.notice_id,NEW.notice_id);
+    INSERT INTO public.workflow_escalation_notice_targets(company_id,notice_id,message_id,intent_id,live_intent_id,
+        principal_id,agent_id,desk_id,binding_id,binding_revision)
+        VALUES(NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.intent_id,
+               NEW.principal_id,NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision);
+    INSERT INTO public.workflow_message_notification_origins(company_id,message_id,origin_id)
+        VALUES(NEW.company_id,NEW.message_id,NEW.notice_id);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_escalation_notice_target_seal AFTER INSERT ON public.workflow_escalation_agent_receipts
+    FOR EACH ROW EXECUTE FUNCTION public.seal_workflow_escalation_notice_target();
+CREATE FUNCTION public.check_workflow_escalation_notice_target() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id)
+        THEN RETURN NULL; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets AS target
+        JOIN public.workflow_message_notification_origins AS origin
+          ON origin.company_id=target.company_id AND origin.message_id=target.message_id AND origin.origin_id=target.notice_id
+        WHERE (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
+               target.agent_id,target.desk_id,target.binding_id,target.binding_revision)=
+              (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
+               NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision))
+        OR (SELECT count(*) FROM public.workflow_message_intents WHERE company_id=NEW.company_id AND message_id=NEW.message_id)>1 THEN
+        RAISE EXCEPTION 'authentic notice must seal its complete private target and message origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_escalation_notice_target_complete AFTER INSERT ON public.workflow_escalation_agent_receipts
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_notice_target();
+CREATE CONSTRAINT TRIGGER workflow_escalation_notice_target_owned_complete AFTER INSERT ON public.workflow_escalation_notice_targets
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_notice_target();
+
+ALTER TABLE public.workflow_escalation_agent_receipts ADD UNIQUE(company_id,notice_id,message_id,intent_id,binding_id,binding_revision);
+CREATE TABLE public.workflow_escalation_handling_roots (
+    company_id uuid NOT NULL,
+    notice_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    live_run_id uuid,
+    message_id uuid NOT NULL,
+    intent_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    binding_revision bigint NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,notice_id),
+    UNIQUE(company_id,run_id),
+    FOREIGN KEY(company_id,notice_id,message_id,intent_id,binding_id,binding_revision)
+        REFERENCES public.workflow_escalation_notice_targets(company_id,notice_id,message_id,intent_id,binding_id,binding_revision) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,live_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE SET NULL(live_run_id),
+    CHECK(live_run_id IS NULL OR live_run_id=run_id)
+);
+
+-- SourceKey::message's bounded typed shape. Use the existing UUID decoder and
+-- perform indexed message lookups, rather than scan every historical receipt.
+CREATE FUNCTION public.workflow_escalation_source_message(source_key text) RETURNS uuid LANGUAGE plpgsql IMMUTABLE AS $$
+DECLARE source jsonb;
+BEGIN
+    IF source_key IS NULL OR octet_length(source_key)>512 OR left(source_key,3)<>'v1:' THEN RETURN NULL; END IF;
+    source=substring(source_key FROM 4)::jsonb;
+    IF jsonb_typeof(source)<>'array' THEN RETURN NULL; END IF;
+    IF jsonb_array_length(source)<>2 OR jsonb_typeof(source->0)<>'string' OR source->>0<>'message'
+        OR jsonb_typeof(source->1)<>'string' THEN RETURN NULL; END IF;
+    RETURN public.workflow_source_uuid(source->>1);
+EXCEPTION WHEN invalid_text_representation THEN RETURN NULL;
+END $$;
+
+CREATE FUNCTION public.workflow_escalation_target_admissible(target public.workflow_escalation_notice_targets)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT public.workflow_escalation_target_source_live(target) IS TRUE
+        AND EXISTS(SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
+            WHERE receipt.company_id=target.company_id AND receipt.notice_id=target.notice_id
+              AND public.workflow_escalation_agent_route_matches(receipt)
+              AND public.workflow_escalation_agent_eligible(receipt.company_id,receipt.notice_id))
+        AND (NOT EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots
+                WHERE company_id=target.company_id AND notice_id=target.notice_id)
+            OR EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots AS ownership
+                JOIN public.workflow_admissions AS admission
+                  ON admission.company_id=ownership.company_id AND admission.run_id=ownership.live_run_id
+                WHERE ownership.company_id=target.company_id AND ownership.notice_id=target.notice_id
+                  AND ownership.live_run_id=ownership.run_id AND admission.binding_id=target.binding_id
+                  AND public.workflow_escalation_source_message(admission.source_key)=target.message_id))
+$$;
+
+CREATE FUNCTION public.guard_workflow_escalation_handling_root() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP<>'INSERT' THEN
+        IF TG_OP='UPDATE' AND NEW.live_run_id IS NULL AND OLD.live_run_id IS NOT NULL
+            AND to_jsonb(NEW)-'live_run_id'=to_jsonb(OLD)-'live_run_id'
+            AND NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.live_run_id)
+            THEN RETURN NEW; END IF;
+        IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'notification handling root ownership is immutable' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_handling_root_guard';
+    END IF;
+    IF NEW.live_run_id IS DISTINCT FROM NEW.run_id
+        OR EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id)
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets AS target
+            WHERE target.company_id=NEW.company_id AND target.notice_id=NEW.notice_id
+              AND public.workflow_escalation_target_admissible(target))
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
+        JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id
+        JOIN public.workflow_message_intents AS intent ON intent.company_id=run.company_id AND intent.id=NEW.intent_id
+        WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.binding_id=NEW.binding_id AND run.binding_revision=NEW.binding_revision
+          AND run.parent_run_id IS NULL AND run.rerun_of_run_id IS NULL AND run.delivery_policy='in_app_only'
+          AND run.channel_id=intent.channel_id AND run.thread_id=intent.thread_id AND intent.message_id=NEW.message_id
+          AND admission.binding_id=NEW.binding_id AND public.workflow_escalation_source_message(admission.source_key)=NEW.message_id) THEN
+        RAISE EXCEPTION 'only the original intended message admission can own a notification root'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_handling_root_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_handling_root_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_handling_roots
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_handling_root();
+
+
+CREATE FUNCTION public.check_workflow_escalation_handling_root() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE message uuid;
+BEGIN
+    message=public.workflow_escalation_source_message(NEW.source_key);
+    IF message IS NULL THEN RETURN NULL; END IF;
+    IF EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets AS target
+        JOIN public.workflow_runs AS run ON run.company_id=target.company_id AND run.id=NEW.run_id
+        WHERE target.company_id=NEW.company_id AND target.message_id=message
+          AND run.parent_run_id IS NULL AND run.rerun_of_run_id IS NULL
+          AND ((NEW.binding_id,run.binding_revision,run.delivery_policy)
+                IS DISTINCT FROM (target.binding_id,target.binding_revision,'in_app_only'::text)
+            OR NOT EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots AS ownership
+                WHERE ownership.company_id=target.company_id AND ownership.notice_id=target.notice_id AND ownership.run_id=run.id))) THEN
+        RAISE EXCEPTION 'an intended notification admission must retain its unique root ownership'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_handling_root_completion';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_escalation_handling_root_completion AFTER INSERT ON public.workflow_admissions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_handling_root();
+
+CREATE FUNCTION public.guard_workflow_run_notification_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id))
+        THEN RETURN OLD; END IF;
+    IF TG_OP='INSERT' AND (EXISTS(SELECT 1 FROM public.workflow_admissions AS admission
+            JOIN public.workflow_message_notification_origins AS origin
+              ON origin.company_id=admission.company_id AND origin.message_id=public.workflow_escalation_source_message(admission.source_key)
+            WHERE admission.company_id=NEW.company_id AND admission.run_id=NEW.run_id AND origin.origin_id=NEW.origin_id)
+        OR EXISTS(SELECT 1 FROM public.workflow_runs AS run
+            JOIN public.workflow_run_notification_origins AS predecessor
+              ON predecessor.company_id=run.company_id AND predecessor.run_id=COALESCE(run.parent_run_id,run.rerun_of_run_id)
+            WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND predecessor.origin_id=NEW.origin_id))
+        THEN RETURN NEW; END IF;
+    RAISE EXCEPTION 'run notification origin requires its exact canonical producer and is immutable' USING ERRCODE='23514';
+END $$;
+CREATE TRIGGER workflow_run_notification_origin_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_notification_origins
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_run_notification_origin();
+
+CREATE FUNCTION public.seal_workflow_notification_run_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_run_notification_origins(company_id,run_id,origin_id)
+        SELECT NEW.company_id,NEW.id,predecessor.origin_id FROM public.workflow_run_notification_origins AS predecessor
+        WHERE predecessor.company_id=NEW.company_id AND predecessor.run_id=COALESCE(NEW.parent_run_id,NEW.rerun_of_run_id);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_notification_run_origin_seal AFTER INSERT ON public.workflow_runs
+    FOR EACH ROW EXECUTE FUNCTION public.seal_workflow_notification_run_origin();
+
+CREATE FUNCTION public.check_workflow_notification_run_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source_run uuid:=COALESCE(NEW.parent_run_id,NEW.rerun_of_run_id); expected uuid; actual uuid;
+BEGIN
+    IF source_run IS NULL OR NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.id)
+        THEN RETURN NULL; END IF;
+    -- Prove creation against the live normalized predecessor. Its later legitimate
+    -- retention never rewrites the sealed token, but cannot wash an omitted link
+    -- inside the dependent creation transaction itself.
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=source_run) THEN
+        RAISE EXCEPTION 'notification predecessor must survive dependent creation commit' USING ERRCODE='23514';
+    END IF;
+    SELECT origin_id INTO expected FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=source_run;
+    SELECT origin_id INTO actual FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=NEW.id;
+    IF actual IS DISTINCT FROM expected THEN
+        RAISE EXCEPTION 'child and rerun must seal the exact normalized predecessor origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_notification_run_origin_complete AFTER INSERT ON public.workflow_runs
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_notification_run_origin();
+CREATE FUNCTION public.seal_workflow_notification_admission_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_run_notification_origins(company_id,run_id,origin_id)
+        SELECT NEW.company_id,NEW.run_id,origin.origin_id FROM public.workflow_message_notification_origins AS origin
+        WHERE origin.company_id=NEW.company_id AND origin.message_id=public.workflow_escalation_source_message(NEW.source_key);
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_notification_admission_origin_seal AFTER INSERT ON public.workflow_admissions
+    FOR EACH ROW EXECUTE FUNCTION public.seal_workflow_notification_admission_origin();
+CREATE FUNCTION public.check_workflow_notification_admission_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM public.workflow_admissions WHERE company_id=NEW.company_id AND run_id=NEW.run_id)
+        AND EXISTS(SELECT 1 FROM public.workflow_message_notification_origins AS origin
+            WHERE origin.company_id=NEW.company_id AND origin.message_id=public.workflow_escalation_source_message(NEW.source_key)
+              AND NOT EXISTS(SELECT 1 FROM public.workflow_run_notification_origins AS inherited
+                  WHERE inherited.company_id=NEW.company_id AND inherited.run_id=NEW.run_id AND inherited.origin_id=origin.origin_id)) THEN
+        RAISE EXCEPTION 'notification admission must seal its exact message origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_notification_admission_origin_complete AFTER INSERT ON public.workflow_admissions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_notification_admission_origin();
+
+CREATE FUNCTION public.seal_workflow_generated_message_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.message_id IS NULL THEN RETURN NULL; END IF;
+    INSERT INTO public.workflow_message_notification_origins(company_id,message_id,origin_id)
+        SELECT NEW.company_id,NEW.message_id,origin.origin_id FROM public.workflow_run_notification_origins AS origin
+        WHERE origin.company_id=NEW.company_id AND origin.run_id=NEW.run_id
+        ON CONFLICT(company_id,message_id) DO NOTHING;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER workflow_destination_notification_origin_seal AFTER INSERT ON public.workflow_message_destinations
+    FOR EACH ROW EXECUTE FUNCTION public.seal_workflow_generated_message_origin();
+CREATE TRIGGER workflow_response_notification_origin_seal AFTER UPDATE OF message_id ON public.channel_reply_decisions
+    FOR EACH ROW WHEN (NEW.message_id IS NOT NULL AND OLD.message_id IS NULL)
+    EXECUTE FUNCTION public.seal_workflow_generated_message_origin();
+
+CREATE FUNCTION public.check_workflow_generated_message_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE expected uuid; actual uuid;
+BEGIN
+    IF NEW.message_id IS NULL OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id)
+        THEN RETURN NULL; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id) THEN
+        RAISE EXCEPTION 'message producer must survive output creation commit' USING ERRCODE='23514';
+    END IF;
+    SELECT origin_id INTO expected FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=NEW.run_id;
+    SELECT origin_id INTO actual FROM public.workflow_message_notification_origins WHERE company_id=NEW.company_id AND message_id=NEW.message_id;
+    IF actual IS DISTINCT FROM expected OR (expected IS NOT NULL AND NOT EXISTS(
+        SELECT 1 FROM public.workflow_message_producer_seals WHERE company_id=NEW.company_id AND message_id=NEW.message_id
+            AND producer_run_id=NEW.run_id)) THEN
+        RAISE EXCEPTION 'workflow output must seal its exact producing run origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_destination_notification_origin_complete AFTER INSERT ON public.workflow_message_destinations
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_generated_message_origin();
+CREATE CONSTRAINT TRIGGER workflow_response_notification_origin_complete AFTER UPDATE ON public.channel_reply_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.message_id IS NOT NULL)
+    EXECUTE FUNCTION public.check_workflow_generated_message_origin();
+
+CREATE FUNCTION public.check_workflow_message_producer_seal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE owner uuid; producer uuid; expected uuid; actual uuid;
+BEGIN
+    IF TG_TABLE_NAME='messages' THEN owner:=NEW.id; ELSE owner:=NEW.message_id; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=NEW.company_id AND id=owner) THEN RETURN NULL; END IF;
+    SELECT producer_run_id INTO producer FROM public.workflow_message_producer_seals WHERE company_id=NEW.company_id AND message_id=owner;
+    IF NOT FOUND THEN RAISE EXCEPTION 'canonical message must seal its producer classification' USING ERRCODE='23514'; END IF;
+    IF producer IS NULL THEN RETURN NULL; END IF;
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=producer)
+        OR (NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer)
+            AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer AND state='published')) THEN
+        RAISE EXCEPTION 'canonical workflow producer must prove its exact normalized output' USING ERRCODE='23514';
+    END IF;
+    SELECT origin_id INTO expected FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=producer;
+    SELECT origin_id INTO actual FROM public.workflow_message_notification_origins WHERE company_id=NEW.company_id AND message_id=owner;
+    IF actual IS DISTINCT FROM expected THEN
+        RAISE EXCEPTION 'canonical workflow message cannot omit or replace its producer origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_message_producer_complete AFTER INSERT ON public.messages
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_message_producer_seal();
+CREATE CONSTRAINT TRIGGER workflow_message_producer_owned_complete AFTER INSERT ON public.workflow_message_producer_seals
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_message_producer_seal();
+
+-- D4.3: an internally relayed canonical message names the exact frozen delivery
+-- part that carried it. The guard proves the server-internal claim against the
+-- stored delivery, its part and the message just written; the message inherits
+-- its source message's origin from this row alone. Retention of the delivery
+-- removes the proof row, never the sealed origin it produced.
+CREATE TABLE public.message_internal_relays (
+    company_id uuid NOT NULL,
+    message_id uuid NOT NULL,
+    delivery_id uuid NOT NULL,
+    part_index integer NOT NULL,
+    source_channel_id uuid NOT NULL,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,message_id),
+    FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,delivery_id) REFERENCES public.message_deliveries(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(delivery_id,part_index) REFERENCES public.message_delivery_parts(delivery_id,part_index) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,source_channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE
+);
+CREATE INDEX message_internal_relays_delivery ON public.message_internal_relays(company_id,delivery_id);
+CREATE FUNCTION public.guard_message_internal_relay() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=OLD.company_id AND id=OLD.message_id)
+        OR NOT EXISTS(SELECT 1 FROM public.message_deliveries WHERE company_id=OLD.company_id AND id=OLD.delivery_id)
+        OR NOT EXISTS(SELECT 1 FROM public.message_delivery_parts
+            WHERE company_id=OLD.company_id AND delivery_id=OLD.delivery_id AND part_index=OLD.part_index))
+        THEN RETURN OLD; END IF;
+    IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM public.message_deliveries AS delivery
+        JOIN public.message_delivery_parts AS part
+          ON part.company_id=delivery.company_id AND part.delivery_id=delivery.id AND part.part_index=NEW.part_index
+        JOIN public.messages AS message ON message.company_id=NEW.company_id AND message.id=NEW.message_id
+        JOIN public.email_message_metadata AS mail ON mail.company_id=message.company_id AND mail.message_id=message.id
+        WHERE delivery.company_id=NEW.company_id AND delivery.id=NEW.delivery_id
+          AND delivery.transport='email' AND delivery.channel_id=NEW.source_channel_id AND delivery.message_id IS NOT NULL
+          AND delivery.message_id<>NEW.message_id AND message.direction='inbound'
+          AND part.payload->'body'->'relay'->>'source_channel_id'=NEW.source_channel_id::text
+          AND part.payload->'body'->>'message_id'=mail.rfc_message_id
+          AND part.content_digest=encode(sha256(convert_to(COALESCE(mail.raw_text_body,''),'UTF8')),'hex')
+          AND EXISTS(SELECT 1 FROM public.message_participants AS recipient
+              JOIN public.participant_identities AS identity
+                ON identity.company_id=recipient.company_id AND identity.id=recipient.participant_identity_id
+              WHERE recipient.company_id=message.company_id AND recipient.message_id=message.id
+                AND recipient.kind='to' AND identity.transport='email'
+                AND lower(identity.subject)=lower(part.payload->'body'->'recipients_to'->>0)))
+        THEN RETURN NEW; END IF;
+    RAISE EXCEPTION 'internal relay must prove the exact delivery part it is and is immutable'
+        USING ERRCODE='23514',CONSTRAINT='message_internal_relay_guard';
+END $$;
+CREATE TRIGGER message_internal_relay_guard BEFORE INSERT OR UPDATE OR DELETE ON public.message_internal_relays
+    FOR EACH ROW EXECUTE FUNCTION public.guard_message_internal_relay();
+CREATE FUNCTION public.seal_message_internal_relay_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.workflow_message_notification_origins(company_id,message_id,origin_id)
+        SELECT NEW.company_id,NEW.message_id,source.origin_id FROM public.message_deliveries AS delivery
+        JOIN public.workflow_message_notification_origins AS source
+          ON source.company_id=delivery.company_id AND source.message_id=delivery.message_id
+        WHERE delivery.company_id=NEW.company_id AND delivery.id=NEW.delivery_id;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER message_internal_relay_origin_seal AFTER INSERT ON public.message_internal_relays
+    FOR EACH ROW EXECUTE FUNCTION public.seal_message_internal_relay_origin();
+CREATE FUNCTION public.check_message_internal_relay_origin() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE source_message uuid; expected uuid; actual uuid;
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.messages WHERE company_id=NEW.company_id AND id=NEW.message_id)
+        OR NOT EXISTS(SELECT 1 FROM public.message_internal_relays WHERE company_id=NEW.company_id AND message_id=NEW.message_id)
+        THEN RETURN NULL; END IF;
+    SELECT message_id INTO source_message FROM public.message_deliveries WHERE company_id=NEW.company_id AND id=NEW.delivery_id;
+    SELECT origin_id INTO expected FROM public.workflow_message_notification_origins WHERE company_id=NEW.company_id AND message_id=source_message;
+    SELECT origin_id INTO actual FROM public.workflow_message_notification_origins WHERE company_id=NEW.company_id AND message_id=NEW.message_id;
+    IF actual IS DISTINCT FROM expected THEN
+        RAISE EXCEPTION 'internally relayed message must seal its exact source message origin' USING ERRCODE='23514';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER message_internal_relay_origin_complete AFTER INSERT ON public.message_internal_relays
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_message_internal_relay_origin();
+-- Every internal-origin intent belongs to a message whose relay proof survives
+-- its creation commit, so a hop can neither skip the proof nor lose it to a
+-- source deletion inside the same transaction and be admitted as unmarked work.
+CREATE FUNCTION public.check_message_internal_relay_proved() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NOT EXISTS(SELECT 1 FROM public.workflow_message_intents WHERE company_id=NEW.company_id AND id=NEW.id)
+        OR EXISTS(SELECT 1 FROM public.message_internal_relays WHERE company_id=NEW.company_id AND message_id=NEW.message_id)
+        THEN RETURN NULL; END IF;
+    RAISE EXCEPTION 'internal message must retain its exact delivery proof through creation' USING ERRCODE='23514';
+END $$;
+CREATE CONSTRAINT TRIGGER message_internal_relay_proved AFTER INSERT ON public.workflow_message_intents
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.origin='internal')
+    EXECUTE FUNCTION public.check_message_internal_relay_proved();
+
+CREATE FUNCTION public.workflow_escalation_agent_handling_failure(checked_company uuid,checked_notice uuid) RETURNS text LANGUAGE sql STABLE AS $$
+    SELECT CASE
+        WHEN EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots AS ownership
+            JOIN public.workflow_runs AS run ON run.company_id=ownership.company_id AND run.id=ownership.run_id
+            WHERE ownership.company_id=target.company_id AND ownership.notice_id=target.notice_id AND run.state='failed' AND run.terminal_execution_id IS NOT NULL)
+            THEN 'escalation.notification_handling_failed'
+        WHEN EXISTS(SELECT 1 FROM public.workflow_escalation_handling_roots AS ownership
+            WHERE ownership.company_id=target.company_id AND ownership.notice_id=target.notice_id) THEN NULL
+        WHEN public.workflow_escalation_target_source_live(target) IS NOT TRUE THEN NULL
+        WHEN intent.state NOT IN ('done','failed') THEN NULL
+        WHEN NOT public.workflow_escalation_agent_route_matches(receipt)
+            THEN 'escalation.notification_route_changed'
+        WHEN NOT public.workflow_escalation_agent_eligible(receipt.company_id,receipt.notice_id) THEN 'escalation.notification_route_unavailable'
+        WHEN intent.state='failed' THEN 'escalation.notification_handling_exhausted'
+        ELSE 'escalation.notification_handling_refused' END
+    FROM public.workflow_escalation_notice_targets AS target
+    LEFT JOIN public.workflow_escalation_agent_receipts AS receipt ON receipt.company_id=target.company_id AND receipt.notice_id=target.notice_id
+    LEFT JOIN public.workflow_message_intents AS intent ON intent.company_id=target.company_id AND intent.id=target.live_intent_id
+    WHERE target.company_id=checked_company AND target.notice_id=checked_notice
+$$;
+
+CREATE FUNCTION public.guard_workflow_escalation_intent_identity() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.outcome='notification_source_retired'
+        AND NOT public.workflow_escalation_intent_source_retired(NEW.company_id,NEW.id) THEN
+        RAISE EXCEPTION 'source-retired outcome requires the authentic private target and missing action context' USING ERRCODE='23514';
+    END IF;
+    IF TG_OP='INSERT' THEN
+        IF EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets WHERE company_id=NEW.company_id
+            AND (message_id=NEW.message_id OR intent_id=NEW.id)
+            AND (intent_id<>NEW.id OR message_id<>NEW.message_id OR live_intent_id IS DISTINCT FROM NEW.id)) THEN
+            RAISE EXCEPTION 'a private canonical notice cannot mint another intent' USING ERRCODE='23514';
+        END IF;
+        RETURN NEW;
+    END IF;
+    IF EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        AND EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets WHERE company_id=OLD.company_id AND message_id=OLD.message_id)
+        AND public.channel_reply_source(NEW) IS DISTINCT FROM public.channel_reply_source(OLD) THEN
+        RAISE EXCEPTION 'a notification intent cannot replace its authenticated source or private delivery policy'
+            USING ERRCODE='23514',CONSTRAINT='workflow_escalation_intent_identity_guard';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_intent_identity_guard BEFORE INSERT OR UPDATE ON public.workflow_message_intents
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_intent_identity();
+
+-- Administrative escalation receipts retain historical actor identity after account retirement.
+CREATE TABLE public.workflow_escalation_commands (
+    company_id uuid NOT NULL,
+    command_key text NOT NULL CHECK (octet_length(command_key) BETWEEN 1 AND 128 AND command_key COLLATE "C" ~ '^[!-~]+$'),
+    case_id uuid NOT NULL,
+    decision_id uuid NOT NULL,
+    actor_user_id uuid NOT NULL,
+    actor_principal_id uuid NOT NULL,
+    fingerprint text NOT NULL CHECK (fingerprint ~ '^[0-9a-f]{64}$'),
+    choice jsonb NOT NULL CHECK (octet_length(choice::text)<=512),
+    settlement text NOT NULL CHECK (settlement IN ('acknowledged','reassigned','cancelled','already_terminal')),
+    next_decision_id uuid,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY(company_id,command_key),
+    UNIQUE(company_id,decision_id),
+    FOREIGN KEY(company_id,case_id,decision_id) REFERENCES public.workflow_escalation_decisions(company_id,case_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,case_id,next_decision_id) REFERENCES public.workflow_escalation_decisions(company_id,case_id,id) DEFERRABLE INITIALLY DEFERRED,
+    CHECK (((settlement='acknowledged' AND choice='{"kind":"acknowledge"}'::jsonb AND next_decision_id IS NULL)
+        OR (settlement='reassigned' AND choice->>'kind'='reassign' AND jsonb_typeof(choice->'principal')='string'
+            AND choice-ARRAY['kind','principal']='{}'::jsonb AND next_decision_id IS NOT NULL)
+        OR (settlement IN ('cancelled','already_terminal') AND choice->>'kind'='cancel'
+            AND jsonb_typeof(choice->'expected_run_revision')='number'
+            AND (choice->>'expected_run_revision') ~ '^(0|[1-9][0-9]{0,18})$'
+            AND (choice->>'expected_run_revision')::numeric<=9223372036854775807
+            AND choice-ARRAY['kind','expected_run_revision']='{}'::jsonb AND next_decision_id IS NULL)) IS TRUE)
+);
+CREATE FUNCTION public.guard_workflow_escalation_command() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE assignment record; next_assignment record;
+BEGIN
+    IF TG_OP<>'INSERT' THEN
+        IF TG_OP='DELETE' AND (NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_decisions WHERE company_id=OLD.company_id AND id=OLD.decision_id)) THEN RETURN OLD; END IF;
+        RAISE EXCEPTION 'escalation command receipts are immutable' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.principals AS principal JOIN public.company_members AS member
+        ON member.company_id=principal.company_id AND member.user_id=principal.user_id
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.actor_principal_id
+            AND principal.kind='person' AND principal.user_id=NEW.actor_user_id) THEN
+        RAISE EXCEPTION 'escalation command requires the current authenticated person' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.company_members AS member JOIN public.companies AS company ON company.id=member.company_id
+        WHERE member.company_id=NEW.company_id AND member.user_id=NEW.actor_user_id
+            AND (member.role IN ('owner','admin') OR company.user_id=NEW.actor_user_id))
+        AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id
+            AND decision_id=NEW.decision_id AND principal_id=NEW.actor_principal_id AND principal_kind='person') THEN
+        RAISE EXCEPTION 'escalation command actor is neither assigned nor an operator' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM public.workflow_escalation_progress WHERE company_id=NEW.company_id AND case_id=NEW.case_id
+        AND ((NEW.settlement='reassigned' AND state='manual' AND current_decision_id=NEW.next_decision_id)
+            OR (NEW.settlement<>'reassigned' AND state='settled' AND current_decision_id=NEW.decision_id))) THEN
+        RAISE EXCEPTION 'escalation command must commit its matching progression' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    IF NEW.settlement IN ('cancelled','already_terminal') AND (NOT EXISTS (
+        SELECT 1 FROM public.company_members WHERE company_id=NEW.company_id AND user_id=NEW.actor_user_id AND role IN ('owner','admin'))
+        OR NOT EXISTS (SELECT 1 FROM public.workflow_escalation_cases AS escalation JOIN public.workflow_runs AS run
+            ON run.company_id=escalation.company_id AND run.id=escalation.run_id
+            WHERE escalation.company_id=NEW.company_id AND escalation.id=NEW.case_id
+                AND ((NEW.settlement='cancelled' AND run.state='cancelled')
+                    OR (NEW.settlement='already_terminal' AND run.state IN ('succeeded','failed','cancelled'))))) THEN
+        RAISE EXCEPTION 'escalation cancellation requires actual run control and terminal state' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    SELECT settlement,settled_at INTO assignment FROM public.workflow_escalation_decisions
+        WHERE company_id=NEW.company_id AND case_id=NEW.case_id AND id=NEW.decision_id;
+    IF NOT FOUND OR assignment.settled_at IS NULL OR assignment.settlement IS DISTINCT FROM NEW.settlement THEN
+        RAISE EXCEPTION 'escalation command must prove its committed settlement' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+    END IF;
+    IF NEW.settlement='reassigned' THEN
+        SELECT manual_principal_id,manual_principal_kind,manual_principal_label INTO next_assignment
+            FROM public.workflow_escalation_decisions WHERE company_id=NEW.company_id AND case_id=NEW.case_id
+                AND id=NEW.next_decision_id AND assignment_kind='manual';
+        IF NOT FOUND OR next_assignment.manual_principal_id::text IS DISTINCT FROM NEW.choice->>'principal'
+            OR NOT EXISTS (SELECT 1 FROM public.principals WHERE company_id=NEW.company_id
+                AND id=next_assignment.manual_principal_id AND kind=next_assignment.manual_principal_kind
+                AND display_label=next_assignment.manual_principal_label) THEN
+            RAISE EXCEPTION 'manual escalation must name its actual current target' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_guard';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_escalation_command_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_commands
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_command();
+CREATE FUNCTION public.check_workflow_escalation_command() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE assignment record;
+BEGIN
+    SELECT assignment_kind,settlement,id INTO assignment FROM public.workflow_escalation_decisions
+        WHERE company_id=NEW.company_id AND id=NEW.id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    IF assignment.assignment_kind='manual' AND NOT EXISTS (SELECT 1 FROM public.workflow_escalation_commands
+        WHERE company_id=NEW.company_id AND next_decision_id=NEW.id AND settlement='reassigned') THEN
+        RAISE EXCEPTION 'manual escalation requires its explicit command' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_complete';
+    END IF;
+    IF assignment.settlement IN ('acknowledged','reassigned','cancelled','already_terminal') AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_escalation_commands WHERE company_id=NEW.company_id AND decision_id=NEW.id
+            AND settlement=assignment.settlement) THEN
+        RAISE EXCEPTION 'administrative settlement requires its exact command receipt' USING ERRCODE='23514',CONSTRAINT='workflow_escalation_command_complete';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER workflow_escalation_command_complete AFTER INSERT OR UPDATE ON public.workflow_escalation_decisions
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_command();

@@ -11,8 +11,24 @@ use crate::{
         NotificationCensus, NotificationEvent, NotificationEventId, NotificationPage,
         NotificationProjection, NotificationProjectionResult,
     },
-    transport::{ExecutionLease, NewStandaloneDelivery, WorkerId},
+    entities::{notification::NotificationDisposition, transport::ExternalMessageKey},
+    transport::{ExecutionLease, NewStandaloneDelivery, TransportRenderer, WorkerId},
 };
+
+/// An agent notice is a trusted application message, so the email transport mints its key. The
+/// notice id is the nonce: a retried projection commits the same message rather than another.
+/// `email` is asked for the renderer only for an agent notice.
+pub fn agent_notice_key<'r>(
+    projection: &NotificationProjection,
+    email: impl FnOnce() -> AppResult<&'r dyn TransportRenderer>,
+) -> AppResult<Option<ExternalMessageKey>> {
+    let NotificationDisposition::Agent { company, .. } = &projection.disposition else {
+        return Ok(None);
+    };
+    email()?
+        .application_message_key(company, projection.event.source_id)
+        .map(Some)
+}
 
 pub const NOTIFICATION_EVENT_CLAIM_BATCH: i64 = 32;
 pub const NOTIFICATION_EVENT_LEASE_SECONDS: i64 = 30;
@@ -29,6 +45,8 @@ pub struct NotificationProjectionCommit<'a> {
     pub fence: &'a ExecutionLease<NotificationEventId>,
     pub expected: &'a NotificationProjection,
     pub email: Option<&'a NewStandaloneDelivery>,
+    /// The message key of an agent notice, minted by [`agent_notice_key`].
+    pub agent_message_key: Option<&'a ExternalMessageKey>,
     /// Captured only when an escalation control creates its first hop.
     pub escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
 }

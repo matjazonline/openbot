@@ -85,6 +85,8 @@ pub enum AgentBuiltinTool {
     MemoryTimeline,
     MemoryDetails,
     SaveMemory,
+    ReadEscalation,
+    RespondToEscalation,
 }
 impl AgentBuiltinTool {
     pub const fn name(self) -> &'static str {
@@ -98,6 +100,8 @@ impl AgentBuiltinTool {
             Self::MemoryTimeline => "memory_timeline",
             Self::MemoryDetails => "memory_details",
             Self::SaveMemory => "save_memory",
+            Self::ReadEscalation => "read_escalation",
+            Self::RespondToEscalation => "respond_to_escalation",
         }
     }
     pub fn parse(name: &str) -> Option<Self> {
@@ -111,6 +115,8 @@ impl AgentBuiltinTool {
             "memory_timeline" => Some(Self::MemoryTimeline),
             "memory_details" => Some(Self::MemoryDetails),
             "save_memory" => Some(Self::SaveMemory),
+            "read_escalation" => Some(Self::ReadEscalation),
+            "respond_to_escalation" => Some(Self::RespondToEscalation),
             _ => None,
         }
     }

@@ -270,6 +270,12 @@ fn compose_tools(
     let dispatch = AgentActionTools::new(http.clone(), mcp.clone(), message.clone())
         .with_workflow_tools(Arc::new(persistence.clone()))
         .with_provisioning(provisioning)
+        .with_escalations(Arc::new(
+            crate::adapters::workflow_escalation::EscalationRuntime::new(
+                persistence.clone(),
+                lease,
+            ),
+        ))
         .with_knowledge(Arc::new(knowledge));
     ToolRuntimes {
         http,

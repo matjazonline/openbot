@@ -1,0 +1,60 @@
+
+running 55 tests
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_delivery_retry_keeps_one_exchange_output_and_model_call ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::channel_reply_e2e_silence_preserves_result_and_explicit_final_has_no_duplicate ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_projection_is_not_the_saved_output_or_next_seed ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_terminal_delivery_failure_preserves_business_success_and_accepted_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::agent_history_channel_no_reply_and_explicit_send_retain_agent_output_independently ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::memory_capture_a_thread_exchange_is_captured_into_the_agent_memory_at_the_thread_level ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::continuation::agent_history_continuation_real_thread_reply_reaches_child_before_parent_owned_turn_queue ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::retention::agent_history_retention_real_pending_channel_delivery_pins_the_produced_payload_even_after_age ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::history::release::agent_history_channel_customer_cc_after_output_refuses_release_and_retains_classified_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_current_transport_revocation_blocks_final_after_human_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_protected_final_requires_exact_current_approval ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_grandchild_human_wait_returns_to_the_only_response_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_question_rounds_resume_same_owner_with_frozen_contract ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_committed_intent_survives_reconstruction_without_its_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::recovery::channel_reply_e2e_remote_acceptance_before_receipt_keeps_unknown_after_shutdown ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::hitl::channel_reply_e2e_two_waits_in_one_thread_route_answers_without_new_runs ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... ignored, spawned with isolated fixture by agent_history_e2e process parents
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::children::workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_later_question_preserves_owning_root_and_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_review_classification_does_not_reveal_private_wait_metadata ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_child_review_wakes_and_reconciles_the_unchanged_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::views::continuations::channel_reply_views_expired_child_review_advances_parent_without_stale_wait_label ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_continuation_settle_the_call_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_cancelled_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_reopened_attempt_lost_before_saving_replays_the_same_result ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_agent_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_agent_child ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary::doop_binary_child_actual_completion_provider_checkpoint_and_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary_mcp::doop_binary_mcp_child_actual_action_completion_error_and_parent_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::run_schema_tests::workflow_run_schema_preserves_snapshot_refuses_binding_removal_and_scopes_children ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+
+test result: ok. 54 passed; 0 failed; 1 ignored; 0 measured; 4330 filtered out; finished in 109.52s
+

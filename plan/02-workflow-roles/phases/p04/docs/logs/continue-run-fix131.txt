@@ -1,0 +1,34 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_unrouted_child_failure_escalates_once_at_the_root_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_authored_parent_route_consumes_child_failure_without_a_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case' (6123458) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:72:5:
+assertion `left == right` failed: one case and its control, and a replayed sweep adds nothing
+  left: Object {"cases": Number(1), "controls": Number(2), "guard_events": Number(0), "hops": Number(1), "notices": Number(1), "runs": Number(1), "state": String("failed")}
+ right: Object {"cases": Number(1), "controls": Number(1), "guard_events": Number(0), "hops": Number(0), "notices": Number(0), "runs": Number(1), "state": String("failed")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit' (6123455) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:236:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"workflow_run_events\" violates check constraint \"workflow_approval_event_kind\"", detail: Some("Failing row contains (1b284736-bd0d-4067-8a18-28e2943913c2, null, 9b2ceb3e-f16d-4ed6-814a-fa198b7eeeb9, 4, token_allowance_rejected, f46c9541-faae-453a-bbd6-1f99561cbf83, 2026-11-14 01:14:17.835542+00, 76fb0f8d-a9df-4512-ac45-402d4b8c9aa1, null, null, null)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_run_events"), column: None, data_type: None, constraint: Some("workflow_approval_event_kind"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_source_proves_each_parked_owner_reason_from_its_audit
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case
+
+test result: FAILED. 5 passed; 2 failed; 0 ignored; 0 measured; 4467 filtered out; finished in 6.62s
+
+EXIT 101

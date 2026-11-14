@@ -8,6 +8,9 @@ use std::collections::BTreeSet;
 #[path = "escalation_person_tests.rs"]
 mod person_notices;
 
+#[path = "escalation_agent_tests.rs"]
+mod agent_notices;
+
 async fn assign(f: &PeopleFixture, department: DepartmentId, principal: PrincipalId) {
     let departments = crate::adapters::persistence::test_support::department_use_cases(f.role.p());
     let actor = f.role.admission.binding.target.actor.user_id();

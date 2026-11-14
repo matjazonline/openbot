@@ -1,0 +1,16 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7', 'workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution', '--nocapture', '--test-threads=1']
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution' (239837) panicked at src/adapters/persistence/workflow/escalation_source_guard_tests.rs:74:10:
+called `Result::unwrap_err()` on an `Ok` value: PgQueryResult { rows_affected: 1 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4298 filtered out; finished in 1.62s
+

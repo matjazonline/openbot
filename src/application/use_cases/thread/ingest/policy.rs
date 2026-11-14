@@ -123,6 +123,8 @@ pub enum IngressOrigin {
     InternalChannel {
         company_id: uuid::Uuid,
         channel_id: uuid::Uuid,
+        /// The delivery part the hop is, which the commit proves before storing anything.
+        proof: crate::transport::InternalRelayProof,
     },
 }
 
@@ -297,6 +299,7 @@ mod tests {
     use crate::transport::CanonicalContent;
     use crate::transport::EmailIngressFacts;
     use crate::transport::IngressDirectives;
+    use crate::transport::test_support::relay_proof;
     use uuid::Uuid;
 
     fn identity(subject: &str) -> QualifiedIdentity {
@@ -390,6 +393,7 @@ mod tests {
         let origin = IngressOrigin::InternalChannel {
             company_id,
             channel_id,
+            proof: relay_proof(company_id),
         };
 
         let mismatched = draft(
@@ -426,9 +430,11 @@ mod tests {
                 },
             )
         };
+        let company_id = Uuid::new_v4();
         let origin = IngressOrigin::InternalChannel {
-            company_id: Uuid::new_v4(),
+            company_id,
             channel_id: Uuid::nil(),
+            proof: relay_proof(company_id),
         };
         assert!(guard_ingress(&relayed(MAX_INGRESS_HOPS - 1), origin).is_ok());
         assert_eq!(

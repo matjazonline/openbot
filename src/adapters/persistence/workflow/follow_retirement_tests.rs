@@ -1,6 +1,85 @@
 use super::*;
 
 #[tokio::test]
+async fn workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision() {
+    use crate::application::ports::account_deletion::HostAccountDeletion;
+
+    let f = Box::pin(FollowFixture::new(1)).await;
+    let owner = f.people.role.admission.binding.target.actor.user_id();
+    let principal = PrincipalId::new(
+        f.people
+            .role
+            .admission
+            .binding
+            .fixture
+            .principal(owner)
+            .await,
+    );
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(f.people.role.p());
+    departments
+        .add_member(
+            owner,
+            f.scope.company.as_uuid(),
+            f.people.role.department,
+            principal,
+        )
+        .await
+        .unwrap();
+    departments
+        .assign_role(
+            owner,
+            f.scope.company.as_uuid(),
+            f.people.role.department,
+            DepartmentRole::Reviewer,
+            principal,
+        )
+        .await
+        .unwrap();
+    let current = f.assignment().await;
+    assert_eq!(current.reviewers.len(), 2);
+    assert!(
+        current
+            .reviewers
+            .iter()
+            .any(|reviewer| reviewer.principal_id == principal)
+    );
+    let parked: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_pending_follow_decisions \
+         WHERE company_id=$1 AND decision_id=$2)",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(f.decision.0)
+    .fetch_one(f.people.role.p().pool())
+    .await
+    .unwrap();
+    assert!(
+        parked,
+        "the role holder owns a currently parked followed decision"
+    );
+
+    f.people.role.p().delete_user_account(owner).await.unwrap();
+
+    let removed: bool = sqlx::query_scalar(
+        "SELECT NOT EXISTS(SELECT 1 FROM users WHERE id=$1) \
+           AND NOT EXISTS(SELECT 1 FROM companies WHERE id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_follow_decisions WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_reviewer_assignments WHERE company_id=$2) \
+           AND NOT EXISTS(SELECT 1 FROM workflow_reviewer_notices WHERE company_id=$2)",
+    )
+    .bind(owner)
+    .bind(f.scope.company.as_uuid())
+    .fetch_one(f.people.role.p().pool())
+    .await
+    .unwrap();
+    assert!(
+        removed,
+        "owner retirement committed the complete followed-decision cascade"
+    );
+}
+
+#[tokio::test]
 async fn workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit()
  {
     use crate::use_cases::company_invite::CompanyInvitePersistence;

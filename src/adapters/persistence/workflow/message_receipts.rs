@@ -243,11 +243,26 @@ pub(in crate::adapters::persistence::workflow) enum EffectResume {
     Pending,
     Accepted(Value),
     Failed,
-    /// Already parked by `conflicted_effect_park_on` in this transaction.
+    /// Automatic continuation is vetoed. The actual resume owner parks this;
+    /// read-only account planning leaves the recorded facts untouched.
     Conflicted,
 }
 
 pub(in crate::adapters::persistence::workflow) async fn effect_resume_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+) -> AppResult<EffectResume> {
+    // The shared observation is read-only; only this actual owner may park a conflict.
+    // Box its IO phase so receipt planning does not grow the runtime's debug stack.
+    let result = Box::pin(observe_effect_on(db, scope, wait)).await?;
+    if matches!(result, EffectResume::Conflicted) {
+        conflicted_effect_park_on(db, scope).await?;
+    }
+    Ok(result)
+}
+
+pub(in crate::adapters::persistence::workflow) async fn observe_effect_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
     wait: Uuid,
@@ -260,7 +275,6 @@ pub(in crate::adapters::persistence::workflow) async fn effect_resume_on(
         execution: scope.execution,
     };
     if super::super::action_uncertainty::conflicted_on(db, action_scope).await? {
-        conflicted_effect_park_on(db, scope).await?;
         return Ok(EffectResume::Conflicted);
     }
     let result: Option<Value> = sqlx::query_scalar(
@@ -282,21 +296,22 @@ pub(in crate::adapters::persistence::workflow) async fn effect_resume_on(
     })
 }
 
-/// Whether this effect wait belongs to a saved model tool call (an agent continuation)
-/// rather than a message step.
-pub(in crate::adapters::persistence::workflow) async fn model_tool_wait_on(
+/// Use the same saved origin for receipt completion and account planning. A model
+/// tool delivery continues its agent; only a step receipt can finish the workflow.
+pub(in crate::adapters::persistence::workflow) fn wait_origin_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
     wait: Uuid,
-) -> AppResult<bool> {
-    Ok(sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM workflow_message_actions WHERE company_id=$1 AND execution_id=$2 AND wait_id=$3 AND origin='model_tool')",
+    origin: MessageOrigin,
+) -> impl std::future::Future<Output = Result<bool, sqlx::Error>> + '_ {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM workflow_message_actions WHERE company_id=$1 AND execution_id=$2 AND wait_id=$3 AND origin=$4)",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.execution.as_uuid())
     .bind(wait)
-    .fetch_one(&mut *db)
-    .await?)
+    .bind(origin.as_str())
+    .fetch_one(db)
 }
 
 /// The Reconcile outcome `retire_on` gives `complete_io`'s conflict failure, for a parked

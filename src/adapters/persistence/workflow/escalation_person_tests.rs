@@ -51,6 +51,51 @@ async fn counts(f: &PeopleFixture) -> Value {
         .bind(f.role.company().as_uuid()).fetch_one(f.role.p().pool()).await.unwrap()
 }
 
+async fn no_run_attention(f: &PeopleFixture, decision: Uuid) {
+    use crate::application::attention::AttentionPersistence;
+    use crate::entities::attention::{AttentionQuery, AttentionSourceKind, AttentionView};
+    let channels = [f.role.channel];
+    let page = f
+        .role
+        .p()
+        .list_attention(AttentionQuery {
+            company_id: f.role.company().as_uuid(),
+            principal_id: f.principals[0],
+            visible_channel_ids: &channels,
+            manager: true,
+            company_items: false,
+            view: AttentionView::MyWork,
+            cursor: None,
+            limit: 100,
+        })
+        .await
+        .unwrap();
+    let rows: Vec<_> = page
+        .items
+        .iter()
+        .filter(|item| item.source_kind == AttentionSourceKind::EscalationDecision)
+        .collect();
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].source_id, decision);
+    assert_eq!(
+        rows[0].run_id, None,
+        "the genuine refused admission never fabricated a run"
+    );
+    assert_eq!(
+        rows[0].href.as_deref(),
+        Some(format!("/ui/workflow-decisions/escalations/{decision}").as_str())
+    );
+    assert_eq!(
+        f.role
+            .p()
+            .operational_summary(f.role.company().as_uuid(), &channels)
+            .await
+            .unwrap()
+            .open_decision_count,
+        1
+    );
+}
+
 #[tokio::test]
 async fn workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run()
  {
@@ -73,6 +118,7 @@ async fn workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secu
         JOIN workflow_escalation_notices AS source ON source.company_id=notification.company_id AND source.event_id=notification.event_id \
         WHERE notification.company_id=$1 AND notification.recipient_user_id=$2")
         .bind(f.role.company().as_uuid()).bind(f.users[0]).fetch_one(f.role.p().pool()).await.unwrap();
+    no_run_attention(&f, link.decision_id).await;
     let href = f
         .role
         .p()
@@ -290,6 +336,7 @@ async fn workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_p
             fence: &claim.lease,
             expected: &expected,
             email: None,
+            agent_message_key: None,
             escalation_ack_hours: Default::default(),
         })
         .await

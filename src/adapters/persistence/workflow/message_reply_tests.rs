@@ -238,17 +238,20 @@ async fn reply(s: &Intents, asked: &Asked, by: By, role: &str) -> Uuid {
 /// A reply into the question's thread that reached ingress by `origin`, as its intent.
 async fn reply_from(s: &Intents, asked: &Asked, by: By, role: &str, origin: &str) -> Uuid {
     let n = s.messages.fetch_add(1, Ordering::SeqCst);
-    let message = s
-        .p()
-        .create_message(&inbound(
-            asked.thread,
-            &format!("<reply-{n}@partner.test>"),
-            &[],
-            "Yes, go ahead.",
-        ))
-        .await
-        .unwrap()
-        .canonical_id;
+    let message = if origin == "internal" {
+        Box::pin(relayed_reply(s, asked, n)).await
+    } else {
+        s.p()
+            .create_message(&inbound(
+                asked.thread,
+                &format!("<reply-{n}@partner.test>"),
+                &[],
+                "Yes, go ahead.",
+            ))
+            .await
+            .unwrap()
+            .canonical_id
+    };
     let id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, thread_id, \
@@ -275,6 +278,70 @@ async fn reply_from(s: &Intents, asked: &Asked, by: By, role: &str, origin: &str
     .await
     .unwrap();
     id
+}
+
+/// A reply that genuinely arrived by internal relay: another channel's queued email delivery
+/// whose frozen part is exactly this message, so the database's own relay guard accepts the
+/// proof an `internal` intent requires (D4.3).
+async fn relayed_reply(s: &Intents, asked: &Asked, n: usize) -> CanonicalMessageId {
+    use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
+    use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
+    use crate::adapters::protocols::email::test_support::relayed_part;
+    use crate::transport::NewDelivery;
+    const RECIPIENT: &str = "runs@workflow-tests.agents.test";
+    let body = "Yes, go ahead.";
+    let company = s.fixture.target.company.as_uuid();
+    let source = new_channel(&s.fixture, &format!("delegate-{n}")).await;
+    let thread = s
+        .p()
+        .create_thread(source, "Delegated", &[])
+        .await
+        .unwrap()
+        .id;
+    let key = format!("relayed-{n}");
+    let mut fixture = delivery_fixture(
+        s.p(),
+        DeliveryFixtureRequest {
+            recipient: RECIPIENT,
+            body,
+            ..DeliveryFixtureRequest::new(company, source, thread, &key)
+        },
+    )
+    .await;
+    let rfc = format!("<relayed-{n}@workflow-tests.agents.test>");
+    fixture.delivery.parts = NewDelivery::frozen_parts(vec![relayed_part(
+        fixture.delivery.idempotency_key.as_str(),
+        &format!("delegate-{n}@workflow-tests.agents.test"),
+        RECIPIENT,
+        &rfc,
+        body,
+        source,
+    )])
+    .unwrap();
+    let mut tx = s.pool().begin().await.unwrap();
+    let delivery = insert_delivery_on(&mut tx, &fixture.delivery)
+        .await
+        .unwrap()
+        .delivery_id();
+    tx.commit().await.unwrap();
+    let message = s
+        .p()
+        .create_message(&inbound(asked.thread, &rfc, &[], body))
+        .await
+        .unwrap()
+        .canonical_id;
+    sqlx::query(
+        "INSERT INTO message_internal_relays(company_id,message_id,delivery_id,part_index,source_channel_id) \
+         VALUES($1,$2,$3,0,$4)",
+    )
+    .bind(company)
+    .bind(message.as_uuid())
+    .bind(delivery.as_uuid())
+    .bind(source)
+    .execute(s.pool())
+    .await
+    .unwrap();
+    message
 }
 
 /// A member's principal: a party to the company who is not whom a question addressed.

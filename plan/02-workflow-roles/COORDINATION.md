@@ -1,8 +1,8 @@
 # Plan coordination: 02-workflow-roles
 
-- Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/02-workflow-roles/COORDINATION.md
-- Writer: `/root` in `/Users/mac02/.codex/worktrees/2050/openbot`
-- Revision: 30
+- Authority: /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/COORDINATION.md
+- Writer: Claude Code root/A (Opus 5.5 `claude-opus-5-5`, xhigh confirmed by the user; session d139d6f0) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
+- Revision: 41
 
 ## Plan-wide instructions
 
@@ -15,15 +15,18 @@ Root/A is Sol 6.1/xhigh, confirmed by the user earlier in this session. Independ
 ### I003 / r1
 Run focused checks in implementation phases and the full repository/CI gate once at this plan's final integration phase. Retain failed checks. Do not raise limits or weaken assertions.
 
+### I004 / r1 — publish completed plan 02
+User explicitly instructed: "push when 02 plan is complete". Once all plan02 phases and final integration gates are complete and independently accepted, commit the plan02 changes and push the current task branch before starting plan03. Do not push partial p04/B1 work. Preserve unrelated user edits and exclude secrets. Pull with rebase immediately before each push, retry a rejected push only after another pull, and never force-push. This authorizes the necessary plan02 commit/push; it does not authorize merging or deployment. This updates I002's earlier no-publishing-inferred disposition for the explicitly requested completed-plan publication.
+
 ## Phase directory
 
 | Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
 | --- | --- | --- | --- |
-| p01 | /root; accepted in phase; integration pending p05 | /Users/mac02/.codex/worktrees/2050/openbot | phases/p01/docs/TASK.md; HANDOFF.md |
-| p02 | /root; accepted in phase; integration pending p05 | /Users/mac02/.codex/worktrees/2050/openbot | phases/p02/docs/TASK.md; HANDOFF.md |
-| p03 | /root; accepted in phase; integration pending p05 | /Users/mac02/.codex/worktrees/2050/openbot | phases/p03/docs/TASK.md; HANDOFF.md |
-| p04 | /root; implementing B1, architecture accepted | /Users/mac02/.codex/worktrees/2050/openbot | phases/p04/docs/TASK.md; HANDOFF.md |
-| p05 | /root; queued | /Users/mac02/.codex/worktrees/2050/openbot | phases/p05/docs/TASK.md; HANDOFF.md |
+| p01 | /root; accepted in phase; integrated (p05 accepted, revision41) | /Users/mac02/.codex/worktrees/2050/openbot | phases/p01/docs/TASK.md; HANDOFF.md |
+| p02 | /root; accepted in phase; integrated (p05 accepted, revision41) | /Users/mac02/.codex/worktrees/2050/openbot | phases/p02/docs/TASK.md; HANDOFF.md |
+| p03 | /root; accepted in phase; integrated (p05 accepted, revision41) | /Users/mac02/.codex/worktrees/2050/openbot | phases/p03/docs/TASK.md; HANDOFF.md |
+| p04 | /root; accepted in phase (02WR-P04-B1-R2/N1 PASS, digest e9ce4b95…2b03); integrated (p05 accepted, revision41) | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p04/docs/TASK.md; HANDOFF.md |
+| p05 | /root; accepted in phase (02WR-P05-R3 PASS, digest bd5279a5…1da7); plan02 complete (Claude Code implement-opus-reviewed-2_3) | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p05/docs/TASK.md; HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -245,3 +248,82 @@ Root activatesC007/r1afterindependentPASS02WR-P04-D3-R1/N1 forcompleteD3/r1 +exa
 
 ## C1/r1 activation (revision30)
 Root activates C008/r1 after independent PASS02WR-P04-C1-R1/N1 for immutable C1/r1 and source d6afad07875439fc5bdf12f3e5ceac1fb7c396e0fe9a214a19e070b231528038. Root same6excludes snapshot identical; retained evidence valid. No real production pre-PreparedAdmission role-refusal producer found; only that absent conditional consumer is not applicable. Samples/authoring never mint cases; actual prepared-admission/runtime and future earlier-producer fencing remain required, only channel.call deferred. p04 acknowledges I001-3/r1,C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1 before adopting disposition. Source freeze ends; whole B1 still partial/unaccepted, p05/allplan03 queued.
+
+
+## Resume and authority transfer (revision31, 2026-11-12)
+
+The user resumed plan02 implementation using implement-astra-reviewed-2-3, confirming root/A Sol6.1/xhigh. The previous authoritative checkout `/Users/mac02/.codex/worktrees/2050/openbot` and its disposable PostgreSQL cluster do not exist on this machine. Authority and sole writer transfer to this file in the current Cloudroom worktree, @thread:thr_jt43h4qc8d; historical paths above remain evidence of prior ownership. Current branch starts at committed checkpoint `2bbe2649024aa6a4617b74b0c0c7868b14590b5f`; preserved p01–p04 checkpoint source is committed, with no pre-existing dirty changes.
+
+p04 resumes its existing cohesive B1 under unchanged accepted D1/r3, D2/r2, D3/r1 and C1/r1. Root acknowledges I001–I003/r1 and active C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1; no new contract is introduced. Historical acceptance identities and phase start/review base remain unchanged; the new starting checkpoint does not accept unfinished p04. Existing local phase record paths remain authoritative under the new root. Prior worker handles belong to the absent session and are unavailable; a fresh independent Astra/high reviewer will be started through Cloudroom when review is required, with no inherited history. p05 remains queued; plan03 remains dependent on plan02 completion.
+
+User explicitly authorized installing missing Rust/PostgreSQL/Graft and remaining required tools locally. New isolated cluster/build resources will be recorded in p04 TASK/HANDOFF. No deployment, main merge, new commit or push is inferred from this resume.
+
+
+### 02WR-C009 / r1
+- State: active after independent C2/r1 coverage PASS
+- Origin: p04 source-owner account proof continuation; immutable phases/p04/docs/logs/C2-r1.md and actual build18 119PASS/1FAIL
+- Targets: p04,p05; plan03 when consuming account/current-route contracts
+- Instruction/change: Preserve D1.7/1.8 account→company atomicity and all C004 exact-frozen-recipient/current-proof security. Only an obsolete inherited race orchestration (application address write commits while publication owns company) is proposed for replacement by actual release-predicate adversarial SQL coverage plus full real-runtime mutation/publication both orders and actual provider admission refusal. No omission/timeout-as-result/async refresh/authority relaxation. No test/code changes for this disposition before B PASS/root activation.
+- Dependencies/order: Existing B1 source remains partial/unaccepted; entire source frozen during C2 review. Active I001–3/r1,C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1 unchanged.
+- Evidence/review: C2-r1.md; resume-account-visibility-before1/native1 logs; current source snapshot/coord32 pin. B independent review pending.
+- Verification: C2 exact criterion/assertion mapping, actual constructors/source owners/release guards, named inventory/stand-in limits, all affected account/source/security checks and original B1/p05 obligations.
+- Responses: p04 acknowledges proposal r1 at32 before changing the inherited test; p05/plan03 evaluate at startup/activation.
+
+
+## C2/r1 activation (revision33)
+
+Root activates C009/r1 after independent PASS02WR-P04-C2-R1/N1 for complete C2/r1 and frozen source bde774d4d637e671804ffa5ace3a4331178be0d07861c52cc3a05b0db87ddbf7. Root identical six-exclusion snapshot and five immutable input hashes rechecked. B is fresh Cloudroom @thread:thr_9t9ekqz3i9; Cloudroom execution metadata confirms gpt-6-astra/high although that metadata was unavailable inside B's context. No actionable findings. Coverage disposition only: replacements remain unimplemented/unexercised and the inherited119PASS/1FAIL remains failed evidence. Full B1/F1 and p05 are unaccepted. p04 acknowledges active I001–3/r1,C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1,C009/r1 before affected edits. Source freeze ends; implement all combined release-seam, both-order runtime and actual provider-observability coverage. Only channel.call remains deferred. p04 directory metadata now names the current authoritative checkout; historical p01–p03 records remain immutable.
+
+
+## Continuation ownership (revision34, 2026-11-12)
+
+User requested continue in @thread:thr_c7pja4f7ef, same implementation worktree/branch. Root/A adopts the existing p04 continuation records and sole coordination writer role from the saved @thread:thr_jt43h4qc8d handoff. Existing source changes, user Trail changes, immutable decisions/reviews and owned resource paths are preserved. No source freeze or reviewer task is pending. Acknowledges I001–3/r1,C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1,C009/r1; no contract changes. Prepare24 completed successfully; build20 has no completion artifact and no active owned Cargo process, so a fresh build21 is required. Owned PG52471 was stopped; restarted the existing disposable cluster. No new commit, push, merge or deployment authorization inferred. Full B1/p05 remains unaccepted.
+
+
+## Publication authorization (revision35, 2026-11-13)
+
+User requested "push when 02 plan is complete" in @thread:thr_c7pja4f7ef. Root publishes I004/r1 and acknowledges it for p04 continuation; p05 must satisfy the full integration/verification/review gate before the commit/push. p04 remains partial/unreviewed; no push or commit performed at this instruction boundary. Existing I001–3 and C001–C009 revisions remain unchanged. Plan03 remains dependent on completed plan02 and now follows its requested push.
+
+
+### 02WR-C010 / r1
+- State: superseded by proposed r2
+- Origin: p04 D4/r1, durable authenticated suppression needs explicit source-retention and private relay provenance ownership before implementation.
+- Targets: p04,p05; plan03 origin/routing consumers.
+- Instruction/change: Proposed D4-r1.md supplements D1.9/1.12 with guarded tenant-scoped durable origin tokens, exact run/message producer inheritance, typed server-internal actual delivery/part proof, bounded retention cleanup and existing cross-company relay refusal. Original intended-root settlement, authority, limits, D1–D3 and I004 remain unchanged. No new cross-company transport or wire origin flag.
+- Dependencies/order: Whole immutable D4/r1 requires independent Astra/high PASS and root activation before dependent origin implementation. Entire source frozen for gate; root can do read-only independent analysis.
+- Evidence/review: phases/p04/docs/logs/D4-r1.md; source/coordination pin and snapshot to follow.
+- Verification: D4 actual causal owner, relay/proof/forgery/retention/concurrency matrix plus all original D1/D2/D3/F1 criteria and p05 final full gate.
+- Responses: p04 acknowledges proposed r1 for architecture review at36; p05/plan03 evaluate on startup after activation.
+
+
+### 02WR-C010 / r2
+- State: active after D4/r2 architecture PASS
+- Origin: immutable D4/r2, correcting independent02WR-P04-D4-R1/F1(P1).
+- Targets: p04,p05; plan03 origin/routing consumers.
+- Instruction/change: Preserve whole r1 plus independent canonical-notice target classification/exact binding/revision and at-most-one root seal through canonical-message/original-intent lifetime, without a source-receipt cascade or ordinary fallback. All candidate/admission/guard/settlement consumers use the retained target authority; lost source action context is a typed closed outcome with zero new roots/providers. Actual pending/claimed retention/admission schedules and root-retention latch proofs required.
+- Dependencies/order: No dependent origin implementation until whole D4/r2 independent Astra/high PASS and root activation. Current review correction source is re-frozen with exact same6 excludes.
+- Evidence/review: D4-r1 original and B finding/notes retained; D4-r2.md plus pinned coord37/source identity/reviewer recheck. Unrelated I/O source-guard ordinal correction included in new snapshot, not an origin implementation or phase acceptance.
+- Verification: D4.1a retention target/zero-one root/no fallback matrix plus all original D4/D1/D2/D3/F1/p05 obligations.
+- Responses: p04 acknowledges proposed r2 at37 before dependent edits; p05/plan03 evaluate after activation.
+
+
+## D4/r2 activation (revision38)
+
+Root accepts whole immutable D4/r2 after independent PASS02WR-P04-D4-R2/N1 by fresh B@thread:thr_9t82uwgsiu (actual gpt-6-astra/high confirmed by Cloudroom metadata). Exact source4c0a3396c2af07a24a9a9dc19894f032cb3ebb13839ffad17ca8bcb216192ba4 and decision/coordination37 hashes rechecked by root with the same6 exclusions. F1 resolved at architecture level only. Root activates C010/r2 and acknowledges I001–4/r1,C001/r1,C002/r2,C003/r2,C004/r3,C005/r3,C006/r2,C007/r1,C008/r1,C009/r1,C010/r2 before dependent edits. Source freeze ends. All D4 actual targeting/origin/relay/retention tests and original D1/D2/D3/F1/B1/p05 work remain required; no implementation acceptance, waiver, commit or push.
+
+## p04 acceptance and p05 start (revision39, 2026-11-14)
+
+Root accepts p04 B1 in phase on independent PASS 02WR-P04-B1-R2/N1 (Claude Code B, Opus 5.5 `claude-opus-5-5`, xhigh requested) for digest e9ce4b95a6bb2afc0670cd305c2a39397967b5a97db404f68d7a9ae0502b2b03 (base 2bbe2649, same six exclusions), recomputed by root (`phases/p04/docs/logs/B1-R2-acceptance-snapshot.txt`). Optional findings: 02WR-P04-B1-R2/F8 (end-to-end approval-rejection and delivery-failure escalation tests) carried into p05 integration coverage; F9 disposition: keep — an unrouted reviewer rejection fails the run and escalates, per accepted D1.3 (only user cancellation stays outside), as token-allowance rejection already did; reported to the user. Known unrelated red tests carried to the p05 gate: 6 cloudroom Node-ABI tests, 2 inherited p03 failures. I002's original worker models (Sol/Astra) were superseded in this session by the Claude Code workflow (root/A Opus 5.5 xhigh, fresh Opus 5.5 B). No new notices; I001–I004/r1 and C001–C010 acknowledged at their current revisions. p04 is not integrated; no commit or push until p05 is accepted (I004/r1).
+
+## p05 final-gate corrections (revision40, 2026-11-14)
+
+The p05 gate (`phases/p05/docs/TASK.md` "B2 final gate, run 1", "Correction checks and failure triage", "CI-only gates") found plan02 regressions that earlier focused checks could not see. Two had been hidden: `rg` is not a binary in the Claude Code shell, so the transport boundary gate scanned nothing, and the sample boundary runs only in CI. Corrections, all in plan02-owned code:
+- Agent escalation notices take their RFC Message-ID from the email transport (`TransportRenderer::application_message_key(company, notice_id)` via `application::notification::agent_notice_key`, passed on `NotificationProjectionCommit::agent_message_key`; `NotificationDisposition::Agent` carries the company slug). The receipt guard `guard_workflow_escalation_agent_receipt` now requires `split_part(rfc_message_id,'@',1)='<'||notice_id` instead of the literal `<escalation-{id}@openbot.invalid>` (init-schema edit; fresh databases). This is a shared contract: any later producer of private platform messages follows the same rule.
+- Test-only: the relayed email fixture moved to `protocols::email::test_support::relayed_part`; two stale plan02 tests now pass person principals as reviewers; plan02 clippy findings fixed.
+- `scripts/workflow-sample-boundary.py` admits the pure `roles::refuse_unresolved_sample_role`.
+- Instruction for later phases and plan03: run boundary gates with a real `rg` on PATH, and run CI's extra boundary scripts (`scripts/tests/workflow-sample-boundary.py`, `scripts/workflow-sample-boundary.py`, `scripts/tests/integration-boundary.py`, `scripts/integration-boundary.py`, `scripts/check-integration-docs.py`), which `scripts/check.sh` does not run.
+- Responses: p05 owns these changes and is under independent review (round 02WR-P05-R1). plan03 acknowledges at activation.
+
+## p05 acceptance and plan02 completion (revision41, 2026-11-14)
+
+Root accepts p05 in phase on the independent PASS 02WR-P05-R3-N1 (Claude Code B, Opus 5.5 `claude-opus-5-5`, xhigh requested) for digest bd5279a566cdffd7b50e30277160ecb512e6cc9f3871b431422b695391a01da7 (base 2bbe2649, same seven exclusions), recomputed by root (`phases/p05/docs/logs/acceptance-snapshot1.txt`). All p05 findings are resolved: R1/F1–F3 and R2/F4. The revision40 shared contract stands unchanged. Final gate: `phases/p05/docs/TASK.md` and the completion record in `05-integration-and-final-verification.md`. Only confirmed-unrelated failures remain red (7 clippy lints predating plan02, 5 library tests, 4 doop timeouts under load), and the unavailable CI prerequisites are listed there. p01–p05 are accepted and integrated, so plan02 is complete. After acceptance the only edits were records: the completion table, this file, and the p05 TASK/HANDOFF. Per I004/r1, root commits the plan02 changes and pushes the task branch before plan03 starts. I001–I004/r1 and C001–C010 are acknowledged at their current revisions. No new notices.

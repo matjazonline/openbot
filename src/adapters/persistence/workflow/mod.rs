@@ -65,6 +65,8 @@ mod completion;
 mod completion_job;
 mod decisions;
 mod definitions;
+mod escalation_handling;
+pub(crate) mod escalation_tools;
 pub(crate) mod escalations;
 mod fair_polling;
 mod fairness;
@@ -82,7 +84,9 @@ pub mod local_agents;
 pub mod mcp;
 mod member_dependents;
 mod memory_steps;
-pub(crate) use member_dependents::refresh_member_dependents_on;
+pub(crate) use member_dependents::{
+    prelock_account_companies_on, refresh_account_dependents_on, refresh_member_dependents_on,
+};
 pub mod message;
 mod message_intents;
 mod metrics;

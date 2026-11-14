@@ -65,6 +65,8 @@ impl fmt::Display for BusinessPriority {
 pub enum AttentionSourceKind {
     /// One open workflow decision, for its reviewers and the company's managers.
     Decision,
+    /// An open administrative escalation assignment, including the final owner handoff.
+    EscalationDecision,
     /// A run waiting on a check of whether an uncertain action took effect.
     RunReconciliation,
     /// A run that failed in the last 7 days and has not been rerun.
@@ -79,6 +81,7 @@ impl AttentionSourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Decision => "decision",
+            Self::EscalationDecision => "escalation_decision",
             Self::RunReconciliation => "run_reconciliation",
             Self::RunFailure => "run_failure",
             Self::BindingRefusal => "binding_refusal",
@@ -93,6 +96,7 @@ impl FromStr for AttentionSourceKind {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "decision" => Ok(Self::Decision),
+            "escalation_decision" => Ok(Self::EscalationDecision),
             "run_reconciliation" => Ok(Self::RunReconciliation),
             "run_failure" => Ok(Self::RunFailure),
             "binding_refusal" => Ok(Self::BindingRefusal),
@@ -291,6 +295,7 @@ mod tests {
         // would silently truncate the cursor rather than fail to parse.
         for source_kind in [
             AttentionSourceKind::Decision,
+            AttentionSourceKind::EscalationDecision,
             AttentionSourceKind::RunReconciliation,
             AttentionSourceKind::RunFailure,
             AttentionSourceKind::BindingRefusal,

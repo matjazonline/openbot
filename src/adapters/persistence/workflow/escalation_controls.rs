@@ -9,6 +9,7 @@ use chrono::{DateTime, Utc};
 
 #[path = "escalation_hops.rs"]
 mod hops;
+pub(super) use hops::enqueue_notices_on;
 
 pub(crate) enum ControlProjection {
     Complete,

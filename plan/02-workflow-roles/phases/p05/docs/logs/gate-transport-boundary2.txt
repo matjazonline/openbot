@@ -1,0 +1,11 @@
+rg: symlink /private/tmp/claude-501/-Users-mac02--gui-cloudroom-plugins-environment-git-worktree-host-data-worktrees-thr-jt43h4qc8d-1-openbot/d139d6f0-976b-419b-b64a-47335b295a58/scratchpad/bin/rg -> /opt/homebrew/Caskroom/claude-code/2.1.311/claude (Claude Code bundled ripgrep; no system rg on this host)
+ripgrep 14.1.1 (rev 0ae49f8b6e)
+runtime boundary gate regression tests passed
+transport boundary check failed:
+src/adapters/persistence/notification/agent_notice_message.rs:49:    let key = format!("<escalation-{}@openbot.invalid>", event.source_id);
+synthetic email identity escaped the email adapter
+49:    let key = format!("<escalation-{}@openbot.invalid>", event.source_id);
+an RFC Message-ID was constructed outside the email adapter in src/adapters/persistence/notification/agent_notice_message.rs
+src/adapters/persistence/workflow/message_reply_tests.rs:318:    let email = OutboundEmailV1 {
+outbound email constructed outside the email adapter
+EXIT 1

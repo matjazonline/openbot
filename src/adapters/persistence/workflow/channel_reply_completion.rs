@@ -34,60 +34,24 @@ pub(super) async fn root_on(
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
 
-/// Account/company locks precede run locks even when suppression needs no message grant.
-pub(super) async fn prelock_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<()> {
-    let owned: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs WHERE company_id=$1 AND run_id=$2)",
+pub(super) fn pending_reply_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> impl std::future::Future<Output = Result<bool, sqlx::Error>> + '_ {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs AS owned \
+         JOIN workflow_executions AS execution ON execution.company_id=owned.company_id AND execution.run_id=owned.run_id \
+         JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
+         WHERE owned.company_id=$1 AND owned.run_id=$2 AND execution.id=$3 AND job.id=$4 AND execution.completed_at IS NULL)",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .fetch_one(&mut *db)
-    .await?;
-    if owned {
-        action_authority::prelock_on(
-            db,
-            ActionScope {
-                company: scope.company,
-                run: scope.run,
-                execution: scope.execution,
-            },
-        )
-        .await?;
-    }
-    Ok(())
+    .bind(scope.execution.as_uuid())
+    .bind(scope.job.0)
+    .fetch_one(db)
 }
 
-#[derive(sqlx::FromRow)]
-struct ControlScope {
-    execution_id: Uuid,
-}
-pub(super) async fn prelock_control_on(
-    db: &mut PgConnection,
-    company: CompanyId,
-    run: RunId,
-    actor: WorkflowActor,
-) -> AppResult<()> {
-    let scope: Option<ControlScope>=sqlx::query_as("SELECT execution.id AS execution_id FROM channel_reply_runs AS owned \
-        JOIN workflow_executions AS execution ON execution.company_id=owned.company_id AND execution.run_id=owned.run_id \
-        JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
-        WHERE owned.company_id=$1 AND owned.run_id=$2 ORDER BY execution.activation DESC LIMIT 1")
-        .bind(company.as_uuid()).bind(run.as_uuid()).fetch_optional(&mut *db).await?;
-    if let Some(scope) = scope {
-        action_authority::prelock_accounts_on(
-            db,
-            ActionScope {
-                company,
-                run,
-                execution: ExecutionId::new(scope.execution_id),
-            },
-            Some(actor),
-        )
-        .await?;
-        // The scope is a lock hint only. The control reloads the real run under its own lock.
-    }
-    Ok(())
-}
-
+/// Account/company locks precede run locks; immutable completed facts need no live recipients.
 pub(super) async fn authorize_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -148,6 +112,13 @@ pub(super) enum PreparedFinal {
     Parked,
 }
 
+pub(super) fn final_response_disposition(
+    completion: &PureCompletion,
+) -> Option<ResponseDisposition> {
+    (completion.state == RunState::Succeeded && completion.target == TransitionTarget::End)
+        .then_some(completion.response_disposition)
+}
+
 pub(super) async fn prepare_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -155,13 +126,13 @@ pub(super) async fn prepare_on(
     owner: completion_job::CompletionOwner,
     notices: Option<&DecisionNotices>,
 ) -> AppResult<PreparedFinal> {
-    if completion.state != RunState::Succeeded || completion.target != TransitionTarget::End {
+    let Some(disposition) = final_response_disposition(completion) else {
         return Ok(PreparedFinal::Unowned);
-    }
+    };
     let Some(root) = root_on(db, scope).await? else {
         return Ok(PreparedFinal::Unowned);
     };
-    if completion.response_disposition == ResponseDisposition::Suppressed {
+    if disposition == ResponseDisposition::Suppressed {
         return Ok(PreparedFinal::Suppressed {
             intent: root.intent_id,
         });

@@ -8,21 +8,74 @@ use crate::services::harness::runs::ModelReservation;
 
 type Admission = WorkflowModelAdmission;
 
-pub(super) async fn reserve_on(
+#[path = "checkpoint_model_accounts.rs"]
+mod accounts;
+
+const MAX_HINT_ATTEMPTS: usize = 2;
+
+pub(super) async fn reserve(
+    conn: &mut sqlx::pool::PoolConnection<Postgres>,
+    write: WorkflowCheckpointWrite,
+    request: &WorkflowModelRequest,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+    bound: &WriteBound,
+) -> AppResult<Admission> {
+    for _ in 0..MAX_HINT_ATTEMPTS {
+        let mut tx = bound.begin(conn).await?;
+        match accounts::prepare_on(&mut tx, write, accounts::Purpose::Reserve(request), notices)
+            .await?
+        {
+            accounts::Preparation::Stale => {
+                bound.roll_back(tx, Ok(())).await?;
+            }
+            accounts::Preparation::Current(authority) => {
+                let result = reserve_on(&mut tx, write, request, notices, bound, authority).await;
+                return bound.end(tx, result).await;
+            }
+        }
+    }
+    Err(accounts::changed())
+}
+
+pub(super) async fn settle(
+    conn: &mut sqlx::pool::PoolConnection<Postgres>,
+    write: WorkflowCheckpointWrite,
+    turn: &SavedModelTurn,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+    bound: &WriteBound,
+) -> AppResult<WorkflowModelSettlement> {
+    for _ in 0..MAX_HINT_ATTEMPTS {
+        let mut tx = bound.begin(conn).await?;
+        match accounts::prepare_on(&mut tx, write, accounts::Purpose::Settle(turn), notices).await?
+        {
+            accounts::Preparation::Stale => {
+                bound.roll_back(tx, Ok(())).await?;
+            }
+            accounts::Preparation::Current(authority) => {
+                let result = settle_on(&mut tx, write, turn, notices, bound, authority).await;
+                return bound.end(tx, result).await;
+            }
+        }
+    }
+    Err(accounts::changed())
+}
+
+async fn reserve_on(
     tx: &mut Transaction<'_, Postgres>,
     write: WorkflowCheckpointWrite,
     request: &WorkflowModelRequest,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
     bound: &WriteBound,
+    authority: accounts::ModelAuthority,
 ) -> AppResult<End<Admission>> {
-    if !token_budget::prelock_reviewers(tx, write.fence.scope).await? {
-        return Ok(End::Rollback(Admission::OwnershipLost));
-    }
     // Revocation linearizes against admission: checked under authority locks.
-    if authorize_on(tx, write.fence).await?.is_none() {
+    if authorize_prelocked_on(tx, write.fence, authority.actor)
+        .await?
+        .is_none()
+    {
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
-    if !lock_owner(tx, write.fence, bound).await? {
+    if !lock_prelocked_owner(tx, write.fence, bound, authority.actor).await? {
         return Ok(End::Rollback(Admission::OwnershipLost));
     }
     agent_history::audience_on(
@@ -54,17 +107,11 @@ pub(super) async fn reserve_on(
         charge(tx, write, request, bound).await?;
         return Ok(End::Commit(Admission::BudgetExhausted));
     }
-    if root.original.is_some() && notices.is_none() {
-        return Err(AppError::BadRequest(
-            "Token review notifications are unavailable".into(),
-        ));
-    }
-    let additional = request
-        .reservation
-        .input_tokens
-        .checked_add(request.reservation.output_tokens)
-        .ok_or_else(invalid)?;
+    let additional = review_request_tokens(&root, request, notices)?;
     if root.requires_approval(additional)? {
+        if !authority.reviewers_available {
+            return Ok(End::Rollback(Admission::OwnershipLost));
+        }
         let paused = decisions::tokens::park(
             tx,
             decisions::tokens::TokenPause {
@@ -93,6 +140,23 @@ pub(super) async fn reserve_on(
     Ok(End::Commit(Admission::New(NewModelAdmission::committed(
         next,
     ))))
+}
+
+fn review_request_tokens(
+    root: &token_budget::RootTokens,
+    request: &WorkflowModelRequest,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<u64> {
+    if root.original.is_some() && notices.is_none() {
+        return Err(AppError::BadRequest(
+            "Token review notifications are unavailable".into(),
+        ));
+    }
+    request
+        .reservation
+        .input_tokens
+        .checked_add(request.reservation.output_tokens)
+        .ok_or_else(invalid)
 }
 
 async fn charge(
@@ -154,15 +218,15 @@ fn admission_replay(
     Ok(None)
 }
 
-pub(super) async fn settle_on(
+async fn settle_on(
     tx: &mut Transaction<'_, Postgres>,
     write: WorkflowCheckpointWrite,
     turn: &SavedModelTurn,
     notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
     bound: &WriteBound,
+    authority: accounts::ModelAuthority,
 ) -> AppResult<End<WorkflowModelSettlement>> {
-    let reviewers_available = token_budget::prelock_reviewers(tx, write.fence.scope).await?;
-    if !lock_owner(tx, write.fence, bound).await? {
+    if !lock_prelocked_owner(tx, write.fence, bound, authority.actor).await? {
         return Ok(End::Rollback(WorkflowModelSettlement::saved(
             WriteOutcome::OwnershipLost,
         )));
@@ -188,7 +252,7 @@ pub(super) async fn settle_on(
         ))));
     }
     if next.state == RunState::Active && root.requires_approval(0)? {
-        let Some(notices) = notices.filter(|_| reviewers_available) else {
+        let Some(notices) = notices.filter(|_| authority.reviewers_available) else {
             return Ok(End::Commit(WorkflowModelSettlement::ReviewUnavailable(
                 Box::new(next),
             )));

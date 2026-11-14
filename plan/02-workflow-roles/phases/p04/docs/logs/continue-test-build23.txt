@@ -1,0 +1,20 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 12s
+      192.78 real       188.34 user         6.15 sys
+         12515590144  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+             1414110  page reclaims
+               27742  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   0  messages sent
+                   0  messages received
+                   2  signals received
+                7340  voluntary context switches
+               25462  involuntary context switches
+          3485440471  instructions retired
+          1273788502  cycles elapsed
+           109658928  peak memory footprint

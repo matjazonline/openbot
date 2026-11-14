@@ -1,0 +1,26 @@
+
+running 3 tests
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... FAILED
+test adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution ... FAILED
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+
+failures:
+
+---- adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping stdout ----
+
+thread 'adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping' (3315678) panicked at src/adapters/persistence/notification_lease_tests.rs:6:46:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"notification_events\" violates check constraint \"notification_events_lease_check\"", detail: Some("Failing row contains (10da5b18-49fe-461b-aa2e-369cfec7220f, b452930c-d2f6-4cb5-b902-3ba8aba68b5b, 6680a02c-7ded-4606-b1ae-9adeeb96b532, delivery, e3b12b81-abbc-4459-89d0-621a9d977b12, delivery_failure, 1, null, processing, 1, 10, 2000-01-01 00:00:00+00, 23aecd8b-aab4-42de-8212-f274bf40875e, d87c8494-64bc-41f6-a6cd-8a91cd5a0317, 2026-11-13 11:39:08.068951+00, 2026-11-13 11:39:07.073921+00, null, null, 2026-11-13 11:39:08.065902+00, null)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("notification_events"), column: None, data_type: None, constraint: Some("notification_events_lease_check"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution stdout ----
+
+thread 'adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution' (3315679) panicked at src/adapters/persistence/notification_lease_tests.rs:6:46:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"notification_events\" violates check constraint \"notification_events_lease_check\"", detail: Some("Failing row contains (219ace6d-0ac9-408f-bdce-8a6e863594ea, 2482c7f2-a18b-4683-a45b-72d0e08b87b8, cb1a016a-9fcf-4064-814b-215f309a0b50, delivery, 505703d7-24c3-4692-b404-1d99b6b8263c, delivery_failure, 1, null, processing, 1, 10, 2000-01-01 00:00:00+00, 22e53740-7656-425a-bd80-da69d82f52d9, 3a785d0b-7fa1-40fb-9afe-316a07bc503d, 2026-11-13 11:39:08.599438+00, 2026-11-13 11:39:07.603294+00, null, null, 2026-11-13 11:39:08.597124+00, null)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("notification_events"), column: None, data_type: None, constraint: Some("notification_events_lease_check"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+
+
+failures:
+    adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping
+    adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 4404 filtered out; finished in 1.96s
+

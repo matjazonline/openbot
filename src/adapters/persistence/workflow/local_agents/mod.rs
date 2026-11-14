@@ -17,6 +17,7 @@ mod delivery;
 mod preparation;
 mod resolution;
 
+pub(super) use continuation::due_on;
 pub(super) use continuation::prelock_on as prelock_wait_on;
 pub(super) use continuation::resume_on;
 pub(in crate::adapters::persistence) use delivery::authorize_operation_on;

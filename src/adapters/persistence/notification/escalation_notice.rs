@@ -11,6 +11,25 @@ use crate::entities::workflow_escalation::EscalationId;
 #[path = "escalation_receipts.rs"]
 mod receipts;
 pub(super) use receipts::record_receipt_on;
+#[path = "agent_notice.rs"]
+mod agent;
+pub(super) use agent::commit_on as commit_agent_on;
+
+pub(super) async fn agent_disposition_on(
+    db: &mut PgConnection,
+    event: &NotificationEvent,
+) -> AppResult<Option<NotificationDisposition>> {
+    if event.source_kind != NotificationSourceKind::EscalationNotice {
+        return Ok(None);
+    }
+    Ok(notice_on(db, event)
+        .await?
+        .filter(|source| source.is_agent && source.active && !source.failed)
+        .map(|source| NotificationDisposition::Agent {
+            principal_id: source.principal_id,
+            company: source.company_slug.into(),
+        }))
+}
 
 #[derive(sqlx::FromRow)]
 struct NoticeSource {
@@ -23,6 +42,7 @@ struct NoticeSource {
     active: bool,
     resolved: bool,
     failed: bool,
+    company_slug: String,
 }
 
 async fn notice_on(
@@ -33,8 +53,10 @@ async fn notice_on(
         notice.principal_kind='person' AS is_person,notice.principal_kind='agent' AS is_agent,account.id AS user_id, \
         progress.state IN ('waiting','owner_waiting','manual') AND progress.current_decision_id=notice.decision_id \
           AND decision.settled_at IS NULL AS active,progress.state='settled' AS resolved, \
-        EXISTS (SELECT 1 FROM workflow_escalation_recipient_failures AS failure WHERE failure.company_id=notice.company_id AND failure.notice_id=notice.id) AS failed \
+        EXISTS (SELECT 1 FROM workflow_escalation_recipient_failures AS failure WHERE failure.company_id=notice.company_id AND failure.notice_id=notice.id) AS failed, \
+        company.slug AS company_slug \
         FROM workflow_escalation_notices AS notice \
+        JOIN companies AS company ON company.id=notice.company_id \
         JOIN workflow_escalation_progress AS progress ON progress.company_id=notice.company_id AND progress.case_id=notice.case_id \
         JOIN workflow_escalation_decisions AS decision ON decision.company_id=notice.company_id AND decision.id=notice.decision_id \
         LEFT JOIN principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id AND principal.kind='person' \
@@ -66,9 +88,9 @@ pub(super) async fn source_on(
     } else if !source.active || source.failed {
         SourceLifecycle::Withdrawn
     } else if source.is_agent {
-        return Err(AppError::Internal(
-            "Agent escalation notice requires canonical routing".into(),
-        ));
+        // Active agents have a separate account-free projection. A concurrent
+        // source change is revalidated by the owning commit, never coerced to a person.
+        return Ok(None);
     } else if !source.is_person {
         SourceLifecycle::Withdrawn
     } else if let Some(user) = source.user_id {

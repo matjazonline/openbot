@@ -55,6 +55,7 @@ pub(crate) async fn rekey_account_identity_on(
     old_email: &str,
     new_email: &str,
 ) -> AppResult<()> {
+    let companies = super::workflow::prelock_account_companies_on(connection, user_id).await?;
     let persons: Vec<PersonPrincipal> = sqlx::query_as(
         r#"SELECT company_id, id FROM principals
            WHERE user_id = $1 AND kind = 'person'
@@ -73,7 +74,8 @@ pub(crate) async fn rekey_account_identity_on(
     let old = account_email_identity(old_email).ok();
     let new = account_email_identity(new_email)?;
     if old.as_ref() == Some(&new) {
-        return Ok(());
+        // A confirmed same-address change can install previously missing proof.
+        return super::workflow::refresh_account_dependents_on(connection, &companies).await;
     }
     let username: String = sqlx::query_scalar("SELECT username::text FROM users WHERE id = $1")
         .bind(user_id)
@@ -96,7 +98,7 @@ pub(crate) async fn rekey_account_identity_on(
         }
         adopt_new_address(connection, person.company_id, principal, &new, &username).await?;
     }
-    Ok(())
+    super::workflow::refresh_account_dependents_on(connection, &companies).await
 }
 
 async fn identity_holder(

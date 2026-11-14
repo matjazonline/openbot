@@ -1,0 +1,8 @@
+{
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::attention::workflow_escalation_attention_actual_retirement_hands_waiting_work_to_the_company_owner",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::attention::workflow_escalation_attention_lists_only_current_assignments_and_removes_settled_work",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::history::workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history"
+  ],
+  "removed": []
+}

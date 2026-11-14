@@ -1,0 +1,21 @@
+{
+  "build": 61,
+  "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+  "inventory": 4375,
+  "selected": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers",
+    "--test-threads=2"
+  ],
+  "exit": 101,
+  "seconds": 1.6,
+  "stats": [
+    "test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4373 filtered out; finished in 1.58s"
+  ]
+}

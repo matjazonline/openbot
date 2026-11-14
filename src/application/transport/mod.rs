@@ -63,9 +63,9 @@ pub use ingress::{
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
     DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, InternalMailRelay,
-    InternalRelayMail, PolicyDeliveryPlanner, RegisteredTransport, RelayDisposition,
-    TransportRegistrationError, TransportRegistry, TransportRenderer, TransportRenderers,
-    TransportSender,
+    InternalRelayMail, InternalRelayProof, PolicyDeliveryPlanner, RegisteredTransport,
+    RelayDisposition, TransportRegistrationError, TransportRegistry, TransportRenderer,
+    TransportRenderers, TransportSender,
 };
 pub use queue::{
     ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryAttribution,

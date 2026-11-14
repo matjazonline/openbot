@@ -3,7 +3,6 @@ use super::*;
 use crate::application::workflow::{CancelCommand, CancelResult};
 
 const EXECUTION_WAIT: &str = "SELECT id FROM workflow_executions";
-const CANCEL_RUN_WAIT: &str = "SELECT run.company_id,run.id,run.workflow_id";
 
 async fn cancel_command(s: &Scheduled, key: &str) -> CancelCommand {
     let scope = s.request.fence.scope;
@@ -144,7 +143,7 @@ async fn cancel_first(attempt: usize) -> bool {
     let mut early = None;
     let claim_pid = tokio::select! {
         result = cancel.as_mut() => panic!("cancel escaped execution gate: {result:?}"),
-        pid = try_wait_for_lock(&mut observer, cancel_pid, RUN_WAIT, claim.as_mut()) => match pid {
+        pid = try_wait_for_lock(&mut observer, cancel_pid, LEASE_COMPANY_WAIT, claim.as_mut()) => match pid {
             Ok(pid) => Some(pid),
             Err(output) if not_applied(&output) => {
                 early = Some(output);
@@ -241,7 +240,7 @@ async fn claim_first(attempt: usize) -> bool {
             early = Some(result);
             None
         }
-        pid = wait_for_lock(&mut observer, claim_pid, CANCEL_RUN_WAIT, cancel.as_mut()) => Some(pid),
+        pid = wait_for_lock(&mut observer, claim_pid, AUTHORITY_COMPANY_WAIT, cancel.as_mut()) => Some(pid),
     };
     assert_ne!(Some(claim_pid), cancel_pid);
     gate.tx.rollback().await.unwrap();

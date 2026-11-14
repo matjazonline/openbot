@@ -133,6 +133,7 @@ gate "Test database for this run" create_check_database
 gate "Database-backed test suite (isolated network)" \
   scripts/test-network-isolation.sh cargo test --locked --offline --all-targets
 gate "Stack budget" scripts/test-network-isolation.sh scripts/stack-budget.sh --offline
+gate "Lease budget" scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
 
 printf '\n==> Summary\n'
 for index in "${!names[@]}"; do

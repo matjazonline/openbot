@@ -1,0 +1,27 @@
+{
+  "build": 57,
+  "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+  "inventory": 4366,
+  "selected": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_cancelled_wait_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_fresh_final_timer_resume_requires_current_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_future_timer_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_nonfinal_timer_resume_ignores_unused_retired_final_reviewers"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_cancelled_wait_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_event_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_fresh_final_timer_resume_requires_current_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_future_timer_resume_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::wait_resume_hints::workflow_reviewer_follow_nonfinal_timer_resume_ignores_unused_retired_final_reviewers",
+    "--test-threads=2"
+  ],
+  "exit": 101,
+  "seconds": 3.01,
+  "stats": [
+    "test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 4361 filtered out; finished in 2.99s"
+  ]
+}

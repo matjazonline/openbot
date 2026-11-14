@@ -140,6 +140,7 @@ pub(super) async fn supported_publication(
                     builtin_message_tool(tool)?;
                 }
                 ToolKind::Provisioning => builtin_provisioning_tool(tool)?,
+                ToolKind::Escalation => builtin_escalation_tool(tool)?,
                 ToolKind::Knowledge => builtin_knowledge_tool(tool)?,
                 ToolKind::Memory => builtin_memory_tool(tx, tool, check).await?,
                 ToolKind::Http => {
@@ -192,6 +193,14 @@ pub(super) async fn builtin_memory_tool(
 
 pub(super) fn builtin_knowledge_tool(tool: &ToolSnapshot) -> AppResult<()> {
     if crate::application::workflow::knowledge::is_trusted_knowledge_snapshot(tool)? {
+        Ok(())
+    } else {
+        Err(missing())
+    }
+}
+
+pub(super) fn builtin_escalation_tool(tool: &ToolSnapshot) -> AppResult<()> {
+    if crate::application::workflow::escalation::tools::trusted(tool)? {
         Ok(())
     } else {
         Err(missing())

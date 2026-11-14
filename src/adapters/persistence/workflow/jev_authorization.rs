@@ -89,16 +89,23 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
 ) -> AppResult<JevCredential> {
     let started = tokio::time::Instant::now();
     let scope = claim.fence.scope;
-    channel_reply_completion::prelock_on(tx, scope).await?;
-    let hints: Hints = sqlx::query_as(
-        "SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2",
+    // JEV uses its actual effect actor/requester and never creates a final response here.
+    let actor = action_authority::prelock_on(
+        tx,
+        ActionScope {
+            company: scope.company,
+            run: scope.run,
+            execution: scope.execution,
+        },
     )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(revoked)?;
-    let actor = WorkflowActor::authenticated(hints.actor_id)?;
+    let hints = hints_on(tx, scope.company, scope.run)
+        .await?
+        .ok_or_else(revoked)?;
+    if actor.user_id() != hints.actor_id {
+        return Err(revoked());
+    }
     authority::authorize_company(tx, scope.company, actor).await?;
     association::authorize_association(
         tx,
@@ -156,6 +163,15 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
     })
 }
 
+fn hints_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+) -> impl std::future::Future<Output = Result<Option<Hints>, sqlx::Error>> + '_ {
+    sqlx::query_as("SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2")
+        .bind(company.as_uuid()).bind(run.as_uuid()).fetch_optional(db)
+}
+
 async fn verify_locked(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
@@ -163,13 +179,9 @@ async fn verify_locked(
     selected: &Selection,
 ) -> AppResult<()> {
     let scope = claim.fence.scope;
-    let locked: Hints = sqlx::query_as(
-        "SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .fetch_one(&mut **tx)
-    .await?;
+    let locked = hints_on(tx, scope.company, scope.run)
+        .await?
+        .ok_or(sqlx::Error::RowNotFound)?;
     if hints.actor_id != locked.actor_id
         || hints.channel_id != locked.channel_id
         || hints.thread_id != locked.thread_id

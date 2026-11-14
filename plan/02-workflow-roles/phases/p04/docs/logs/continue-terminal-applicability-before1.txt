@@ -1,0 +1,20 @@
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_expiry_ignores_unused_retired_final_reviewers' (1886001) panicked at src/adapters/persistence/workflow/reviewer_terminal_hint_tests.rs:35:96:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "workflow run snapshot is immutable", detail: None, hint: None, position: None, where: Some("PL/pgSQL function guard_workflow_run_snapshot() line 7 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("workflow_guard:guard_workflow_run_snapshot"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_guard_failure_ignores_unused_retired_final_reviewers' (1886002) panicked at src/adapters/persistence/workflow/reviewer_terminal_hint_tests.rs:91:44:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_expiry_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_guard_failure_ignores_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_expiry_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_guard_failure_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4338 filtered out; finished in 1.61s
+

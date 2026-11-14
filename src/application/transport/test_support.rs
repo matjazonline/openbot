@@ -25,6 +25,16 @@ use crate::transport::IngressDirectives;
 use crate::transport::IngressPolicyFacts;
 use crate::transport::RecipientRole;
 
+/// The delivery part an internal hop claims, for a test whose commit is a double that records the
+/// claim rather than proving it against stored rows.
+pub fn relay_proof(company_id: uuid::Uuid) -> crate::transport::InternalRelayProof {
+    crate::transport::InternalRelayProof::claiming(
+        company_id,
+        crate::entities::transport::DeliveryId::random(),
+        crate::transport::PartIndex::new(0),
+    )
+}
+
 /// One email address as the qualified identity the platform stores it as.
 pub fn email_identity(address: &str) -> QualifiedIdentity {
     QualifiedIdentity::new(

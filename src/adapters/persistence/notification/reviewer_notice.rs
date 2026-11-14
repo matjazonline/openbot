@@ -87,7 +87,7 @@ pub(super) async fn record_receipt_on(
         NotificationDisposition::Active(_) => "opted_out",
         NotificationDisposition::Resolved => "resolved",
         NotificationDisposition::Withdrawn => "withdrawn",
-        NotificationDisposition::Control => return Ok(()),
+        NotificationDisposition::Control | NotificationDisposition::Agent { .. } => return Ok(()),
     };
     sqlx::query("INSERT INTO workflow_reviewer_notice_receipts(company_id,notice_id,decision_id,event_id,outcome,email_delivery_id) \
         SELECT source.company_id,source.id,source.decision_id,source.event_id,$4,CASE WHEN $4='delivered' THEN notification.email_delivery_id ELSE NULL END \

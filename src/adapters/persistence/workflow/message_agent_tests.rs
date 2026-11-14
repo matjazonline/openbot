@@ -29,7 +29,9 @@ use crate::services::test_support::{
     LlmTurn, SCRIPTED_MODEL, SCRIPTED_PROVIDER, register_scripted_agent_base_url, scripted_llm,
 };
 
-async fn published_message_agent(fixture: &Fixture) -> Uuid {
+pub(in crate::adapters::persistence::workflow::tests) async fn published_message_agent(
+    fixture: &Fixture,
+) -> Uuid {
     let p = fixture.persistence.clone();
     let company = fixture.target.company;
     let agent = AgentPersistence::create(
@@ -105,25 +107,7 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
     ])
     .await;
     register_scripted_agent_base_url(agent, &llm.base_url);
-    let runtime = WorkflowAgentRuntime::new(
-        ProviderRegistry::standard().unwrap(),
-        p.clone(),
-        AgentActionTools::new(
-            Arc::new(HttpRuntime::new(
-                p.clone(),
-                HttpDestinationPolicy::default(),
-                lease(),
-            )),
-            Arc::new(McpRuntime::new(
-                p.clone(),
-                Arc::new(HttpMcpClient::new(EndpointPolicy::default())),
-                lease(),
-            )),
-            Arc::new(runtime(&p)),
-        ),
-        Some(notices(&p)),
-        lease(),
-    );
+    let runtime = agent_runtime(&p);
     let kind = WorkflowStepKind("agent.run".into());
     let WorkflowHandlerOutcome::Suspended(parked) = Box::pin(runtime.execute(&kind, &claim)).await
     else {
@@ -187,4 +171,28 @@ async fn workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_re
     .await
     .unwrap();
     assert_eq!(counts, (1, 1, 1, 1, 0));
+}
+
+pub(in crate::adapters::persistence::workflow::tests) fn agent_runtime(
+    p: &PostgresPersistence,
+) -> impl WorkflowHandler {
+    WorkflowAgentRuntime::new(
+        ProviderRegistry::standard().unwrap(),
+        p.clone(),
+        AgentActionTools::new(
+            Arc::new(HttpRuntime::new(
+                p.clone(),
+                HttpDestinationPolicy::default(),
+                lease(),
+            )),
+            Arc::new(McpRuntime::new(
+                p.clone(),
+                Arc::new(HttpMcpClient::new(EndpointPolicy::default())),
+                lease(),
+            )),
+            Arc::new(runtime(p)),
+        ),
+        Some(notices(p)),
+        lease(),
+    )
 }

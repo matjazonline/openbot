@@ -36,6 +36,7 @@ pub(in crate::adapters::persistence::notification) async fn record_receipt_on(
                 "An escalation notice cannot be a control".into(),
             ));
         }
+        NotificationDisposition::Agent { .. } => return Ok(()),
     };
     if !source.is_person {
         return Ok(());
