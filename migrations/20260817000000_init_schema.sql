@@ -19294,6 +19294,7 @@ CREATE TABLE public.native_mcp_brokers (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     id uuid NOT NULL,
     actor_id uuid NOT NULL,
+    actor_principal_id uuid NOT NULL,
     agent_revision_id uuid NOT NULL,
     agent_binding_id uuid NOT NULL,
     contract jsonb NOT NULL CHECK(jsonb_typeof(contract)='object' AND octet_length(contract::text)<=131072),
@@ -19302,7 +19303,7 @@ CREATE TABLE public.native_mcp_brokers (
     workflow_binding_id uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,id),
-    UNIQUE(company_id,actor_id,agent_revision_id,agent_binding_id),
+    UNIQUE(company_id,actor_id,actor_principal_id,agent_revision_id,agent_binding_id),
     UNIQUE(company_id,workflow_id),
     UNIQUE(company_id,version_id),
     UNIQUE(company_id,workflow_binding_id),
@@ -19368,6 +19369,21 @@ CREATE INDEX native_mcp_calls_session ON public.native_mcp_calls(company_id,sess
 ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_native_call_provenance
     FOREIGN KEY(company_id,native_mcp_call_id,id)
     REFERENCES public.native_mcp_calls(company_id,id,original_run_id) DEFERRABLE INITIALLY DEFERRED;
+
+-- Historical reviewer identity survives principal retirement and physical deletion.
+-- Validate it only at creation; it grants no live authority or deletion pin.
+CREATE FUNCTION public.native_mcp_broker_actor() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    PERFORM principal.id FROM public.principals AS principal
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.actor_principal_id
+            AND principal.kind='person' AND principal.user_id=NEW.actor_id FOR SHARE NOWAIT;
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'native MCP broker actor principal does not match its company and account' USING ERRCODE='23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER native_mcp_broker_actor BEFORE INSERT ON public.native_mcp_brokers
+    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_broker_actor();
 
 CREATE FUNCTION public.native_mcp_broker_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -19626,6 +19642,7 @@ BEGIN
             AND credential.machine_id=machine.id AND credential.generation=machine.credential_generation
         JOIN public.company_members AS member ON member.company_id=call.company_id AND member.user_id=call.actor_id
         JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id
+            AND principal.id=broker.actor_principal_id
         JOIN public.users AS account ON account.id=member.user_id
         WHERE call.company_id=tenant AND call.id=selected_call AND call.run_id=owner AND call.retired_at IS NULL
             AND NOT call.cancel_requested AND call.deadline>clock_timestamp()

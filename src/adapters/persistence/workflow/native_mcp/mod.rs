@@ -6,6 +6,7 @@ use crate::application::workflow::native_mcp::{NativeBrokerIdentity, PreparedNat
 use crate::domain::local_agents::{
     InstallationId, MachineId, NativeHarnessSelection, NativeMcpCallId, OperationId, SessionId,
 };
+use crate::entities::transport::PrincipalId;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 

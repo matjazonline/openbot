@@ -30,6 +30,35 @@ async fn direct_setup() -> (Setup, PrincipalId) {
 }
 
 #[tokio::test]
+async fn native_mcp_direct_populated_company_cascade_removes_broker_call_run_and_thread() {
+    let (s, _) = Box::pin(direct_setup()).await;
+    let f = Box::pin(McpSetup::from_setup(s)).await;
+    let p = f.s.f.persistence.as_ref();
+    p.native_mcp(&f.request(json!({"query":"direct company cascade"})))
+        .await
+        .unwrap();
+    sqlx::query("DELETE FROM companies WHERE id=$1")
+        .bind(f.s.f.company)
+        .execute(p.pool())
+        .await
+        .unwrap();
+    for table in [
+        "native_mcp_brokers",
+        "native_mcp_calls",
+        "workflow_runs",
+        "threads",
+    ] {
+        let count: i64 =
+            sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE company_id=$1"))
+                .bind(f.s.f.company)
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        assert_eq!(count, 0, "company cascade must remove {table}");
+    }
+}
+
+#[tokio::test]
 async fn native_mcp_direct_principal_source_preserves_target_and_immutable_witness() {
     let (s, principal) = Box::pin(direct_setup()).await;
     let thread = s.conversation;
