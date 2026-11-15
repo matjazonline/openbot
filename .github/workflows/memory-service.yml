@@ -6,7 +6,7 @@ on:
 
 jobs:
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         # PostgreSQL 18 with pgvector 0.8.7, the version used in development.
@@ -73,7 +73,7 @@ jobs:
         run: services/memory/scripts/standalone-journey.sh
 
   image:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - name: Build the service image from its own directory

@@ -139,16 +139,42 @@ fn autonomous_agent_contract_skills_require_local_aliases_without_granting_tools
 #[test]
 fn autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets() {
     assert!(ResolvedAgentDefinition::decode(&vec![b' '; MAX_AGENT_DEFINITION_BYTES + 1]).is_err());
+    assert!(
+        ResolvedAgentDefinition::decode_and_hash(&vec![b' '; MAX_AGENT_DEFINITION_BYTES + 1])
+            .is_err()
+    );
     let value = definition();
     let mut json = serde_json::to_value(&value).unwrap();
     json["model"]["api_key"] = json!("must-never-be-captured");
     assert!(ResolvedAgentDefinition::decode(&serde_json::to_vec(&json).unwrap()).is_err());
+    assert!(ResolvedAgentDefinition::decode_and_hash(&serde_json::to_vec(&json).unwrap()).is_err());
     let mut value = value;
     value.instructions = "x".repeat(MAX_AGENT_TEXT_BYTES + 1);
     assert!(value.canonical_content().is_err());
     value.instructions.clear();
     value.model.as_mut().unwrap().max_output_tokens = 0;
     assert!(value.validate().is_err());
+}
+
+#[test]
+fn autonomous_agent_contract_decoded_hash_preserves_canonical_proof_and_schema_validation() {
+    use sha2::{Digest, Sha256};
+    let value = definition();
+    let pretty = serde_json::to_vec_pretty(&value).unwrap();
+    let (decoded, digest) = ResolvedAgentDefinition::decode_and_hash(&pretty).unwrap();
+    assert_eq!(digest, value.content_hash().unwrap());
+    assert_eq!(
+        decoded.canonical_content().unwrap(),
+        value.canonical_content().unwrap()
+    );
+    assert_ne!(digest.as_slice(), Sha256::digest(&pretty).as_slice());
+
+    let mut invalid = serde_json::to_value(&value).unwrap();
+    invalid["tools"][0]["input_schema"] = json!({"type":"not-a-schema-type"});
+    assert!(
+        ResolvedAgentDefinition::decode_and_hash(&serde_json::to_vec(&invalid).unwrap()).is_err()
+    );
+    assert!(ResolvedAgentDefinition::decode_and_hash(b"not JSON").is_err());
 }
 
 #[test]

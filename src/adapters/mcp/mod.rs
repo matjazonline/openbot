@@ -10,6 +10,8 @@ mod preparation;
 pub(crate) mod preparation_test_server;
 #[cfg(test)]
 pub(crate) mod preparation_tests;
+#[cfg(test)]
+mod registration_test_support;
 mod worker;
 use crate::{
     app_error::{AppError, AppResult},
@@ -39,6 +41,8 @@ pub struct HttpMcpClient {
     shutdown: tokio_util::sync::CancellationToken,
     /// One bound for acquiring both session permits.
     permit_wait: Duration,
+    #[cfg(test)]
+    registration_probe: Option<Arc<registration_test_support::RegistrationProbe>>,
 }
 impl HttpMcpClient {
     pub fn new(policy: EndpointPolicy) -> Self {
@@ -49,6 +53,8 @@ impl HttpMcpClient {
             workers: Default::default(),
             shutdown: Default::default(),
             permit_wait: Duration::from_secs(5),
+            #[cfg(test)]
+            registration_probe: None,
         }
     }
 }
@@ -105,7 +111,7 @@ struct Session {
     _endpoint_permit: OwnedSemaphorePermit,
     token: Option<SecretString>,
     remaining: Arc<std::sync::atomic::AtomicUsize>,
-    pending_call: std::sync::Mutex<Option<rmcp::model::RequestId>>,
+    pending_call: Arc<std::sync::Mutex<Option<rmcp::model::RequestId>>>,
     stop: tokio_util::sync::CancellationToken,
     finished: Option<tokio::sync::oneshot::Receiver<()>>,
     cleanup: http::Cleanup,
@@ -199,20 +205,41 @@ impl McpSession for Session {
         let request = rmcp::model::CallToolRequest::new(
             CallToolRequestParams::new(name.as_str().to_owned()).with_arguments(args),
         );
-        let handle = self
-            .client
-            .send_cancellable_request(
-                request.into(),
-                rmcp::service::PeerRequestOptions::no_options(),
-            )
-            .await
-            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
-        *self
-            .pending_call
-            .lock()
-            .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
+        let handle = {
+            // SDK enqueue can dispatch on another thread before returning the real ID. Cleanup
+            // must wait for synchronous publication, then run without waiting for the response.
+            let _registration = self.cleanup.gate.lock().await;
+            if self.stop.is_cancelled()
+                || self.client.is_closed()
+                || self.client.is_transport_closed()
+            {
+                return Err(failed("MCP session unavailable"));
+            }
+            let handle = self
+                .client
+                .send_cancellable_request(
+                    request.into(),
+                    rmcp::service::PeerRequestOptions::no_options(),
+                )
+                .await
+                .map_err(|error| {
+                    errors::service(error, "MCP effect indeterminate; do not retry")
+                })?;
+            #[cfg(test)]
+            if let Some(probe) = &self.cleanup.registration_probe {
+                probe.pause();
+            }
+            *self
+                .pending_call
+                .lock()
+                .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
+            handle
+        };
         let response = tokio::time::timeout(Duration::from_secs(30), handle.await_response()).await;
-        if response.is_ok() {
+        if matches!(
+            &response,
+            Ok(Ok(_)) | Ok(Err(rmcp::service::ServiceError::McpError(_)))
+        ) {
             self.pending_call
                 .lock()
                 .map_err(|_| failed("MCP session unavailable"))?
@@ -347,15 +374,6 @@ impl HttpMcpClient {
 
 impl Session {
     async fn cancel_pending(&self) {
-        let pending = self.pending_call.lock().ok().and_then(|mut id| id.take());
-        if let Some(request_id) = pending {
-            let params = rmcp::model::CancelledNotificationParam {
-                request_id,
-                reason: Some("Local execution cancelled".into()),
-            };
-            let _ =
-                tokio::time::timeout(Duration::from_secs(3), self.client.notify_cancelled(params))
-                    .await;
-        }
+        let _ = tokio::time::timeout(Duration::from_secs(3), self.cleanup.cancel_pending()).await;
     }
 }

@@ -10,9 +10,20 @@ use crate::entities::transport::PrincipalId;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+mod accounts;
 mod live;
+pub(super) use accounts::{NativeAccounts, current_on as account_hints_on};
 mod maintenance;
 pub(super) use live::authorize_on as live_on;
+
+pub(super) fn busy(error: AppError) -> AppError {
+    match error {
+        AppError::DatabaseTimeout(_) => AppError::ServiceUnavailable(
+            "Native MCP authority is busy; no new dispatch was authorized".into(),
+        ),
+        error => error,
+    }
+}
 mod provenance;
 pub(in crate::adapters::persistence) use maintenance::sweep;
 mod reads;
