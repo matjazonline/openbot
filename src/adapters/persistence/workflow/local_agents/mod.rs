@@ -20,6 +20,7 @@ mod resolution;
 pub(super) use continuation::due_on;
 pub(super) use continuation::prelock_on as prelock_wait_on;
 pub(super) use continuation::resume_on;
+pub(super) use delivery::parked_subject_on;
 pub(in crate::adapters::persistence) use delivery::{
     authorize_native_source_on, authorize_operation_with_locks_on,
 };
