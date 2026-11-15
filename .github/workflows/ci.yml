@@ -8,7 +8,7 @@ jobs:
   # Phase 05 E11: OpenBot's memory adapter, workers and freezes against the real memory service,
   # built from services/memory and served on loopback, with a stand-in for the Messages API.
   memory-integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         # The memory service needs pgvector; OpenBot's own test databases live on the same server.
@@ -52,7 +52,7 @@ jobs:
         run: scripts/memory-integration.sh
 
   verify:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     services:
       postgres:
         image: postgres:18.6-bookworm
@@ -80,6 +80,10 @@ jobs:
         with:
           node-version: 24.21.0
           cache: npm
+      - name: Install boundary test tool
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y ripgrep
       - name: Install frontend dependencies
         run: npm ci
       - name: Verify local-agent plugin and build counted test peers
@@ -121,15 +125,20 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Patch whitespace
         run: git diff --check
+      - name: Transport boundary self-tests
+        run: scripts/tests/transport-boundary.sh
       - name: Transport abstraction boundary
-        run: |
-          scripts/tests/transport-boundary.sh
-          scripts/transport-boundary-check.sh
-          python3 scripts/tests/workflow-sample-boundary.py
-          python3 scripts/workflow-sample-boundary.py
-          python3 scripts/tests/integration-boundary.py
-          python3 scripts/integration-boundary.py
-          python3 scripts/check-integration-docs.py
+        run: scripts/transport-boundary-check.sh
+      - name: Workflow sample boundary self-tests
+        run: python3 scripts/tests/workflow-sample-boundary.py
+      - name: Workflow sample boundary
+        run: python3 scripts/workflow-sample-boundary.py
+      - name: Integration boundary self-tests
+        run: python3 scripts/tests/integration-boundary.py
+      - name: Integration boundary
+        run: python3 scripts/integration-boundary.py
+      - name: Integration documentation boundary
+        run: python3 scripts/check-integration-docs.py
       - name: Fetch locked Rust dependencies
         run: cargo fetch --locked
       - name: Workflow evidence retention
@@ -269,7 +278,7 @@ jobs:
         run: scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
 
   doop-integration:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
     services:
       postgres:
@@ -328,7 +337,11 @@ jobs:
               for name in ("format:check", "typecheck", "lint", "doc-lint", "test", "build")]
           for command in commands:
               print("Doop gate:", " ".join(command), flush=True)
-              subprocess.run(command, cwd=source, env=environment, check=True, timeout=1200)
+              try:
+                  subprocess.run(command, cwd=source, env=environment, check=True, timeout=1200)
+              except subprocess.CalledProcessError:
+                  print("::error::Doop service gate failed: " + " ".join(command), flush=True)
+                  raise
           runner.reviewed_source(source, identity["fingerprint"], manifest)
           PY
       - name: Compile and retain the exact Openbot helper executable
@@ -360,11 +373,26 @@ jobs:
               for chunk in iter(lambda: source.read(1024 * 1024), b""): digest.update(chunk)
           (root / "doop-libtest-sha256.txt").write_text(digest.hexdigest() + "\n")
           PY
-      - name: Prepare the pinned private deployment dependencies and image
+      - name: Enable OCI image export and import
+        uses: docker/setup-docker-action@v4
+        with:
+          version: v29.9.3
+          daemon-config: |
+            {"features":{"containerd-snapshotter":true}}
+      - name: Pull the pinned private PostgreSQL image
+        run: docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+      - name: Pull the pinned private object-storage image
+        run: docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+      - name: Build the private Doop deployment image
         run: |
-          docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
-          docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
-          python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"
+          if ! python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"; then
+            for log in build.log load.log; do
+              if test -f "$RUNNER_TEMP/doop-image/$log"; then
+                cat "$RUNNER_TEMP/doop-image/$log"
+              fi
+            done
+            exit 1
+          fi
       - name: Require both private storage modes and both actual probe families
         run: |
           python3 scripts/doop-test.py acceptance --directory "$RUNNER_TEMP/doop" \

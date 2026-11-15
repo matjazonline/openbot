@@ -122,6 +122,29 @@ fn adapter(url: &str) -> HttpMcpClient {
     HttpMcpClient::new(EndpointPolicy::new([format!("{}/", url.trim_end_matches('/'))]).unwrap())
 }
 
+fn cancellation(request_id: u64) -> ScriptedExchange {
+    let mut response = ScriptedResponse::json_body(String::new());
+    response.status = 202;
+    ScriptedExchange::new(
+        move |request| {
+            if request.method == "POST"
+                && request.path == "/"
+                && request.header_matches("authorization", "Bearer mcp-key")
+                && request.body["method"] == "notifications/cancelled"
+                && request.body["params"]["requestId"] == request_id
+            {
+                Ok(())
+            } else {
+                Err("only the original request may be cancelled; no effect retry")
+            }
+        },
+        response,
+    )
+}
+
+#[path = "cleanup_tests.rs"]
+mod cleanup_tests;
+
 #[tokio::test]
 async fn mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links() {
     let output = json!({"type":"object","properties":{"name":{"type":"string"}}});
@@ -321,7 +344,7 @@ async fn mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_ret
     response.disconnect = true;
     exchanges.push(ScriptedExchange::new(
         |r| {
-            if r.body["method"] == "tools/call" {
+            if r.body["method"] == "tools/call" && r.body["id"] == 1 {
                 Ok(())
             } else {
                 Err("call expected")
@@ -329,6 +352,7 @@ async fn mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_ret
         },
         response,
     ));
+    exchanges.push(cancellation(1));
     let server = scripted_scenario(exchanges).await;
     let adapter = adapter(&server.base_url);
     let session = adapter
@@ -345,7 +369,7 @@ async fn mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_ret
     assert!(error.to_string().contains("indeterminate"));
     session.close().await.unwrap();
     adapter.shutdown().await.unwrap();
-    assert_eq!(server.finish().await, Ok(3));
+    assert_eq!(server.finish().await, Ok(4));
 }
 #[tokio::test]
 async fn mcp_shutdown_joins_an_abandoned_session_and_closes_admission() {

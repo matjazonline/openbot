@@ -88,10 +88,10 @@ impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
         request: &ActionDispatchRequest,
         server: Duration,
     ) -> AppResult<AuthorizedAction> {
-        let actor =
+        let prefix =
             action_authority::prelock_dispatch_on(tx, request, self.decision_notices.as_ref())
                 .await?;
-        self.authorize_prelocked_on(tx, request, server, actor)
+        self.authorize_prelocked_on(tx, request, server, prefix)
             .await
     }
 
@@ -100,7 +100,7 @@ impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
         tx: &mut Transaction<'_, Postgres>,
         request: &ActionDispatchRequest,
         server: Duration,
-        actor: Option<WorkflowActor>,
+        prefix: action_authority::AccountPrefix,
     ) -> AppResult<AuthorizedAction> {
         if !lease::lock_prelocked_fence(tx, request.fence, server).await? {
             return Err(conflict());
@@ -123,14 +123,16 @@ impl<A: SqlActionAuthority, L> PostgresActionDispatch<A, L> {
         {
             return Err(conflict());
         }
-        let authority = Box::pin(action_authority::load_on(
+        let authority = Box::pin(action_authority::load_with_locks_on(
             tx,
             request.scope(),
             &request.subject,
-            actor,
+            prefix.actor,
             action_authority::RunPhase::Claimed,
+            prefix.locks,
         ))
-        .await?;
+        .await
+        .map_err(|error| prefix.error(error))?;
         validate_run_authority(request.scope(), &request.subject, &authority)?;
         let current = self.authority.lock_current(tx, &authority).await?;
         validate_resource(authority.action.request(), &current.resource)?;

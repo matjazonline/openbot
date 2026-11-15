@@ -39,7 +39,15 @@ pub(super) async fn resolve_on(
         let saved = continuation::saved_result_on(&mut tx, &request, &action).await?;
         if let Some(saved) = saved {
             let authorized = dispatch
-                .authorize_prelocked_on(&mut tx, &request, bound.server_timeout(), actor)
+                .authorize_prelocked_on(
+                    &mut tx,
+                    &request,
+                    bound.server_timeout(),
+                    action_authority::AccountPrefix {
+                        actor,
+                        locks: super::super::row_locks::RowLocks::Wait,
+                    },
+                )
                 .await?;
             if authorized.approval_required {
                 return Err(conflict());

@@ -3,7 +3,7 @@
 //! workflow approvals (`workflow_mcp_operations`) and every current-authority read of them.
 //! Lock order: company (authorize_company) → run/attempt where applicable → connection
 //! FOR SHARE/UPDATE → operation. Catalog writers lock the company first and never a run.
-use super::http::{begin_http, live_run_on};
+use super::http::{begin_http, live_run_with_locks_on};
 use super::invalid;
 use super::*;
 use crate::adapters::persistence::credentials::envelope::CredentialContext;
@@ -348,13 +348,28 @@ impl McpActionUse for PostgresPersistence {
     async fn mcp_use(&self, request: &ActionRequest) -> AppResult<McpUse> {
         let company = request.scope.company;
         let mut tx = begin_http(self).await?;
-        authority::authorize_company(
-            &mut tx,
-            company,
-            WorkflowActor::authenticated(request.context.actor)?,
-        )
-        .await?;
-        live_run_on(&mut tx, request).await?;
+        let prefix = action_authority::prelock_native_on(&mut tx, request.scope).await?;
+        if let Some(prefix) = prefix {
+            if prefix.actor != Some(WorkflowActor::authenticated(request.context.actor)?) {
+                return Err(missing());
+            }
+        } else {
+            authority::authorize_company(
+                &mut tx,
+                company,
+                WorkflowActor::authenticated(request.context.actor)?,
+            )
+            .await?;
+        }
+        let locks = prefix
+            .map(|prefix| prefix.locks)
+            .unwrap_or(super::row_locks::RowLocks::Wait);
+        live_run_with_locks_on(&mut tx, request, locks)
+            .await
+            .map_err(|error| match prefix {
+                Some(prefix) => prefix.error(error),
+                None => error,
+            })?;
         super::native_mcp::live_on(&mut tx, request).await?;
         super::agent_origin::current_on(&mut tx, request).await?;
         let (connection, decision) = current_on(&mut tx, request).await?;

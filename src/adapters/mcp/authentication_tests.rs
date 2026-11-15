@@ -115,7 +115,7 @@ async fn mcp_authentication_is_typed_through_actual_initialization_discovery_and
             let method = ["initialize", "tools/list", "tools/call"][phase];
             exchanges.push(ScriptedExchange::new(
                 move |request| {
-                    if request.body["method"] == method {
+                    if request.body["method"] == method && (phase != 2 || request.body["id"] == 1) {
                         Ok(())
                     } else {
                         Err("unexpected authentication probe")
@@ -123,6 +123,9 @@ async fn mcp_authentication_is_typed_through_actual_initialization_discovery_and
                 },
                 response,
             ));
+            if phase == 2 {
+                exchanges.push(cancellation(1));
+            }
             let expected_requests = exchanges.len();
             let server = scripted_scenario(exchanges).await;
             let adapter = adapter(&server.base_url);

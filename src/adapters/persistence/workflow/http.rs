@@ -464,11 +464,19 @@ impl PostgresPersistence {
 }
 
 /// The action's run is still live, unexpired and owned by the frozen actor.
-pub(super) async fn live_run_on(
+pub(super) fn live_run_on<'a, 'c>(
+    tx: &'a mut Transaction<'c, Postgres>,
+    request: &'a ActionRequest,
+) -> impl std::future::Future<Output = AppResult<()>> + 'a {
+    live_run_with_locks_on(tx, request, super::row_locks::RowLocks::Wait)
+}
+
+pub(super) async fn live_run_with_locks_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ActionRequest,
+    locks: super::row_locks::RowLocks,
 ) -> AppResult<()> {
-    let live: Option<Uuid> = sqlx::query_scalar("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 AND actor_id=$3 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR SHARE")
+    let live: Option<Uuid> = sqlx::query_scalar(&locks.sql("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 AND actor_id=$3 AND state IN ('queued','running') AND deadline>clock_timestamp() FOR SHARE"))
         .bind(request.scope.company.as_uuid()).bind(request.scope.run.as_uuid()).bind(request.context.actor).fetch_optional(&mut **tx).await?;
     live.map(|_| ()).ok_or_else(missing)
 }
