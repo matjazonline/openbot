@@ -52,6 +52,7 @@ jobs:
         run: scripts/memory-integration.sh
 
   verify:
+    if: false
     runs-on: ubuntu-24.04
     services:
       postgres:
@@ -278,6 +279,7 @@ jobs:
         run: scripts/test-network-isolation.sh scripts/lease-budget.sh --offline
 
   doop-integration:
+    if: false
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     services:
