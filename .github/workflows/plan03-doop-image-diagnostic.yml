@@ -1,0 +1,25 @@
+name: Plan03 Doop image diagnostic
+on: push
+permissions:
+  contents: read
+jobs:
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - name: Prepare the pinned managed source
+        run: python3 scripts/doop-test.py setup --managed --directory "$RUNNER_TEMP/doop"
+      - name: Build the actual private image and retain build errors
+        run: |
+          if ! python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"; then
+            for log in build.log load.log; do
+              if test -f "$RUNNER_TEMP/doop-image/$log"; then
+                cat "$RUNNER_TEMP/doop-image/$log"
+              fi
+            done
+            exit 1
+          fi
