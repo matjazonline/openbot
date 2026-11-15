@@ -1,8 +1,8 @@
 # Plan coordination: 03-principal-addresses
 
-- Authority: /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md
+- Authority: /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-integration-20261115/plan/03-principal-addresses/COORDINATION.md
 - Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed 2026-11-14) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
-- Revision: 20
+- Revision: 21
 
 ## Plan-wide instructions
 
@@ -214,3 +214,15 @@ p04 may now start combined main integration, deliverable documentation and final
 retaining accepted Plan02/Plan03 ancestry and newer main work. I001–I004/C001–C007/r1 and revision10
 remain unchanged. Main publication remains gated on complete Plan03 verification/independent
 acceptance; no main push yet. Already-authorized Plan04/root-unit and Plan05/scopes remain queued.
+
+## Coordination authority handoff for final integration (revision21)
+
+Root accepted p03 and committed the scoped reviewed Plan03 producer as
+3fceb7d3435f3b821c3b37820200e1c5400206d9 (material export6891f662…08cacb,
+413 exact staged/working source hashes verified; all77 evidence manifests retained).
+Original worktree unrelated configuration/Plan02 handoff changes remain untouched. No push yet.
+The same root now transfers sole coordination authority to the clean integration worktree at
+/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-integration-20261115, branch codex/principal-addresses-integration-20261115.
+This old-worktree copy is a historical pointer from this revision onward, not a second live writer.
+The new authority adopts this complete revision before dependent work. Requirements/notices remain
+unchanged. p04 owns docs, combined main integration and all repository/CI gates before main push.
