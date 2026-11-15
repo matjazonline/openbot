@@ -127,7 +127,7 @@ struct ParkedCall {
     argument_digest: String,
 }
 
-pub(super) async fn parked_subject_on(
+pub(in crate::adapters::persistence::workflow) async fn parked_subject_on(
     db: &mut PgConnection,
     company: CompanyId,
     operation: OperationId,
