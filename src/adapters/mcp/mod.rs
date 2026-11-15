@@ -105,7 +105,7 @@ struct Session {
     _endpoint_permit: OwnedSemaphorePermit,
     token: Option<SecretString>,
     remaining: Arc<std::sync::atomic::AtomicUsize>,
-    pending_call: std::sync::Mutex<Option<rmcp::model::RequestId>>,
+    pending_call: Arc<std::sync::Mutex<Option<rmcp::model::RequestId>>>,
     stop: tokio_util::sync::CancellationToken,
     finished: Option<tokio::sync::oneshot::Receiver<()>>,
     cleanup: http::Cleanup,
@@ -212,7 +212,10 @@ impl McpSession for Session {
             .lock()
             .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
         let response = tokio::time::timeout(Duration::from_secs(30), handle.await_response()).await;
-        if response.is_ok() {
+        if matches!(
+            &response,
+            Ok(Ok(_)) | Ok(Err(rmcp::service::ServiceError::McpError(_)))
+        ) {
             self.pending_call
                 .lock()
                 .map_err(|_| failed("MCP session unavailable"))?
@@ -347,15 +350,6 @@ impl HttpMcpClient {
 
 impl Session {
     async fn cancel_pending(&self) {
-        let pending = self.pending_call.lock().ok().and_then(|mut id| id.take());
-        if let Some(request_id) = pending {
-            let params = rmcp::model::CancelledNotificationParam {
-                request_id,
-                reason: Some("Local execution cancelled".into()),
-            };
-            let _ =
-                tokio::time::timeout(Duration::from_secs(3), self.client.notify_cancelled(params))
-                    .await;
-        }
+        let _ = tokio::time::timeout(Duration::from_secs(3), self.cleanup.cancel_pending()).await;
     }
 }

@@ -46,7 +46,7 @@ impl Fixture {
         .await
         .unwrap()
         .id;
-        // Every company agent is created with a desk, which answers on a keyed model.
+        // Every company agent's direct binding answers on a keyed model.
         CompanyPersistence::replace_model_connections_for_user(
             persistence.as_ref(),
             user,
@@ -217,9 +217,29 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         .create_agent_from_library(f.user, f.company, definition.id, None)
         .await
         .unwrap();
-    // 01DEP-P03-D1: the copy comes with its default desk at its slug; "Create additional desk"
-    // adds more.
-    assert_eq!(company_channels().await, channels_before + 1);
+    assert_eq!(company_channels().await, channels_before);
+    let direct: bool = sqlx::query_scalar(
+        "SELECT count(*)=1 AND bool_and(binding.active AND binding.channel_id IS NULL \
+         AND endpoint.status='active' AND address.slug=agents.slug) \
+         FROM agents JOIN principals AS principal ON principal.agent_id=agents.id \
+           AND principal.company_id=agents.company_id \
+         JOIN addresses AS address ON address.principal_id=principal.id \
+           AND address.company_id=principal.company_id \
+         JOIN channel_bindings AS endpoint ON endpoint.principal_id=principal.id \
+           AND endpoint.company_id=principal.company_id \
+         JOIN workflow_bindings AS binding ON binding.principal_id=principal.id \
+           AND binding.company_id=principal.company_id \
+         WHERE agents.company_id=$1 AND agents.id=$2",
+    )
+    .bind(f.company)
+    .bind(copied.agent.id)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap();
+    assert!(
+        direct,
+        "the copy has its active direct address and workflow binding"
+    );
     assert_eq!(
         (
             copied.agent.provider.as_deref(),
@@ -266,6 +286,7 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         .unwrap()
         .unwrap();
     assert_eq!(created["channel"]["slug"], "builder-desk");
+    assert_eq!(company_channels().await, channels_before + 1);
     let company: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
         .bind(f.company)
         .fetch_one(f.persistence.pool())

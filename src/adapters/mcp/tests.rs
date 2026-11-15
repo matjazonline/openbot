@@ -122,6 +122,9 @@ fn adapter(url: &str) -> HttpMcpClient {
     HttpMcpClient::new(EndpointPolicy::new([format!("{}/", url.trim_end_matches('/'))]).unwrap())
 }
 
+#[path = "cleanup_tests.rs"]
+mod cleanup_tests;
+
 #[tokio::test]
 async fn mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links() {
     let output = json!({"type":"object","properties":{"name":{"type":"string"}}});
