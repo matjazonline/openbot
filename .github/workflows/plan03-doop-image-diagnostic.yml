@@ -13,6 +13,8 @@ jobs:
           node-version: 24.21.0
       - name: Prepare the pinned managed source
         run: python3 scripts/doop-test.py setup --managed --directory "$RUNNER_TEMP/doop"
+      - name: Enable the OCI image exporter
+        uses: docker/setup-buildx-action@v3
       - name: Build the actual private image and retain build errors
         run: |
           if ! python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"; then
