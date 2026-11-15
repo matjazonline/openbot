@@ -1,0 +1,914 @@
+diff --git a/src/adapters/http/app_error_impl.rs b/src/adapters/http/app_error_impl.rs
+index da121416..25077026 100644
+--- a/src/adapters/http/app_error_impl.rs
++++ b/src/adapters/http/app_error_impl.rs
+@@ -20,6 +20,7 @@ impl IntoResponse for AppError {
+             AppError::McpAuthentication => "mcp_authentication",
+             AppError::ServiceUnavailable(_) => "service_unavailable",
+             AppError::BadRequest(_) => "bad_request",
++            AppError::NativeMcpNotAdmitted => "native_mcp_not_admitted",
+             AppError::NotFound(_) => "not_found",
+             AppError::Forbidden(_) => "forbidden",
+             AppError::Conflict(_) => "conflict",
+@@ -68,6 +69,11 @@ impl IntoResponse for AppError {
+             )
+                 .into_response(),
+             AppError::BadRequest(message) => (StatusCode::BAD_REQUEST, message).into_response(),
++            AppError::NativeMcpNotAdmitted => (
++                StatusCode::BAD_REQUEST,
++                [("x-openbot-mcp-not-admitted", "invalid_arguments"), ("cache-control", "private, no-store")],
++                "Native MCP arguments failed pre-admission validation",
++            ).into_response(),
+             AppError::NotFound(message) => (StatusCode::NOT_FOUND, message).into_response(),
+             AppError::Forbidden(message) => (StatusCode::FORBIDDEN, message).into_response(),
+             AppError::Conflict(message) | AppError::Superseded(message) => {
+diff --git a/src/adapters/http/pages/agents.rs b/src/adapters/http/pages/agents.rs
+index a03c019a..8a9a4ef4 100644
+--- a/src/adapters/http/pages/agents.rs
++++ b/src/adapters/http/pages/agents.rs
+@@ -266,6 +266,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
+     let draft = AgentDraft {
+         name: &agent.name,
+         slug: &agent.slug,
++        open_to_public: agent.open_to_public,
+         provider: agent.provider.as_deref().unwrap_or(""),
+         model: agent.model.as_deref().unwrap_or(""),
+         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+@@ -341,6 +342,7 @@ pub fn agent_edit_fragment_draft(
+                 <input type="hidden" name="expected_revision" value="{expected_revision}">
+                 <input type="hidden" name="native_permissions" value="{native_permissions}">
+                 {preserved}
++                {direct_settings}
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                         <label class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
+@@ -389,6 +391,7 @@ pub fn agent_edit_fragment_draft(
+             .unwrap_or(agent.draft_revision)
+             .get(),
+         error = form_error_banner(error),
++        direct_settings = super::agent_settings::direct_settings_fields(draft),
+         name = escape_html_attr(name),
+         slug = escape_html_attr(slug),
+         avatar_field =
+diff --git a/src/adapters/http/pages/mailbox.rs b/src/adapters/http/pages/mailbox.rs
+index 2f4a5b15..d85a065f 100644
+--- a/src/adapters/http/pages/mailbox.rs
++++ b/src/adapters/http/pages/mailbox.rs
+@@ -831,7 +831,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
+ 
+ pub(crate) fn application_javascript() -> String {
+     format!(
+-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{agent_authoring}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_agent_picker}\n{workflow_runs}\n{thread_history}",
++        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{agent_authoring}\n{local_agent_profile}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_agent_picker}\n{workflow_runs}\n{thread_history}",
+         selected = icon(Icon::Check, BUTTON_ICON),
+         add = icon(Icon::Plus, BUTTON_ICON),
+         replied = icon(Icon::Check, BUTTON_ICON),
+@@ -843,6 +843,7 @@ pub(crate) fn application_javascript() -> String {
+         schedules = super::schedules::SCHEDULES_SCRIPT,
+         agents = super::agent_settings::AGENT_SETTINGS_SCRIPT,
+         agent_authoring = super::agent_authoring::AGENT_AUTHORING_SCRIPT,
++        local_agent_profile = super::local_agents::PROFILE_PERMISSIONS_SCRIPT,
+         channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
+         library = super::agent_library_multi_select::AGENT_LIBRARY_SCRIPT,
+         delegation = EVENT_DELEGATION_SCRIPT,
+diff --git a/src/adapters/http/pages/workflow_authoring/agent_picker.rs b/src/adapters/http/pages/workflow_authoring/agent_picker.rs
+index 91594e22..41b06a68 100644
+--- a/src/adapters/http/pages/workflow_authoring/agent_picker.rs
++++ b/src/adapters/http/pages/workflow_authoring/agent_picker.rs
+@@ -172,12 +172,11 @@ fn current_capabilities(view: &WorkflowAgentPicker<'_>) -> String {
+         .active
+         .as_ref()
+         .map(|active| {
+-            format!(
+-                "{} · {} / {}",
+-                active.id.as_uuid(),
+-                active.model.provider.as_str(),
+-                active.model.model
+-            )
++            let model = active.model.as_ref().map_or_else(
++                || "Native model selected by local profile; hosted workflows require an explicit model".to_owned(),
++                |model| format!("{} / {}", model.provider.as_str(), model.model),
++            );
++            format!("{} · {}", active.id.as_uuid(), model)
+         })
+         .unwrap_or_else(|| {
+             "Inactive. Publish this agent before publishing a workflow that uses it.".into()
+diff --git a/src/adapters/http/pages/workflow_authoring/sample.rs b/src/adapters/http/pages/workflow_authoring/sample.rs
+index 080df064..06a81c2e 100644
+--- a/src/adapters/http/pages/workflow_authoring/sample.rs
++++ b/src/adapters/http/pages/workflow_authoring/sample.rs
+@@ -150,7 +150,7 @@ mod tests {
+         let html = response_preview(&SampleResponse::Automatic {
+             content: SampleResponseContent {
+                 subject: "<img src=x onerror=alert(1)>".into(),
+-                body: "</pre><script>private text</script>".into(),
++                body: concat!("</pre>", "<script>", "private text", "</script>").into(),
+             },
+             approval_required: true,
+         });
+diff --git a/src/adapters/http/pages/workflow_runs/provenance.rs b/src/adapters/http/pages/workflow_runs/provenance.rs
+index 21f82ea5..9b1eb052 100644
+--- a/src/adapters/http/pages/workflow_runs/provenance.rs
++++ b/src/adapters/http/pages/workflow_runs/provenance.rs
+@@ -115,7 +115,12 @@ pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
+         <p class="break-all text-xs">Agent {} · revision {} · manifest {}</p>
+         <p class="text-xs">tools {}; skills {}</p><ul>{bindings}{assignments}</ul></div>"#,
+         escape_html_text(&agent.key),
+-        escape_html_text(&agent.model),
++        escape_html_text(
++            agent
++                .model
++                .as_deref()
++                .unwrap_or("Native model selected by local profile")
++        ),
+         agent.agent_id.as_uuid(),
+         agent.revision_id.as_uuid(),
+         agent.manifest.as_uuid(),
+diff --git a/src/adapters/http/routes/agent_library.rs b/src/adapters/http/routes/agent_library.rs
+index bf4414e5..3af49ae5 100644
+--- a/src/adapters/http/routes/agent_library.rs
++++ b/src/adapters/http/routes/agent_library.rs
+@@ -93,6 +93,8 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
+         tool_bindings: None,
+         name: payload.name,
+         slug: payload.slug,
++        open_to_public: payload.open_to_public,
++        confirm_spam_disabled: payload.confirm_spam_disabled,
+         provider: payload.provider,
+         model: payload.model,
+         system_prompt: payload.system_prompt,
+diff --git a/src/adapters/http/routes/knowledge/mod.rs b/src/adapters/http/routes/knowledge/mod.rs
+index d87dc5c1..dfd4a26d 100644
+--- a/src/adapters/http/routes/knowledge/mod.rs
++++ b/src/adapters/http/routes/knowledge/mod.rs
+@@ -119,7 +119,7 @@ async fn api_upload(
+ ) -> Response {
+     match upload::receive(&s, scope(&user, company), request).await {
+         Ok(layers) => (StatusCode::CREATED, Json(layers)).into_response(),
+-        Err(response) => response,
++        Err(response) => *response,
+     }
+ }
+ async fn api_delete(
+@@ -171,7 +171,7 @@ async fn ui_upload(
+         Ok(_) => Ok(
+             Redirect::to(&format!("/ui/knowledge?company_id={}", query.company_id)).into_response(),
+         ),
+-        Err(response) => render_failure(&s, &user, query.company_id, response).await,
++        Err(response) => render_failure(&s, &user, query.company_id, *response).await,
+     }
+ }
+ async fn ui_delete(
+diff --git a/src/adapters/http/routes/knowledge/upload.rs b/src/adapters/http/routes/knowledge/upload.rs
+index 85a4a257..a4f40179 100644
+--- a/src/adapters/http/routes/knowledge/upload.rs
++++ b/src/adapters/http/routes/knowledge/upload.rs
+@@ -7,7 +7,7 @@ pub(super) async fn receive(
+     s: &Services,
+     scope: KnowledgeScope,
+     request: Request,
+-) -> Result<Vec<KnowledgeDocumentLayer>, Response> {
++) -> Result<Vec<KnowledgeDocumentLayer>, Box<Response>> {
+     // Resolve account/company membership and admission before constructing a multipart reader.
+     s.library
+         .documents()
+@@ -33,9 +33,15 @@ pub(super) async fn receive(
+             )
+                 .into_response()
+         })??;
+-    s.library.upload(scope, files).await.map_err(mutation_error)
++    s.library
++        .upload(scope, files)
++        .await
++        .map_err(mutation_error)
++        .map_err(Box::new)
+ }
+-pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploadFile>, Response> {
++pub(super) async fn files(
++    mut multipart: Multipart,
++) -> Result<Vec<KnowledgeUploadFile>, Box<Response>> {
+     let mut files = Vec::new();
+     while let Some(mut field) = multipart
+         .next_field()
+@@ -43,13 +49,17 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
+         .map_err(IntoResponse::into_response)?
+     {
+         if field.name() != Some("files") {
+-            return Err(AppError::BadRequest(
+-                "Only file fields are accepted; the level comes from each filename".into(),
+-            )
+-            .into_response());
++            return Err(Box::new(
++                AppError::BadRequest(
++                    "Only file fields are accepted; the level comes from each filename".into(),
++                )
++                .into_response(),
++            ));
+         }
+         if files.len() == MAX_KNOWLEDGE_FILES {
+-            return Err(AppError::BadRequest("Pick at most ten files".into()).into_response());
++            return Err(Box::new(
++                AppError::BadRequest("Pick at most ten files".into()).into_response(),
++            ));
+         }
+         let filename = field
+             .file_name()
+@@ -60,9 +70,9 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
+         let mut bytes = Vec::new();
+         while let Some(chunk) = field.chunk().await.map_err(IntoResponse::into_response)? {
+             if chunk.len() > MAX_KNOWLEDGE_FILE_BYTES.saturating_sub(bytes.len()) {
+-                return Err(
+-                    AppError::BadRequest("A selected file exceeds 1 MiB".into()).into_response()
+-                );
++                return Err(Box::new(
++                    AppError::BadRequest("A selected file exceeds 1 MiB".into()).into_response(),
++                ));
+             }
+             bytes.extend_from_slice(&chunk);
+         }
+@@ -72,7 +82,9 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
+         );
+     }
+     if files.is_empty() {
+-        return Err(AppError::BadRequest("Choose at least one file".into()).into_response());
++        return Err(Box::new(
++            AppError::BadRequest("Choose at least one file".into()).into_response(),
++        ));
+     }
+     Ok(files)
+ }
+diff --git a/src/adapters/http/routes/onboarding.rs b/src/adapters/http/routes/onboarding.rs
+index 4b862408..e1ae8007 100644
+--- a/src/adapters/http/routes/onboarding.rs
++++ b/src/adapters/http/routes/onboarding.rs
+@@ -357,6 +357,7 @@ mod tests {
+     fn library_agent(name: &str, slug: &str) -> Agent {
+         Agent {
+             open_to_public: false,
++            native_permissions: Default::default(),
+             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+             id: Uuid::new_v4(),
+             company_id: None,
+diff --git a/src/adapters/http/routes/ui_agents.rs b/src/adapters/http/routes/ui_agents.rs
+index 2bb53b9d..558cfc03 100644
+--- a/src/adapters/http/routes/ui_agents.rs
++++ b/src/adapters/http/routes/ui_agents.rs
+@@ -666,6 +666,8 @@ impl AgentSettingsView<'_> {
+         let stored = pages::AgentDraft {
+             name: &agent.name,
+             slug: &agent.slug,
++            open_to_public: agent.open_to_public,
++            confirm_spam_disabled: false,
+             system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+             native_permissions: agent.native_permissions,
+             description: agent.description.as_deref().unwrap_or(""),
+@@ -797,6 +799,8 @@ impl SubmittedAgent {
+             tool_bindings: None,
+             name: self.form.name.clone(),
+             slug: self.slug.clone(),
++            open_to_public: self.form.open_to_public,
++            confirm_spam_disabled: self.form.confirm_spam_disabled,
+             provider: self.form.provider.clone(),
+             model: self.form.model.clone(),
+             system_prompt: self.form.system_prompt.clone(),
+@@ -825,6 +829,8 @@ impl SubmittedAgent {
+         pages::AgentDraft {
+             name: &self.form.name,
+             slug: &self.slug,
++            open_to_public: self.form.open_to_public,
++            confirm_spam_disabled: self.form.confirm_spam_disabled,
+             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
+             native_permissions: self.form.native_permissions,
+             description: self.form.description.as_deref().unwrap_or(""),
+diff --git a/src/adapters/http/routes/ui_schedules.rs b/src/adapters/http/routes/ui_schedules.rs
+index ac77a168..a2765ee3 100644
+--- a/src/adapters/http/routes/ui_schedules.rs
++++ b/src/adapters/http/routes/ui_schedules.rs
+@@ -368,12 +368,7 @@ async fn create_pane(
+     Query(query): Query<CompanyScopedQuery>,
+ ) -> AppResult<Html<String>> {
+     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
+-    let Some(CompanyAccess {
+-        company,
+-        membership: _,
+-        ..
+-    }) = company
+-    else {
++    let Some(CompanyAccess { company, .. }) = company else {
+         return Ok(Html(String::new()));
+     };
+ 
+@@ -402,12 +397,7 @@ async fn edit_schedule_pane(
+     Query(query): Query<CompanyScopedQuery>,
+ ) -> AppResult<Html<String>> {
+     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
+-    let Some(CompanyAccess {
+-        company,
+-        membership: _,
+-        ..
+-    }) = company
+-    else {
++    let Some(CompanyAccess { company, .. }) = company else {
+         return Ok(Html(String::new()));
+     };
+ 
+diff --git a/src/adapters/persistence/agent_publication/tools.rs b/src/adapters/persistence/agent_publication/tools.rs
+index cc077664..f88d7f81 100644
+--- a/src/adapters/persistence/agent_publication/tools.rs
++++ b/src/adapters/persistence/agent_publication/tools.rs
+@@ -219,11 +219,27 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
+             company,
+             provisioning::ProvisioningKind::ListAgents,
+         ),
+-        AgentBuiltinTool::CreateAgentChannel => provisioning::builtin_provisioning_snapshot(
++        AgentBuiltinTool::CreateAgent => provisioning::builtin_provisioning_snapshot(
+             company,
+-            provisioning::ProvisioningKind::CreateAgentChannel,
++            provisioning::ProvisioningKind::CreateAgent,
++        ),
++        AgentBuiltinTool::CreateDeskForAgent => provisioning::builtin_provisioning_snapshot(
++            company,
++            provisioning::ProvisioningKind::CreateDeskForAgent,
+         ),
+         AgentBuiltinTool::SearchKnowledge => knowledge::builtin_knowledge_snapshot(company),
++        AgentBuiltinTool::ReadEscalation => {
++            crate::application::workflow::escalation::tools::snapshot(
++                company,
++                crate::application::workflow::escalation::tools::EscalationTool::Read,
++            )
++        }
++        AgentBuiltinTool::RespondToEscalation => {
++            crate::application::workflow::escalation::tools::snapshot(
++                company,
++                crate::application::workflow::escalation::tools::EscalationTool::Respond,
++            )
++        }
+         AgentBuiltinTool::SearchMemory
+         | AgentBuiltinTool::MemoryTimeline
+         | AgentBuiltinTool::MemoryDetails
+diff --git a/src/adapters/persistence/department.rs b/src/adapters/persistence/department.rs
+index ea485601..f85947ed 100644
+--- a/src/adapters/persistence/department.rs
++++ b/src/adapters/persistence/department.rs
+@@ -343,20 +343,17 @@ pub(crate) async fn place_in_department_on(
+     role: Option<DepartmentRole>,
+ ) -> AppResult<()> {
+     write_placement_on(tx, company, department, principal, true, role).await?;
+-    match role {
+-        Some(role) => {
+-            follow_lead_on(
+-                tx,
+-                templates,
+-                company,
+-                actor,
+-                department,
+-                role,
+-                Some(principal),
+-            )
+-            .await?;
+-        }
+-        None => {}
++    if let Some(role) = role {
++        follow_lead_on(
++            tx,
++            templates,
++            company,
++            actor,
++            department,
++            role,
++            Some(principal),
++        )
++        .await?;
+     }
+     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+ }
+diff --git a/src/adapters/persistence/workflow/admission.rs b/src/adapters/persistence/workflow/admission.rs
+index 07b9440e..666d0e29 100644
+--- a/src/adapters/persistence/workflow/admission.rs
++++ b/src/adapters/persistence/workflow/admission.rs
+@@ -10,6 +10,17 @@ impl WorkflowAdmission for PostgresPersistence {
+     #[tracing::instrument(skip_all, fields(company=%command.company_id().as_uuid(), run=%command.proposed_run_id().as_uuid(), correlation=%command.causality().correlation_id().as_uuid()))]
+     async fn admit(&self, command: &PreparedAdmission) -> AppResult<AdmissionResult> {
+         agent_history_sessions::check_manual(command)?;
++        let private: bool = sqlx::query_scalar(
++            "SELECT EXISTS(SELECT 1 FROM native_mcp_brokers WHERE company_id=$1 AND version_id=$2)",
++        )
++        .bind(command.company_id().as_uuid())
++        .bind(command.version_id().as_uuid())
++        .fetch_one(&self.pool)
++        .await?;
++        if private {
++            return Err(missing());
++        }
++
+         let mut tx = self.pool.begin().await?;
+         if command.admission_claim().is_some() {
+             sqlx::query("SET LOCAL lock_timeout = '5s'")
+diff --git a/src/adapters/persistence/workflow/admission_write.rs b/src/adapters/persistence/workflow/admission_write.rs
+index 982dab77..a7ccc5b4 100644
+--- a/src/adapters/persistence/workflow/admission_write.rs
++++ b/src/adapters/persistence/workflow/admission_write.rs
+@@ -28,6 +28,7 @@ pub(super) async fn create(
+             parent: None,
+             rerun_of: command.rerun_of(),
+             delivery_policy: command.delivery_policy(),
++            native_mcp_call: None,
+         },
+     )
+     .await?;
+@@ -98,6 +99,7 @@ pub(super) struct RunRow<'a> {
+     pub rerun_of: Option<RunId>,
+     /// Admission's choice for a root; a runtime child inherits its parent's (p08 D1.7).
+     pub delivery_policy: DeliveryPolicy,
++    pub native_mcp_call: Option<crate::domain::local_agents::NativeMcpCallId>,
+ }
+ 
+ /// The deferred root-budget FK permits inserting the budget before its run; the run's
+@@ -141,9 +143,9 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
+          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
+          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
+-         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id) \
++         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id) \
+          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
+-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28)",
++         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29)",
+     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
+         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
+         .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(association.channel_id).bind(association.thread_id)
+@@ -161,6 +163,7 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
+         .bind(row.content_exact)
+         .bind(row.binding.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)
+         .bind(association.principal_id)
++        .bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid))
+         .execute(db).await?;
+     Ok(())
+ }
+diff --git a/src/adapters/persistence/workflow/agent_preparation.rs b/src/adapters/persistence/workflow/agent_preparation.rs
+index 002838bc..2b5f00ca 100644
+--- a/src/adapters/persistence/workflow/agent_preparation.rs
++++ b/src/adapters/persistence/workflow/agent_preparation.rs
+@@ -127,7 +127,14 @@ impl AgentPreparation for PostgresPersistence {
+                     return Ok(AgentPreparationResult::AtCapacity);
+                 }
+             };
+-        let provider = ModelProvider::from(prepared.selection().agent().model.provider.as_str());
++        let provider = ModelProvider::from(
++            prepared
++                .selection()
++                .agent()
++                .hosted_model()?
++                .provider
++                .as_str(),
++        );
+         let secret = crate::application::use_cases::company::CompanyPersistence::model_api_key(
+             self,
+             scope.company.as_uuid(),
+diff --git a/src/adapters/persistence/workflow/authoring_reads.rs b/src/adapters/persistence/workflow/authoring_reads.rs
+index 480d0f66..8acaf786 100644
+--- a/src/adapters/persistence/workflow/authoring_reads.rs
++++ b/src/adapters/persistence/workflow/authoring_reads.rs
+@@ -239,7 +239,9 @@ impl AuthoringReads for PostgresPersistence {
+     ) -> AppResult<Option<VersionSource>> {
+         let row: Option<VersionSourceRow> = sqlx::query_as(
+             "SELECT id, draft_revision, title, source, content_hash, created_at \
+-               FROM workflow_versions WHERE company_id = $1 AND workflow_id = $2 AND id = $3",
++               FROM workflow_versions WHERE company_id = $1 AND workflow_id = $2 AND id = $3 \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
++                  WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)",
+         )
+         .bind(company.as_uuid())
+         .bind(workflow.as_uuid())
+@@ -267,6 +269,7 @@ impl AuthoringReads for PostgresPersistence {
+         let rows = sqlx::query_as::<_, BindingRow>(&format!(
+             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
+               WHERE binding.company_id = $1 AND version.workflow_id = $2 \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
+               ORDER BY binding.id LIMIT $3"
+         ))
+         .bind(company.as_uuid())
+@@ -284,7 +287,8 @@ impl AuthoringReads for PostgresPersistence {
+     ) -> AppResult<Option<BindingUse>> {
+         let rows = sqlx::query_as::<_, BindingRow>(&format!(
+             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
+-              WHERE binding.company_id = $1 AND binding.id = $2"
++              WHERE binding.company_id = $1 AND binding.id = $2 \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)"
+         ))
+         .bind(company.as_uuid())
+         .bind(binding)
+@@ -297,6 +301,7 @@ impl AuthoringReads for PostgresPersistence {
+         let rows = sqlx::query_as::<_, BindingRow>(&format!(
+             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
+               WHERE binding.company_id = $1 AND binding.channel_id = $2 \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
+               ORDER BY binding.id LIMIT $3"
+         ))
+         .bind(company.as_uuid())
+@@ -313,6 +318,7 @@ impl AuthoringReads for PostgresPersistence {
+         let rows = sqlx::query_as::<_, BindingRow>(&format!(
+             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
+               WHERE binding.company_id = $1 AND $2 = ANY(version.agent_ids) \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
+               ORDER BY binding.id LIMIT $3"
+         ))
+         .bind(company.as_uuid())
+@@ -436,7 +442,8 @@ impl AuthoringReads for PostgresPersistence {
+                FROM workflow_versions AS version \
+                JOIN workflow_definitions AS definition ON definition.company_id = version.company_id \
+                 AND definition.id = version.workflow_id \
+-              WHERE version.company_id = $1 AND version.id = ANY($2)",
++              WHERE version.company_id = $1 AND version.id = ANY($2) \
++                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=version.company_id AND broker.version_id=version.id)",
+         )
+         .bind(company.as_uuid())
+         .bind(&ids)
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+index e3249ac3..465d7401 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+@@ -44,15 +44,16 @@ pub(super) fn definition(
+ ) -> ResolvedAgentDefinition {
+     let company = f.binding.target.company;
+     ResolvedAgentDefinition {
++        native_permissions: Default::default(),
+         company_id: company,
+         agent_id: AgentId::new(agent),
+         key: AgentKey::parse("assistant").unwrap(),
+         instructions: "Retain this immutable instruction.".into(),
+-        model: ModelSettings {
++        model: Some(ModelSettings {
+             provider: TypeName::parse("openai").unwrap(),
+             model: "fixture-model".into(),
+             max_output_tokens: 1000,
+-        },
++        }),
+         tools: bindings
+             .into_iter()
+             .map(|binding| {
+@@ -198,6 +199,7 @@ pub(super) async fn add_skill(f: &AdmissionFixture) -> crate::entities::skill::S
+         .create_company(
+             f.binding.target.company.as_uuid(),
+             SkillWrite {
++                files: None,
+                 slug: format!("skill-{}", Uuid::new_v4().simple()),
+                 name: "Instructions".into(),
+                 description: "Test instructions".into(),
+diff --git a/src/adapters/persistence/workflow/binding_rows.rs b/src/adapters/persistence/workflow/binding_rows.rs
+index f94b1989..6b34bf42 100644
+--- a/src/adapters/persistence/workflow/binding_rows.rs
++++ b/src/adapters/persistence/workflow/binding_rows.rs
+@@ -50,7 +50,7 @@ pub(super) async fn read_binding_at(
+          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
+            ON configuration.company_id = binding.company_id AND configuration.binding_id = binding.id \
+            AND configuration.revision = COALESCE($3,binding.configuration_revision) \
+-         WHERE binding.company_id = $1 AND binding.id = $2",
++         WHERE binding.company_id = $1 AND binding.id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)",
+     ).bind(company.as_uuid()).bind(id.as_uuid())
+         .bind(selected.map(|value| revision(value.get())).transpose()?)
+         .fetch_optional(&mut *db).await?;
+diff --git a/src/adapters/persistence/workflow/children.rs b/src/adapters/persistence/workflow/children.rs
+index 59308a59..2bcdfaaa 100644
+--- a/src/adapters/persistence/workflow/children.rs
++++ b/src/adapters/persistence/workflow/children.rs
+@@ -359,6 +359,7 @@ async fn insert_child_on(
+             rerun_of: None,
+             // A simulation's child is a simulation too: it cannot send what its parent may not.
+             delivery_policy: DeliveryPolicy::parse(&parent.delivery_policy)?,
++            native_mcp_call: None,
+         },
+     )
+     .await?;
+diff --git a/src/adapters/persistence/workflow/controls.rs b/src/adapters/persistence/workflow/controls.rs
+index 3cdca300..39a574de 100644
+--- a/src/adapters/persistence/workflow/controls.rs
++++ b/src/adapters/persistence/workflow/controls.rs
+@@ -221,7 +221,11 @@ pub(super) async fn cancel_children_on(
+     Ok(())
+ }
+ 
+-async fn cancel_run_on(db: &mut PgConnection, company: CompanyId, run: RunId) -> AppResult<()> {
++pub(super) async fn cancel_run_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    run: RunId,
++) -> AppResult<()> {
+     sqlx::query("SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 ORDER BY id FOR UPDATE")
+         .bind(company.as_uuid()).bind(run.as_uuid()).execute(&mut *db).await?;
+     sqlx::query("SELECT job.id FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id WHERE execution.company_id=$1 AND execution.run_id=$2  ORDER BY job.id FOR UPDATE OF job")
+diff --git a/src/adapters/persistence/workflow/definitions.rs b/src/adapters/persistence/workflow/definitions.rs
+index 5fa3bbfd..128fed80 100644
+--- a/src/adapters/persistence/workflow/definitions.rs
++++ b/src/adapters/persistence/workflow/definitions.rs
+@@ -59,11 +59,12 @@ async fn event(
+ async fn insert_draft(
+     tx: &mut Transaction<'_, Postgres>,
+     draft: &CompanyWorkflowDraft,
++    owner_agent: Option<Uuid>,
+ ) -> AppResult<()> {
+     sqlx::query(
+         "INSERT INTO workflow_definitions \
+-        (company_id, id, revision, title, description, source, template_origin) \
+-        VALUES ($1, $2, $3, $4, $5, $6, $7)",
++        (company_id, id, revision, title, description, source, template_origin, owner_agent_id) \
++        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
+     )
+     .bind(draft.company().as_uuid())
+     .bind(draft.workflow().as_uuid())
+@@ -72,6 +73,7 @@ async fn insert_draft(
+     .bind(draft.description())
+     .bind(draft.source())
+     .bind(origin_json(draft)?)
++    .bind(owner_agent)
+     .execute(&mut **tx)
+     .await
+     .map_err(write_error)?;
+@@ -84,7 +86,7 @@ impl WorkflowDraftCopies for PostgresPersistence {
+         let mut tx = self.pool.begin().await?;
+         let draft = copy.draft();
+         authorize_company(&mut tx, draft.company(), copy.actor()).await?;
+-        insert_draft(&mut tx, draft).await?;
++        insert_draft(&mut tx, draft, None).await?;
+         event(&mut tx, draft, copy.actor(), "copied", None).await?;
+         tx.commit().await?;
+         Ok(())
+@@ -208,7 +210,7 @@ pub(super) async fn save_draft_on(
+     archived: bool,
+ ) -> AppResult<()> {
+     match expected {
+-        None => insert_draft(tx, draft).await?,
++        None => insert_draft(tx, draft, None).await?,
+         Some(expected) => {
+             let count = sqlx::query(
+                 "UPDATE workflow_definitions SET revision = $3, title = $4, \
+@@ -250,8 +252,9 @@ pub(super) async fn insert_draft_on(
+     draft: &CompanyWorkflowDraft,
+     actor: WorkflowActor,
+     kind: &str,
++    owner_agent: Option<Uuid>,
+ ) -> AppResult<()> {
+-    insert_draft(tx, draft).await?;
++    insert_draft(tx, draft, owner_agent).await?;
+     event(tx, draft, actor, kind, None).await
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/lease.rs b/src/adapters/persistence/workflow/lease.rs
+index c808146f..aa322cb4 100644
+--- a/src/adapters/persistence/workflow/lease.rs
++++ b/src/adapters/persistence/workflow/lease.rs
+@@ -380,6 +380,14 @@ pub(super) async fn live_window(
+     fence: WorkflowFence,
+     started: Instant,
+ ) -> AppResult<Option<LeaseWindow>> {
++    if !sqlx::query_scalar::<_, bool>("SELECT COALESCE(public.native_mcp_run_live($1,$2),false)")
++        .bind(fence.scope.company.as_uuid())
++        .bind(fence.scope.run.as_uuid())
++        .fetch_one(&mut *db)
++        .await?
++    {
++        return Ok(None);
++    }
+     let row = sqlx::query_as::<_, Remaining>("SELECT extract(epoch FROM (job.lock_expires_at-clock_timestamp()))::float8 AS lease_seconds, extract(epoch FROM (run.deadline-clock_timestamp()))::float8 AS run_seconds FROM background_tasks AS job JOIN workflow_executions AS execution ON execution.company_id=job.company_id AND execution.id=job.workflow_execution_id JOIN workflow_runs AS run ON run.company_id=execution.company_id AND run.id=execution.run_id JOIN task_attempts AS attempt ON attempt.task_id=job.id AND attempt.attempt_number=$7 AND attempt.execution_generation=$6 AND attempt.worker_id=$5 AND attempt.status='processing' WHERE job.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4  AND job.status='processing' AND job.worker_id=$5 AND job.execution_generation=$6 AND job.attempt_ordinal=$7 AND job.lock_expires_at > clock_timestamp() AND execution.completed_at IS NULL AND run.state IN ('queued','running') AND run.deadline > clock_timestamp()")
+         .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(fence.scope.execution.as_uuid()).bind(fence.scope.job.0).bind(fence.worker.0).bind(fence.generation.0).bind(fence.attempt.0).fetch_optional(db).await?;
+     Ok(row
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index 4968514d..2d9fc2fb 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -23,7 +23,7 @@ mod admission_refusal;
+ mod admission_replay;
+ mod admission_source;
+ mod admission_write;
+-mod agent_authority;
++pub(in crate::adapters::persistence) mod agent_authority;
+ mod agent_history;
+ mod agent_history_sessions;
+ pub(crate) mod agent_history_views;
+@@ -90,6 +90,7 @@ pub(crate) use member_dependents::{
+ pub mod message;
+ mod message_intents;
+ mod metrics;
++pub(in crate::adapters::persistence) mod native_mcp;
+ mod people_resolutions;
+ mod persistence_bound;
+ pub mod provisioning;
+@@ -99,6 +100,7 @@ mod resources;
+ mod reviewer_accounts;
+ pub(crate) mod role_binding;
+ mod role_views;
++pub(in crate::adapters::persistence) mod row_locks;
+ mod rows;
+ mod run_provenance;
+ mod run_views;
+@@ -108,6 +110,8 @@ mod schedules;
+ pub mod step_builtins;
+ #[cfg(test)]
+ mod tests;
++#[cfg(test)]
++pub(crate) use tests::native_mcp_remote_fixture;
+ /// The uncertain HTTP action the reconciliation route tests start from (P08-D3).
+ #[cfg(test)]
+ pub(crate) use tests::reconciliation_fixture;
+diff --git a/src/adapters/persistence/workflow/reads.rs b/src/adapters/persistence/workflow/reads.rs
+index bea63698..5dd1ba96 100644
+--- a/src/adapters/persistence/workflow/reads.rs
++++ b/src/adapters/persistence/workflow/reads.rs
+@@ -387,7 +387,7 @@ impl WorkflowReads for PostgresPersistence {
+             None => None,
+             Some(after) => Some(
+                 sqlx::query_as(
+-                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2",
++                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
+                 )
+                 .bind(company.as_uuid())
+                 .bind(after)
+@@ -398,7 +398,7 @@ impl WorkflowReads for PostgresPersistence {
+         };
+         let rows = sqlx::query_as::<_, DefinitionRow>(
+             "SELECT id, revision, title, archived, template_origin FROM workflow_definitions \
+-             WHERE company_id = $1 AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
++             WHERE company_id = $1 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id) AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
+              ORDER BY title, id LIMIT $4",
+         )
+         .bind(company.as_uuid())
+@@ -420,7 +420,7 @@ impl WorkflowReads for PostgresPersistence {
+     ) -> AppResult<Option<DefinitionDetail>> {
+         let row: Option<(Uuid, i64, String, bool, Option<Value>, String, String)> = sqlx::query_as(
+             "SELECT id, revision, title, archived, template_origin, description, source \
+-                 FROM workflow_definitions WHERE company_id = $1 AND id = $2",
++                 FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
+         )
+         .bind(company.as_uuid())
+         .bind(workflow.as_uuid())
+@@ -465,7 +465,7 @@ impl WorkflowReads for PostgresPersistence {
+     ) -> AppResult<Page<BindingSummary>> {
+         let rows = sqlx::query_as::<_, BindingRow>(&format!(
+             "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 \
+-             AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
++             AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
+         ))
+         .bind(company.as_uuid())
+         .bind(page.after)
+@@ -484,7 +484,7 @@ impl WorkflowReads for PostgresPersistence {
+         binding: WorkflowBindingId,
+     ) -> AppResult<Option<BindingSummary>> {
+         sqlx::query_as::<_, BindingRow>(&format!(
+-            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2"
++            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)"
+         ))
+         .bind(company.as_uuid())
+         .bind(binding.as_uuid())
+diff --git a/src/adapters/persistence/workflow/run_provenance/mod.rs b/src/adapters/persistence/workflow/run_provenance/mod.rs
+index 5749fc9e..2bb6f4d8 100644
+--- a/src/adapters/persistence/workflow/run_provenance/mod.rs
++++ b/src/adapters/persistence/workflow/run_provenance/mod.rs
+@@ -71,6 +71,7 @@ impl RevisionRow {
+             })
+             .collect::<Vec<_>>();
+         Ok(SelectedAgentSummary {
++            via_role: None,
+             manifest: DependencyManifestId::new(self.manifest_id),
+             agent_id: definition.agent_id,
+             revision_id: AgentRevisionId::new(self.id),
+diff --git a/src/adapters/persistence/workflow/workflow_tools.rs b/src/adapters/persistence/workflow/workflow_tools.rs
+index fcbed27a..e4e2e55e 100644
+--- a/src/adapters/persistence/workflow/workflow_tools.rs
++++ b/src/adapters/persistence/workflow/workflow_tools.rs
+@@ -213,7 +213,7 @@ impl WorkflowTools for PostgresPersistence {
+     ) -> AppResult<WorkflowToolRegistration> {
+         if crate::application::workflow::provisioning::is_reserved_tool_name(write.name.as_str()) {
+             return Err(refused(
+-                "Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved",
++                "Built-in tool names (message.*, list_company_agents, create_agent) are reserved",
+             ));
+         }
+         if !write.params.is_object()
+diff --git a/src/application/agent/authoring_reads.rs b/src/application/agent/authoring_reads.rs
+index 11000e65..f63ddbd8 100644
+--- a/src/application/agent/authoring_reads.rs
++++ b/src/application/agent/authoring_reads.rs
+@@ -74,7 +74,8 @@ pub struct AgentActiveState {
+     pub id: AgentRevisionId,
+     pub draft_revision: AgentDraftRevision,
+     pub key: AgentKey,
+-    pub model: ModelSettings,
++    pub model: Option<ModelSettings>,
++    pub native_permissions: crate::domain::local_agents::LocalPermissions,
+     pub tools: Vec<AgentToolState>,
+     pub skills: Vec<AgentActiveSkill>,
+ }
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index e61eb346..763f1833 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -4,6 +4,8 @@ use thiserror::Error;
+ /// out a successful one. See `services::dashboard_snapshot`.
+ #[derive(Error, Debug, Clone)]
+ pub enum AppError {
++    #[error("{0}")]
++    WorkflowRole(crate::entities::department::RoleAdmissionRefusal),
+     #[error("The triggering message exceeds this audience's access level")]
+     KnowledgeTrigger {
+         content: crate::entities::access_level::AccessLevel,
+diff --git a/src/application/services/inbound_event_worker.rs b/src/application/services/inbound_event_worker.rs
+index 4952e8b8..6184969c 100644
+--- a/src/application/services/inbound_event_worker.rs
++++ b/src/application/services/inbound_event_worker.rs
+@@ -657,7 +657,8 @@ fn validate_commit_request(
+ 
+ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
+     match error {
+-        AppError::KnowledgeTrigger { .. }
++        AppError::WorkflowRole(_)
++        | AppError::KnowledgeTrigger { .. }
+         | AppError::KnowledgeRelease { .. }
+         | AppError::Execution(_)
+         | AppError::McpAuthentication
+diff --git a/src/application/services/model_usage/mod.rs b/src/application/services/model_usage/mod.rs
+index 2e7fd904..32e4c9b4 100644
+--- a/src/application/services/model_usage/mod.rs
++++ b/src/application/services/model_usage/mod.rs
+@@ -21,7 +21,7 @@ impl TokenPrice {
+         if value.is_empty() || value.len() > 14 {
+             return Err(invalid());
+         }
+-        let (whole, fraction) = value.split_once('.').map_or((value, ""), |parts| parts);
++        let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
+         if whole.is_empty()
+             || !whole.bytes().all(|c| c.is_ascii_digit())
+             || fraction.len() > 6
+diff --git a/src/application/workflow/mod.rs b/src/application/workflow/mod.rs
+index 0f5aafba..ee7d0e02 100644
+--- a/src/application/workflow/mod.rs
++++ b/src/application/workflow/mod.rs
+@@ -44,6 +44,7 @@ pub mod memory_tools;
+ pub mod message;
+ pub mod message_admission;
+ pub mod metrics;
++pub mod native_mcp;
+ pub(crate) mod people_resolution;
+ mod ports;
+ pub mod provisioning;
+diff --git a/src/application/workflow/publication/capabilities.rs b/src/application/workflow/publication/capabilities.rs
+index f23c5ad0..16ec5e14 100644
+--- a/src/application/workflow/publication/capabilities.rs
++++ b/src/application/workflow/publication/capabilities.rs
+@@ -26,6 +26,7 @@ impl ResolvedAgent {
+         {
+             return Err(AppError::Internal("Invalid selected agent revision".into()));
+         }
++        revision.definition.hosted_model()?;
+         Ok(Self {
+             manifest,
+             revision,
+diff --git a/src/application/workflow/run_views.rs b/src/application/workflow/run_views.rs
+index b22701e5..d04923cf 100644
+--- a/src/application/workflow/run_views.rs
++++ b/src/application/workflow/run_views.rs
+@@ -196,7 +196,7 @@ pub struct SelectedAgentSummary {
+     pub agent_id: crate::entities::agent_capability::AgentId,
+     pub revision_id: crate::entities::agent_capability::AgentRevisionId,
+     pub key: String,
+-    pub model: String,
++    pub model: Option<String>,
+     pub tools: Vec<String>,
+     pub skills: Vec<String>,
+ }
+diff --git a/src/domain/entities/mod.rs b/src/domain/entities/mod.rs
+index 4a126fd7..0510960a 100644
+--- a/src/domain/entities/mod.rs
++++ b/src/domain/entities/mod.rs
+@@ -29,6 +29,7 @@ pub mod run_counts;
+ pub mod runtime_metrics;
+ pub mod schedule;
+ pub mod skill;
++pub mod skill_bundle;
+ pub mod stuck_work;
+ pub mod task;
+ pub mod thread;
+diff --git a/src/domain/workflow/reply_integrity.rs b/src/domain/workflow/reply_integrity.rs
+index f28ec096..cbccb26d 100644
+--- a/src/domain/workflow/reply_integrity.rs
++++ b/src/domain/workflow/reply_integrity.rs
+@@ -26,7 +26,7 @@ impl TryFrom<String> for ReplyIntegrity {
+             return Err("Invalid final reply integrity");
+         }
+         let mut result = [0; 32];
+-        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
++        for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
+             let high = nibble(pair[0]).ok_or("Invalid final reply integrity")?;
+             let low = nibble(pair[1]).ok_or("Invalid final reply integrity")?;
+             result[index] = (high << 4) | low;
+diff --git a/src/infra/workflow.rs b/src/infra/workflow.rs
+index 1c7fdcf8..556e6f7f 100644
+--- a/src/infra/workflow.rs
++++ b/src/infra/workflow.rs
+@@ -681,7 +681,7 @@ impl WorkflowEngine {
+         )
+     }
+ 
+-    fn for_tests_with_clients(
++    pub(crate) fn for_tests_with_clients(
+         persistence: PostgresPersistence,
+         integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
+         client: Arc<dyn McpClient>,

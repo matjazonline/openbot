@@ -1,5 +1,108 @@
 # Plan03 p04 — safe checkpoint; stopped at the user's request
 
+## Active B1-R1 review/final verification checkpoint
+
+This entry supersedes all older live statuses below. User resumed: finish Plan03, then Plan04,
+normal main push after each accepted/full-verified plan, and STOP BEFORE PLAN05. No force push or
+deployment. Sole coordination in this checkout revision26; root/A user-confirmed Sol6.1/xhigh.
+
+Current HEAD e5a13246f054325ac97ad5c2355de3b927ac1002, branch
+room/check-last-handoff-md-under-plan-02-work-qc8d. Material source is FROZEN for independent
+B /root/p02_reviewer (Astra/high, existing independent context), whole integration review03PA-P04-B1-R1.
+Artifact canonical-C digest42490f46b0a9225c43501d04fef6db942d506a876769c43b3865823754530ed1,
+review base/phase start3fceb7d3. Exact seven exclusions unchanged (see TASK and source snapshot).
+Only excluded records/check output may change until B returns or coordinated correction boundary.
+B acknowledged/pinned HEAD/digest/coord26; no new architecture gate needed. B has a provisional
+proof concern: added role-selector test covers helper, not actual native role-origin continuation.
+No known retained exact full-branch test; B is continuing whole-batch review and will record all
+findings together. Do not make material edits while review is active. No runtime PASS yet.
+
+Accepted D1/r2 native broker correction implemented. SQLx prepare2 PASS/current schema, .sqlx
+unchanged; all-target dev checkPASS. Strict clippy preflightPASS3m53s before fixture simplification;
+final gate reruns it. Native feature binary exact filters3brokerPASS and36nativeMcpPASS/1existing
+CLI ignore. Broad native_191PASS/2FAIL/4ignore (525s), including100001-retentionPASS. Missing-address
+NativeSetup fixture repaired by existing test_support::register_native_agent_address only; temporary
+local helper/production visibility removed. Current rebuilt cloudroom_native_ checkPASS8/1existing
+ignore, including former concurrency failure. Broad cut-point failure was ready()15s timeout; exact
+isolated8-cut rerunPASS31.88s, cause/disposition pending final full suite. Test inventory4690→4693:
+three additions, no removals (resume-test-inventory-delta.json). Failed type checks/logs retained.
+
+Owned full local gate is RUNNING: unified exec session61370, logs/final-check1.txt. Current stage
+offline all-target compilation. Use external env script, UTF8 runtime, C locale snapshots.
+Do not start other Cargo checks on shared target or DB fixture checks until this gate finishes.
+Rebuilt focused session72195 already finishedPASS; SQLx/Clippy sessions finished. PG51167 running
+owned external data, pa03_p04_dev/test/diag_test; full check creates its own *_check_* DB. Other
+clusters untouched. Follow root/B resource ownership; B currently source/read-only checks only.
+
+Immutable CI candidate ef1cf778ed64ff6d2e6977ec3d0f020928e2719e (treebac02faf…) created via separate
+external Git index: material bytes equal frozen working tree; root HEAD/index/source unchanged.
+Seven workflow-record exclusions retain HEAD versions in CI tree. Candidate pushed via existing
+SSH to codex/plan03-p04-ci-20261115-ef1cf778, not main. JSON/source equality/snapshot/push logs under
+B1-R1-ci-*. Main CI run43732748013 and Memory service43732748071 currently running; public API
+works. Separate agent-history43732746803 failed before any jobs; workflow identical to main,
+retained as inherited workflow failure, do not fix unrelated YAML. HTTPS push failed for missing
+username prompt; SSH succeeded. No credentials logged. B knows CI mapping and unchanged source.
+
+Completed ancillary proof: plugin133tests/14guards/typecheck/build/package/locked runtime install,
+CSS, JS25protocols/run-count browser, seven boundaries, deployment and evidence validatorsPASS.
+Doop runner systemPython3.9 all46PASS; Python3.13 strict TLS failure retained with all17inputs
+identical to main. Scoped macOS network isolationPASS. Full local suite + omitted browser/CI gates,
+B findings/corrections, final manifests/acceptance and Plan03 main push remain; then all Plan04.
+Preflight evidence manifest is immutable B1-R1-preflight.evidence.json (includes FAIL/pending,
+not final acceptance). Save new final manifest when all checks finish; do not overwrite it.
+
+
+## Live resume checkpoint (supersedes older statuses)
+
+User has resumed; finish Plan03 then Plan04 and stop before Plan05 (coordination26).
+Current worktree/branch remain this checkout; HEAD e5a13246 merges origin/main2df562d6.
+Uncommitted native broker correction implements accepted D1/r2, with three added tests.
+Compiled binary8b1fa2d2de168230 collected4693;36 native_mcp_ PASS/1existing CLI ignore and
+3 native_broker_ PASS, including identity/incarnation/historical recovery. Broad native_
+session22903 (log resume-native-focused2.txt) is at196/197, last100001-member retention
+test still running. It has two failures: incomplete NativeSetup transport fixture (fixed
+in source via shared register_agent_address_on, helper visibility pub(super)), and cut-point
+test (same binary rerun isolatedPASS31.88s; original failure cause remains to inspect at end).
+SQLx prepare session81199 is checking; it emitted a wrong Agent type path in the new test helper.
+Corrected to crate::entities::agent::Agent; retain first failure and rerun prepare afterward.
+No source change since that correction. No B runtime/implementation review requested yet; reuse
+completed /root/p02_reviewer when whole-batch ready. Earlier independent architecture PASS stands.
+
+Owned PostgreSQL51167 running; pa03_p04_dev/test reset to new init schema and fresh migrationPASS;
+extra owned pa03_p04_diag_test used for isolated exact compiled-binary diagnostics. No other
+cluster touched. Env script remains external and valid. Use serialized external Cargo cache.
+Plugin133tests/14guards/typecheck/build/package/runtime-installPASS; CSSPASS; JS25protocols,
+run-count browser, seven boundaries, deployment checks and tracked workflow-evidence checksPASS.
+Doop runner46PASS with systemPython3.9; Python3.13strictTLS1failure retained, all17 runner inputs
+identical to main. Scoped macOS network guard works. Full suite/SQLx/clippy/CI/B review still
+pending; no completion or push. TASK has full chronological commands/results and log pointers.
+
+
+## Resumed here — 2026-11-15
+
+User lifted stop and reselected implement-astra-reviewed-2-3; starting HEAD c4671e72, clean tree.
+Root/A /root is Sol6.1/xhigh (user confirmation retained; model also exposed). Context threshold
+controls unavailable: keep durable records and host defaults. Sole coordination revision26 read;
+I001–I004 (Plan05 portion superseded), C001–C007/r1 and revision10 acknowledged. Terminal scope
+is Plan03 complete/review/verify/normal main push, then Plan04 complete/review/verify/normal main
+push, then stop before Plan05. No force push/deployment. Reuse accepted D1/r2 architecture and
+all unchanged historical evidence; it is not runtime acceptance. No new reviewer needed until
+whole-batch review; check existing handles then, otherwise start independent Astra/high B.
+
+D1/r2 §§8–11 implementation mapping: application NativeBrokerIdentity/source and compiler tests;
+registry exact current company/account/person capture, incarnation-keyed reservation/lookup/insert;
+init-schema immutable broker historical principal insertion validation plus exact run_live check;
+provenance FrozenOrigin reconstructs from stored principal. Public private-broker filters and
+contract-only recovery reads remain unchanged because they do not reconstruct reviewer identity.
+Focused assertions: exact literal principal distinct from run_as account, foreign/wrong-account
+INSERT rejected, broker immutable and idempotent, new person incarnation selects a distinct broker
+without renewing old effect authority, original-principal deletion preserves historical unknown
+recovery, real direct-native company teardown commits. Existing native_/workflow-role/address/API
+suites cover coupled interfaces. Fresh owned schema reset, SQLx regeneration, strict clippy then
+final full repository/CI gates remain outstanding. PostgreSQL51167 restarted from owned retained
+data; no other cluster touched. Pin C locale for snapshots; UTF8 for runtime tests.
+
+
 ## Current resume location — transfer completed 2026-11-15
 
 This entry supersedes older worktree, branch, merge-state and next-action statements below.

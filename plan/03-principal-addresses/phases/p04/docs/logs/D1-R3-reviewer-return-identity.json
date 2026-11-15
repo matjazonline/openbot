@@ -1,0 +1,13 @@
+{
+  "round": "03PA-P04-D1-R3",
+  "artifact": "2345b4d4ec0ed95bacd4da34c9deafc24b732b02be6cd3d316e8d35e7942c26f",
+  "decision_sha256": "3ef997db3f23aa25babd827570f8edc2fdfcf0f69c51bdca15f76f0bc1d050cd",
+  "head": "e5a13246f054325ac97ad5c2355de3b927ac1002",
+  "coordination_revision": 27,
+  "coordination_sha256": "23b6864426aa49a4eee26af869dd02f0d11a8f34ab78bbda2d30b957fbd0fbe4",
+  "entry_return_match": true,
+  "outcome": "PASS decision only",
+  "F1": "AMENDED OPEN; unreachable requirement withdrawn; actual-boundary proof pending",
+  "F2": "RESOLVED by inspection",
+  "runtime_checks": "NOT EXERCISED"
+}

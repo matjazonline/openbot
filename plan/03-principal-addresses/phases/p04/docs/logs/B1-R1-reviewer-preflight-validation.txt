@@ -1,0 +1,2 @@
+plan/03-principal-addresses/phases/p04/docs/logs/B1-R1-preflight.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 2, "PASS": 25}
+1 evidence manifest(s) validated; declared results are not acceptance

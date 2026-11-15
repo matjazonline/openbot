@@ -1,0 +1,36 @@
+[
+  {
+    "command": [
+      "python3",
+      "scripts/tests/knowledge-model-prepare.py"
+    ],
+    "exit": 0,
+    "log": "resume-ci-extra-1.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/doop-test.py"
+    ],
+    "exit": 1,
+    "log": "resume-ci-extra-2.txt"
+  },
+  {
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/doop-probe.mjs"
+    ],
+    "exit": 0,
+    "log": "resume-ci-extra-3.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "test:run-counts"
+    ],
+    "exit": 0,
+    "log": "resume-ci-extra-4.txt"
+  }
+]

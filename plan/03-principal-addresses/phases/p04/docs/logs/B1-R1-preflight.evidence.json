@@ -1,0 +1,461 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R1-preflight",
+  "artifact": "42490f46b0a9225c43501d04fef6db942d506a876769c43b3865823754530ed1",
+  "checks": [
+    {
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 native_mcp_",
+      "status": "PASS",
+      "criteria": [
+        "FC2"
+      ],
+      "fixture": "Owned pa03_p04_diag_test/51167; native feature binary before later fixture-only repair;36 exercised/1existing native CLI ignore",
+      "files": [
+        {
+          "path": "logs/resume-exact-native_mcp.txt",
+          "sha256": "da3307aa471b363ed81d336f51495fccef4de96860d9207101314a8a99d7104c"
+        },
+        {
+          "path": "logs/resume-focused-binary-sha256.txt",
+          "sha256": "a4a1577ecbb3680df746623c67bf8ca851b8a6bd63da9f76224f7b9b432dee32"
+        }
+      ]
+    },
+    {
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 native_broker_",
+      "status": "PASS",
+      "criteria": [
+        "FC2"
+      ],
+      "fixture": "Same compiled feature paths;3 exercised",
+      "files": [
+        {
+          "path": "logs/resume-exact-native_broker.txt",
+          "sha256": "07913752ce2c3b345cb26a080efab9e7b4f1e4c576d152fa9b951253e3d3f6bf"
+        },
+        {
+          "path": "logs/resume-focused-binary-sha256.txt",
+          "sha256": "a4a1577ecbb3680df746623c67bf8ca851b8a6bd63da9f76224f7b9b432dee32"
+        }
+      ]
+    },
+    {
+      "command": "cargo test --locked --offline --lib native_",
+      "status": "FAIL",
+      "criteria": [
+        "FC2"
+      ],
+      "fixture": "Owned pa03_p04_test/51167;191pass/2fail/4ignore; fixture missing address now corrected in source, readiness15s timeout remains unresolved",
+      "files": [
+        {
+          "path": "logs/resume-native-focused2.txt",
+          "sha256": "37de8d33f8377c77224404508519f4c4d55f9d5d8944696a800734847db02315"
+        }
+      ]
+    },
+    {
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry --nocapture",
+      "status": "PASS",
+      "criteria": [
+        "FC2"
+      ],
+      "fixture": "Owned diagnostic DB; isolated8cut-point rerun; does not dispose of broader readiness timeout",
+      "files": [
+        {
+          "path": "logs/resume-native-cutpoints-diagnostic.txt",
+          "sha256": "f7dd790643f2299b06f43d2077c19061b5578f496bd41df41e6997664a1bd6cf"
+        }
+      ]
+    },
+    {
+      "command": "cargo sqlx migrate run",
+      "status": "PASS",
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Fresh owned pa03_p04_dev/51167; exact current init schema",
+      "files": [
+        {
+          "path": "logs/resume-fresh-migration.txt",
+          "sha256": "10fd0313da1d41334ccdb8bf77660597adbd9717a419c00570baa911576b4723"
+        }
+      ]
+    },
+    {
+      "command": "scripts/tests/transport-boundary.sh",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-1.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "command": "scripts/transport-boundary-check.sh",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-2.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-3.txt",
+          "sha256": "a53dbdbaa47ba6de5debd4d63cd72abd90b541266706b82d87e27d129a9a57f6"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-4.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-5.txt",
+          "sha256": "5f30edc8ebab95ac5117932b0eb732a57e4f1d3511b65cb238ed47dfa1e3c4b0"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/integration-boundary.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-6.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/check-integration-docs.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-boundary-7.txt",
+          "sha256": "5cf88675881d2c2ff97e4c8c39b48cfd07618058a3d6d536fa707ca2608cbcf2"
+        }
+      ]
+    },
+    {
+      "command": "npm --prefix integrations/cloudroom-plugin run typecheck",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-1.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "command": "npm --prefix integrations/cloudroom-plugin run build",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-2.txt",
+          "sha256": "54ba34766bbe8fa61156b478619557814d7a37b0eb4cce1032e9f7d4a51012a7"
+        }
+      ]
+    },
+    {
+      "command": "npm --prefix integrations/cloudroom-plugin test",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-3.txt",
+          "sha256": "0c9466ef78950714b0a07a64f0437a114b530cd11fea3ee4e5b088f0180febef"
+        }
+      ]
+    },
+    {
+      "command": "npm --prefix integrations/cloudroom-plugin run test:guards",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-4.txt",
+          "sha256": "f5af139fc4891f81983f4bc2a1dccdd107f786432ec220ab26e4064a5f154f2b"
+        }
+      ]
+    },
+    {
+      "command": "npm --prefix integrations/cloudroom-plugin run package",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-5.txt",
+          "sha256": "b22aabfda91c525e8b8700ab59109773c235b1f6f6c47ba436a3a905d0611c84"
+        }
+      ]
+    },
+    {
+      "command": "npm run check:css",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-plugin-gate-6.txt",
+          "sha256": "6689a037e86a03f8addc291281bb585075ffef14ac6661318629727e45d667fc"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/tests/knowledge-model-prepare.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-ci-extra-1.txt",
+          "sha256": "d1276a2d9d79b9ed0a61446aa751886a8b573a45c52c4fe838159bc8be061837"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/tests/doop-test.py",
+      "status": "FAIL",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-ci-extra-2.txt",
+          "sha256": "dd22e7497cecf6223b569642b6c0fe618b47143ab86ca16160e2f8a14de750ce"
+        }
+      ]
+    },
+    {
+      "command": "node --test scripts/tests/doop-probe.mjs",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-ci-extra-3.txt",
+          "sha256": "68d12db207cbcc82864dac0cc3e77331ba4e9b8c95a56ed7c34be6943d718d62"
+        }
+      ]
+    },
+    {
+      "command": "npm run test:run-counts",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-ci-extra-4.txt",
+          "sha256": "463aefa3cc616dfddfb557354210b1a11afc235e99c8090259bf730629b29ce6"
+        }
+      ]
+    },
+    {
+      "command": "scripts/tests/deploy.sh",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-static-1.txt",
+          "sha256": "e970eb58edddc8dae62051093aa49f389c70fb68e98591d8676518e92dd09da7"
+        }
+      ]
+    },
+    {
+      "command": "scripts/tests/credential-key-rotation.sh",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-static-2.txt",
+          "sha256": "3ddbc0e774ee727d438513c3ad4a5c7fc6203e847efa6ffab28dd0f0da6e55a4"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/tests/workflow-evidence.py",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-static-3.txt",
+          "sha256": "f282eb7b35e8803216aabe208daf94519c0e5fa3f4f026f7f17cf893dfaafcb9"
+        }
+      ]
+    },
+    {
+      "command": "python3 scripts/check-workflow-evidence.py --tracked-manifests --require-tracked",
+      "status": "PASS",
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3"
+      ],
+      "fixture": "Current-source static/plugin fixtures; pinned Node24.21.0 and Python3.13",
+      "files": [
+        {
+          "path": "logs/resume-static-4.txt",
+          "sha256": "282481d99d624a0892fac6a80ab3448cfa663761ef461ebc10a14821b1e03689"
+        }
+      ]
+    },
+    {
+      "command": "/usr/bin/python3 scripts/tests/doop-test.py",
+      "status": "PASS",
+      "criteria": [
+        "FC3"
+      ],
+      "fixture": "System Python3.9;46tests; all17inputs unchanged from main",
+      "files": [
+        {
+          "path": "logs/resume-doop-python39.txt",
+          "sha256": "4830625a190afbf265fad2dd3f379ce4b734cec1de353382576620e6e03c2d96"
+        },
+        {
+          "path": "logs/resume-doop-baseline-identity.json",
+          "sha256": "e8de0e9c8ca49c8a3010920daf961a76138bc8b45e922a263d7307c03861ffc2"
+        }
+      ]
+    },
+    {
+      "command": "cargo test --locked --offline --lib cloudroom_native_",
+      "status": "NOT EXERCISED",
+      "criteria": [
+        "FC2"
+      ],
+      "fixture": "Rebuilt fixture correction",
+      "files": [],
+      "reason": "Compilation running; must finish before acceptance"
+    },
+    {
+      "command": "scripts/check.sh plus omitted CI/browser/memory/Doop gates",
+      "status": "NOT EXERCISED",
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "fixture": "Final combined source",
+      "files": [],
+      "reason": "Final full gate pending; no combined verification or implementation acceptance claimed"
+    }
+  ]
+}

@@ -59,6 +59,14 @@ impl NativeSetup {
         )
         .await
         .unwrap();
+        // Box fixture provisioning so native setup keeps its existing poll-frame depth.
+        Box::pin(
+            crate::adapters::persistence::test_support::register_native_agent_address(
+                s.f.persistence.as_ref(),
+                &agent,
+            ),
+        )
+        .await;
         let scope = AgentPublicationScope {
             company: CompanyId::new(s.f.company),
             actor: WorkflowActor::authenticated(s.f.owner).unwrap(),

@@ -1,0 +1,30 @@
+{
+  "commit": "ef1cf778ed64ff6d2e6977ec3d0f020928e2719e",
+  "tree": "bac02fafdc2095412e17275e8714e331bf2bccea",
+  "branch": "codex/plan03-p04-ci-20261115-ef1cf778",
+  "parent": "e5a13246f054325ac97ad5c2355de3b927ac1002",
+  "source_digest": "42490f46b0a9225c43501d04fef6db942d506a876769c43b3865823754530ed1",
+  "exclusions": [
+    "plan/03-principal-addresses/phases/p04/docs",
+    "plan/03-principal-addresses/phases/p03/docs",
+    "plan/03-principal-addresses/phases/p02/docs",
+    "plan/03-principal-addresses/phases/p01/docs",
+    "plan/03-principal-addresses/COORDINATION.md",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/02-workflow-roles/phases/p05/docs"
+  ],
+  "material_files": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/persistence/local_agents/management/native_mcp_direct_tests.rs",
+    "src/adapters/persistence/local_agents/management/native_mcp_identity_tests.rs",
+    "src/adapters/persistence/local_agents/management/native_mcp_live_tests.rs",
+    "src/adapters/persistence/local_agents/management/native_mcp_tests.rs",
+    "src/adapters/persistence/local_agents/management/native_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "src/adapters/persistence/workflow/native_mcp/provenance.rs",
+    "src/adapters/persistence/workflow/native_mcp/registry.rs",
+    "src/application/workflow/native_mcp.rs",
+    "src/application/workflow/native_mcp/tests.rs"
+  ],
+  "method": "external alternate index; current HEAD/index/worktree unchanged"
+}

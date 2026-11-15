@@ -11,12 +11,14 @@ use crate::domain::workflow::{
     WorkflowId,
 };
 use crate::entities::agent_capability::AgentBindingSource;
+use crate::entities::transport::PrincipalId;
 use serde_json::{Value, json};
 use std::{collections::BTreeMap, sync::Arc};
 
 pub struct NativeBrokerIdentity {
     pub company: CompanyId,
     pub actor: WorkflowActor,
+    pub actor_principal: PrincipalId,
     pub workflow: WorkflowId,
     pub version: VersionId,
     pub binding: WorkflowBindingId,
@@ -152,7 +154,7 @@ fn source(identity: &NativeBrokerIdentity, tool: &ResolvedAgentTool, operation: 
         "arguments":{"ref":"/input/arguments"}});
     if tool.approval_required {
         inputs["approval"] = json!({"object":{
-            "reviewers":{"literal":[{"kind":"user","id":identity.actor.user_id()}]},
+            "reviewers":{"literal":[{"kind":"principal","id":identity.actor_principal}]},
             "deadline":{"ref":"/input/deadline"}
         }});
     }

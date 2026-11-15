@@ -1,0 +1,14 @@
+{
+  "producer_missing": [],
+  "main_missing": [],
+  "changed_both": [
+    "public.native_mcp_broker_actor",
+    "public.native_mcp_witness",
+    "public.native_mcp_run_live"
+  ],
+  "counts": [
+    364,
+    263,
+    381
+  ]
+}

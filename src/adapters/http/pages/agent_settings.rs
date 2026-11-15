@@ -872,7 +872,7 @@ fn company_model_selection(fields: &AgentFields<'_>, id_prefix: &str) -> String 
     let (blank_choice, help) = match fields.agent_id {
         None => (
             "Company default",
-            "Leave both blank to use the company's default model for the new agent's desk. Creating an agent requires a model connection with an API key.",
+            "Leave both blank to use the company's default model for the new agent's direct workflow. Creating an agent requires a model connection with an API key.",
         ),
         Some(_) => (
             "No hosted model",

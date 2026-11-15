@@ -1,0 +1,17 @@
+{
+  "round": "03PA-P04-B1-R1",
+  "head": "e5a13246f054325ac97ad5c2355de3b927ac1002",
+  "review_base": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+  "artifact": "42490f46b0a9225c43501d04fef6db942d506a876769c43b3865823754530ed1",
+  "locale": "C",
+  "coordination_revision": 26,
+  "coordination_sha256": "b461a7cc75865bbf6e077bea161cfbf0085e7864bbf6c21773f15e1e061048dc",
+  "entry_return_match": true,
+  "findings": [
+    "03PA-P04-B1-R1/F1",
+    "03PA-P04-B1-R1/F2"
+  ],
+  "outcome": "CHANGES REQUIRED",
+  "reviewer_runtime_tests": "NOT EXERCISED; author owns shared Cargo/PG",
+  "final_verification": "Pending author final evidence"
+}

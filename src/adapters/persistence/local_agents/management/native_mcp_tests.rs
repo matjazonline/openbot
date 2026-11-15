@@ -3,6 +3,8 @@ use super::*;
 mod direct_tests;
 #[path = "native_mcp_http_tests.rs"]
 mod http_tests;
+#[path = "native_mcp_identity_tests.rs"]
+mod identity_tests;
 #[path = "native_mcp_integration_tests.rs"]
 mod integration_tests;
 #[path = "native_mcp_lifecycle_tests.rs"]

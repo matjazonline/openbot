@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision' (17794872) panicked at src/adapters/persistence/local_agents/management/native_tests.rs:435:10:
+called `Result::unwrap()` on an `Err` value: Internal("Company agent has no direct address")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4692 filtered out; finished in 2.81s
+

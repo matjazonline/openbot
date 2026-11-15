@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md
 - Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
-- Revision: 25
+- Revision: 28
 
 ## Plan-wide instructions
 
@@ -269,3 +269,32 @@ their older startup and stop-state paths. I001–I004/C001–C007/r1 and revisio
 Only transfer and preservation are completed here. D1/r2 is architecture acceptance only; its
 broker correction, p04 runtime/final checks and independent implementation review remain pending.
 Plan04/Plan05 remain queued. No new implementation acceptance or main publication is claimed.
+
+## Resume and terminal scope (revision26, 2026-11-15)
+
+User resumed here with implement-astra-reviewed-2-3. The prior stop is lifted. Root/A remains
+user-confirmed Sol6.1/xhigh; use independent Astra/high B for implementation acceptance.
+Latest instruction: "only continue with plan04 and stop before plan05". Finish Plan03 and its
+required acceptance/main push, then finish Plan04 and its required acceptance/main push, and
+**stop before Plan05**. I004/r1's Plan05 continuation is superseded by this explicit limit; its
+Plan03/04 verification, normal main-push authorization and no-force/no-deployment terms remain.
+I001–I003/C001–C007/r1 and revision10 remain acknowledged unchanged for p04.
+
+## p04 verification-obligation correction proposed (revision27)
+
+B1-R1/N1 returned F1medium/F2low. Tracing F1 found FrozenAction::local_agent explicitly permits
+only Workflow origin, so D1's requested actual native Agent-role-origin fixture has no admitted
+producer. D1/r3 proposes preserving that guard, accurately labeling helper-level role proof and
+adding actual native Workflow-origin actor/requester/owner contention proof. This is a pending
+internal decision review, not implementation acceptance or a new feature. I001–I004 (stop before05),
+C001–C007/r1 and revision10 remain unchanged. UI help wording correction is independent.
+
+## p04 D1/r3 proof correction accepted (revision28)
+
+Root accepts independent03PA-P04-D1-R3/N1 PASS after matching decision SHA256
+3ef997db3f23aa25babd827570f8edc2fdfcf0f69c51bdca15f76f0bc1d050cd, source2345b4d4…2c26f
+and unchanged HEAD/coord27. B independently confirmed the strict Workflow-only local-action
+constructor; the earlier unsupported Agent-origin native requirement is withdrawn. F1 remains
+open for real Workflow-origin native actor/requester contention/rollback/retry and origin-guard
+proof. F2 is reviewer-resolved. No runtime/batch/final acceptance. All shared constraints and
+stop-before05 scope unchanged; only the corrected current-branch verification may proceed.

@@ -1,5 +1,30 @@
 # 03PA-P04 — Combined main integration, documentation and final verification
 
+## Resumed here — 2026-11-15
+
+User lifted stop and reselected implement-astra-reviewed-2-3; starting HEAD c4671e72, clean tree.
+Root/A /root is Sol6.1/xhigh (user confirmation retained; model also exposed). Context threshold
+controls unavailable: keep durable records and host defaults. Sole coordination revision26 read;
+I001–I004 (Plan05 portion superseded), C001–C007/r1 and revision10 acknowledged. Terminal scope
+is Plan03 complete/review/verify/normal main push, then Plan04 complete/review/verify/normal main
+push, then stop before Plan05. No force push/deployment. Reuse accepted D1/r2 architecture and
+all unchanged historical evidence; it is not runtime acceptance. No new reviewer needed until
+whole-batch review; check existing handles then, otherwise start independent Astra/high B.
+
+D1/r2 §§8–11 implementation mapping: application NativeBrokerIdentity/source and compiler tests;
+registry exact current company/account/person capture, incarnation-keyed reservation/lookup/insert;
+init-schema immutable broker historical principal insertion validation plus exact run_live check;
+provenance FrozenOrigin reconstructs from stored principal. Public private-broker filters and
+contract-only recovery reads remain unchanged because they do not reconstruct reviewer identity.
+Focused assertions: exact literal principal distinct from run_as account, foreign/wrong-account
+INSERT rejected, broker immutable and idempotent, new person incarnation selects a distinct broker
+without renewing old effect authority, original-principal deletion preserves historical unknown
+recovery, real direct-native company teardown commits. Existing native_/workflow-role/address/API
+suites cover coupled interfaces. Fresh owned schema reset, SQLx regeneration, strict clippy then
+final full repository/CI gates remain outstanding. PostgreSQL51167 restarted from owned retained
+data; no other cluster touched. Pin C locale for snapshots; UTF8 for runtime tests.
+
+
 ## Current resume location — transfer completed 2026-11-15
 
 This entry supersedes older worktree, branch, merge-state and next-action statements below.
@@ -147,3 +172,144 @@ files. B completed, no root-owned cargo/test/Node worker remains. Uncommitted me
 changes preserved; STOP-{git-status,staged-paths,unstaged-paths,untracked-paths}.txt retain inventory.
 HANDOFF rewritten as authoritative resumption guide. No main/temporary push or new source commit
 occurred. Plan03 p04 and full gate remain incomplete; Plan04/05 remain queued. Stop until user resumes.
+
+## Resume implementation/check progress
+
+D1/r2 §§8–11 implemented in the owning application/registry/schema/provenance seams. New
+identity tests cover wrong-account/foreign insertion, immutable updates and principal replacement;
+direct-native populated company cascade added and busy-owner test includes actor principals.
+Fresh owned init migration PASS (resume-fresh-migration.txt). Seven boundary checks PASS
+(resume-boundaries.json); plugin typecheck/build/tests/guards/package and CSS PASS
+(resume-plugin-gates.json). Initial focused compile FAIL from request.clone() in new test; fixed
+by constructing a fresh fixture request (no production API change); failed log retained.
+Latest main tooling-only commit2df562d6 merged as e5a13246; sole conflict was identical .trail
+ignore entries in different order, resolved by retaining both. No runtime source changed there.
+
+Additional browser protocols25PASS; run-count browser protocolPASS; scoped macOS network isolation
+preflightPASS; knowledge artifact testsPASS and Doop probe boundariesPASS. Doop runner Python3.13
+unit gate45PASS/1ERROR: strict TLS reports Missing Authority Key Identifier. Its unchanged baseline
+input identity is retained; full helper inventory and platform disposition are still being checked.
+Do not weaken TLS or claim this check passed. Current main's Actions runs also fail browser install,
+memory integration and external Doop gate; recorded jobs are baseline evidence, not waivers.
+
+The first compile ended naturally with one E0599; its owned PID had already exited when a
+checked attempt to stop failed compilation inspected it, so no signal was sent. Corrected
+compile is resume-native-focused2.txt. All17 Doop runner/helper/static fixture inputs are
+byte-identical to origin/main (resume-doop-baseline-identity.json). Tests remain at original
+assertions; no source fix or TLS relaxation is introduced for this unrelated platform failure.
+
+Doop runner alternative platform proof: system Python3.9 ran all46 tests successfully
+(resume-doop-python39.txt). Pinned Node production package installationPASS
+(resume-package-runtime-install.txt). The local Python3.13 strict TLS failure remains retained
+as confirmed unchanged-input platform behavior, not a source regression or relaxed check.
+
+Focused build2 succeeded in7m51s. All encountered native MCP production-path tests pass, including
+new identity/incarnation/direct-cascade cases and original-actor-deleted unknown recovery.
+Broad native_ also exposed deterministic fixture integration failure in incoming native_tests.rs:
+raw cfg(test) AgentPersistence::create creates a principal but omits its address; the concurrent
+settings update correctly requires the canonical direct address. Isolated exact test reproduced
+Internal(Company agent has no direct address) in owned pa03_p04_diag_test.
+Correction completes only NativeSetup's fixture with the existing production address-registration
+helper (visibility narrowed to persistence siblings); no guard is relaxed and no model/publication
+behavior changes. Native-only low-level publication remains tested without a hosted model;
+production company-agent creation's keyed-model prerequisite is unchanged from main.
+
+Build2 collected4693 total library tests versus4690 retained pre-resume inventory: three new tests
+(two broker-identity and one direct-company-cascade); no deletion/rename planned. Completed
+native_mcp_ subset36PASS/1existing native-CLI ignore; native_broker_ compiler3PASS. Broad native_
+includes many costly calibration/100001-member tests; it is still running and is not an overall
+pass. It also reported cloudroom_e2e_cut_points failure; exact same binary on isolated diagnostic
+database reran all8 production cut-points successfully in31.88s. Preserve original failure and
+investigate its final captured cause; do not infer unrelated flake from one successful rerun.
+SQLx regeneration now running against freshly migrated owned dev DB; no reset of test fixtures.
+
+Broad native_ completed191PASS/2FAIL/4existing ignores in525.17s;100001-member retentionPASS.
+Failure1 canonical-address fixture fixed as recorded. Failure2 captured ready()15-second timeout
+at local_agent_e2e_tests.rs:282; same code/fixture8-cut isolated rerunPASS, so this remains an
+unresolved readiness/load gap until the final combined suite (no limit/assertion changes).
+Initial SQLx prepare failed on new fixture helper's wrong Agent path; corrected exact module
+type and reran as resume-sqlx-prepare2.txt. Historical failures retained; no metadata success
+claimed yet. Runner inventory now retained with explicit no-deletion delta.
+
+SQLx prepare2 PASS against fresh schema; all-target dev compilationPASS in3m01s. Regenerated
+.sqlx is byte-unchanged (all new native SQL uses runtime queries). Exact compiled-binary filters
+now independently report native_broker_3PASS and native_mcp_36PASS/1existing ignore; logs
+resume-exact-native_broker.txt/resume-exact-native_mcp.txt and binary SHA retained. These exact
+checks use the previously built native-correction binary; only later NativeSetup fixture repair
+and helper visibility differ from that binary. Rebuilt fixture/full-suite proof still required.
+Strict all-target offline clippy is now running. No threshold or guard has been relaxed.
+
+Fixture audit found the existing test_support/native_agent.rs::register_native_agent_address
+helper already supplies this exact unpublished-fixture namespace contract, with explicit limits.
+Use it in incoming NativeSetup rather than the temporary local wrapper/new production-helper
+visibility. No global AgentPersistence fixture behavior changes are needed: the existing
+postgres_agent_persistence_works already calls the shared helper and independently passed.
+This supersedes the earlier proposed local address helper/visibility change; final source will
+retain the existing production visibility and reuse the test-support owner.
+
+## B1-R1 whole integration review freeze
+
+HEADe5a13246f054325ac97ad5c2355de3b927ac1002; review base3fceb7d3435f3b821c3b37820200e1c5400206d9;
+canonical C-locale digest `42490f46b0a9225c43501d04fef6db942d506a876769c43b3865823754530ed1`, exact same seven exclusions as above.
+Material source frozen while B reviews the whole integration batch, not just this resume delta.
+Author may continue checks and excluded records only. Preflight evidence manifest records actual
+passes/failures and pending final gates. Strict clippy preflightPASS3m53s before fixture simplification;
+final full gate must rerun it on the frozen source. NativeSetup now uses existing test_support
+register_native_agent_address; production helper visibility restored and temporary wrapper removed.
+Current fixture check compiling; final verification and B acceptance still pending.
+
+Current rebuilt fixture checkPASS8/1existing ignore (resume-native-fixture-check.txt), including
+the previously failing concurrent publication/admission case; existing shared native-agent
+address helper used, no added production visibility. Source remains frozen42490f46…530ed1.
+Temporary CI commit ef1cf778ed64ff6d2e6977ec3d0f020928e2719e created with an external alternate
+Git index; exact material-file equality verified, source snapshot unchanged, current HEAD/index
+unchanged. HTTPS push unavailable (no username prompt); existing SSH authentication succeeded.
+Only codex/plan03-p04-ci-20261115-ef1cf778 was pushed; no main publication. CI identity/push/run
+logs retained. Final local scripts/check.sh running now in final-check1.txt on frozen source.
+B /root/p02_reviewer acknowledged whole integration review and source/coordination identities.
+
+## B1-R1 corrections — all findings together
+
+Independent B returned CHANGES REQUIRED03PA-P04-B1-R1/N1 on unchanged42490f46…530ed1:
+F1medium verification gap (actual role-origin native continuation/actor+requester contention),
+F2low automatic-desk UI creation help. Source freeze ends for this correction batch; decisions
+D1/r1/r2 remain accepted. Root will implement both, run focused proofs and final full gate, then
+request one combined correction/integration recheck. B did no runtime tests; no runtime acceptance.
+
+Owned final-check1 was deliberately stopped at Compile tests before any full runtime suite,
+exit143, to incorporate all review corrections. Its earlier CSS/JS/deploy/format/whitespace/
+boundary/evidence/offline/clippy/migration/SQLx-check stages passed on42490f46; no full-suite
+claim. Only exact-owned scripts/check.sh and3descendants stopped; EXIT cleanup handled its own
+check DB, other processes/clusters untouched. Retain log as aborted preflight, restart full gate
+after corrections. CI candidate1 continues on its immutable earlier source as comparison evidence.
+
+F1 trace contradicted D1's original native Agent-origin assumption: FrozenAction::local_agent
+explicitly rejects it, and the sole producer emits Workflow origin. Proposed correction is immutable
+logs/D1-r3.md SHA2563ef997db3f23aa25babd827570f8edc2fdfcf0f69c51bdca15f76f0bc1d050cd, coordination27. Obtain B architecture/criterion acceptance before
+dependent new proof. Preserve strict origin guard and actual actor/requester native boundary
+proof; no new agent-local tool or forged producer. F2 wording corrected independently.
+
+Root matched/accepted03PA-P04-D1-R3/N1 on exact decision/source, coordination28. B amended F1:
+unsupported native Agent-origin fixture withdrawn; genuine Workflow-origin actor/requester
+contention, rollback/retry and strict-origin rejection remain required. F2 reviewer-resolved.
+New test fixture will use a real application-authored stored message and actual intent admission
+to distinguish the privileged run owner from the original member requester, then execute normal
+local-agent park/native observations and native MCP pre-body/admission/live guards. No new
+native producer or schema/authorization behavior. Helper-level role test stays explicitly narrow.
+
+D1/r3 dependent source test implemented (local_agent_mcp_source_tests.rs, two registered tests).
+Fixture writes an actual internal application message by an existing admin, admits its intent
+through MessageAdmissions/WorkflowService under owner run-as, and verifies production requester_on
+resolves a distinct requester. It then parks a normal local-agent worker, accepts native protocol
+observations and contends real actor/requester/native-revision locks at native authentication,
+admission and live preparation, with full effect-state comparison, release/retry and exact
+captured revision checks. A separate guard test starts from a real saved local action, proves its
+valid base, changes only origin to Agent, and asserts constructor rejection without state changes.
+No special native producer, role fixture forgery or authorization/schema change. Current all-target
+compile check running; runtime proof not claimed yet. Existing helper role test remains narrow.
+
+CI candidate1 results: main verify stops at Install browser for protocol tests (also failed on
+main); doop-integrationPASS; memory-integrationFAIL before any step; separate Memory service
+imagePASS/verifyFAIL at Extracted-copy full gate. Retained job metadata; root collecting logs
+before any failure disposition. These checks concern earlier-source CI candidate1, not corrected
+current source. No main push, final acceptance or Plan04 start.

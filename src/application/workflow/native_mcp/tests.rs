@@ -8,6 +8,7 @@ fn identity() -> NativeBrokerIdentity {
     NativeBrokerIdentity {
         company: CompanyId::new(Uuid::new_v4()),
         actor: WorkflowActor::authenticated(Uuid::new_v4()).unwrap(),
+        actor_principal: PrincipalId::new(Uuid::new_v4()),
         workflow: WorkflowId::new(Uuid::new_v4()),
         version: VersionId::new(Uuid::new_v4()),
         binding: WorkflowBindingId::new(Uuid::new_v4()),
@@ -44,6 +45,8 @@ fn native_broker_compiles_real_mcp_contract_and_binds_original_reviewer() {
     for protected in [false, true] {
         let id = identity();
         let actor = id.actor.user_id();
+        let principal = id.actor_principal;
+        assert_ne!(actor, principal.as_uuid());
         let tool = tool(protected);
         let prepared = PreparedNativeMcp::compile(
             &crate::adapters::workflow_source::WorkflowSourceDecoder,
@@ -65,8 +68,8 @@ fn native_broker_compiles_real_mcp_contract_and_binds_original_reviewer() {
         );
         if protected {
             assert_eq!(
-                source["steps"]["start"]["with"]["approval"]["object"]["reviewers"]["literal"][0]["id"],
-                json!(actor)
+                source["steps"]["start"]["with"]["approval"]["object"]["reviewers"]["literal"],
+                json!([{"kind":"principal","id":principal}])
             );
         }
         assert_eq!(
@@ -74,6 +77,7 @@ fn native_broker_compiles_real_mcp_contract_and_binds_original_reviewer() {
             json!(18446744073709551615_u64)
         );
         assert_eq!(prepared.argument_digest().len(), 64);
+        assert_eq!(prepared.binding().run_as().user_id(), actor);
     }
 }
 

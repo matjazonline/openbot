@@ -8,6 +8,7 @@ use crate::entities::agent_capability::AgentBindingSource;
 struct FrozenOrigin {
     id: Uuid,
     actor_id: Uuid,
+    actor_principal_id: Uuid,
     contract: Value,
     workflow_id: Uuid,
     version_id: Uuid,
@@ -39,7 +40,7 @@ pub(in crate::adapters::persistence::workflow) async fn restore_on(
     if !private || request.context.origin != ToolCallOrigin::Workflow {
         return Err(missing());
     }
-    let origin=sqlx::query_as::<_,FrozenOrigin>("SELECT call.id,call.actor_id,broker.contract,broker.workflow_id,broker.version_id,
+    let origin=sqlx::query_as::<_,FrozenOrigin>("SELECT call.id,call.actor_id,broker.actor_principal_id,broker.contract,broker.workflow_id,broker.version_id,
         broker.workflow_binding_id,call.input,call.argument_digest,call.deadline,run.resources,run.params
         FROM native_mcp_calls AS call JOIN native_mcp_brokers AS broker ON broker.company_id=call.company_id AND broker.id=call.broker_id
         JOIN workflow_runs AS run ON run.company_id=call.company_id AND run.id=call.run_id
@@ -70,6 +71,7 @@ fn validate(
         NativeBrokerIdentity {
             company: request.scope.company,
             actor,
+            actor_principal: PrincipalId::new(origin.actor_principal_id),
             workflow: WorkflowId::new(origin.workflow_id),
             version: VersionId::new(origin.version_id),
             binding: WorkflowBindingId::new(origin.workflow_binding_id),

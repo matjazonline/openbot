@@ -7,6 +7,7 @@ pub(super) struct Broker {
     pub version_id: Uuid,
     pub workflow_binding_id: Uuid,
     pub contract: Value,
+    pub actor_principal_id: Uuid,
 }
 
 pub(super) async fn prepare_on(
@@ -18,35 +19,12 @@ pub(super) async fn prepare_on(
     let NativeHarnessSelection::Agent { revision_id, .. } = owner.harness else {
         return Err(missing());
     };
-    // A zero-wait key reservation prevents unique-index waits between different machines.
-    // It owns no existing run and is released with the enclosing admission transaction.
-    let key = format!(
-        "native-mcp:{}:{}:{}:{}",
-        owner.company.as_uuid(),
-        owner.actor.user_id(),
-        revision_id.as_uuid(),
-        tool.binding.id.as_uuid()
-    );
-    let reserved: bool =
-        sqlx::query_scalar("SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))")
-            .bind(key)
-            .fetch_one(&mut *db)
-            .await?;
-    if !reserved {
-        return Err(AppError::ServiceUnavailable(
-            "Native MCP admission is busy".into(),
-        ));
-    }
-    let existing = sqlx::query_as::<_, Broker>(
-        "SELECT id,workflow_id,version_id,workflow_binding_id,contract FROM native_mcp_brokers
-        WHERE company_id=$1 AND actor_id=$2 AND agent_revision_id=$3 AND agent_binding_id=$4",
-    )
-    .bind(owner.company.as_uuid())
-    .bind(owner.actor.user_id())
-    .bind(revision_id.as_uuid())
-    .bind(tool.binding.id.as_uuid())
-    .fetch_optional(&mut *db)
-    .await?;
+    // Source authorization already owns the exact company, member and person principal.
+    let actor_principal = sqlx::query_scalar::<_, Uuid>(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person' FOR SHARE NOWAIT",
+    ).bind(owner.company.as_uuid()).bind(owner.actor.user_id())
+        .fetch_optional(&mut *db).await?.map(PrincipalId::new).ok_or_else(missing)?;
+    let existing = broker_on(db, owner, revision_id.as_uuid(), tool, actor_principal).await?;
     let is_new = existing.is_none();
     let contract = serde_json::to_value(tool).map_err(|_| invalid())?;
     let broker = existing.unwrap_or_else(|| Broker {
@@ -55,6 +33,7 @@ pub(super) async fn prepare_on(
         version_id: Uuid::new_v4(),
         workflow_binding_id: Uuid::new_v4(),
         contract: contract.clone(),
+        actor_principal_id: actor_principal.as_uuid(),
     });
     if broker.contract != contract {
         return Err(conflict());
@@ -64,6 +43,7 @@ pub(super) async fn prepare_on(
         NativeBrokerIdentity {
             company: owner.company,
             actor: owner.actor,
+            actor_principal: PrincipalId::new(broker.actor_principal_id),
             workflow: WorkflowId::new(broker.workflow_id),
             version: VersionId::new(broker.version_id),
             binding: WorkflowBindingId::new(broker.workflow_binding_id),
@@ -91,6 +71,46 @@ pub(super) async fn prepare_on(
         }
     }
     Ok((broker, prepared))
+}
+
+async fn broker_on(
+    db: &mut PgConnection,
+    owner: &NativeMcpOwner,
+    revision: Uuid,
+    tool: &ResolvedAgentTool,
+    actor_principal: PrincipalId,
+) -> AppResult<Option<Broker>> {
+    // A zero-wait key reservation prevents unique-index waits between different machines.
+    // It owns no existing run and is released with the enclosing admission transaction.
+    let key = format!(
+        "native-mcp:{}:{}:{}:{}:{}",
+        owner.company.as_uuid(),
+        owner.actor.user_id(),
+        actor_principal.as_uuid(),
+        revision,
+        tool.binding.id.as_uuid()
+    );
+    let reserved: bool =
+        sqlx::query_scalar("SELECT pg_try_advisory_xact_lock(hashtextextended($1,0))")
+            .bind(key)
+            .fetch_one(&mut *db)
+            .await?;
+    if !reserved {
+        return Err(AppError::ServiceUnavailable(
+            "Native MCP admission is busy".into(),
+        ));
+    }
+    sqlx::query_as::<_, Broker>(
+        "SELECT id,workflow_id,version_id,workflow_binding_id,contract,actor_principal_id FROM native_mcp_brokers
+        WHERE company_id=$1 AND actor_id=$2 AND agent_revision_id=$3 AND agent_binding_id=$4 AND actor_principal_id=$5",
+    )
+    .bind(owner.company.as_uuid())
+    .bind(owner.actor.user_id())
+    .bind(revision)
+    .bind(tool.binding.id.as_uuid())
+    .bind(actor_principal.as_uuid())
+    .fetch_optional(&mut *db)
+    .await.map_err(Into::into)
 }
 
 async fn insert_on(
@@ -122,10 +142,10 @@ async fn insert_on(
         VALUES($1,$2,1,$3,$4,$5,$6,$6)")
         .bind(owner.company.as_uuid()).bind(broker.workflow_binding_id).bind(broker.version_id).bind(prepared.binding().params())
         .bind(serde_json::to_value(prepared.binding().resources()).map_err(|_| invalid())?).bind(owner.actor.user_id()).execute(&mut *db).await?;
-    sqlx::query("INSERT INTO native_mcp_brokers(company_id,id,actor_id,agent_revision_id,agent_binding_id,contract,workflow_id,version_id,workflow_binding_id)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)")
+    sqlx::query("INSERT INTO native_mcp_brokers(company_id,id,actor_id,agent_revision_id,agent_binding_id,contract,workflow_id,version_id,workflow_binding_id,actor_principal_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
         .bind(owner.company.as_uuid()).bind(broker.id).bind(owner.actor.user_id()).bind(revision_id.as_uuid())
         .bind(broker.contract["binding"]["id"].as_str().and_then(|id|Uuid::parse_str(id).ok()).ok_or_else(invalid)?)
-        .bind(&broker.contract).bind(broker.workflow_id).bind(broker.version_id).bind(broker.workflow_binding_id).execute(db).await?;
+        .bind(&broker.contract).bind(broker.workflow_id).bind(broker.version_id).bind(broker.workflow_binding_id).bind(broker.actor_principal_id).execute(db).await?;
     Ok(())
 }

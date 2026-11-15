@@ -1,0 +1,10 @@
+{
+  "baseline_count": 4690,
+  "current_count": 4693,
+  "added": [
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_populated_company_cascade_removes_broker_call_run_and_thread",
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_broker_rejects_foreign_or_wrong_account_principal_and_identity_updates",
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_new_person_incarnation_gets_new_broker_without_reviving_old_invocation"
+  ],
+  "removed": []
+}
