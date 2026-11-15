@@ -1,0 +1,9 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/provider-bridge-acp
+
+
+ Test Files  1 passed (1)
+      Tests  31 passed (31)
+   Start at  18:14:59
+   Duration  550ms (transform 282ms, setup 0ms, import 433ms, tests 9ms, environment 0ms)
+

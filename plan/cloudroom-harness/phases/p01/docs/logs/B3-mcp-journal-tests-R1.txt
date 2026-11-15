@@ -1,0 +1,32 @@
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (30.047083ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (4.254584ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (5.882291ms)
+✖ record and byte bounds refuse before a second admission while saved identity remains recoverable (6.716667ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (4.360416ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 4
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 143.398959
+
+✖ failing tests:
+
+test at build-tests/mcp-journal.test.js:884:1
+✖ record and byte bounds refuse before a second admission while saved identity remains recoverable (6.716667ms)
+  AssertionError [ERR_ASSERTION]: Missing expected exception (JournalCapacity).
+      at TestContext.<anonymous> (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin/build-tests/mcp-journal.test.js:893:14)
+      at Test.runInAsyncScope (node:async_hooks:227:14)
+      at Test.run (node:internal/test_runner/test:1402:25)
+      at Test.processPendingSubtests (node:internal/test_runner/test:974:18)
+      at Test.postRun (node:internal/test_runner/test:1542:19)
+      at Test.run (node:internal/test_runner/test:1467:12)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: undefined,
+    operator: 'throws',
+    diff: 'simple'
+  }

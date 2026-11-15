@@ -1,0 +1,7 @@
+{
+  "path": "integrations/cloudroom-plugin/src/mcp-transport.ts",
+  "change": "remove one final LF only; no tokens or executable behavior change",
+  "oldSha256": "325e8a297170634ecfed04605da24773d7d953d2f6041c0531f0ad9c8095abad",
+  "newSha256": "03539a5c16689bbb57d812da1228f69f896513462588b21862a7252aad1d7042",
+  "oldArtifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e"
+}

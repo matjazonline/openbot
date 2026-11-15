@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "round": "CH-P01-B1-R1",
+  "artifact": "cd38325289a55b05843071e92738e5bf97fb8bfeeb06d5a4e4a7afec1e74ebad",
+  "checks": [
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo fmt --all",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-offline-alltargets.txt",
+          "sha256": "e545e06f9504b003c2dabf4e262046056adb617997cedd1b083b60e5968928c7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC1",
+        "B1-AC2",
+        "B1-AC3",
+        "B1-AC4",
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib skill",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-all-skill-callers.txt",
+          "sha256": "4859696acf42837b6f5ecdae59bb8ba5e2724318049c1fe0e4fe9d9f42805ed1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_skill_bundle_browser_fixtures -- --ignored",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-browser-fixtures.txt",
+          "sha256": "b5a1f6dbdc55fcfe7362dca90cd8b31e3494e735b7b29445d58347fff0c0bb1f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC5"
+      ],
+      "command": "node --test scripts/tests/skill-bundle-browser.mjs",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-browser.txt",
+          "sha256": "d6bcf9bf199d9ae7c6b49e52f016ec3f6b8d7ad642d5fc3b9d34953a1ba85012"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-clippy.txt",
+          "sha256": "6768cf8ec118971eed6de3e553d337b9ed145f9be761892dabad4072c1984962"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned PG18 database openbot_cloudroom_harness_t1gfnhz1 on loopback63451; Node24.21.0; private Cargo target; real shipped markup/JS/CSS/CSP; browser server stands in only for HTTP response delivery",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R3-sqlx-prepare-check.txt",
+          "sha256": "5eb6fa2eecd0289a34d8f9f7e9ce056e83254c46bad8c602a21fc7d8cae03912"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "same isolated database/schema/toolchain. Borrowed focused evidence: affected auth/agent/source-module contracts unchanged since this run; later edits only import inversion and HTTP/browser test assertions. No hosted execution tool was added.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-fresh-migration.txt",
+          "sha256": "5241f89274a960e0b0f06cf375d6bbe7aea3433238354734ec5ec5dd24aaa633"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::http::auth::tests",
+      "fixture": "same isolated database/schema/toolchain. Borrowed focused evidence: affected auth/agent/source-module contracts unchanged since this run; later edits only import inversion and HTTP/browser test assertions. No hosted execution tool was added.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-auth.txt",
+          "sha256": "6d17b50180af31164855ccd282c55c3a32a5b6d3e6d9e2e7ad5a90cc2b5c47eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib application::agent::",
+      "fixture": "same isolated database/schema/toolchain. Borrowed focused evidence: affected auth/agent/source-module contracts unchanged since this run; later edits only import inversion and HTTP/browser test assertions. No hosted execution tool was added.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-agent-contracts.txt",
+          "sha256": "e1465d416751d2ac7790af85d65d01586073ef3c028de796077792166e48b35e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "same isolated database/schema/toolchain. Borrowed focused evidence: affected auth/agent/source-module contracts unchanged since this run; later edits only import inversion and HTTP/browser test assertions. No hosted execution tool was added.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-sqlx-prepare.txt",
+          "sha256": "48e7fecd2925e7a03027ba277241767e2130675034a883cc2f1d5cb1ca123343"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "same isolated database/schema/toolchain. Borrowed focused evidence: affected auth/agent/source-module contracts unchanged since this run; later edits only import inversion and HTTP/browser test assertions. No hosted execution tool was added.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R2-source-modules.txt",
+          "sha256": "701a6348e04ca2641768f216be0c8aeb2dc8ec9be77f7350080a962992625ac7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current frozen source and generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "npm run check:css",
+      "fixture": "current frozen source and generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-css-check.txt",
+          "sha256": "93e6f0b6cbccecafa298548f4d4498f842e38d2e6175eb37a6cddc298daa387d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "current frozen source and generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "current frozen source and generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-integration-docs.txt",
+          "sha256": "28a74ac6ade106fadeecf5185cdc1d9cc2c7fe586ae3258385ece25e853c11ca"
+        }
+      ]
+    }
+  ]
+}

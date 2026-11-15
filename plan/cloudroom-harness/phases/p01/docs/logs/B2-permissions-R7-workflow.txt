@@ -1,0 +1,37 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.25s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 30 tests
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_publication_native_output_is_data_and_direct_followup_cannot_reopen_workflow ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_approval_parks_before_native_admission_and_grants_one_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_withdrawn_original_private_access ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_private_run_output_and_every_direct_control_require_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_offline_operation_expires_at_frozen_deadline_without_native_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_result_commit_ack_resolves_authorized_saved_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_park_commit_ack_proves_atomic_saved_owner_or_no_operation ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer ... ok
+
+test result: ok. 27 passed; 0 failed; 3 ignored; 0 measured; 4031 filtered out; finished in 43.88s
+

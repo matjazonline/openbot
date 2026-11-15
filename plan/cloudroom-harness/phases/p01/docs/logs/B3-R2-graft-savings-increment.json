@@ -1,0 +1,139 @@
+{
+  "previous_persisted_total": 18636224,
+  "previous_unadded_known": [
+    2588,
+    5244,
+    1077,
+    2834,
+    3043,
+    4705,
+    5540,
+    5141,
+    8584,
+    1277,
+    63331
+  ],
+  "current_inline_known": [
+    3859,
+    2963,
+    1301,
+    2737,
+    3036,
+    541,
+    1519,
+    2148,
+    1025,
+    169
+  ],
+  "retained_current_logs": [
+    {
+      "file": "B3-F1-integration-authority-graft.txt",
+      "tokens": 28793
+    },
+    {
+      "file": "B3-F2-forwarding-source.txt",
+      "tokens": 30399
+    },
+    {
+      "file": "B3-gate-trigger-test-callers.txt",
+      "tokens": 5928
+    },
+    {
+      "file": "B3-F4-connection-lifetime-graft.txt",
+      "tokens": 17681
+    },
+    {
+      "file": "B3-F3-rejection-graft.txt",
+      "tokens": 26311
+    },
+    {
+      "file": "B3-F3-http-error-graft.txt",
+      "tokens": 898
+    },
+    {
+      "file": "B3-F1-runtime-integrations-graft.txt",
+      "tokens": 36213
+    },
+    {
+      "file": "B3-F3-journal-callers.txt",
+      "tokens": 5489
+    },
+    {
+      "file": "B3-F1-grant-source.txt",
+      "tokens": 8224
+    },
+    {
+      "file": "B3-F1-mcp-tool-callers.txt",
+      "tokens": 44890
+    },
+    {
+      "file": "B3-F1-prelock-callers.txt",
+      "tokens": 56664
+    },
+    {
+      "file": "B3-F1-tool-source.txt",
+      "tokens": 103323
+    },
+    {
+      "file": "B3-F1-cipher-graft.txt",
+      "tokens": 218557
+    },
+    {
+      "file": "B3-F3-error-source.txt",
+      "tokens": 1538
+    },
+    {
+      "file": "B3-F1-snapshot-callers.txt",
+      "tokens": 5596
+    },
+    {
+      "file": "B3-F1-binding-graft.txt",
+      "tokens": 8479
+    },
+    {
+      "file": "B3-F3-error-callers.txt",
+      "tokens": 1506
+    },
+    {
+      "file": "B3-gate-authoring-test-source.txt",
+      "tokens": 1192
+    },
+    {
+      "file": "B3-F1-pinned-fixture-graft.txt",
+      "tokens": 290
+    },
+    {
+      "file": "B3-F4-broker-graft.txt",
+      "tokens": 5479
+    },
+    {
+      "file": "B3-F1-configured-setup-source.txt",
+      "tokens": 7481
+    },
+    {
+      "file": "B3-F1-rotate-graft.txt",
+      "tokens": 8791
+    },
+    {
+      "file": "B3-F1-mcp-api.txt",
+      "tokens": 4324
+    },
+    {
+      "file": "B3-F3-request-callers.txt",
+      "tokens": 28165
+    },
+    {
+      "file": "B3-F2-origin-callers.txt",
+      "tokens": 23758
+    },
+    {
+      "file": "B3-F1-prelock-source.txt",
+      "tokens": 18254
+    },
+    {
+      "file": "B3-native-queue-status-callers.txt",
+      "tokens": 3001
+    }
+  ],
+  "new_total": 19460110
+}

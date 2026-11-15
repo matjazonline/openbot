@@ -1,102 +1,66 @@
-# Inter-Desk Communication
+# Communication between desks and agents
 
-Same-company desks can address one another without SMTP. A desk's automation is a workflow
-binding (p08), so one desk asking another is a workflow run sending a message to the other
-desk's address with a `message.send` or `message.reply` step. The receiving desk's own
-bindings decide what, if anything, runs.
+Same-company mail to a desk or a person's or agent's direct address can use the internal relay
+before SMTP. Desks and principals share one address namespace. Agents have their own principal
+address and default workflow binding; creating an agent creates no desk. Shared desks retain
+independent workflow bindings and access settings.
 
-The earlier protocol, where an agent recorded an outreach naming another desk, its task
-suspended, and the callee's answer resumed it, was removed with the legacy task runtime in p08,
-along with its tables (`task_outreaches`, `task_outreach_targets`, `task_outreach_replies`).
+## Identity and access
 
-## The internal relay
+`InternalMailRelay::relay_internal` resolves the recipient through the company's namespace and
+accepts only a sender proven by the stored delivery: the run's source desk address or the running
+agent's own principal address. A run cannot borrow another agent's identity. The receiving message
+carries the authenticated agent principal, and current principal grants decide admission to a
+department's restricted desk. Membership and role-derived grants apply to agent senders too.
+A desk-only relay retains the desk's existing internal authorization; it cannot impersonate an
+agent to gain the agent's grants.
 
-The email sender reaches the internal relay (`InternalMailRelay::relay_internal`,
-`application/use_cases/thread/mod.rs`) before SMTP:
+Agent direct addresses accept company senders and authenticated internal agents. Outside senders
+need that agent's **Allow external messages** setting. This control is independent of a desk being
+public: a private agent can staff a public desk without exposing its direct address. Direct
+submission grants no external read access. Person direct threads remain private to that person and
+the company owner.
 
-- **Recipients.** A recipient that resolves to a desk of the sending company is ingested
-  directly as an internal-origin message (`IngressOrigin::InternalChannel`). It is never rendered
-  to RFC 5322 and parsed back. Any other recipient is sent over SMTP as usual.
-- **Sender identity.** The sender address must be the source desk's own address
-  (`authorize_relay`), so a relayed message cannot borrow another desk's identity. The ingress
-  trusts an internal origin because of this check, not because of any verdict the message
-  carries.
-- **Correlation.** The correlation id is carried, never re-minted: the sending run and whatever
-  the receiving desk starts form one chain.
-- **Refusals.** If the receiving desk refuses the message (a spent hop budget, a disabled
-  desk, an access policy), the refusal is definite. The delivery records it rather than
-  retrying toward the same verdict.
+The relay carries canonical content directly into ingress. It preserves correlation and proves the
+exact delivery part, source target and sender principal again in the inbound commit. Source or
+target revocation after observation refuses the commit without storing a message; replay cannot
+bypass that check. A definite internal refusal is recorded as a delivery failure. It never falls
+through to SMTP. A transient database failure remains retryable.
 
-Workflow admission happens after the desk accepts the message. If a workflow cannot resolve a
-required department role, the message stays delivered and visible on the desk. Its admission
-intent records a definite workflow refusal naming the step and role, and no run starts. The
-message's workflow outcome shows that refusal; it does not cause another delivery attempt or
-change the completed relay delivery into a delivery failure.
+## Threads and workflow admission
 
-## On the receiving desk
+A relayed message follows normal conversation/reply correlation, current access policy, an atomic
+inbound commit and one durable admission intent per target association. Direct messages form
+conversation threads, rather than one permanent thread per person or agent. The receiving
+binding decides whether to start work. A role refusal leaves the delivered message visible and
+records a workflow refusal without retrying delivery.
 
-A relayed message goes through the same ingress as mail:
+An email delivery to an internal address can therefore start the target's message-triggered
+workflow. A `message.send` whose explicit destination kind is `channel` instead posts an outbound
+system note on that desk; it does not start the desk's bindings. Reply correlation offers a matching
+message to an already waiting run before ordinary admission. Sending a message does not by itself
+wait for or resume a caller; request/response dispatch remains the separate `channel.call` work.
 
-- thread resolution and access policy;
-- one inbound commit, under the desk gate and its settings-revision check;
-- one admission intent per association.
+Department context names the department, charter, role and nearby desk addresses; agent entries use
+their principal addresses. The context is frozen with the prepared run. Agent escalation notices
+also use the target's exact principal binding and revision. They retain their authenticated
+notification origin, so work descended from a notice cannot recursively escalate another notice.
+Only the narrowly authenticated platform-notice path has its notice-specific participation
+exception; ordinary relays use ordinary current authority.
 
-The access-policy step does not apply the receiving desk's participant list to a relay: once
-`authorize_relay` has matched the sender address to its source desk, ingress trusts
-`IngressOrigin::InternalChannel`. A members-only desk, whose allowlist is derived from its
-department's members, role holders and adjacent leads, therefore restricts people and outside
-senders only; any desk of the same company may relay into it, still bound by the hop budget
-and the loop rule below.
+## Loop protection
 
-From there the receiving desk's workflow bindings decide, by their message triggers, whether
-it starts a run. The relay itself starts no work. A `message.send` step whose destination is a
-desk posts into a new thread on that desk as an outbound system note, which starts none of
-its bindings: one desk cannot hand work to another this way (see "Department dispatch and
-escalation" below). An intent that answers a message a run is
-waiting on is offered to that run before ordinary admission (reply correlation,
-`application/workflow/message_admission.rs`).
+`EmailRelayTrace` carries a typed source target, bounded hop count and visited desk/principal
+targets. Reusing a UUID across the two target kinds does not make them the same hop. Ingress
+refuses a previously visited target or a count beyond `MAX_INGRESS_HOPS` (5); trace length is also
+bounded. Replies continue the source trace. A return along the chain to an earlier target is a
+cycle and is refused.
 
-## Department dispatch and escalation
+The email adapter encodes these values in `X-MailAgents-Source-Target`, `X-MailAgents-Hop-Count`,
+`X-MailAgents-Correlation-ID` and `X-MailAgents-Trace`. Application code carries typed targets and
+does not parse those wire headers. Retries retain stable delivery and provider message keys.
 
-Departments ([departments](departments.md)) organize desks into a hierarchy with a lead, and a
-lead's job is to hand work to its members' desks and to escalate to its parent department's desk.
-What holds today:
-
-- **The lead knows where to send.** An `agent.run` on a desk its department owns gets the
-  department's name, charter, whether the agent is the lead, and — on a desk that is not public —
-  the addresses of the department's own desk, its parent's, its direct children's and its agents'
-  own desks, frozen with the run (coordination C003).
-- **Relays are admitted.** A relay into a members-only desk is trusted like any other relay inside
-  the company; members-only restricts people and outside senders (coordination C001). For people,
-  a members-only desk admits its department's members and role holders, the parent department's
-  lead and each direct child department's lead: one step up and one step down (coordination C002).
-- **A send does not start the member's work.** A `message.send` to a member's desk is an outbound
-  note on that desk; none of its bindings run. A member's reply travelling back along the trace to
-  the lead's desk is refused as a cycle (see "Loops").
-
-So dispatch that starts the member's run, and escalation that returns an answer to the lead, wait
-for `channel.call` in agent-workflow-call, which the plan names as their successor (coordination
-C004). Until then a lead can tell a person where work belongs, and people can forward it.
-
-## Loops
-
-Every relayed message carries a trace (`EmailRelayTrace`): its source desk, its hop count and
-the desks it has passed through. A reply continues the trace its source arrived with; a new
-send starts one at its own desk. Ingress refuses:
-
-- a desk that already appears in the trace, as a routing cycle;
-- a hop count past `MAX_INGRESS_HOPS` (5).
-
-Over SMTP the same trace travels as the `X-MailAgents-Channel-ID`, `X-MailAgents-Hop-Count`,
-`X-MailAgents-Correlation-ID` and `X-MailAgents-Trace` headers.
-
-So no two desks can bounce a message between themselves indefinitely. It also means a reply
-travelling back along a relay chain to the desk that started it is refused as a cycle, which is
-one reason dispatch waits for `channel.call`.
-
-## Invariants
-
-- A relay never leaves the deployment and never needs a DMARC verdict.
-- A relayed message is admitted only by the receiving desk's own bindings; nothing on the
-  sending side resumes automatically.
-- Each delivery keeps its own stable idempotency key, so a retried send is the same message.
+External SMTP and signed provider-webhook ingress resolve the same desk/principal namespace.
+They still require routed company domains, authenticated ingress and outbound sender-domain
+configuration; internal relay tests do not establish those deployment prerequisites. See
+[Transport architecture](transport_architecture.md#principal-addresses-and-direct-threads).

@@ -1,7 +1,7 @@
 //! Shared skill-library editor for company owners and platform operators.
 
 use super::*;
-use crate::entities::skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill};
+use crate::entities::skill::{MAX_SKILL_INSTRUCTIONS_BYTES, Skill, SkillSummary};
 
 #[derive(Debug, Clone, Default)]
 pub struct SkillDraft {
@@ -27,7 +27,7 @@ impl SkillDraft {
 /// Everything one skill-library section needs. `company_id = None` is the operator library.
 pub struct SkillSection<'a> {
     pub company_id: Option<Uuid>,
-    pub skills: &'a [Skill],
+    pub skills: &'a [SkillSummary],
     pub next_url: Option<&'a str>,
     pub previous_url: Option<&'a str>,
     pub draft: Option<&'a SkillDraft>,
@@ -170,10 +170,10 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
             skill_url(company_id, Some(skill_id))
         )
     });
-    format!(
+    let editor = format!(
         r##"<form id="skill-editor" class="rounded-box border border-base-300 bg-base-200 p-4 space-y-4"
             hx-{method}="{save_url}" hx-target="#skill-library-section" hx-swap="outerHTML"
-            hx-disabled-elt="find button[type='submit']">
+            hx-disabled-elt="#skill-library-section button[type='submit']">
             <h3 class="font-semibold">{title}</h3>
             <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label class="form-control"><span class="label text-xs opacity-70">Name</span>
@@ -205,10 +205,70 @@ pub fn skill_editor_fragment(company_id: Option<Uuid>, draft: &SkillDraft) -> St
         instructions = escape_html_text(&draft.instructions),
         max_instructions = MAX_SKILL_INSTRUCTIONS_BYTES,
         base_url = skill_url(company_id, None),
+    );
+    format!("{editor}{}", skill_bundle_editor(company_id, draft.id))
+}
+
+fn skill_bundle_editor(company: Option<Uuid>, id: Option<Uuid>) -> String {
+    let base = skill_url(company, None);
+    let selected = skill_url(company, id);
+    let upload = if id.is_some() {
+        format!("{selected}/bundle")
+    } else {
+        format!("{base}/import")
+    };
+    let action = if id.is_some() {
+        "Replace directory"
+    } else {
+        "Import directory"
+    };
+    let saved = id.map_or_else(String::new, |_| format!(
+        r##"<a class="link" href="{selected}/bundle">Download ZIP</a>
+        <div hx-get="{selected}/bundle/files" hx-trigger="load" hx-swap="innerHTML"
+            hx-sync="#skill-library-section:replace"><span class="loading loading-spinner loading-sm"></span> Loading files…</div>"##,
+    ));
+    format!(
+        r##"<section class="rounded-box border border-base-300 bg-base-200 p-4 space-y-3">
+        <h3 class="font-semibold">Skill directory</h3>
+        <p class="text-sm opacity-70">Include SKILL.md and its scripts, references and assets. Executable file permissions are preserved.</p>
+        {saved}
+        <form method="post" action="{upload}" enctype="multipart/form-data" hx-post="{upload}"
+            hx-encoding="multipart/form-data" hx-target="#skill-library-section" hx-swap="outerHTML"
+            hx-disabled-elt="#skill-library-section button[type='submit']" class="space-y-3">
+            <label class="form-control"><span class="label text-xs">ZIP, up to 1 MiB; 64 supporting files and 512 KiB of decoded assets</span>
+                <input type="file" class="file-input w-full" name="bundle" accept=".zip,application/zip" required></label>
+            <button type="submit" class="btn btn-secondary">
+                <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                <span class="[.htmx-request_&]:hidden">{action}</span>
+                <span class="hidden [.htmx-request_&]:inline">Importing…</span></button>
+        </form></section>"##
     )
 }
 
-pub fn library_skill_browser(company_id: Uuid, skills: &[Skill]) -> String {
+pub fn skill_bundle_files(skill: &Skill) -> String {
+    let mut html = String::from(
+        "<ul class=\"text-sm space-y-1\"><li><code>SKILL.md</code> — instructions</li>",
+    );
+    for file in &skill.files {
+        let size = match file.bytes() {
+            Ok(bytes) => format!("{} bytes", bytes.len()),
+            Err(_) => "invalid file data".into(),
+        };
+        let mode = if file.executable {
+            "executable"
+        } else {
+            "regular file"
+        };
+        html.push_str(&format!(
+            "<li><code>{}</code> — {size}, {mode}</li>",
+            escape_html_text(file.path.as_str())
+        ));
+    }
+    html.push_str("</ul>");
+    html
+}
+
+pub fn library_skill_browser(company_id: Uuid, skills: &[SkillSummary]) -> String {
     if skills.is_empty() {
         return r#"<p class="mt-3 text-sm opacity-60">The global skill library is empty.</p>"#
             .to_string();

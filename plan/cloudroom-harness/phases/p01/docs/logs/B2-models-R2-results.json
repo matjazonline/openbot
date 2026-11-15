@@ -1,0 +1,28 @@
+[
+  {
+    "check": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 3.0,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R2-format.txt"
+  },
+  {
+    "check": "offline-alltargets",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "cwd": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree",
+    "exit": 0,
+    "elapsed_s": 27.49,
+    "log": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B2-models-R2-offline-alltargets.txt"
+  }
+]

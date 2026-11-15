@@ -26,6 +26,7 @@ impl ResolvedAgent {
         {
             return Err(AppError::Internal("Invalid selected agent revision".into()));
         }
+        revision.definition.hosted_model()?;
         Ok(Self {
             manifest,
             revision,

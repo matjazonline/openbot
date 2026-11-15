@@ -20,7 +20,7 @@ fn provenance(prepared: &PreparedAgent) -> AppResult<Value> {
     serde_json::to_value(AgentExchangeProvenance {
         agent: selection.agent().agent_id,
         revision: selection.revision().id,
-        model: selection.agent().model.clone(),
+        model: selection.agent().hosted_model()?.clone(),
         output_contract: prepared.response_contract()?,
     })
     .map_err(|_| invalid())

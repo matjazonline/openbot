@@ -1,0 +1,105 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0277]: the trait bound `application::local_agents::mcp::NativeMcpBody: serde::Serialize` is not satisfied
+   --> src/adapters/persistence/local_agents/management/native_mcp_http_tests.rs:137:37
+    |
+137 |     let body = serde_json::to_value(h.f.request(json!({"query":"http exact"})).body).unwrap();
+    |                -------------------- ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+    |                |
+    |                required by a bound introduced by this call
+    |
+help: the trait `memory_service::_::_serde::Serialize` is not implemented for `application::local_agents::mcp::NativeMcpBody`
+   --> src/application/local_agents/mcp.rs:51:1
+    |
+ 51 | pub struct NativeMcpBody {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    = note: for local types consider adding `#[derive(serde::Serialize)]` to your `application::local_agents::mcp::NativeMcpBody` type
+    = note: for types from other crates check whether the crate offers a `serde` feature flag
+    = help: the following other types implement trait `memory_service::_::_serde::Serialize`:
+              &'a T
+              &'a mut T
+              ()
+              (T,)
+              (T0, T1)
+              (T0, T1, T2)
+              (T0, T1, T2, T3)
+              (T0, T1, T2, T3, T4)
+            and 1524 others
+note: required by a bound in `serde_json::to_value`
+   --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/value/mod.rs:997:8
+    |
+995 | pub fn to_value<T>(value: T) -> Result<Value, Error>
+    |        -------- required by a bound in this function
+996 | where
+997 |     T: Serialize,
+    |        ^^^^^^^^^ required by this bound in `to_value`
+
+error[E0277]: the trait bound `application::local_agents::mcp::NativeMcpResponse: serde::Deserialize<'de>` is not satisfied
+    --> src/adapters/persistence/local_agents/management/native_mcp_http_tests.rs:155:39
+     |
+ 155 |     let admitted: NativeMcpResponse = serde_json::from_slice(&bytes).unwrap();
+     |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `memory_service::_::_serde::Deserialize<'_>` is not implemented for `application::local_agents::mcp::NativeMcpResponse`
+    --> src/application/local_agents/mcp.rs:82:1
+     |
+  82 | pub struct NativeMcpResponse {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::local_agents::mcp::NativeMcpResponse` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `memory_service::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a str` implements `memory_service::_::_serde::Deserialize<'de>`
+               `()` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T,)` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `memory_service::_::_serde::Deserialize<'de>`
+             and 1615 others
+note: required by a bound in `serde_json::from_slice`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/de.rs:2669:8
+     |
+2667 | pub fn from_slice<'a, T>(v: &'a [u8]) -> Result<T>
+     |        ---------- required by a bound in this function
+2668 | where
+2669 |     T: de::Deserialize<'a>,
+     |        ^^^^^^^^^^^^^^^^^^^ required by this bound in `from_slice`
+     = note: the full name for the type has been written to '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015.long-type-17807786162506176954.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+
+error[E0277]: the trait bound `application::local_agents::mcp::NativeMcpResponse: serde::Deserialize<'de>` is not satisfied
+    --> src/adapters/persistence/local_agents/management/native_mcp_http_tests.rs:171:37
+     |
+ 171 |     let replay: NativeMcpResponse = serde_json::from_slice(&bytes).unwrap();
+     |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+     |
+help: the trait `memory_service::_::_serde::Deserialize<'_>` is not implemented for `application::local_agents::mcp::NativeMcpResponse`
+    --> src/application/local_agents/mcp.rs:82:1
+     |
+  82 | pub struct NativeMcpResponse {
+     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = note: for local types consider adding `#[derive(serde::Deserialize)]` to your `application::local_agents::mcp::NativeMcpResponse` type
+     = note: for types from other crates check whether the crate offers a `serde` feature flag
+     = help: the following other types implement trait `memory_service::_::_serde::Deserialize<'de>`:
+               `&'a JsonRawValue` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a [u8]` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a std::path::Path` implements `memory_service::_::_serde::Deserialize<'de>`
+               `&'a str` implements `memory_service::_::_serde::Deserialize<'de>`
+               `()` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T,)` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T0, T1)` implements `memory_service::_::_serde::Deserialize<'de>`
+               `(T0, T1, T2)` implements `memory_service::_::_serde::Deserialize<'de>`
+             and 1615 others
+note: required by a bound in `serde_json::from_slice`
+    --> /Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/serde_json-1.0.151/src/de.rs:2669:8
+     |
+2667 | pub fn from_slice<'a, T>(v: &'a [u8]) -> Result<T>
+     |        ---------- required by a bound in this function
+2668 | where
+2669 |     T: de::Deserialize<'a>,
+     |        ^^^^^^^^^^^^^^^^^^^ required by this bound in `from_slice`
+     = note: the full name for the type has been written to '/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015.long-type-17807786162506176954.txt'
+     = note: consider using `--verbose` to print the full type name to the console
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

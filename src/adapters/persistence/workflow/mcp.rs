@@ -176,6 +176,7 @@ impl action_dispatch::SqlActionAuthority for McpActionAuthority {
         authority: &ActionRunAuthority,
     ) -> AppResult<action_dispatch::LockedActionAuthority> {
         let request = authority.action.request();
+        super::native_mcp::live_on(tx, request).await?;
         let connection = connection_on(tx, request.scope.company, mcp_target(&request.target)?)
             .await?
             .ok_or_else(missing)?;
@@ -354,6 +355,7 @@ impl McpActionUse for PostgresPersistence {
         )
         .await?;
         live_run_on(&mut tx, request).await?;
+        super::native_mcp::live_on(&mut tx, request).await?;
         super::agent_origin::current_on(&mut tx, request).await?;
         let (connection, decision) = current_on(&mut tx, request).await?;
         let current = super::integration_authority::mcp_snapshot(&mut tx, &connection).await?;

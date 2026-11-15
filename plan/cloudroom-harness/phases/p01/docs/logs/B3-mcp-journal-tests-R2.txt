@@ -1,0 +1,13 @@
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (17.129833ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (4.435667ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (5.020916ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (6.830042ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (4.886166ms)
+ℹ tests 5
+ℹ suites 0
+ℹ pass 5
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 126.263291

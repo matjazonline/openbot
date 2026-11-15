@@ -1,0 +1,29 @@
+{
+  "prior_total": 20353842,
+  "retained_calls": [
+    {
+      "file": "B3-R3-doop-observe-symbol.txt",
+      "tokens": 3983
+    },
+    {
+      "file": "B3-R3-doop-published-symbol.txt",
+      "tokens": 3983
+    },
+    {
+      "file": "B3-R3-doop-observe-callees.txt",
+      "tokens": 34783
+    },
+    {
+      "file": "B3-R3-document-fixture-symbols.txt",
+      "tokens": 10375
+    },
+    {
+      "file": "B3-R3-scripted-scenario-api.txt",
+      "tokens": 2742
+    }
+  ],
+  "inline": [
+    2898
+  ],
+  "new_total": 20412606
+}

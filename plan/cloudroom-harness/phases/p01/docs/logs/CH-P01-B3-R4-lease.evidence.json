@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R4-lease",
+  "artifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "checks": [
+    {
+      "criteria": [
+        "M3-AC6",
+        "CH-P01-B3-F7"
+      ],
+      "command": "scripts/test-network-isolation.sh bash scripts/lease-budget.sh --offline (default filters/50% thresholds unchanged)",
+      "fixture": "owned PG18 port63451/current R4 schema, pinned Node24, uncontended serial check",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R4-lease-budget-R1.txt",
+          "sha256": "ffa8ebcd0f7943ad5c68b0c413f2e986daac6723ead34d37edf67202b56e49d5"
+        },
+        {
+          "path": "logs/B3-R4-lease-budget-record-R1.txt",
+          "sha256": "d5f52cea0508e11da5e6f41ac202352a23c6c2780bd89d120777b52a2359f238"
+        }
+      ]
+    }
+  ]
+}

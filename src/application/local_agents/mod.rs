@@ -3,6 +3,7 @@ pub mod bounds;
 mod catalog;
 pub mod lifecycle;
 pub mod management;
+pub mod mcp;
 mod pairing;
 pub mod ports;
 pub mod protocol;
@@ -17,5 +18,6 @@ pub use secrets::*;
 #[cfg(test)]
 mod contract_tests;
 
+pub mod harness;
 #[cfg(test)]
 mod wire_tests;

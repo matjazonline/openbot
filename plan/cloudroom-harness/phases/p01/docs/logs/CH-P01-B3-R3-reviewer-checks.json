@@ -1,0 +1,25 @@
+{
+  "artifact": "32445711c489b73d4f95820e1d8e1f732be11c3220f9f47252f22a27f86efe5c",
+  "external_targets": [
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r2",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r5-verify",
+      "count": 58,
+      "mismatches": []
+    }
+  ],
+  "independent_checks": [
+    "integration-boundary.py PASS",
+    "integration-boundary mutation fixtures 22 PASS",
+    "evidence validator PASS (5PASS/1retainedFAIL/2pending)"
+  ]
+}

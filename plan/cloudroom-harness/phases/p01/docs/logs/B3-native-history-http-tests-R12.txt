@@ -1,0 +1,34 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 20s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 26 tests
+test adapters::mcp::http::body_lifetime_tests::integration_gateway_native_mcp_sse_body_owns_completion_after_client_release ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_abandonment_and_shutdown_join_initialization ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_competing_admission_cancel_releases_only_its_claim ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... ignored, requires the owned patched Cloudroom checkout, Node24 and local scripted native CLI fixture
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_authenticates_before_body_and_refuses_foreign_or_stale_connections ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback ... ok
+test application::local_agents::mcp::tests::native_mcp_maximum_result_fits_the_complete_response_with_maximum_origin_ids ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_http_api_key_policy_denies_mcp_consent_before_any_remote_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_bearer_google_and_strict_oauth_use_real_native_mcp_without_workflow_branches ... ok
+
+test result: ok. 25 passed; 0 failed; 1 ignored; 0 measured; 4073 filtered out; finished in 14.40s
+

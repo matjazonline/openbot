@@ -1,0 +1,62 @@
+[
+  {
+    "name": "required skill directory transfer > authenticates the required route, preserves every byte/mode through production daemon staging and executes an adjacent-file script",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required skill directory transfer > refuses unregistered or changed trees and does not fall back to the ordinary registry",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required skill directory transfer > rejects file count and file-byte limit+1 before reading content",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "accepts exact count, file, entry and portable-path limits and refuses the next byte",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "evicts required registrations at its explicit bound without ordinary fallback",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "refuses a required skill name colliding with a resolved ambient skill before provider launch",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/internal/required-skill-trees.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required native agent configuration > persists an immutable owner in the create transaction, keeps lineage independent, and rolls back a refused owner insertion",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required native agent configuration > uses the actual loaded required provider without truncation, and refuses disable, callback failure and missing owner on restart",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required configuration dispatch lifecycle > keeps Send-now queued and sends no provider command when the durable owner is missing",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "required configuration dispatch lifecycle > cancels an active required callback before unloading its owner",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "public plugin spawn stamps the closure owner and refuses managed forks",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  },
+  {
+    "name": "bounds complete required instructions and explicit directory descriptors at their wire limits",
+    "file": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server/test/threads/required-agent-configuration.test.ts",
+    "projectName": "@cloudroom/server"
+  }
+]

@@ -19,7 +19,7 @@ test('bounded mapping traversal passes a retained oldest page and wraps after re
   const f = fixture();
   try {
     f.journal.db.transaction(() => {
-      for (let i = 0; i < LIMITS.history; i++) f.journal.bindSession(randomUUID(), `thr_${i}`, f.selection);
+      for (let i = 0; i < LIMITS.history; i++) f.journal.bindSession({sessionId:randomUUID(),threadId:`thr_${i}`,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
       f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
     })();
     assert(f.journal.diagnostics().newSessionsPaused);
@@ -45,7 +45,7 @@ for (const expected of [{ count: 4096, requests: 2, remaining: 3996 }, { count: 
     const s = await server(); const f = fixture({ initialized: false });
     f.binding.origin = s.origin; f.journal.initialize(f.binding);
     f.journal.db.transaction(() => {
-      for (let i = 0; i < expected.count; i++) f.journal.bindSession(randomUUID(), `thr_${i}`, f.selection);
+      for (let i = 0; i < expected.count; i++) f.journal.bindSession({sessionId:randomUUID(),threadId:`thr_${i}`,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
       f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
     })();
     const prefix = f.journal.mappingCandidates().map(candidate => candidate.id); const retained = new Set(prefix);
@@ -101,7 +101,7 @@ test('same-point journal restore retains mapping while SQL-only history rollback
   const f = fixture(); const command = send(); const context = { signal: new AbortController().signal, canDispatch: () => true };
   let restored: Database.Database | undefined;
   try {
-    f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
     const snapshot = join(f.directory, 'coordinated-snapshot.db');
     await f.journal.db.backup(snapshot); const cursor = f.journal.acknowledged();
@@ -124,7 +124,7 @@ test('same-point journal restore retains mapping while SQL-only history rollback
 });
 
 test('terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again', async t => {
-  const f = fixture(); const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const f = fixture(); const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const dispatcher = new Dispatcher(f.journal, n.sdk);
   const op = operation(command); const context = { signal: new AbortController().signal, canDispatch: () => true };
   try {
@@ -150,8 +150,8 @@ test('uncertainty and pending local references survive compaction and only uncha
   const f = fixture();
   try {
     const command = send(); const unused = randomUUID();
-    f.journal.bindSession(command.session_id, command.thread_id, f.selection);
-    f.journal.bindSession(unused, 'thr_unused', f.selection);
+    f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
+    f.journal.bindSession({sessionId:unused,threadId:'thr_unused',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
     const record = f.journal.admit({ operation: operation(command), mode: 'dispatch' }).record;
     f.journal.beginIntent(record); record.stage = 'uncertain';
@@ -162,7 +162,7 @@ test('uncertainty and pending local references survive compaction and only uncha
     const candidates = f.journal.mappingCandidates(); assert.deepEqual(candidates.map(value => value.id), [unused]);
     assert.throws(() => f.journal.retireMappings(candidates, [command.session_id]), RecoveryRequired);
     assert(f.journal.session(command.session_id));
-    f.journal.bindSession(unused, 'thr_unused', f.selection);
+    f.journal.bindSession({sessionId:unused,threadId:'thr_unused',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     assert.equal(f.journal.retireMappings(candidates, [unused]), 0, 'new use invalidates a captured candidate');
     f.journal.db.prepare('UPDATE sessions SET last_used_at=? WHERE id=?').run(OLD, unused);
     assert.equal(f.journal.retireMappings(f.journal.mappingCandidates(), [unused]), 1);
@@ -173,7 +173,7 @@ test('uncertainty and pending local references survive compaction and only uncha
 test('64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary', () => {
   const f = fixture();
   try {
-    const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     const op = operation(command); const record = f.journal.admit({ operation: op, mode: 'dispatch' }).record;
     f.journal.beginIntent(record);
     for (let i = 1; i < 21; i++) f.journal.admit({ operation: operation(), mode: 'dispatch' });
@@ -206,7 +206,7 @@ test('64MiB outbox pressure coalesces progress and preserves its reserved unackn
 test('real WSS retirement requires current nonce and unchanged binding after server confirmation', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
   const keep = randomUUID(); const retire = randomUUID();
-  f.journal.bindSession(keep, 'thr_keep', f.selection); f.journal.bindSession(retire, 'thr_retire', f.selection);
+  f.journal.bindSession({sessionId:keep,threadId:'thr_keep',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null}); f.journal.bindSession({sessionId:retire,threadId:'thr_retire',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
   const n = nativeFixture(f.journal, f.selection); const connector = new Connector(new Dispatcher(f.journal, n.sdk));
   const identity: Identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: 1 };
@@ -230,7 +230,7 @@ test('real WSS retirement requires current nonce and unchanged binding after ser
     await waitFor(() => !!query && connector.status === 'recovering');
     assert(f.journal.session(keep)); assert(f.journal.session(retire));
     assert.deepEqual(new Set(query!.sessions), new Set([keep, retire]));
-    f.journal.bindSession(keep, 'thr_keep', f.selection);
+    f.journal.bindSession({sessionId:keep,threadId:'thr_keep',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     write(peer!, { kind: 'mappings_retired', identity, nonce: query!.nonce, sessions: [keep, retire] });
     write(peer!, { kind: 'ready', identity, ready: true });
     await waitFor(() => connector.status === 'connected');
@@ -240,7 +240,7 @@ test('real WSS retirement requires current nonce and unchanged binding after ser
 
 test('real WSS mapping retirement rejects a stale connection before deleting local ownership', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
-  const id = randomUUID(); f.journal.bindSession(id, 'thr_keep', f.selection); f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
+  const id = randomUUID(); f.journal.bindSession({sessionId:id,threadId:'thr_keep',selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null}); f.journal.db.prepare('UPDATE sessions SET last_used_at=?').run(OLD);
   const n = nativeFixture(f.journal, f.selection); const stop = new AbortController(); let closed = false;
   s.wss.on('connection', socket => {
     const identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: 1 };
@@ -260,11 +260,11 @@ test('real WSS mapping retirement rejects a stale connection before deleting loc
 test('full mapping history pauses new creates while existing native work completes and ACKs drain', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
   const command = send(); f.journal.db.transaction(() => {
-    f.journal.bindSession(command.session_id, command.thread_id, f.selection);
-    for (let i = 1; i < 4096; i++) f.journal.bindSession(randomUUID(), `thr_old_${i}`, f.selection);
+    f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
+    for (let i = 1; i < 4096; i++) f.journal.bindSession({sessionId:randomUUID(),threadId:`thr_old_${i}`,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   })();
   const n = nativeFixture(f.journal, f.selection); const connector = new Connector(new Dispatcher(f.journal, n.sdk));
-  const blocked = operation({ kind: 'create', session_id: randomUUID(), selection: f.selection, prompt: 'never dispatch this new session' });
+  const blocked = operation({ kind: 'create', harness: {kind:'unconfigured'}, session_id: randomUUID(), selection: f.selection, prompt: 'never dispatch this new session' });
   const admitted = operation(command); let delivered = false; let terminal = false;
   s.wss.on('connection', socket => {
     const identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: 1 };

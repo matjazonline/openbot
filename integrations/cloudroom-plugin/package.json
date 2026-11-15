@@ -45,18 +45,19 @@
   "dependencies": {
     "fs-ext": "2.1.1",
     "ws": "8.22.1",
+    "yaml": "2.9.0",
     "zod": "4.6.7"
   },
   "devDependencies": {
-    "@types/fs-ext": "2.0.3",
-    "@types/ws": "8.18.1",
-    "@types/node": "22.19.10",
     "@types/better-sqlite3": "7.6.13",
+    "@types/fs-ext": "2.0.3",
+    "@types/node": "22.19.10",
     "@types/react": "19.2.13",
+    "@types/ws": "8.18.1",
     "better-sqlite3": "12.10.0",
+    "esbuild": "0.28.1",
     "hono": "4.13.17",
-    "typescript": "npm:@typescript/typescript6@6.0.2",
-    "esbuild": "0.28.1"
+    "typescript": "npm:@typescript/typescript6@6.0.2"
   },
   "allowScripts": {
     "fs-ext@2.1.1": true,

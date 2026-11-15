@@ -21,7 +21,7 @@ impl TokenPrice {
         if value.is_empty() || value.len() > 14 {
             return Err(invalid());
         }
-        let (whole, fraction) = value.split_once('.').map_or((value, ""), |parts| parts);
+        let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
         if whole.is_empty()
             || !whole.bytes().all(|c| c.is_ascii_digit())
             || fraction.len() > 6

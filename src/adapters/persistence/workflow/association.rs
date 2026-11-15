@@ -7,14 +7,25 @@ pub(in crate::adapters::persistence) async fn authorize_thread(
     actor: WorkflowActor,
     thread: Uuid,
 ) -> AppResult<()> {
+    authorize_thread_with_locks(tx, company, actor, thread, super::row_locks::RowLocks::Wait).await
+}
+
+pub(in crate::adapters::persistence) async fn authorize_thread_with_locks(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    thread: Uuid,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<()> {
     let columns = sqlx::query_as::<_, association::AssociationColumns>(
         "SELECT channel_id, principal_id, id AS thread_id FROM threads WHERE company_id=$1 AND id=$2",
     ).bind(company.as_uuid()).bind(thread).fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
-    authorize_association(
+    authorize_association_with_locks(
         tx,
         company,
         actor,
         association::association_from_columns(columns)?,
+        locks,
     )
     .await
 }
@@ -28,14 +39,33 @@ pub(in crate::adapters::persistence) async fn authorize_association(
     actor: WorkflowActor,
     association: RelatedAssociation,
 ) -> AppResult<()> {
+    authorize_association_with_locks(
+        tx,
+        company,
+        actor,
+        association,
+        super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(in crate::adapters::persistence) async fn authorize_association_with_locks(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    association: RelatedAssociation,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<()> {
     let Some(target) = association.target() else {
         return Ok(());
     };
     match target {
-        AddressTarget::Desk(channel) => authorize_channel(tx, company, actor, channel).await?,
+        AddressTarget::Desk(channel) => {
+            authorize_channel(tx, company, actor, channel, locks).await?
+        }
         AddressTarget::Principal(principal) => {
             sqlx::query_scalar::<_, Uuid>(
-                "SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR SHARE",
+                &locks.sql("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR SHARE"),
             )
             .bind(company.as_uuid())
             .bind(principal.as_uuid())
@@ -58,11 +88,11 @@ pub(in crate::adapters::persistence) async fn authorize_association(
         }
     }
     if let Some(thread) = association.thread_id() {
-        sqlx::query_scalar::<_, Uuid>(
+        sqlx::query_scalar::<_, Uuid>(&locks.sql(
             "SELECT id FROM threads WHERE company_id=$1 AND id=$2 \
              AND channel_id IS NOT DISTINCT FROM $3::uuid \
              AND principal_id IS NOT DISTINCT FROM $4::uuid FOR SHARE",
-        )
+        ))
         .bind(company.as_uuid())
         .bind(thread.as_uuid())
         .bind(target.desk_id())
@@ -79,9 +109,10 @@ async fn authorize_channel(
     company: CompanyId,
     actor: WorkflowActor,
     channel: Uuid,
+    locks: super::row_locks::RowLocks,
 ) -> AppResult<()> {
     let mode: String = sqlx::query_scalar(
-        "SELECT access_mode FROM channels WHERE company_id = $1 AND id = $2 FOR SHARE",
+        &locks.sql("SELECT access_mode FROM channels WHERE company_id = $1 AND id = $2 FOR SHARE"),
     )
     .bind(company.as_uuid())
     .bind(channel)
@@ -97,7 +128,7 @@ async fn authorize_channel(
         "team" | "public" => {}
         "allowlist" if owner => {}
         "allowlist" => {
-            sqlx::query_scalar::<_, Uuid>(
+            sqlx::query_scalar::<_, Uuid>(&locks.sql(
                 "SELECT access_grant.principal_id FROM channel_principal_grants AS access_grant \
                  JOIN principals AS principal ON principal.company_id = access_grant.company_id \
                    AND principal.id = access_grant.principal_id \
@@ -106,7 +137,7 @@ async fn authorize_channel(
                    AND principal.user_id = $3 AND account.email_verified_at IS NOT NULL \
                    AND access_grant.capability = 'view' \
                  FOR SHARE OF access_grant, account",
-            )
+            ))
             .bind(company.as_uuid())
             .bind(channel)
             .bind(actor.user_id())

@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 16s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry' (48475511) panicked at src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:217:10:
+historical operator can authorize the original association: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4093 filtered out; finished in 2.75s
+
+error: test failed, to rerun pass `--lib`

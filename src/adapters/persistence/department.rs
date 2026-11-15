@@ -343,20 +343,17 @@ pub(crate) async fn place_in_department_on(
     role: Option<DepartmentRole>,
 ) -> AppResult<()> {
     write_placement_on(tx, company, department, principal, true, role).await?;
-    match role {
-        Some(role) => {
-            follow_lead_on(
-                tx,
-                templates,
-                company,
-                actor,
-                department,
-                role,
-                Some(principal),
-            )
-            .await?;
-        }
-        None => {}
+    if let Some(role) = role {
+        follow_lead_on(
+            tx,
+            templates,
+            company,
+            actor,
+            department,
+            role,
+            Some(principal),
+        )
+        .await?;
     }
     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }

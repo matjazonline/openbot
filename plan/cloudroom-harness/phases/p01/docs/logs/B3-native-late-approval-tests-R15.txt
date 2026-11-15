@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 03s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway' (48525767) panicked at src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:344:5:
+assertion failed: matches!(state.as_str(), "cancelled" | "failed")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4101 filtered out; finished in 2.05s
+
+error: test failed, to rerun pass `--lib`

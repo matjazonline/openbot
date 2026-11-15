@@ -1,0 +1,33 @@
+{
+  "merge_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "source_overlap": [
+    "assets/app.css",
+    "docs/agent-authoring.md",
+    "docs/rig.md",
+    "integrations/cloudroom-plugin/OPERATIONS.md",
+    "integrations/cloudroom-plugin/README.md",
+    "integrations/cloudroom-plugin/package.json",
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/http/pages/agent_settings.rs",
+    "src/adapters/http/pages/mailbox.rs",
+    "src/adapters/http/pages/tests.rs",
+    "src/adapters/http/routes/agent.rs",
+    "src/adapters/http/routes/agent_api_tests.rs",
+    "src/adapters/http/routes/onboarding.rs",
+    "src/adapters/http/routes/ui_agents.rs",
+    "src/adapters/http/routes/workflows/tool_tests.rs",
+    "src/adapters/persistence/agent.rs",
+    "src/adapters/persistence/onboarding/tests.rs",
+    "src/adapters/persistence/skill_tests.rs",
+    "src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs",
+    "src/adapters/persistence/workflow/definitions.rs",
+    "src/adapters/persistence/workflow/reads.rs",
+    "src/application/agent/authoring_reads.rs",
+    "src/application/use_cases/agent.rs",
+    "src/application/use_cases/agent_tests.rs",
+    "src/application/workflow/agent.rs",
+    "src/application/workflow/sample/tests.rs",
+    "src/domain/entities/mod.rs",
+    "src/infra/workflow.rs"
+  ]
+}

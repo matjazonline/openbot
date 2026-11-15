@@ -1,0 +1,7 @@
+{
+  "status": "NOT COMPARABLE",
+  "reason": "Baseline plugin output/dependencies not prepared; root network guard changes cwd to current worktree, mixing current plugin fixture with original Rust. Six E2E failures and Doop PASS from this partial trial are not source-causality evidence. Prepare original plugin and use original identical guard rooted at baseline, then repeat fresh full comparison.",
+  "terminated": [
+    48824
+  ]
+}

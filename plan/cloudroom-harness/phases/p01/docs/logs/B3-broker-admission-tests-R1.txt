@@ -1,0 +1,98 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0433]: cannot find type `TypeName` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_tests.rs:176:39
+    |
+176 | ...                   name: TypeName::parse("lookup").unwrap(),
+    |                             ^^^^^^^^ use of undeclared type `TypeName`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::TypeName;
+    |
+
+error[E0433]: cannot find type `TypeName` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_tests.rs:182:45
+    |
+182 | ...                   capability: TypeName::parse("mcp.lookup").unwrap(),
+    |                                   ^^^^^^^^ use of undeclared type `TypeName`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::TypeName;
+    |
+
+error[E0433]: cannot find type `TypeName` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_tests.rs:199:24
+    |
+199 |             operation: TypeName::parse("lookup").unwrap(),
+    |                        ^^^^^^^^ use of undeclared type `TypeName`
+    |
+help: consider importing this struct through its public re-export
+    |
+  1 + use crate::workflow::TypeName;
+    |
+
+warning: unused import: `agent`
+ --> src/adapters/persistence/local_agents/management/native_mcp_tests.rs:2:74
+  |
+2 | use crate::adapters::persistence::local_agents::protocol::test_support::{agent, turn};
+  |                                                                          ^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0618]: expected function, found `domain::entities::agent::Agent`
+   --> src/adapters/persistence/local_agents/protocol/test_support.rs:166:1
+    |
+166 | pub(crate) fn agent(sequence: u64, id: OperationId, evidence: LocalEvidence) -> JournalObservation {
+    | -------------------------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/persistence/memory/tests.rs:69:1
+    |
+ 69 | pub(super) async fn agent(persistence: &PostgresPersistence, company: Uuid) -> Uuid {
+    | ----------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/application/workflow/publication/tests.rs:27:1
+    |
+ 27 | fn agent() -> AgentReference {
+    | ---------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/persistence/local_agents/management/native_mcp_tests.rs:24:13
+    |
+ 24 |         let agent = AgentPersistence::create(
+    |             ----- `agent` has type `domain::entities::agent::Agent`
+...
+ 83 |             agent(1, request.request_id, LocalEvidence::Receipt {}),
+    |             ^^^^^--------------------------------------------------
+    |             |
+    |             call expression requires function
+
+error[E0618]: expected function, found `domain::entities::agent::Agent`
+   --> src/adapters/persistence/local_agents/protocol/test_support.rs:166:1
+    |
+166 | pub(crate) fn agent(sequence: u64, id: OperationId, evidence: LocalEvidence) -> JournalObservation {
+    | -------------------------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/persistence/memory/tests.rs:69:1
+    |
+ 69 | pub(super) async fn agent(persistence: &PostgresPersistence, company: Uuid) -> Uuid {
+    | ----------------------------------------------------------------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/application/workflow/publication/tests.rs:27:1
+    |
+ 27 | fn agent() -> AgentReference {
+    | ---------------------------- this function of the same name is available here, but it's shadowed by the local binding
+    |
+   ::: src/adapters/persistence/local_agents/management/native_mcp_tests.rs:24:13
+    |
+ 24 |         let agent = AgentPersistence::create(
+    |             ----- `agent` has type `domain::entities::agent::Agent`
+...
+ 84 |             agent(2, request.request_id, LocalEvidence::SubmissionIntent {}),
+    |             ^^^^^-----------------------------------------------------------
+    |             |
+    |             call expression requires function
+
+Some errors have detailed explanations: E0433, E0618.
+For more information about an error, try `rustc --explain E0433`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 5 previous errors; 1 warning emitted

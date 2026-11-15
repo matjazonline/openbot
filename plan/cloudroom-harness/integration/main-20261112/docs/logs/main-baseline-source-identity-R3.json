@@ -1,0 +1,30 @@
+[
+  {
+    "path": "src/adapters/http/pages/workflow_authoring/sample.rs",
+    "current_sha256": "c6060c0cb96e5067fa042664bf497eae478736589e43de0a38bf0f746ca6bc88",
+    "inputs": {
+      "23eb638d609614cafe958bd6a5d17a4e9bef6463": {
+        "sha256": "c6060c0cb96e5067fa042664bf497eae478736589e43de0a38bf0f746ca6bc88",
+        "identical": true
+      },
+      "103004a8ac2fd643cf14bde7e09022ae79f72053": {
+        "sha256": "c6060c0cb96e5067fa042664bf497eae478736589e43de0a38bf0f746ca6bc88",
+        "identical": true
+      }
+    }
+  },
+  {
+    "path": "src/adapters/mcp/tests.rs",
+    "current_sha256": "b25f9e643c8c3e19cdff3e8bf97fca3e809f7b628823eb125b1ad6b7ff072cb0",
+    "inputs": {
+      "23eb638d609614cafe958bd6a5d17a4e9bef6463": {
+        "sha256": "b25f9e643c8c3e19cdff3e8bf97fca3e809f7b628823eb125b1ad6b7ff072cb0",
+        "identical": true
+      },
+      "103004a8ac2fd643cf14bde7e09022ae79f72053": {
+        "sha256": "b25f9e643c8c3e19cdff3e8bf97fca3e809f7b628823eb125b1ad6b7ff072cb0",
+        "identical": true
+      }
+    }
+  }
+]

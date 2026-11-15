@@ -2,8 +2,8 @@ use super::bounds::{MAX_MODELS_PER_PROVIDER, MAX_PROJECTS, MAX_PROVIDERS};
 use crate::{
     application::transport::bounded::BoundedVec,
     domain::local_agents::{
-        CloudroomProjectId, EventSequence, ExecutionSelection, InstallationId, LocalProvider,
-        LocalReasoningLevel, MachineId, ModelId,
+        CloudroomProjectId, EventSequence, ExecutionSelection, InstallationId, LocalPermissions,
+        LocalProvider, LocalReasoningLevel, MachineId, ModelId,
     },
 };
 use serde::{Deserialize, Serialize};
@@ -19,6 +19,7 @@ pub struct LocalCatalog {
 #[serde(deny_unknown_fields)]
 pub struct ProviderCatalog {
     pub provider: LocalProvider,
+    pub permission_modes: BoundedVec<LocalPermissions, 3>,
     pub models: BoundedVec<ModelCapabilities, MAX_MODELS_PER_PROVIDER>,
 }
 
@@ -34,11 +35,20 @@ impl LocalCatalog {
         if !self.projects.contains(&selection.project_id) {
             return Err("project is not advertised");
         }
-        let model = self
+        let provider = self
             .providers
             .iter()
-            .filter(|provider| provider.provider == selection.provider)
-            .flat_map(|provider| provider.models.iter())
+            .find(|provider| provider.provider == selection.provider)
+            .ok_or("exact provider is not advertised")?;
+        if !provider
+            .permission_modes
+            .contains(&selection.policy.permissions)
+        {
+            return Err("permission mode is not supported by this host/provider");
+        }
+        let model = provider
+            .models
+            .iter()
             .find(|model| model.model == selection.model)
             .ok_or("exact provider/model is not advertised")?;
         if !model.reasoning_levels.contains(&selection.policy.reasoning) {

@@ -247,6 +247,7 @@ async fn onboarding_second_principal_workflow_error_rolls_back_every_effect() {
     let skill = SkillManagementPersistence::create_library(
         f.persistence.as_ref(),
         SkillWrite {
+            files: None,
             slug: "support-skill".into(),
             name: "Support".into(),
             description: "Support rules".into(),

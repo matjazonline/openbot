@@ -239,7 +239,9 @@ impl AuthoringReads for PostgresPersistence {
     ) -> AppResult<Option<VersionSource>> {
         let row: Option<VersionSourceRow> = sqlx::query_as(
             "SELECT id, draft_revision, title, source, content_hash, created_at \
-               FROM workflow_versions WHERE company_id = $1 AND workflow_id = $2 AND id = $3",
+               FROM workflow_versions WHERE company_id = $1 AND workflow_id = $2 AND id = $3 \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
+                  WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)",
         )
         .bind(company.as_uuid())
         .bind(workflow.as_uuid())
@@ -267,6 +269,7 @@ impl AuthoringReads for PostgresPersistence {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
               WHERE binding.company_id = $1 AND version.workflow_id = $2 \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
               ORDER BY binding.id LIMIT $3"
         ))
         .bind(company.as_uuid())
@@ -284,7 +287,8 @@ impl AuthoringReads for PostgresPersistence {
     ) -> AppResult<Option<BindingUse>> {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
-              WHERE binding.company_id = $1 AND binding.id = $2"
+              WHERE binding.company_id = $1 AND binding.id = $2 \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)"
         ))
         .bind(company.as_uuid())
         .bind(binding)
@@ -297,6 +301,7 @@ impl AuthoringReads for PostgresPersistence {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
               WHERE binding.company_id = $1 AND binding.channel_id = $2 \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
               ORDER BY binding.id LIMIT $3"
         ))
         .bind(company.as_uuid())
@@ -313,6 +318,7 @@ impl AuthoringReads for PostgresPersistence {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} \
               WHERE binding.company_id = $1 AND $2 = ANY(version.agent_ids) \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) \
               ORDER BY binding.id LIMIT $3"
         ))
         .bind(company.as_uuid())
@@ -436,7 +442,8 @@ impl AuthoringReads for PostgresPersistence {
                FROM workflow_versions AS version \
                JOIN workflow_definitions AS definition ON definition.company_id = version.company_id \
                 AND definition.id = version.workflow_id \
-              WHERE version.company_id = $1 AND version.id = ANY($2)",
+              WHERE version.company_id = $1 AND version.id = ANY($2) \
+                AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=version.company_id AND broker.version_id=version.id)",
         )
         .bind(company.as_uuid())
         .bind(&ids)

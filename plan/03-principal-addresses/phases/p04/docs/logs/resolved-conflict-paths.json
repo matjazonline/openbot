@@ -1,0 +1,19 @@
+[
+  "migrations/20260817000000_init_schema.sql",
+  "src/adapters/http/pages/agent_settings.rs",
+  "src/adapters/http/pages/tests.rs",
+  "src/adapters/http/routes/agent.rs",
+  "src/adapters/http/routes/onboarding.rs",
+  "src/adapters/persistence/agent.rs",
+  "src/adapters/persistence/agent_publication/commands.rs",
+  "src/adapters/persistence/local_agents/protocol/commands.rs",
+  "src/adapters/persistence/workflow/action_authority.rs",
+  "src/adapters/persistence/workflow/admission_write.rs",
+  "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+  "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+  "src/adapters/persistence/workflow/association.rs",
+  "src/adapters/persistence/workflow/local_agents/mod.rs",
+  "src/adapters/persistence/workflow/mod.rs",
+  "src/application/use_cases/agent_tests.rs",
+  "src/application/workflow/mod.rs"
+]

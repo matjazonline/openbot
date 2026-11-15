@@ -1,0 +1,13 @@
+{
+  "status": "USER-REQUESTED STOP; B2 incomplete/unreviewed",
+  "source_digest": "c7f1caa6465907c7b7f01a19bf9e0571a63704f810a2d18f3eac0a3c8545faea",
+  "base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "snapshot_exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 1,
+  "historical_B1_accepted": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13",
+  "previous_tested_checkpoint": "6c782bc816a757c5790ebc6a639529d1fdae0bd9df63f21a51fe5b43a5ec736f",
+  "recorded_at_utc": "2026-11-10T22:41:08.886754+00:00"
+}

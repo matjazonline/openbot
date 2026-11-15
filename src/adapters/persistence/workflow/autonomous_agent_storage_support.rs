@@ -44,15 +44,16 @@ pub(super) fn definition(
 ) -> ResolvedAgentDefinition {
     let company = f.binding.target.company;
     ResolvedAgentDefinition {
+        native_permissions: Default::default(),
         company_id: company,
         agent_id: AgentId::new(agent),
         key: AgentKey::parse("assistant").unwrap(),
         instructions: "Retain this immutable instruction.".into(),
-        model: ModelSettings {
+        model: Some(ModelSettings {
             provider: TypeName::parse("openai").unwrap(),
             model: "fixture-model".into(),
             max_output_tokens: 1000,
-        },
+        }),
         tools: bindings
             .into_iter()
             .map(|binding| {
@@ -198,6 +199,7 @@ pub(super) async fn add_skill(f: &AdmissionFixture) -> crate::entities::skill::S
         .create_company(
             f.binding.target.company.as_uuid(),
             SkillWrite {
+                files: None,
                 slug: format!("skill-{}", Uuid::new_v4().simple()),
                 name: "Instructions".into(),
                 description: "Test instructions".into(),

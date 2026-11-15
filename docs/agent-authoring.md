@@ -8,7 +8,7 @@ publishing them. A stale save keeps submitted fields for reconciliation with the
 Assign capabilities on the agent:
 
 - Built-ins provide message send/reply and knowledge search. Message authority still comes from
-  the workflow's actual desk and source message. Ordinary edits cannot add Builder provisioning
+  the workflow's actual desk or principal target and source message. Ordinary edits cannot add Builder provisioning
   privileges; a trusted Builder copy may retain or drop its existing provisioning bindings.
 - HTTP choices identify a company connection and approved operation.
 - MCP choices identify a company connection, operation, reviewed version and remote tool name.
@@ -52,6 +52,58 @@ call-origin projections show at most 50 entries per list and explicitly report t
 history shows 20 entries per cursor page. Catalogs show 50 choices per page and retain selected
 identities outside their page.
 
+## Direct address and shared desks
+
+Creating a company agent atomically gives it a principal address at its slug, a published
+autonomous workflow and an active direct binding. A taken slug refuses the entire creation.
+Agent and desk slugs share one namespace. A rename moves the agent's canonical address; it does
+not create a forwarding alias. Creating a working agent requires an enabled model with a keyed
+company connection. Library definitions get their address and binding when copied into a company.
+
+**Allow external messages to this agent's direct address** controls `open_to_public`, initially
+false. It is independent of every shared desk the agent staffs. A private agent may answer a
+public desk, using the desk's thread, reply scope and access rules. When spam scanning is unavailable,
+opening direct access requires the explicit form confirmation. Opening access does not configure
+DNS, inbound provider routing or outbound sender-domain authorization; an already routed company
+domain requires no extra per-agent mailbox or DNS record.
+
+The agent settings show the direct address. **Create additional desk** adds a separately configured
+shared desk; it is optional. The Builder's `create_agent` provisions the same direct endpoint,
+while `create_desk_for_agent` creates a shared desk for an existing agent. Deleting an unused agent
+removes its owned direct binding and workflow. Retained direct threads, runs or other publication
+consumers refuse deletion, preserving history.
+
+## Skill directories
+
+Company owners can import a ZIP from **Skills**. Operators have the same controls in the global
+skill library. Include `SKILL.md` at the archive root or inside one enclosing directory, with its
+supporting `scripts/`, reference files and binary assets. Its YAML frontmatter needs a `name`
+matching the skill slug and a nonempty `description`. Preserve executable file modes when
+creating the ZIP; an executable script stays executable on export.
+
+Use **Replace directory** to replace the saved instruction text and all supporting files together.
+An invalid upload leaves the existing skill intact. Ordinary metadata edits preserve supporting
+files. **Download ZIP** exports the saved directory; the file list shows paths, sizes and
+executable flags. Copying a global skill into a company creates independent files. If its slug
+already exists, the copied frontmatter uses the new slug too. Published agent revisions retain
+the original file bytes and executable flags even after the shared skill changes.
+
+Archives accept at most 64 supporting regular files, 256 KiB per file and 512 KiB total decoded
+assets. The ZIP itself may be at most 1 MiB and contain 130 entries, including directories.
+Instruction text is limited to 16 KiB; plain text
+skills receive generated frontmatter on export. Paths must be portable relative ASCII paths,
+at most 240 bytes, without traversal, case collisions or file/directory collisions. Symlinks,
+special files, encrypted archives and ZIP64 are rejected. Empty directories are not stored.
+Importing a script does not execute it on the Openbot server.
+
+Company JSON skill writes under `/api/companies/{company}/skills` and operator writes under
+`/api/skill-library` accept `files` entries shaped like
+`{"path":"scripts/check.sh","content_base64":"ZWNobyBvawo=","executable":true}`.
+`instructions` remains the canonical `SKILL.md` source: do not duplicate it in `files`. Omit
+`files` on update to preserve supporting files, or submit `[]` to clear them. List responses
+return file counts; load an individual skill to read its file content. These asset JSON routes
+allow bodies up to 2 MiB.
+
 ## Company API
 
 Use the existing authenticated company owner/admin session and browser Origin/Referer protection.
@@ -65,8 +117,8 @@ HTTP/MCP operations), and `history`. Catalog responses contain `items` and `next
 `after` for subsequent options/connections. History uses both `before_created_at` and `before_id`.
 `GET /api/companies/{company}/agents/directory` lists scoped agent identities. Each entry carries
 `departments` (the departments the agent belongs to or holds a role in: `id`, `name`, `slug`,
-`charter`, `roles`) and `desk`, the agent's own desk as `{"id", "address"}`, or `null` once that
-desk is deleted.
+`charter`, `roles`) and `address`, the agent's direct endpoint as `{"principal_id", "address"}`, or
+`null` when no address is available.
 
 Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 
@@ -79,6 +131,8 @@ Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
     "provider": "openai",
     "model": "your-enabled-model",
     "system_prompt": "Answer support questions using the approved tools.",
+    "native_permissions": "full",
+    "open_to_public": false,
     "description": "Customer support",
     "skill_ids": []
   },
@@ -92,14 +146,17 @@ Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 }
 ```
 
+`native_permissions` is required on create and update. Choose `auto`, `accept_edits` or `full`
+for native execution; it does not grant hosted workflow tools.
+
 Read the saved revision from the response's `agent.draft_revision`. Omitting `tool_assignments`
 preserves them; `[]` clears the draft list. Omitting `skill_ids` preserves ordered skill assignments;
 `[]` clears them. For an unchanged tool, submit its existing `binding` and exact `choice` returned
 by authoring. Catalog `choice` values carry exact HTTP/MCP/workflow identifiers; use those values
 rather than fabricating operation names, review versions or workflow parameter digests.
 Create uses `POST /api/companies/{company}/agents` with flat agent metadata. It creates the agent,
-publishes its first revision and gives it its default desk at its slug: a team desk with the
-autonomous reply workflow and an active binding, all in one transaction. The company needs a model
+publishes its first revision and gives its principal the direct address at its slug, an autonomous
+reply workflow and an active direct binding, all in one transaction. No desk is created. The company needs a model
 connection first: an omitted provider and model are pinned to the default connection's first model.
 A taken address, a model the company's connections lack or an unmet publication prerequisite (such
 as a skill whose tool the draft does not bind) refuses the whole create. Optional `department_id`
@@ -110,12 +167,12 @@ The update contract requires the nested payload and expected revision.
 An `agent.run` on a desk a department owns gets that department's context as system text after
 the agent's own instructions and before its skills: the department's name and charter, a sentence
 that the agent answers as the lead when it holds the department's `lead` role, and the desks around
-it -- the department's own desk, its parent's, its child departments' and its agents' own desks,
+it: the department's own desk, its parent's, its child departments' desks and its agents' principal addresses,
 each by address (at most 20 children and 50 agents, with a note when there are more). The context
-follows the desk's ownership, not the agent's membership: a member agent's own default desk belongs
-to no department, so its runs there get none. A public department desk gets the name, charter and
+follows the desk's ownership. A principal-owned direct thread has no owning desk department, so
+it does not acquire department context from the agent's memberships. A public department desk gets the name, charter and
 lead sentence but no desks, since its conversations are with outsiders. The context only lists
-addresses; a message sent to a desk does not start that desk's work. A run that is retried reuses
+addresses; an outbound system note posted with a channel destination does not start that desk's work. A run that is retried reuses
 the context it first prepared with, even after the charter or roster changes.
 
 `POST .../{agent}/preview` previews the saved draft and returns revision/count metadata.

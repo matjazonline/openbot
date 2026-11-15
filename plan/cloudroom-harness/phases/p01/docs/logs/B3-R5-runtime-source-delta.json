@@ -1,0 +1,8 @@
+{
+  "oldArtifact": "cc4310ca8e9f91d875b321a0d0a80b6feaa56163078e813891c26b02458d0add",
+  "verifiedBeforeTargets": 58,
+  "changed": [
+    "gui/plugins/provider-claude-code/src/bridge/__tests__/native-tool-origins.test.ts",
+    "gui/plugins/provider-claude-code/src/bridge/native-tool-origins.ts"
+  ]
+}

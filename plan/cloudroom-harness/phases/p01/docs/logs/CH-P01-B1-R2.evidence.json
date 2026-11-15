@@ -1,0 +1,235 @@
+{
+  "version": 1,
+  "round": "CH-P01-B1-R2",
+  "artifact": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13",
+  "checks": [
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo fmt --all",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-offline-alltargets.txt",
+          "sha256": "f0f66da076b23e364c569114dfd3feb52ca34eb60f61742d3766372968e715f8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC1",
+        "B1-AC2",
+        "B1-AC3",
+        "B1-AC4",
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib skill",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-all-skill-callers.txt",
+          "sha256": "74bb5c21c15e6866252838577762a8a198d535314750eb53b23d7faca5404831"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC5"
+      ],
+      "command": "cargo test --locked --offline --lib dump_skill_bundle_browser_fixtures -- --ignored",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-browser-fixtures.txt",
+          "sha256": "89f6ea0aa94dc89983d4ec5a96a05bb812471670ed9e29fdcc35a1c70ae83a27"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC5"
+      ],
+      "command": "node --test scripts/tests/skill-bundle-browser.mjs",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-browser.txt",
+          "sha256": "a3465cf7e47f4f4d5eb0b52c8e37feeac51cf94c48bfa0f1bce2e4e497fcf1fb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R6-clippy.txt",
+          "sha256": "08f5e0af244ef6d46ef99edb79490720fecb1cfca636c30f6d90c18682fa4b7b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R4-source-modules.txt",
+          "sha256": "5f903da2205278003afc90a7d8ce7ce5f3302523debbc0b71d7a47e19ef7d91d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R4-sqlx-prepare.txt",
+          "sha256": "8710562a43ca4e5e0e9d455e6769948f2bb6f728f22ba50f25a2f9fd8093f05a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx prepare --check -- --all-targets",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R5-sqlx-prepare-check.txt",
+          "sha256": "2004df33dfd64f68d35cf1bde101cca210692f0e1346aa2ed333a8890107764d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-fresh-migration.txt",
+          "sha256": "5241f89274a960e0b0f06cf375d6bbe7aea3433238354734ec5ec5dd24aaa633"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::http::auth::tests",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-auth.txt",
+          "sha256": "6d17b50180af31164855ccd282c55c3a32a5b6d3e6d9e2e7ad5a90cc2b5c47eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo test --locked --offline --lib application::agent::",
+      "fixture": "owned PG18 task database on63451; private target; Node24.21.0. R6 current source. Borrowed R1/R4/R5 evidence only for unchanged auth/agent/schema/query/module-path contracts; later changes are private ZIP checks and their test fixture. Browser stands in for HTTP response delivery only; real route tests cover persistence/auth.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-focused-R1-agent-contracts.txt",
+          "sha256": "e1465d416751d2ac7790af85d65d01586073ef3c028de796077792166e48b35e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current frozen source/generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-R2-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "npm run check:css",
+      "fixture": "current frozen source/generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-R2-css-check.txt",
+          "sha256": "d921d553c6c5b839c888493208434569d4f7cf33ad624bc122e05067173b8b81"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "current frozen source/generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-R2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC6"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "current frozen source/generated CSS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-freeze-R2-integration-docs.txt",
+          "sha256": "28a74ac6ade106fadeecf5185cdc1d9cc2c7fe586ae3258385ece25e853c11ca"
+        }
+      ]
+    }
+  ]
+}

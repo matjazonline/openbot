@@ -1,0 +1,113 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0364]: `authorize_on` is private, and cannot be re-exported
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use live::authorize_on as live_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: consider marking `authorize_on` as `pub` in the imported module
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use live::authorize_on as live_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0603]: function import `live_on` is private
+  --> src/adapters/persistence/workflow/actions.rs:52:32
+   |
+52 |             super::native_mcp::live_on(&mut tx, action.request()).await?;
+   |                                ^^^^^^^ private function import
+   |
+note: the function import `live_on` is defined here...
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use live::authorize_on as live_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `authorize_on` which is defined here
+  --> src/adapters/persistence/workflow/native_mcp/live.rs:16:1
+   |
+16 | / pub(super) async fn authorize_on(
+17 | |     tx: &mut Transaction<'_, Postgres>,
+18 | |     request: &ActionRequest,
+19 | | ) -> AppResult<()> {
+...  |
+26 | | }
+   | |_^
+
+error[E0603]: function import `live_on` is private
+  --> src/adapters/persistence/workflow/mcp_runtime.rs:74:28
+   |
+74 |         super::native_mcp::live_on(&mut tx, &result).await?;
+   |                            ^^^^^^^ private function import
+   |
+note: the function import `live_on` is defined here...
+  --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+   |
+14 | pub(super) use live::authorize_on as live_on;
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `authorize_on` which is defined here
+  --> src/adapters/persistence/workflow/native_mcp/live.rs:16:1
+   |
+16 | / pub(super) async fn authorize_on(
+17 | |     tx: &mut Transaction<'_, Postgres>,
+18 | |     request: &ActionRequest,
+19 | | ) -> AppResult<()> {
+...  |
+26 | | }
+   | |_^
+
+error[E0603]: function import `live_on` is private
+   --> src/adapters/persistence/workflow/mcp.rs:179:28
+    |
+179 |         super::native_mcp::live_on(tx, request).await?;
+    |                            ^^^^^^^ private function import
+    |
+note: the function import `live_on` is defined here...
+   --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+    |
+ 14 | pub(super) use live::authorize_on as live_on;
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `authorize_on` which is defined here
+   --> src/adapters/persistence/workflow/native_mcp/live.rs:16:1
+    |
+ 16 | / pub(super) async fn authorize_on(
+ 17 | |     tx: &mut Transaction<'_, Postgres>,
+ 18 | |     request: &ActionRequest,
+ 19 | | ) -> AppResult<()> {
+...   |
+ 26 | | }
+    | |_^
+
+error[E0603]: function import `live_on` is private
+   --> src/adapters/persistence/workflow/mcp.rs:358:28
+    |
+358 |         super::native_mcp::live_on(&mut tx, request).await?;
+    |                            ^^^^^^^ private function import
+    |
+note: the function import `live_on` is defined here...
+   --> src/adapters/persistence/workflow/native_mcp/mod.rs:14:16
+    |
+ 14 | pub(super) use live::authorize_on as live_on;
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: ...and refers to the function `authorize_on` which is defined here
+   --> src/adapters/persistence/workflow/native_mcp/live.rs:16:1
+    |
+ 16 | / pub(super) async fn authorize_on(
+ 17 | |     tx: &mut Transaction<'_, Postgres>,
+ 18 | |     request: &ActionRequest,
+ 19 | | ) -> AppResult<()> {
+...   |
+ 26 | | }
+    | |_^
+
+warning: unused import: `crate::adapters::persistence::workflow::action_dispatch::SqlActionAuthority`
+ --> src/adapters/persistence/workflow/local_agents/delivery.rs:2:5
+  |
+2 | use crate::adapters::persistence::workflow::action_dispatch::SqlActionAuthority;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0364, E0603.
+For more information about an error, try `rustc --explain E0364`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 5 previous errors; 1 warning emitted

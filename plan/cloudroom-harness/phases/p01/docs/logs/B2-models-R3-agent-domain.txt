@@ -1,0 +1,38 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 24s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 17 tests
+test application::agent::contract_tests::autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority ... ok
+test application::agent::contract_tests::autonomous_agent_contract_alias_and_identity_uniqueness_is_agent_local ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_alias_collision_and_reserved_spoofing_are_refused ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_requires_exact_binding_identity_source_and_order ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_refuse_foreign_tenant_facts_and_missing_requirements ... ok
+test application::agent::contract_tests::autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets ... ok
+test application::agent::contract_tests::autonomous_agent_contract_binding_count_and_parameter_bytes_fail_before_execution ... ok
+test application::agent::contract_tests::autonomous_agent_contract_target_variants_and_remote_aliases_round_trip ... ok
+test application::agent::contract_tests::autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content ... ok
+test application::agent::contract_tests::autonomous_agent_contract_skills_require_local_aliases_without_granting_tools ... ok
+test application::agent::contract_tests::autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_require_explicit_aliases_without_adding_tools ... ok
+test application::agent::resolution_tests::autonomous_agent_skills_preserve_order_and_reject_substituted_assignments ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent ... ok
+test application::agent::resolution_tests::autonomous_agent_native_definition_needs_no_hosted_model_connection ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model ... FAILED
+
+failures:
+
+---- application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model stdout ----
+
+thread 'application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model' (44737820) panicked at src/application/agent/resolution_tests.rs:129:5:
+assertion failed: resolve_agent(missing).is_err()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model
+
+test result: FAILED. 16 passed; 1 failed; 0 ignored; 0 measured; 4046 filtered out; finished in 0.17s
+
+error: test failed, to rerun pass `--lib`

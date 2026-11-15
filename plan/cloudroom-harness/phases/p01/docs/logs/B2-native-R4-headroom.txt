@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.63s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom ... FAILED
+
+failures:
+
+---- application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom stdout ----
+
+thread 'application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom' (47155593) panicked at src/application/local_agents/harness.rs:148:53:
+called `Result::unwrap()` on an `Err` value: BadRequest("A native skill needs bounded description and instruction text.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::local_agents::harness::tests::native_bundle_maximum_projection_retains_twenty_five_percent_headroom
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4068 filtered out; finished in 0.64s
+
+error: test failed, to rerun pass `--lib`

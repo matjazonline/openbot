@@ -1,0 +1,17 @@
+{
+  "phase": "p01",
+  "stage": "whole B3 review and combined B1/B2 integration",
+  "phase_start": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "artifact": "6818b04bee06fd0b6ad6d6ed365ebd40cf7c5978033ded4b2325041c5ee11cba",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "mapping": "B3-verification-mapping-R2.md",
+  "evidence": "CH-P01-B3-R1.evidence.json",
+  "full_gate_status": "RUNNING; acceptance remains pending"
+}

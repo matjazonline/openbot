@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 3 tests
+test application::use_cases::skill::tests::a_page_cursor_is_emitted_only_when_the_probe_found_another_row ... ok
+test application::use_cases::skill::tests::normalize_trims_metadata_and_preserves_instruction_file_bytes ... ok
+test application::use_cases::skill::tests::nonoperators_cannot_read_or_write_the_skill_library_management_surface ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4050 filtered out; finished in 0.77s
+

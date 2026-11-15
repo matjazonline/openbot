@@ -1,8 +1,8 @@
 # Plan coordination: 03-principal-addresses
 
-- Authority: /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-integration-20261115/plan/03-principal-addresses/COORDINATION.md
-- Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed 2026-11-14) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
-- Revision: 21
+- Authority: /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md
+- Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
+- Revision: 25
 
 ## Plan-wide instructions
 
@@ -22,7 +22,7 @@ Run focused checks in implementation phases and the full repository/CI gate once
 | p01 | Claude Code root/A; accepted in phase (03PA-P01-B1-R2 PASS, digest dc9329df…ca23); integration pending p04 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p01/docs/TASK.md; HANDOFF.md |
 | p02 | Codex root/A `/root`; accepted in phase, integration pending p04 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p02/docs/TASK.md; HANDOFF.md |
 | p03 | Codex root/A `/root`; B1 implementation under accepted D1/r2 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p03/docs/TASK.md; HANDOFF.md |
-| p04 | queued | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p04/docs/TASK.md; HANDOFF.md |
+| p04 | Codex root/A /root; transferred unfinished checkpoint | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | plan/03-principal-addresses/phases/p04/docs/TASK.md and HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -226,3 +226,46 @@ The same root now transfers sole coordination authority to the clean integration
 This old-worktree copy is a historical pointer from this revision onward, not a second live writer.
 The new authority adopts this complete revision before dependent work. Requirements/notices remain
 unchanged. p04 owns docs, combined main integration and all repository/CI gates before main push.
+
+## p04 startup/adoption (revision22)
+
+Root adopts revision21's complete authority handoff here. Source prerequisite is accepted p03
+artifact3247c1f3…a9230d, committed producer3fceb7d3; p01/p02/Plan02 accepted ancestry retained.
+p04 acknowledges I001–I004/C001–C007/r1 and revision10 notes against those exact accepted inputs.
+No contract notice changed. Shared main merge, docs and final-gate corrections remain in scope;
+new costly policy/ownership/concurrency decisions, if discovered, require the internal architecture
+gate before dependent edits. Reusing accepted decisions for integration needs no redundant gate.
+
+## p04 combined native/principal authority decision (revision23)
+
+Independent Astra/high B passed 03PA-P04-D1-R1/N1 for D1/r1 SHA25625ad97ff…19d68 on source2cfa7782…d6d76; root matched the seven-exclusion identity and accepted the architecture. No actionable findings. Incoming native MCP NOWAIT/account prefixes, sealed role selectors and principal association preservation are one integrated contract. The explicit outer-entry exact account union before company ownership and post-company validation remain required. Main merge conflicts are resolved in material files; implementation/focused proof/full verification are still pending. I001–I004/C001–C007/r1/revision10 remain unchanged. No main publication or Plan04 start yet.
+
+## p04 safe checkpoint and user-requested stop (revision24, 2026-11-15)
+
+User instruction: "at safe checkpoint write handoff and stop". Root stops implementation here.
+Root accepts D1/r2 architecture after independent03PA-P04-D1-R2/N1 PASS and matching decision SHA
+f0de7324072fe8dbdb761897936bbbe7b362093ba5fbba0b4f34b3ad65f0a388, unchanged HEAD3fceb7d3,
+matching UTF8 source d36ece50…e1583a and canonical-C source0ea4417d…d4604. Locale equivalence is
+retained; no source drift. Broker reviewer identity implementation has NOT started. No p04 runtime,
+whole-plan or main publication acceptance. Coordination23 requirements/I001–I004/C001–C007/r1 and
+revision10 unchanged;24 records only acceptance/status and this explicit stop.
+
+Authoritative resumable state: phases/p04/docs/HANDOFF.md and TASK.md in this integration worktree.
+All17 conflicts are resolved; merge remains uncommitted. Reviewer completed; no owned build/test
+worker remains. Owned PostgreSQL51167 stopped cleanly with data retained; no other cluster touched.
+Original worktree user changes remain preserved. No push this continuation. Plan04/root-unit and
+Plan05/scopes remain queued. Prior main-push/continuation authorization persists for a later resume;
+do not continue while the user's stop remains in effect.
+
+## p04 checkpoint transfer to original checkout (revision25, 2026-11-15)
+
+The user authorized preserving the other worktree's implementation here so it can be removed.
+Checkpoint `a8d220041b0a90e001815cf8e29fab87f6ab149a` contains all integration source,
+tests, documentation and p04 evidence, including the resolved merge of main `d543787f`.
+This checkout is now the sole coordination authority and implementation location; older absolute
+worktree paths in retained evidence are historical. TASK/HANDOFF's transfer entry supersedes
+their older startup and stop-state paths. I001–I004/C001–C007/r1 and revision10 are unchanged.
+
+Only transfer and preservation are completed here. D1/r2 is architecture acceptance only; its
+broker correction, p04 runtime/final checks and independent implementation review remain pending.
+Plan04/Plan05 remain queued. No new implementation acceptance or main publication is claimed.

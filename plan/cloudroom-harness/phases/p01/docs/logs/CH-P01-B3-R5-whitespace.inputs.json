@@ -1,0 +1,12 @@
+{
+  "artifact": "b2fc6f2c11e57a2e88e09d5978903b91e1977ef3219c65fe6376bf5428f856ac",
+  "parentAcceptedArtifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 3,
+  "scope": "final staged-source whitespace: one EOF LF only; source map changes package hash; executable unchanged"
+}

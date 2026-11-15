@@ -73,7 +73,16 @@ impl MachineDb {
 }
 
 async fn lock_machine(db: &mut PgConnection, company: Uuid, id: MachineId) -> AppResult<MachineDb> {
-    sqlx::query_as::<_,MachineDb>(&format!("SELECT {MACHINE_COLUMNS} FROM local_machines AS machine WHERE company_id=$1 AND id=$2 FOR UPDATE"))
+    lock_machine_with_locks(db, company, id, super::workflow::row_locks::RowLocks::Wait).await
+}
+
+async fn lock_machine_with_locks(
+    db: &mut PgConnection,
+    company: Uuid,
+    id: MachineId,
+    locks: super::workflow::row_locks::RowLocks,
+) -> AppResult<MachineDb> {
+    sqlx::query_as::<_,MachineDb>(&locks.sql(&format!("SELECT {MACHINE_COLUMNS} FROM local_machines AS machine WHERE company_id=$1 AND id=$2 FOR UPDATE")))
         .bind(company).bind(id.as_uuid()).fetch_optional(db).await?.ok_or_else(missing)
 }
 
@@ -220,6 +229,7 @@ pub(in crate::adapters::persistence) mod protocol;
 #[cfg(test)]
 pub(crate) use protocol::test_support as protocol_test_support;
 mod management;
+pub(in crate::adapters::persistence) mod native;
 mod retention;
 #[cfg(test)]
 mod retention_tests;

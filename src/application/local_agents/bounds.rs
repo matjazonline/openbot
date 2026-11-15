@@ -3,7 +3,9 @@ use chrono::{DateTime, Utc};
 
 pub use crate::domain::local_agents::{MAX_PROMPT_BYTES, MAX_RESULT_BYTES};
 
-pub const PROTOCOL_VERSION: u16 = 1;
+pub const PROTOCOL_VERSION: u16 = 2;
+/// Chunk framing is independent of the logical bridge contract.
+pub const FRAME_VERSION: u16 = 1;
 pub const PAIRING_ENTROPY_BYTES: usize = 16;
 pub const PAIRING_TTL_SECONDS: i64 = 600;
 pub const MAX_PAIRING_CODES: usize = 5;

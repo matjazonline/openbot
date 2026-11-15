@@ -1,0 +1,10 @@
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model' (49191340) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["notify", "verify_final_canvas", "final_canvas", "read_final", "verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas", "get_canvas", "get_frame", "edit_frame_html", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (49191425) panicked at src/adapters/persistence/workflow/doop_document_agent_tests.rs:96:35:
+called `Result::unwrap()` on an `Err` value: "scenario lifetime exceeded"
+

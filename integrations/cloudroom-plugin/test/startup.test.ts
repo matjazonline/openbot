@@ -9,7 +9,7 @@ import { nativeFixture } from './native-fixture.js';
 for (const stage of ['paired', 'enrolling']) for (const setting of ['selectedProjects', 'openbotOrigin', 'enrollment']) {
   test(`startup ${stage} ${setting} change prevents connector and native admission`, async () => {
     const f = fixture({ initialized: stage === 'paired' });
-    const command = send(); if (stage === 'paired') f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+    const command = send(); if (stage === 'paired') f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
     const n = nativeFixture(f.journal, f.selection); const op = operation(command);
     let values: Record<string, string> = { openbotOrigin: f.binding.origin, machineName: 'Disposable', selectedProjects: f.selection.project_id,
       ...(stage === 'paired' ? { enrollment: JSON.stringify({ state: 'paired', version: 1, binding: f.binding, credential: 'a'.repeat(64) }) }

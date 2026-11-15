@@ -1,0 +1,10 @@
+✔ local profile and session forms escape native output and acknowledge accepted writes (2347.805167ms)
+✔ an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation (1860.140333ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 2
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4458.698208

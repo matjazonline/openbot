@@ -32,9 +32,24 @@ pub(crate) async fn server(
     body: Vec<u8>,
     delay: Duration,
 ) -> (JevHttp, JoinHandle<String>) {
+    let (http, task, _) = observed_server(status, headers, body, delay).await;
+    (http, task)
+}
+
+pub(crate) async fn observed_server(
+    status: u16,
+    headers: &str,
+    body: Vec<u8>,
+    delay: Duration,
+) -> (
+    JevHttp,
+    JoinHandle<String>,
+    tokio::sync::oneshot::Receiver<()>,
+) {
     let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let endpoint = format!("http://{}/v1/systemone", listener.local_addr().unwrap());
     let headers = headers.to_owned();
+    let (received, request_entered) = tokio::sync::oneshot::channel();
     let task = tokio::spawn(async move {
         let (mut stream, _) = listener.accept().await.unwrap();
         let mut request = Vec::new();
@@ -60,6 +75,7 @@ pub(crate) async fn server(
                 }
             }
         }
+        let _ = received.send(());
         tokio::time::sleep(delay).await;
         let length = if headers.contains("Transfer-Encoding") {
             String::new()
@@ -72,7 +88,7 @@ pub(crate) async fn server(
         let _ = stream.write_all(&body).await;
         String::from_utf8(request).unwrap()
     });
-    (JevHttp::loopback(&endpoint), task)
+    (JevHttp::loopback(&endpoint), task, request_entered)
 }
 #[tokio::test]
 async fn jev_http_mixed_types_exact_request_and_auth() {

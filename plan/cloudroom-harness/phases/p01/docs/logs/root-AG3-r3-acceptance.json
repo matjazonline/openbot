@@ -1,0 +1,22 @@
+{
+  "phase": "p01",
+  "batch": "B3",
+  "decision": "CH-P01-M3/r3",
+  "decision_sha256": "9241772862bb0b762f56e3b84ef9488a250460ee0e6d69c20758146e9bf420b6",
+  "status": "architecture accepted",
+  "note": "CH-P01-AG3-N3",
+  "findings": {
+    "CH-P01-AG3-F1": "FIXED in architecture",
+    "CH-P01-AG3-F2": "FIXED in architecture",
+    "CH-P01-AG3-F3": "FIXED in architecture"
+  },
+  "prerequisite_source": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "coordination_revision": 3,
+  "notices": [],
+  "implementation_verified": false,
+  "limitations": [
+    "MCP initial support pinned Claude only",
+    "B3 implementation and concurrency/recovery/native end-to-end not exercised",
+    "Final full gate outstanding"
+  ]
+}

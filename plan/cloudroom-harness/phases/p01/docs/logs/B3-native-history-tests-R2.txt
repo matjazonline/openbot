@@ -1,0 +1,93 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0425]: cannot find type `EvidenceRecordReference` in this scope
+  --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:34:21
+   |
+34 |         reference: &EvidenceRecordReference,
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct through its public re-export
+   |
+ 3 + use crate::workflow::EvidenceRecordReference;
+   |
+
+error[E0433]: cannot find type `EvidenceProviderId` in this scope
+  --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:55:17
+   |
+55 |                 EvidenceProviderId::parse("fixture.native_mcp").unwrap(),
+   |                 ^^^^^^^^^^^^^^^^^^ use of undeclared type `EvidenceProviderId`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 3 + use crate::workflow::EvidenceProviderId;
+   |
+
+error[E0433]: cannot find type `EvidenceVerifierId` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:120:13
+    |
+120 |             EvidenceVerifierId::parse("fixture.native_mcp").unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^ use of undeclared type `EvidenceVerifierId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  3 + use crate::workflow::EvidenceVerifierId;
+    |
+
+error[E0433]: cannot find type `EvidenceVerifierVersion` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:121:13
+    |
+121 |             EvidenceVerifierVersion::parse("v1").unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `EvidenceVerifierVersion`
+    |
+help: a struct with a similar name exists
+    |
+121 -             EvidenceVerifierVersion::parse("v1").unwrap(),
+121 +             EvidenceVerifierRegistration::parse("v1").unwrap(),
+    |
+help: consider importing this struct through its public re-export
+    |
+  3 + use crate::workflow::EvidenceVerifierVersion;
+    |
+
+error[E0433]: cannot find type `EvidenceProviderId` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:122:13
+    |
+122 |             EvidenceProviderId::parse("fixture.native_mcp").unwrap(),
+    |             ^^^^^^^^^^^^^^^^^^ use of undeclared type `EvidenceProviderId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  3 + use crate::workflow::EvidenceProviderId;
+    |
+
+error[E0433]: cannot find type `ActionRemoteMarkerId` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:134:17
+    |
+134 |         marker: ActionRemoteMarkerId::new(marker),
+    |                 ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `ActionRemoteMarkerId`
+    |
+help: consider importing this struct through its public re-export
+    |
+  3 + use crate::workflow::ActionRemoteMarkerId;
+    |
+
+error[E0433]: cannot find type `EvidenceRecordReference` in this scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:140:24
+    |
+140 |             reference: EvidenceRecordReference::parse("fixture-native-request").unwrap(),
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `EvidenceRecordReference`
+    |
+help: consider importing this struct through its public re-export
+    |
+  3 + use crate::workflow::EvidenceRecordReference;
+    |
+
+error[E0599]: no method named `approval_subject` found for reference `&application::workflow::actions::service::ActionRequest` in the current scope
+   --> src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:133:35
+    |
+133 |         subject: frozen.request().approval_subject(),
+    |                                   ^^^^^^^^^^^^^^^^ method not found in `&application::workflow::actions::service::ActionRequest`
+
+Some errors have detailed explanations: E0425, E0433, E0599.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib test) due to 8 previous errors

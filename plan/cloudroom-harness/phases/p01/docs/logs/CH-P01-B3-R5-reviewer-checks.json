@@ -1,0 +1,33 @@
+{
+  "artifact": "b2fc6f2c11e57a2e88e09d5978903b91e1977ef3219c65fe6376bf5428f856ac",
+  "reviewed_files": 190,
+  "changed": [
+    {
+      "path": "integrations/cloudroom-plugin/src/mcp-transport.ts",
+      "old": "325e8a297170634ecfed04605da24773d7d953d2f6041c0531f0ad9c8095abad",
+      "new": "03539a5c16689bbb57d812da1228f69f896513462588b21862a7252aad1d7042",
+      "adding_one_LF_restores_old_hash": true
+    }
+  ],
+  "other_files_identical": 189,
+  "staged_whitespace_exit": 0,
+  "staged_whitespace_output": "",
+  "old_package_sha256": "3198f64c9599487882de2a87549ea644c42d8d162ddfef878c3c3ba1c5a2d787",
+  "new_package_sha256": "e06c8b073850ba74d216225018cda5f30dbc560173cc846f7930bda455f9ddcb",
+  "package_members": 25,
+  "same_member_names": true,
+  "changed_members": [
+    "package/dist/server.js.map"
+  ],
+  "server_js_identical": true,
+  "sourcemap_changed_fields": [
+    "sourcesContent"
+  ],
+  "sourcemap_source_deltas": [
+    {
+      "source": "../src/mcp-transport.ts",
+      "only_one_final_LF_removed": true
+    }
+  ],
+  "snapshot_paths_match_previous_manifest": true
+}

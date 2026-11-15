@@ -1,0 +1,8 @@
+{
+  "source_digest": "a71abff5242d2b22bb709629bef778c14ee799acbca9c0f417163f42bc7f9793",
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "prepared_core_targets": 41,
+  "prepared_core_identity": "b07514e73662642270ebd54a393a499599266679f32ad7d4d433ff4be87bdc86",
+  "all_match": true
+}

@@ -1,0 +1,7 @@
+{
+  "status": "PASS",
+  "artifact": "cc4310ca8e9f91d875b321a0d0a80b6feaa56163078e813891c26b02458d0add",
+  "sdk_sha256": "15d79e915398fc0136a82da641c7a825fad41d41ee56c3502867316b2e73ca4c",
+  "sdk_fresh_replay_equal": true,
+  "fresh_source_replay_equal": true
+}

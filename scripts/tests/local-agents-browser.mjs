@@ -117,3 +117,31 @@ test('local profile and session forms escape native output and acknowledge accep
     await new Promise(resolve => server.close(resolve));
   }
 });
+
+
+test('an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation',async()=>{
+  const metadata=JSON.parse(fixture('profile-agent-permissions.json'));const writes=[];
+  const server=createServer(async(request,response)=>{
+    if(request.method==='POST'){let body='';for await(const chunk of request)body+=chunk;writes.push(new URLSearchParams(body));}
+    const pathname=new URL(request.url,'http://127.0.0.1').pathname;
+    if(pathname.startsWith('/assets/')){
+      const name=pathname.split('/').at(-1);const content=['app.js','theme-init.js'].includes(name)?fixture(name):readFileSync(new URL(pathname.slice(1),root));
+      response.writeHead(200,{'content-type':name.endsWith('.css')?'text/css':'text/javascript'}).end(content);return;
+    }
+    response.writeHead(200,{'content-type':'text/html','content-security-policy':csp}).end(fixture('profiles-agent-permissions.html'));
+  });
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  const browser=await chromium.launch(process.env.CHROME_PATH?{executablePath:process.env.CHROME_PATH}:{});
+  try {
+    const page=await browser.newPage();await page.goto(`http://127.0.0.1:${server.address().port}/ui/local-agents`);
+    const form=page.locator('form').filter({has:page.locator('[data-local-agent-selector]')});
+    const permissions=form.locator('[data-local-agent-permissions]');const agent=form.locator('[data-local-agent-selector]');
+    await expect(permissions).toHaveValue('');assert.equal(await form.evaluate(form=>form.checkValidity()),false);
+    await agent.fill(metadata.agent);await expect(permissions).toBeDisabled();
+    assert.equal(await form.evaluate(form=>form.checkValidity()),true);
+    await agent.fill('');await expect(permissions).toBeEnabled();assert.equal(await form.evaluate(form=>form.checkValidity()),false);
+    await agent.fill(metadata.agent);await form.getByRole('button',{name:'Save profile',exact:true}).click();
+    await expect.poll(()=>writes.length).toBe(1);assert.equal(writes[0].get('agent_id'),metadata.agent);
+    assert.deepEqual(writes[0].getAll('permissions'),[metadata.fallback]);
+  }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
+});

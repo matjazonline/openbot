@@ -42,7 +42,8 @@ pub(super) fn prelock_on(
 #[path = "action_account_hints.rs"]
 mod account_hints;
 pub(super) use account_hints::{
-    actor_hints_on, prelock_accounts_on, prelock_dispatch_on, prelock_message_on, prelock_reply_on,
+    actor_hints_on, prelock_accounts_on, prelock_accounts_with_locks_on, prelock_dispatch_on,
+    prelock_message_on, prelock_reply_on,
 };
 
 pub(super) enum RunPhase {
@@ -57,15 +58,34 @@ pub(super) async fn load_on(
     actor: Option<WorkflowActor>,
     phase: RunPhase,
 ) -> AppResult<ActionRunAuthority> {
+    load_with_locks_on(
+        tx,
+        scope,
+        subject,
+        actor,
+        phase,
+        super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(super) async fn load_with_locks_on(
+    tx: &mut Transaction<'_, Postgres>,
+    scope: ActionScope,
+    subject: &ApprovalSubject,
+    actor: Option<WorkflowActor>,
+    phase: RunPhase,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<ActionRunAuthority> {
     let actor = actor.ok_or_else(missing)?;
     let states: &[&str] = match phase {
         RunPhase::Claimed => &["queued", "running"],
         RunPhase::LocalAgentWait => &["waiting"],
     };
     let run = sqlx::query_as::<_, RunAuthorityRow>(
-        "SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
+        &locks.sql("SELECT actor_id,version_id,workflow_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
              WHERE run.company_id=$1 AND id=$2 AND state=ANY($3) \
-             AND deadline > clock_timestamp() FOR UPDATE OF run",
+             AND deadline > clock_timestamp() FOR UPDATE OF run"),
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
@@ -117,13 +137,16 @@ pub(super) async fn load_on(
     if !active {
         return Err(conflict());
     }
-    let origin = super::agent_origin::authority_on(tx, action.request(), actor, &bundle).await?;
+    let origin =
+        super::agent_origin::authority_with_locks_on(tx, action.request(), actor, &bundle, locks)
+            .await?;
     if let ActionOriginAuthority::Agent(selection) = &origin {
-        super::agent_authority::check_execution_on(
+        super::agent_authority::check_execution_with_locks_on(
             tx,
             scope,
             selection.agent(),
             AgentUseMode::Tools,
+            locks,
         )
         .await?;
     }

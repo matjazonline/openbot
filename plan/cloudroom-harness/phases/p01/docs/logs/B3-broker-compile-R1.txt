@@ -1,0 +1,188 @@
+    Checking sqlx-core v0.8.6
+    Checking tokio-tungstenite v0.26.2
+    Checking axum v0.8.4
+    Checking sqlx-postgres v0.8.6
+    Checking axum-extra v0.10.1
+    Checking sqlx v0.8.6
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0425]: cannot find function `decode` in module `compiler`
+   --> src/application/workflow/native_mcp.rs:58:23
+    |
+ 58 |             compiler::decode(&source).map_err(diagnostic)?,
+    |                       ^^^^^^ not found in `compiler`
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/http/routes/skill_library/archive.rs:234:1
+    |
+234 | pub(super) fn decode(bytes: &[u8]) -> AppResult<SkillWrite> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::skill_library::archive::decode`: not accessible
+    |
+   ::: src/application/integrations/wire/mod.rs:119:1
+    |
+119 | fn decode<T: DeserializeOwned>(bytes: &[u8]) -> IntegrationResult<T> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::integrations::execution::mcp::wire::decode`: not accessible
+    |
+   ::: src/adapters/persistence/harness_checkpoint.rs:7:1
+    |
+  7 | pub(super) fn decode(run_id: uuid::Uuid, value: serde_json::Value) -> AppResult<RunCheckpoint> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::harness_checkpoint::decode`: not accessible
+    |
+   ::: src/adapters/persistence/knowledge/rows.rs:91:1
+    |
+ 91 | fn decode(rows: Vec<LayerRow>) -> AppResult<Vec<KnowledgeDocumentLayer>> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::knowledge::rows::decode`: not accessible
+    |
+   ::: src/adapters/persistence/knowledge/search.rs:81:1
+    |
+ 81 | fn decode(row: ChunkRow) -> AppResult<StoredKnowledgeChunk> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::knowledge::search::decode`: not accessible
+    |
+   ::: src/adapters/persistence/local_agents/mod.rs:24:1
+    |
+ 24 | fn decode<T: DeserializeOwned>(value: Value, kind: &str) -> AppResult<T> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::local_agents::decode`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/wakeups.rs:45:1
+    |
+ 45 | fn decode(child: RunId, row: WakeupRow) -> AppResult<ParentWakeup> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::wakeups::decode`: not accessible
+help: consider importing this function
+    |
+  3 + use crate::adapters::workflow_source::decode;
+    |
+help: if you import `decode`, refer to it directly
+    |
+ 58 -             compiler::decode(&source).map_err(diagnostic)?,
+ 58 +             decode(&source).map_err(diagnostic)?,
+    |
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:57:22
+    |
+ 57 |           let bundle = publication::freeze(
+    |  ______________________^
+ 58 | |             compiler::decode(&source).map_err(diagnostic)?,
+ 59 | |             identity.company,
+ 60 | |             identity.version,
+...   |
+ 77 | |         .map_err(diagnostic)?;
+    | |____________________________^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:77:18
+    |
+ 77 |         .map_err(diagnostic)?;
+    |                  ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+error[E0599]: no method named `map_err` found for enum `std::option::Option<T>` in the current scope
+  --> src/application/workflow/native_mcp.rs:81:51
+   |
+81 |                 revision: BindingRevision::new(1).map_err(diagnostic)?,
+   |                                                   ^^^^^^^
+   |
+help: there is a method `map_or` with a similar name, but with different arguments
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/option.rs:1224:4
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:78:23
+    |
+ 78 |           let binding = ConfiguredBinding::new(
+    |  _______________________^
+ 79 | |             BindingConfiguration {
+ 80 | |                 id: identity.binding,
+ 81 | |                 revision: BindingRevision::new(1).map_err(diagnostic)?,
+...   |
+ 90 | |         .map_err(diagnostic)?;
+    | |____________________________^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:90:18
+    |
+ 90 |         .map_err(diagnostic)?;
+    |                  ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:92:9
+    |
+ 92 | /         binding
+ 93 | |             .bundle()
+ 94 | |             .compiled()
+ 95 | |             .validate_input(&input)
+ 96 | |             .map_err(diagnostic)?;
+    | |________________________________^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+error[E0277]: `application::workflow::compiler::source::Diagnostic` doesn't implement `std::fmt::Display`
+   --> src/application/workflow/native_mcp.rs:96:22
+    |
+ 96 |             .map_err(diagnostic)?;
+    |                      ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::compiler::source::Diagnostic`
+   --> src/application/workflow/compiler/source.rs:39:1
+    |
+ 39 | pub struct Diagnostic {
+    | ^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `native_mcp::diagnostic`
+   --> src/application/workflow/native_mcp.rs:119:27
+    |
+119 | fn diagnostic(error: impl std::fmt::Display) -> AppError {
+    |                           ^^^^^^^^^^^^^^^^^ required by this bound in `diagnostic`
+
+Some errors have detailed explanations: E0277, E0425, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib) due to 8 previous errors

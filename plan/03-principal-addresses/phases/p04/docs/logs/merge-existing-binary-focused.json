@@ -1,0 +1,47 @@
+[
+  {
+    "filter": "workflow_role_",
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/merge-existing-binary-focused-1.txt",
+    "summary": [
+      "test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 4638 filtered out; finished in 28.89s"
+    ],
+    "scope": "unchanged exercised paths in merge-native-focused2 binary; source-prefix consolidation not compiled"
+  },
+  {
+    "filter": "rendered_markup_carries_no_inline_javascript",
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/merge-existing-binary-focused-2.txt",
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4689 filtered out; finished in 0.14s"
+    ],
+    "scope": "unchanged exercised paths in merge-native-focused2 binary; source-prefix consolidation not compiled"
+  },
+  {
+    "filter": "adapters::http::routes::knowledge::multipart_tests::",
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/merge-existing-binary-focused-3.txt",
+    "summary": [
+      "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4690 filtered out; finished in 0.00s"
+    ],
+    "scope": "unchanged exercised paths in merge-native-focused2 binary; source-prefix consolidation not compiled"
+  },
+  {
+    "filter": "adapters::persistence::address_tests::",
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/merge-existing-binary-focused-4.txt",
+    "summary": [
+      "test result: ok. 52 passed; 0 failed; 0 ignored; 0 measured; 4638 filtered out; finished in 26.49s"
+    ],
+    "scope": "unchanged exercised paths in merge-native-focused2 binary; source-prefix consolidation not compiled"
+  },
+  {
+    "filter": "relay_identity_",
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/merge-existing-binary-focused-5.txt",
+    "summary": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4682 filtered out; finished in 25.69s"
+    ],
+    "scope": "unchanged exercised paths in merge-native-focused2 binary; source-prefix consolidation not compiled"
+  }
+]

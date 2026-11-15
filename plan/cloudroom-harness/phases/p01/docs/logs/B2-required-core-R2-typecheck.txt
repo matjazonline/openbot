@@ -1,0 +1,8 @@
+Scope: 3 of 97 workspace projects
+apps/host-daemon typecheck$ tsc --noEmit
+packages/plugin-sdk typecheck$ tsc --noEmit
+apps/host-daemon typecheck: src/injected-skills.ts(463,9): error TS2739: Type 'CollectedSkillTree' is missing the following properties from type 'SkillTreeCollectionState': visited, paths
+apps/host-daemon typecheck: Failed
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cloudroom/host-daemon@0.0.1 typecheck: `tsc --noEmit`
+Exit status 1

@@ -1,0 +1,243 @@
+{
+  "observed": [
+    {
+      "phase": 1,
+      "requested": false,
+      "script_result_received": false,
+      "model": "claude-opus-5-5"
+    }
+  ],
+  "targets": [
+    {
+      "exists": false
+    },
+    {
+      "exists": false
+    }
+  ],
+  "thread": {
+    "id": "thr_pxp3cehxui",
+    "projectId": "proj_f9qnjbrznv",
+    "environmentId": "env_dtupbrrzhn",
+    "providerId": "claude-code",
+    "title": "Native permission fixture",
+    "titleFallback": "OPENBOT_PERMISSION_REQUEST_1: run the protected disposable Bash command reque...",
+    "sectionId": null,
+    "status": "error",
+    "parentThreadId": null,
+    "sourceThreadId": null,
+    "originKind": null,
+    "originPluginId": "required-permission",
+    "visibility": "visible",
+    "archivedAt": null,
+    "pinnedAt": null,
+    "deletedAt": null,
+    "lastReadAt": 1794421179498,
+    "latestAttentionAt": 1794421179818,
+    "createdAt": 1794421179492,
+    "updatedAt": 1794421179818,
+    "runtime": {
+      "displayStatus": "error",
+      "hostReconnectGraceExpiresAt": null
+    },
+    "activeBackgroundAgentCount": 0,
+    "canSpawnChild": true,
+    "queuedMessageCount": 0
+  },
+  "events": [
+    {
+      "id": "evt_qzbmry6daz",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 1,
+      "createdAt": 1794421179497,
+      "type": "client/turn/requested",
+      "data": {
+        "direction": "outbound",
+        "requestId": "creq_wj4nrb9th7",
+        "source": "spawn",
+        "initiator": "user",
+        "senderThreadId": null,
+        "systemMessageKind": "unlabeled",
+        "systemMessageSubject": null,
+        "input": [
+          {
+            "type": "text",
+            "text": "OPENBOT_PERMISSION_REQUEST_1: run the protected disposable Bash command requested by the fixture.",
+            "mentions": []
+          }
+        ],
+        "target": {
+          "kind": "thread-start"
+        },
+        "request": {
+          "method": "thread/start",
+          "params": {}
+        },
+        "execution": {
+          "model": "claude-sonnet-4-6",
+          "serviceTier": "default",
+          "reasoningLevel": "medium",
+          "permissionMode": "accept-edits",
+          "source": "client/turn/requested"
+        }
+      }
+    },
+    {
+      "id": "evt_8qficvpqyv",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 2,
+      "createdAt": 1794421179499,
+      "type": "client/thread/start",
+      "data": {
+        "direction": "outbound",
+        "source": "spawn",
+        "initiator": "user",
+        "request": {
+          "method": "thread/start",
+          "params": {}
+        }
+      }
+    },
+    {
+      "id": "evt_vcqpnfqx3j",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 3,
+      "createdAt": 1794421179502,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_igfdtrwpsi",
+        "status": "active",
+        "environmentId": null,
+        "entries": [
+          {
+            "type": "step",
+            "key": "workspace-started",
+            "text": "Preparing workspace",
+            "status": "started"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_rpjmxqs8k2",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 4,
+      "createdAt": 1794421179506,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_igfdtrwpsi",
+        "status": "active",
+        "environmentId": "env_dtupbrrzhn",
+        "entries": [
+          {
+            "type": "step",
+            "key": "provider-step-1-Preparing Project checkout…",
+            "text": "Preparing Project checkout…",
+            "status": "started"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_kaeib4qx5b",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 5,
+      "createdAt": 1794421179711,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_igfdtrwpsi",
+        "status": "active",
+        "environmentId": "env_dtupbrrzhn",
+        "entries": [
+          {
+            "type": "step",
+            "key": "provider-step-1-Preparing Project checkout…",
+            "text": "Preparing Project checkout…",
+            "status": "completed"
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_uahdjbxdtw",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 6,
+      "createdAt": 1794421179805,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_igfdtrwpsi",
+        "status": "active",
+        "environmentId": "env_dtupbrrzhn",
+        "entries": [
+          {
+            "type": "step",
+            "key": "workspace-path",
+            "text": "Using workspace: /private/tmp/openbot-cloudroom-harness-t1gfnhz1/native-permission-runner/tmp/cloudroom-vt-dY2liK/bb-integration-Dt7pIo/repos/test-project",
+            "startedAt": 1794421179781,
+            "status": "completed"
+          },
+          {
+            "type": "step",
+            "key": "workspace-branch",
+            "text": "Using branch: main (1bc23ef)",
+            "startedAt": 1794421179802,
+            "status": "completed",
+            "metadata": {
+              "branchName": "main",
+              "sha": "1bc23ef40a4d48d485c9209ea60d48119fb55299"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "evt_7s3pi4yap7",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 7,
+      "createdAt": 1794421179809,
+      "type": "system/thread-provisioning",
+      "data": {
+        "provisioningId": "tpv_igfdtrwpsi",
+        "status": "active",
+        "environmentId": "env_dtupbrrzhn",
+        "entries": []
+      }
+    },
+    {
+      "id": "evt_ungtvzjzjm",
+      "scope": {
+        "kind": "thread"
+      },
+      "threadId": "thr_pxp3cehxui",
+      "seq": 8,
+      "createdAt": 1794421179818,
+      "type": "system/error",
+      "data": {
+        "code": "thread_provisioning_failed",
+        "message": "Provisioning thread failed",
+        "detail": "Missing shared built-in skills manifest"
+      }
+    }
+  ]
+}

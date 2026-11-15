@@ -1,0 +1,6 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+src/sdk.ts(44,38): error TS2339: Property 'permissionCeiling' does not exist on type '{ aiServices: { inference: string; inferenceFallback: string; services: { displayName: string; id: string; kinds: ("inference" | "voice")[]; pluginId: string; }[]; transcription: string; }; appearance: { ...; }; ... 15 more ...; voiceTranscriptionEnabled: boolean; }'.
+src/sdk.ts(47,57): error TS2339: Property 'permissionCeiling' does not exist on type '{ aiServices: { inference: string; inferenceFallback: string; services: { displayName: string; id: string; kinds: ("inference" | "voice")[]; pluginId: string; }[]; transcription: string; }; appearance: { ...; }; ... 15 more ...; voiceTranscriptionEnabled: boolean; }'.

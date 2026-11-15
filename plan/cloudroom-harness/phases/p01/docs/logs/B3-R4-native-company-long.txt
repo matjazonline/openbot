@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway has been running for over 60 seconds
+native approval source after held wait: {"actor_live":true,"call_seconds":833.410408,"call_thread":"thr_cjv4r7n66h","call_turn":"daa967475e-t1","cancel":false,"credential_live":true,"dispatch_thread":"thr_cjv4r7n66h","dispatch_turn":"daa967475e-t1","live":true,"machine_owner":true,"machine_seconds":39.487008,"machine_state":"enabled","operation_seconds":1716.28898,"outcome":null,"revision_live":true,"session_live":true,"state":"waiting","stop":false,"turn":"running","waiting":"decision"}
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4104 filtered out; finished in 97.96s
+

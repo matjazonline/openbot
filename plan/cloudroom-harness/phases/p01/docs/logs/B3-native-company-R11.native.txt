@@ -1,0 +1,11 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/tests/integration
+
+ ✓ |@cloudroom/required-native-permissions| real/required-native-company-mcp.test.ts (1 test) 34777ms
+   ✓ runs the loaded Openbot proxy from the actual native Claude CLI through authenticated PostgreSQL broker approval and the normal MCP worker  34776ms
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  23:54:56
+   Duration  38.33s (transform 2.37s, setup 0ms, import 3.45s, tests 34.78s, environment 0ms)
+

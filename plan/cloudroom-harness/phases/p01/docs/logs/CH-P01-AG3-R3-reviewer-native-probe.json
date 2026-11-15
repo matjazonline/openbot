@@ -1,0 +1,68 @@
+{
+  "observed": [
+    {
+      "kind": "api",
+      "hasTool": false,
+      "done": false
+    },
+    {
+      "kind": "user_prompt_submit",
+      "promptId": "56935687-bbc7-4314-a87e-999a9245d310",
+      "matchesSubmittedText": true
+    },
+    {
+      "kind": "api",
+      "hasTool": true,
+      "done": false
+    },
+    {
+      "kind": "pre_tool_use",
+      "toolUseId": "toolu_identity_stable_1",
+      "promptId": "56935687-bbc7-4314-a87e-999a9245d310",
+      "expectedPrompt": "81a8723a-4509-4ac1-8ad8-9a81c0dcf7e5",
+      "toolName": "mcp__identity__lookup"
+    },
+    {
+      "kind": "mcp_request",
+      "params": {
+        "_meta": {
+          "progressToken": 2,
+          "claudecode/toolUseId": "toolu_identity_stable_1"
+        },
+        "name": "lookup",
+        "arguments": {}
+      },
+      "extraKeys": [
+        "signal",
+        "sessionId",
+        "_meta",
+        "sendNotification",
+        "sendRequest",
+        "authInfo",
+        "requestId",
+        "requestInfo",
+        "taskId",
+        "taskStore",
+        "taskRequestedTtl",
+        "closeSSEStream",
+        "closeStandaloneSSEStream"
+      ],
+      "requestId": 2,
+      "meta": {
+        "claudecode/toolUseId": "toolu_identity_stable_1",
+        "progressToken": 2
+      }
+    },
+    {
+      "kind": "api",
+      "hasTool": true,
+      "done": true
+    },
+    {
+      "kind": "result",
+      "subtype": "success",
+      "isError": false
+    }
+  ],
+  "limitations": "Owned isolated native SDK/MCP metadata probe with scripted local Messages, no remote credentials or paid inference."
+}

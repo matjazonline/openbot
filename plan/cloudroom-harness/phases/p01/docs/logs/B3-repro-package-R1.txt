@@ -1,0 +1,7 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs /private/tmp/openbot-cloudroom-harness-t1gfnhz1/artifacts-b3
+
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"efffa83ecbd17c83b816b896703fdf37c8cc335d713e92e2a940ea6906e26d86"}

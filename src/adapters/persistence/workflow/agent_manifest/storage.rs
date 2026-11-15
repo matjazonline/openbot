@@ -65,10 +65,29 @@ pub(in crate::adapters::persistence::workflow) async fn selected_on(
     actor: WorkflowActor,
     agent: AgentId,
 ) -> AppResult<ResolvedAgent> {
+    selected_with_locks_on(
+        db,
+        company,
+        run,
+        actor,
+        agent,
+        super::super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+async fn selected_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    actor: WorkflowActor,
+    agent: AgentId,
+    locks: super::super::row_locks::RowLocks,
+) -> AppResult<ResolvedAgent> {
     let selected: Option<(Uuid, Uuid)> = sqlx::query_as(
-        "SELECT ownership.manifest_id,selection.revision_id FROM run_dependency_manifests AS ownership \
+        &locks.sql("SELECT ownership.manifest_id,selection.revision_id FROM run_dependency_manifests AS ownership \
          JOIN agent_manifest_revisions AS selection ON selection.company_id=ownership.company_id AND selection.manifest_id=ownership.manifest_id \
-         WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND selection.agent_id=$3 FOR SHARE OF ownership,selection"
+         WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND selection.agent_id=$3 FOR SHARE OF ownership,selection")
     ).bind(company.as_uuid()).bind(run.as_uuid()).bind(agent.as_uuid()).fetch_optional(&mut *db).await?;
     let (manifest, revision) = selected.ok_or_else(refused)?;
     let scope = AgentPublicationScope {
@@ -76,13 +95,15 @@ pub(in crate::adapters::persistence::workflow) async fn selected_on(
         actor,
         agent,
     };
-    let revision = crate::adapters::persistence::agent_publication::storage::revision_on(
-        db,
-        scope,
-        AgentRevisionId::new(revision),
-    )
-    .await?
-    .ok_or_else(invalid)?;
+    let revision =
+        crate::adapters::persistence::agent_publication::storage::revision_with_locks_on(
+            db,
+            scope,
+            AgentRevisionId::new(revision),
+            locks,
+        )
+        .await?
+        .ok_or_else(invalid)?;
     ResolvedAgent::from_revision(DependencyManifestId::new(manifest), revision)
 }
 
@@ -121,6 +142,23 @@ pub(in crate::adapters::persistence::workflow) async fn execution_selection_on(
     actor: WorkflowActor,
     bundle: &PublishedBundle,
 ) -> AppResult<ResolvedAgent> {
+    execution_selection_with_locks_on(
+        db,
+        scope,
+        actor,
+        bundle,
+        super::super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(in crate::adapters::persistence::workflow) async fn execution_selection_with_locks_on(
+    db: &mut PgConnection,
+    scope: crate::application::workflow::actions::ActionScope,
+    actor: WorkflowActor,
+    bundle: &PublishedBundle,
+    locks: super::super::row_locks::RowLocks,
+) -> AppResult<ResolvedAgent> {
     let (step, inputs): (String, serde_json::Value) = sqlx::query_as(
         "SELECT step_id,frozen_inputs FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3"
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
@@ -140,8 +178,11 @@ pub(in crate::adapters::persistence::workflow) async fn execution_selection_on(
     } else {
         AgentUseMode::ModelOnly
     };
-    let agent = agent_for_step_on(db, scope.company, scope.run, bundle, &step, &inputs).await?;
-    let selection = selected_on(db, scope.company, scope.run, actor, agent).await?;
+    let agent =
+        agent_for_step_with_locks_on(db, scope.company, scope.run, bundle, &step, &inputs, locks)
+            .await?;
+    let selection =
+        selected_with_locks_on(db, scope.company, scope.run, actor, agent, locks).await?;
     Ok(match mode {
         AgentUseMode::Tools => selection,
         AgentUseMode::ModelOnly => selection.model_only(),
@@ -157,6 +198,27 @@ pub(in crate::adapters::persistence::workflow) async fn agent_for_step_on(
     bundle: &PublishedBundle,
     step: &StepId,
     inputs: &serde_json::Value,
+) -> AppResult<AgentId> {
+    agent_for_step_with_locks_on(
+        db,
+        company,
+        run,
+        bundle,
+        step,
+        inputs,
+        super::super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+async fn agent_for_step_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
+    bundle: &PublishedBundle,
+    step: &StepId,
+    inputs: &serde_json::Value,
+    locks: super::super::row_locks::RowLocks,
 ) -> AppResult<AgentId> {
     let definition = bundle.compiled().graph().definition();
     let kind = definition
@@ -184,7 +246,7 @@ pub(in crate::adapters::persistence::workflow) async fn agent_for_step_on(
             return Err(missing());
         }
         let agent: Uuid = sqlx::query_scalar(
-            "SELECT role_binding.agent_id FROM run_dependency_manifests AS ownership \
+            &locks.sql("SELECT role_binding.agent_id FROM run_dependency_manifests AS ownership \
              JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \
                AND role_binding.run_id=ownership.root_run_id AND role_binding.manifest_id=ownership.manifest_id \
              JOIN agent_manifest_revisions AS selection ON selection.company_id=role_binding.company_id \
@@ -192,7 +254,7 @@ pub(in crate::adapters::persistence::workflow) async fn agent_for_step_on(
                AND selection.revision_id=role_binding.agent_revision_id \
              WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND role_binding.version_id=$3 \
                AND role_binding.step=$4 AND role_binding.role=$5 AND role_binding.resolution_revision=0 \
-               AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection",
+               AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection"),
         ).bind(company.as_uuid()).bind(run.as_uuid()).bind(definition.version_id.as_uuid())
             .bind(step.as_str()).bind(reference.role.as_str()).fetch_optional(db).await?.ok_or_else(missing)?;
         return Ok(AgentId::new(agent));

@@ -286,6 +286,7 @@ async fn agent_direct_address_refuses_a_library_copy_it_cannot_publish() {
             description: "Requires a company tool".into(),
             instructions: "Use support.lookup.".into(),
             required_tools: Some(vec![TypeName::parse("support.lookup").unwrap()]),
+            files: None,
             created_by: None,
         },
     )

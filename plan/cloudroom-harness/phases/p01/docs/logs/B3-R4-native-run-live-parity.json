@@ -1,0 +1,11 @@
+{
+  "beforeSha256": "dd05d0881621ee13315f32ea13b1bbcd70c39106220bb22021719dfe85559833",
+  "afterSha256": "57fa901523c791c6a8124a5edaf05acef356562e427f5b9c86b331a5f32a2a7d",
+  "nativePredicateIdenticalExceptOuterMarkerAlias": true,
+  "ordinaryPrivateVersionRefusalPreserved": true,
+  "missingRowNullPreserved": true,
+  "volatility": "STABLE unchanged",
+  "locks": "none unchanged",
+  "snapshotAuthority": "https://www.postgresql.org/docs/18/xfunc-volatility.html",
+  "causalStatus": "measured cold planning overhead; full regression correction not yet verified"
+}

@@ -1,0 +1,7 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4029 filtered out; finished in 49.21s
+

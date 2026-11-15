@@ -70,8 +70,10 @@ fn with_skill() -> ResolvedAgent {
             company_id: company(),
             skill_id: Uuid::from_u128(81),
             name: name("pricing"),
+            description: "Pricing guidance".into(),
             instructions: "Quote list prices.".into(),
             required_tools: vec![],
+            files: vec![],
         },
     }];
     resolved(definition).unwrap()

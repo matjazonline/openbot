@@ -1,0 +1,11 @@
+{
+  "decision": "CH-P01-M2",
+  "revision": 2,
+  "sha256": "08357154aecaa1b044a42688a0f25230eff0e7ca2f9ca56d7bb7989889be9403",
+  "source_digest": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13",
+  "coordination_revision": 1,
+  "findings_addressed": [
+    "CH-P01-AG2-F1",
+    "CH-P01-AG2-F2"
+  ]
+}

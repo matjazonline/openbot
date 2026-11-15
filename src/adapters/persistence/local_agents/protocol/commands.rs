@@ -1,14 +1,6 @@
 use super::*;
 
-#[derive(sqlx::FromRow)]
-struct SessionBinding {
-    selection: Value,
-    conversation_id: Option<Uuid>,
-    workflow_run_id: Option<Uuid>,
-    thread_id: Option<String>,
-}
-
-async fn authorize_session(
+pub(super) async fn authorize_session(
     db: &mut Transaction<'_, Postgres>,
     company: Uuid,
     machine: MachineId,
@@ -16,26 +8,53 @@ async fn authorize_session(
     operation: &LocalAgentOperation,
     origin: OperationOrigin,
 ) -> AppResult<()> {
+    authorize_session_with_locks(
+        db,
+        company,
+        machine,
+        actor,
+        operation,
+        origin,
+        crate::adapters::persistence::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(super) async fn authorize_session_with_locks(
+    db: &mut Transaction<'_, Postgres>,
+    company: Uuid,
+    machine: MachineId,
+    actor: Uuid,
+    operation: &LocalAgentOperation,
+    origin: OperationOrigin,
+    locks: crate::adapters::persistence::workflow::row_locks::RowLocks,
+) -> AppResult<()> {
     let command = operation.command();
     let Some(session) = command_session(command) else {
         return Ok(());
     };
-    let stored=sqlx::query_as::<_,SessionBinding>("SELECT selection,conversation_id,workflow_run_id,thread_id FROM local_agent_sessions WHERE company_id=$1 AND id=$2 AND machine_id=$3")
-        .bind(company).bind(session.as_uuid()).bind(machine.as_uuid()).fetch_optional(&mut **db).await?.ok_or_else(missing)?;
-    if let Some(run) = stored.workflow_run_id {
-        super::super::super::workflow::local_agents::authorize_run_on(
+    let stored = super::super::shared::session_on(db, CompanyId::new(company), session)
+        .await?
+        .ok_or_else(missing)?;
+    if stored.selection.machine_id != machine {
+        return Err(missing());
+    }
+    if let SessionAssociation::Workflow { run_id: run } = stored.association {
+        super::super::super::workflow::local_agents::authorize_run_with_locks_on(
             db,
             CompanyId::new(company),
             run,
             WorkflowActor::authenticated(actor)?,
+            locks,
         )
         .await?;
         if origin == OperationOrigin::Workflow {
-            super::super::super::workflow::local_agents::authorize_operation_on(
+            super::super::super::workflow::local_agents::authorize_operation_with_locks_on(
                 db,
                 CompanyId::new(company),
                 operation.id(),
                 WorkflowActor::authenticated(actor)?,
+                locks,
             )
             .await?;
         }
@@ -43,27 +62,35 @@ async fn authorize_session(
         if origin == OperationOrigin::Workflow {
             return Err(missing());
         }
-        let conversation = stored
-            .conversation_id
-            .ok_or_else(|| invalid("session association"))?;
-        super::super::super::workflow::association::authorize_thread(
+        let SessionAssociation::Conversation { conversation_id } = stored.association else {
+            return Err(missing());
+        };
+        super::super::super::workflow::association::authorize_thread_with_locks(
             db,
             CompanyId::new(company),
             WorkflowActor::authenticated(actor)?,
-            conversation,
+            conversation_id,
+            locks,
         )
         .await?;
     }
-    let selection: ExecutionSelection = decode(stored.selection, "session selection")?;
+    let selection = &stored.selection;
+    if command.is_effect() {
+        super::super::native::selected_with_locks_on(db, company, actor, &stored.harness, locks)
+            .await?;
+    }
     if let LocalCommand::Create {
         selection: command_selection,
+        harness,
         ..
     } = command
     {
-        if command_selection != &selection {
+        if command_selection != selection || harness != &stored.harness {
             return Err(AppError::Conflict("session creation inputs changed".into()));
         }
-    } else if target_thread(command).map(CloudroomThreadId::as_str) != stored.thread_id.as_deref() {
+    } else if target_thread(command).map(CloudroomThreadId::as_str)
+        != stored.thread_id.as_ref().map(CloudroomThreadId::as_str)
+    {
         return Err(missing());
     }
     Ok(())

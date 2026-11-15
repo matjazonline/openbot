@@ -9,7 +9,7 @@ _help@{company}.{application-domain}
 
 System addresses are email-adapter routes, not business desks, principals, or desk
 identities. Likewise, an ordinary platform email address is adapter syntax that resolves to a
-transport-neutral desk selector and then to a canonical desk and email binding. See the
+transport-neutral address selector and then to a canonical desk or principal and its email binding. See the
 [Transport Architecture Contract](transport_architecture.md).
 
 ## Why the underscore
@@ -23,7 +23,7 @@ slug::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
 slug::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'
 ```
 
-A leading underscore is therefore not a legal desk slug, alias, or company slug. Reserved names
+A leading underscore is therefore not a legal desk slug, alias, principal slug, or company slug. Reserved names
 cannot be shadowed by anything a customer creates, and the guarantee is a CHECK constraint rather
 than an application-level blocklist that can drift out of sync.
 
@@ -32,16 +32,19 @@ already hold that slug.
 
 ## `_help`
 
-Replies with the desks the sender may write to, each with its description — under their
-department's heading, root departments first and desks no department owns last, once any desk
-belongs to a department ([departments](departments.md)) — followed by the
-addressing syntax. It is answered only for a member of that company's team; anyone else is ignored.
+Replies with the desks the sender may write to, grouped by department, followed by a
+**People and agents** section and the addressing syntax. Principal entries include only currently
+writable addresses; another person's private address is not a directory entry for an ordinary
+teammate. `_help` answers only a member of the company's team; anyone else is ignored. Unknown
+address bounces use the same access-filtered directory and disclose no entries to outsiders.
 
-The desk list comes from `ThreadUseCases::writable_channel_directory`, the same helper the
-undeliverable-address bounce uses, so "which desks may this person write to" is decided once. It
-filters on `Channel::enabled` and `Channel::participant_access(sender, membership).authorized` — the
-predicate the delivery path itself applies — so the list can never name an address that would then
-bounce.
+`ThreadUseCases::writable_channel_directory` applies current desk and principal policy before
+listing either kind. Desks and principals share the company-scoped `addresses` namespace, so a
+slug cannot name both. Company agents use their agent slug; people receive a company-local slug
+when they join and can edit it in their profile. A rename updates the canonical endpoint while
+preserving the principal's lifetime binding and history. External and system principals have no
+address. Desk pipelines and context suffixes remain desk syntax; a principal in a pipeline or
+with a context suffix is refused.
 
 ## Rules
 

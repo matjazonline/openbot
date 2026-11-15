@@ -1,0 +1,449 @@
+{
+  "version": 1,
+  "round": "CH-P01-B3-R1",
+  "artifact": "6818b04bee06fd0b6ad6d6ed365ebd40cf7c5978033ded4b2325041c5ee11cba",
+  "checks": [
+    {
+      "criteria": [
+        "M3-AC1"
+      ],
+      "command": "focused Rust and Node native v2 projection checks (recorded exact commands in TASK)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-projection-R2.txt",
+          "sha256": "93f40741a56712ff538965429ed4edacb3247dd049bd171970c26f9e1935d7c2"
+        },
+        {
+          "path": "logs/B3-projection-plugin-tests-R2.txt",
+          "sha256": "16ad4906b9bfc9fdd414d501f60532991c7c6cbbf2cbdbd1f748c5927b1a3457"
+        },
+        {
+          "path": "logs/B3-projection-plugin-typecheck-R1.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1",
+        "M3-AC5"
+      ],
+      "command": "npm test (plugin full regression suite)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-plugin-suite-R1.txt",
+          "sha256": "27e87b602b1be1a8f2c7a09407a9693c8a8831def31d0b1a377d0beeaa143abc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1",
+        "M3-AC6"
+      ],
+      "command": "npm run typecheck; npm run test:guards",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-plugin-typecheck-R1.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/B3-source-guards-R4.txt",
+          "sha256": "b6bf0fd5bb3d24206458b931ffe8710f5cdc1026bb7b9d1750b4c5a4c58e4310"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1"
+      ],
+      "command": "pinned Claude bridge and native-tool-origin unit tests",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-core-claude-required-tests-R2.txt",
+          "sha256": "2f008ae9c5c519c3aa4efc5fdcfa9f8b088c48cd7d9e7d64e05783547ac2cdc7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1",
+        "M3-AC6"
+      ],
+      "command": "actual native CLI permission and explicit origin opt-in tests on final production core",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-native-regressions-R2.txt",
+          "sha256": "46880fa32977c360329743d37afeba292a40330a60eae6a3df7aa0724594c3e8"
+        },
+        {
+          "path": "logs/B3-final-native-permissions-R2.json",
+          "sha256": "43b2ffa809f35ebbc8bb631a327b126facf4a4fe3ab1fc7a4aa0c8ee05b60b07"
+        },
+        {
+          "path": "logs/B3-final-native-origin-R2.json",
+          "sha256": "83b7d06569a38a17c42bc6eb9b4b8928d561db1af58ad7dbd5106bf73c06255d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1",
+        "M3-AC6"
+      ],
+      "command": "required configuration, disk restart and actual native staged instruction/skill/script test",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-core-required-stage-tests-R2.txt",
+          "sha256": "81878c3c65bb523da1b0a633a5aaef178081129944e9a7a489424635b8fa4949"
+        },
+        {
+          "path": "logs/B3-final-native-stage-R2.json",
+          "sha256": "4c539efc1b837df7e8b594f30c77c5e2422d8e02cd8c2806b20d226bbca3bf49"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC1",
+        "M3-AC6"
+      ],
+      "command": "runtime required-skills capability tests; ACP session parameter tests",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-clean-runtime-required-tests-R2.txt",
+          "sha256": "29ef57850102ea3244ba6ccb72e1b025ac2fd3a5744df0e376766922f041fd00"
+        },
+        {
+          "path": "logs/B3-clean-acp-required-tests-R1.txt",
+          "sha256": "015265c1d050c08dbe0de3a387591341398ff69427d8964c3c1be9d6eed4e127"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "cargo test --offline --lib native_mcp_ -- --nocapture",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-native-history-http-tests-R12.txt",
+          "sha256": "d0cf8ae63725ed9f66a4350fc13d97c5afc9ca92c695793bf0a7770bd014aa0d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "cargo test --offline --lib native_mcp_ -- --nocapture (late-approval fixture correction follows)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-native-lifecycle-tests-R14.txt",
+          "sha256": "c77baa27d509fed3c2058dc82df4068dd4e8ddd339df2ff90ad69e6a127ea90d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "cargo test --offline --lib native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway -- --nocapture",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-native-late-approval-tests-R16.txt",
+          "sha256": "3083d81173cbaacc607fd59b3761fd9921d5fa9d08dcfaf71ba8af2da20f6efa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC4",
+        "M3-AC5"
+      ],
+      "command": "actual CLI/plugin/HTTPS/PG/approval/normal worker/gateway/queued B native test R17",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-native-company-R17.txt",
+          "sha256": "bd34e9f9c4a517838d7f2bc2397cec887ec149f043a4012dd2d5688c7242f2df"
+        },
+        {
+          "path": "logs/B3-final-native-company-R17.native.txt",
+          "sha256": "fc54333c69f9b62f686b4335cca404216088164bbadeeea893c9550ce7c4a3bf"
+        },
+        {
+          "path": "logs/B3-final-native-company-R17.proof.json",
+          "sha256": "5812b6576122614decc41f7c0ab439e129d4d11df5bd24ee5045610f9fe6bad1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC5"
+      ],
+      "command": "actual whole native test R13; retained failure, see mapping/chronology",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-native-company-R13.txt",
+          "sha256": "e772041906a239eaaab5a5b4b585dd6613a2a924ee4a96381250ef352e34aabb"
+        },
+        {
+          "path": "logs/B3-final-native-company-R13.native.txt",
+          "sha256": "2a199cb96ec87074ca4c7087290b679b247165362e06baddf05bae1acba24cfc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC5"
+      ],
+      "command": "actual whole native test R14; retained failure, see mapping/chronology",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-native-company-R14.txt",
+          "sha256": "58776f14155711728b5983a9e7272cb210be739e66fce7429b553f52e2bafda5"
+        },
+        {
+          "path": "logs/B3-final-native-company-R14.native.txt",
+          "sha256": "61eeb2c2480c468110fc56ad27647391bbf72851cd219f86069474d7acce0a2c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC3",
+        "M3-AC5"
+      ],
+      "command": "actual whole native test R16; retained failure, see mapping/chronology",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-final-native-company-R16.txt",
+          "sha256": "20531f373af2d16639484d069f6eccfe1fbbb7422ab503eb1a0fcbfcb610a5ea"
+        },
+        {
+          "path": "logs/B3-final-native-company-R16.native.txt",
+          "sha256": "f726fee33c974b483f3e985a28a4e8ff0ea3685b4f0e8adc0ab2c8f02ac52786"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC2",
+        "M3-AC6"
+      ],
+      "command": "fresh browser fixture exporters and actual native company cascade (Cargo named filters)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-browser-fixtures-cascade-R1.txt",
+          "sha256": "92745c95a9ed301705e72baf897951432e53fce21ccf486047a60959b4664005"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "real Chrome local-agent/agent-authoring/skill browser tests; workflow browser protocols",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-authoring-browser-R1.txt",
+          "sha256": "834b74368e423043d363dae215471da110b63c16246e96c721eb95e5d4c1579a"
+        },
+        {
+          "path": "logs/B3-final-workflow-browser-protocols-R1.txt",
+          "sha256": "6faea3a09d5228670b515fc9fc163a66b4d5c2de3b57747211759270fad98cd1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "cargo sqlx database reset -y (owned empty main DB; initial schema reset)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-schema-migrate-R3.txt",
+          "sha256": "6c56b1450c10be86943ea75fb0b7c6fb00747a6b9df4db382659d27f58e21504"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-pre-freeze-clippy-R3.txt",
+          "sha256": "5ad7956b687bb5ef57d58bac58c802f1ba2e32475bc02ebd6cd6a5db0c3538da"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "complete pinned runtime build and clean current source replay",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-prepare-runtime-clean-R2.txt",
+          "sha256": "f418473868874cc6c2bbbe09123402e32c4750637c04249c26dd7556e5ad858d"
+        },
+        {
+          "path": "logs/B3-prepare-runtime-teardown-R4.txt",
+          "sha256": "9cba4b559ae209926c4a847bfeb046b639ab732cf684e128786fb0fc79903866"
+        },
+        {
+          "path": "logs/B3-final-source-replay-R4.json",
+          "sha256": "b6e7b2a375f5f3dd7afe7f3fbab0359d0ba0085e4377545af07fc60ee44f99fe"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "verify final public SDK declaration/current runtime/type manifest and fresh source replay identities",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-replay-identity-R4.json",
+          "sha256": "d71ea55ded59bd1d8e964da3286e91913261352cbc7ba4a93b4c70c41f239346"
+        },
+        {
+          "path": "logs/B3-export-core-R4.json",
+          "sha256": "18c180f11b9a469f624db693470732ad75290424bcdbc17d32e451e0e0e241c1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "npm run package (two identical builds and archives)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-repro-package-R4.txt",
+          "sha256": "6d293d58201448b62749ccdfa5dfa4c92ff773fb74ef2697eb273fbc37290652"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "npm ci --omit=dev --offline; load packaged production entrypoint (same production Node code/dependencies before test-only metadata refresh)",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-package-production-install-R2.txt",
+          "sha256": "dc2b3de353deeb2154fcaa32eeb67003612350b77e3d1a40b3932cd5ac26941a"
+        },
+        {
+          "path": "logs/B3-final-package-production-load-R2.txt",
+          "sha256": "ec266a2bd46db527c3a9e90dc2d5269a2fb10058c43d1d2b52704d458bd2510b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "affected CI boundary/doc fixture and production checks",
+      "fixture": "phase-owned fixtures; PostgreSQL18 port63451, Node24.21.0, isolated local endpoints and dummy native key only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-final-sample-boundary-fixtures-R1.txt",
+          "sha256": "886a3fc4ead9c828e867f7c9a03b5b7e173eb09ae7b8fb8abca6a520e9277c1b"
+        },
+        {
+          "path": "logs/B3-final-sample-boundary-R1.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        },
+        {
+          "path": "logs/B3-final-integration-boundary-fixtures-R1.txt",
+          "sha256": "6c51fb71b929896d8e738098c69c66beddabf7b52d3be28acfbb1de1dcabd13e"
+        },
+        {
+          "path": "logs/B3-final-integration-boundary-R1.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        },
+        {
+          "path": "logs/B3-final-integration-docs-R1.txt",
+          "sha256": "28a74ac6ade106fadeecf5185cdc1d9cc2c7fe586ae3258385ece25e853c11ca"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "bash scripts/check.sh",
+      "fixture": "phase-owned PostgreSQL18/target with isolated test database",
+      "status": "NOT EXERCISED",
+      "reason": "Running now in B3-final-full-gate-R1.txt; no final result yet. Root must retain a final same-artifact manifest before acceptance.",
+      "files": []
+    },
+    {
+      "criteria": [
+        "M3-AC6"
+      ],
+      "command": "bash scripts/lease-budget.sh --offline",
+      "fixture": "phase-owned PostgreSQL18/target with isolated test database",
+      "status": "NOT EXERCISED",
+      "reason": "Must run after the full gate using a separate owned test database; no concurrent Cargo/DB verification.",
+      "files": []
+    }
+  ]
+}

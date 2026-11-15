@@ -94,7 +94,16 @@ pub(in crate::adapters::persistence) async fn connection_on(
     company: CompanyId,
     id: Uuid,
 ) -> AppResult<Option<HttpConnection>> {
-    sqlx::query_as::<_, ConnectionRow>("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection")
+    connection_with_locks_on(tx, company, id, super::row_locks::RowLocks::Wait).await
+}
+
+pub(in crate::adapters::persistence) async fn connection_with_locks_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    id: Uuid,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<Option<HttpConnection>> {
+    sqlx::query_as::<_, ConnectionRow>(&locks.sql("SELECT connection.company_id, connection.id, connection.origin, connection.enabled, connection.bearer,CASE WHEN connection.integration_grant_id IS NOT NULL THEN jsonb_build_object('account',connection.integration_account_id,'grant',connection.integration_grant_id,'authorization',connection.integration_authorization,'grant_revision',connection.integration_grant_revision) END AS integration, connection.revision, connection.access_level::smallint AS access_level, EXISTS(SELECT 1 FROM workflow_http_credentials AS credential WHERE credential.company_id=connection.company_id AND credential.connection_id=connection.id) AS secret_set FROM workflow_http_connections AS connection WHERE connection.company_id=$1 AND connection.id=$2 FOR SHARE OF connection"))
         .bind(company.as_uuid()).bind(id).fetch_optional(&mut *tx).await?.map(ConnectionRow::decode).transpose()
 }
 async fn edit_on(

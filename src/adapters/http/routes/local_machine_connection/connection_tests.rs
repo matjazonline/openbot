@@ -140,7 +140,7 @@ fn connect_request(
     );
     request
         .headers_mut()
-        .insert("x-openbot-protocol-version", "1".parse().unwrap());
+        .insert("x-openbot-protocol-version", "2".parse().unwrap());
     request
 }
 
@@ -155,7 +155,7 @@ impl<S: AsyncRead + AsyncWrite + Unpin> Peer<S> {
     async fn initialize(mut socket: WebSocketStream<S>, c: &Context, sequence: u64) -> Self {
         let hello = ClientMessage::Hello {
             hello: JournalHello {
-                version: 1,
+                version: 2,
                 installation_id: c.paired.receipt.machine.installation_id,
                 journal_id: c.journal,
                 journal_sequence: sequence,
@@ -425,7 +425,7 @@ async fn cloudroom_connection_revocation_during_bounded_hello_accepts_no_observa
         &mut socket,
         &ClientMessage::Hello {
             hello: JournalHello {
-                version: 1,
+                version: 2,
                 installation_id: c.paired.receipt.machine.installation_id,
                 journal_id: c.journal,
                 journal_sequence: 2,

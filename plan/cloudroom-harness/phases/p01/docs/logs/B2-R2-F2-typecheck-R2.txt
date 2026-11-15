@@ -1,0 +1,42 @@
+
+> @cloudroom/server@0.0.1 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> tsc --noEmit
+
+test/security/browser-websocket-origin.test.ts(30,15): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/security/browser-websocket-origin.test.ts(31,15): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/security/browser-websocket-origin.test.ts(43,24): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/security/browser-websocket-origin.test.ts(48,41): error TS7006: Parameter '_request' implicitly has an 'any' type.
+test/security/browser-websocket-origin.test.ts(48,51): error TS7006: Parameter 'response' implicitly has an 'any' type.
+test/security/browser-websocket-origin.test.ts(62,39): error TS2339: Property 'CLOSED' does not exist on type 'typeof import("ws")'.
+test/security/browser-websocket-origin.test.ts(67,12): error TS2339: Property 'once' does not exist on type 'WebSocket'.
+test/security/browser-websocket-origin.test.ts(75,12): error TS2339: Property 'terminate' does not exist on type 'WebSocket'.
+test/services/plugins/plugin-wire.test.ts(757,12): error TS2339: Property 'once' does not exist on type 'WebSocket'.
+test/services/plugins/plugin-wire.test.ts(757,29): error TS7006: Parameter 'data' implicitly has an 'any' type.
+test/services/plugins/plugin-wire.test.ts(757,35): error TS7006: Parameter 'isBinary' implicitly has an 'any' type.
+test/services/plugins/plugin-wire.test.ts(758,12): error TS2339: Property 'once' does not exist on type 'WebSocket'.
+test/services/plugins/plugin-wire.test.ts(767,24): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/services/plugins/plugin-wire.test.ts(780,22): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/services/plugins/plugin-wire.test.ts(794,24): error TS2351: This expression is not constructable.
+  Type 'typeof import("ws")' has no construct signatures.
+test/services/plugins/plugin-wire.test.ts(799,41): error TS7006: Parameter '_request' implicitly has an 'any' type.
+test/services/plugins/plugin-wire.test.ts(799,51): error TS7006: Parameter 'response' implicitly has an 'any' type.
+test/services/plugins/plugin-wire.test.ts(815,30): error TS2339: Property 'buffer' does not exist on type 'string | Buffer<ArrayBufferLike>'.
+  Property 'buffer' does not exist on type 'string'.
+test/services/plugins/plugin-wire.test.ts(815,43): error TS2339: Property 'byteOffset' does not exist on type 'string | Buffer<ArrayBufferLike>'.
+  Property 'byteOffset' does not exist on type 'string'.
+test/services/plugins/plugin-wire.test.ts(815,60): error TS2339: Property 'byteLength' does not exist on type 'string | Buffer<ArrayBufferLike>'.
+  Property 'byteLength' does not exist on type 'string'.
+test/services/plugins/plugin-wire.test.ts(834,42): error TS2339: Property 'terminate' does not exist on type 'WebSocket'.
+test/services/plugins/plugin-wire.test.ts(896,11): error TS2353: Object literal may only specify known properties, and 'origin' does not exist in type 'ClientOptions'.
+test/services/plugins/plugin-wire.test.ts(923,9): error TS2353: Object literal may only specify known properties, and 'origin' does not exist in type 'ClientOptions'.
+test/services/plugins/plugin-wire.test.ts(963,14): error TS2339: Property 'once' does not exist on type 'WebSocket'.
+test/services/plugins/plugin-wire.test.ts(963,29): error TS7006: Parameter 'code' implicitly has an 'any' type.
+test/services/plugins/plugin-wire.test.ts(963,35): error TS7006: Parameter 'reason' implicitly has an 'any' type.
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cloudroom/server@0.0.1 typecheck: `tsc --noEmit`
+Exit status 1

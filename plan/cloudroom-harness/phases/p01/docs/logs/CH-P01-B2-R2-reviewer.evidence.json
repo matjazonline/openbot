@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "round": "CH-P01-B2-N2",
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "checks": [
+    {
+      "criteria": [
+        "F1"
+      ],
+      "command": "cargo test --locked --offline --lib skill_bundle_ -- --nocapture",
+      "fixture": "owned PostgreSQL port63451; 19 passed, 1 explicit fixture generator ignored",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-skill-tests.txt",
+          "sha256": "25ec234ca87570d81c4c5bd7b813254682acc7829f37b7c3f4f32a1c36ea92dd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1"
+      ],
+      "command": "node scripts/build.mjs --test; node --test build-tests/native-bundle.test.js",
+      "fixture": "pinned Node24; 13 native cache tests passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-plugin-build.txt",
+          "sha256": "535a705606afb658b156faba9e468b3a906d04b754d19bfacc23a1d6537985c2"
+        },
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-native-cache.txt",
+          "sha256": "26f89dc81900934eaaae93b83f834609b3e728c3e847c808ada5b51d456fec41"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F3"
+      ],
+      "command": "pnpm --filter @cloudroom/server exec vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts test/internal/required-skill-trees.test.ts -t 'real on-disk|identically spelled'",
+      "fixture": "owned isolated core fixtures; 2 selected tests passed, 13 deliberately filtered",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-core-corrections.txt",
+          "sha256": "338ed833355336f9088cdf26bd1771ef722b8491ebeb238f1f7011bb916caa55"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F2"
+      ],
+      "command": "env -i <allowlisted pinned Node24 and owned HOME/TMPDIR> OPENBOT_NATIVE_PERMISSION_PROBE=1 OPENBOT_NATIVE_PERMISSION_OUTPUT=<reviewer output> node vitest.mjs run --config vitest.required-native.config.ts",
+      "fixture": "real pinned server/daemon/Claude native CLI; local scripted Messages/dummy key only; 1 passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-native-permissions.txt",
+          "sha256": "e4fcdfd14379e9051f9d1a55950b13c353daba9df2358f23f35880c18ee642ac"
+        },
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-native-permissions.json",
+          "sha256": "b698051baf336cf03ad7b5a3798c8e78dc90037e01de929da1ffc50d54b53797"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F4"
+      ],
+      "command": "cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored --nocapture; CHROME_PATH=<installed Chrome> node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "owned generated production markup/shipped JS; 1 generator and 2 browser tests passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-browser-fixture.txt",
+          "sha256": "ce274141db68e56f66ab4c7ad9d574a542ca8b7609db1790256d1159c2eb337b"
+        },
+        {
+          "path": "logs/CH-P01-B2-R2-reviewer-browser.txt",
+          "sha256": "c989588bb194f2477077ada1d67e52b4f40fa2a05ae6f75e7d9af6d438ac2f3c"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "status": "PASS",
+  "approvalHoldMs": 65100,
+  "samples": 1212,
+  "activeSamples": 1200,
+  "allActiveSourceLive": true,
+  "ownerGapsDuringActiveCall": 0,
+  "minMachineSeconds": 37.201482,
+  "limitations": "actual pinned CLI/loaded plugin/PG/worker/gateway, local scripted Messages/MCP, not paid inference"
+}

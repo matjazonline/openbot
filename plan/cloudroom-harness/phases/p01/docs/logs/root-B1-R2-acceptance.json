@@ -1,0 +1,23 @@
+{
+  "status": "B1 accepted in phase; not integrated; full task incomplete",
+  "artifact": "4cd3cf46d84474c01e74508751adc5dd6918a9c8e75c41cf8f0c1f52a37f3b13",
+  "phase_start": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "head": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "branch": "codex/cloudroom-harness-t1gfnhz1",
+  "coordination_revision": 1,
+  "coordination_sha256": "360354ed88bb6b64e0b8f3a74ee7facce51c9a7aef44790fd34904042007448d",
+  "notices": [],
+  "review_note": "CH-P01-B1-N2",
+  "findings": {
+    "CH-P01-B1-F1": "fixed",
+    "CH-P01-B1-F2": "fixed"
+  },
+  "evidence_manifest_sha256": "f813ebd0ef4df141ffff50a2f5c8f6b98e622c26a020eae8ba670a1942d55cbe",
+  "weekly_stop_remaining_percent": 2,
+  "accepted_at_utc": "2026-11-10T21:04:44.591946+00:00",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ]
+}

@@ -1,0 +1,7 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs
+
+built 1 plugin entry
+built 1 plugin entry
+{"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"5849c8c3db0901cd3b0c50747d8ddd95c92b70688ca5b0c2954aa5da5ca1415d"}
