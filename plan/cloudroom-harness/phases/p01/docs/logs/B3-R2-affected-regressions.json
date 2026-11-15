@@ -1,0 +1,44 @@
+[
+  {
+    "filter": "native_mcp_",
+    "exit": 0,
+    "seconds": 18.41,
+    "log": "B3-R2-affected-regressions-1.txt"
+  },
+  {
+    "filter": "autonomous_agent_publication_",
+    "exit": 0,
+    "seconds": 1.66,
+    "log": "B3-R2-affected-regressions-2.txt"
+  },
+  {
+    "filter": "nonoperators_get_not_found_before_library_form_or_avatar_validation",
+    "exit": 0,
+    "seconds": 0.48,
+    "log": "B3-R2-affected-regressions-3.txt"
+  },
+  {
+    "filter": "autonomous_agent_authoring_competing_json_draft_writes_apply_once",
+    "exit": 0,
+    "seconds": 1.11,
+    "log": "B3-R2-affected-regressions-4.txt"
+  },
+  {
+    "filter": "documented_rig_configuration_and_response_contracts_pass_application_parsers",
+    "exit": 0,
+    "seconds": 0.3,
+    "log": "B3-R2-affected-regressions-5.txt"
+  },
+  {
+    "filter": "cloudroom_bounds_admission_preserves_control_capacity",
+    "exit": 0,
+    "seconds": 0.24,
+    "log": "B3-R2-affected-regressions-6.txt"
+  },
+  {
+    "filter": "workflow_action_reconciliation_claim_sql_multiple_applicable_candidates",
+    "exit": 0,
+    "seconds": 3.1,
+    "log": "B3-R2-affected-regressions-7.txt"
+  }
+]

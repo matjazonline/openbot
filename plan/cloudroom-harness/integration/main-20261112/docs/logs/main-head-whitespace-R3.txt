@@ -1,0 +1,106 @@
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1-reviewer-affected-tests.txt:87: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1-reviewer-department-tests.txt:39: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2-reviewer-department-tests.txt:41: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:89: trailing whitespace.
++ id | parent_id 
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:91: trailing whitespace.
++ 30 |          
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:92: trailing whitespace.
++ 31 |          
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:155: trailing whitespace.
++             ?column?             |            department_id             |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:160: trailing whitespace.
++            ?column?            |            department_id             | role |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:166: trailing whitespace.
++     ?column?     | count 
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:173: trailing whitespace.
++             ?column?             |            department_id             |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:178: trailing whitespace.
++            ?column?            |            department_id             | role |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:184: trailing whitespace.
++     ?column?     | count 
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:191: trailing whitespace.
++             ?column?             |            department_id             |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:196: trailing whitespace.
++            ?column?            |            department_id             | role |   kind   
+plan/01-departments/phases/p01/docs/logs/01DEP-P01-G1-R1-sql-probes.txt:202: trailing whitespace.
++     ?column?     | count 
+plan/01-departments/phases/p01/docs/logs/B1-R1-affected-tests.txt:77: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/B1-R1-demotion-callers.txt:55: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/B1-R1-department-tests.txt:39: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/B1-R1-router-mount.txt:11: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/B1-R2-department-tests.txt:41: new blank line at EOF.
+plan/01-departments/phases/p01/docs/logs/B1-R2-source-modules.txt:16: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-reviewer-affected-tests.txt:555: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-reviewer-department-tests.txt:60: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt:24: trailing whitespace.
++ pg_sleep 
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt:26: trailing whitespace.
++ 
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1-sql-deadlock-probe.txt:29: trailing whitespace.
++                  id                  
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2-reviewer-department-tests.txt:61: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1-reviewer-routes-tests.txt:348: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-G1-R1-sql-probes.txt:49: trailing whitespace.
++  ?column?  |      provenance      
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-G1-R1-sql-probes.txt:56: trailing whitespace.
++                ?column?                 | count 
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-G1-R1-sql-probes.txt:64: trailing whitespace.
++                         ?column?                         | count 
+plan/01-departments/phases/p02/docs/logs/01DEP-P02-G1-R1-sql-probes.txt:71: trailing whitespace.
++            ?column?             | count 
+plan/01-departments/phases/p02/docs/logs/B1-R1-allowlist-rerun.txt:9: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B1-R1-department-tests.txt:59: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B1-R1-source-modules.txt:16: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B1-R2-department-tests.txt:62: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B2-author-builtin-agent-library.txt:10: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B2-author-desk-wording.txt:15: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B2-author-routes.txt:348: new blank line at EOF.
+plan/01-departments/phases/p02/docs/logs/B2-author-thread-notices.txt:76: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R1-review-affected.txt:331: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R1-review-agent-default-desk.txt:28: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R2-affected.txt:338: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R2-agent-default-desk.txt:30: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R2-review-affected.txt:338: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-R2-review-agent-default-desk.txt:30: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-affected-2.txt:343: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-affected-3.txt:331: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-3.txt:28: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-4.txt:28: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B1-agent-default-desk-5.txt:38: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R1-review-affected.txt:694: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R1-review-focused.txt:60: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R2-affected.txt:509: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R2-lead-desk-1.txt:22: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R2-review-affected.txt:522: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-R2-review-lead-desk.txt:21: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-affected-1.txt:694: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-desk-3.txt:61: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-e2e-1.txt:9: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-e2e-2.txt:9: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-focused-final.txt:60: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B2-third-run.txt:109: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B3-R1-review-affected.txt:839: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B3-R1-review-focused.txt:45: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B3-affected-2.txt:67: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/B3-focused-final.txt:45: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B2-r1.md:95: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B2-r2.md:136: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B2-r3.md:151: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B2-r4.md:165: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B3-r1.md:83: new blank line at EOF.
+plan/01-departments/phases/p03/docs/logs/gate-B3-r2.md:99: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B1-R1-review-focused.txt:37: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B1-R2-focused.txt:38: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B1-R2-review-focused.txt:70: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B1-focused-final.txt:37: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-R1-review-db.txt:323: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-R1-review-focused.txt:84: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-R2-focused.txt:53: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-R2-review-focused.txt:196: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-focused-final.txt:48: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B2-skill-rerun.txt:20: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B3-R1-review-doc-readers.txt:23: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B3-R2-doc-readers.txt:23: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/B3-doc-readers.txt:20: new blank line at EOF.
+plan/01-departments/phases/p04/docs/logs/merge-main-affected-1.txt:866: new blank line at EOF.

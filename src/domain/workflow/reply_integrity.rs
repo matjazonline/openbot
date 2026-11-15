@@ -26,7 +26,7 @@ impl TryFrom<String> for ReplyIntegrity {
             return Err("Invalid final reply integrity");
         }
         let mut result = [0; 32];
-        for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+        for (index, pair) in value.as_bytes().as_chunks::<2>().0.iter().enumerate() {
             let high = nibble(pair[0]).ok_or("Invalid final reply integrity")?;
             let low = nibble(pair[1]).ok_or("Invalid final reply integrity")?;
             result[index] = (high << 4) | low;

@@ -1,0 +1,6 @@
+CACHE REFUSED RecoveryRequired local journal recovery required
+ accepted_by_storage 
+---------------------
+ t
+(1 row)
+

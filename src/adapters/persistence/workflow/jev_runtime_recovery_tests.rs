@@ -7,7 +7,7 @@ async fn jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement() {
     let c = create(&f).await;
     let target = bound(&f, &c).await;
     let first = claim(&f, target).await;
-    let (http, server) = server(
+    let (http, server, request_entered) = crate::adapters::workflow_jev::tests::observed_server(
         200,
         "",
         serde_json::to_vec(&output()).unwrap(),
@@ -26,14 +26,18 @@ async fn jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement() {
         std::future::pending::<()>(),
     );
     let expire = async {
-        tokio::time::sleep(Duration::from_millis(150)).await;
+        tokio::time::timeout(Duration::from_secs(3), request_entered)
+            .await
+            .expect("actual JEV request must enter before testing lease loss")
+            .unwrap();
         sqlx::query("UPDATE background_tasks SET locked_at=clock_timestamp()-interval '40 seconds',lock_expires_at=clock_timestamp()-interval '1 second' WHERE id=$1").bind(first.fence.scope.job.0).execute(f.persistence.pool()).await.unwrap();
     };
     let (result, ()) = tokio::join!(supervised, expire);
-    assert!(matches!(
-        result,
-        SupervisedResult::Stopped(StopReason::LeaseLost)
-    ));
+    assert!(
+        matches!(result, SupervisedResult::Stopped(StopReason::LeaseLost)),
+        "lost lease result={result:?}; counts={}",
+        counts(&f.persistence, &first).await
+    );
     server.await.unwrap();
     assert_eq!(
         counts(&f.persistence, &first).await,

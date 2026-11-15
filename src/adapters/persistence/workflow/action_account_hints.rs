@@ -114,7 +114,22 @@ pub(in crate::adapters::persistence::workflow) fn prelock_accounts_on(
     scope: ActionScope,
     reviewer: Option<WorkflowActor>,
 ) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + '_ {
-    prelock(db, scope, reviewer, Purpose::Effect)
+    prelock(
+        db,
+        scope,
+        reviewer,
+        Purpose::Effect,
+        super::super::row_locks::RowLocks::Wait,
+    )
+}
+
+pub(in crate::adapters::persistence::workflow) fn prelock_accounts_with_locks_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
+    locks: super::super::row_locks::RowLocks,
+) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + '_ {
+    prelock(db, scope, reviewer, Purpose::Effect, locks)
 }
 
 /// Final-response owners may actually create or consume the frozen reply approval.
@@ -123,7 +138,13 @@ pub(in crate::adapters::persistence::workflow) fn prelock_reply_on(
     scope: ActionScope,
     reviewer: Option<WorkflowActor>,
 ) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + '_ {
-    prelock(db, scope, reviewer, Purpose::Reply)
+    prelock(
+        db,
+        scope,
+        reviewer,
+        Purpose::Reply,
+        super::super::row_locks::RowLocks::Wait,
+    )
 }
 
 pub(in crate::adapters::persistence::workflow) fn prelock_message_on<'a>(
@@ -141,6 +162,7 @@ pub(in crate::adapters::persistence::workflow) fn prelock_message_on<'a>(
             plan,
             notices,
         },
+        super::super::row_locks::RowLocks::Wait,
     )
 }
 
@@ -154,6 +176,7 @@ pub(in crate::adapters::persistence::workflow) fn prelock_dispatch_on<'a>(
         request.scope(),
         None,
         Purpose::Dispatch { request, notices },
+        super::super::row_locks::RowLocks::Wait,
     )
 }
 
@@ -245,13 +268,15 @@ async fn prelock(
     scope: ActionScope,
     reviewer: Option<WorkflowActor>,
     purpose: Purpose<'_>,
+    locks: super::super::row_locks::RowLocks,
 ) -> AppResult<Option<WorkflowActor>> {
     let Some(hints) = actor_hints_on(db, scope, reviewer).await? else {
         return Ok(None);
     };
     let mut source = source_on(db, scope, purpose).await?;
     let mut accounts = hints.users().chain(source.users()).collect();
-    let locked = super::super::reviewer_accounts::lock_users_on(db, &mut accounts).await?;
+    let locked =
+        super::super::reviewer_accounts::lock_users_with_locks_on(db, &mut accounts, locks).await?;
     if locked != accounts {
         // A concurrent publication can turn this into observation while a destination account
         // retires. Observation needs no historical recipient; every live base account must
@@ -266,7 +291,7 @@ async fn prelock(
         }
     }
     let actor = hints.actor()?;
-    match authority::authorize_company(db, scope.company, actor).await {
+    match authority::authorize_company_with_locks(db, scope.company, actor, locks).await {
         Ok(_) => {
             if actor_hints_on(db, scope, reviewer).await?.as_ref() != Some(&hints) {
                 return Err(missing());

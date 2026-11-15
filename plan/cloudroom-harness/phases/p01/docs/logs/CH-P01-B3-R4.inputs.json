@@ -1,0 +1,19 @@
+{
+  "phase": "p01",
+  "stage": "complete F7 correction and combined integration recheck",
+  "phase_start": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "artifact": "201d4cdf142829b5babd80119f52209a40f56438806045906e88ea393a2cfc6e",
+  "prior_artifact": "32445711c489b73d4f95820e1d8e1f732be11c3220f9f47252f22a27f86efe5c",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination_revision": 3,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "mapping": "B3-verification-mapping-R5.md",
+  "mapping_sha256": "c45d059c923af5ce12ae240426f1ebd36fac14a12e5d139cbca3ba23458b5c33",
+  "evidence": "CH-P01-B3-R4.evidence.json",
+  "gate_status": "lease running, full next; root acceptance pending"
+}

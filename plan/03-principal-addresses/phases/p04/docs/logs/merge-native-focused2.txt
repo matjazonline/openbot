@@ -1,0 +1,194 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-integration-20261115)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7m 58s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 34 tests
+test adapters::mcp::http::body_lifetime_tests::integration_gateway_native_mcp_sse_body_owns_completion_after_client_release ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_abandonment_and_shutdown_join_initialization ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_competing_admission_cancel_releases_only_its_claim ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_authenticates_before_body_and_refuses_foreign_or_stale_connections ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... ignored, requires the owned patched Cloudroom checkout, Node24 and local scripted native CLI fixture
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_foreign_conversation_refuses_before_session_publication ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback ... FAILED
+test application::local_agents::mcp::tests::native_mcp_maximum_result_fits_the_complete_response_with_maximum_origin_ids ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation ... FAILED
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload ... FAILED
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_http_api_key_policy_denies_mcp_consent_before_any_remote_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect ... FAILED
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_bearer_google_and_strict_oauth_use_real_native_mcp_without_workflow_branches ... ok
+
+failures:
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay' (17334282) panicked at src/adapters/persistence/local_agents/management/native_mcp_limits_tests.rs:67:63:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once' (17334265) panicked at src/adapters/persistence/local_agents/management/native_mcp_lifecycle_tests.rs:168:49:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor' (17334284) panicked at src/adapters/persistence/local_agents/management/native_mcp_live_tests.rs:78:14:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run' (17334263) panicked at src/adapters/persistence/local_agents/management/native_mcp_http_tests.rs:166:5:
+assertion `left == right` failed
+  left: 400
+ right: 200
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input' (17334266) panicked at src/adapters/persistence/local_agents/management/native_mcp_lifecycle_tests.rs:90:14:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness' (17334261) panicked at src/adapters/persistence/local_agents/management/native_mcp_direct_tests.rs:41:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners' (17334318) panicked at src/adapters/persistence/local_agents/management/native_mcp_live_tests.rs:166:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes' (17334259) panicked at src/adapters/persistence/local_agents/management/native_mcp_direct_tests.rs:137:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway' (17334264) panicked at src/adapters/persistence/local_agents/management/native_mcp_integration_tests.rs:171:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work' (17334278) panicked at src/adapters/persistence/local_agents/management/native_mcp_limits_tests.rs:26:17:
+NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation' (17334597) panicked at src/adapters/persistence/local_agents/management/native_mcp_live_tests.rs:44:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work' (17334626) panicked at src/adapters/persistence/local_agents/management/native_mcp_tests.rs:271:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job' (17334655) panicked at src/adapters/persistence/local_agents/management/native_mcp_tests.rs:206:31:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback' (17334677) panicked at src/adapters/persistence/local_agents/management/native_mcp_tests.rs:312:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway' (17334702) panicked at src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:277:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry' (17334740) panicked at src/adapters/persistence/local_agents/management/native_mcp_reconciliation_tests.rs:74:14:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance' (17334788) panicked at src/adapters/persistence/local_agents/management/native_mcp_private_tests.rs:18:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible' (17334821) panicked at src/adapters/persistence/local_agents/management/native_mcp_private_tests.rs:38:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation' (17334842) panicked at src/adapters/persistence/local_agents/management/native_mcp_private_tests.rs:121:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload stdout ----
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload' (17334874) panicked at src/adapters/persistence/local_agents/management/native_mcp_retention_tests.rs:117:10:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal' (17335081) panicked at src/adapters/persistence/workflow/local_agent_mcp_history_tests.rs:36:62:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks' (17335117) panicked at src/adapters/persistence/workflow/local_agent_mcp_tests.rs:178:49:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+---- adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect' (17335142) panicked at src/adapters/persistence/workflow/local_agent_mcp_tests.rs:196:62:
+called `Result::unwrap()` on an `Err` value: NativeMcpNotAdmitted
+
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect
+
+test result: FAILED. 10 passed; 23 failed; 1 ignored; 0 measured; 4656 filtered out; finished in 35.09s
+
+error: test failed, to rerun pass `--lib`

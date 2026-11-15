@@ -1,0 +1,38 @@
+    Checking tokio-rustls v0.26.4
+    Checking uuid v1.26.1
+    Checking tungstenite v0.26.2
+    Checking sqlx-core v0.8.6
+    Checking hyper-rustls v0.27.9
+    Checking reqwest v0.13.4
+    Checking tokio-tungstenite v0.26.2
+    Checking uuid-simd v0.8.0
+    Checking rig-core v0.42.0
+    Checking sqlx-postgres v0.8.6
+    Checking axum v0.8.4
+    Checking unicode-ident v1.0.18
+    Checking lettre v0.11.23
+    Checking jsonschema v0.33.0
+    Checking proc-macro2 v1.0.101
+    Checking axum-extra v0.10.1
+    Checking rmcp v1.8.0
+    Checking rig-agent v0.42.0
+    Checking sqlx v0.8.6
+    Checking quote v1.0.47
+    Checking syn v2.0.119
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0063]: missing field `files` in initializer of `SkillWrite`
+   --> src/adapters/http/routes/skill_library.rs:427:9
+    |
+427 |         Self {
+    |         ^^^^ missing `files`
+
+error[E0063]: missing field `files` in initializer of `application::use_cases::skill::SkillWrite`
+   --> src/adapters/http/routes/skill_library.rs:427:9
+    |
+427 |         Self {
+    |         ^^^^ missing `files`
+
+For more information about this error, try `rustc --explain E0063`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 1 previous error

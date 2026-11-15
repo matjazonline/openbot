@@ -10,7 +10,7 @@ use axum::{
 use uuid::Uuid;
 
 use crate::{
-    adapters::http::{app_state::AppState, session::SessionAuthority},
+    adapters::http::session::SessionAuthority,
     application::session::VerifiedSession,
     entities::{
         user::{Caller, User, Viewer},
@@ -157,21 +157,25 @@ pub fn caller_for(account: &User, config: &AppConfig) -> Caller {
 
 /// The signed-in account as the use cases that check operator status see it, decided once per
 /// request from the session's own account.
-impl FromRequestParts<AppState> for Caller {
+impl<S> FromRequestParts<S> for Caller
+where
+    S: Send + Sync,
+    Arc<crate::use_cases::user::UserUseCases>: axum::extract::FromRef<S>,
+    Arc<AppConfig>: axum::extract::FromRef<S>,
+{
     type Rejection = AuthError;
 
-    async fn from_request_parts(
-        parts: &mut Parts,
-        state: &AppState,
-    ) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let user = AuthenticatedUser::from_request_parts(parts, state).await?;
-        let account = state
-            .user_use_cases
+        let users: Arc<crate::use_cases::user::UserUseCases> =
+            axum::extract::FromRef::from_ref(state);
+        let config: Arc<AppConfig> = axum::extract::FromRef::from_ref(state);
+        let account = users
             .get_user_by_id(user.id)
             .await
             .map_err(|_| AuthError::ServiceUnavailable)?
             .ok_or_else(|| auth_error_for(parts))?;
-        Ok(caller_for(&account, &state.config))
+        Ok(caller_for(&account, &config))
     }
 }
 

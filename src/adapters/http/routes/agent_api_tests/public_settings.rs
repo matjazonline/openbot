@@ -161,7 +161,7 @@ async fn submit_form(f: &Fixture, id: Uuid, public: bool) {
         .method("PUT")
         .header("content-type", "application/x-www-form-urlencoded")
         .body(Body::from(format!(
-            "name=Form&slug=form&expected_revision={}{fields}",
+            "name=Form&slug=form&native_permissions=full&expected_revision={}{fields}",
             stored.draft_revision.get()
         )))
         .unwrap();
@@ -227,7 +227,7 @@ async fn fixed_revision_write(
         State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
         AuthenticatedUser{id:f.user},Path((f.company,id)),
         Json(serde_json::from_value(json!({"expected_revision":expected,
-            "agent":{"name":"Contended","slug":"contended","open_to_public":public,"confirm_spam_disabled":true}})).unwrap()),
+            "agent":{"native_permissions":"full","name":"Contended","slug":"contended","open_to_public":public,"confirm_spam_disabled":true}})).unwrap()),
     ).await?;
     Ok(response_json(result).await)
 }

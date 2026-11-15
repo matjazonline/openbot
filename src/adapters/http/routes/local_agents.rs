@@ -69,6 +69,7 @@ where
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct ProfileInput {
+    agent_id: Option<crate::entities::agent_capability::AgentId>,
     name: String,
     selection: ExecutionSelection,
 }
@@ -133,6 +134,7 @@ async fn create_profile(
         id: ProfileId::new(Uuid::new_v4()).map_err(|_| missing())?,
         company_id: company,
         name: input.name,
+        agent_id: input.agent_id,
         selection: input.selection,
     };
     cases.save_profile(user.id, &profile).await?;
@@ -153,6 +155,7 @@ async fn update_profile(
         id,
         company_id: company,
         name: input.name,
+        agent_id: input.agent_id,
         selection: input.selection,
     };
     cases.save_profile(user.id, &profile).await?;

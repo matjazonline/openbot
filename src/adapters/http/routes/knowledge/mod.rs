@@ -119,7 +119,7 @@ async fn api_upload(
 ) -> Response {
     match upload::receive(&s, scope(&user, company), request).await {
         Ok(layers) => (StatusCode::CREATED, Json(layers)).into_response(),
-        Err(response) => response,
+        Err(response) => *response,
     }
 }
 async fn api_delete(
@@ -171,7 +171,7 @@ async fn ui_upload(
         Ok(_) => Ok(
             Redirect::to(&format!("/ui/knowledge?company_id={}", query.company_id)).into_response(),
         ),
-        Err(response) => render_failure(&s, &user, query.company_id, response).await,
+        Err(response) => render_failure(&s, &user, query.company_id, *response).await,
     }
 }
 async fn ui_delete(

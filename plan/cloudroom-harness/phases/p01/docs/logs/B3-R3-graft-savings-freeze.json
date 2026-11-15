@@ -1,0 +1,68 @@
+{
+  "prior_total": 20119906,
+  "retained_calls": [
+    {
+      "file": "B3-R2-full-integration-boundary-graft.txt",
+      "tokens": 2940
+    },
+    {
+      "file": "B3-R2-full-credential-readiness-callers.txt",
+      "tokens": 42423
+    },
+    {
+      "file": "B3-R2-full-integration-publication-graft.txt",
+      "tokens": 3100
+    },
+    {
+      "file": "B3-R2-F1-storage-boundary-api.txt",
+      "tokens": 37754
+    },
+    {
+      "file": "B3-R2-F1-mcp-snapshot-callees.txt",
+      "tokens": 24023
+    },
+    {
+      "file": "B3-R2-F1-integration-storage-api.txt",
+      "tokens": 474
+    },
+    {
+      "file": "B3-R2-F1-mcp-snapshot-symbols.txt",
+      "tokens": 21255
+    },
+    {
+      "file": "B3-R2-F1-grant-metadata-callers.txt",
+      "tokens": 17310
+    },
+    {
+      "file": "B3-R2-F1-attach-vault-symbols.txt",
+      "tokens": 6356
+    },
+    {
+      "file": "B3-R2-F1-publication-capture-api.txt",
+      "tokens": 1655
+    },
+    {
+      "file": "B3-R2-F1-resolve-tools-callers.txt",
+      "tokens": 5332
+    },
+    {
+      "file": "B3-R2-F1-check-snapshot-uses.txt",
+      "tokens": 17474
+    },
+    {
+      "file": "B3-R2-F1-prepare-source-symbols.txt",
+      "tokens": 5678
+    }
+  ],
+  "manual_inline": [
+    430,
+    4595,
+    1154,
+    1766,
+    2327,
+    1673,
+    36217
+  ],
+  "increment": 233936,
+  "new_total": 20353842
+}

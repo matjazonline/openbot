@@ -1,0 +1,10 @@
+
+> @cloudroom/server@0.0.1 typecheck /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+> tsc --noEmit
+
+src/services/skills/injected-skills.ts(290,14): error TS2339: Property 'sourceRootPath' does not exist on type '{ name: string; description: string; kind: "required-tree"; sourceType: "managed"; treeHash: string; entryPath: "SKILL.md"; } | { name: string; description: string; kind: "workspace-path"; sourceType: "project"; sourceRootPath: string; skillFilePath: string; } | { ...; }'.
+  Property 'sourceRootPath' does not exist on type '{ name: string; description: string; kind: "required-tree"; sourceType: "managed"; treeHash: string; entryPath: "SKILL.md"; }'.
+src/services/threads/thread-runtime-config.ts(6,63): error TS2724: '"@cloudroom/db"' has no exported member named 'getRequiredAgentConfigurationOwner'. Did you mean 'threadRequiredAgentConfigurations'?
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_RUN_FIRST_FAIL  @cloudroom/server@0.0.1 typecheck: `tsc --noEmit`
+Exit status 1

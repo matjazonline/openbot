@@ -1,0 +1,30 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error[E0433]: cannot find type `Arc` in this scope
+   --> src/adapters/persistence/local_agents/management/native_tests.rs:210:19
+    |
+210 |     let service = Arc::new(LocalMachineConnections::new(p.clone()));
+    |                   ^^^ use of undeclared type `Arc`
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::adapters::persistence::Arc;
+    |
+  1 + use std::sync::Arc;
+    |
+
+error[E0425]: cannot find type `Arc` in this scope
+   --> src/adapters/persistence/local_agents/management/native_tests.rs:211:24
+    |
+211 |     let app = router::<Arc<LocalMachineConnections>>().with_state(service.clone());
+    |                        ^^^ not found in this scope
+    |
+help: consider importing one of these structs
+    |
+  1 + use crate::adapters::persistence::Arc;
+    |
+  1 + use std::sync::Arc;
+    |
+
+Some errors have detailed explanations: E0425, E0433.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

@@ -1,0 +1,26 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.68s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 6 tests
+test adapters::http::routes::skill_library::archive::tests::skill_archive_caps_footer_counts_before_constructing_the_zip_reader ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_one_directory_wrapper_is_supported_without_escaping_its_root ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_round_trip_preserves_source_binary_files_nested_scripts_and_modes ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_rejects_unsafe_paths_case_collisions_links_and_bombs ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_files_and_bytes_are_accepted_then_one_more_is_refused ... ok
+test adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_text_only_skill_has_a_byte_exact_native_round_trip ... FAILED
+
+failures:
+
+---- adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_text_only_skill_has_a_byte_exact_native_round_trip stdout ----
+
+thread 'adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_text_only_skill_has_a_byte_exact_native_round_trip' (43666841) panicked at src/adapters/http/routes/skill_library/archive_tests.rs:217:37:
+called `Result::unwrap()` on an `Err` value: BadRequest("Skill source exceeds 16 KiB.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::skill_library::archive::tests::skill_archive_maximum_text_only_skill_has_a_byte_exact_native_round_trip
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 4046 filtered out; finished in 0.05s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,141 @@
+src/adapters/persistence/onboarding/tests.rs:147:            .create_library(AgentWrite {
+src/adapters/persistence/onboarding/tests.rs:176:            AgentWrite {
+src/adapters/persistence/onboarding/tests.rs:696:        AgentWrite {
+src/application/use_cases/agent.rs:36:pub struct AgentWrite {
+src/application/use_cases/agent.rs:52:impl AgentWrite {
+src/application/use_cases/agent.rs:196:pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
+src/application/use_cases/agent.rs:197:    AgentWrite {
+src/adapters/persistence/agent_capability.rs:144:    sqlx::query("UPDATE agents SET draft_revision=draft_revision+1 WHERE id=$1")
+src/adapters/persistence/channel.rs:962:            AgentWrite {
+src/adapters/persistence/skill_tests.rs:67:fn agent_write(slug: impl Into<String>) -> AgentWrite {
+src/adapters/persistence/skill_tests.rs:68:    AgentWrite {
+src/adapters/persistence/skill_tests.rs:410:    let company_write = AgentWrite {
+src/adapters/persistence/thread/test_support.rs:217:            crate::use_cases::agent::AgentWrite {
+src/adapters/persistence/agent_retire_tests.rs:64:        AgentWrite {
+src/adapters/persistence/agent_retire_tests.rs:221:        AgentWrite {
+src/adapters/persistence/agent_retire_tests.rs:300:        AgentWrite {
+src/adapters/persistence/company.rs:830:            crate::use_cases::agent::AgentWrite {
+src/adapters/persistence/memory/tests.rs:73:        AgentWrite {
+src/application/use_cases/onboarding.rs:219:        let mut write = AgentWrite {
+src/application/use_cases/builtin_agent_library.rs:65:        write: AgentWrite {
+src/application/use_cases/agent_tests.rs:214:fn support_agent() -> AgentWrite {
+src/application/use_cases/agent_tests.rs:215:    AgentWrite {
+src/application/use_cases/agent_tests.rs:248:            AgentWrite {
+src/application/use_cases/agent_tests.rs:264:            AgentWrite {
+src/application/use_cases/agent_tests.rs:311:            AgentWrite {
+src/application/use_cases/agent_tests.rs:326:            AgentWrite {
+src/application/use_cases/agent_tests.rs:350:            AgentWrite {
+src/application/use_cases/agent_tests.rs:374:                write: AgentWrite {
+src/application/use_cases/agent_tests.rs:394:                write: AgentWrite {
+src/application/use_cases/agent_tests.rs:496:            AgentWrite {
+src/application/use_cases/agent_tests.rs:580:            AgentWrite {
+src/application/use_cases/agent_tests.rs:595:                write: AgentWrite {
+src/adapters/persistence/agent.rs:107:        r#"INSERT INTO agents
+src/adapters/persistence/agent.rs:293:        r#"UPDATE agents AS agent
+src/adapters/persistence/agent.rs:619:            write: AgentWrite {
+src/adapters/persistence/agent.rs:679:            AgentWrite {
+src/adapters/persistence/agent.rs:721:            AgentWrite {
+src/adapters/persistence/agent_constraint_tests.rs:62:        AgentWrite {
+src/adapters/persistence/agent_constraint_tests.rs:71:        let error = sqlx::query("UPDATE agents SET provider=$2,model=$3 WHERE id=$1")
+src/adapters/persistence/agent_constraint_tests.rs:81:        sqlx::query("UPDATE agents SET provider=$2,model='native-model' WHERE id=$1")
+src/adapters/persistence/agent_constraint_tests.rs:88:    sqlx::query("UPDATE agents SET provider=NULL,model=NULL WHERE id=$1")
+src/adapters/persistence/agent_publication/tests/authoring.rs:16:        write: AgentWrite {
+src/adapters/persistence/agent_publication/tests/authoring.rs:146:        AgentWrite {
+src/adapters/persistence/agent_publication/tests/mcp.rs:84:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/mcp.rs:231:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/http.rs:61:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/http.rs:89:        AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:45:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:132:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:170:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:183:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:193:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/publication.rs:291:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/support.rs:57:            AgentWrite {
+src/adapters/persistence/agent_publication/tests/support.rs:115:        self.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/support.rs:146:pub(super) fn write() -> AgentWrite {
+src/adapters/persistence/agent_publication/tests/support.rs:147:    AgentWrite {
+src/adapters/persistence/agent_publication/tests/skills.rs:134:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/races.rs:127:    let error = sqlx::query("UPDATE agents SET system_prompt='Concurrent draft',draft_revision=draft_revision+1 WHERE id=$1")
+src/adapters/persistence/agent_publication/tests/races.rs:163:    sqlx::query("UPDATE agents SET system_prompt='Concurrent draft',draft_revision=draft_revision+1 WHERE id=$1")
+src/adapters/persistence/workflow/workflow_tool_support.rs:206:            AgentWrite {
+src/adapters/persistence/agent_publication/tests/authoring_views.rs:11:    f.update(AgentWrite {
+src/adapters/persistence/agent_publication/tests/authoring_views.rs:24:        write: AgentWrite {
+src/adapters/persistence/agent_publication/tests/authoring_views.rs:85:    f.update(AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs:46:        write: AgentWrite {
+src/adapters/persistence/workflow/memory_tool_tests.rs:666:        AgentWrite {
+src/adapters/persistence/workflow/agent_history_private_context_tests.rs:225:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs:20:            write: AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_draft_tests.rs:22:    let mut write = AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_draft_tests.rs:72:    let write = |binding| AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:77:                write: AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:117:            write: AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:26:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:60:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:177:        "UPDATE agents SET system_prompt='Later child behavior' WHERE company_id=$1 AND id=$2",
+src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:374:        "UPDATE agents SET system_prompt='later child instructions' WHERE company_id=$1 AND id=$2",
+src/adapters/persistence/workflow/agent_history_cascade_tests.rs:34:        AgentWrite {
+src/adapters/persistence/workflow/workflow_tool_current_authority_tests.rs:147:        AgentWrite {
+src/adapters/persistence/workflow/knowledge_search_support.rs:269:        AgentWrite {
+src/adapters/persistence/workflow/child_publication_tests.rs:228:        AgentWrite {
+src/adapters/persistence/workflow/agent_runtime_tests.rs:110:        AgentWrite {
+src/adapters/persistence/workflow/agent_runtime_tests.rs:319:    sqlx::query("UPDATE agents SET system_prompt='Edited later' WHERE id=$1")
+src/adapters/persistence/workflow/agent_runtime_tests.rs:412:    let unrelated = AgentWrite {
+src/adapters/persistence/workflow/agent_runtime_tests.rs:572:            "UPDATE agents SET provider=NULL,model=NULL WHERE id=$1",
+src/adapters/persistence/workflow/agent_runtime_tests.rs:576:            "WITH agent AS (UPDATE agents SET provider='openai',model='gpt-4o-mini' WHERE id=$1 RETURNING company_id) UPDATE workflow_http_operations SET revoked_at=clock_timestamp() WHERE company_id IN (SELECT company_id FROM agent)",
+src/adapters/persistence/workflow/agent_runtime_tests.rs:715:        sqlx::query("UPDATE agents SET system_prompt='Edited concurrently' WHERE id=$1")
+src/adapters/persistence/workflow/autonomous_agent_entrypoint_tests.rs:27:    let agent: Uuid = sqlx::query_scalar("UPDATE agents SET system_prompt='New independently published entrypoint behavior' WHERE company_id=$1 AND slug='assistant' RETURNING id")
+src/adapters/persistence/workflow/agent_history_thread_continuation_tests.rs:55:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_support.rs:10:        AgentWrite {
+src/adapters/persistence/workflow/agent_recovery_tests.rs:454:                AgentWrite {
+src/adapters/persistence/workflow/agent_recovery_tests.rs:546:            AgentWrite {
+src/adapters/persistence/workflow/vault_gmail_journey.rs:130:    let agent=AgentPersistence::create(&setup.fixture.persistence,setup.fixture.target.company.as_uuid(),AgentWrite {
+src/adapters/persistence/workflow/mcp_agent_tests.rs:87:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs:33:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs:61:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:37:            write: AgentWrite {
+src/adapters/persistence/workflow/job_core_query_tests.rs:28:    sqlx::query("INSERT INTO agents (id, company_id, name, slug, created_by) VALUES ($1, $2, 'Worker', 'worker', $3)")
+src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs:88:        "UPDATE agents SET system_prompt='Published second behavior' WHERE company_id=$1 AND id=$2",
+src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs:172:        "UPDATE agents SET system_prompt='Racing publication' WHERE company_id=$1 AND id=$2",
+src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs:237:    sqlx::query("UPDATE agents SET slug='renamed-assistant' WHERE company_id=$1 AND id=$2")
+src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs:247:        AgentWrite {
+src/adapters/persistence/workflow/provisioning_runtime_tests.rs:24:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs:21:            AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs:180:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs:68:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs:87:        AgentWrite {
+src/adapters/persistence/workflow/provisioning.rs:615:    Ok(Ok(AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs:52:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs:49:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs:74:            AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs:147:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_provisioning_tests.rs:169:        AgentWrite {
+src/adapters/persistence/workflow/agent_history_thread_tests.rs:50:            AgentWrite {
+src/adapters/persistence/workflow/agent_history_thread_tests.rs:184:    sqlx::query("UPDATE agents SET system_prompt='New revision, same conversation' WHERE company_id=$1 AND id=$2")
+src/adapters/persistence/workflow/agent_history_thread_tests.rs:360:        AgentWrite {
+src/adapters/persistence/workflow/mcp_agent_isolation_tests.rs:222:        AgentWrite {
+src/adapters/persistence/workflow/doop_document_tests.rs:145:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs:164:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs:315:            AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs:350:            AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:375:        AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:545:        AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:599:            AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:647:        AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:712:        AgentWrite {
+src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:815:        AgentWrite {
+src/adapters/persistence/workflow/storage_tests.rs:70:        AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:40:    sqlx::query("UPDATE agents SET system_prompt='later private prompt',name='Current display name' WHERE company_id=$1 AND id=$2")
+src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:69:    sqlx::query("UPDATE agents SET slug='renamed-current-agent' WHERE company_id=$1 AND id=$2")
+src/adapters/persistence/workflow/message_agent_tests.rs:38:        AgentWrite {
+src/adapters/persistence/workflow/agent_history_retention_capacity_tests.rs:123:            AgentWrite {
+src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs:77:    let write = AgentWrite {
+src/adapters/persistence/workflow/model_usage_tests.rs:17:        AgentWrite {
+src/adapters/persistence/workflow/model_usage_tests.rs:37:        AgentWrite {
+src/adapters/persistence/workflow/model_usage_tests.rs:142:        AgentWrite {
+src/adapters/persistence/workflow/model_usage_tests.rs:184:        AgentWrite {
+src/adapters/persistence/workflow/harness_model_fixture.rs:60:        AgentWrite {
+src/adapters/persistence/workflow/agent_history_entrypoint_tests.rs:8:        AgentWrite {
+src/adapters/persistence/workflow/harness_owner_tests.rs:24:        AgentWrite {
+src/adapters/persistence/workflow/harness_owner_tests.rs:263:        AgentWrite {
+src/adapters/persistence/workflow/message_ingress_tests.rs:109:            AgentWrite {

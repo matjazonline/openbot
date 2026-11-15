@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 05s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4103 filtered out; finished in 3.61s
+

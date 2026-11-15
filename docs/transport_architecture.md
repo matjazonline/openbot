@@ -18,12 +18,13 @@ model and an explicit amendment to this record before implementation.
 
 | Term | Meaning |
 |---|---|
-| `Channel` | The company-scoped business object that owns agents, policy, memory configuration, threads, and access rules. |
+| `Channel` | The company-scoped desk that owns policy, memory configuration, desk threads and access rules, with workflow bindings selecting agents. |
 | `TransportKind` | The supported interface family, initially `email` or `slack`. It replaces `ChannelType`; “channel” is reserved for the business object, the product’s desk. |
-| `ChannelBinding` | One independently addressable transport interface on a `Channel`. |
+| `ChannelBinding` | One independently addressable transport interface on a desk or principal, identified by `AddressTarget`. |
 | `Principal` | A stable actor within one company: app user/person, agent, external person, or system actor. |
 | `QualifiedIdentity` | A transport-qualified name for a principal, unique by `(transport, namespace, subject)`. The persisted identity row is `participant_identities`. |
-| `ChannelSelector` | Transport-neutral intent to address a business desk; it resolves to a canonical desk ID. |
+| `AddressSelector` | Adapter-parsed addressing intent, resolved through the company address namespace to a desk or principal. |
+| `AddressTarget` | A typed desk or principal ID; each thread and binding has exactly one target. |
 | External key | An opaque provider event, thread, or message key interpreted only by its adapter and qualified by the appropriate installation or binding. |
 | Delivery | A durable intent to expose one canonical message through one destination binding. |
 | Delivery part | One frozen provider request within a logical delivery, with a stable part ID and zero-based index. |
@@ -87,9 +88,43 @@ a durable key built from either goes stale when it changes.
 
 An email alias is adapter routing syntax and resolves to the desk's email binding. A Slack
 conversation ID resolves only within its installation. Neither value is the desk's identity.
-`ChannelSelector` represents the application intent to call a desk and resolves to a canonical
+`AddressSelector` represents the application addressing intent and resolves to a canonical
 desk ID before delivery. External destinations, such as a third-party email address, are modeled
-separately and are never smuggled into `ChannelSelector`.
+separately and are never smuggled into `AddressSelector`.
+
+## Principal addresses and direct threads
+
+Desks and addressable principals share one company-local `addresses` namespace. An address
+resolves to an `AddressTarget::Desk` or `AddressTarget::Principal`; bindings, threads, messages,
+workflow associations, replies and history preserve that exact target. A NULL `channel_id` alone
+never means company scope: principal-owned rows carry `principal_id` and the schema enforces the
+mutually exclusive shape and tenant ownership.
+
+A person or agent has one lifetime canonical email binding. Retirement orphans the binding and
+releases its live endpoint, preserving history. A returning account can restore its own person
+principal; a different account with a reused email address cannot inherit that history.
+
+Direct threads group messages by conversation and reply correlation, like desk mail. A new
+unrelated message may start another thread; concurrent messages sharing a conversation key converge
+on the same thread. Each principal recipient receives its own admission intent. Personal mail
+appears in the product and raises a durable in-app notification. Agent creation provisions the
+principal address and its published default workflow binding together, with no automatic desk.
+Retained direct threads or runs prevent deleting an agent.
+
+Public desk access and an agent's `open_to_public` direct-address setting are independent. A
+private agent can answer a public desk through that desk's binding, and its answer stays on the
+desk's thread. Opening its direct address allows external submissions, without granting external
+read access. Person threads are private to that person and the company owner; agent direct history
+is visible to company members. Current policy and binding/settings revisions are revalidated at
+commit and admission.
+
+External delivery still requires company-domain MX/inbound routing to the configured SMTP listener
+or provider webhook, authenticated provider ingress, and outbound sender-domain setup. The listener
+reads `INCOMING_SMTP_ENABLED`, `INCOMING_SMTP_HOST` and `INCOMING_SMTP_PORT`; SendGrid ingress reads
+`SENDGRID_INBOUND_ENABLED` and `SENDGRID_WEBHOOK_PUBLIC_KEY`. Outbound SMTP uses the `SMTP_*`
+settings, or the configured email-provider integration. `APP_DOMAIN_NAME` supplies the application
+address domain. Access settings configure admission to an entry point; they do not configure DNS
+or a provider mailbox. An already routed company domain needs no per-agent DNS record or mailbox.
 
 ## Principals and qualified identities
 
@@ -293,7 +328,7 @@ message text, but custom bot names/icons are not requested and do not create ind
 mentionable Slack agents. A message in a bound conversation routes to the position-0 active agent;
 later native Slack agent sessions require a separate product and threat-model decision.
 
-Cross-desk delegation resolves a `ChannelSelector` to a same-company canonical desk ID.
+Internal addressing resolves an `AddressSelector` to a same-company canonical desk or principal target.
 Email may parse a platform address into that selector, but tools and use cases do not manufacture
 an email address as the identity or internal routing mechanism for another desk.
 
@@ -573,7 +608,7 @@ a provider sent us is what a test is for. What the gate forbids is *production* 
 1. **Authentication boundary:** the email adapter accepts bounded SMTP/webhook input, evaluates
    envelope and email authentication facts, and treats all public headers as untrusted.
 2. **Principal and binding:** the normalized sender email becomes or resolves a qualified identity
-   in the deployment/email namespace. Recipient adapter syntax resolves a `ChannelSelector`, then
+   in the deployment/email namespace. Recipient adapter syntax resolves a `AddressSelector`, then
    the canonical desk's active email binding. Company membership plus desk principal ACL (or
    the explicitly configured external participation policy) authorizes ingress.
 3. **External thread key:** the email adapter supplies the RFC/Thread-Index key and ordered reply

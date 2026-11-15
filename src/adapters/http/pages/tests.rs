@@ -1112,6 +1112,8 @@ fn agent_edit_pane_prefills_the_stored_agent_and_offers_delete() {
         capability_options: AgentCapabilityOptions::default(),
     });
     assert!(!plain_html.contains("bg-base-200\" open"));
+    assert!(plain_html.contains("<option value=\"\">No hosted model</option>"));
+    assert!(plain_html.contains("Leave both blank for native profiles."));
 }
 
 #[test]
@@ -1396,6 +1398,9 @@ fn agent_create_pane_opens_on_the_tab_that_was_submitted() {
 
     // A rejected Advanced submit has to come back on the Advanced tab.
     let advanced = pane(AgentCreateTab::Advanced);
+    assert!(advanced.contains("<option value=\"\">Company default</option>"));
+    assert!(advanced.contains("Creating an agent requires a model connection with an API key."));
+    assert!(!advanced.contains("Leave both blank for native profiles."));
     assert!(advanced.contains(r##"<form id="agent-tab-simple" class="hidden space-y-4""##));
     assert!(!advanced.contains(r##"<form id="agent-tab-advanced" class="hidden space-y-4""##));
 }
@@ -1439,6 +1444,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
         open_to_public: false,
+        native_permissions: Default::default(),
         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
         company_id: Some(company_id),

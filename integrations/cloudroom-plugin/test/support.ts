@@ -19,7 +19,7 @@ export function fixture(options: { initialized?: boolean } = {}) {
   };
   const journal = open(); if (options.initialized !== false) journal.initialize(binding);
   const selection: Selection = { machine_id: binding.machine_id, project_id: 'proj_selected', provider: 'codex',
-    model: 'gpt-test', policy: { workspace: 'project_directory', permissions: 'provider_default', reasoning: 'low' } };
+    model: 'gpt-test', policy: { workspace: 'project_directory', permissions: 'full', reasoning: 'low' } };
   return { directory, file, journal, binding, selection, open,
     close: () => { for (const db of handles) if (db.open) db.close(); rmSync(directory, { recursive: true, force: true }); } };
 }

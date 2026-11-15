@@ -1,0 +1,14 @@
+SET
+Timing is on.
+ native_mcp_run_live 
+---------------------
+ 
+(1 row)
+
+Time: 37.536 ms
+ native_mcp_run_live 
+---------------------
+ 
+(1 row)
+
+Time: 24.122 ms

@@ -1,6 +1,7 @@
 //! Lock order: company/association authority → machine fence → operation/session.
 use super::*;
 use crate::application::local_agents::protocol::*;
+mod mcp;
 
 #[derive(sqlx::FromRow)]
 struct FenceRow {
@@ -13,8 +14,20 @@ struct FenceRow {
 }
 
 async fn lock_fence(db: &mut PgConnection, fence: ConnectionFence) -> AppResult<FenceRow> {
-    let row=sqlx::query_as::<_,FenceRow>("SELECT state,journal_id,acknowledged_sequence,reconciled_generation,journal_generation,connection_expires_at FROM local_machines \
-        WHERE company_id=$1 AND id=$2 AND installation_id=$3 AND credential_generation=$4 AND connection_generation=$5 AND connection_owner=$6 AND state<>'revoked' FOR UPDATE")
+    lock_fence_with_locks(
+        db,
+        fence,
+        crate::adapters::persistence::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+async fn lock_fence_with_locks(
+    db: &mut PgConnection,
+    fence: ConnectionFence,
+    locks: crate::adapters::persistence::workflow::row_locks::RowLocks,
+) -> AppResult<FenceRow> {
+    let row=sqlx::query_as::<_,FenceRow>(&locks.sql("SELECT state,journal_id,acknowledged_sequence,reconciled_generation,journal_generation,connection_expires_at FROM local_machines \
+        WHERE company_id=$1 AND id=$2 AND installation_id=$3 AND credential_generation=$4 AND connection_generation=$5 AND connection_owner=$6 AND state<>'revoked' FOR UPDATE"))
         .bind(fence.machine.company_id).bind(fence.machine.machine_id.as_uuid()).bind(fence.machine.installation_id.as_uuid())
         .bind(fence.machine.credential_generation.get() as i64).bind(fence.generation.get() as i64).bind(fence.owner_id)
         .fetch_optional(&mut *db).await?.ok_or(AppError::InvalidCredentials)?;
@@ -129,6 +142,12 @@ pub(super) async fn capacity(
 
 #[async_trait]
 impl LocalProtocolStore for PostgresPersistence {
+    async fn native_bundle(
+        &self,
+        request: &crate::application::local_agents::harness::NativeBundleRequest,
+    ) -> AppResult<crate::application::local_agents::harness::NativeBundleResponse> {
+        bundles::read(self, request).await
+    }
     async fn retired_mappings(
         &self,
         fence: ConnectionFence,
@@ -295,6 +314,7 @@ impl LocalProtocolStore for PostgresPersistence {
     }
 }
 
+mod bundles;
 #[cfg(test)]
 mod capacity_tests;
 #[cfg(test)]

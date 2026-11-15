@@ -1,0 +1,21 @@
+{
+  "revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "verified_source_files": 13,
+  "sourcePatches": [
+    {
+      "path": "patches/local-onboarding.patch",
+      "sha256": "c201acedcbe1003a3867507e7fb4138c4171d7f5fa0c2971c4e182800cd58ca4",
+      "sourcePath": "gui/apps/app/src/components/Onboarding.tsx",
+      "beforeSha256": "26edcb0d980159dbf88fd28979d7d87dcd1935c8e429546e90228dbe5c22e489",
+      "afterSha256": "d2aebaadf687bc3863f645acd2dff5add1fb943219afe0dec4f5a9ac2836496d"
+    },
+    {
+      "path": "patches/sdk-mutation-abort.patch",
+      "sha256": "1a8782db46c9450974cadede95d32c76ad1d3ffa6eb9bb53db97315df6228451",
+      "sourcePath": "gui/packages/sdk/src/areas/threads.ts",
+      "beforeSha256": "2fcd66e9c89af1bf288ac20d08d7c55bc67104b61e982d009cc517710df70413",
+      "afterSha256": "87c13f25884f240e7b94267d497d82fd1a8cc50398783e63185064aa846d8fe3"
+    }
+  ],
+  "scope": "exact supported source + two existing reviewed patches; fixture only"
+}

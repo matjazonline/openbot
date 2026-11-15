@@ -45,10 +45,19 @@ pub(super) async fn registration_on(
     company: CompanyId,
     name: &TypeName,
 ) -> AppResult<Option<WorkflowToolRegistration>> {
-    sqlx::query_as::<_, RegistrationRow>(
+    registration_with_locks_on(db, company, name, super::row_locks::RowLocks::Wait).await
+}
+
+async fn registration_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    name: &TypeName,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<Option<WorkflowToolRegistration>> {
+    sqlx::query_as::<_, RegistrationRow>(&locks.sql(
         "SELECT name, workflow_id, version_id, params, revision FROM workflow_tool_registrations \
          WHERE revoked_at IS NULL AND company_id=$1 AND name=$2 FOR SHARE",
-    )
+    ))
     .bind(company.as_uuid())
     .bind(name.as_str())
     .fetch_optional(&mut *db)
@@ -63,10 +72,20 @@ pub(super) async fn registered_on(
     tool: &ToolSnapshot,
     check: ToolCheck,
 ) -> AppResult<()> {
+    registered_with_locks_on(db, company, tool, check, super::row_locks::RowLocks::Wait).await
+}
+
+pub(super) async fn registered_with_locks_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    tool: &ToolSnapshot,
+    check: ToolCheck,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<()> {
     let ToolKind::Workflow(pin) = tool.kind() else {
         return Err(invalid());
     };
-    let registration = registration_on(db, company, &tool.contract.name)
+    let registration = registration_with_locks_on(db, company, &tool.contract.name, locks)
         .await?
         .ok_or_else(missing)?;
     let held = match check {
@@ -75,7 +94,7 @@ pub(super) async fn registered_on(
             registration.workflow == pin.workflow_id
                 && registration.version == pin.version_id
                 && registration.params == pin.params
-                && selectable_bundle(db, company, pin.workflow_id, pin.version_id)
+                && selectable_bundle_with_locks(db, company, pin.workflow_id, pin.version_id, locks)
                     .await?
                     .is_some()
         }
@@ -90,13 +109,30 @@ async fn selectable_bundle(
     workflow: WorkflowId,
     version: VersionId,
 ) -> AppResult<Option<Vec<u8>>> {
+    selectable_bundle_with_locks(
+        db,
+        company,
+        workflow,
+        version,
+        super::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+async fn selectable_bundle_with_locks(
+    db: &mut PgConnection,
+    company: CompanyId,
+    workflow: WorkflowId,
+    version: VersionId,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<Option<Vec<u8>>> {
     Ok(sqlx::query_scalar(
-        "SELECT version.bundle FROM workflow_versions AS version \
+        &locks.sql("SELECT version.bundle FROM workflow_versions AS version \
          JOIN workflow_definitions AS definition ON definition.company_id = version.company_id \
            AND definition.id = version.workflow_id \
          WHERE version.company_id = $1 AND version.workflow_id = $2 AND version.id = $3 \
-           AND NOT definition.archived \
-         FOR SHARE OF version, definition",
+           AND NOT definition.archived AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=version.company_id AND broker.version_id=version.id) \
+         FOR SHARE OF version, definition"),
     )
     .bind(company.as_uuid())
     .bind(workflow.as_uuid())

@@ -1,0 +1,2 @@
+plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R4-final.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance

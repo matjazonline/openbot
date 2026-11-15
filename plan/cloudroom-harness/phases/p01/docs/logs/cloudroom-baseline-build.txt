@@ -1,0 +1,73 @@
+• turbo 2.10.12
+
+   • Packages in scope: @cloudroom/host-daemon, @cloudroom/server
+   • Running build in 2 packages
+   • Remote caching disabled
+
+@cloudroom/templates:generate:templates: cache hit, replaying logs 65015034ea530ec1
+@cloudroom/templates:generate:plugin-scaffold: cache hit, replaying logs ea93e508507d7fc2
+@cloudroom/templates:generate:templates: 
+@cloudroom/templates:generate:templates: > @cloudroom/templates@0.0.1 generate:templates /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/templates
+@cloudroom/templates:generate:templates: > node ./scripts/generate-templates.mjs
+@cloudroom/templates:generate:templates: 
+@cloudroom/templates:generate:plugin-scaffold: 
+@cloudroom/templates:generate:plugin-scaffold: > @cloudroom/templates@0.0.1 generate:plugin-scaffold /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/templates
+@cloudroom/templates:generate:plugin-scaffold: > node ./scripts/generate-plugin-scaffold.mjs
+@cloudroom/templates:generate:plugin-scaffold: 
+@cloudroom/plugin-build:generate: cache hit, replaying logs 6d10f6f6cf6f76d7
+@cloudroom/server:generate:bb-official-marketplace: cache hit, replaying logs 474ea0bead9b15a7
+@cloudroom/plugin-build:generate: 
+@cloudroom/plugin-build:generate: > @cloudroom/plugin-build@0.0.1 generate /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-build
+@cloudroom/plugin-build:generate: > node ./scripts/generate-plugin-theme.mjs && node ./scripts/generate-runtime-export-manifest.mjs
+@cloudroom/plugin-build:generate: 
+@cloudroom/plugin-build:generate: wrote packages/plugin-build/src/generated/plugin-theme.generated.ts
+@cloudroom/plugin-build:generate: wrote /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-build/src/generated/runtime-export-manifest.generated.ts (react@19.2.4)
+@cloudroom/server:generate:bb-official-marketplace: 
+@cloudroom/server:generate:bb-official-marketplace: > @cloudroom/server@0.0.1 generate:bb-official-marketplace /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+@cloudroom/server:generate:bb-official-marketplace: > node --conditions=source --import tsx scripts/generate-bb-official-marketplace.ts
+@cloudroom/server:generate:bb-official-marketplace: 
+@cloudroom/server:generate:bb-official-marketplace: warning: bb-official marketplace dates were omitted because complete Git history is unavailable
+@get-bb/plugin-sdk:build:types: cache miss, executing 29e0bcd472beb480
+@cloudroom/server:build: cache bypass, force executing fe1597909c5c24bd
+@cloudroom/server:build: 
+@cloudroom/server:build: > @cloudroom/server@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+@cloudroom/server:build: > node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --external ./start-server.js --copy-dir ../../packages/db/drizzle dist/drizzle --copy-dir src/assets dist/assets && node --import tsx scripts/copy-builtin-skills.ts && node ../../scripts/build-node-entry.mjs src/start-server.ts dist/start-server.js && node ../../scripts/build-node-entry.mjs ../../packages/plugin-sdk/src/index.ts dist/plugin-sdk-runtime.js
+@cloudroom/server:build: 
+@get-bb/plugin-sdk:build:types: 
+@get-bb/plugin-sdk:build:types: > @get-bb/plugin-sdk@0.6.50 build:types /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-sdk
+@get-bb/plugin-sdk:build:types: > node scripts/build-bundled-dts.mjs
+@get-bb/plugin-sdk:build:types: 
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-provider-bridge.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-ai-services.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-provider-bridge-testing.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-provider-bridge-acp.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-environment-provider.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-machine-provider.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-app.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-host.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-composer-customization-validation.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-composer-handle.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-composer-view.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-file-navigation-validation.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-command-guard.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-host-policy.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-internal-plugin-app-collector.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-testing.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-testing-app.d.ts
+@get-bb/plugin-sdk:build:types: Wrote bundled-types/bb-plugin-sdk-testing-host.d.ts
+@cloudroom/host-daemon:build: cache miss, executing e890755e0b7e5075
+@cloudroom/host-daemon:build: 
+@cloudroom/host-daemon:build: > @cloudroom/host-daemon@0.0.1 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/host-daemon
+@cloudroom/host-daemon:build: > node ../../scripts/build-node-entry.mjs src/index.ts dist/index.js --clean-dist --external ./start-host-daemon.js && node ../../scripts/build-node-entry.mjs src/start-host-daemon.ts dist/start-host-daemon.js && node ../../scripts/build-node-entry.mjs src/plugin-host-worker.ts dist/plugin-host-worker.js && node ./scripts/build-bundles.mjs
+@cloudroom/host-daemon:build: 
+@cloudroom/host-daemon:build: daemon: 1445133 bytes
+@cloudroom/host-daemon:build: provider bridge worker: 13026 bytes
+@cloudroom/host-daemon:build: plugin host worker: 318200 bytes
+@cloudroom/host-daemon:build: room-cli: 45504 bytes
+@cloudroom/host-daemon:build: parcel watcher child: 2057 bytes
+
+ Tasks:    7 successful, 7 total
+Cached:    4 cached, 7 total
+  Time:    14.061s 
+

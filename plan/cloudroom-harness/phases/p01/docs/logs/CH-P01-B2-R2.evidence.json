@@ -1,0 +1,380 @@
+{
+  "version": 1,
+  "round": "CH-P01-B2-R2",
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "checks": [
+    {
+      "criteria": [
+        "M2-AC1"
+      ],
+      "command": "Focused B2 capture R4 driver commands in logs/focused-B2-capture-R4.py",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-capture-R4-agent-publication.txt",
+          "sha256": "d40f247ac8b8a40d1cb7c2a6c41ed3fe765b96fc2e2cffe96067060b805bc2e4"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-api.txt",
+          "sha256": "ca247ecde664f436a254a939119f92606f67fe13ddc985a7b9a15487ce7a8d5e"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-ui.txt",
+          "sha256": "143358170498a654c51a656852257db551ab4f2047c118aa5f1a92aa2202e084"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-runtime.txt",
+          "sha256": "bc9520df66c71c3beb7321a0902ca74a15ad7930afb5350038f3fe4b08f04e08"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-workflow-publication.txt",
+          "sha256": "33944e0feafd5a8f9b35b65a7698d32e1c68e0913e56fae67968ad896111cc39"
+        },
+        {
+          "path": "logs/B2-capture-R4-local-management-db.txt",
+          "sha256": "920e738bf93db28445daaeff7a9e27def4f991e9759b11d9e4fcb790a627b6fc"
+        },
+        {
+          "path": "logs/B2-capture-R4-local-management-ui.txt",
+          "sha256": "18524e04cd77cdb623ae078470bcb2bf5c350344d7fcad1d637bea48767e78b3"
+        },
+        {
+          "path": "logs/B2-capture-R4-results.json",
+          "sha256": "6b0dc77d507208a017ec8206606e52df785e4b9ebadb0e95def29c81411ea1e4"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC1",
+        "M2-AC2",
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline cloudroom_native_ -- --nocapture",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R13-db-workflow.txt",
+          "sha256": "8f623dfd55ff353ffcf497519c68d061911a91c2ff99081b8344e207d77aeee1"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC1",
+        "M2-AC2",
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline --lib adapters::persistence::local_agents:: -- --nocapture",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R15-local-regression.txt",
+          "sha256": "119ae16f35feb1c9fdd66456460b04dee66c56eeb941da304331941813357d91"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC2"
+      ],
+      "command": "cargo test --offline --lib adapters::persistence::workflow::tests::local_agent_tests:: -- --nocapture (pinned Node24 PATH)",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R16-workflow-regression.txt",
+          "sha256": "a750d0fb4eb462dc6d4af3d0234628a187c56198f2785570db557f77c75e1874"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline --lib native_bundle_maximum_projection_retains_twenty_five_percent_headroom",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R5-headroom.txt",
+          "sha256": "0aaaf69760c36d41538cb22f84b42d87407d6f809f1fd083459b135a893dd92a"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/agent-runtime exec vitest run --config vitest.config.ts src/runtime.skill-roots-capability.test.ts",
+      "fixture": "production runtime and generated test bridge;4 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-runtime-capability.txt",
+          "sha256": "e777a6ebf5ad35fd657ae923fa1a6886038d3fea089daed82a6f01a7e75b36c8"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter bb-plugin-provider-claude-code exec vitest run --config vitest.config.ts src/bridge/__tests__/bridge.test.ts -t 'canonical skills/configure'",
+      "fixture": "actual Claude bridge;2 selected tests;76 filtered",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-claude-capability.txt",
+          "sha256": "3ad7bdf3416d15a44efed4a47b8ac520c1963d7d8106bd81178f3f05f8f5cf15"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/provider-bridge-acp exec vitest run --config vitest.config.ts src/session-params.test.ts",
+      "fixture": "actual ACP session params;31 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-acp-required.txt",
+          "sha256": "26b82c4e7d86db1440b85ac3274fdecbb2b4b5daff356a1827b6a58bb4749b62"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/server --filter @cloudroom/host-daemon --filter @get-bb/plugin-sdk --filter @cloudroom/agent-runtime --filter @cloudroom/provider-bridge-acp --filter bb-plugin-provider-claude-code typecheck; later server typecheck",
+      "fixture": "six changed pinned-source packages; later tests typechecked by server",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-typecheck.txt",
+          "sha256": "4540583a09ffcf96358e3f9f837e450c0a39be83b9d4f4303196e23d5a7b8458"
+        },
+        {
+          "path": "logs/B2-required-core-R12-typecheck.txt",
+          "sha256": "a00ea7860f1c0d06403bf8e4991b8067f8f27df1c2db014739cd1017258f2286"
+        }
+      ],
+      "reuse": "Unchanged relevant production branch and fixture from B2 R1; affected F1\u2013F4 checks and source identity superseded below. Current initial schema fresh migration and F1 DB regression separately exercised."
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F1",
+        "M2-AC3"
+      ],
+      "command": "cargo sqlx database reset -y --no-dotenv; cargo test --offline --lib skill_bundle_ -- --nocapture",
+      "fixture": "Owned PostgreSQL18 port63451, database openbot_cloudroom_harness_t1gfnhz1;19 PASS +1 explicit generator ignored",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-F1-migrate-R3.txt",
+          "sha256": "65761ca54c137f08baa497870b9149167654c9ceb57daeb1fc71ec049c434328"
+        },
+        {
+          "path": "logs/B2-R2-F1-skill-callers-R2.txt",
+          "sha256": "3e931fe91a0fbd5c8c8c0a965bfe9fa59a3b5680e710867844f7c9b85928be08"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F1",
+        "M2-AC3",
+        "M2-AC4"
+      ],
+      "command": "npm test",
+      "fixture": "Pinned Node24/plugin SQLite;118 PASS incl parent-component collision refusal before writes and valid repeated parent paths",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-F1-plugin-tests-R1.txt",
+          "sha256": "b3068bce531c6aeb50c978085543b063017a6bd0cd0e434dd4ba3a368273ea06"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F1",
+        "CH-P01-B2-F3",
+        "M2-AC5",
+        "M2-AC6"
+      ],
+      "command": "pnpm --filter @cloudroom/server exec vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts test/internal/required-skill-trees.test.ts (owned OPENBOT_NATIVE_STAGE_* set)",
+      "fixture": "Pinned actual core;15 PASS including real disk restart, authenticated transfer of repeated-parent leaves and actual staged native CLI/script",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-core-combined-R2.txt",
+          "sha256": "27784c40e762d08c46b83713e7b1289f54019dabb2b13f9a4152073b4b91e259"
+        },
+        {
+          "path": "logs/B2-R2-staged-native-R2/result.json",
+          "sha256": "4c539efc1b837df7e8b594f30c77c5e2422d8e02cd8c2806b20d226bbca3bf49"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F2",
+        "M2-AC5",
+        "M2-AC6"
+      ],
+      "command": "env -i PATH=<pinned Node24 plus system tools> HOME=<owned runner home> TMPDIR=<owned runner tmp> OPENBOT_NATIVE_PERMISSION_PROBE=1 OPENBOT_NATIVE_PERMISSION_OUTPUT=<owned R13.json> node gui/node_modules/vitest/vitest.mjs run --config vitest.required-native.config.ts (cwd gui/tests/integration)",
+      "fixture": "Actual pinned server/daemon/first-party built Claude bridge/native CLI; local scripted Messages, dummy key, isolated HOME; real pending/absent effect/allow_once/continued spawn AND send; no paid inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-F2-native-permissions-R13.txt",
+          "sha256": "8713ea866fb09ffb76875d896f4ae4879f5de4bfa901d67bcf1bb8fd5ff21e6c"
+        },
+        {
+          "path": "logs/B2-R2-F2-native-permissions-R13.json",
+          "sha256": "23ed850e04463894bcb36dc11836067b908bb8d53d62ee455e56d49975a64ae0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F4",
+        "M2-AC1"
+      ],
+      "command": "cargo test --offline dump_cloudroom_management_browser_fixtures -- --ignored --nocapture; CHROME_PATH=<installed Chrome> node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "Actual generated Rust markup and shipped JS in installed Google Chrome/Playwright1.55.1;2 PASS; final HTTP write intercepted, existing native DB tests cover save authority",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-F4-browser-fixture-R1.txt",
+          "sha256": "57a88c9769ebb79457365e479f09eb71ec43f115f8b7093faffd3d27027eb833"
+        },
+        {
+          "path": "logs/B2-R2-F4-browser-R1.txt",
+          "sha256": "71e6aba58ea0991de59228fcc94c39722d1c0da512fcf9fc584193f953cbea30"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "npm run typecheck; npm run package; npm run test:guards",
+      "fixture": "Pinned Node24/npm11.19.0; reproducible package and6 source guard tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-plugin-typecheck.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        },
+        {
+          "path": "logs/B2-R2-package.txt",
+          "sha256": "18bfa878e8f072642a1db58f9f19b870a06dce21f6ccd726815bcd7471a42819"
+        },
+        {
+          "path": "logs/B2-R2-source-guards-R2.txt",
+          "sha256": "b121f1f3a52eaba9c2f2fa6f4580e2f111766afab6e34f0c7a7ea19a1ba648cb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "pnpm --filter @cloudroom/server --filter @cloudroom/integration-tests typecheck",
+      "fixture": "Pinned Node24/pnpm10.34.9; actual server/integration TypeScript surfaces, unchanged other six-target R1 evidence retained",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-external-typecheck-R7.txt",
+          "sha256": "8b22b00ac7e8c76cbc2bd39274a7af97803010fcadcf3bd374466afe126a42ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "node scripts/prepare-runtime.mjs <owned pinned checkout>; prepareSource(author) deepEquals prepareSource(clean pinned replay)",
+      "fixture": "Pinned Node24/pnpm10.34.9, clean owned replay-r3; all45 exact source targets; actual generated SDK, production server/daemon/CLI/UI build pre/post guard",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-runtime-build-R2.txt",
+          "sha256": "7847cc44eb4399e41b474765500e09655b8236b590ea9f1b33973b73d1d7791e"
+        },
+        {
+          "path": "logs/B2-R2-source-clean-replay.json",
+          "sha256": "84cf9f5237167a8ce3a3f56e129b9925642d65820a21f7097251612c926d98f3"
+        },
+        {
+          "path": "logs/CH-P01-B2-R2-runtime-identity.json",
+          "sha256": "0886415232e1249ab6f1582fab69b98f71f85d86648e9c93d24a6a1fdcca73c2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "cargo fmt --all -- --check; cargo clippy --offline --all-targets -- -D warnings; cargo sqlx prepare -- --all-targets; git diff --check",
+      "fixture": "Normal Rust1.95 PATH; owned PG/target; metadata unchanged after current initial schema migration; no final full-suite claim",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B2-R2-clippy.txt",
+          "sha256": "7ba6611cdbd05acd58729ba871dc9f875ac99328d6d663eeef36b4f8a798daa3"
+        },
+        {
+          "path": "logs/B2-R2-sqlx-prepare-R2.txt",
+          "sha256": "f425b4ddc57a2e51f3018411dbcd9bef08691acd2b5208b78af8c6274b186542"
+        },
+        {
+          "path": "logs/B2-R2-diff-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CH-P01-B2-F3",
+        "M2-AC7"
+      ],
+      "command": "vitest list --config vitest.config.ts <two affected files> --json before and after exact source restoration",
+      "fixture": "R1 sources from exact owned replay-r2 temporarily substituted only for discovery, current files byte-restored before snapshot;12 to14 discovered default-enabled tests, one title rename/two additions; opt-in native separately ran",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-core-discovery-before.json",
+          "sha256": "c2b34965241b9e98b94e79ae0a891609c05f9148025645654951612a23d6504f"
+        },
+        {
+          "path": "logs/B2-R2-core-discovery-after.json",
+          "sha256": "99fa7a16a01a245fee5eb30b4d8466e6b9fe09c7a9f3c0f18d0480f8c2420a3c"
+        },
+        {
+          "path": "logs/B2-R2-test-name-disposition.json",
+          "sha256": "a9e04990c26d245982f8f84e7c621c8341c2d732886b2b03d788008afd79b66f"
+        }
+      ]
+    }
+  ]
+}

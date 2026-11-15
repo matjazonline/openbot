@@ -1,0 +1,10 @@
+{
+  "status": "ACCEPTED",
+  "decision": "CH-P01-M1/r2",
+  "sha256": "aabc37ecdcb5960c066b65c58b001f3020c9852ff4f8ebb189d45194eaa61853",
+  "reviewer": "/root/cloudroom_harness_reviewer Astra/high",
+  "note": "CH-P01-AG1-N2",
+  "coordination_revision": 1,
+  "active_notices": [],
+  "scope": "B1 skill-directory foundation only; no native execution claim"
+}

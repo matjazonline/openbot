@@ -1,0 +1,20 @@
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (28.997375ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (6.951291ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (6.728833ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (9.551834ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (5.944542ms)
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (75.9065ms)
+✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (26.909792ms)
+✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16630.217667ms)
+✔ native abort cancels the immutable invocation even when the admission response was lost (48.374125ms)
+✔ only a proven first-attempt admission rejection retires after restart; ambiguous errors retain the intent (589.604084ms)
+✔ unknown outcome survives a physical plugin journal restart; status from B resolves A without another admission (36.184042ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (82.215125ms)
+ℹ tests 12
+ℹ suites 0
+ℹ pass 12
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 17646.788292

@@ -1,0 +1,332 @@
+{
+  "version": 1,
+  "round": "CH-P01-B2-R1",
+  "artifact": "a71abff5242d2b22bb709629bef778c14ee799acbca9c0f417163f42bc7f9793",
+  "checks": [
+    {
+      "criteria": [
+        "M2-AC1"
+      ],
+      "command": "Focused B2 capture R4 driver commands in logs/focused-B2-capture-R4.py",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-capture-R4-agent-publication.txt",
+          "sha256": "d40f247ac8b8a40d1cb7c2a6c41ed3fe765b96fc2e2cffe96067060b805bc2e4"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-api.txt",
+          "sha256": "ca247ecde664f436a254a939119f92606f67fe13ddc985a7b9a15487ce7a8d5e"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-ui.txt",
+          "sha256": "143358170498a654c51a656852257db551ab4f2047c118aa5f1a92aa2202e084"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-runtime.txt",
+          "sha256": "bc9520df66c71c3beb7321a0902ca74a15ad7930afb5350038f3fe4b08f04e08"
+        },
+        {
+          "path": "logs/B2-capture-R4-agent-workflow-publication.txt",
+          "sha256": "33944e0feafd5a8f9b35b65a7698d32e1c68e0913e56fae67968ad896111cc39"
+        },
+        {
+          "path": "logs/B2-capture-R4-local-management-db.txt",
+          "sha256": "920e738bf93db28445daaeff7a9e27def4f991e9759b11d9e4fcb790a627b6fc"
+        },
+        {
+          "path": "logs/B2-capture-R4-local-management-ui.txt",
+          "sha256": "18524e04cd77cdb623ae078470bcb2bf5c350344d7fcad1d637bea48767e78b3"
+        },
+        {
+          "path": "logs/B2-capture-R4-results.json",
+          "sha256": "6b0dc77d507208a017ec8206606e52df785e4b9ebadb0e95def29c81411ea1e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC1",
+        "M2-AC2",
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline cloudroom_native_ -- --nocapture",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R13-db-workflow.txt",
+          "sha256": "8f623dfd55ff353ffcf497519c68d061911a91c2ff99081b8344e207d77aeee1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC1",
+        "M2-AC2",
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline --lib adapters::persistence::local_agents:: -- --nocapture",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R15-local-regression.txt",
+          "sha256": "119ae16f35feb1c9fdd66456460b04dee66c56eeb941da304331941813357d91"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC2"
+      ],
+      "command": "cargo test --offline --lib adapters::persistence::workflow::tests::local_agent_tests:: -- --nocapture (pinned Node24 PATH)",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R16-workflow-regression.txt",
+          "sha256": "a750d0fb4eb462dc6d4af3d0234628a187c56198f2785570db557f77c75e1874"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC3"
+      ],
+      "command": "cargo test --offline --lib native_bundle_maximum_projection_retains_twenty_five_percent_headroom",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R5-headroom.txt",
+          "sha256": "0aaaf69760c36d41538cb22f84b42d87407d6f809f1fd083459b135a893dd92a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC3",
+        "M2-AC4"
+      ],
+      "command": "npm test",
+      "fixture": "plugin SQLite/real trusted TLS/SDK fixtures; pinned Node24.21.0;117 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-plugin-R15-tests.txt",
+          "sha256": "c6fc1dbbd83d7fcff34ff2f95731d3c3065075324b6282a86e6a690650ea4267"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC4",
+        "M2-AC7"
+      ],
+      "command": "npm run typecheck",
+      "fixture": "actual generated SDK declaration, pinned Node24.21.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-plugin-R15-typecheck.txt",
+          "sha256": "2a76b0b41aed0a0cb5fa95cac7cc06b64b1ae4106faf0279b855bd394e7dadab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC5",
+        "M2-AC6"
+      ],
+      "command": "pnpm --filter @cloudroom/server exec vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts test/internal/required-skill-trees.test.ts (OPENBOT_NATIVE_STAGE_PROBE and owned output set)",
+      "fixture": "owned pinned Cloudroom/source dataDir; actual host-daemon and native Claude CLI; isolated HOME/local scripted Messages/dummy key;13 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R12-combined.txt",
+          "sha256": "29c2f46f9c7e58d699566c36f4ae0eef51a61a247ae314ad6fb9d0a573fc7455"
+        },
+        {
+          "path": "logs/B2-staged-native-R5/result.json",
+          "sha256": "4c539efc1b837df7e8b594f30c77c5e2422d8e02cd8c2806b20d226bbca3bf49"
+        },
+        {
+          "path": "logs/B2-staged-native-client-version.txt",
+          "sha256": "0896bb2b0f0c7741c8ab6df43385b83f8fc18620da007e784d0dba2f4b75580b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/agent-runtime exec vitest run --config vitest.config.ts src/runtime.skill-roots-capability.test.ts",
+      "fixture": "production runtime and generated test bridge;4 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-runtime-capability.txt",
+          "sha256": "e777a6ebf5ad35fd657ae923fa1a6886038d3fea089daed82a6f01a7e75b36c8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter bb-plugin-provider-claude-code exec vitest run --config vitest.config.ts src/bridge/__tests__/bridge.test.ts -t 'canonical skills/configure'",
+      "fixture": "actual Claude bridge;2 selected tests;76 filtered",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-claude-capability.txt",
+          "sha256": "3ad7bdf3416d15a44efed4a47b8ac520c1963d7d8106bd81178f3f05f8f5cf15"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/provider-bridge-acp exec vitest run --config vitest.config.ts src/session-params.test.ts",
+      "fixture": "actual ACP session params;31 tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-acp-required.txt",
+          "sha256": "26b82c4e7d86db1440b85ac3274fdecbb2b4b5daff356a1827b6a58bb4749b62"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC5"
+      ],
+      "command": "pnpm --filter @cloudroom/server --filter @cloudroom/host-daemon --filter @get-bb/plugin-sdk --filter @cloudroom/agent-runtime --filter @cloudroom/provider-bridge-acp --filter bb-plugin-provider-claude-code typecheck; later server typecheck",
+      "fixture": "six changed pinned-source packages; later tests typechecked by server",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-core-R10-typecheck.txt",
+          "sha256": "4540583a09ffcf96358e3f9f837e450c0a39be83b9d4f4303196e23d5a7b8458"
+        },
+        {
+          "path": "logs/B2-required-core-R12-typecheck.txt",
+          "sha256": "a00ea7860f1c0d06403bf8e4991b8067f8f27df1c2db014739cd1017258f2286"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "node scripts/prepare-runtime.mjs owned-pinned-checkout",
+      "fixture": "exact pinned Node/pnpm/source/41 targets; frozen-lockfile;SDK+server+daemon+CLI+UI builds",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-required-runtime-R2-build.txt",
+          "sha256": "9976dd530612ddb1bb29339bff120dbfa183d1a0dcf30bca6ae186f0805410e0"
+        },
+        {
+          "path": "logs/CH-P01-B2-R1-runtime-identity.json",
+          "sha256": "82ed2a61630bafc75222757d1e839d7aa495bb4776a3b3975f53dcf5c21ad3a7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "prepareSource(author checkout) === prepareSource(clean pinned replay); npm run test:guards",
+      "fixture": "owned detached replay at pin;6 guard tests including75% headroom",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-source-clean-replay-R3.json",
+          "sha256": "8afed4f24e8c136aeceb0d52de84dee2c6a9c8d5cd3b70b78506a6a2db71182c"
+        },
+        {
+          "path": "logs/B2-source-guard-R3.txt",
+          "sha256": "9cf1c6da5ccd30be8b389c1eb3bd8853d3c6d0c6be313b4666853962cb62d968"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "npm run package",
+      "fixture": "two deterministic plugin builds/archives in package script",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-plugin-R15-package.txt",
+          "sha256": "caf642a9389cb7e528640bf8441b9d0fd1625632edf1e696d68852e15367951f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "cargo clippy --offline --all-targets -- -D warnings",
+      "fixture": "phase-owned PostgreSQL63451 and target; pinned Node24.21.0 where Node peers are used",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R11-clippy.txt",
+          "sha256": "f3ea33909a64314534febb2c5907a08ecc442bbeca8c8c314983f94072f8333e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned reset/migrated DB; online schema compile; no metadata drift",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R12-sqlx-prepare.txt",
+          "sha256": "3edb0b7101b1c8c332daac0af6f232c640ed7b6e19336212be9fc0d5408f7164"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "cargo test --offline dump_cloudroom_management_browser_fixtures -- --ignored --nocapture; node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "owned DB markup; installed Google Chrome via CHROME_PATH and Playwright1.55.1;1 real browser test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-native-R14-browser-fixtures.txt",
+          "sha256": "9a911281d3dc30d97fd1adabc8dbcc0bd9d869055a700cc2a330572aa2565302"
+        },
+        {
+          "path": "logs/B2-native-R14-browser.txt",
+          "sha256": "a462e833dc94bf4b563c5dd27c9c1e7a8b79cf3432bc7caa5400c8f2d229eb7f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "M2-AC7"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current frozen worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-pre-review-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

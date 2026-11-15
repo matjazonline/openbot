@@ -1,0 +1,23 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 16 tests
+test adapters::persistence::skill::tests::copied_slugs_stay_bounded ... ok
+test adapters::persistence::skill::tests::deleting_an_in_use_library_skill_is_refused ... ok
+test adapters::persistence::skill::tests::a_company_skill_round_trips ... ok
+test adapters::persistence::skill::tests::a_stored_skill_the_domain_refuses_is_a_contextual_conversion_error ... ok
+test adapters::persistence::skill::tests::copying_a_library_skill_produces_a_company_owned_row_and_preserves_the_source ... ok
+test adapters::persistence::skill::tests::database_bounds_skill_positions ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_library_copy_renames_only_new_identity_and_keeps_assets_independent ... ok
+test adapters::persistence::skill::tests::database_scope_trigger_refuses_live_cross_library_skill_links ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_database_constraints_match_the_domain_and_refuse_direct_invalid_writes ... ok
+test adapters::persistence::skill::tests::another_companys_skill_is_not_readable_updatable_or_deletable ... ok
+test adapters::persistence::skill::tests::bundle_tests::skill_bundle_persistence_create_update_preserve_and_scope_round_trip ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+test adapters::persistence::skill::tests::two_competing_library_skill_copies_receive_distinct_slugs ... ok
+test adapters::persistence::skill::tests::deleting_either_side_cascades_a_company_agent_skill_selection ... ok
+test adapters::persistence::skill::tests::picking_a_library_agent_copies_its_skills_with_the_agent_and_channel ... ok
+test adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 4037 filtered out; finished in 0.35s
+

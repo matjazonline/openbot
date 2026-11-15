@@ -41,6 +41,7 @@ impl Journey {
             &f.persistence,
             f.target.company.as_uuid(),
             SkillWrite {
+                files: None,
                 slug: "mixed-support".into(),
                 name: "Mixed support".into(),
                 description: "Both tools required".into(),
@@ -139,6 +140,7 @@ impl Journey {
             self.scope.company.as_uuid(),
             self.skill.id,
             SkillWrite {
+                files: None,
                 slug: self.skill.slug.as_str().into(),
                 name: self.skill.name.clone(),
                 description: self.skill.description.clone(),
@@ -357,7 +359,7 @@ impl Journey {
         assert_eq!(selected.revision_id, revision.id);
         assert_eq!(
             selected.model,
-            format!("{SCRIPTED_PROVIDER} / {SCRIPTED_MODEL}")
+            Some(format!("{SCRIPTED_PROVIDER} / {SCRIPTED_MODEL}"))
         );
         assert_eq!(selected.bindings.len(), 2);
         assert_eq!(selected.assignments.len(), 1);

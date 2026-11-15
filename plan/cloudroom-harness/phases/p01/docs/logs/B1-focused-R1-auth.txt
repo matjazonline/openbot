@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.30s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 7 tests
+test adapters::http::auth::tests::api_auth_error_is_unauthorized ... ok
+test adapters::http::auth::tests::a_ui_page_is_sent_to_login_rather_than_told_it_is_unauthorized ... ok
+test adapters::http::auth::tests::auth_error_htmx_redirects_to_login ... ok
+test adapters::http::auth::tests::auth_error_redirects_to_login ... ok
+test adapters::http::auth::tests::security_session_extractor_requires_verified_extension ... ok
+test adapters::http::auth::tests::middleware_redirects_pages_and_rejects_apis ... ok
+test adapters::http::auth::tests::a_signed_session_gets_in_and_a_typed_user_id_does_not ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4045 filtered out; finished in 0.00s
+

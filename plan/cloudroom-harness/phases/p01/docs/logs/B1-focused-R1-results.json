@@ -1,0 +1,217 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all"
+    ],
+    "exit": 0,
+    "elapsed_s": 3.148,
+    "log": "B1-focused-R1-format.txt"
+  },
+  {
+    "name": "offline-alltargets",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "elapsed_s": 27.219,
+    "log": "B1-focused-R1-offline-alltargets.txt"
+  },
+  {
+    "name": "reset-owned-database",
+    "command": [
+      "python3",
+      "-c",
+      "import subprocess; subprocess.run(['dropdb','-h','127.0.0.1','-p','63451','-U','mac02','openbot_cloudroom_harness_t1gfnhz1'],check=True); subprocess.run(['createdb','-h','127.0.0.1','-p','63451','-U','mac02','openbot_cloudroom_harness_t1gfnhz1'],check=True)"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.24,
+    "log": "B1-focused-R1-reset-owned-database.txt"
+  },
+  {
+    "name": "fresh-migration",
+    "command": [
+      "cargo",
+      "sqlx",
+      "migrate",
+      "run"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.547,
+    "log": "B1-focused-R1-fresh-migration.txt"
+  },
+  {
+    "name": "skill-bundles",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "skill_bundle"
+    ],
+    "exit": 101,
+    "elapsed_s": 271.773,
+    "log": "B1-focused-R1-skill-bundles.txt"
+  },
+  {
+    "name": "archives",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "skill_archive"
+    ],
+    "exit": 101,
+    "elapsed_s": 0.839,
+    "log": "B1-focused-R1-archives.txt"
+  },
+  {
+    "name": "skill-persistence",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::persistence::skill::tests"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.671,
+    "log": "B1-focused-R1-skill-persistence.txt"
+  },
+  {
+    "name": "frozen-skills",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "agent_publication::tests::skills"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.71,
+    "log": "B1-focused-R1-frozen-skills.txt"
+  },
+  {
+    "name": "skill-usecases",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::use_cases::skill::tests"
+    ],
+    "exit": 0,
+    "elapsed_s": 1.194,
+    "log": "B1-focused-R1-skill-usecases.txt"
+  },
+  {
+    "name": "auth",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "adapters::http::auth::tests"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.405,
+    "log": "B1-focused-R1-auth.txt"
+  },
+  {
+    "name": "agent-contracts",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::agent::"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.402,
+    "log": "B1-focused-R1-agent-contracts.txt"
+  },
+  {
+    "name": "source-modules",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "source_modules"
+    ],
+    "exit": 0,
+    "elapsed_s": 120.257,
+    "log": "B1-focused-R1-source-modules.txt"
+  },
+  {
+    "name": "browser-fixtures",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "dump_skill_bundle_browser_fixtures",
+      "--",
+      "--ignored"
+    ],
+    "exit": 0,
+    "elapsed_s": 0.292,
+    "log": "B1-focused-R1-browser-fixtures.txt"
+  },
+  {
+    "name": "browser",
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/skill-bundle-browser.mjs"
+    ],
+    "exit": 1,
+    "elapsed_s": 0.947,
+    "log": "B1-focused-R1-browser.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 0,
+    "elapsed_s": 124.983,
+    "log": "B1-focused-R1-clippy.txt"
+  },
+  {
+    "name": "sqlx-prepare",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "elapsed_s": 22.048,
+    "log": "B1-focused-R1-sqlx-prepare.txt"
+  }
+]

@@ -1,8 +1,10 @@
 //! Company-owned local execution. Cloudroom owns processes and canonical transcripts.
+mod harness;
 mod identities;
 mod observations;
 mod operations;
 mod selection;
+pub use harness::*;
 
 pub use identities::*;
 pub use observations::*;
@@ -68,6 +70,7 @@ pub struct LocalAgentProfile {
     pub id: ProfileId,
     pub company_id: Uuid,
     pub name: String,
+    pub agent_id: Option<crate::entities::agent_capability::AgentId>,
     pub selection: ExecutionSelection,
 }
 
@@ -87,6 +90,7 @@ pub struct LocalAgentSession {
     pub company_id: Uuid,
     pub installation_id: InstallationId,
     pub selection: ExecutionSelection,
+    pub harness: NativeHarnessSelection,
     pub association: SessionAssociation,
     pub thread_id: Option<CloudroomThreadId>,
 }

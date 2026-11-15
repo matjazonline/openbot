@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "round": "CH-MAIN-B1-R3-final",
+  "artifact": "a0aa542552ba808a17447d5c219eb6777ec00c9c0801550da8dc8329219b2554",
+  "checks": [
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Generated CSS is current",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: SSE navigation lifecycle",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 2s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Deployment script tests",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Formatting",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 3s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Patch whitespace",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 0s",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Transport abstraction boundary",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 7s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Workflow evidence validator fixtures",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Retained workflow evidence",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 29s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Fetch locked Rust dependencies",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Offline compilation",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 22s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Clippy",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 130s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Migrations",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 0s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: SQLx metadata matches migrated schema",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 22s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Compile tests",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 109s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Rust source module reachability",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 8s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Test database for this run",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 0s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Database-backed test suite (isolated network)",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1368s",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "scripts/check.sh gate: Stack budget",
+      "fixture": "owned PostgreSQL18 check database; pinned Node24; unchanged2048KiB stock stack; 1384s",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/main-final-full-gate-R3.txt",
+          "sha256": "f67fedf288a603e854a7383e8223deaeb719132ca443a8bb4c439360099950f0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "already-compiled src/main.rs test binary under scripts/test-network-isolation.sh (all5 tests)",
+      "fixture": "owned integration worktree / no database for binary tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-binary-tests-R3.txt",
+          "sha256": "97c61fed3071800e3982a1723284208120eabf41f3ddfa38b2ac4ea3b8e46fb0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "git diff origin/main --check excluding only retained workflow logs",
+      "fixture": "owned integration worktree / no database for binary tests",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/main-target-product-whitespace-R3.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

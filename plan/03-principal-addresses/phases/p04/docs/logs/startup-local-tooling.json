@@ -1,0 +1,6 @@
+{
+  "entry": ".trail/cache/",
+  "added": true,
+  "metadata_path": "/Users/mac02/dev/openbot/.git/info/exclude",
+  "purpose": "generated graph cache only; no source, retained evidence, or tracked files excluded"
+}

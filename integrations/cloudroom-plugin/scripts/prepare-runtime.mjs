@@ -16,6 +16,8 @@ for (const args of [
   ['install', '--frozen-lockfile'],
   ['--filter', '@get-bb/plugin-sdk', 'build'],
   ['--filter', '@get-bb/plugin-sdk', 'build:types'],
+  ['--filter', '@cloudroom/server', 'build'],
+  ['--filter', '@cloudroom/host-daemon', 'build'],
   ['--filter', '@cloudroom/cli', 'build'],
   ['--filter', '@cloudroom/app', 'build'],
 ]) execFileSync('pnpm', args, { cwd, stdio: 'inherit', timeout: 15 * 60_000 });

@@ -111,6 +111,7 @@ fn operation_admission(
         None => LocalCommand::Create {
             session_id: session.id,
             selection: args.selection,
+            harness: args.harness,
             prompt: args.prompt,
         },
     };
@@ -147,6 +148,7 @@ async fn session_on(
         // immutable profile/selection here without acquiring a later workflow lock.
         if session.profile_id != args.profile_id
             || session.selection != args.selection
+            || session.harness != args.harness
             || session.thread_id.is_none()
             || !matches!(session.association, SessionAssociation::Workflow { .. })
         {
@@ -162,6 +164,7 @@ async fn session_on(
         company_id: scope.company.as_uuid(),
         installation_id: InstallationId::new(installation).map_err(|_| invalid())?,
         selection: args.selection.clone(),
+        harness: args.harness.clone(),
         association: SessionAssociation::Workflow {
             run_id: scope.run.as_uuid(),
         },

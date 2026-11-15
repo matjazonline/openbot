@@ -1,9 +1,5 @@
-//! A skill: reusable prompt instructions an agent may be given (06-D5). Executable tool steps
-//! were removed in 06C; procedures that call tools are workflows, and a skill names the tools it
-//! needs as `required_tools` instead.
-//!
-//! The instructions are one text. Every linked skill is pasted into the agent's prompt in full, so
-//! the model never sees them as separate items, and a list would only be an editing affordance.
+//! Reusable skill instructions and their supporting directory files. Native filesystem harnesses
+//! can use these assets; storing a script never grants a hosted model a process-execution tool.
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -30,9 +26,56 @@ pub struct Skill {
     /// The subtitle a picker shows.
     pub description: String,
     pub instructions: String,
+    pub files: Vec<super::skill_bundle::SkillFile>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+/// Lists and pickers carry metadata; supporting file bytes are explicit detail/publication reads.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SkillSummary {
+    pub id: Uuid,
+    pub company_id: Option<Uuid>,
+    pub slug: SkillSlug,
+    pub name: String,
+    pub description: String,
+    pub updated_at: DateTime<Utc>,
+    pub file_count: usize,
+}
+
+impl SkillSummary {
+    pub fn validate(&self) -> Result<(), String> {
+        validate_bounded_text("A skill name", &self.name, MAX_SKILL_NAME_CHARS)?;
+        validate_bounded_text(
+            "A skill description",
+            &self.description,
+            MAX_SKILL_DESCRIPTION_CHARS,
+        )?;
+        if self.file_count > super::skill_bundle::MAX_SKILL_FILES {
+            return Err("Invalid skill file count.".into());
+        }
+        Ok(())
+    }
+}
+
+impl From<&Skill> for SkillSummary {
+    fn from(skill: &Skill) -> Self {
+        Self {
+            id: skill.id,
+            company_id: skill.company_id,
+            slug: skill.slug.clone(),
+            name: skill.name.clone(),
+            description: skill.description.clone(),
+            updated_at: skill.updated_at,
+            file_count: skill.files.len(),
+        }
+    }
+}
+impl From<Skill> for SkillSummary {
+    fn from(skill: Skill) -> Self {
+        (&skill).into()
+    }
 }
 
 impl Skill {
@@ -61,6 +104,12 @@ impl Skill {
                 "A skill's instructions may be at most {MAX_SKILL_INSTRUCTIONS_BYTES} bytes."
             ));
         }
+        super::skill_bundle::validate_skill_files(&self.files)?;
+        super::skill_bundle::native_skill_markdown(
+            self.slug.as_str(),
+            &self.description,
+            &self.instructions,
+        )?;
         Ok(())
     }
 }
@@ -81,6 +130,7 @@ mod tests {
 
     fn skill(instructions: &str) -> Skill {
         Skill {
+            files: Vec::new(),
             id: Uuid::new_v4(),
             company_id: Some(Uuid::new_v4()),
             slug: SkillSlug::parse("triage-invoice").expect("a well-formed slug"),

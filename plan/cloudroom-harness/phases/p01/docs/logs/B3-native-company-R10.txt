@@ -1,0 +1,19 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 12s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 1 test
+
+thread 'adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway' (48419217) panicked at src/adapters/persistence/local_agents/management/native_mcp_native_tests.rs:317:10:
+called `Result::unwrap()` on an `Err` value: InvalidCredentials
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4090 filtered out; finished in 39.17s
+
+error: test failed, to rerun pass `--lib`

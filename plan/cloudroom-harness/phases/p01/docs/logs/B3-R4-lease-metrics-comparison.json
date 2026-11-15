@@ -1,0 +1,16 @@
+{
+  "rows": {
+    "before": [
+      "completion                     354          239      2000       205       241            0          20  {'completed': 346, 'refused': 8}",
+      "lease.claim                    698          196      2000        78       199          197           2  {'completed': 694, 'refused': 4}",
+      "lease.validate                  23           30      3000         2        31            0           0  {'completed': 23}"
+    ],
+    "after": [
+      "completion                     354          215      2000       206       216            0           7  {'completed': 346, 'refused': 8}",
+      "lease.claim                    695           71      2000        26        73           70           2  {'completed': 691, 'refused': 4}",
+      "lease.validate                  23            1      3000         2         3            0           0  {'completed': 23}"
+    ]
+  },
+  "limitsUnchanged": true,
+  "caveat": "same default checks/samples and owned host, sequential runs; aggregate wall timings may vary"
+}

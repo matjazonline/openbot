@@ -10,7 +10,10 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
-        agent::Agent, creation::CreationProvenance, skill::Skill, user::Caller,
+        agent::Agent,
+        creation::CreationProvenance,
+        skill::{Skill, SkillSummary},
+        user::Caller,
         value_objects::SkillSlug,
     },
     use_cases::{
@@ -27,6 +30,8 @@ pub struct SkillWrite {
     pub name: String,
     pub description: String,
     pub instructions: String,
+    /// None preserves stored assets on update; an explicit empty list clears them.
+    pub files: Option<Vec<crate::entities::skill_bundle::SkillFile>>,
     /// Workflow tools an agent must grant for this skill (06-D5); `None` keeps them.
     pub required_tools: Option<Vec<crate::domain::workflow::TypeName>>,
     pub created_by: Option<CreationProvenance>,
@@ -38,7 +43,10 @@ impl SkillWrite {
         self.slug = self.slug.trim().to_ascii_lowercase();
         self.name = self.name.trim().to_string();
         self.description = self.description.trim().to_string();
-        self.instructions = self.instructions.trim().to_string();
+        // SKILL.md is a file: preserve its body and final newline exactly.
+        if let Some(files) = &mut self.files {
+            files.sort_by(|a, b| a.path.cmp(&b.path));
+        }
 
         let slug = SkillSlug::parse(&self.slug).map_err(AppError::BadRequest)?;
         let now = Utc::now();
@@ -49,6 +57,7 @@ impl SkillWrite {
             name: self.name.clone(),
             description: self.description.clone(),
             instructions: self.instructions.clone(),
+            files: self.files.clone().unwrap_or_default(),
             created_by: CreationProvenance::system(),
             created_at: now,
             updated_at: now,
@@ -82,12 +91,12 @@ impl SkillPageRequest {
 
 #[derive(Debug, Clone, Default)]
 pub struct SkillPage {
-    pub items: Vec<Skill>,
+    pub items: Vec<SkillSummary>,
     pub next: Option<SkillCursor>,
 }
 
 impl SkillPage {
-    pub fn from_probe(mut items: Vec<Skill>, limit: u16) -> Self {
+    pub fn from_probe(mut items: Vec<SkillSummary>, limit: u16) -> Self {
         let has_more = items.len() > usize::from(limit);
         items.truncate(usize::from(limit));
         let next = has_more.then(|| {
@@ -179,6 +188,10 @@ impl SkillUseCases {
 
     pub async fn verify_company_owner(&self, user_id: Uuid, company_id: Uuid) -> AppResult<()> {
         self.authorize_write(user_id, company_id).await
+    }
+
+    pub fn verify_library_operator(&self, caller: &Caller) -> AppResult<()> {
+        require_operator(caller)
     }
 
     /// The ordered capability relationships stored for one company agent, for an owner-facing
@@ -366,6 +379,7 @@ mod tests {
 
     fn write(instructions: &str) -> SkillWrite {
         SkillWrite {
+            files: None,
             required_tools: None,
             slug: "  REVIEW-Invoice  ".into(),
             name: " Review invoice ".into(),
@@ -439,18 +453,19 @@ mod tests {
     }
 
     #[test]
-    fn normalize_lowercases_the_slug_and_trims_every_field() {
+    fn normalize_trims_metadata_and_preserves_instruction_file_bytes() {
         let mut candidate = write(" Reply clearly. ");
         candidate.normalize().unwrap();
         assert_eq!(candidate.slug, "review-invoice");
         assert_eq!(candidate.name, "Review invoice");
         assert_eq!(candidate.description, "Decide what it needs.");
-        assert_eq!(candidate.instructions, "Reply clearly.");
+        assert_eq!(candidate.instructions, " Reply clearly. ");
     }
 
     fn skill() -> Skill {
         let now = Utc::now();
         Skill {
+            files: Vec::new(),
             id: Uuid::new_v4(),
             company_id: Some(Uuid::new_v4()),
             slug: SkillSlug::parse("delegate").unwrap(),
@@ -468,14 +483,14 @@ mod tests {
         let first = skill();
         let second = skill();
 
-        let final_page = SkillPage::from_probe(vec![first.clone()], 1);
+        let final_page = SkillPage::from_probe(vec![first.clone().into()], 1);
         assert_eq!(final_page.items.len(), 1);
         assert!(final_page.next.is_none());
 
-        let page_with_more = SkillPage::from_probe(vec![first.clone(), second], 1);
+        let page_with_more = SkillPage::from_probe(vec![first.clone().into(), second.into()], 1);
         assert_eq!(
             page_with_more.items.as_slice(),
-            std::slice::from_ref(&first)
+            std::slice::from_ref(&SkillSummary::from(&first))
         );
         assert_eq!(
             page_with_more.next,

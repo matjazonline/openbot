@@ -78,6 +78,7 @@ impl Fixture {
                 self.f.owner.id,
                 self.f.company.id,
                 crate::use_cases::skill::SkillWrite {
+                    files: None,
                     slug: name.into(),
                     name: name.into(),
                     description: format!("Use {name}"),
@@ -122,6 +123,7 @@ pub(super) fn fields(revision: AgentDraftRevision, tools: &str) -> Vec<(&'static
     vec![
         ("name", "Edited <agent>".into()),
         ("slug", "authoring".into()),
+        ("native_permissions", "full".into()),
         ("provider", "openai".into()),
         ("model", "gpt-test".into()),
         (

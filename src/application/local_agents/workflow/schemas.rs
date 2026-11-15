@@ -20,7 +20,7 @@ pub fn input_schema() -> Value {
 }
 pub fn frozen_schema() -> Value {
     let policy = object(
-        json!({"workspace":{"const":"project_directory"},"permissions":{"const":"provider_default"},
+        json!({"workspace":{"const":"project_directory"},"permissions":{"enum":["full","auto","accept_edits"]},
         "reasoning":{"enum":["none","low","medium","high","xhigh","max","ultra","ultracode"]}}),
         &["workspace", "permissions", "reasoning"],
     );
@@ -32,6 +32,10 @@ pub fn frozen_schema() -> Value {
     );
     let mut input = input_schema();
     input["properties"]["selection"] = selection;
+    input["properties"]["harness"] = json!({"oneOf":[
+        object(json!({"kind":{"const":"unconfigured"}}), &["kind"]),
+        object(json!({"kind":{"const":"agent"},"agent_id":uuid(),"revision_id":uuid(),"digest":{"type":"string","pattern":"^[0-9a-f]{64}$"}}), &["kind","agent_id","revision_id","digest"])
+    ]});
     input["properties"]["deadline"] = json!({"type":"string","maxLength":64});
     // The frozen internal form always serializes the two optional authored fields.
     input["properties"]["session_id"] = json!({"anyOf":[uuid(),{"type":"null"}]});
@@ -42,6 +46,7 @@ pub fn frozen_schema() -> Value {
         "session_id",
         "approval",
         "selection",
+        "harness",
         "deadline"
     ]);
     input

@@ -1,0 +1,2 @@
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 16}
+1 evidence manifest(s) validated; declared results are not acceptance

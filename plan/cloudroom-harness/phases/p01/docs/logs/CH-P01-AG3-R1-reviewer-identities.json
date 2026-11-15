@@ -1,0 +1,7 @@
+{
+  "external_revision": "d8b3cc3a16bb4b06fc99d8e543d40f1087d1e815",
+  "targets_verified": 45,
+  "coordination_sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408",
+  "decision_sha256": "5aa258b1db1e4382d3914514ab1c2668eedaa9d18566a59f28d9535cca4f0562",
+  "status": "MATCH"
+}

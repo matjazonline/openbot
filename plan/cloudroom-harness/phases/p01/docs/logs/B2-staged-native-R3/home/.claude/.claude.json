@@ -1,0 +1,34 @@
+{
+  "firstStartTime": "2026-11-11T17:09:34.968Z",
+  "firstStartVersion": "2.1.311",
+  "machineID": "d39a1b45f557db79fd1303ce8b12212cafc66161328158e2254ae06830aa0110",
+  "opusProMigrationComplete": true,
+  "sonnet1m45MigrationComplete": true,
+  "seenNotifications": {},
+  "hasResetAutoModeOptInForDefaultOffer": true,
+  "migrationVersion": 14,
+  "userID": "f7d592f2753674ab5e13be00cb6989c368790d0a28c86bf985c55c5a1c11fbf4",
+  "pluginUsage": {
+    "cloudroom@inline": {
+      "usageCount": 1,
+      "lastUsedAt": 1794416978304,
+      "lastUsedNumStartups": 0
+    },
+    "cc-plugin-agents-md@builtin": {
+      "usageCount": 0,
+      "lastUsedAt": 1794416978272,
+      "lastUsedNumStartups": 0
+    },
+    "cc-plugin-plugin-authoring@builtin": {
+      "usageCount": 0,
+      "lastUsedAt": 1794416978272,
+      "lastUsedNumStartups": 0
+    }
+  },
+  "skillUsage": {
+    "cloudroom:required-proof": {
+      "usageCount": 1,
+      "lastUsedAt": 1794416978304
+    }
+  }
+}

@@ -1,0 +1,25 @@
+--- D1-r1.md
++++ D1-r2.md
+@@ -1,4 +1,4 @@
+-# 03PA-P04 D1/r1 — Combined principal/role and native MCP authority
++# 03PA-P04 D1/r2 — Combined principal/role and native MCP authority
+ 
+ No backward compatibility. Reset disposable databases for the combined init schema.
+ 
+@@ -26,3 +26,16 @@
+ - Full repository and CI gates remain mandatory after integration/docs, with original limits and no weakened assertions.
+ 
+ Architecture acceptance is not implementation acceptance. D1 is the sole newly gated integration decision; unrelated mechanical conflict resolution/docs may proceed during review.
++
++## D1/r2 extension: native broker reviewer identity
++
++Evidence: merge-native-focused2.txt has23 NativeMcpNotAdmitted failures sharing one broker compilation path. Running the existing immutable compiled native broker unit tests directly exposes registry.role: its source still emits removed `kind:user` reviewers. Plan02 requires person-principal references. The sanitized public error remains correct and must not be relaxed.
++
++8. NativeBrokerIdentity gains an explicit typed actor_principal PrincipalId beside its authenticated account actor. Native broker source emits the one literal `{kind:principal,id:actor_principal}` reviewer for protected tools. Binding run_as remains the real account. This is a mandatory integration of Plan02's existing reviewer contract, not an alternate decoder or user-UUID/principal-ID conversion.
++9. Native broker creation resolves the current person principal by exact company/account under the already-owned company/member/principal authority. Persist actor_principal_id on native_mcp_brokers as immutable historical identity, alongside its historical actor_id. It is not a live FK or new permission and must not block principal/account retirement or physical deletion. On initial INSERT validate the exact tenant/person/account relationship; later updates remain forbidden and company teardown keeps its existing exception. Source admission and live checks continue to use actual current authorization.
++10. Include actor_principal_id in the broker uniqueness key, lookup and advisory reservation, so a later person-principal incarnation cannot reuse the old reviewer's broker. The existing native MCP live SQL additionally binds the current person principal to that broker ID. A prior immutable invocation does not move to the new broker or gain renewed effect authority. New explicit calls may create the new incarnation's broker. Same-principal replay remains idempotent.
++11. Historical restoration reconstructs PreparedNativeMcp from the stored broker actor_principal_id, never from a current principal lookup. Preserve exact frozen source/hash/reviewer/contract validation after the original actor is retired or removed; historical proof still confers no live effect authority. There is no reviewer backfill, fallback or compatibility path. Native calls keep their existing actor/broker/run/session pins, original source association and knowledge ceiling.
++
++Additional proof: existing native_broker_compiles_real_mcp_contract_and_binds_original_reviewer must assert the exact principal reference and distinguish it from the account UUID. Full native-focused admission/real approval/stop/unknown recovery/retirement/history suites must run, including original-actor removal. Add rollback-only native INSERT negatives for foreign/wrong-account actor principals and production broker lifetime/replay/incarnation checks. Native direct populated company cascade must retain the exact existing all-or-nothing teardown. Fresh migrations and final full gate remain mandatory.
++
++This extension changes the schema and frozen reviewer contract; dependent broker edits wait for B's explicit D1/r2 pass. D1/r1 sections1–7 remain the accepted integration invariants; its runtime acceptance was never claimed.

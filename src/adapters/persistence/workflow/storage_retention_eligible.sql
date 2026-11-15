@@ -44,3 +44,7 @@ SELECT
                     WHERE entry.company_id=marker.company_id AND entry.invocation_id=marker.invocation_id
                     AND NOT EXISTS(SELECT 1 FROM workflow_action_evidence_coverage AS coverage
                         WHERE coverage.company_id=proof.company_id AND coverage.evidence_id=proof.id AND coverage.remote_entry_id=entry.id)))))
+
+    AND NOT EXISTS(SELECT 1 FROM native_mcp_calls AS call JOIN tree ON tree.run_id=call.run_id
+        LEFT JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
+        WHERE call.company_id=$1 AND (operation.settled_at IS NULL OR public.native_mcp_has_unknown(call.company_id,call.run_id)))

@@ -7,7 +7,7 @@ async fn cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_
     let selection: ExecutionSelection = serde_json::from_value(serde_json::json!({
         "machine_id":uuid::Uuid::new_v4(), "project_id":"proj_wire", "provider":"acp-opencode",
         "model":"openai/gpt-6-luna", "policy":{
-            "workspace":"project_directory", "permissions":"provider_default", "reasoning":"low"
+            "workspace":"project_directory", "permissions":"full", "reasoning":"low"
         }
     }))
     .unwrap();
@@ -16,6 +16,7 @@ async fn cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_
     let prompt = LocalPrompt::try_from("exact é😀\n\t\r\"\\\u{1}".to_owned()).unwrap();
     let commands = [
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id,
             selection,
             prompt: prompt.clone(),

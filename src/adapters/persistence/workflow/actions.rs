@@ -48,6 +48,9 @@ impl ActionIntents for PostgresPersistence {
         if existing.is_none() && !active {
             return Err(conflict());
         }
+        if existing.is_none() {
+            super::native_mcp::live_on(&mut tx, action.request()).await?;
+        }
         let intent = match existing {
             Some(row) => restore(action, row, replayed)?,
             None => insert_on(&mut tx, action, model_call).await?,

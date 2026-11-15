@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 15s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 4 tests
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_publication_and_admission_capture_a_coherent_revision ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_bundle_http_authorizes_cached_reads_and_preserves_connection_identity ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_profile_uses_published_permissions_and_database_rejects_foreign_agent ... ok
+test adapters::persistence::local_agents::management::tests::native_tests::cloudroom_native_competing_starts_capture_one_revision_and_replay_before_profile_change ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4065 filtered out; finished in 2.35s
+

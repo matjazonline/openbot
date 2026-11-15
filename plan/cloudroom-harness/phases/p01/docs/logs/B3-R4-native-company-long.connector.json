@@ -1,0 +1,420 @@
+{
+  "status": {
+    "exitCode": 0,
+    "stdout": "{\"connection\":\"connected\",\"paired\":true,\"recoveryRequired\":false,\"sequence\":9,\"acknowledged\":9,\"providers\":[{\"provider\":\"claude-code\",\"status\":\"available\"},{\"provider\":\"codex\",\"status\":\"unavailable\"},{\"provider\":\"acp-opencode\",\"status\":\"available\"}],\"journal\":{\"commands\":3,\"mappings\":1,\"outboxBytes\":667,\"reservedBytes\":6290564,\"newCommandsPaused\":false,\"newSessionsPaused\":false}}",
+    "stderr": ""
+  },
+  "mappings": [
+    {
+      "threadId": "thr_cjv4r7n66h",
+      "operationId": "01a1ce46-1f5e-76c1-b21f-7f94e068411d"
+    }
+  ],
+  "commands": [
+    {
+      "id": "1541d02d-7933-42ae-b306-7bfc0a29eb16",
+      "sdkCalls": 0,
+      "queueId": null,
+      "stage": "terminal",
+      "nativeState": null,
+      "lastObservation": {
+        "kind": "catalog",
+        "sequence": 2,
+        "operation_id": "1541d02d-7933-42ae-b306-7bfc0a29eb16",
+        "catalog": {
+          "projects": [
+            "proj_8x3dx83ith"
+          ],
+          "providers": [
+            {
+              "provider": "claude-code",
+              "permission_modes": [
+                "full",
+                "auto",
+                "accept_edits"
+              ],
+              "models": [
+                {
+                  "model": "claude-opus-5-5[1m]",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-fable-5-1",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-opus-5[1m]",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-opus-4-8[1m]",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-opus-4-7[1m]",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-sonnet-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-opus-5-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-sonnet-5-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "claude-haiku-5-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "ultracode",
+                    "max"
+                  ]
+                }
+              ]
+            },
+            {
+              "provider": "acp-opencode",
+              "permission_modes": [
+                "full",
+                "accept_edits"
+              ],
+              "models": [
+                {
+                  "model": "anthropic/claude-fable-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-haiku-4-5-20251001",
+                  "reasoning_levels": [
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-haiku-4-5",
+                  "reasoning_levels": [
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-5-20251101",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-6",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-6-fast",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-7",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-7-fast",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-8",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-opus-4-8-fast",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-sonnet-4-5-20250929",
+                  "reasoning_levels": [
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-sonnet-4-5",
+                  "reasoning_levels": [
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-sonnet-4-6",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "anthropic/claude-sonnet-5",
+                  "reasoning_levels": [
+                    "low",
+                    "medium",
+                    "high",
+                    "xhigh",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "opencode/big-pickle",
+                  "reasoning_levels": [
+                    "medium"
+                  ]
+                },
+                {
+                  "model": "opencode/deepseek-v4-flash-free",
+                  "reasoning_levels": [
+                    "high",
+                    "max"
+                  ]
+                },
+                {
+                  "model": "opencode/hy3-free",
+                  "reasoning_levels": [
+                    "medium"
+                  ]
+                },
+                {
+                  "model": "opencode/mimo-v2.5-free",
+                  "reasoning_levels": [
+                    "medium"
+                  ]
+                },
+                {
+                  "model": "opencode/nemotron-3-ultra-free",
+                  "reasoning_levels": [
+                    "medium"
+                  ]
+                },
+                {
+                  "model": "opencode/north-mini-code-free",
+                  "reasoning_levels": [
+                    "none",
+                    "high"
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "id": "01a1ce45-db4a-7223-9f39-91e02ade9745",
+      "sdkCalls": 1,
+      "queueId": null,
+      "stage": "observing",
+      "nativeState": "running",
+      "lastObservation": {
+        "kind": "agent",
+        "observation": {
+          "sequence": 6,
+          "operation_id": "01a1ce45-db4a-7223-9f39-91e02ade9745",
+          "evidence": {
+            "kind": "turn",
+            "thread_id": "thr_cjv4r7n66h",
+            "turn_id": "daa967475e-t1",
+            "state": "running",
+            "output": null,
+            "truncated": false,
+            "usage": null
+          }
+        }
+      }
+    },
+    {
+      "id": "01a1ce46-1f5e-76c1-b21f-7f94e068411d",
+      "sdkCalls": 1,
+      "queueId": "qmsg_u7gdrjc8a5",
+      "stage": "observing",
+      "nativeState": null,
+      "lastObservation": {
+        "kind": "agent",
+        "observation": {
+          "sequence": 9,
+          "operation_id": "01a1ce46-1f5e-76c1-b21f-7f94e068411d",
+          "evidence": {
+            "kind": "submission",
+            "thread_id": "thr_cjv4r7n66h",
+            "state": "queued"
+          }
+        }
+      }
+    }
+  ],
+  "plugins": [
+    {
+      "id": "openbot-local",
+      "source": "path:/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+      "rootDir": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+      "version": "0.2.0",
+      "provenance": "direct",
+      "publisherLabel": null,
+      "isOrphanedBuiltin": false,
+      "sourceDisplay": "path · /private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin",
+      "updateState": {},
+      "enabled": true,
+      "description": "Company-owned native sessions through the local Cloudroom server.",
+      "name": "Openbot local agents",
+      "screenshots": [],
+      "collections": [],
+      "icon": "Plug",
+      "iconUrl": null,
+      "status": "running",
+      "statusDetail": null,
+      "handlerStats": {
+        "count": 94,
+        "totalMs": 129.15046199998142,
+        "maxMs": 69.5772500000021,
+        "errorCount": 0
+      },
+      "services": [
+        {
+          "name": "openbot-connector",
+          "state": "running"
+        }
+      ],
+      "schedules": [],
+      "cliCommand": {
+        "name": "openbot-local",
+        "summary": "Local connector status and project discovery"
+      },
+      "capabilities": [
+        {
+          "kind": "agent-tool",
+          "id": "openbot_company_mcp",
+          "label": "openbot_company_mcp",
+          "detail": "Use this Openbot agent’s existing company MCP tools. List aliases, describe the frozen contract, call an alias, or read a retained call status."
+        }
+      ],
+      "hasSettings": true,
+      "app": {
+        "hasApp": false,
+        "bundle": null
+      },
+      "logoUrl": null,
+      "logoDarkUrl": null,
+      "providerIds": [],
+      "icons": {}
+    }
+  ],
+  "logs": []
+}

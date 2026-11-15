@@ -1,0 +1,75 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+warning: unused import: `crate::entities::skill::Skill`
+  --> src/adapters/http/pages/agent_settings.rs:11:5
+   |
+11 | use crate::entities::skill::Skill;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/ui_agents.rs:607:29
+    |
+607 |                 skills.push(skill);
+    |                        ---- ^^^^^ expected `SkillSummary`, found `Skill`
+    |                        |
+    |                        arguments to this method are incorrect
+    |
+note: method defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:991:11
+help: call `Into::into` on this expression to convert `domain::entities::skill::Skill` into `SkillSummary`
+    |
+607 |                 skills.push(skill.into());
+    |                                  +++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/http/routes/ui_agents.rs:668:29
+    |
+668 |                 skills.push(selected.clone());
+    |                        ---- ^^^^^^^^^^^^^^^^ expected `SkillSummary`, found `Skill`
+    |                        |
+    |                        arguments to this method are incorrect
+    |
+note: method defined here
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/vec/mod.rs:991:11
+help: call `Into::into` on this expression to convert `domain::entities::skill::Skill` into `SkillSummary`
+    |
+668 |                 skills.push(selected.clone().into());
+    |                                             +++++++
+
+error[E0308]: mismatched types
+   --> src/adapters/http/pages/agent_settings.rs:972:46
+    |
+972 |             AgentCapabilityOptions { skills: &options },
+    |                                              ^^^^^^^^ expected `&[SkillSummary]`, found `&[Skill; 2]`
+    |
+    = note: expected reference `&[SkillSummary]`
+               found reference `&[domain::entities::skill::Skill; 2]`
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 2 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0277]: can't compare `SkillSummary` with `domain::entities::skill::Skill`
+   --> src/application/use_cases/skill.rs:491:9
+    |
+491 | /         assert_eq!(
+492 | |             page_with_more.items.as_slice(),
+493 | |             std::slice::from_ref(&first)
+494 | |         );
+    | |_________^ no implementation for `SkillSummary == domain::entities::skill::Skill`
+    |
+help: the trait `PartialEq<domain::entities::skill::Skill>` is not implemented for `SkillSummary`
+      but trait `PartialEq<SkillSummary>` is implemented for it
+   --> src/domain/entities/skill.rs:36:24
+    |
+ 36 | #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+    |                        ^^^^^^^^^
+    = help: for that trait implementation, expected `SkillSummary`, found `domain::entities::skill::Skill`
+    = note: required for `[SkillSummary]` to implement `PartialEq<[domain::entities::skill::Skill]>`
+    = note: 1 redundant requirement hidden
+    = note: required for `&[SkillSummary]` to implement `PartialEq<&[domain::entities::skill::Skill]>`
+
+Some errors have detailed explanations: E0277, E0308.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

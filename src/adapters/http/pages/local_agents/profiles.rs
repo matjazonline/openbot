@@ -93,30 +93,10 @@ fn editor(view: &Page<'_>) -> String {
         machine = machine.machine.id,
         context = conversation_fields(view)
     );
-    let projects = runtime
-        .projects
-        .iter()
-        .map(|project| {
-            option(
-                project.as_str(),
-                project.as_str(),
-                seeded.is_some_and(|profile| &profile.selection.project_id == project),
-            )
-        })
-        .collect::<String>();
-    let reasoning = model
-        .reasoning_levels
-        .iter()
-        .map(|level| {
-            option(
-                &enum_value(level),
-                &enum_value(level),
-                seeded.is_some_and(|profile| profile.selection.policy.reasoning == *level),
-            )
-        })
-        .collect::<String>();
+    let controls = runtime_fields(&runtime.projects, provider, model, view.profile);
+    let agent = agent_field(view);
     let fields = format!(
-        r#"<input type="hidden" name="machine_id" value="{machine}"><input type="hidden" name="provider" value="{provider}"><input type="hidden" name="model" value="{model}"><label class="block">Profile name<input class="input w-full" name="name" maxlength="128" required value="{name}"></label><label class="block">Enabled project<select class="select w-full" name="project" required>{projects}</select></label><label class="block">Reasoning<select class="select w-full" name="reasoning" required>{reasoning}</select></label><p>Workspace: existing project directory. Permissions: provider defaults. Native prompts are answered in Cloudroom.</p>"#,
+        r#"<input type="hidden" name="machine_id" value="{machine}"><input type="hidden" name="provider" value="{provider}"><input type="hidden" name="model" value="{model}"><label class="block">Profile name<input class="input w-full" name="name" maxlength="128" required value="{name}"></label>{agent}{controls}<p>Workspace: existing project directory. Full access is the default. Native prompts are answered in Cloudroom.</p>"#,
         machine = machine.machine.id,
         provider = attr(&enum_value(&provider.provider)),
         model = attr(model.model.as_str()),
@@ -134,5 +114,86 @@ fn editor(view: &Page<'_>) -> String {
             "New profile"
         },
         editor = form(&action, &fields, "Save profile")
+    )
+}
+
+fn runtime_fields(
+    projects: &[crate::domain::local_agents::CloudroomProjectId],
+    provider: &crate::application::local_agents::ProviderCatalog,
+    model: &crate::application::local_agents::ModelCapabilities,
+    profile: Option<&LocalAgentProfile>,
+) -> String {
+    use crate::domain::local_agents::LocalPermissions;
+    let projects = projects
+        .iter()
+        .map(|project| {
+            option(
+                project.as_str(),
+                project.as_str(),
+                profile.is_some_and(|profile| &profile.selection.project_id == project),
+            )
+        })
+        .collect::<String>();
+    let reasoning = model
+        .reasoning_levels
+        .iter()
+        .map(|level| {
+            option(
+                &enum_value(level),
+                &enum_value(level),
+                profile.is_some_and(|profile| profile.selection.policy.reasoning == *level),
+            )
+        })
+        .collect::<String>();
+    let selected = profile.map_or(LocalPermissions::Full, |profile| {
+        profile.selection.policy.permissions
+    });
+    let mut permissions = if provider.permission_modes.contains(&selected) {
+        String::new()
+    } else {
+        "<option value=\"\" disabled selected>Selected access unavailable; choose a supported mode</option>".into()
+    };
+    for mode in provider.permission_modes.iter() {
+        let label = match mode {
+            LocalPermissions::Full => "Full access",
+            LocalPermissions::Auto => "Auto",
+            LocalPermissions::AcceptEdits => "Accept edits",
+        };
+        permissions.push_str(&option(&enum_value(mode), label, *mode == selected));
+    }
+    let uses_agent = profile.is_some_and(|profile| profile.agent_id.is_some());
+    let select_state = if uses_agent { "disabled" } else { "required" };
+    let fallback_state = if uses_agent { "" } else { "disabled" };
+    let fallback = enum_value(&selected);
+    format!(
+        r#"<input type="hidden" name="permissions" data-local-agent-fallback value="{fallback}" {fallback_state}><label class="block">Enabled project<select class="select w-full" name="project" required>{projects}</select></label><label class="block">Reasoning<select class="select w-full" name="reasoning" required>{reasoning}</select></label><label class="block">Profile permissions (without an agent)<select class="select w-full" name="permissions" data-local-agent-permissions {select_state}>{permissions}</select></label>"#
+    )
+}
+
+fn agent_field(view: &Page<'_>) -> String {
+    let options = view
+        .native_agents
+        .entries
+        .iter()
+        .map(|agent| {
+            format!(
+                r#"<option value="{}">{}</option>"#,
+                agent.id.as_uuid(),
+                text(&agent.name)
+            )
+        })
+        .collect::<String>();
+    let current = view
+        .profile
+        .and_then(|profile| profile.agent_id)
+        .map(|id| id.as_uuid().to_string())
+        .unwrap_or_default();
+    let more = if view.native_agents.truncated {
+        " Suggestions are limited; enter the exact agent ID to select another published company agent."
+    } else {
+        ""
+    };
+    format!(
+        r#"<label class="block">Openbot agent (optional)<input class="input w-full" name="agent_id" data-local-agent-selector list="local-native-agents" maxlength="36" value="{current}" placeholder="Choose a published agent"><datalist id="local-native-agents">{options}</datalist><span class="text-xs opacity-60">Uses the published agent's instructions, skills and native permissions. Leave blank for a profile without an agent.{more}</span></label>"#
     )
 }

@@ -63,6 +63,22 @@ impl Proxy {
         cert: CertificateDer<'static>,
         key: PrivateKeyDer<'static>,
     ) -> Self {
+        let backend = server
+            .origin
+            .strip_prefix("ws://")
+            .unwrap()
+            .split('/')
+            .next()
+            .unwrap()
+            .to_owned();
+        Self::with_backend(backend, cert, key, Duration::from_secs(30)).await
+    }
+    async fn with_backend(
+        backend: String,
+        cert: CertificateDer<'static>,
+        key: PrivateKeyDer<'static>,
+        handshake_timeout: Duration,
+    ) -> Self {
         let provider = Arc::new(rustls::crypto::ring::default_provider());
         let config = rustls::ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
@@ -73,14 +89,6 @@ impl Proxy {
         let acceptor = TlsAcceptor::from(Arc::new(config));
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
-        let backend = server
-            .origin
-            .strip_prefix("ws://")
-            .unwrap()
-            .split('/')
-            .next()
-            .unwrap()
-            .to_owned();
         let stop = CancellationToken::new();
         let shutdown = stop.clone();
         let task = tokio::spawn(async move {
@@ -93,12 +101,18 @@ impl Proxy {
                         let (socket,_)=accepted.unwrap();if clients.len()>=2 {drop(socket);continue;}
                         let acceptor=acceptor.clone();let backend=backend.clone();let stop=shutdown.clone();
                         clients.spawn(async move {
-                            let relay=async {
-                                let Ok(mut tls)=acceptor.accept(socket).await else {return;};
-                                let Ok(mut tcp)=TcpStream::connect(backend).await else {return;};
-                                let _=tokio::io::copy_bidirectional(&mut tls,&mut tcp).await;
+                            let setup=async {
+                                let tls=acceptor.accept(socket).await.ok()?;
+                                let tcp=TcpStream::connect(backend).await.ok()?;
+                                Some((tls,tcp))
                             };
-                            tokio::select! {biased; _=stop.cancelled()=>{},_=timeout(Duration::from_secs(30),relay)=>{}}
+                            let connected=tokio::select! {biased; _=stop.cancelled()=>return,
+                                result=timeout(handshake_timeout,setup)=>result};
+                            let Ok(Some((mut tls,mut tcp)))=connected else {return;};
+                            // The fixture owns this live relay until shutdown. A human
+                            // approval can outlive the setup budget on this connection.
+                            tokio::select! {biased; _=stop.cancelled()=>{},
+                                _=tokio::io::copy_bidirectional(&mut tls,&mut tcp)=>{}}
                         });
                     }
                 }
@@ -138,6 +152,52 @@ fn connector(roots: rustls::RootCertStore) -> TlsConnector {
     .with_root_certificates(roots)
     .with_no_client_auth();
     TlsConnector::from(Arc::new(config))
+}
+
+#[tokio::test]
+async fn cloudroom_tls_setup_deadline_preserves_established_relay_and_shutdown_joins_it() {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap().to_string();
+    let backend = tokio::spawn(async move {
+        let (socket, _) = listener.accept().await.unwrap();
+        let (mut read, mut write) = socket.into_split();
+        let _ = tokio::io::copy(&mut read, &mut write).await;
+    });
+    let (cert, key) = certificate();
+    let mut roots = rustls::RootCertStore::empty();
+    roots.add(cert.clone()).unwrap();
+    let proxy = Proxy::with_backend(address, cert, key, Duration::from_secs(1)).await;
+    let socket = TcpStream::connect(proxy.address).await.unwrap();
+    let mut tls = connector(roots)
+        .connect(ServerName::try_from("localhost").unwrap(), socket)
+        .await
+        .unwrap();
+    tokio::time::sleep(Duration::from_millis(1500)).await;
+    tls.write_all(b"still live").await.unwrap();
+    let mut echoed = [0; 10];
+    timeout(Duration::from_secs(1), tls.read_exact(&mut echoed))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(&echoed, b"still live");
+    // Unnegotiated clients still consume only the setup budget and bounded slots.
+    let mut stalled = TcpStream::connect(proxy.address).await.unwrap();
+    let mut byte = [0; 1];
+    assert_eq!(
+        timeout(Duration::from_secs(2), stalled.read(&mut byte))
+            .await
+            .unwrap()
+            .unwrap(),
+        0
+    );
+    timeout(Duration::from_secs(1), proxy.close())
+        .await
+        .expect("fixture shutdown must join established relays");
+    timeout(Duration::from_secs(1), backend)
+        .await
+        .unwrap()
+        .unwrap();
 }
 
 /// Reuse the production route and TLS terminator for plugin lifecycle tests.

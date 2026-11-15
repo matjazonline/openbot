@@ -1,0 +1,329 @@
+ .github/workflows/ci.yml                           |   6 +
+ Cargo.lock                                         |   1 +
+ Cargo.toml                                         |   1 +
+ assets/app.css                                     |   2 +-
+ docs/agent-authoring.md                            |  31 ++
+ integrations/cloudroom-plugin/README.md            |   6 +
+ integrations/cloudroom-plugin/src/connector.ts     |   6 +-
+ integrations/cloudroom-plugin/src/protocol.ts      |   9 +-
+ integrations/cloudroom-plugin/src/sdk.ts           |  45 ++-
+ .../cloudroom-plugin/test/connector.test.ts        |   3 +-
+ .../cloudroom-plugin/test/native-fixture.ts        |  12 +-
+ .../cloudroom-plugin/test/permissions.test.ts      |  57 ++++
+ integrations/cloudroom-plugin/test/support.ts      |   2 +-
+ migrations/20260817000000_init_schema.sql          |  54 ++++
+ plan/cloudroom-harness/COORDINATION.md             |  19 ++
+ plan/cloudroom-harness/README.md                   |  18 ++
+ plan/cloudroom-harness/phases/p01/docs/HANDOFF.md  |  41 +++
+ plan/cloudroom-harness/phases/p01/docs/REVIEW.md   |  27 ++
+ plan/cloudroom-harness/phases/p01/docs/TASK.md     | 154 ++++++++++
+ .../phases/p01/docs/agent-review-findings.md       | 100 ++++++
+ .../phases/p01/docs/agent-review-notes.md          | 115 +++++++
+ .../phases/p01/docs/logs/B1-browser-R2.txt         |   9 +
+ .../phases/p01/docs/logs/B1-css-R1.txt             |   9 +
+ .../phases/p01/docs/logs/B1-css-R2.txt             |   8 +
+ .../phases/p01/docs/logs/B1-css-build-R1.txt       |   8 +
+ .../docs/logs/B1-focused-R1-agent-contracts.txt    |  23 ++
+ .../p01/docs/logs/B1-focused-R1-archives.txt       |  26 ++
+ .../phases/p01/docs/logs/B1-focused-R1-auth.txt    |  14 +
+ .../docs/logs/B1-focused-R1-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R1-browser.txt |  22 ++
+ .../phases/p01/docs/logs/B1-focused-R1-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R1-driver.txt  |  33 ++
+ .../phases/p01/docs/logs/B1-focused-R1-format.txt  |   0
+ .../docs/logs/B1-focused-R1-fresh-migration.txt    |   1 +
+ .../p01/docs/logs/B1-focused-R1-frozen-skills.txt  |  10 +
+ .../docs/logs/B1-focused-R1-offline-alltargets.txt |   2 +
+ .../logs/B1-focused-R1-reset-owned-database.txt    |   0
+ .../p01/docs/logs/B1-focused-R1-results.json       | 217 +++++++++++++
+ .../p01/docs/logs/B1-focused-R1-skill-bundles.txt  |  64 ++++
+ .../docs/logs/B1-focused-R1-skill-persistence.txt  |  23 ++
+ .../p01/docs/logs/B1-focused-R1-skill-usecases.txt |  10 +
+ .../p01/docs/logs/B1-focused-R1-source-modules.txt |  16 +
+ .../p01/docs/logs/B1-focused-R1-sqlx-prepare.txt   |   3 +
+ .../p01/docs/logs/B1-focused-R1.snapshot.txt       |  48 +++
+ .../p01/docs/logs/B1-focused-R2-archives.txt       |  13 +
+ .../docs/logs/B1-focused-R2-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R2-browser.txt |   9 +
+ .../phases/p01/docs/logs/B1-focused-R2-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R2-driver.txt  |  25 ++
+ .../phases/p01/docs/logs/B1-focused-R2-format.txt  |   0
+ .../p01/docs/logs/B1-focused-R2-frozen-skills.txt  |  10 +
+ .../docs/logs/B1-focused-R2-offline-alltargets.txt |   2 +
+ .../p01/docs/logs/B1-focused-R2-results.json       | 167 ++++++++++
+ .../p01/docs/logs/B1-focused-R2-skill-bundles.txt  |  40 +++
+ .../docs/logs/B1-focused-R2-skill-persistence.txt  |  23 ++
+ .../p01/docs/logs/B1-focused-R2-skill-usecases.txt |  10 +
+ .../p01/docs/logs/B1-focused-R2-source-modules.txt |  16 +
+ .../docs/logs/B1-focused-R2-sqlx-prepare-check.txt |   2 +
+ .../p01/docs/logs/B1-focused-R2.snapshot.txt       |  49 +++
+ .../docs/logs/B1-focused-R3-all-skill-callers.txt  |  82 +++++
+ .../docs/logs/B1-focused-R3-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R3-browser.txt |   9 +
+ .../phases/p01/docs/logs/B1-focused-R3-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R3-driver.txt  |  15 +
+ .../phases/p01/docs/logs/B1-focused-R3-format.txt  |   0
+ .../docs/logs/B1-focused-R3-offline-alltargets.txt |   2 +
+ .../p01/docs/logs/B1-focused-R3-results.json       |  97 ++++++
+ .../docs/logs/B1-focused-R3-sqlx-prepare-check.txt |   2 +
+ .../p01/docs/logs/B1-focused-R3.snapshot.txt       |  49 +++
+ .../docs/logs/B1-focused-R4-all-skill-callers.txt  |  85 +++++
+ .../docs/logs/B1-focused-R4-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R4-browser.txt |   9 +
+ .../phases/p01/docs/logs/B1-focused-R4-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R4-driver.txt  |  17 +
+ .../phases/p01/docs/logs/B1-focused-R4-format.txt  |   0
+ .../docs/logs/B1-focused-R4-offline-alltargets.txt |   2 +
+ .../p01/docs/logs/B1-focused-R4-results.json       | 110 +++++++
+ .../p01/docs/logs/B1-focused-R4-source-modules.txt |  16 +
+ .../p01/docs/logs/B1-focused-R4-sqlx-prepare.txt   |   3 +
+ .../p01/docs/logs/B1-focused-R4.snapshot.txt       |  50 +++
+ .../docs/logs/B1-focused-R5-all-skill-callers.txt  |  99 ++++++
+ .../docs/logs/B1-focused-R5-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R5-browser.txt |   9 +
+ .../phases/p01/docs/logs/B1-focused-R5-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R5-driver.txt  |  15 +
+ .../phases/p01/docs/logs/B1-focused-R5-format.txt  |   0
+ .../docs/logs/B1-focused-R5-offline-alltargets.txt |   2 +
+ .../p01/docs/logs/B1-focused-R5-results.json       |  97 ++++++
+ .../docs/logs/B1-focused-R5-sqlx-prepare-check.txt |   2 +
+ .../p01/docs/logs/B1-focused-R5.snapshot.txt       |  50 +++
+ .../docs/logs/B1-focused-R6-all-skill-callers.txt  |  86 ++++++
+ .../docs/logs/B1-focused-R6-browser-fixtures.txt   |   8 +
+ .../phases/p01/docs/logs/B1-focused-R6-browser.txt |   9 +
+ .../phases/p01/docs/logs/B1-focused-R6-clippy.txt  |   2 +
+ .../phases/p01/docs/logs/B1-focused-R6-driver.txt  |  13 +
+ .../phases/p01/docs/logs/B1-focused-R6-format.txt  |   0
+ .../docs/logs/B1-focused-R6-offline-alltargets.txt |   2 +
+ .../p01/docs/logs/B1-focused-R6-results.json       |  83 +++++
+ .../p01/docs/logs/B1-focused-R6.snapshot.txt       |  50 +++
+ .../phases/p01/docs/logs/B1-format-R1.txt          |   0
+ .../phases/p01/docs/logs/B1-format-R3.txt          |   0
+ .../phases/p01/docs/logs/B1-format-R4.txt          |   0
+ .../phases/p01/docs/logs/B1-format-R5.txt          |   0
+ .../phases/p01/docs/logs/B1-format-R6.txt          |   0
+ .../p01/docs/logs/B1-freeze-R2-css-check.txt       |   8 +
+ .../p01/docs/logs/B1-freeze-R2-format-check.txt    |   0
+ .../p01/docs/logs/B1-freeze-R2-graft-build.txt     |   6 +
+ .../docs/logs/B1-freeze-R2-integration-docs.txt    |   1 +
+ .../p01/docs/logs/B1-freeze-R2-whitespace.txt      |   0
+ .../phases/p01/docs/logs/B1-freeze-css-check.txt   |   8 +
+ .../p01/docs/logs/B1-freeze-format-check.txt       |   0
+ .../phases/p01/docs/logs/B1-freeze-whitespace.txt  |   0
+ .../phases/p01/docs/logs/B1-graft-build.txt        |   6 +
+ .../phases/p01/docs/logs/B1-initial-migrate.txt    |   1 +
+ .../p01/docs/logs/B1-initial-offline-check.txt     |  38 +++
+ .../phases/p01/docs/logs/B1-integration-docs.txt   |   1 +
+ .../phases/p01/docs/logs/B1-offline-check-R2.txt   | 122 ++++++++
+ .../phases/p01/docs/logs/B1-offline-check-R3.txt   |  62 ++++
+ .../phases/p01/docs/logs/B1-offline-check-R4.txt   |   2 +
+ .../phases/p01/docs/logs/B1-offline-check-R5.txt   |  75 +++++
+ .../phases/p01/docs/logs/B1-offline-check-R6.txt   |   2 +
+ .../phases/p01/docs/logs/B1-patch-whitespace.txt   |   0
+ .../docs/logs/B1-review-archive-probe-build.txt    |   0
+ .../p01/docs/logs/B1-review-archive-probe.rs       |  17 +
+ .../p01/docs/logs/B1-review-archive-probe.txt      |   2 +
+ .../p01/docs/logs/B1-review-copy-race-build-R2.txt |   0
+ .../p01/docs/logs/B1-review-copy-race-build.txt    |  25 ++
+ .../phases/p01/docs/logs/B1-review-copy-race.rs    |  36 +++
+ .../phases/p01/docs/logs/B1-review-copy-race.txt   |   2 +
+ .../p01/docs/logs/B1-review-probe-identities.json  |  34 ++
+ .../phases/p01/docs/logs/B2-investigation-notes.md |  37 +++
+ .../phases/p01/docs/logs/B2-models-R1-format.txt   |   0
+ .../docs/logs/B2-models-R1-offline-alltargets.txt  | 166 ++++++++++
+ .../phases/p01/docs/logs/B2-models-R1-results.json |  28 ++
+ .../phases/p01/docs/logs/B2-models-R2-format.txt   |   0
+ .../docs/logs/B2-models-R2-offline-alltargets.txt  |   2 +
+ .../phases/p01/docs/logs/B2-models-R2-results.json |  28 ++
+ .../p01/docs/logs/B2-models-R3-agent-domain.txt    |  38 +++
+ .../phases/p01/docs/logs/B2-models-R3-format.txt   |   0
+ .../phases/p01/docs/logs/B2-models-R3-results.json |  29 ++
+ .../p01/docs/logs/B2-models-R4-agent-domain.txt    |  25 ++
+ .../phases/p01/docs/logs/B2-models-R4-format.txt   |   0
+ .../p01/docs/logs/B2-models-R4-publication-db.txt  |  44 +++
+ .../phases/p01/docs/logs/B2-models-R4-results.json |  59 ++++
+ .../logs/B2-models-R4-workflow-publication.txt     |  42 +++
+ .../p01/docs/logs/B2-permissions-R1-format.txt     |   0
+ .../p01/docs/logs/B2-permissions-R1-node-tests.txt | 116 +++++++
+ .../docs/logs/B2-permissions-R1-node-typecheck.txt |   6 +
+ .../logs/B2-permissions-R1-offline-alltargets.txt  |   2 +
+ .../docs/logs/B2-permissions-R2-domain-wire.txt    |  26 ++
+ .../p01/docs/logs/B2-permissions-R2-format.txt     |   0
+ .../p01/docs/logs/B2-permissions-R2-node-tests.txt | 116 +++++++
+ .../docs/logs/B2-permissions-R2-node-typecheck.txt |   4 +
+ .../p01/docs/logs/B2-permissions-R2-results.json   |  52 ++++
+ .../docs/logs/B2-permissions-R3-domain-wire.txt    |  25 ++
+ .../p01/docs/logs/B2-permissions-R3-http-ui.txt    |   7 +
+ .../docs/logs/B2-permissions-R3-persistence.txt    |  64 ++++
+ .../p01/docs/logs/B2-permissions-R3-results.json   |  47 +++
+ .../p01/docs/logs/B2-permissions-R4-clippy.txt     |   2 +
+ .../p01/docs/logs/B2-permissions-R4-format.txt     |   0
+ .../p01/docs/logs/B2-permissions-R4-http-ui.txt    |  12 +
+ .../p01/docs/logs/B2-permissions-R4-results.json   |  46 +++
+ .../p01/docs/logs/B2-permissions-R5-connection.txt |  27 ++
+ .../p01/docs/logs/B2-permissions-R5-format.txt     |   0
+ .../p01/docs/logs/B2-permissions-R5-node-tests.txt | 116 +++++++
+ .../docs/logs/B2-permissions-R5-node-typecheck.txt |   4 +
+ .../docs/logs/B2-permissions-R5-persistence.txt    |  64 ++++
+ .../p01/docs/logs/B2-permissions-R5-results.json   |  82 +++++
+ .../p01/docs/logs/B2-permissions-R5-workflow.txt   |   7 +
+ .../p01/docs/logs/B2-permissions-R6-clippy.txt     |   2 +
+ .../p01/docs/logs/B2-permissions-R6-discover.txt   | 115 +++++++
+ .../docs/logs/B2-permissions-R6-protocol-frame.txt |   8 +
+ .../p01/docs/logs/B2-permissions-R6-results.json   |  51 +++
+ .../docs/logs/B2-permissions-R7-graft-build.txt    |   6 +
+ .../p01/docs/logs/B2-permissions-R7-results.json   |  40 +++
+ .../p01/docs/logs/B2-permissions-R7-whitespace.txt |   0
+ .../p01/docs/logs/B2-permissions-R7-workflow.txt   |  37 +++
+ .../logs/B2-permissions-checkpoint.identity.json   |  13 +
+ .../logs/B2-permissions-checkpoint.snapshot.txt    |  79 +++++
+ .../phases/p01/docs/logs/B2-plugin-baseline.json   |  10 +
+ .../phases/p01/docs/logs/B2-plugin-baseline.txt    | 104 +++++++
+ .../p01/docs/logs/CH-P01-AG1-R2-identity-check.md  |   7 +
+ .../p01/docs/logs/CH-P01-AG1-coordination-r1.md    |  19 ++
+ .../phases/p01/docs/logs/CH-P01-AG1-inspection.md  | 182 +++++++++++
+ .../p01/docs/logs/CH-P01-AG2-R2-inspection.md      | 317 +++++++++++++++++++
+ .../docs/logs/CH-P01-AG2-R2-return.snapshot.txt    |  50 +++
+ .../p01/docs/logs/CH-P01-AG2-coordination-r1.md    |  19 ++
+ .../p01/docs/logs/CH-P01-AG2-source-evidence.md    | 231 ++++++++++++++
+ .../p01/docs/logs/CH-P01-B1-R1-coordination.md     |  19 ++
+ .../p01/docs/logs/CH-P01-B1-R1.evidence.json       | 235 ++++++++++++++
+ .../phases/p01/docs/logs/CH-P01-B1-R1.snapshot.txt |  49 +++
+ .../p01/docs/logs/CH-P01-B1-R2-coordination.md     |  19 ++
+ .../p01/docs/logs/CH-P01-B1-R2.evidence.json       | 235 ++++++++++++++
+ .../phases/p01/docs/logs/CH-P01-B1-R2.snapshot.txt |  50 +++
+ .../p01/docs/logs/CH-P01-M1-r1.identity.json       |   7 +
+ .../phases/p01/docs/logs/CH-P01-M1-r1.md           |  29 ++
+ .../p01/docs/logs/CH-P01-M1-r2.identity.json       |  11 +
+ .../phases/p01/docs/logs/CH-P01-M1-r2.md           |  34 ++
+ .../p01/docs/logs/CH-P01-M2-r1.identity.json       |   7 +
+ .../phases/p01/docs/logs/CH-P01-M2-r1.md           |  59 ++++
+ .../p01/docs/logs/CH-P01-M2-r2.identity.json       |  11 +
+ .../phases/p01/docs/logs/CH-P01-M2-r2.md           |  76 +++++
+ .../p01/docs/logs/M2-preparation-R2.snapshot.txt   |  50 +++
+ .../p01/docs/logs/M2-preparation.snapshot.txt      |   0
+ .../p01/docs/logs/branch-publication-input.json    |   9 +
+ .../p01/docs/logs/cloudroom-baseline-build.json    |  18 ++
+ .../p01/docs/logs/cloudroom-baseline-build.txt     |  73 +++++
+ .../p01/docs/logs/cloudroom-baseline-install.txt   | 195 ++++++++++++
+ .../p01/docs/logs/cloudroom-baseline-source.json   |  21 ++
+ .../phases/p01/docs/logs/focused-B1-R1.py          |  69 +++++
+ .../phases/p01/docs/logs/focused-B1-R2.py          |  63 ++++
+ .../phases/p01/docs/logs/focused-B1-R3.py          |  58 ++++
+ .../phases/p01/docs/logs/focused-B1-R4.py          |  59 ++++
+ .../phases/p01/docs/logs/focused-B1-R5.py          |  58 ++++
+ .../phases/p01/docs/logs/focused-B1-R6.py          |  57 ++++
+ .../phases/p01/docs/logs/focused-B2-models-R1.py   |  21 ++
+ .../phases/p01/docs/logs/focused-B2-models-R2.py   |  21 ++
+ .../phases/p01/docs/logs/focused-B2-models-R3.py   |  21 ++
+ .../phases/p01/docs/logs/focused-B2-models-R4.py   |  21 ++
+ .../p01/docs/logs/focused-B2-permissions-R3.py     |  22 ++
+ .../p01/docs/logs/focused-B2-permissions-R4.py     |  21 ++
+ .../p01/docs/logs/focused-B2-permissions-R5.py     |  21 ++
+ .../p01/docs/logs/focused-B2-permissions-R6.py     |  21 ++
+ .../p01/docs/logs/focused-B2-permissions-R7.py     |  21 ++
+ .../phases/p01/docs/logs/focused-B2-permissions.py |  21 ++
+ .../logs/native-fixture-baseline/claude-help.txt   | 314 +++++++++++++++++++
+ .../logs/native-fixture-baseline/native-stderr.txt |   0
+ .../native-fixture-baseline/native-stdout.jsonl    |   5 +
+ .../native-fixture-baseline/portable-recheck.json  |  32 ++
+ .../p01/docs/logs/native-fixture-baseline/probe.py |  38 +++
+ .../docs/logs/native-fixture-baseline/result.json  |  27 ++
+ .../phases/p01/docs/logs/plugin-npm-ci.txt         |   8 +
+ .../phases/p01/docs/logs/postgres-setup.txt        |  25 ++
+ .../phases/p01/docs/logs/resources.json            |  16 +
+ .../p01/docs/logs/root-B1-R2-acceptance.json       |  23 ++
+ .../docs/logs/root-B1-R2-evidence-validation.txt   |   2 +
+ .../phases/p01/docs/logs/root-B1-R2.snapshot.txt   |  50 +++
+ .../docs/logs/root-CH-P01-M1-r2-acceptance.json    |  10 +
+ .../p01/docs/logs/root-M2-r2-acceptance.json       |  19 ++
+ .../phases/p01/docs/logs/root-M2-r2.snapshot.txt   |  50 +++
+ .../phases/p01/docs/logs/root-npm-ci.txt           |  18 ++
+ .../p01/docs/logs/stop-checkpoint.identity.json    |  13 +
+ .../p01/docs/logs/stop-checkpoint.snapshot.txt     |  97 ++++++
+ .../phases/p01/docs/logs/stop-graft-build.txt      |   6 +
+ .../phases/p01/docs/logs/stop-postgres.txt         |   2 +
+ .../phases/p01/docs/logs/stop-status.json          |  27 ++
+ .../p01/docs/logs/weekly-budget-current.json       |  14 +
+ .../p01/docs/logs/weekly-budget-history.jsonl      |   2 +
+ .../p01/docs/logs/weekly-budget-proxy-errors.txt   |   0
+ scripts/tests/skill-bundle-browser.mjs             |  82 +++++
+ src/adapters/harness/rig/workflow.rs               |   5 +-
+ src/adapters/http/auth.rs                          |  22 +-
+ src/adapters/http/pages/agent_settings.rs          |  13 +-
+ src/adapters/http/pages/company_skills.rs          |  70 ++++-
+ src/adapters/http/pages/local_agents/profiles.rs   |  68 ++--
+ .../http/pages/workflow_authoring/agent_picker.rs  |  11 +-
+ .../http/pages/workflow_runs/provenance.rs         |   7 +-
+ .../connection_failure_tests.rs                    |   6 +-
+ .../connection_resource_tests.rs                   |   2 +-
+ .../local_machine_connection/connection_tests.rs   |   6 +-
+ .../routes/local_machine_connection/framing.rs     |   6 +-
+ .../local_machine_connection/framing_tests.rs      |  21 +-
+ .../http/routes/local_machine_connection/mod.rs    |   2 +-
+ src/adapters/http/routes/skill_library.rs          |  74 ++++-
+ src/adapters/http/routes/skill_library/archive.rs  | 329 ++++++++++++++++++++
+ .../http/routes/skill_library/archive_tests.rs     | 302 ++++++++++++++++++
+ src/adapters/http/routes/skill_library/bundles.rs  | 284 +++++++++++++++++
+ .../http/routes/skill_library/http_bundle_tests.rs | 342 +++++++++++++++++++++
+ .../http/routes/skill_library/http_tests.rs        | 318 +++++++++++++++++++
+ src/adapters/http/routes/skill_library/json.rs     |  98 ++++++
+ src/adapters/http/routes/ui_agents.rs              |   6 +-
+ .../routes/ui_agents/authoring/test_support.rs     |   1 +
+ src/adapters/http/routes/ui_local_agents.rs        |   3 +-
+ src/adapters/http/routes/ui_local_agents_tests.rs  |  94 ++++++
+ .../http/routes/workflows/ui/runs/pages_tests.rs   |   2 +-
+ .../persistence/agent_publication/capture.rs       |  24 +-
+ .../agent_publication/tests/publication.rs         |  40 ++-
+ .../persistence/agent_publication/tests/skills.rs  |  34 ++
+ .../persistence/agent_publication/tests/support.rs |   3 +
+ .../persistence/local_agents/constraint_tests.rs   |   2 +-
+ .../local_agents/protocol/recovery_tests.rs        |   3 +-
+ .../local_agents/protocol/test_support.rs          |   4 +-
+ .../persistence/local_agents/test_support.rs       |   4 +-
+ src/adapters/persistence/onboarding/tests.rs       |   1 +
+ src/adapters/persistence/skill.rs                  |  99 +++++-
+ .../skill_bundle_copy_concurrency_tests.rs         | 125 ++++++++
+ .../persistence/skill_bundle_persistence_tests.rs  | 195 ++++++++++++
+ src/adapters/persistence/skill_tests.rs            |  52 +++-
+ .../persistence/workflow/agent_authority.rs        |   5 +-
+ .../persistence/workflow/agent_history/storage.rs  |   2 +-
+ .../persistence/workflow/agent_preparation.rs      |   9 +-
+ .../persistence/workflow/agent_runtime_tests.rs    |   1 +
+ .../workflow/autonomous_agent_e2e/approval.rs      |   1 +
+ .../workflow/autonomous_agent_e2e/support.rs       |   4 +-
+ .../autonomous_agent_provisioning_tests.rs         |   1 +
+ .../autonomous_agent_storage_revision_tests.rs     |   2 +
+ ...utonomous_agent_storage_skill_lifetime_tests.rs |   2 +
+ .../workflow/autonomous_agent_storage_support.rs   |   5 +-
+ .../persistence/workflow/doop_document_tests.rs    |   1 +
+ .../persistence/workflow/local_agent_tests.rs      |   2 +-
+ .../persistence/workflow/run_provenance/mod.rs     |   9 +-
+ .../workflow/sample_capture_bounds_tests.rs        |   2 +-
+ src/application/agent/authoring_reads.rs           |   2 +-
+ src/application/agent/contract_tests.rs            |   8 +-
+ src/application/agent/definition.rs                |  24 +-
+ src/application/agent/mod.rs                       |   2 +
+ src/application/agent/resolution.rs                |   6 +-
+ src/application/agent/resolution_tests.rs          |  27 +-
+ src/application/local_agents/bounds.rs             |   4 +-
+ src/application/local_agents/catalog.rs            |  20 +-
+ src/application/local_agents/contract_tests.rs     |  36 ++-
+ src/application/local_agents/wire_tests.rs         |   2 +-
+ src/application/local_agents/workflow/schemas.rs   |   2 +-
+ src/application/use_cases/skill.rs                 |  33 +-
+ src/application/workflow/agent.rs                  |   8 +-
+ .../workflow/publication/capabilities.rs           |   1 +
+ .../workflow/publication/capabilities_tests.rs     |   2 +
+ src/application/workflow/publication/tests.rs      |   4 +-
+ src/application/workflow/run_views.rs              |   2 +-
+ src/application/workflow/sample/approval_tests.rs  |   4 +-
+ src/application/workflow/sample/tests.rs           |   4 +-
+ src/domain/entities/mod.rs                         |   1 +
+ src/domain/entities/skill.rs                       |  62 +++-
+ src/domain/entities/skill_bundle.rs                | 262 ++++++++++++++++
+ src/domain/entities/skill_bundle_tests.rs          | 135 ++++++++
+ src/domain/local_agents/observations.rs            |   1 +
+ src/domain/local_agents/selection.rs               |   4 +-
+ src/main.rs                                        |   1 +
+ 328 files changed, 11642 insertions(+), 208 deletions(-)
