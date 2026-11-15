@@ -1,0 +1,41 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 8 tests
+test adapters::persistence::address_tests::address_namespace_competing_self_edit_and_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_rejects_a_target_from_another_company ... ok
+test adapters::persistence::address_tests::address_namespace_person_paths_leave_exactly_one_address ... ok
+test adapters::persistence::address_tests::address_namespace_a_slug_names_one_desk_or_person_per_company ... ok
+test adapters::persistence::address_tests::address_namespace_competing_insert_and_demotion_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address ... FAILED
+test adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address ... FAILED
+test adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner ... FAILED
+
+failures:
+
+---- adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address stdout ----
+
+thread 'adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address' (8693620) panicked at src/adapters/persistence/address_tests.rs:334:5:
+assertion `left == right` failed
+  left: ("23514", "addresses_principal_kind")
+ right: ("23514", "addresses_target_check")
+
+---- adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address stdout ----
+
+thread 'adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address' (8693618) panicked at src/adapters/persistence/address_tests.rs:483:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23502", message: "null value in column \"created_by\" of relation \"agents\" violates not-null constraint", detail: Some("Failing row contains (65061100-664b-4290-bde8-1d9e6e953589, 289a4d6a-e42b-47ae-b023-1f627fd25c34, Helper, helper-31ec8544, null, null, null, null, 2026-11-14 09:09:25.571126+00, null, null, 1)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("agents"), column: Some("created_by"), data_type: None, constraint: None, file: Some("execMain.c"), line: Some(2235), routine: Some("ReportNotNullViolationError") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner stdout ----
+
+thread 'adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner' (8693615) panicked at src/adapters/persistence/address_tests.rs:519:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23502", message: "null value in column \"created_by\" of relation \"channels\" violates not-null constraint", detail: Some("Failing row contains (357f4820-f561-48ab-8647-7e85a25a0136, 7aac94a4-d69e-4750-a4b0-0ba82a416d52, Gale, team, 2026-11-14 09:09:25.57339+00, f, t, null, null, 0, null, f)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("channels"), column: Some("created_by"), data_type: None, constraint: None, file: Some("execMain.c"), line: Some(2235), routine: Some("ReportNotNullViolationError") })
+
+
+failures:
+    adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner
+    adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address
+    adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address
+
+test result: FAILED. 5 passed; 3 failed; 0 ignored; 0 measured; 4480 filtered out; finished in 0.96s
+
+EXIT 101

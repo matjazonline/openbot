@@ -119,7 +119,9 @@ async fn channel_reply_publication_policy_change_refuses_without_redirecting() {
     let selected =
         f.p.channel_reply_settings(
             f.scope.company,
-            RelatedChannelId::new(f.s.channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(f.s.channel)).as_uuid(),
+            ),
             f.s.owner(),
         )
         .await
@@ -210,7 +212,9 @@ async fn channel_reply_publication_approved_content_survives_elapsed_review_dead
     let selected =
         f.p.channel_reply_settings(
             f.scope.company,
-            RelatedChannelId::new(f.s.channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(f.s.channel)).as_uuid(),
+            ),
             f.s.owner(),
         )
         .await

@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
 
 #[derive(sqlx::FromRow)]
 struct SessionBinding {
@@ -47,22 +46,11 @@ async fn authorize_session(
         let conversation = stored
             .conversation_id
             .ok_or_else(|| invalid("session association"))?;
-        let channel: Uuid = sqlx::query_scalar(
-            "SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2 FOR SHARE",
-        )
-        .bind(company)
-        .bind(conversation)
-        .fetch_optional(&mut **db)
-        .await?
-        .ok_or_else(missing)?;
-        super::super::super::workflow::association::authorize_association(
+        super::super::super::workflow::association::authorize_thread(
             db,
             CompanyId::new(company),
             WorkflowActor::authenticated(actor)?,
-            RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(channel),
-                thread_id: RelatedThreadId::new(conversation),
-            },
+            conversation,
         )
         .await?;
     }

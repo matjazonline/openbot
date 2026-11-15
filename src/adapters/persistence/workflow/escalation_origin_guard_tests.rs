@@ -37,7 +37,7 @@ async fn workflow_escalation_origin_database_requires_authentic_complete_immutab
         "INSERT INTO workflow_notification_origins(company_id,id,notice_id) SELECT $1,value,value FROM (SELECT gen_random_uuid() AS value) AS forged",
         "INSERT INTO workflow_message_notification_origins(company_id,message_id,origin_id) SELECT company_id,gen_random_uuid(),notice_id FROM workflow_escalation_notice_targets WHERE company_id=$1",
         "INSERT INTO workflow_run_notification_origins(company_id,run_id,origin_id) SELECT target.company_id,escalation.run_id,target.notice_id FROM workflow_escalation_notice_targets AS target JOIN workflow_escalation_cases AS escalation ON escalation.company_id=target.company_id WHERE target.company_id=$1",
-        "INSERT INTO workflow_escalation_notice_targets(company_id,notice_id,message_id,intent_id,live_intent_id,principal_id,agent_id,desk_id,binding_id,binding_revision) SELECT company_id,notice_id,gen_random_uuid(),intent_id,intent_id,principal_id,agent_id,desk_id,binding_id,binding_revision FROM workflow_escalation_notice_targets WHERE company_id=$1",
+        "INSERT INTO workflow_escalation_notice_targets(company_id,notice_id,message_id,intent_id,live_intent_id,principal_id,agent_id,binding_id,binding_revision) SELECT company_id,notice_id,gen_random_uuid(),intent_id,intent_id,principal_id,agent_id,binding_id,binding_revision FROM workflow_escalation_notice_targets WHERE company_id=$1",
     ] {
         reject(&f, sql).await;
     }
@@ -196,11 +196,14 @@ async fn workflow_escalation_origin_missing_message_seal_aborts_real_fenced_comp
         .await
         .unwrap();
     let key = minted_agent_notice_key(&projection);
+    let recipient =
+        crate::adapters::persistence::test_support::minted_agent_notice_recipient(&projection);
     let request = || NotificationProjectionCommit {
         fence: &claim.lease,
         expected: &projection,
         email: None,
         agent_message_key: key.as_ref(),
+        agent_recipient: recipient.as_ref(),
         escalation_ack_hours: Default::default(),
     };
     let error = p

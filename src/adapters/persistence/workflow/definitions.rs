@@ -59,11 +59,12 @@ async fn event(
 async fn insert_draft(
     tx: &mut Transaction<'_, Postgres>,
     draft: &CompanyWorkflowDraft,
+    owner_agent: Option<Uuid>,
 ) -> AppResult<()> {
     sqlx::query(
         "INSERT INTO workflow_definitions \
-        (company_id, id, revision, title, description, source, template_origin) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        (company_id, id, revision, title, description, source, template_origin, owner_agent_id) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -72,6 +73,7 @@ async fn insert_draft(
     .bind(draft.description())
     .bind(draft.source())
     .bind(origin_json(draft)?)
+    .bind(owner_agent)
     .execute(&mut **tx)
     .await
     .map_err(write_error)?;
@@ -84,7 +86,7 @@ impl WorkflowDraftCopies for PostgresPersistence {
         let mut tx = self.pool.begin().await?;
         let draft = copy.draft();
         authorize_company(&mut tx, draft.company(), copy.actor()).await?;
-        insert_draft(&mut tx, draft).await?;
+        insert_draft(&mut tx, draft, None).await?;
         event(&mut tx, draft, copy.actor(), "copied", None).await?;
         tx.commit().await?;
         Ok(())
@@ -208,7 +210,7 @@ pub(super) async fn save_draft_on(
     archived: bool,
 ) -> AppResult<()> {
     match expected {
-        None => insert_draft(tx, draft).await?,
+        None => insert_draft(tx, draft, None).await?,
         Some(expected) => {
             let count = sqlx::query(
                 "UPDATE workflow_definitions SET revision = $3, title = $4, \
@@ -247,8 +249,9 @@ pub(super) async fn insert_draft_on(
     draft: &CompanyWorkflowDraft,
     actor: WorkflowActor,
     kind: &str,
+    owner_agent: Option<Uuid>,
 ) -> AppResult<()> {
-    insert_draft(tx, draft).await?;
+    insert_draft(tx, draft, owner_agent).await?;
     event(tx, draft, actor, kind, None).await
 }
 

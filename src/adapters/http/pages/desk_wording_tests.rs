@@ -25,8 +25,13 @@ fn desk_wording_nav_names_the_desks_link() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -168,11 +173,11 @@ fn desk_wording_flash_messages_say_desk() {
         &company,
         &[OnboardedAgent {
             agent: &triage,
-            channel: OnboardingChannel::Missing,
+            address: OnboardingAddress::Missing,
         }],
     );
-    assert!(missing.contains("No desk yet."));
-    assert!(missing.contains("Create an assistant desk</a>"));
+    assert!(missing.contains("Direct address unavailable."));
+    assert!(missing.contains("Manage agent</a>"));
 }
 
 /// Collect the value of every string literal in `source`, except doc comments: the copy a page

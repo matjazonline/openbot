@@ -7,6 +7,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use crate::entities::address::AddressTarget;
 use async_trait::async_trait;
 use sha2::{Digest, Sha256};
 use uuid::Uuid;
@@ -35,7 +36,7 @@ use crate::entities::message_view::EmailReplyContext;
 use crate::entities::message_view::MessageAuditView;
 use crate::entities::message_view::ThreadMessageView;
 use crate::entities::thread::Thread;
-use crate::entities::transport::ChannelSelector;
+use crate::entities::transport::AddressSelector;
 use crate::entities::transport::ExternalMessageKey;
 use crate::entities::transport::ExternalThreadKey;
 use crate::entities::transport::QualifiedIdentity;
@@ -76,15 +77,17 @@ pub use ingest::{
     CanonicalMessageIngress, InboundMessage, InboundPreflight, IngestRejection, IngressOrigin,
     PreparedInbound, UnusableHint,
 };
+mod inbox;
 mod notices;
 mod reads;
+pub use inbox::{Inbox, ReadableInbox};
 #[cfg(test)]
 pub(crate) use reads::project_message;
-pub use reads::{ChannelReadScope, ThreadReadScope};
+pub use reads::{InboxReadScope, ThreadReadScope};
 mod support;
 pub use notices::{
-    BounceInfo, BounceSuggestion, ChannelDirectoryEntry, bounce_cause, format_bounce_email_body,
-    format_help_email_body,
+    AddressDirectoryEntry, BounceInfo, BounceSuggestion, PrincipalBounce, PrincipalRefusal,
+    bounce_cause, format_bounce_email_body, format_help_email_body,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -201,7 +204,7 @@ impl ThreadUseCases {
     /// Read-only trust decision shared with routing; failures remain distinct from strangers.
     pub async fn sender_trust(
         &self,
-        selector: &ChannelSelector,
+        selector: &AddressSelector,
         sender: &QualifiedIdentity,
     ) -> AppResult<SenderTrust> {
         let Some(slug) = selector.company() else {
@@ -235,30 +238,26 @@ impl ThreadUseCases {
         &self,
         viewer: &Viewer,
         company_id: Uuid,
-        channel_id: Uuid,
+        target: AddressTarget,
         thread_id: Uuid,
     ) -> AppResult<Option<Thread>> {
-        let readers = ChannelReaders {
-            companies: self.company_persistence.as_ref(),
-            channels: self.channel_persistence.as_ref(),
-            participants: self.participant_persistence.as_ref(),
-        };
-        let Some(channel) = readable_channel(&readers, viewer, company_id, channel_id).await?
-        else {
-            return Ok(None);
-        };
+        let scope = InboxReadScope { company_id, target };
+        match self.require_readable_inbox(viewer, scope).await {
+            Ok(()) => {}
+            Err(AppError::NotFound(_)) => return Ok(None),
+            Err(error) => return Err(error),
+        }
         let thread = self
             .thread_persistence
-            .get_thread_by_id(thread_id)
+            .get_thread_by_id(company_id, thread_id)
             .await?
-            .filter(|thread| thread.channel_id == channel.id);
+            .filter(|thread| thread.belongs_to(company_id, target));
         let projected = self
-            .project_thread_titles(viewer, company_id, thread.into_iter().collect())
+            .project_thread_titles(viewer, scope, thread.into_iter().collect())
             .await?;
         Ok(projected.into_iter().next())
     }
 
-    /// Who sent the newest message in each of these threads, for the live column's reply mark.
     pub async fn thread_last_roles(
         &self,
         thread_ids: &[Uuid],
@@ -311,20 +310,21 @@ impl ThreadUseCases {
 
     async fn resolve_target_thread(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         target_thread_id: Option<Uuid>,
         reply_to_message_id: Option<CanonicalMessageId>,
     ) -> AppResult<Option<Thread>> {
         let thread = match target_thread_id {
             Some(thread_id) => self
                 .thread_persistence
-                .get_thread_by_id(thread_id)
+                .get_thread_by_id(company_id, thread_id)
                 .await?
-                .filter(|t| t.channel_id == channel_id),
+                .filter(|t| t.belongs_to(company_id, target)),
             None => match reply_to_message_id {
                 Some(reply_to) => {
                     self.thread_persistence
-                        .find_thread_for_message(channel_id, reply_to)
+                        .find_thread_for_message(company_id, target, reply_to)
                         .await?
                 }
                 None => None,
@@ -389,22 +389,8 @@ impl ThreadUseCases {
         let principal_id = actor
             .principal_id
             .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        let channel = self
-            .channel_persistence
-            .get_by_id(command.channel_id)
-            .await?
-            .filter(|channel| channel.company_id == command.company_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        if !channel.viewer_access(actor) {
-            return Err(AppError::NotFound("Thread not found.".into()));
-        }
-        let thread = self
-            .thread_persistence
-            .get_thread_by_id(command.thread_id)
-            .await?
-            .filter(|thread| thread.channel_id == channel.id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        debug_assert_eq!(thread.channel_id, command.channel_id);
+        self.require_note_target(command.company_id, command.target, command.thread_id, actor)
+            .await?;
         self.thread_persistence
             .create_internal_note(&command, principal_id)
             .await
@@ -418,28 +404,52 @@ impl ThreadUseCases {
         let principal_id = actor
             .principal_id
             .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        let channel = self
-            .channel_persistence
-            .get_by_id(command.channel_id)
-            .await?
-            .filter(|channel| channel.company_id == command.company_id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        if !channel.viewer_access(actor) {
-            return Err(AppError::NotFound("Thread not found.".into()));
-        }
-        let thread = self
-            .thread_persistence
-            .get_thread_by_id(command.thread_id)
-            .await?
-            .filter(|thread| thread.channel_id == channel.id)
-            .ok_or_else(|| AppError::NotFound("Thread not found.".into()))?;
-        debug_assert_eq!(thread.channel_id, command.channel_id);
+        self.require_note_target(command.company_id, command.target, command.thread_id, actor)
+            .await?;
         self.thread_persistence
             .tombstone_internal_note(&command, principal_id)
             .await
     }
 
-    /// Attach a message that is already stored to another of its company's threads.
+    async fn require_note_target(
+        &self,
+        company_id: Uuid,
+        target: AddressTarget,
+        thread_id: Uuid,
+        actor: crate::entities::participant::PrincipalAccessContext,
+    ) -> AppResult<()> {
+        let allowed = match target {
+            AddressTarget::Desk(id) => self
+                .channel_persistence
+                .get_by_id(id)
+                .await?
+                .filter(|desk| desk.company_id == company_id)
+                .is_some_and(|desk| desk.viewer_access(actor)),
+            AddressTarget::Principal(id) => self
+                .participant_persistence
+                .principal_by_id(company_id, id)
+                .await?
+                .is_some_and(|principal| {
+                    matches!(
+                        principal.kind,
+                        crate::entities::participant::PrincipalKind::Person
+                            | crate::entities::participant::PrincipalKind::Agent
+                    ) && principal.direct_viewer_access(actor)
+                }),
+        };
+        if !allowed
+            || !self
+                .thread_persistence
+                .get_thread_by_id(company_id, thread_id)
+                .await?
+                .is_some_and(|thread| thread.belongs_to(company_id, target))
+        {
+            return Err(AppError::NotFound("Thread not found.".into()));
+        }
+        Ok(())
+    }
+
+    /// Attach a stored message to another thread in its company.
     pub async fn associate_message(
         &self,
         thread_id: Uuid,
@@ -464,16 +474,11 @@ impl ThreadUseCases {
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct ChannelMatch {
     pub company: Company,
-    pub channel: Channel,
-    /// The address this message actually arrived on — an alias, or the canonical slug.
-    ///
-    /// Optional because durable task payloads written before aliases existed carry no value, and
-    /// `ChannelSlug::default()` is the empty string, which would silently send from
-    /// `@company.domain`.
-    #[serde(default)]
+    pub inbox: Inbox,
+    /// The alias or canonical slug actually addressed by this in-process message.
     pub matched_slug: Option<ChannelSlug>,
     pub thread: Thread,
     pub inbound_message: Message,
@@ -488,7 +493,7 @@ impl ChannelMatch {
     pub fn reply_slug(&self) -> ChannelSlug {
         self.matched_slug
             .clone()
-            .unwrap_or_else(|| self.channel.slug.clone())
+            .unwrap_or_else(|| self.inbox.slug().clone())
     }
 }
 

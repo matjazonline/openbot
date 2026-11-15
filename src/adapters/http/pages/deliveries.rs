@@ -482,7 +482,12 @@ fn delivery_facts(pane: &DeliveryDetailPane<'_>) -> String {
             "Recipient",
             entry.external_destination.clone().unwrap_or_else(dash),
         ),
-        ("Desk", delivery_channel_name(pane)),
+        match entry.target {
+            crate::entities::address::AddressTarget::Desk(_) => {
+                ("Desk", delivery_channel_name(pane))
+            }
+            crate::entities::address::AddressTarget::Principal(_) => ("Inbox", "Direct".into()),
+        },
         ("Queued", super::format_time(entry.created_at)),
         ("Updated", super::format_time(entry.updated_at)),
         (

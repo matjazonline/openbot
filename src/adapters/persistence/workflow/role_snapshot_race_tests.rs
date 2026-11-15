@@ -46,7 +46,7 @@ async fn blocked(f: &RoleFixture, blocker: i32, query: &str) -> i32 {
 
 fn published_conflict(result: AppResult<()>) {
     assert!(
-        matches!(result, Err(AppError::Conflict(ref message)) if message == "This agent has published revisions and cannot be deleted. Deactivate it instead."),
+        matches!(result, Err(AppError::Conflict(ref message)) if message == "This agent is referenced by a retained workflow binding or manifest and cannot be deleted."),
         "{result:?}"
     );
 }
@@ -99,23 +99,25 @@ async fn workflow_role_competing_delete_first_serializes_admission_before_channe
     let admission = tokio::spawn(async move { p.admit(&command).await });
     blocked(&f, deleting, "%FROM companies%FOR NO KEY UPDATE%").await;
     barrier.release().await;
-    published_conflict(
-        tokio::time::timeout(Duration::from_secs(5), deletion)
-            .await
-            .unwrap()
-            .unwrap(),
-    );
-    let admitted = tokio::time::timeout(Duration::from_secs(5), admission)
+    tokio::time::timeout(Duration::from_secs(5), deletion)
         .await
         .unwrap()
         .unwrap()
         .unwrap();
-    let AdmissionResult::Created(run) = admitted else {
-        panic!("{admitted:?}")
-    };
+    let result = tokio::time::timeout(Duration::from_secs(5), admission)
+        .await
+        .unwrap()
+        .unwrap();
+    assert!(
+        matches!(result, Err(AppError::WorkflowRole(ref refusal)) if refusal.kind==RoleRefusalKind::NoHolder),
+        "{result:?}"
+    );
+    let effects:(i64,i64)=sqlx::query_as("SELECT (SELECT count(*) FROM workflow_runs WHERE company_id=$1), (SELECT count(*) FROM agent_manifest_revisions WHERE company_id=$1)")
+        .bind(f.company().as_uuid()).fetch_one(f.p().pool()).await.unwrap();
     assert_eq!(
-        f.manifest(run).await.roles[0].principals[0].revision_id,
-        Some(f.revision)
+        effects,
+        (0, 0),
+        "retirement-first admission cannot retain partial capture"
     );
 }
 

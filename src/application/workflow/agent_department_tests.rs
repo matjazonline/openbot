@@ -36,13 +36,23 @@ fn department(lead: bool, roster: bool) -> DepartmentContext {
                     name: "Closer".into(),
                     slug: "closer".into(),
                     lead: true,
-                    desk: desk(3, "closer"),
+                    address: Some(crate::application::agent::AgentAddress {
+                        principal_id: crate::entities::transport::PrincipalId::new(
+                            Uuid::from_u128(3),
+                        ),
+                        address: "closer@acme.example.test".into(),
+                    }),
                 },
                 RosterAgent {
                     name: "Scout".into(),
                     slug: "scout".into(),
                     lead: false,
-                    desk: desk(4, "scout"),
+                    address: Some(crate::application::agent::AgentAddress {
+                        principal_id: crate::entities::transport::PrincipalId::new(
+                            Uuid::from_u128(4),
+                        ),
+                        address: "scout@acme.example.test".into(),
+                    }),
                 },
             ],
             more_agents: true,
@@ -88,7 +98,7 @@ fn department_context_follows_the_instructions_and_precedes_skills() {
         Desks around this department:\n\
         - This department's desk: sales@acme.example.test\n\
         - Parent department Revenue (revenue): revenue@acme.example.test\n\
-        - Child department Inside sales (inside-sales): no desk\n\
+        - Child department Inside sales (inside-sales): no address\n\
         - Agent Closer (closer, lead): closer@acme.example.test\n\
         - Agent Scout (scout): scout@acme.example.test\n\
         - More agents belong to this department than are listed.\n\n\
@@ -199,7 +209,7 @@ fn department_directory_tool_description_names_departments_and_desks() {
     assert!(
         declaration
             .description
-            .contains("An agent's desk is the address its own replies come from")
+            .contains("An agent's address names its direct principal inbox")
     );
     assert_eq!(
         declaration.parameters["properties"]["department"]["type"],

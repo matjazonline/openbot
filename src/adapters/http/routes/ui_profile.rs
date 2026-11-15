@@ -54,6 +54,7 @@ pub fn router() -> Router<AppState> {
             put(update_notification_preferences),
         )
         .route("/ui/profile/password", put(change_password))
+        .route("/ui/profile/addresses/{company_id}", put(rename_address))
         .route("/ui/profile/password/setup", put(set_password))
         .route(
             "/ui/profile/changes/{kind}",
@@ -95,6 +96,12 @@ pub struct PasswordSetupForm {
 #[derive(Debug, Clone, Deserialize)]
 pub struct CodeForm {
     pub code: String,
+}
+
+/// A new local part for the account's own address in one company.
+#[derive(Debug, Clone, Deserialize)]
+pub struct AddressForm {
+    pub slug: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -202,6 +209,12 @@ async fn profile_page(
     let (_, company) = load_readable_company(&company_use_cases, user.id, query.company_id).await?;
 
     let pane_html = account.pane(None, pages::ProfileOutcome::Untouched);
+    let addresses = user_use_cases.person_addresses(user.id).await?;
+    let addresses_html = pages::profile_addresses(&pages::ProfileAddresses {
+        addresses: &addresses,
+        app_domain_name: &config.app_domain_name,
+        submitted: None,
+    });
     let account_email = EmailAddress::from(account.user.email.as_str());
     let workspace_user = workspace_user(&account.user, &account_email, &config)
         .with_company_membership(
@@ -215,6 +228,40 @@ async fn profile_page(
         user: &workspace_user,
         company: company.as_ref().map(|access| &access.company),
         pane_html: &pane_html,
+        addresses_html: &addresses_html,
+    })))
+}
+
+/// PUT /ui/profile/addresses/{company_id} - Rename the account's own address there (Protected).
+///
+/// Only ever the caller's own: persistence matches the address through the caller's person
+/// principal in that company, so another company's id, or one the caller has left, is not found.
+/// A taken or malformed address re-renders the section with the reason beside that company.
+#[instrument(skip_all, fields(company_id = %company_id))]
+async fn rename_address(
+    State(user_use_cases): State<Arc<UserUseCases>>,
+    State(config): State<Arc<AppConfig>>,
+    user: AuthenticatedUser,
+    Path(company_id): Path<Uuid>,
+    Form(form): Form<AddressForm>,
+) -> AppResult<Html<String>> {
+    let outcome = user_use_cases
+        .rename_person_address(user.id, company_id, &form.slug)
+        .await;
+    let message = match &outcome {
+        Ok(_) => None,
+        Err(AppError::BadRequest(message) | AppError::Conflict(message)) => Some(message.clone()),
+        Err(_) => return outcome.map(|_| Html(String::new())),
+    };
+    let addresses = user_use_cases.person_addresses(user.id).await?;
+    let submitted = match &message {
+        None => pages::ProfileOutcome::Saved(pages::ProfileForm::Address, "Address saved."),
+        Some(message) => pages::ProfileOutcome::Rejected(pages::ProfileForm::Address, message),
+    };
+    Ok(Html(pages::profile_addresses(&pages::ProfileAddresses {
+        addresses: &addresses,
+        app_domain_name: &config.app_domain_name,
+        submitted: Some((company_id, submitted)),
     })))
 }
 

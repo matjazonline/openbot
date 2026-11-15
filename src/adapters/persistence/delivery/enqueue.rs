@@ -54,14 +54,14 @@ pub async fn insert_delivery_on(
         r#"INSERT INTO message_deliveries (
                 id, company_id, channel_id, message_id, source_binding_id,
                 destination_binding_id, external_destination, depends_on_delivery_id,
-                correlation_id, transport, purpose, idempotency_key, max_attempts, message_audience
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+                correlation_id, transport, purpose, idempotency_key, max_attempts, message_audience, principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
            ON CONFLICT ON CONSTRAINT message_deliveries_destination_key_key DO NOTHING
            RETURNING id"#,
     )
     .bind(delivery.id.as_uuid())
     .bind(delivery.company_id)
-    .bind(delivery.channel_id)
+    .bind(delivery.target.desk_id())
     .bind(delivery.message_id.as_uuid())
     .bind(delivery.source_binding_id.as_uuid())
     .bind(delivery.destination_binding_id.as_uuid())
@@ -78,6 +78,7 @@ pub async fn insert_delivery_on(
     .bind(delivery.idempotency_key.as_str())
     .bind(delivery.max_attempts)
     .bind(delivery.message_audience.as_str())
+    .bind(delivery.target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;

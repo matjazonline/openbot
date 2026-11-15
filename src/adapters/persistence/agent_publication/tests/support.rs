@@ -60,6 +60,7 @@ impl Fixture {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(&p, &agent).await;
         Self {
             p,
             scope: AgentPublicationScope {

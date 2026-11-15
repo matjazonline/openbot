@@ -1,0 +1,750 @@
+{
+  "paths": 186,
+  "basis": "Independent before/current hashes and deltas; deep production contract review plus named new test review; lighter mechanical test fixture changes explicitly distinguished",
+  "coverage": [
+    {
+      "path": "Cargo.lock",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "Cargo.toml",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "scripts/tests/run-list-query-plan.py",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/pages/attention.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/versions.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/responses.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/attention.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/attention_authorization_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/http/routes/live_updates.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_run_counts.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_run_counts_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/http/routes/webhooks/resend_api.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/bindings.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/board.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/channel_replies.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/events.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/events_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/ingress.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/attention.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/attention_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/enqueue.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/department.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/department/lifecycle.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/management/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_route.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/notification/escalation_notice.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/run_counts.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/test_support.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_history.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_refusal.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_replay.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_source.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_source_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_write.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/frozen.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/preparation.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/scope.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_e2e_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_knowledge_e2e_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_private_context_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_private_fixture.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_session_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_sessions.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_thread_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_views/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_views/rows.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/association.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/attention_decision_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/authoring_reads.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/binding_rows.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/bindings.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/board_reads.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_child_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_authority.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_delivery.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_membership_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_policy_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish_plan.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.sql",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/children.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_role_admission_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_role_binding_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_policy_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_read_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_access.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_guard_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_attention_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_decisions.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_person_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/inspection.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_authorization.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_delivery_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intents.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_writer.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_department.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_native.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_smtp_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_webhook_tests.rs",
+      "coverage": "Full changed/new test implementation and decisive assertions reviewed"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reads.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reads_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_binding.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/run_board_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/schedules.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/protocols/email/authentication.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/protocols/email/parser.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support/dns.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_egress_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/resend_api/accounts.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/resend_api/inbound.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/resend_api/inbound_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/adapters/smtp/server.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/attention.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/run_counts.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/transport/compose.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/transport/delivery.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/transport/ingress.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/transport/ports.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/transport/queue.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/application/use_cases/thread/tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/application/workflow/agent_history/identity.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/authorization.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/board.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/board_tests.rs",
+      "coverage": "Added/deleted assertions and fixture propagation reviewed; unchanged test bodies not uniformly re-read"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/mod.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/outcomes.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/message.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/message_admission.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/message_planner.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/reads.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/association.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/cancellation.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/reader_errors.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/domain/entities/attention.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/infra/events.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/infra/setup/foundation.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/infra/setup/inbound.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    },
+    {
+      "path": "src/infra/setup/workers.rs",
+      "coverage": "Full delta and affected production contract/caller review"
+    }
+  ]
+}

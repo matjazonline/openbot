@@ -104,6 +104,13 @@ impl TransportRenderer for TestRenderer {
     fn rendered_correlation(&self, part: &RenderedPart) -> AppResult<RenderedCorrelation> {
         self.email.rendered_correlation(part)
     }
+    fn application_address(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity> {
+        self.email.application_address(company, address)
+    }
     fn application_message_key(
         &self,
         company: &crate::entities::value_objects::CompanySlug,

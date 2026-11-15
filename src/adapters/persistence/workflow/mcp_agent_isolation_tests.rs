@@ -234,6 +234,11 @@ async fn agent_run(fixture: &Fixture, key: &str, binding: &McpBinding) -> AgentR
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(
+        &fixture.persistence,
+        &agent,
+    )
+    .await;
     fixture.publish_agent(agent.id).await;
     let target = publish_reference(fixture, key).await;
     let claim = admit(fixture, target, key).await;

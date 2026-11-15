@@ -1,0 +1,8 @@
+{
+  "before": 4587,
+  "after": 4588,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department: test"
+  ],
+  "removed": []
+}

@@ -90,17 +90,14 @@ pub(super) async fn claim_holds(
             let TriggerSource::Message { message_id } = command.trigger().source() else {
                 return Ok(false);
             };
-            let RelatedAssociation::Thread {
-                channel_id,
-                thread_id,
-            } = command.association()
-            else {
+            let RelatedAssociation::Thread { target, thread_id } = command.association() else {
                 return Ok(false);
             };
             Ok(sqlx::query_scalar::<_, Uuid>(
                 "SELECT id FROM workflow_message_intents WHERE company_id=$1 AND id=$2 \
                  AND state='claimed' AND worker_id=$3 AND claim_generation=$4 \
-                 AND message_id=$5 AND channel_id=$6 AND thread_id=$7 \
+                 AND message_id=$5 AND channel_id IS NOT DISTINCT FROM $6::uuid AND thread_id=$7 \
+                 AND principal_id IS NOT DISTINCT FROM $8::uuid \
                  AND lease_expires_at > clock_timestamp() FOR UPDATE",
             )
             .bind(claim.company.as_uuid())
@@ -108,8 +105,9 @@ pub(super) async fn claim_holds(
             .bind(claim.worker.0)
             .bind(claim.generation)
             .bind(message_id.as_uuid())
-            .bind(channel_id.as_uuid())
+            .bind(target.desk_id())
             .bind(thread_id.as_uuid())
+            .bind(target.principal_id().map(|id| id.as_uuid()))
             .fetch_optional(&mut **tx)
             .await?
             .is_some())
@@ -297,15 +295,7 @@ async fn verify_current(
 }
 
 fn within_association(binding: RelatedAssociation, run: RelatedAssociation) -> bool {
-    match (binding, run) {
-        (RelatedAssociation::Company, _) => true,
-        (RelatedAssociation::Channel(expected), RelatedAssociation::Channel(actual))
-        | (
-            RelatedAssociation::Channel(expected),
-            RelatedAssociation::Thread {
-                channel_id: actual, ..
-            },
-        ) => expected == actual,
-        (expected, actual) => expected == actual,
-    }
+    binding == RelatedAssociation::Company
+        || binding == run
+        || (binding.thread_id().is_none() && binding.target() == run.target())
 }

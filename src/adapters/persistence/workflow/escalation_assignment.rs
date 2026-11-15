@@ -7,7 +7,6 @@ pub(in crate::adapters::persistence::workflow) struct Target {
     kind: String,
     label: String,
     pub account: Uuid,
-    desk: Option<Uuid>,
 }
 
 pub(super) async fn target_on(
@@ -16,7 +15,7 @@ pub(super) async fn target_on(
     principal: PrincipalId,
 ) -> AppResult<Option<Target>> {
     Ok(sqlx::query_as("SELECT principal.id AS principal,principal.kind,principal.display_label AS label, \
-        COALESCE(principal.user_id,route.run_as_user_id) AS account,route.desk_id AS desk \
+        COALESCE(principal.user_id,route.run_as_user_id) AS account \
         FROM principals AS principal \
         LEFT JOIN LATERAL workflow_escalation_agent_route(principal.company_id,principal.id) AS route \
           ON principal.kind='agent' \
@@ -55,7 +54,7 @@ pub(super) async fn reassign_on(
             db,
             command.company,
             actor,
-            RelatedAssociation::Channel(RelatedChannelId::new(target.desk.ok_or_else(invalid)?)),
+            RelatedAssociation::Principal(PrincipalId::new(target.principal)),
         )
         .await?;
     }

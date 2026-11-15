@@ -3,7 +3,7 @@
 //! competing claimants, the requester rule, committed refusals, and transient faults (F043,
 //! F046).
 use super::*;
-use crate::adapters::persistence::channel::{insert_channel_row_on, insert_channel_slugs};
+use crate::adapters::persistence::channel::{insert_channel_row_on, insert_desk_addresses};
 use crate::adapters::persistence::workflow::action_dispatch::PostgresActionDispatch;
 use crate::adapters::persistence::workflow::provisioning::{
     AssistantChannelService, ProvisioningActionAuthority, ProvisioningDeployment,
@@ -87,7 +87,8 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
         DependencySnapshots {
             tools: [
                 ProvisioningKind::ListAgents,
-                ProvisioningKind::CreateAgentChannel,
+                ProvisioningKind::CreateAgent,
+                ProvisioningKind::CreateDeskForAgent,
             ]
             .into_iter()
             .map(|kind| builtin_provisioning_snapshot(company(&f), kind).unwrap())
@@ -114,13 +115,34 @@ async fn call(
     kind: ProvisioningKind,
     arguments: Value,
 ) -> ActionDispatchRequest {
+    let request = provisioning_action(f, claim, kind, arguments);
+    let intent = ActionService::new(f.persistence().clone())
+        .prepare_tool(
+            request,
+            ModelToolCallId::parse(Uuid::new_v4().to_string()).unwrap(),
+        )
+        .await
+        .unwrap();
+    ActionDispatchRequest {
+        subject: intent.approval_subject(),
+        fence: claim.fence,
+        lease: policy(),
+    }
+}
+
+fn provisioning_action(
+    f: &AdmissionFixture,
+    claim: &ClaimedWorkflow,
+    kind: ProvisioningKind,
+    arguments: Value,
+) -> ActionRequest {
     let scope = ActionScope {
         company: claim.fence.scope.company,
         run: claim.fence.scope.run,
         execution: claim.fence.scope.execution,
     };
     let contract = builtin_provisioning_snapshot(scope.company, kind).unwrap();
-    let request = ActionRequest {
+    ActionRequest {
         scope,
         operation_key: contract.contract.name.clone(),
         target: ActionTarget::Local {
@@ -136,25 +158,13 @@ async fn call(
             approval_required: false,
         },
         contract,
-    };
-    let intent = ActionService::new(f.persistence().clone())
-        .prepare_tool(
-            request,
-            ModelToolCallId::parse(Uuid::new_v4().to_string()).unwrap(),
-        )
-        .await
-        .unwrap();
-    ActionDispatchRequest {
-        subject: intent.approval_subject(),
-        fence: claim.fence,
-        lease: policy(),
     }
 }
 
 fn spec(slug: &str) -> Value {
     json!({
         "name": "Helper", "slug": slug, "system_prompt": "Help the team.",
-        "provider": "openai", "model": "gpt-4o-mini", "reply_mode": "autonomous"
+        "provider": "openai", "model": "gpt-4o-mini"
     })
 }
 
@@ -173,11 +183,11 @@ async fn written(f: &AdmissionFixture) -> Value {
            'markers', (SELECT count(*) FROM workflow_action_dispatches WHERE company_id = $1), \
            'receipts', (SELECT count(*) FROM workflow_action_receipts WHERE company_id = $1), \
            'agents', (SELECT count(*) FROM agents WHERE company_id = $1), \
-           'channels', (SELECT count(*) FROM channel_slugs WHERE company_id = $1), \
+           'channels', (SELECT count(*) FROM addresses WHERE company_id = $1 AND target_kind = 'desk'), \
            'workflows', (SELECT count(*) FROM workflow_definitions \
              WHERE company_id = $1 AND template_origin IS NOT NULL), \
            'bindings', (SELECT count(*) FROM workflow_bindings \
-             WHERE company_id = $1 AND channel_id IS NOT NULL))",
+             WHERE company_id = $1))",
     )
     .bind(company(f).as_uuid())
     .fetch_one(f.persistence().pool())
@@ -227,20 +237,14 @@ async fn person(f: &AdmissionFixture, role: &str) -> WorkflowActor {
 }
 
 const ONE_ASSISTANT: &str =
-    r#"{"markers": 1, "receipts": 1, "agents": 1, "channels": 1, "workflows": 1, "bindings": 1}"#;
+    r#"{"markers": 1, "receipts": 1, "agents": 1, "channels": 0, "workflows": 1, "bindings": 1}"#;
 
 /// F043: two holders of the same current fence dispatch one call at once; one assistant is
 /// provisioned, and both (and a later restart) observe its one receipt.
 #[tokio::test]
 async fn provisioning_competing_claimants_create_one_assistant() {
     let (f, claim) = claimed(false).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("helper"),
-    )
-    .await;
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, spec("helper")).await;
     let before = written(&f).await;
     let (left, right) = (dispatch(&f), dispatch(&f));
     let barrier = Barrier::new(2);
@@ -256,16 +260,16 @@ async fn provisioning_competing_claimants_create_one_assistant() {
     );
     assert_eq!(a, b);
     assert_eq!(a["agent"]["slug"], "helper");
-    assert_eq!(a["reply_mode"], "autonomous");
+    assert!(a.get("channel").is_none());
     let company_slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
         .bind(company(&f).as_uuid())
         .fetch_one(f.persistence().pool())
         .await
         .unwrap();
     assert_eq!(
-        a["channel"]["address"],
+        a["address"],
         format!("helper@{company_slug}.agents.test"),
-        "F051: the channel's real address"
+        "F051: the principal's real address"
     );
     let expected: Value = serde_json::from_str(ONE_ASSISTANT).unwrap();
     assert_eq!(grew(&before, &written(&f).await), expected);
@@ -273,16 +277,16 @@ async fn provisioning_competing_claimants_create_one_assistant() {
     assert_eq!(grew(&before, &written(&f).await), expected);
 
     // Everything is configured by the requester (the manual root's actor) and runs as them.
-    let channel = Uuid::parse_str(a["channel"]["id"].as_str().unwrap()).unwrap();
+    let principal = Uuid::parse_str(a["principal_id"].as_str().unwrap()).unwrap();
     let binding = Uuid::parse_str(a["binding_id"].as_str().unwrap()).unwrap();
-    let (access, created_by): (String, Value) =
-        sqlx::query_as("SELECT access_mode, created_by FROM channels WHERE id = $1")
-            .bind(channel)
+    let (target, channel): (Uuid, Option<Uuid>) =
+        sqlx::query_as("SELECT principal_id, channel_id FROM workflow_bindings WHERE id=$1")
+            .bind(binding)
             .fetch_one(f.persistence().pool())
             .await
             .unwrap();
-    assert_eq!(access, "team");
-    assert_eq!(created_by["actor_id"], json!(owner(&f).user_id()));
+    assert_eq!(target, principal);
+    assert!(channel.is_none());
     let (active, run_as, configured_by): (bool, Uuid, Uuid) = sqlx::query_as(
         "SELECT binding.active, revision.run_as_user_id, revision.actor_id \
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS revision \
@@ -340,13 +344,7 @@ async fn provisioning_competing_claimants_create_one_assistant() {
 #[tokio::test]
 async fn provisioning_stale_fences_write_nothing() {
     let (f, claim) = claimed(false).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("helper"),
-    )
-    .await;
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, spec("helper")).await;
     let before = written(&f).await;
     for mode in 0..3 {
         let mut stale = request.clone();
@@ -383,11 +381,9 @@ async fn provisioning_refusals_commit_a_receipt_and_no_effect() {
     let mut unknown_model = spec("fresh");
     unknown_model["model"] = json!("gpt-5");
     let mut provisioning_tool = spec("fresh");
-    provisioning_tool["tools"] = json!([CREATE_AGENT_CHANNEL]);
+    provisioning_tool["tools"] = json!([CREATE_AGENT]);
     let mut unknown_skill = spec("fresh");
     unknown_skill["skills"] = json!(["missing"]);
-    let mut bad_address = spec("fresh");
-    bad_address["channel_slug"] = json!("not an address!");
     let mut bad_agent = spec("fresh");
     bad_agent["slug"] = json!("-edge");
     for (arguments, code) in [
@@ -395,11 +391,10 @@ async fn provisioning_refusals_commit_a_receipt_and_no_effect() {
         (unknown_model, PROVISIONING_INVALID),
         (provisioning_tool, PROVISIONING_INVALID),
         (unknown_skill, PROVISIONING_INVALID),
-        (bad_address, PROVISIONING_INVALID),
         (bad_agent, PROVISIONING_INVALID),
     ] {
         let before = written(&f).await;
-        let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;
+        let request = call(&f, &claim, ProvisioningKind::CreateAgent, arguments).await;
         let refused = committed(&dispatch(&f), &request).await;
         assert_eq!(refused["error"]["code"], code, "{refused}");
         assert_eq!(committed(&dispatch(&f), &request).await, refused);
@@ -419,12 +414,12 @@ async fn provisioning_transient_fault_leaves_no_marker_receipt_or_effect() {
     let (f, claim) = claimed(false).await;
     let mut faulty = spec("faulty");
     faulty["name"] = json!("Faulty provisioning target");
-    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, faulty).await;
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, faulty).await;
     let pool = f.persistence().pool();
     sqlx::raw_sql(
         "CREATE FUNCTION provisioning_fault() RETURNS trigger LANGUAGE plpgsql AS $$ \
            BEGIN RAISE EXCEPTION 'injected provisioning fault'; END $$; \
-         CREATE TRIGGER provisioning_fault BEFORE INSERT ON channels FOR EACH ROW \
+         CREATE TRIGGER provisioning_fault BEFORE INSERT ON agents FOR EACH ROW \
            WHEN (NEW.name = 'Faulty provisioning target') EXECUTE FUNCTION provisioning_fault();",
     )
     .execute(pool)
@@ -432,16 +427,14 @@ async fn provisioning_transient_fault_leaves_no_marker_receipt_or_effect() {
     .unwrap();
     let before = written(&f).await;
     let failed = dispatch(&f).dispatch_local(&request).await;
-    sqlx::raw_sql(
-        "DROP TRIGGER provisioning_fault ON channels; DROP FUNCTION provisioning_fault();",
-    )
-    .execute(pool)
-    .await
-    .unwrap();
+    sqlx::raw_sql("DROP TRIGGER provisioning_fault ON agents; DROP FUNCTION provisioning_fault();")
+        .execute(pool)
+        .await
+        .unwrap();
     assert!(failed.is_err(), "a fault is not a refusal");
     assert_eq!(written(&f).await, before);
     assert_eq!(
-        committed(&dispatch(&f), &request).await["channel"]["slug"],
+        committed(&dispatch(&f), &request).await["agent"]["slug"],
         "faulty"
     );
 }
@@ -452,13 +445,7 @@ async fn provisioning_transient_fault_leaves_no_marker_receipt_or_effect() {
 #[tokio::test]
 async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
     let (f, claim) = claimed(false).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("raced"),
-    )
-    .await;
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, spec("raced")).await;
     let before = written(&f).await;
     let pool = f.persistence().pool();
     let mut rival = pool.begin().await.unwrap();
@@ -471,7 +458,7 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
     insert_channel_row_on(&mut rival, company(&f).as_uuid(), rival_channel, &write)
         .await
         .unwrap();
-    insert_channel_slugs(
+    insert_desk_addresses(
         &mut rival,
         company(&f).as_uuid(),
         rival_channel,
@@ -489,7 +476,7 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
     for _ in 0..100 {
         let waiting: i64 = sqlx::query_scalar(
             "SELECT count(*) FROM pg_stat_activity WHERE wait_event_type = 'Lock' \
-             AND query LIKE '%INSERT INTO channel_slugs%' AND datname = current_database()",
+             AND query LIKE '%INSERT INTO addresses%' AND datname = current_database()",
         )
         .fetch_one(pool)
         .await
@@ -516,13 +503,7 @@ async fn provisioning_losing_an_address_race_is_a_conflict_refusal() {
 #[tokio::test]
 async fn provisioning_in_a_child_run_acts_for_the_roots_requester() {
     let (f, claim) = claimed(true).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("helper"),
-    )
-    .await;
+    let request = call(&f, &claim, ProvisioningKind::CreateAgent, spec("helper")).await;
     let created = committed(&dispatch(&f), &request).await;
     let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
     let run_as: Uuid = sqlx::query_scalar(
@@ -558,7 +539,7 @@ async fn provisioning_lists_agents_and_models() {
     assert_eq!(
         listed["agents"],
         json!([{"slug": "support", "name": "Support", "description": "Answers customers.",
-            "provider": "openai", "model": "gpt-4o-mini", "departments": [], "desk": null}])
+            "provider": "openai", "model": "gpt-4o-mini", "departments": [], "address": null}])
     );
     assert_eq!(
         listed["models"],
@@ -827,7 +808,7 @@ async fn provisioning_agent_reference_keeps_its_own_published_binding() {
             model: Some("gpt-4o-mini".into()),
             tool_bindings: Some(vec![
                 crate::entities::agent_capability::AgentToolBinding::builtin(
-                    crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,
+                    crate::entities::agent_capability::AgentBuiltinTool::CreateAgent,
                 ),
             ]),
             ..Default::default()
@@ -888,7 +869,7 @@ async fn provisioning_agent_reference_keeps_its_own_published_binding() {
     assert!(matches!(
         published.definition.tools[0].binding.source,
         crate::entities::agent_capability::AgentBindingSource::Builtin {
-            tool: crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel
+            tool: crate::entities::agent_capability::AgentBuiltinTool::CreateAgent
         }
     ));
     let snapshots = capture(vec![]).await.unwrap();
@@ -897,7 +878,7 @@ async fn provisioning_agent_reference_keeps_its_own_published_binding() {
     assert_eq!(snapshots.agents[0].agent_id, scope.agent);
 
     let mut mcp =
-        builtin_provisioning_snapshot(company(&f), ProvisioningKind::CreateAgentChannel).unwrap();
+        builtin_provisioning_snapshot(company(&f), ProvisioningKind::CreateAgent).unwrap();
     mcp.contract.connection = Some(ResourceName::parse("crm").unwrap());
     let snapshots = capture(vec![mcp.clone()]).await.unwrap();
     assert_eq!(
@@ -916,289 +897,8 @@ mod autonomous_provisioning;
 #[path = "channel_reply_native_tests.rs"]
 mod channel_reply_native_tests;
 
-/// The company's `agent:{id}` command rows, oldest first: its agents' default desks.
-async fn default_desks(f: &AdmissionFixture) -> Vec<Value> {
-    sqlx::query_scalar(
-        "SELECT result FROM workflow_provisioning_commands \
-         WHERE company_id = $1 AND command_key LIKE 'agent:%' ORDER BY created_at",
-    )
-    .bind(company(f).as_uuid())
-    .fetch_all(f.persistence().pool())
-    .await
-    .unwrap()
-}
-
-/// 01DEP-P03-D5: the agent's own address is its default desk. A request for exactly that desk --
-/// autonomous, no steps, the agent's name -- answers with it, and nothing else is provisioned.
-#[tokio::test]
-async fn agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug() {
-    let (f, claim) = claimed(false).await;
-    let before = written(&f).await;
-    let mut named = spec("helper");
-    named["channel_slug"] = json!("helper");
-    named["channel_name"] = json!("Helper");
-    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, named).await;
-    let created = committed(&dispatch(&f), &request).await;
-    assert_eq!(created["channel"]["slug"], "helper");
-    assert_eq!(
-        grew(&before, &written(&f).await),
-        serde_json::from_str::<Value>(ONE_ASSISTANT).unwrap()
-    );
-    assert_eq!(default_desks(&f).await, [created]);
-}
-
-/// D5: any other setting at the agent's own address -- reviewed replies, added steps, another
-/// name -- refuses the whole command; the receipt commits and nothing is provisioned.
-#[tokio::test]
-async fn agent_default_desk_builder_refuses_other_settings_at_the_agents_slug() {
-    let (f, claim) = claimed(false).await;
-    let mut reviewed = spec("helper");
-    reviewed["reply_mode"] = json!("reviewed");
-    let mut stepped = spec("helper");
-    stepped["steps"] = json!([{"id": "quiet", "slot": "after_reply", "type": "channel.no_reply",
-        "with": {}}]);
-    let mut renamed = spec("helper");
-    renamed["channel_slug"] = json!("helper");
-    renamed["channel_name"] = json!("Another name");
-    for arguments in [reviewed, stepped, renamed] {
-        let before = written(&f).await;
-        let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;
-        let refused = committed(&dispatch(&f), &request).await;
-        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
-        assert!(
-            refused["error"]["message"]
-                .as_str()
-                .unwrap()
-                .contains("autonomous default desk"),
-            "{refused}"
-        );
-        assert_eq!(
-            grew(&before, &written(&f).await),
-            json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
-                "bindings": 0})
-        );
-    }
-    assert!(default_desks(&f).await.is_empty());
-}
-
-/// D5: a desk at another address is provisioned beside the default one, in the same command;
-/// the answer is the requested desk.
-#[tokio::test]
-async fn agent_default_desk_builder_provisions_another_desk_beside_the_default() {
-    let (f, claim) = claimed(false).await;
-    let before = written(&f).await;
-    let mut reviewed = spec("helper");
-    reviewed["channel_slug"] = json!("helper-review");
-    reviewed["reply_mode"] = json!("reviewed");
-    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, reviewed).await;
-    let created = committed(&dispatch(&f), &request).await;
-    assert_eq!(created["channel"]["slug"], "helper-review");
-    assert_eq!(created["reply_mode"], "reviewed");
-    assert_eq!(
-        grew(&before, &written(&f).await),
-        json!({"markers": 1, "receipts": 1, "agents": 1, "channels": 2, "workflows": 2,
-            "bindings": 2})
-    );
-    let defaults = default_desks(&f).await;
-    assert_eq!(defaults.len(), 1);
-    assert_eq!(defaults[0]["channel"]["slug"], "helper");
-    assert_eq!(defaults[0]["reply_mode"], "autonomous");
-    assert_eq!(committed(&dispatch(&f), &request).await, created);
-}
-
-/// D5, F2: refusals of the shared creation -- no keyed model, an address a desk already holds --
-/// are worded tool errors with a committed receipt and no agent or desk.
-#[tokio::test]
-async fn agent_default_desk_builder_creation_refusals_are_tool_errors() {
-    let (f, claim) = claimed(false).await;
-    let mut tx = f.persistence().pool().begin().await.unwrap();
-    let desk = Uuid::new_v4();
-    let write = ChannelWrite {
-        name: "Front desk".into(),
-        slug: "front".into(),
-        enabled: true,
-        ..ChannelWrite::default()
-    };
-    insert_channel_row_on(&mut tx, company(&f).as_uuid(), desk, &write)
-        .await
-        .unwrap();
-    insert_channel_slugs(&mut tx, company(&f).as_uuid(), desk, "front", &[])
-        .await
-        .unwrap();
-    tx.commit().await.unwrap();
-    let before = written(&f).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("front"),
-    )
-    .await;
-    let refused = committed(&dispatch(&f), &request).await;
-    assert_eq!(refused["error"]["code"], PROVISIONING_CONFLICT, "{refused}");
-    assert_eq!(
-        grew(&before, &written(&f).await),
-        json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
-            "bindings": 0})
-    );
-
-    CompanyPersistence::replace_model_connections_for_user(
-        f.persistence(),
-        owner(&f).user_id(),
-        company(&f).as_uuid(),
-        vec![],
-    )
-    .await
-    .unwrap();
-    let before = written(&f).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("helper"),
-    )
-    .await;
-    let refused = committed(&dispatch(&f), &request).await;
-    assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
-    assert_eq!(
-        grew(&before, &written(&f).await),
-        json!({"markers": 1, "receipts": 1, "agents": 0, "channels": 0, "workflows": 0,
-            "bindings": 0})
-    );
-    assert!(default_desks(&f).await.is_empty());
-}
-
-/// 03C.0: the Builder places the agent in a named department (with a role), or by default in the
-/// requester's one department; an unknown department or a role without one is refused.
-#[tokio::test]
-async fn agent_default_desk_builder_places_the_agent_in_a_department() {
-    let (f, claim) = claimed(false).await;
-    let pool = f.persistence().pool();
-    let company_id = company(&f).as_uuid();
-    let department = |slug: &'static str| async move {
-        let id = Uuid::new_v4();
-        sqlx::query(
-            "INSERT INTO departments (id, company_id, name, slug, created_by) \
-             VALUES ($1, $2, $3, $3, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
-        )
-        .bind(id)
-        .bind(company_id)
-        .bind(slug)
-        .execute(pool)
-        .await
-        .unwrap();
-        id
-    };
-    let support = department("support").await;
-    let sales = department("sales").await;
-    let requester: Uuid = sqlx::query_scalar(
-        "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 AND kind = 'person'",
-    )
-    .bind(company_id)
-    .bind(owner(&f).user_id())
-    .fetch_one(pool)
-    .await
-    .unwrap();
-    sqlx::query(
-        "INSERT INTO department_members (company_id, department_id, principal_id) VALUES ($1, $2, $3)",
-    )
-    .bind(company_id)
-    .bind(support)
-    .bind(requester)
-    .execute(pool)
-    .await
-    .unwrap();
-    let placed = |slug: &'static str| async move {
-        sqlx::query_as::<_, (Uuid, Option<String>)>(
-            "SELECT member.department_id, role.role FROM agents AS agent \
-             JOIN principals AS principal ON principal.agent_id = agent.id \
-             JOIN department_members AS member ON member.principal_id = principal.id \
-             LEFT JOIN department_roles AS role ON role.principal_id = principal.id \
-              AND role.department_id = member.department_id \
-             WHERE agent.company_id = $1 AND agent.slug = $2",
-        )
-        .bind(company_id)
-        .bind(slug)
-        .fetch_all(pool)
-        .await
-        .unwrap()
-    };
-
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("member"),
-    )
-    .await;
-    committed(&dispatch(&f), &request).await;
-    assert_eq!(placed("member").await, [(support, None)]);
-
-    let mut lead = spec("lead");
-    lead["department"] = json!("sales");
-    lead["role"] = json!("lead");
-    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, lead).await;
-    committed(&dispatch(&f), &request).await;
-    assert_eq!(placed("lead").await, [(sales, Some("lead".into()))]);
-
-    let mut unknown = spec("stray");
-    unknown["department"] = json!("nowhere");
-    let mut roleless = spec("stray");
-    roleless["role"] = json!("lead");
-    for arguments in [unknown, roleless] {
-        let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;
-        let refused = committed(&dispatch(&f), &request).await;
-        assert_eq!(refused["error"]["code"], PROVISIONING_INVALID, "{refused}");
-    }
-
-    // In a second department, the requester has no single one, so the agent is placed nowhere.
-    sqlx::query(
-        "INSERT INTO department_members (company_id, department_id, principal_id) VALUES ($1, $2, $3)",
-    )
-    .bind(company_id)
-    .bind(sales)
-    .bind(requester)
-    .execute(pool)
-    .await
-    .unwrap();
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("unplaced"),
-    )
-    .await;
-    committed(&dispatch(&f), &request).await;
-    assert!(placed("unplaced").await.is_empty());
-}
-
-/// Two holders of one fence dispatch the same command at once: one agent, one default desk and
-/// one `agent:{id}` record, which is the command's answer.
-#[tokio::test]
-async fn agent_default_desk_competing_builder_claimants_make_one_default_desk() {
-    let (f, claim) = claimed(false).await;
-    let request = call(
-        &f,
-        &claim,
-        ProvisioningKind::CreateAgentChannel,
-        spec("helper"),
-    )
-    .await;
-    let (left, right) = (dispatch(&f), dispatch(&f));
-    let barrier = Barrier::new(2);
-    let (a, b) = tokio::join!(
-        async {
-            barrier.wait().await;
-            committed(&left, &request).await
-        },
-        async {
-            barrier.wait().await;
-            committed(&right, &request).await
-        }
-    );
-    assert_eq!(a, b);
-    assert_eq!(default_desks(&f).await, [a]);
-}
+#[path = "provisioning_builder_tests.rs"]
+mod builder;
 
 #[path = "provisioning_directory_tests.rs"]
 mod directory;

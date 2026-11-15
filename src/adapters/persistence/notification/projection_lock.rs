@@ -40,6 +40,9 @@ pub(super) async fn lock_on(
         return Ok(LockedProjection::Stale);
     }
     match event.source_kind {
+        NotificationSourceKind::DirectMessage => {
+            super::direct_message::lock_source_on(db, event).await?;
+        }
         NotificationSourceKind::Delivery => {
             sqlx::query(
                 "SELECT id FROM message_deliveries WHERE company_id=$1 AND id=$2 FOR SHARE",

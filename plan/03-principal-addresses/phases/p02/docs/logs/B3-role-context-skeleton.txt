@@ -1,0 +1,3 @@
+trail skeleton — src/adapters/persistence/workflow/role_context.rs
+
+no definitions indexed for this file

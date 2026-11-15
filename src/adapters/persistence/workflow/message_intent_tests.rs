@@ -24,6 +24,9 @@ mod reply_tests;
 #[path = "tenant_fk_intent_tests.rs"]
 mod tenant_fk_tests;
 
+#[path = "direct_workflow_tests.rs"]
+mod direct_workflow;
+
 type Admission = WorkflowService<
     PostgresPersistence,
     PostgresPersistence,
@@ -127,7 +130,8 @@ impl Intents {
         let thread = fixture
             .persistence
             .create_thread(
-                channel,
+                fixture.target.company.as_uuid(),
+                crate::entities::address::AddressTarget::Desk(channel),
                 "Question",
                 &[EmailAddress::from("customer@partner.test")],
             )
@@ -288,10 +292,10 @@ impl Intents {
         sqlx::query(
             "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
                thread_id, role, mentioned, admissible, origin, responder_principal_id, hop_count, \
-               trace_channels, delivery_policy, correlation_id) \
+               trace_targets, delivery_policy, correlation_id) \
              SELECT $1, $2, message.id, $3, $4, $5, $6, $7, \
                CASE WHEN message.audience='internal_only' THEN 'application' ELSE 'external' END, message.author_principal_id, \
-               0, '{}', $9, $2 \
+               0, '[]', $9, $2 \
              FROM messages AS message WHERE message.company_id = $1 AND message.id = $8",
         )
         .bind(self.fixture.target.company.as_uuid())
@@ -1354,6 +1358,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
             visible_channel_ids,
             manager: true,
             company_items: true,
+            direct_items: true,
             view,
             cursor: None,
             limit: 100,
@@ -1374,7 +1379,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
     let row = refusals[0];
     assert_eq!(row.source_id, removed.as_uuid());
     assert_ne!(row.source_id, sibling.as_uuid());
-    assert_eq!(row.channel_id, Some(s.channel));
+    assert_eq!(row.target, Some(AddressTarget::Desk(s.channel)));
     assert_eq!(row.version, 2);
     assert_eq!(
         row.next_action,
@@ -1410,7 +1415,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
     );
     assert_eq!(
         s.p()
-            .operational_summary(company, &channels)
+            .operational_summary(company, &channels, owner)
             .await
             .unwrap()
             .binding_refusal_count,
@@ -1573,11 +1578,11 @@ async fn workflow_run_triggers_notify_a_threads_run_on_both_channels() {
         vec![
             (
                 "thread_activity".to_string(),
-                json!({"company_id":company,"channel_id":s.channel,"thread_id":s.thread}),
+                json!({"company_id":company,"target":AddressTarget::Desk(s.channel),"thread_id":s.thread}),
             ),
             (
                 "workflow_run_changed".to_string(),
-                json!({"company_id":company,"channel_id":s.channel,"thread_id":s.thread,
+                json!({"company_id":company,"target":AddressTarget::Desk(s.channel),"thread_id":s.thread,
                     "run_id":run,"state":state,"waiting_reason":waiting_reason}),
             ),
         ]

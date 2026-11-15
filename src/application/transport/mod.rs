@@ -56,16 +56,16 @@ pub use ingress::{
     InboundDraft, InboundEnvelope, InboundOrigin, InboundRouting, IngressDirectives,
     IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS, MAX_ATTACHMENTS,
     MAX_BODY_BYTES, MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES,
-    MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_CHANNELS, MessageDisposition,
+    MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_TARGETS, MessageDisposition,
     PipelineStep, ReplyCandidates, ReplyDelivery, SMALL_INLINE_IMAGE_BYTES, SystemAddress,
-    ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
+    ThreadAssociation, ThreadPrincipalIntent, ThreadPrincipalReference, ThreadTarget,
 };
 pub use lease::{ExecutionId, ExecutionLease, WorkerId};
 pub use ports::{
-    DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter, InternalMailRelay,
-    InternalRelayMail, InternalRelayProof, PolicyDeliveryPlanner, RegisteredTransport,
-    RelayDisposition, TransportRegistrationError, TransportRegistry, TransportRenderer,
-    TransportRenderers, TransportSender,
+    AuthenticatedRelaySource, DeliveryPlanner, ExternalCorrelationStore, InboundMessageCommitter,
+    InternalMailRelay, InternalRelayMail, InternalRelayProof, PolicyDeliveryPlanner,
+    RegisteredTransport, RelayDisposition, TransportRegistrationError, TransportRegistry,
+    TransportRenderer, TransportRenderers, TransportSender,
 };
 pub use queue::{
     ClaimedDelivery, DELIVERY_CLAIM_BATCH, DELIVERY_LEASE_SECONDS, DeliveryAttribution,

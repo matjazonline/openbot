@@ -29,10 +29,11 @@ fn channel(company_id: CompanyId, mode: ChannelAccessMode) -> Channel {
     }
 }
 
-fn thread(channel_id: Uuid) -> Thread {
+fn thread(channel: &Channel) -> Thread {
     Thread {
         id: Uuid::new_v4(),
-        channel_id,
+        company_id: channel.company_id,
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
         subject: "Related".into(),
         participant_principal_ids: vec![],
         participant_projection: ThreadParticipantProjection::default(),

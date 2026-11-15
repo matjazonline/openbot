@@ -1,0 +1,23 @@
+
+running 6 tests
+test application::workflow::provisioning::tests::every_built_in_name_is_reserved ... ok
+test application::workflow::provisioning::tests::only_the_exact_name_only_built_in_is_trusted ... ok
+test application::workflow::provisioning::tests::arguments_are_held_to_the_input_contract ... ok
+test application::workflow::provisioning::tests::custom_steps_are_held_to_the_builder_step_types ... ok
+test application::workflow::provisioning::tests::http_operations_cannot_take_a_built_in_name ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... FAILED
+
+failures:
+
+---- application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts stdout ----
+
+thread 'application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts' (16435020) panicked at src/application/workflow/provisioning_tests.rs:121:9:
+desk is required
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 4583 filtered out; finished in 0.23s
+

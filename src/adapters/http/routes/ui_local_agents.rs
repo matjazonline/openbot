@@ -219,7 +219,12 @@ impl Workspace {
         match (selection.channel, selection.conversation) {
             (Some(channel), Some(thread)) => self
                 .threads
-                .readable_thread(&self.viewer, company, channel, thread)
+                .readable_thread(
+                    &self.viewer,
+                    company,
+                    crate::entities::address::AddressTarget::Desk(channel),
+                    thread,
+                )
                 .await?
                 .ok_or_else(missing)
                 .map(Some),

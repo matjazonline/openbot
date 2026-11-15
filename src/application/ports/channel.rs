@@ -2,6 +2,7 @@
 use crate::{
     app_error::AppResult,
     entities::{
+        address::ResolvedAddress,
         channel::Channel,
         creation::CreationProvenance,
         department::DepartmentId,
@@ -66,6 +67,22 @@ pub trait ChannelPersistence: Send + Sync {
     ) -> AppResult<Option<Channel>>;
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>>;
+
+    /// What each of these slugs names in the company's address namespace, read in one statement
+    /// so every slug of one message is answered from the same snapshot. Slugs that name nothing
+    /// are absent from the result.
+    async fn address_targets(
+        &self,
+        company_id: Uuid,
+        slugs: &[ChannelSlug],
+    ) -> AppResult<Vec<ResolvedAddress>>;
+
+    /// The current primary address of an exact tenant-scoped target; archived targets have none.
+    async fn address_for_target(
+        &self,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
+    ) -> AppResult<Option<ResolvedAddress>>;
 
     /// The company's departments, to label its desks by owner (01-departments 04C.3).
     async fn list_departments(

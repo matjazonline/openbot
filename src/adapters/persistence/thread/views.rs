@@ -643,7 +643,8 @@ struct MessageAuditDb {
     canonical_id: Uuid,
     company_id: Uuid,
     thread_id: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     #[sqlx(flatten)]
     author: AuthorDb,
     direction: String,
@@ -679,6 +680,7 @@ pub(super) async fn get_message_audit(
            message.company_id,
            association.thread_id,
            association.channel_id,
+           association.principal_id,
 {AUTHOR_COLUMNS},
            message.direction,
            message.role,
@@ -736,7 +738,12 @@ pub(super) async fn get_message_audit(
         canonical_id: CanonicalMessageId::new(db.canonical_id),
         company_id: db.company_id,
         thread_id: db.thread_id,
-        channel_id: db.channel_id,
+        target: crate::entities::address::AddressTarget::from_parts(
+            db.channel_id,
+            db.principal_id
+                .map(crate::entities::transport::PrincipalId::new),
+        )
+        .ok_or_else(|| AppError::Internal("Invalid message audit target".into()))?,
         author: db.author.try_into()?,
         direction: MessageDirection::from_str(&db.direction)
             .map_err(|error| AppError::Internal(error.to_string()))?,

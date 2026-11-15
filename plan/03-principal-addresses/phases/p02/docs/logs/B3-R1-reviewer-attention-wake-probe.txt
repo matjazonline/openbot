@@ -1,0 +1,3 @@
+ERROR:  relation "message_deliveries" does not exist
+LINE 1: ...get_triggerdef(oid) FROM pg_trigger WHERE tgrelid='message_d...
+                                                             ^

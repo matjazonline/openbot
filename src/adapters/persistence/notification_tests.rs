@@ -231,6 +231,7 @@ async fn commit_stale(
             expected: &expected,
             email: None,
             agent_message_key: None,
+            agent_recipient: None,
             escalation_ack_hours: Default::default(),
         })
         .await

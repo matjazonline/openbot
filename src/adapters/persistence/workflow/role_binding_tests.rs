@@ -270,3 +270,6 @@ async fn workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders(
 
 #[path = "escalation_binding_tests.rs"]
 mod escalation;
+
+#[path = "direct_role_binding_tests.rs"]
+mod direct;

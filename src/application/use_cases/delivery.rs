@@ -17,6 +17,14 @@ use crate::{
 
 #[async_trait]
 pub trait DeliveryReader: Send + Sync {
+    /// Load a list and optional selection, then recheck both after all payload reads.
+    async fn workspace(
+        &self,
+        scope: DeliveryReadScope,
+        filter: &DeliveryFilter,
+        selected: Option<DeliveryId>,
+    ) -> AppResult<DeliveryWorkspace>;
+
     /// One filtered page of the company's deliveries, newest first unless the filter says
     /// otherwise.
     ///
@@ -34,6 +42,11 @@ pub trait DeliveryReader: Send + Sync {
         scope: DeliveryReadScope,
         delivery_id: DeliveryId,
     ) -> AppResult<Option<DeliveryEntry>>;
+}
+
+pub struct DeliveryWorkspace {
+    pub entries: Vec<DeliveryEntry>,
+    pub selected: Option<DeliveryEntry>,
 }
 
 #[derive(Debug, Clone, Copy)]

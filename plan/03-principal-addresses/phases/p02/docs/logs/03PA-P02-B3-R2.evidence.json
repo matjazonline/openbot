@@ -1,0 +1,321 @@
+{
+  "version": 1,
+  "round": "03PA-P02-B3-R2",
+  "artifact": "1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa",
+  "checks": [
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "B3-AC9"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run --message-format=json",
+      "fixture": "Current R2 build4, phase-owned compiler cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-build4.jsonl",
+          "sha256": "efa46222b9e3e0434fc1c9aa499fd785935e14b73003477940f1b64e032b3bc9"
+        },
+        {
+          "path": "logs/B3-R2-build4-stderr.txt",
+          "sha256": "5eac51316b9c37992b389ab116caf408d53b59a00e5af2f806b6f0ac79e2e6e8"
+        },
+        {
+          "path": "logs/B3-R2-build4-source.txt",
+          "sha256": "9925c3093b9ab64d5c69214f28633af400fe2508cea97d2b7931ac629a8c079b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F2",
+        "B3-AC9"
+      ],
+      "command": "cargo sqlx migrate run",
+      "fixture": "Fresh pa02_codex_b3_runtime6_20261115; source SHA384 matches the applied checksum",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-migrate2.txt",
+          "sha256": "dce8c2e07661060488aaf28880ceb4ff627eac4927389f53e044c12ac6b19cce"
+        },
+        {
+          "path": "logs/B3-R2-schema-proof.json",
+          "sha256": "34bee62f227e182364cfa928579cbad2aa2e5c7bfdcdee57f3cccc0c4d47b2be"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "B3-AC9"
+      ],
+      "command": "cargo sqlx prepare -- --locked --offline --all-targets",
+      "fixture": "runtime6; unchanged production SQL and offline cache, reused after private test-only strengthening",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final-sqlx.txt",
+          "sha256": "7ade6eb8ace167a158e6c3869f632ef038ef3bc58bbd95d2d6e01c3cd716b158"
+        },
+        {
+          "path": "logs/B3-R2-schema-proof.json",
+          "sha256": "34bee62f227e182364cfa928579cbad2aa2e5c7bfdcdee57f3cccc0c4d47b2be"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "B3-AC1",
+        "B3-AC4",
+        "B3-AC6",
+        "B3-AC7"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda adapters::persistence::delivery:: application::services::delivery_worker adapters::protocols::email application::transport ui_deliveries knowledge_view_delivery public_desk_private_agent_ direct_workflow direct_binding notification entities::delivery attention delivery_pane delivery_list --test-threads=4",
+      "fixture": "Current frozen R2; gate4 plus OwnDatabase,235 PASS/no ignores. Real direct publisher/global mixed queue/email worker/fenced results/native events. Private delivery fixture/verification stamp/provider recording limits in TASK.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-focused2.txt",
+          "sha256": "75f034ca7be1771b7af0e25a1ec0e4e7b23e1286e9ad605fde33d3ce0f78ed92"
+        },
+        {
+          "path": "logs/B3-R2-focused2-summary.json",
+          "sha256": "fbb57b820864481bb08ce9c065c377bfef52cf31946bfc370e1d0fc88dfc6b6c"
+        },
+        {
+          "path": "logs/B3-R2-focused-selection.json",
+          "sha256": "ca7284d5ba4a514d81f59a78f02bd96c1b0fb39324769e53a748f3bd56fd8e99"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-offline.txt",
+          "sha256": "b9ae5f99c99a5ca9f91d13ea3231f80bbdfadd67f6c4cfc81e15ce5e14219fc1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current R2 source; clippy FAIL exactly matches isolated HEAD baseline, no green lint claim",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-clippy.txt",
+          "sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014"
+        },
+        {
+          "path": "logs/B3-R2-HEAD-clippy.txt",
+          "sha256": "e7c8d5acd39e33be4ce9e36b4db15b24a40ede96cf0665b86a95faf32786ce7c"
+        },
+        {
+          "path": "logs/B3-R2-HEAD-clippy-summary.json",
+          "sha256": "3a8f9be218746d5592104440a46ef829957e1347699e3fcc24e3393e323ab49e"
+        },
+        {
+          "path": "logs/B3-R2-HEAD-resource.json",
+          "sha256": "e6940cf5f9c8a021b083041efa934abe79d7f81e263da39018dd7a2930b414a0"
+        },
+        {
+          "path": "logs/B3-R2-clippy-baseline-comparison2.json",
+          "sha256": "0e9696899c594d431d6711c67d310b70c778d6c5377024448b6aff20055296af"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/source_modules-eebb1cce2b17f9a5 --test-threads=4",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-source-modules.txt",
+          "sha256": "804fdda3c711fcf948123623084a9b233794ce6ad3f1f662f505513bc64b6b0c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-transport-fixtures.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-transport.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-workflow-fixtures.txt",
+          "sha256": "d8086ec9a48996dc722ca6809152d557251bca3841c9ff370723f401ed866500"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-workflow.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-integration-fixtures.txt",
+          "sha256": "c26b08d8cbf42cb47df201c1d62b725c1cfda4c14962c628eff162e5538f08a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-integration.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B3-AC9"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "Current R2 source and phase-owned cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-final2-integration-docs.txt",
+          "sha256": "a75f51322dfe954d187ec5cca653d5bb70f69db617566e98110ffea4a375978f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "B3-AC9"
+      ],
+      "command": "Current libtest --list; R1/current inventory and interim moved-test accounting",
+      "fixture": "4588 to4589,one new/no removed versus R1; interim new private test moved with an exact replacement and unchanged assertions",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B3-R2-collection4.txt",
+          "sha256": "1f2bc6a98617afd53d752f343e83ca7e3d53e94bc3bc0d98215c0401de2bd341"
+        },
+        {
+          "path": "logs/B3-R2-complete-collection-delta.json",
+          "sha256": "382cb4cf863b9e00778868ab4ad42e5f7d9a27331e556efdaa7535ce3147a2c6"
+        },
+        {
+          "path": "logs/B3-R2-collection-delta2.json",
+          "sha256": "47aea2f3eecd0c8fb3741e9013efd922f2e0d5967da5327e9b491074134f7525"
+        },
+        {
+          "path": "logs/B3-R2-snapshot.txt",
+          "sha256": "9925c3093b9ab64d5c69214f28633af400fe2508cea97d2b7931ac629a8c079b"
+        },
+        {
+          "path": "logs/B3-R2-coordination.md",
+          "sha256": "b67026d05ad7dd8e2643f40d32ef3e69a89a669628cbc6279cbfe2a3733fb063"
+        },
+        {
+          "path": "logs/B3-R2-delta.json",
+          "sha256": "c005670040e37602a6c1b25a415b6ca8793018f68c6f3c6a6402ff580fbb3da0"
+        },
+        {
+          "path": "logs/B3-R1-material-source.json",
+          "sha256": "b533198473262c9d380e981840abaedd30259baa0f24fe5a5579c162b032800e"
+        }
+      ]
+    }
+  ]
+}

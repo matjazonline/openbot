@@ -5,6 +5,33 @@ use crate::application::attention::AttentionPersistence;
 use crate::entities::attention::{AttentionQuery, AttentionSourceKind, AttentionView};
 use crate::entities::transport::PrincipalId;
 
+use super::super::channel_reply_e2e::private_agent::{open_desk, smtp, webhook};
+use crate::entities::value_objects::EmailAddress;
+
+#[derive(Clone, Copy)]
+enum IngressEdge {
+    Application,
+    Smtp,
+    SignedWebhook,
+}
+
+async fn receive(
+    edge: IngressEdge,
+    d: &Deployment,
+    sender: EmailAddress,
+    cc: Option<EmailAddress>,
+) -> Uuid {
+    match edge {
+        IngressEdge::Application => {
+            let mut incoming = email(d, &sender, "race-sales");
+            incoming.cc = cc.map(|address| address.to_string());
+            d.email(incoming).await.thread.unwrap().id
+        }
+        IngressEdge::Smtp => Box::pin(smtp::receive_member_mail(d, sender, cc)).await,
+        IngressEdge::SignedWebhook => Box::pin(webhook::receive_member_mail(d, sender, cc)).await,
+    }
+}
+
 enum AudienceChange {
     CustomerCc,
     MemberDemotion,
@@ -60,6 +87,7 @@ async fn assert_typed_attention(j: &SalesJourney) {
                 visible_channel_ids: &[j.d.channel],
                 manager: true,
                 company_items: true,
+                direct_items: true,
                 view: AttentionView::MyWork,
                 cursor: None,
                 limit: 100,
@@ -71,78 +99,129 @@ async fn assert_typed_attention(j: &SalesJourney) {
     ));
 }
 
+async fn refuse_after_observation(edge: IngressEdge, change: AudienceChange) {
+    // Only the initial search call is allowed. The scripted server rejects any
+    // second request, independently of the recorded request-content assertions.
+    let expected = turns("sales.md: PRIVATE FLOOR 60")
+        .into_iter()
+        .take(1)
+        .collect();
+    let mut j = Box::pin(SalesJourney::new(expected, Audience::Team)).await;
+    let member = j.member(AccessLevel::L5).await;
+    j.d.bind(answering_source(), Some(MessageTrigger::Direct))
+        .await;
+    if !matches!(edge, IngressEdge::Application) {
+        open_desk(&j.d).await;
+    }
+    let private: bool = sqlx::query_scalar("SELECT NOT principal.open_to_public FROM principals AS principal JOIN agents AS agent ON agent.company_id=principal.company_id AND agent.id=principal.agent_id WHERE principal.company_id=$1 AND agent.slug='assistant'")
+        .bind(j.d.fixture.target.company.as_uuid()).fetch_one(j.d.p().pool()).await.unwrap();
+    assert!(private);
+    let thread = receive(edge, &j.d, member.email.clone(), None).await;
+    let (mut observer, _) = connect(&j).await;
+    let mut gate = Gate::arm(
+        &j,
+        "workflow_knowledge_consumptions",
+        "INSERT",
+        "true",
+        Stall::Statement {
+            table: "workflow_knowledge_consumptions",
+            events: "INSERT",
+            when: "true",
+        },
+    )
+    .await;
+    {
+        let drive = j.drive(1);
+        tokio::pin!(drive);
+        tokio::select! {
+            _ = gate.stalled(&mut observer, &[&||true]) => {},
+            _ = drive.as_mut() => panic!("workflow completed before its actual observation gate"),
+        }
+        let ceiling: i16 = sqlx::query_scalar(
+            "SELECT knowledge_ceiling::smallint FROM workflow_runs WHERE company_id=$1",
+        )
+        .bind(j.d.fixture.target.company.as_uuid())
+        .fetch_one(j.d.p().pool())
+        .await
+        .unwrap();
+        assert_eq!(
+            ceiling, 5,
+            "admission preceded the actual audience mutation"
+        );
+        change_audience(&j, member.user_id, thread, change).await;
+        gate.release().await;
+        drive.await;
+    }
+    let facts = j.facts().await;
+    assert_eq!(facts["ceiling"], 5);
+    assert_eq!(facts["content"], 5);
+    assert_eq!(facts["state"], "failed");
+    assert_eq!(facts["proofs"], 1);
+    assert_eq!(facts["reply_levels"], json!([]));
+    assert_eq!(facts["delivered"], 0);
+    assert_eq!(j.transport.calls.load(Ordering::SeqCst), 0);
+    // The current audience is rechecked before another model entry, after the
+    // genuine search committed its classified observation. No private tool result
+    // may reach a second provider call after CC/demotion changes the audience.
+    let requests = j.d.llm.observed();
+    assert_eq!(requests.len(), 1);
+    assert!(
+        requests
+            .iter()
+            .all(|request| !request.to_string().contains(PRIVATE))
+    );
+    assert_typed_attention(&j).await;
+    j.d.knowledge.shutdown().await.unwrap();
+    assert_eq!(j.d.llm.finish().await.unwrap(), 1);
+}
+
 #[tokio::test]
 async fn knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention() {
     for change in [AudienceChange::CustomerCc, AudienceChange::MemberDemotion] {
-        // Only the initial search call is allowed. The scripted server rejects any
-        // second request, independently of the recorded request-content assertions.
-        let expected = turns("sales.md: PRIVATE FLOOR 60")
-            .into_iter()
-            .take(1)
-            .collect();
-        let mut j = Box::pin(SalesJourney::new(expected, Audience::Team)).await;
+        // The driver descends into the real engine; keep the test future shallow.
+        Box::pin(refuse_after_observation(IngressEdge::Application, change)).await;
+    }
+}
+
+#[tokio::test]
+async fn public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change()
+{
+    for edge in [IngressEdge::Smtp, IngressEdge::SignedWebhook] {
+        for change in [AudienceChange::CustomerCc, AudienceChange::MemberDemotion] {
+            Box::pin(refuse_after_observation(edge, change)).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search() {
+    for edge in [IngressEdge::Smtp, IngressEdge::SignedWebhook] {
+        let mut j = Box::pin(SalesJourney::new(
+            turns("I don't have that information."),
+            Audience::Public,
+        ))
+        .await;
         let member = j.member(AccessLevel::L5).await;
+        open_desk(&j.d).await;
         j.d.bind(answering_source(), Some(MessageTrigger::Direct))
             .await;
-        let inbound =
-            j.d.email(email(&j.d, member.email.as_str(), "race-sales"))
-                .await;
-        let thread = inbound.thread.unwrap().id;
-        let (mut observer, _) = connect(&j).await;
-        let mut gate = Gate::arm(
-            &j,
-            "workflow_knowledge_consumptions",
-            "INSERT",
-            "true",
-            Stall::Statement {
-                table: "workflow_knowledge_consumptions",
-                events: "INSERT",
-                when: "true",
-            },
-        )
-        .await;
-        {
-            let drive = j.drive(1);
-            tokio::pin!(drive);
-            tokio::select! {
-                _ = gate.stalled(&mut observer, &[&||true]) => {},
-                _ = drive.as_mut() => panic!("workflow completed before its actual observation gate"),
-            }
-            let ceiling: i16 = sqlx::query_scalar(
-                "SELECT knowledge_ceiling::smallint FROM workflow_runs WHERE company_id=$1",
-            )
-            .bind(j.d.fixture.target.company.as_uuid())
-            .fetch_one(j.d.p().pool())
-            .await
-            .unwrap();
-            assert_eq!(
-                ceiling, 5,
-                "admission preceded the actual audience mutation"
-            );
-            change_audience(&j, member.user_id, thread, change).await;
-            gate.release().await;
-            drive.await;
-        }
+        receive(edge, &j.d, member.email, Some(CUSTOMER.into())).await;
+        j.drive(1).await;
+        assert!(!observed_private(&mut j));
         let facts = j.facts().await;
-        assert_eq!(facts["ceiling"], 5);
-        assert_eq!(facts["content"], 5);
-        assert_eq!(facts["state"], "failed");
-        assert_eq!(facts["proofs"], 1);
-        assert_eq!(facts["reply_levels"], json!([]));
-        assert_eq!(facts["delivered"], 0);
-        assert_eq!(j.transport.calls.load(Ordering::SeqCst), 0);
-        // The current audience is rechecked before another model entry, after the
-        // genuine search committed its classified observation. No private tool result
-        // may reach a second provider call after CC/demotion changes the audience.
-        let requests = j.d.llm.observed();
-        assert_eq!(requests.len(), 1);
+        assert_eq!(facts["ceiling"], 0);
+        assert_eq!(facts["content"], 0);
+        assert_eq!(facts["reply_levels"], json!([0]));
+        assert_eq!(j.transport.calls.load(Ordering::SeqCst), 1);
         assert!(
-            requests
+            j.transport
+                .payloads
+                .lock()
+                .unwrap()
                 .iter()
-                .all(|request| !request.to_string().contains(PRIVATE))
+                .all(|payload| !payload.to_string().contains(PRIVATE))
         );
-        assert_typed_attention(&j).await;
         j.d.knowledge.shutdown().await.unwrap();
-        assert_eq!(j.d.llm.finish().await.unwrap(), 1);
+        assert_eq!(j.d.llm.finish().await.unwrap(), 2);
     }
 }

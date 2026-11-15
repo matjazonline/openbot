@@ -1,0 +1,31 @@
+{
+  "R1_artifact": "411abe73337fe93ccde3a39560722bca1125df70dcc0c32e106b9a233e59e52e",
+  "finding": "03PA-P02-B2-R1/F1",
+  "files": [
+    {
+      "path": "src/adapters/http/routes/ui.rs",
+      "R1_before_sha256": "487a8d49097888e2a86e30dd2786958b92ec7b68e8123db07fb758d8b8201ec2",
+      "current_sha256": "117bec48c56a1fc5f2761d19fa98f540375009d070cf4264c3b95f0e4a4761c2"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_revocation_tests.rs",
+      "R1_before_sha256": null,
+      "current_sha256": "22a6eb10c5ce54db091d138ddf4cd55cda3840dd620641d799056ca5e7c34d45"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_tests.rs",
+      "R1_before_sha256": "5aac4b1773f66f66bbf42ad0c3b3f6ab569d49dee858cb68ea7a9f252af05a63",
+      "current_sha256": "cb8ae62067c42b2f2e4c031fa0364ee3b163e83fa31fc98b953654da52d94eb3"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message.rs",
+      "R1_before_sha256": "2a6fb998a3c4781486e5044ea0f3a40fde0cc5aeeb19b07cde795c74e004d019",
+      "current_sha256": "25985d0d508f98215090713212c7301d535eb5c9a67d8a2cf52d3eaca5e258d9"
+    },
+    {
+      "path": "src/application/use_cases/thread/reads.rs",
+      "R1_before_sha256": "804c65553d12e3ac803d68171cdc49384be60dbac681d8e5c0efd616d96ff970",
+      "current_sha256": "cbb71e8a20db75b4344719d10e3566e5e9b3f424ba0f4e9dcad9ea72d47d65cc"
+    }
+  ]
+}

@@ -53,26 +53,10 @@ async fn load_facts_on(
     association: RelatedAssociation,
     reference: &RoleReference,
 ) -> AppResult<RoleFacts> {
-    let channel = match association {
-        RelatedAssociation::Company => {
-            return Err(role_error(reference, RoleRefusalKind::MissingDepartment));
-        }
-        RelatedAssociation::Channel(channel)
-        | RelatedAssociation::Thread {
-            channel_id: channel,
-            ..
-        } => channel,
-    };
-    let department: Option<Uuid> =
-        sqlx::query_scalar("SELECT department_id FROM channels WHERE company_id=$1 AND id=$2")
-            .bind(company.as_uuid())
-            .bind(channel.as_uuid())
-            .fetch_optional(&mut *tx)
-            .await?
-            .flatten();
-    let department =
-        department.ok_or_else(|| role_error(reference, RoleRefusalKind::MissingDepartment))?;
-    load_context_on(tx, company, DepartmentId::new(department)).await
+    let department = super::super::role_binding::context_on(tx, company, association)
+        .await?
+        .map_err(|kind| role_error(reference, kind))?;
+    load_context_on(tx, company, department).await
 }
 
 async fn load_context_on(

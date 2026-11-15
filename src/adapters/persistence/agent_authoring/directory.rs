@@ -17,12 +17,12 @@ impl DirectoryRow {
             name: self.name,
             active_revision: self.active_revision.map(AgentRevisionId::new),
             departments: Vec::new(),
-            desk: None,
+            address: None,
         })
     }
 }
 
-/// Each entry's departments and desk address (01DEP-P03-D10).
+/// Each entry's departments and direct address (01DEP-P03-D10).
 async fn placed(
     db: &mut PgConnection,
     scope: AgentCompanyScope,
@@ -30,12 +30,12 @@ async fn placed(
     entries: &mut [AgentDirectoryEntry],
 ) -> AppResult<()> {
     use crate::adapters::persistence::department_roster::{
-        DeskAddresses, agent_departments_on, agent_desks_on,
+        CompanyAddresses, agent_addresses_on, agent_departments_on,
     };
     let ids: Vec<Uuid> = entries.iter().map(|entry| entry.id.as_uuid()).collect();
     let mut departments = agent_departments_on(db, scope.company, &ids).await?;
-    let mut addresses = DeskAddresses::new(scope.company, domain);
-    let mut desks = agent_desks_on(db, &mut addresses, &ids).await?;
+    let mut addresses = CompanyAddresses::new(scope.company, domain);
+    let mut desks = agent_addresses_on(db, &mut addresses, &ids).await?;
     for entry in entries {
         let id = entry.id.as_uuid();
         entry.departments = departments
@@ -51,10 +51,7 @@ async fn placed(
                 roles: department.roles,
             })
             .collect();
-        entry.desk = desks.remove(&id).map(|desk| AgentDesk {
-            id: desk.id,
-            address: desk.address,
-        });
+        entry.address = desks.remove(&id);
     }
     Ok(())
 }

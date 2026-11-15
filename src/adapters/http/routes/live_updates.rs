@@ -63,14 +63,16 @@ pub(super) fn simulation_wake_ups(
     })
 }
 
-/// The mailbox column's wake-ups: a message or a run's activity on any of the channel's threads.
-pub(super) fn channel_wake_ups(
+/// Wake one exact typed inbox; a desk and principal with the same UUID remain distinct.
+pub(super) fn inbox_wake_ups(
     events: &MailboxEvents,
     label: &'static str,
-    channel_id: Uuid,
+    target: crate::entities::address::AddressTarget,
 ) -> impl Stream<Item = Wake> + Send + use<> {
     wake_ups(events, label, move |event| {
-        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
+        event
+            .thread_scope()
+            .is_some_and(|scope| scope.target == target)
     })
 }
 
@@ -101,7 +103,7 @@ mod tests {
         let run = |company_id| {
             MailboxEvent::WorkflowRunChanged(crate::infra::events::RunScope {
                 company_id,
-                channel_id: None,
+                target: None,
                 thread_id: None,
                 run_id: Uuid::new_v4(),
             })
@@ -109,7 +111,7 @@ mod tests {
         events.publish(run(Uuid::new_v4()));
         events.publish(MailboxEvent::AttentionChanged(AttentionScope {
             company_id,
-            channel_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             source_kind: AttentionWakeSource::Delivery,
             source_id: Uuid::new_v4(),
         }));
@@ -133,7 +135,7 @@ mod tests {
         let run = |thread_id| {
             MailboxEvent::WorkflowRunChanged(crate::infra::events::RunScope {
                 company_id,
-                channel_id: Some(Uuid::new_v4()),
+                target: Some(crate::entities::address::AddressTarget::Desk(Uuid::new_v4())),
                 thread_id,
                 run_id: Uuid::new_v4(),
             })
@@ -160,22 +162,26 @@ mod tests {
         let thread_id = Uuid::new_v4();
         let scope = ThreadScope {
             thread_id,
-            channel_id,
+            target: crate::entities::address::AddressTarget::Desk(channel_id),
             company_id,
         };
 
         let mut thread = Box::pin(thread_wake_ups(&events, "test", thread_id));
-        let mut column = Box::pin(channel_wake_ups(&events, "test", channel_id));
+        let mut column = Box::pin(inbox_wake_ups(
+            &events,
+            "test",
+            crate::entities::address::AddressTarget::Desk(channel_id),
+        ));
 
         events.publish(MailboxEvent::AttentionChanged(AttentionScope {
             company_id,
-            channel_id,
+            target: crate::entities::address::AddressTarget::Desk(channel_id),
             source_kind: AttentionWakeSource::Delivery,
             source_id: Uuid::new_v4(),
         }));
         events.publish(MailboxEvent::ActivityChanged(ThreadScope {
             thread_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             company_id,
         }));
         events.publish(MailboxEvent::ActivityChanged(scope));

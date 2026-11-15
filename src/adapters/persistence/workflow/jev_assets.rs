@@ -85,7 +85,7 @@ pub(super) async fn locate_on(
             company,
             actor,
             RelatedAssociation::Thread {
-                channel_id: reference.channel_id,
+                target: AddressTarget::Desk(reference.channel_id.as_uuid()),
                 thread_id: reference.thread_id,
             },
         )

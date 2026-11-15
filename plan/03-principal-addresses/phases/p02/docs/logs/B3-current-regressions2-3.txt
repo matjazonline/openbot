@@ -1,0 +1,18 @@
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_changes_only' (15446398) panicked at src/adapters/persistence/workflow/admission_tests.rs:436:5:
+assertion `left == right` failed
+  left: ("workflow_run_changed", Object {"company_id": String("f732b4c1-7cdd-487a-9940-76388055a0c9"), "run_id": String("8ce79285-d78c-49f4-b385-98428077d362"), "state": String("queued"), "target": Null, "thread_id": Null, "waiting_reason": Null})
+ right: ("workflow_run_changed", Object {"channel_id": Null, "company_id": String("f732b4c1-7cdd-487a-9940-76388055a0c9"), "run_id": String("8ce79285-d78c-49f4-b385-98428077d362"), "state": String("queued"), "thread_id": Null, "waiting_reason": Null})
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_changes_only ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::workflow_run_triggers_notify_a_threads_run_on_both_channels ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_changes_only
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4576 filtered out; finished in 1.61s
+

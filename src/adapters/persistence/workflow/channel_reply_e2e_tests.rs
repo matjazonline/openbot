@@ -13,6 +13,9 @@ mod recovery;
 #[path = "agent_history_channel_tests.rs"]
 mod history;
 
+#[path = "public_desk_private_agent_tests.rs"]
+pub(super) mod private_agent;
+
 #[tokio::test]
 async fn channel_reply_e2e_selected_binding_manual_and_schedule_runs_never_inherit_destination() {
     use crate::adapters::persistence::workflow::schedule_test_support::schedule_use_cases;

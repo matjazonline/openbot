@@ -134,13 +134,22 @@ fn association_value(association: RelatedAssociation) -> String {
     match association {
         RelatedAssociation::Company => "company".into(),
         RelatedAssociation::Channel(channel) => format!("channel:{}", channel.as_uuid()),
-        RelatedAssociation::Thread { channel_id, .. } => {
-            format!("channel:{}", channel_id.as_uuid())
+        RelatedAssociation::Principal(principal) => format!("principal:{}", principal.as_uuid()),
+        RelatedAssociation::Thread { target, .. } => {
+            association_value(RelatedAssociation::inbox(target))
         }
     }
 }
 
 fn parse_association(value: &str) -> AppResult<RelatedAssociation> {
+    if let Some(principal) = value.strip_prefix("principal:") {
+        return principal
+            .parse()
+            .map(|id| {
+                RelatedAssociation::Principal(crate::entities::transport::PrincipalId::new(id))
+            })
+            .map_err(|_| AppError::BadRequest("The association names no principal".into()));
+    }
     match value.strip_prefix("channel:") {
         None if value == "company" => Ok(RelatedAssociation::Company),
         Some(channel) => channel

@@ -74,9 +74,13 @@ pub async fn decode_sendgrid_request(
 
     let envelope_from = decoded.payload.from.clone();
     let envelope_to = decoded.payload.to.clone();
-    let auth =
-        verify_email_authentication(&decoded.raw_mime, Some(&envelope_from), decoded.sender_ip)
-            .await;
+    let auth = verify_email_authentication(
+        &decoded.raw_mime,
+        Some(&envelope_from),
+        decoded.sender_ip,
+        None,
+    )
+    .await;
     let payload = parse_raw_mime_to_payload(
         &decoded.raw_mime,
         Some(&envelope_from),
@@ -279,6 +283,62 @@ mod tests {
         assert_eq!(decoded.sender_ip, "192.0.2.10".parse::<IpAddr>().unwrap());
         assert_eq!(decoded.payload.to, "inbox@acme.example.com");
         assert_eq!(decoded.payload.from, "sender@example.com");
+    }
+
+    /// The SendGrid path states a person's address exactly as it states a desk's: one platform
+    /// selector, decided by the company namespace when the message is routed. These are the steps
+    /// [`decode_sendgrid_request`] takes, without the DNS-backed authentication lookup, whose
+    /// verdicts are stated instead.
+    #[tokio::test]
+    async fn address_external_ingress_sendgrid_names_a_person_the_way_it_names_a_desk() {
+        use crate::entities::auth::AuthVerdict;
+        let config = AppConfig {
+            app_domain_name: "example.com".into(),
+            ..AppConfig::for_test()
+        };
+        let mut routings = Vec::new();
+        for local in ["support", "alice"] {
+            const BOUNDARY: &str = "sendgrid-test-boundary";
+            let to = format!("{local}@acme.example.com");
+            let raw_mime = format!("From: sender@example.com\r\nTo: {to}\r\n\r\nhello");
+            let body = format!(
+                "--{BOUNDARY}\r\nContent-Disposition: form-data; name=\"envelope\"\r\n\r\n{{\"to\":[\"{to}\"],\"from\":\"sender@example.com\"}}\r\n\
+                 --{BOUNDARY}\r\nContent-Disposition: form-data; name=\"sender_ip\"\r\n\r\n192.0.2.10\r\n\
+                 --{BOUNDARY}\r\nContent-Disposition: form-data; name=\"email\"\r\n\r\n{raw_mime}\r\n\
+                 --{BOUNDARY}--\r\n"
+            );
+            let content_type = format!("multipart/form-data; boundary={BOUNDARY}");
+            let request = axum::extract::Request::builder()
+                .header("content-type", &content_type)
+                .body(axum::body::Body::from(body))
+                .unwrap();
+            let decoded = decode_provider_request(request, &content_type)
+                .await
+                .expect("a valid SendGrid multipart request decodes");
+            let payload = parse_raw_mime_to_payload(
+                &decoded.raw_mime,
+                Some(&decoded.payload.from),
+                Some(&decoded.payload.to),
+                std::slice::from_ref(&decoded.payload.to),
+                AuthVerdict::Pass,
+                AuthVerdict::Pass,
+                AuthVerdict::Pass,
+            );
+            let accepted = EmailIngressAdapter::for_config(&config)
+                .accept(
+                    payload,
+                    EmailIngressTrust::Verified(VerifiedEmailAuth {
+                        spf: AuthVerdict::Pass,
+                        dkim: AuthVerdict::Pass,
+                        dmarc: AuthVerdict::Pass,
+                        spam_score: None,
+                    }),
+                )
+                .expect("the decoded mail is accepted at the boundary");
+            routings.push(format!("{:?}", accepted.routing));
+        }
+        assert!(routings[0].contains("Platform"), "{}", routings[0]);
+        assert_eq!(routings[1], routings[0].replace("support", "alice"));
     }
 
     #[test]

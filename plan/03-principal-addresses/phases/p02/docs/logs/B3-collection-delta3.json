@@ -1,0 +1,6 @@
+{
+  "added": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding: test"
+  ],
+  "removed": []
+}

@@ -1,0 +1,657 @@
+
+running 571 tests
+test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ignored, exports native authoring responses for the browser gate
+test adapters::http::routes::onboarding::tests::onboarding_pages_render_each_step ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_every_publication_write_refuses_cross_origin_cookie_posts ... ok
+test adapters::http::routes::ui_agents::authoring::security_tests::autonomous_agent_authoring_routes_mount_in_the_authenticated_application_router ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_malformed_skill_csv_keeps_input_and_does_not_clear_assignments ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_preview_publish_replay_and_deactivation_omit_canonical_payloads ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::every_workspace_write_refuses_a_cross_origin_cookie_post ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection ... ok
+test adapters::http::routes::ui_agents::authoring::catalog::tests::autonomous_agent_authoring_catalog_connection_pages_are_scoped_bounded_and_complete ... ok
+test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... ok
+test adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... ignored, exports native workflow agent picker responses for the browser gate
+test adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once ... ok
+test adapters::http::routes::workflows::tests::tool_tests::workflow_tool_routes_register_and_revoke ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_blank_draft_is_created_once_per_key_and_validates_as_a_one_step_graph ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::a_template_copy_is_keyed_and_a_stale_catalogue_revision_is_refused ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::an_archived_workflows_binding_can_still_be_paused_but_not_activated_or_configured ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::an_admin_of_another_company_reaches_no_write_or_version_of_this_one ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::hostile_text_is_escaped_in_the_list_the_editor_and_the_preview ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::other_tenants_and_plain_members_reach_no_workflow_and_admins_do ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::access_tests::workflow_company_lookup_failures_remain_server_errors_on_pages_and_panes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_preserves_unsaved_source_and_selected_agent_outside_page ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_refuses_foreign_actor_agent_workflow_and_non_model_step ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_uses_current_hint_and_keeps_model_only_steps_tool_free ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_binding_is_created_once_paused_then_activated_at_the_revision_seen ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_refused_binding_keeps_every_choice_and_says_why ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_version_change_renders_that_versions_fields_and_keeps_matching_values ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::a_resource_that_is_not_ready_is_refused_as_such_on_create_configure_and_activate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_json_routes_share_current_settings_and_conflict_scope ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_rejects_invalid_projection_before_activation_and_keeps_selection ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_select_clear_stale_form_and_escaped_rejection ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channels_an_admin_cannot_see_stay_out_of_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::configure_saves_at_the_revision_seen_and_a_stale_one_keeps_the_choices ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::hostile_names_are_escaped_in_the_tab_the_form_and_the_card ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::other_tenants_and_plain_members_reach_no_binding ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::params_the_fields_cannot_carry_open_as_json_and_save_unchanged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::destination_tests::binding_destinations_authorize_tenant_role_and_private_channel ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_concurrent_save_keeps_the_authors_text_and_shows_what_the_other_saved ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::channel_response_tests::channel_reply_authoring_private_foreign_and_member_requests_reveal_no_settings ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_naming_more_tools_than_are_offered_still_saves_and_renders ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_draft_that_moves_after_the_save_keeps_the_text_and_says_both ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_save_refreshes_the_sidebar_and_a_changed_publication_is_flagged ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::a_source_and_description_that_start_with_a_newline_keep_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::an_invalid_source_is_saved_kept_and_located ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::archiving_refuses_a_stale_revision_then_locks_the_draft ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_guards_unsaved_text_and_reports_only_the_work_it_does ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::editor_tests::the_editor_offers_a_needed_mcp_tool_past_any_company_wide_count_and_cuts_per_tool ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_catalogue_binding_and_sample ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::jev_tests::workflow_authoring_jev_company_forms_permissions_rotation_and_readiness ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::memory_tests::memory_capture_settings_form_is_owner_admin_only_revision_checked_and_states_its_reach ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::memory_tests::memory_scope_company_settings_form_is_owner_admin_only_and_revision_checked ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_agent_step_previews_every_published_candidate ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_parameter_selected_step_lists_its_own_parameters_agents ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_conflict_that_is_not_a_moved_draft_says_what_the_command_said ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::a_publish_of_a_revision_that_is_no_longer_the_draft_is_refused_in_the_editor ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_agent_step_previews_the_published_agent_reference_and_use ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::an_mcp_step_validates_publishes_through_the_selected_slot_and_locates_bad_arguments ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::selections_read_only_well_formed_connection_fields ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::publish_tests::publishing_moves_no_binding_and_versions_compare_line_by_line ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_preserves_unsaved_source ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republishing_workflow ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::run_board_view_filter_workflow_pages_link_to_the_board ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::cloudroom_samples_local_run_uses_scripted_output_without_machine_or_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_mcp_fixture_never_contacts_selected_endpoint_and_rejects_foreign_selection ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::samples_authorize_tenant_revision_and_preserve_invalid_hostile_text ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_every_runnable_type_and_the_agents_a_step_can_name ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_catalogue_lists_memory_steps_only_when_the_memory_service_is_configured ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope ... ok
+test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::the_sidebar_pages_through_every_draft ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_identical_keys_return_one_result ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::a_tool_name_is_registered_re_pinned_re_pointed_and_revoked_saying_what_each_does ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_competing_publishers_choose_one_without_partial_state ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_preview_and_publish_without_a_workflow ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::autonomous_agent_authoring_usage_refuses_members_and_foreign_agents ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_requires_current_authority_and_scopes_history ... ok
+test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... ok
+test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::tools_tests::used_by_lists_a_binding_that_reaches_the_agent_only_through_a_child_diamond ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once ... ok
+test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_draft_edit_first_refuses_stale_expected_state ... ok
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_competing_same_conversation_and_redelivery_keep_one_target_thread ... ok
+test adapters::persistence::department::tests::lead_desks::address_namespace_a_department_desk_cannot_take_a_persons_address ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_direct_thread_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_binding_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_blocks_deleting_its_department_until_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_an_agent_created_as_its_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_agent_to_agent_repoints_the_same_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_person_and_agent_leads_with_one_binding ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_taken_address_refuses_the_department ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_run_as_moves_to_the_admin_who_changes_the_lead ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_leaves_a_users_own_responder_alone ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_refuses_lead_changes_it_cannot_follow ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_survives_a_rename_and_is_left_once_detached ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_a_person_lead_or_none_is_a_plain_team_desk ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_an_agent_lead_answers_on_it ... ok
+test adapters::persistence::department::tests::lead_desks::department_lead_desk_competing_lead_changes_leave_the_holders_agent_answering ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_promotion_and_mail_finish_in_both_identity_lock_orders ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_creates_and_replays_the_first_department ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_removal_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_names_the_department_on_a_resubmission ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing ... ok
+test adapters::persistence::onboarding::tests::agent_default_desk_onboarding_without_a_keyed_model_is_rejected ... ok
+test adapters::persistence::onboarding::tests::department_lead_desk_onboarding_address_collision_with_an_agent_is_rejected ... ok
+test adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_rename_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_self_mail_rekey_finishes_in_both_identity_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::status::direct_competing_binding_status_and_ingress_finish_in_both_lock_orders ... ok
+test adapters::persistence::onboarding::tests::onboarding_library_model_lookup_failure_remains_an_infrastructure_error ... ok
+test adapters::persistence::onboarding::tests::onboarding_denials_and_invalid_selection_have_no_provider_effects ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_creates_a_fresh_principal ... ok
+test adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command ... ok
+test adapters::persistence::onboarding::tests::onboarding_one_connection_progresses_with_real_custom_library_and_competitor ... ok
+test adapters::persistence::onboarding::tests::onboarding_provider_failure_releases_transaction_for_retry ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_custom_competitors_wait_for_company_and_generate_once ... ok
+test adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh ... ok
+test adapters::persistence::onboarding::tests::onboarding_second_principal_workflow_error_rolls_back_every_effect ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_ingress_first_keeps_the_agent_and_direct_history ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_retirement_first_refuses_ingress_atomically ... ok
+test adapters::persistence::onboarding::tests::onboarding_selection_is_bounded_and_custom_fields_are_paired ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_company_delete_waits_for_ingress_then_cascades_every_direct_effect ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_ingress_waits_for_company_delete_then_refuses_without_effects ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::onboarding::tests::onboarding_prompt_and_operation_timeouts_cancel_and_allow_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refuses_implicit_desk_configuration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_returns_direct_binding_without_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_competing_builder_claimants_make_one_direct_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_competing_expiry_owners_record_one_exhausted_handling_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_expiry_keeps_one_bounded_mixed_page_and_ordinary_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_authenticated_projector_ignores_unobserved_wire_identity_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_origin_policy_stays_private_without_a_reply_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_database_requires_authentic_complete_immutable_target_and_links ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_existing_root_failure_after_source_retention_never_restarts_the_ladder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_missing_message_seal_aborts_real_fenced_completion_and_retries_atomically ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_bounds_scanned_pages_skips_locked_prefix_and_collectors_delete_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_missing_child_or_rerun_seal_rolls_back_real_creation_then_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_admission_first_preserves_its_only_root_when_source_retention_retries ... ok
+2026-11-15T12:36:47.781502Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=fe6e0ce6-1346-4f69-a565-533f28a37f19 binding_id=ce1460af-663c-84c0-80c7-cff0bbb3dde6 intent_id=5345cdeb-88c0-43e9-8dbd-10e54a3bfee0 reason="unavailable"
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_retention_first_closes_the_competing_actual_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_real_child_recovery_and_authorized_rerun_keep_origin_across_source_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_notice_before_real_role_writer_commits_captured_root_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_former_root_retention_keeps_the_one_root_seal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_department_member_uses_its_agent_grant_and_keeps_its_author ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_account_update_role_writer_and_notice_all_finish ... ok
+2026-11-15T12:36:56.746262Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(779ca3bc-26fc-4d51-aeb2-e3d504e6eef9)
+2026-11-15T12:36:56.754733Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=52e2b4f0-b80c-4015-b151-7599898599b5 correlation_id=c579a479-10cb-4681-9346-4c67eed67e56 transport=email status=dead_letter
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_nonmember_agent_is_refused_without_a_canonical_hop_or_smtp ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_running_agent_cannot_send_as_another_agents_address ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::runtime::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_native_scope_kind_and_reserved_alias_constraints ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_activation_locks_before_competing_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_actual_source_retention_closes_pending_and_claimed_private_intents_without_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_retained_reactivation_serializes_revocation ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_race_tests::autonomous_agent_storage_native_revocation_locks_before_competing_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::grant_tests::autonomous_agent_storage_public_mcp_grant_edits_retain_identity_and_require_fresh_review ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_retention_races_preserve_surviving_revisions ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::manifest_tests::autonomous_agent_storage_manifest_seals_selection_and_accepts_only_its_tree ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_revision_round_trip_seals_members_and_active_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_external_targets_round_trip_and_revoke_without_aba ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::targets_tests::autonomous_agent_storage_workflow_pin_survives_repin_and_revocation_is_permanent ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::view_tests::autonomous_agent_views_bound_agent_and_workflow_dependencies_with_explicit_truncation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_competing_duplicates_and_publication_share_one_complete_selection ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_revisions_are_selected_at_admission_and_replay_before_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_authority_checkpoint_requires_the_exact_selected_agent_identity ... ok
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_workflow' (16765943) panicked at src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs:242:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_workflow ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_checks_eligibility_while_admission_checks_readiness ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::native_claims::workflow_escalation_agent_native_receipt_rejects_forged_fence_route_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_competing_draft_edit_preserves_reference ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_agent_workflow_reference_step_http_slot_does_not_change_agent_binding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_combined_depth_is_bounded_across_agent_workflow_edges ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_node_limit_covers_the_complete_dynamic_universe ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_continuation_two_real_approval_rounds_and_competing_reviewers_preserve_one_exchange ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_identity::agent_history_identity_same_agent_child_has_private_branch_and_keeps_actual_actor ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_continuation::agent_history_retention_actual_human_submission_owner_competes_with_cleanup_and_replays_expired_selected_source ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_callers_repeated_activation_replay_keeps_outputs_after_later_workflow_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_children_same_agent_private_branch_completes_without_parent_transcript ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_level_child_branch_inherits_content_and_result_taints_parent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_children_first_tool_child_keeps_root_selected_agent_and_workflow_after_publication_and_repin ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_aggregate_draft_bytes_are_bounded_without_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_message_steps_keep_metadata_and_generic_message_tools_stay_forbidden ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_combined_capture_depth_accepts_32_and_refuses_34 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_unique_draft_selections_accept_256_and_refuse_257 ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::history::agent_history_samples_sealed_capture_cannot_load_production_history_or_advance_turns ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_install_failure_rolls_back_portable_skills_and_principal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_missing_local_tool_refuses_the_copy ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_provisioning::autonomous_agent_provisioning_library_requires_explicit_company_local_binding_before_publish ... ok
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version' (16766869) panicked at src/adapters/persistence/workflow/autonomous_agent_view_tests.rs:74:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_model_invented_tool_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_refuses_rebound_tool_target ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_repairs_invalid_output_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_token_pause_resumes_with_the_saved_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_competing_fenced_resolvers_converge_and_stale_fence_refuses ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::workflow_agent_run_two_approval_cycles_dispatch_each_call_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_current_agent_revocation_refuses_existing_conversation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_principal_deletion_preserves_audit_and_refuses_current_use ... ok
+observed gated transaction pids=[25244] blocker=25250 elapsed_ms=171
+observed gated transaction pids=[25255] blocker=25262 elapsed_ms=44
+observed gated transaction pids=[25268] blocker=25274 elapsed_ms=41
+2026-11-15T12:37:51.695266Z  WARN open_bots::adapters::persistence::workflow::checkpoints: Workflow checkpoint acknowledgment is unresolved company_id=0d03380f-0929-42d4-aea0-35a3dde8f1c9 run_id=dcf5b102-2ed3-46c4-a989-cfb6480a54d1 execution_id=542f1c4f-f240-4cd9-869e-55219c063b6a durability="unknown" event="workflow.checkpoint_ack_unknown"
+2026-11-15T12:37:51.695314Z  WARN open_bots::adapters::persistence::workflow::persistence_bound: Workflow persistence bound op="checkpoint.update" outcome="unknown" cause="unresolved" acquire_ms=Some(0) body_ms=Some(13) commit_ms=Some(1989) resolution_ms=Some(0) total_ms=2002 attempt_bound_ms=2000
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_cancel_before_checkpoint_keeps_the_captured_input ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_completion_actual_final_commit_ack_loss_replays_without_another_provider_call ... ok
+observed resolution pids=[25256] blocker=25255 elapsed_ms=1960
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_driver_keeps_exact_json_and_replays_without_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_aborted_keeps_counter_available_for_recovery ... ok
+observed resolution pids=[25267] blocker=25268 elapsed_ms=1968
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::acknowledgement::agent_history_storage_ambiguous_enqueue_committed_reuses_one_position_before_checkpoint ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_invalid_candidates_never_become_an_answer ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_json_null_is_an_accepted_value_in_storage ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_completion_repair_accepts_only_the_repaired_value ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_level_enqueue_uses_current_content_and_refuses_lower_or_out_of_domain ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_capture_precedes_checkpoint_and_replays_one_original_input ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_identity::agent_history_identity_model_only_steps_allocate_no_conversation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_checkpoint_requires_exact_server_owned_exchange_reference ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_competing_preparations_share_position_and_reject_changed_replay ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::history_storage::agent_history_storage_native_identity_order_and_source_pins_are_enforced ... ok
+2026-11-15T12:37:58.285724Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=6186440c-efdd-4f2a-877d-d53b1e84c90f run_id=3249d660-5e5b-4fd7-b015-7af2fe9b5099 execution_id=76ac9c73-9931-482b-905b-3cc59e3f4b99 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_run_level_model_continues_after_refused_http_tool_without_egress ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::agent_history_level_accepted_checkpoint_contains_the_real_classified_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_busy_model_is_retryable_without_saving_an_empty_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_competing_observers_keep_one_canonical_result_and_its_exact_stamp ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_current_grant_revocation_blocks_saved_invocation_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_empty_corpus_saves_empty_observation_without_classification_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_failure_after_result_and_rise_rolls_back_the_entire_observation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_forged_fences_and_changed_arguments_fail_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_generic_checkpoint_result_cannot_bypass_classification ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_level_argument_is_a_saved_tool_error_without_embedding_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_model_token_limit_is_a_saved_tool_error_without_empty_success_or_rise ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::atomic::knowledge_search_observation_above_actual_immutable_ceiling_cannot_commit ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_allows_unchanged_audience ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::history_resume::agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_driver_persists_observation_and_classification_before_continuing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_low_ceiling_never_observes_private_exact_content_or_raises ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::knowledge_search_replay_uses_the_canonical_result_without_embedding_again ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_a_switched_on_target_is_provisioned_at_preparation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_accepted_private_session_exchange_is_captured_for_its_creator ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_agent_without_the_switch_captures_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_nothing_is_captured_without_a_configured_service ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_operations_capture_and_delivery_logs_carry_ids_not_content ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_agent_memory_search_is_ceilinged_recorded_once_and_replayed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_a_replacement_claim_fences_the_stale_saver_and_replays_one_intent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_details_and_timeline_stay_within_the_ceiling ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_agent_memory_tools_search_and_save_through_the_production_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_forged_calls_and_fences_refuse_before_the_service ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_integration_service_auth_refusals_are_controlled_and_raise_nothing ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_authoring_catalog_lists_memory_tools_only_while_enabled ... ok
+2026-11-15T12:38:17.580881Z  WARN open_bots::adapters::persistence::agent_publication::commands: Agent preview failed failure="missing"
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_memory_tools_publish_only_while_memory_is_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_attempt_replays_the_pack_and_validates_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_pack_without_a_configured_service_is_unavailable ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_recall_past_its_deadline_continues_without_memory ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_freezes_a_ceilinged_pack_into_the_untrusted_context ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_real_replacement_claim_replays_original_and_fences_stale_competitor ... ok
+observed gated transaction pids=[26185] blocker=26193 elapsed_ms=30
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_optional_unavailability_continues_and_refusal_fails_closed ... ok
+2026-11-15T12:38:31.717189Z  WARN open_bots::adapters::persistence::workflow::persistence_bound: Workflow persistence bound op="knowledge.observe" outcome="unknown" cause="unresolved" acquire_ms=Some(0) body_ms=Some(26) commit_ms=Some(1977) resolution_ms=Some(0) total_ms=2003 attempt_bound_ms=2000
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_applies_only_to_memory_search_agents_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_access_level_competing_rise_and_tool_save_freeze_the_committed_level ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_proof_rewrite_delete_and_cross_company_insert_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_expired_database_lease_or_deadline_refuses_before_embedding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_answers_a_declared_label_with_a_tool_free_request ... ok
+observed gated transaction pids=[26249] blocker=26482 elapsed_ms=35
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_repairs_an_undeclared_label_then_fails_terminally ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_chooses_only_a_declared_route_with_valid_data ... ok
+2026-11-15T12:38:40.882249Z  WARN open_bots::adapters::persistence::workflow::persistence_bound: Workflow persistence bound op="knowledge.observe" outcome="unknown" cause="unresolved" acquire_ms=Some(0) body_ms=Some(27) commit_ms=Some(1976) resolution_ms=Some(0) total_ms=2003 attempt_bound_ms=2000
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_resumed_attempts_revalidate_recorded_tool_items ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_decision_agent_data_schema_local_references_resolve ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_unknown_commit_ack_returns_no_content_then_reconstruction_reads_truth ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::agent_history_protocol_model_only_native_checkpoint_refuses_seed_and_keeps_empty_control ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_invalid_output_after_repairs_is_terminal ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_crash_during_effect_is_indeterminate_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_binding_revocation_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_classify_token_pause_and_restart_use_the_shared_driver ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_dynamic_selection_runs_the_bound_agent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_reservation_without_provider_io_retries_with_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::ownership::knowledge_search_actual_statement_and_commit_expiry_roll_back_payload_rise_and_proof ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::model_steps::workflow_model_steps_check_only_the_capabilities_they_use ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_token_denial_never_enters_the_provider ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_receipt_reuses_the_saved_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_unanswered_effect_is_terminal_and_reconciled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_restart_after_provider_entry_charges_a_new_request ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::memory_park_race::memory_access_level_competing_rise_and_parked_save_freeze_the_committed_level ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::workflow_agent_run_settlement_pause_and_second_pause_resume_exact_requests ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::zero_effect::vault_google_e2e_direct_nested_model_and_sealed_sample_never_resolve_private_credentials ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_sql_shape_matches_type_names ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::vault_gmail::vault_google_e2e_different_login_mailbox_callback_reads_thread_and_passes_selected_data_to_model ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_publication_refuses_forged_snapshot_and_keeps_frozen_version ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_competing_revocation_refuses_admission ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_removed_tool_grant_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_revoked_model_connection_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_refuses_unlinked_skill_before_provider_entry ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_run_saves_tool_call_dispatches_once_and_replays_final_output ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_samples_mcp_without_slots_never_opens_the_server ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::autonomous_agent_dispatch_mcp_without_workflow_slot_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::doop_binary::doop_binary_raw_result_bound_preserves_unknown_and_no_reissue ... ok
+2026-11-15T12:39:04.993391Z  WARN open_bots::adapters::persistence::agent_publication::commands: Agent publication failed failure="invalid_definition"
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_draft_skill_detach_keeps_selection_until_exact_revocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_model_removal_after_admission_refuses_before_all_peers ... ok
+2026-11-15T12:39:06.114451Z  WARN open_bots::adapters::persistence::agent_publication::commands: Agent publication failed failure="conflict"
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_invalid_required_alias_draft_cannot_replace_active_capabilities ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_binding_revocation_during_discovery_has_no_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_authority_mcp_credential_rotation_before_open_keeps_binding_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_recovery_mcp_cancellation_closes_session_and_preserves_one_possible_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_retargeted_alias_cannot_redirect_saved_call_and_dispatch_races_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::doop_binary::doop_binary_agent_actual_provider_checkpoint_raw_receipt_and_replay ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::autonomous_agent_dispatch_same_alias_keeps_two_connections_origins_and_receipts_isolated ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_actual_agents_in_same_thread_remain_distinct ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_manual_thread_attachment_is_private_and_scope_updates_refuse ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_native_cross_tenant_agent_and_thread_anchors_refuse ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_identity_real_message_roots_share_thread_across_agent_revisions ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::agent_history_level_thread_stream_survives_audience_drop_and_restore ... ok
+observed gated transaction pids=[27385] blocker=27394 elapsed_ms=40
+observed gated transaction pids=[27398] blocker=27409 elapsed_ms=43
+observed gated transaction pids=[27413] blocker=27420 elapsed_ms=162
+observed resolution pids=[27386] blocker=27385 elapsed_ms=1969
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_aborted_park_commit_has_no_receipt_and_retries_same_frozen_activation ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::agent_address_create_actual_default_binding_answers_a_direct_message ... ok
+observed resolution pids=[27400] blocker=27398 elapsed_ms=1965
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_park_commit_ack_loss_proves_retired_attempt_and_survives_fast_wake ... ok
+2026-11-15T12:39:19.541038Z  WARN open_bots::adapters::persistence::workflow::checkpoints: Workflow checkpoint acknowledgment is unresolved company_id=62cda2f9-0009-49a6-a03b-760aec9824c9 run_id=fbf57b9c-9063-4a53-89ce-d6362498c719 execution_id=ee728eed-385e-4860-8351-6c2bbd8c29a8 durability="unknown" event="workflow.checkpoint_ack_unknown"
+2026-11-15T12:39:19.541083Z  WARN open_bots::adapters::persistence::workflow::persistence_bound: Workflow persistence bound op="checkpoint.update" outcome="unknown" cause="unresolved" acquire_ms=Some(0) body_ms=Some(22) commit_ms=Some(1980) resolution_ms=Some(0) total_ms=2003 attempt_bound_ms=2000
+observed native writer behind final checkpoint pids=[27412] blocker=27413 elapsed_ms=10
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_cancelled_queued_turn_never_releases_owner_or_blocks_next_position ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_ordering_competing_preparations_park_without_checkpoint_or_retry_and_resume_once ... ok
+observed native writer behind final checkpoint pids=[27414] blocker=27413 elapsed_ms=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::agent_history_recovery_final_commit_releases_before_workflow_finish_and_poll_recovers_lost_wake ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_unknown_final_ack_keeps_turn_until_commit_and_completed_replay_cannot_release_successor ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_saved_calls_recheck_connection_grant_review_and_peer_schema ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_pointer_cannot_reference_another_tenants_exchange ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_conversation_limit_refuses_atomically_then_admits_after_cancel ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::doop_binary_workflow::doop_binary_workflow_context_and_removed_pointer_concat_never_leak_or_reissue ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_safe_retry_at_capacity_is_atomic_and_old_position_cannot_steal_new_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_ordering_native_guards_refuse_pointer_theft_nonowner_activation_and_wait_retag ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_company_teardown_removes_turn_and_parked_companion_proofs ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_deferred_companion_pin_blocks_exchange_only_delete_at_commit ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_invalid_model_settlement_releases_without_accepting_an_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_queued_deadline_vs_resume_settles_once_without_releasing_another_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_replacement_before_checkpoint_keeps_turn_and_fences_old_preparation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::guards::agent_history_recovery_revoked_wait_head_reaches_normal_terminal_owner_and_frees_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::reviewer_turn_hints::workflow_reviewer_follow_pending_agent_turn_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::reviewer_turn_hints::workflow_reviewer_follow_ready_agent_turn_reopens_with_actor_account_locked ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::agent_history_selection_second_real_call_sees_complete_pair_and_current_input_last ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_views_runs_narrow_to_the_departments_desks ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_context_frozen_preparation_replays_the_department_it_froze ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::department::department_views_usage_names_the_department_of_the_runs_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_allows_unchanged_team_audience ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_selection_raises_once_for_competing_preparations_and_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_failed_commit_rolls_back_snapshot_selection_taint_and_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_native_first_freeze_attests_sources_content_order_and_level ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_preparation_seed_mismatch_refuses_checkpoint_and_pruned_sources_replay_exactly ... ok
+history_selection_plan: {"eligible_count":[{"Execution Time":0.014,"Plan":{"Actual Loops":1,"Actual Rows":1.0,"Actual Startup Time":0.009,"Actual Total Time":0.01,"Async Capable":false,"Disabled":false,"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Aggregate","Parallel Aware":false,"Partial Mode":"Simple","Plan Rows":1,"Plan Width":8,"Plans":[{"Actual Loops":1,"Actual Rows":2.0,"Actual Startup Time":0.008,"Actual Total Time":0.008,"Alias":"agent_history_exchanges","Async Capable":false,"Disabled":false,"Heap Fetches":2,"Index Cond":"((company_id = '30c784a8-9a2f-44fa-b6ed-69335041ebc0'::uuid) AND (conversation_id = '58b01d59-5918-4e83-aaa2-aaa1e8a56390'::uuid) AND (access_level <= '0'::smallint) AND (\"position\" < '22'::bigint))","Index Name":"agent_history_exchanges_recent","Index Searches":1,"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Index Only Scan","Parallel Aware":false,"Parent Relationship":"Outer","Plan Rows":1,"Plan Width":0,"Relation Name":"agent_history_exchanges","Rows Removed by Index Recheck":0,"Scan Direction":"Forward","Shared Dirtied Blocks":0,"Shared Hit Blocks":6,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":0.14,"Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":8.17}],"Shared Dirtied Blocks":0,"Shared Hit Blocks":6,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":8.17,"Strategy":"Plain","Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":8.18},"Planning":{"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Shared Dirtied Blocks":0,"Shared Hit Blocks":3,"Shared Read Blocks":0,"Shared Written Blocks":0,"Temp Read Blocks":0,"Temp Written Blocks":0},"Planning Time":0.082,"Triggers":[]}],"hidden_pairs":18,"limit":17,"metadata":[{"Execution Time":0.027,"Plan":{"Actual Loops":1,"Actual Rows":2.0,"Actual Startup Time":0.017,"Actual Total Time":0.02,"Async Capable":false,"Disabled":false,"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Limit","Parallel Aware":false,"Plan Rows":1,"Plan Width":35,"Plans":[{"Actual Loops":1,"Actual Rows":2.0,"Actual Startup Time":0.017,"Actual Total Time":0.02,"Async Capable":false,"Disabled":false,"Inner Unique":true,"Join Filter":"((execution.run_id = exchange.run_id) AND (execution.id = exchange.execution_id))","Join Type":"Inner","Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Nested Loop","Parallel Aware":false,"Parent Relationship":"Outer","Plan Rows":1,"Plan Width":35,"Plans":[{"Actual Loops":1,"Actual Rows":2.0,"Actual Startup Time":0.01,"Actual Total Time":0.011,"Alias":"exchange","Async Capable":false,"Disabled":false,"Filter":"(((access_level)::smallint <= '0'::smallint) AND (state = 'completed'::text))","Index Cond":"((company_id = '30c784a8-9a2f-44fa-b6ed-69335041ebc0'::uuid) AND (conversation_id = '58b01d59-5918-4e83-aaa2-aaa1e8a56390'::uuid) AND (\"position\" < '22'::bigint))","Index Name":"agent_history_exchanges_retained","Index Searches":1,"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Index Scan","Parallel Aware":false,"Parent Relationship":"Outer","Plan Rows":1,"Plan Width":107,"Relation Name":"agent_history_exchanges","Rows Removed by Filter":19,"Rows Removed by Index Recheck":0,"Scan Direction":"Backward","Shared Dirtied Blocks":0,"Shared Hit Blocks":20,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":0.14,"Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":8.17},{"Actual Loops":2,"Actual Rows":14.0,"Actual Startup Time":0.001,"Actual Total Time":0.002,"Alias":"execution","Async Capable":false,"Disabled":false,"Index Cond":"(company_id = '30c784a8-9a2f-44fa-b6ed-69335041ebc0'::uuid)","Index Name":"workflow_executions_pkey","Index Searches":2,"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Node Type":"Index Scan","Parallel Aware":false,"Parent Relationship":"Inner","Plan Rows":1,"Plan Width":80,"Relation Name":"workflow_executions","Rows Removed by Index Recheck":0,"Scan Direction":"Forward","Shared Dirtied Blocks":0,"Shared Hit Blocks":8,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":0.14,"Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":8.16}],"Rows Removed by Join Filter":26,"Shared Dirtied Blocks":0,"Shared Hit Blocks":28,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":0.29,"Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":16.37}],"Shared Dirtied Blocks":0,"Shared Hit Blocks":28,"Shared Read Blocks":0,"Shared Written Blocks":0,"Startup Cost":0.29,"Temp Read Blocks":0,"Temp Written Blocks":0,"Total Cost":16.37},"Planning":{"Local Dirtied Blocks":0,"Local Hit Blocks":0,"Local Read Blocks":0,"Local Written Blocks":0,"Shared Dirtied Blocks":0,"Shared Hit Blocks":3,"Shared Read Blocks":0,"Shared Written Blocks":0,"Temp Read Blocks":0,"Temp Written Blocks":0},"Planning Time":0.17,"Triggers":[]}],"scope":"owned test fixture; count scan not constant-time","visible_pairs":2}
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::agent_history_level_hidden_rows_are_filtered_before_candidate_limit_and_omission_count ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_checks_current_acting_member_on_resume ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::memory_access_level_history_freeze_lowers_for_inexact_exchanges ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_level_private_thread_anchor_keeps_authorized_member_above_public_anchor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::level::agent_history_level_classified_current_input_empty_seed_refuses_initial_and_restarted_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::driver::history_crash_child_entry ... ignored, spawned with isolated fixture by agent_history_e2e process parents
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_preparation_mandatory_current_budget_refusal_has_no_provider_snapshot_or_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_selection_oversized_newest_pair_stops_walk_without_loading_older_pair ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::capacity::agent_history_ordering_company_limit_spans_streams_and_rolls_back_new_identity ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_selection_private_session_preserves_json_pairs_without_recursive_current_input ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_database_first_freeze_binds_current_version_and_trusted_mcp_policy ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::callers::agent_history_callers_copied_context_cannot_join_private_session_but_authenticated_reuse_can ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_selection_pair_limit_keeps_recent_complete_suffix_and_exact_omissions ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::callers::agent_history_level_lower_private_session_reuse_filters_hidden_pairs_without_raising_ceiling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::controls::agent_history_controls_native_scope_deletions_keep_retained_history_and_recreated_thread_window_rejects_old_cursor ... ok
+AH-P07 genuine_process_crash point=Enqueued cancelled_middle=true same_identity=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_expiry_owner_precedes_blocked_fresh_selection_without_mixed_seed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_conversation_metadata_actual_limit_blocks_competitors_with_expired_payload_prefix ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::owner_races::agent_history_retention_actual_preparation_owner_skips_competing_cleanup_and_replays_exact_copy ... ok
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_competing_collectors_expire_json_null_once_and_keep_checkpoint_proof ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_direct_expiry_refuses_reverse_source_lock_without_deadlock_or_partial_boundary ... ok
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_holes_and_source_cascade_keep_truthful_monotone_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_lifecycle_events_are_structured_and_never_contain_the_native_payload_or_credential ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention::agent_history_retention_rollback_and_deferred_abort_preserve_payload_digests_and_boundary ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_company_metadata_actual_limit_is_independent_of_payload_and_conversation_limits ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::metadata_capacity::agent_history_retention_company_payload_actual_limit_and_pressure_expire_sparse_streams_to_soft_ceiling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_controls_empty_scope_capacity_is_native_and_pruning_keeps_live_resolved_identity ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::authority::agent_history_level_history_reader_rechecks_demotion_and_inflight_raise_after_payload_fetch ... ok
+2026-11-15T12:40:00.697667Z ERROR open_bots::adapters::http::app_error_impl: Request failed error_kind="bad_request"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::authority::agent_history_views_payload_expiry_after_fetch_releases_only_expired_metadata_without_stale_payload ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::authority::agent_history_views_private_admin_positive_restricted_member_customer_foreign_scope_cursor_and_sample_denials ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::supervision::agent_history_ordering_supervised_park_frees_work_and_independent_stream_has_all_database_connections ... ok
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_continuation_settle_the_call_once ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_reopened_attempt_lost_before_saving_replays_the_same_result ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_dispatch_after_or_during_lease_expiry_starts_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_cancel_and_dispatch_never_leave_a_live_child_under_a_cancelled_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_race_tests::workflow_tool_schema_guards_refuse_parks_reopens_and_lineage_written_by_hand ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_keeps_the_child_contract_in_the_agent_revision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_workflow_reference_step_http_alias_cannot_redirect_agent_child ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_pins_and_grants_stay_within_the_agents_company ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::workflow_tool_registration_commands_keep_revisions_authority_and_bounds ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retry_retention::agent_history_retention_completed_output_failed_job_pressure_competes_with_native_retry_without_model_reentry ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::workflow_tool_revocation_refuses_new_runs_and_calls_while_parked_calls_deliver ... ok
+2026-11-15T12:40:12.763428Z  WARN open_bots::adapters::persistence::agent_publication::commands: Agent preview failed failure="invalid_definition"
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_repin_and_archive_leave_published_workflows_on_their_frozen_version ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::workflow_tool_stored_children_keep_their_frozen_pin_until_the_tool_is_revoked ... ok
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary::doop_binary_child_actual_completion_provider_checkpoint_and_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock ... ok
+test application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents ... ok
+test application::use_cases::thread::ingest::commit::tests::a_file_only_message_has_intents_that_admit_nothing ... ok
+test application::use_cases::thread::ingest::commit::tests::every_association_gets_an_intent_with_its_own_facts ... ok
+test application::use_cases::thread::ingest::policy::tests::a_signed_in_composer_is_not_asked_for_a_dmarc_verdict ... ok
+test application::use_cases::thread::ingest::policy::tests::a_trusted_sender_is_never_scored_and_an_absent_score_is_not_a_zero ... ok
+test application::use_cases::thread::ingest::policy::tests::an_internal_message_must_prove_which_channel_relayed_it ... ok
+test application::use_cases::thread::ingest::policy::tests::only_a_dmarc_pass_authorizes_a_message_from_a_remote_mail_server ... ok
+test application::use_cases::thread::ingest::policy::tests::participants_join_once_and_only_when_the_rule_allows ... ok
+test application::use_cases::thread::ingest::policy::tests::the_hop_limit_applies_to_relayed_traffic_and_the_auto_reply_guard_to_outside_traffic ... ok
+test application::use_cases::thread::support::mention_tests::email_mentions_are_case_insensitive_and_bounded ... ok
+test application::use_cases::thread::support::mention_tests::slug_mentions_do_not_match_longer_slugs_or_bracket_syntax ... ok
+test application::use_cases::thread::tests::a_cc_d_channel_the_body_never_names_is_not_mentioned ... ok
+test application::use_cases::thread::tests::a_cc_d_channels_address_in_the_body_is_a_mention ... ok
+test application::use_cases::thread::tests::a_cc_d_channels_name_or_alias_in_the_body_is_a_mention ... ok
+test application::use_cases::thread::tests::a_closed_channel_keeps_cc_d_outsiders_off_the_thread ... ok
+2026-11-15T12:40:15.278048Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(5531b50e-2996-47e5-869b-cebf41a78e13)
+test application::use_cases::thread::tests::a_closed_channel_refuses_the_outsider_s_own_reply ... ok
+2026-11-15T12:40:15.278733Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing an unauthorized thread injection and bouncing it back thread_id=21c92735-21e1-475b-b5b0-4f4ebde1e85e
+test application::use_cases::thread::tests::a_closed_public_channel_bounces_the_outsider_s_own_reply ... ok
+2026-11-15T12:40:15.279079Z  WARN open_bots::thread_index: Ignoring a malformed Thread-Index header reason="invalid_base64" encoded_length=15
+test application::use_cases::thread::tests::a_malformed_thread_index_is_dropped_at_the_boundary_and_counted_by_ingest ... ok
+test application::use_cases::thread::tests::a_mention_only_in_quoted_history_is_not_a_mention ... ok
+test application::use_cases::thread::tests::a_passively_copied_channel_records_an_unmentioned_cc_intent ... ok
+test application::use_cases::thread::tests::a_pure_workflow_hop_to_a_public_channel_is_relayed ... ok
+test application::use_cases::thread::tests::a_quiet_outside_reply_records_an_inadmissible_intent ... ok
+test application::use_cases::thread::tests::a_team_member_who_mistypes_a_channel_is_told_which_ones_they_can_use ... ok
+test application::use_cases::thread::tests::a_team_member_writing_to_help_is_answered_and_nothing_is_routed ... ok
+2026-11-15T12:40:15.283050Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+test application::use_cases::thread::tests::access_level_dmarc_failure_rejects_a_known_member_address ... ok
+test application::use_cases::thread::tests::address_grouping::a_cc_address_gets_an_intent_with_its_role_and_mention ... ok
+test application::use_cases::thread::tests::address_grouping::a_plus_address_gives_each_channel_its_own_intent ... ok
+test application::use_cases::thread::tests::address_grouping::a_quiet_cc_address_makes_every_intent_inadmissible ... ok
+test application::use_cases::thread::tests::address_grouping::a_repeated_cc_channel_stays_in_its_first_address ... ok
+test application::use_cases::thread::tests::address_grouping::an_unmentioned_cc_address_still_gets_an_intent ... ok
+test application::use_cases::thread::tests::address_grouping::separate_to_addresses_each_get_an_intent ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_context_suffix_strips_for_a_desk_and_is_refused_for_a_person ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_a_person_together_get_one_copy_each ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_the_senders_direct_address_are_admitted ... ok
+2026-11-15T12:40:15.287511Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(11ad5b43-621f-4d8f-9962-0451b5b066c9)
+2026-11-15T12:40:15.287632Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(11ad5b43-621f-4d8f-9962-0451b5b066c9)
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_an_internal_relay_to_a_person_is_refused_definitely ... ok
+2026-11-15T12:40:15.288122Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a routing cycle target=Principal(PrincipalId(ae3c0a2c-ccf7-bb0f-fc44-084d34d22431))
+test application::use_cases::thread::tests::address_resolution::direct_trace_principal_cycle_is_refused_without_conflating_a_desk_with_the_same_uuid ... ok
+test application::use_cases::thread::tests::alias_address_reaches_the_channel_and_is_replied_from ... ok
+test application::use_cases::thread::tests::alias_and_canonical_slug_in_one_pipeline_ingest_once ... ok
+2026-11-15T12:40:15.289687Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=Internal source channel identity mismatch
+test application::use_cases::thread::tests::an_agent_cannot_use_help_to_enumerate_its_company ... ok
+test application::use_cases::thread::tests::an_explicit_quiet_trigger_makes_a_mentioning_message_inadmissible ... ok
+test application::use_cases::thread::tests::an_open_channel_still_adds_cc_d_outsiders_to_the_thread ... ok
+test application::use_cases::thread::tests::an_outside_reply_to_an_existing_thread_records_an_admissible_intent ... ok
+test application::use_cases::thread::tests::an_outsider_s_bounce_never_discloses_the_channel_directory ... ok
+test application::use_cases::thread::tests::an_untrusted_sender_cannot_add_outsiders_even_with_the_flag_on ... ok
+test application::use_cases::thread::tests::authenticated_application_message_does_not_require_dmarc ... ok
+2026-11-15T12:40:15.291966Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(c975f51f-959c-49ea-8f4f-bb6733e08614)
+test application::use_cases::thread::tests::authenticated_application_origin_does_not_bypass_participant_authorization ... ok
+2026-11-15T12:40:15.292516Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(f51214b0-707f-482f-930c-66c18d289d34)
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal ... ok
+2026-11-15T12:40:15.292677Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(aa0b7f8d-98b4-4eaa-bbbf-0445184ba3d4)
+2026-11-15T12:40:15.292745Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(aa0b7f8d-98b4-4eaa-bbbf-0445184ba3d4)
+2026-11-15T12:40:15.292801Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a routing cycle target=Desk(aa0b7f8d-98b4-4eaa-bbbf-0445184ba3d4)
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants ... ok
+test application::use_cases::thread::tests::department_views_directory_orders_desks_by_department_root_first ... ok
+test application::use_cases::thread::tests::department_views_help_and_bounce_list_desks_under_their_department ... ok
+2026-11-15T12:40:15.293424Z  WARN open_bots::application::use_cases::thread::ingest::routing: Bouncing a message for a disabled channel channel_id=02f9946f-9363-4e14-8438-b6dd008bbebe
+test application::use_cases::thread::tests::disabled_channel_bounces_inbound_mail ... ok
+test application::use_cases::thread::tests::enabled_channel_still_accepts_the_same_message ... ok
+test application::use_cases::thread::tests::external_email_cannot_use_mailagents_thread_id_header_to_inject ... ok
+test application::use_cases::thread::tests::help_cc_d_alongside_a_real_channel_still_reaches_that_channel ... ok
+2026-11-15T12:40:15.294857Z  WARN open_bots::application::use_cases::thread::ingest::routing: Ignoring a reserved-address request from a non-member address="_help" company_id=8652b7a1-e7b1-4ba4-88a4-a8aca5e5c630
+test application::use_cases::thread::tests::help_discloses_nothing_to_someone_outside_the_company ... ok
+test application::use_cases::thread::tests::ingest_canonical_threads_correctly_with_target_thread_and_reply_to ... ok
+2026-11-15T12:40:15.295734Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T12:40:15.295858Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(ca996de7-8351-4fdd-adc8-b994a6f91d2a)
+2026-11-15T12:40:15.296087Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(3eb8f21d-51df-485d-be28-383f7ebac21b)
+2026-11-15T12:40:15.296207Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=Max inter-channel hop count reached
+2026-11-15T12:40:15.296319Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a routing cycle target=Desk(408167ea-7d29-4dc9-8111-3fe8c56338bb)
+2026-11-15T12:40:15.325878Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(8c1eef3a-a6d4-4e24-8846-da6f07fae128)
+test application::use_cases::thread::tests::ingress_rejections_create_no_identity_thread_message_task_delivery_or_attachment_state ... ok
+2026-11-15T12:40:15.326251Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=Max inter-channel hop count reached
+test application::use_cases::thread::tests::inter_channel_max_hops_exceeded_is_rejected ... ok
+test application::use_cases::thread::tests::send_reply_in_thread_with_prior_agent_turn_stays_in_same_thread ... ok
+test application::use_cases::thread::tests::test_channel_in_cc_resolves_properly ... ok
+test application::use_cases::thread::tests::test_context_only_quiet_mode_ingestion ... ok
+2026-11-15T12:40:15.328050Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(8c179790-8209-42b5-b97b-591507a2b7b0)
+test application::use_cases::thread::tests::test_high_spam_score_rejection ... ok
+2026-11-15T12:40:15.328279Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=Max inter-channel hop count reached
+test application::use_cases::thread::tests::test_inter_channel_hop_limit_rejection ... ok
+test application::use_cases::thread::tests::test_misspelled_channel_bounce_and_strict_pipeline_validation ... ok
+test application::use_cases::thread::tests::test_multi_channel_to_and_cc_execution ... ok
+2026-11-15T12:40:15.330673Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(15a23777-2074-45f9-9ef1-29bd353e1176)
+2026-11-15T12:40:15.331294Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(3589ba60-cae1-48fb-92cc-6558b9c542cc)
+test application::use_cases::thread::tests::test_participant_modes_company_team_public_and_explicit ... ok
+test application::use_cases::thread::tests::test_participant_sender_bypasses_spam_checks ... ok
+test application::use_cases::thread::tests::test_pipeline_address_chaining_execution ... ok
+test application::use_cases::thread::tests::test_quote_stripping_rules_for_first_in_thread_and_forwarded_emails ... ok
+2026-11-15T12:40:15.333795Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing an unauthorized thread injection and bouncing it back thread_id=2608de41-8a01-430b-8081-d754cdf14ce0
+2026-11-15T12:40:15.333925Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing an unauthorized thread injection and bouncing it back thread_id=2608de41-8a01-430b-8081-d754cdf14ce0
+test application::use_cases::thread::tests::test_sender_verification_refuses_strangers_replying_into_a_thread ... ok
+2026-11-15T12:40:15.334217Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+test application::use_cases::thread::tests::test_spf_authentication_failure_rejection ... ok
+2026-11-15T12:40:15.334937Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(976d99f1-9a34-4ab1-b789-b02ff9da15dd)
+test application::use_cases::thread::tests::test_third_party_thread_participants_addition_and_authorization ... ok
+2026-11-15T12:40:15.336001Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(4d1aad90-692d-4c01-b418-61fbf415742c)
+test application::use_cases::thread::tests::test_unauthorized_sender_blocked_before_spam_checks ... ok
+test application::use_cases::thread::tests::the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list ... ok
+test application::use_cases::thread::tests::the_directory_lists_only_what_this_sender_could_actually_reach ... ok
+test application::use_cases::thread::tests::the_help_body_lists_channels_and_teaches_the_address_syntax ... ok
+test application::use_cases::thread::tests::the_help_body_still_teaches_the_syntax_when_there_is_nothing_to_list ... ok
+2026-11-15T12:40:15.336658Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a routing cycle target=Desk(25e4fadf-108b-40c4-bf08-564897b2a17c)
+test application::use_cases::thread::tests::uncorrelated_inter_channel_cycle_is_rejected ... ok
+test application::use_cases::thread::tests::unknown_slug_is_still_a_bounce_when_the_channel_has_aliases ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_belongs_to_agent_runs_only ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_follows_the_instructions_and_precedes_skills ... ok
+test application::workflow::publication::tests::agent_tests::department::department_context_names_the_lead_only_for_its_run_and_no_roster_on_a_public_desk ... ok
+test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... ok
+test application::workflow::publication::tests::workflow_publication_freezes_workflow_tool_pins_like_children ... ok
+test application::workflow::sample::tests::tools_tests::direct_agent_tools_and_pinned_workflow_tools_stay_in_sample ... ok
+test application::workflow::sample::tests::tools_tests::protected_step_workflow_tool_needs_approval_and_executes_child ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::retention_capacity::agent_history_retention_actual_last_payload_slot_has_one_competing_producer_and_replay_survives_capacity ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary_mcp::doop_binary_mcp_child_actual_action_completion_error_and_parent_replay ... ok
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_workflow
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version
+
+test result: FAILED. 566 passed; 2 failed; 3 ignored; 0 measured; 4032 filtered out; finished in 298.18s
+

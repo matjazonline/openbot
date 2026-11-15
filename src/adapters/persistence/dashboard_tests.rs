@@ -146,9 +146,15 @@ async fn seed_company(
     units: i64,
 ) -> CompanyFixture {
     let fixture = company_fixture(persistence, label).await;
-    let thread = ThreadPersistence::create_thread(persistence, fixture.channel, "Dashboard", &[])
-        .await
-        .expect("the fixture thread is created");
+    let thread = ThreadPersistence::create_thread(
+        persistence,
+        fixture.company,
+        crate::entities::address::AddressTarget::Desk(fixture.channel),
+        "Dashboard",
+        &[],
+    )
+    .await
+    .expect("the fixture thread is created");
     for unit in 0..units {
         queue_blocked_delivery(persistence, &fixture, thread.id, unit).await;
     }
@@ -335,9 +341,15 @@ async fn the_snapshot_cache_never_serves_one_view_to_another() {
     assert_eq!((first_a, first_b), (2, 4));
     assert!(first_global >= 6, "the global rollup holds both companies");
 
-    let thread = ThreadPersistence::create_thread(&persistence, a.channel, "Later", &[])
-        .await
-        .unwrap();
+    let thread = ThreadPersistence::create_thread(
+        &persistence,
+        a.company,
+        crate::entities::address::AddressTarget::Desk(a.channel),
+        "Later",
+        &[],
+    )
+    .await
+    .unwrap();
     queue_blocked_delivery(&persistence, &a, thread.id, 9).await;
 
     assert_eq!(pending(&read(Some(a.company), window).await.unwrap()), 2);

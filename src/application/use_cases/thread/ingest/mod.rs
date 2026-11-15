@@ -64,7 +64,7 @@ pub use policy::{IngestRejection, IngressOrigin};
 #[derive(Debug, Clone)]
 pub struct CanonicalMessageIngress {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     /// Explicit target thread, if continuing an existing conversation.
     pub target_thread_id: Option<Uuid>,
     /// Specific message turn being answered, if this is a direct reply.
@@ -90,14 +90,14 @@ pub struct CanonicalMessageIngress {
 impl CanonicalMessageIngress {
     pub fn new(
         company_id: Uuid,
-        channel_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         author: QualifiedIdentity,
         text_body: impl Into<String>,
         origin: IngressOrigin,
     ) -> Self {
         Self {
             company_id,
-            channel_id,
+            target,
             target_thread_id: None,
             reply_to_message_id: None,
             author,
@@ -285,7 +285,7 @@ impl ThreadUseCases {
         };
 
         let prepared = match self
-            .prepare_channels(&draft, &routing, &resolved, &mut directory)
+            .prepare_channels(&draft, &routing, &resolved, origin, &mut directory)
             .await?
         {
             Ok(prepared) => prepared,
@@ -409,7 +409,7 @@ impl ThreadUseCases {
         for (prepared_channel, thread_id) in prepared.channels.iter().zip(&outcome.thread_ids) {
             let thread = self
                 .thread_persistence
-                .get_thread_by_id(*thread_id)
+                .get_thread_by_id(prepared_channel.candidate.company.id, *thread_id)
                 .await?
                 .ok_or_else(|| {
                     AppError::Internal(format!("Thread {thread_id} vanished after its own commit"))
@@ -418,10 +418,12 @@ impl ThreadUseCases {
             // positional. Checked rather than trusted: a mispaired thread would attribute one
             // channel's conversation to another, and the redelivery path builds its list from the
             // associations the *first* delivery wrote rather than from this request's.
-            if thread.channel_id != prepared_channel.candidate.channel.id {
+            if !thread.belongs_to(
+                prepared_channel.candidate.company.id,
+                prepared_channel.candidate.inbox.target(),
+            ) {
                 return Err(AppError::Internal(format!(
-                    "Committed thread {thread_id} belongs to channel {} rather than {}",
-                    thread.channel_id, prepared_channel.candidate.channel.id
+                    "Committed thread {thread_id} has the wrong target"
                 )));
             }
             let inbound_message = self
@@ -436,7 +438,7 @@ impl ThreadUseCases {
                 })?;
             channel_matches.push(ChannelMatch {
                 company: prepared_channel.candidate.company.clone(),
-                channel: prepared_channel.candidate.channel.clone(),
+                inbox: prepared_channel.candidate.inbox.clone(),
                 matched_slug: Some(prepared_channel.candidate.matched_slug.clone()),
                 thread,
                 inbound_message,
@@ -463,7 +465,7 @@ impl ThreadUseCases {
             thread: Some(primary.thread.clone()),
             inbound_message: Some(primary.inbound_message.clone()),
             company: Some(primary.company.clone()),
-            channel: Some(primary.channel.clone()),
+            channel: primary.inbox.desk().cloned(),
             envelope: Some(envelope),
             intent_ids: outcome.intent_ids,
             reply_delivery,
@@ -506,14 +508,14 @@ fn should_warn_about_thread_index(error: ThreadIndexParseError) -> bool {
 /// Both trusted ingress producers address one channel through the same bounded routing shape.
 fn single_channel_routing(
     handle: crate::entities::transport::QualifiedIdentity,
-    selector: crate::entities::transport::ChannelSelector,
+    selector: crate::entities::transport::AddressSelector,
     disposition: crate::transport::MessageDisposition,
 ) -> AppResult<crate::transport::InboundRouting> {
     use crate::transport::{AddressedRecipient, AddressedTarget, InboundRouting, RecipientRole};
     Ok(InboundRouting::parse(vec![AddressedRecipient {
         role: RecipientRole::To,
         handle,
-        target: AddressedTarget::Channels(vec![selector]),
+        target: AddressedTarget::Platform(vec![selector]),
         disposition,
     }])?)
 }

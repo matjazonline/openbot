@@ -1,0 +1,17 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection' (15461439) panicked at src/adapters/persistence/workflow/agent_history_knowledge_e2e_tests.rs:172:5:
+assertion `left == right` failed
+  left: 0
+ right: 2
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::agent_history::agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4577 filtered out; finished in 18.08s
+

@@ -21,7 +21,7 @@ use crate::{
         message::{AttachmentMetadata, CanonicalMessageId},
         participant::ThreadPrincipalRole,
         transport::{
-            ChannelBindingId, ChannelSelector, ExternalEventKey, ExternalMessageKey,
+            AddressSelector, ChannelBindingId, ExternalEventKey, ExternalMessageKey,
             ExternalThreadKey, InboundEventId, InboundSource, QualifiedIdentity, RecipientRole,
             ReplyMessageKeyCandidate, ReplyThreadKeyCandidate,
         },
@@ -64,7 +64,7 @@ pub const MAX_THREAD_ASSOCIATIONS: usize = 20;
 pub const MAX_INGRESS_HOPS: u32 = 5;
 
 /// The trace contains at most one channel for every completed relay hop.
-pub const MAX_TRACE_CHANNELS: usize = MAX_INGRESS_HOPS as usize;
+pub const MAX_TRACE_TARGETS: usize = MAX_INGRESS_HOPS as usize;
 
 /// One sender plus every bounded addressed identity may become a party to a thread.
 pub const MAX_THREAD_PRINCIPALS: usize = MAX_ADDRESSED_IDENTITIES + 1;
@@ -169,10 +169,10 @@ impl MessageDisposition {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IngressDirectives {
     pub hop_count: u32,
-    pub trace_channels: BoundedVec<Uuid, MAX_TRACE_CHANNELS>,
+    pub trace_targets: BoundedVec<crate::entities::address::AddressTarget, MAX_TRACE_TARGETS>,
     pub disposition: MessageDisposition,
     /// The channel this message provably came from, when a trusted internal transport carried it.
-    pub source_channel_id: Option<Uuid>,
+    pub source_target: Option<crate::entities::address::AddressTarget>,
     /// Explicit thread target requested by a trusted caller (e.g. reply from `/ui`).
     pub target_thread_id: Option<Uuid>,
     /// Specific message turn being answered, requested by a trusted caller.
@@ -197,9 +197,9 @@ impl Default for IngressDirectives {
     fn default() -> Self {
         Self {
             hop_count: 0,
-            trace_channels: BoundedVec::empty(),
+            trace_targets: BoundedVec::empty(),
             disposition: MessageDisposition::Answer,
-            source_channel_id: None,
+            source_target: None,
             target_thread_id: None,
             reply_to_message_id: None,
             is_auto_reply: false,
@@ -367,7 +367,7 @@ pub struct InboundEnvelope {
 
 /// A reserved platform address that the platform answers itself instead of routing to a channel.
 ///
-/// The leading underscore is what makes this namespace safe to reserve: `channel_slugs_format` and
+/// The leading underscore is what makes this namespace safe to reserve: `addresses_slug_format` and
 /// `companies_slug_format` both constrain slugs to `^[a-z0-9]...`, so no customer can create a
 /// channel or company that shadows one of these names. Adding a variant needs no blocklist and no
 /// migration.
@@ -410,8 +410,10 @@ impl SystemAddress {
 /// one place that owns it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum AddressedTarget {
-    /// An ordered pipeline of business channels, in the order the address named them.
-    Channels(Vec<ChannelSelector>),
+    /// An ordered pipeline of platform addresses, in the order the address named them. Each
+    /// names a desk or a principal; which one is the company's address namespace's answer, read
+    /// when the application routes the message, not the adapter's.
+    Platform(Vec<AddressSelector>),
     /// A reserved platform address that the platform answers itself.
     System {
         company: CompanySlug,
@@ -457,13 +459,13 @@ impl InboundRouting {
     }
 
     /// Every channel pipeline named, `To:` before `Cc:`, in address order.
-    pub fn channel_pipelines(
+    pub fn platform_pipelines(
         &self,
-    ) -> impl Iterator<Item = (&AddressedRecipient, &[ChannelSelector])> {
+    ) -> impl Iterator<Item = (&AddressedRecipient, &[AddressSelector])> {
         self.recipients
             .iter()
             .filter_map(|recipient| match &recipient.target {
-                AddressedTarget::Channels(selectors) => Some((recipient, selectors.as_slice())),
+                AddressedTarget::Platform(selectors) => Some((recipient, selectors.as_slice())),
                 AddressedTarget::System { .. } | AddressedTarget::Outsider => None,
             })
     }
@@ -474,7 +476,7 @@ impl InboundRouting {
             .iter()
             .filter_map(|recipient| match &recipient.target {
                 AddressedTarget::System { company, address } => Some((company, *address)),
-                AddressedTarget::Channels(_) | AddressedTarget::Outsider => None,
+                AddressedTarget::Platform(_) | AddressedTarget::Outsider => None,
             })
     }
 
@@ -524,7 +526,7 @@ impl PipelineStep {
 /// that must stay transport-neutral.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThreadAssociation {
-    pub channel_id: Uuid,
+    pub address_target: crate::entities::address::AddressTarget,
     pub binding_id: ChannelBindingId,
     pub target: ThreadTarget,
     pub role: RecipientRole,
@@ -545,13 +547,32 @@ pub struct ThreadAssociation {
 /// turn a participant into the author.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ThreadPrincipalIntent {
-    pub identity: QualifiedIdentity,
+    pub reference: ThreadPrincipalReference,
     pub role: ThreadPrincipalRole,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ThreadPrincipalReference {
+    Observed(QualifiedIdentity),
+    Known(crate::entities::transport::PrincipalId),
 }
 
 impl ThreadPrincipalIntent {
     pub const fn new(identity: QualifiedIdentity, role: ThreadPrincipalRole) -> Self {
-        Self { identity, role }
+        Self {
+            reference: ThreadPrincipalReference::Observed(identity),
+            role,
+        }
+    }
+
+    pub const fn principal(
+        principal: crate::entities::transport::PrincipalId,
+        role: ThreadPrincipalRole,
+    ) -> Self {
+        Self {
+            reference: ThreadPrincipalReference::Known(principal),
+            role,
+        }
     }
 }
 
@@ -593,7 +614,7 @@ impl InboundOrigin {
 /// channel execution settings.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct InboundAdmissionIntent {
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub role: RecipientRole,
     /// Whether the body names this channel (name, alias, address or handle).
     pub mentioned: bool,

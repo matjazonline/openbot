@@ -11,7 +11,11 @@ pub(crate) const RUN_COUNTS_QUERY: &str = r#"
 SELECT run.channel_id, run.state, COUNT(*)::bigint AS count
   FROM workflow_runs AS run
  WHERE run.company_id = $1 AND run.state IN ('queued', 'running', 'waiting')
-   AND (run.channel_id = ANY($2) OR run.channel_id IS NULL)
+   AND (run.channel_id = ANY($2)
+        OR (run.channel_id IS NULL AND run.principal_id IS NULL)
+        OR EXISTS (SELECT 1 FROM principals AS viewer
+                   WHERE viewer.company_id=run.company_id AND viewer.user_id=$3
+                     AND principal_direct_can_view(run.company_id,run.principal_id,viewer.id)))
  GROUP BY run.channel_id, run.state
 "#;
 
@@ -28,10 +32,12 @@ impl RunCountsReader for PostgresPersistence {
         &self,
         company_id: Uuid,
         visible_channel_ids: &[Uuid],
+        viewer_user_id: Uuid,
     ) -> AppResult<RunCountSnapshot> {
         let rows = sqlx::query_as::<_, RunCountDb>(RUN_COUNTS_QUERY)
             .bind(company_id)
             .bind(visible_channel_ids)
+            .bind(viewer_user_id)
             .fetch_all(self.pool())
             .await?;
         let rows = rows

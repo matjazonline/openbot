@@ -1,0 +1,268 @@
+
+running 8 tests
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent stdout ----
+2026-11-15T11:07:04.245809Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=74823023-1ee2-4efe-b5bf-964bc1b55568 run_id=d559ca0e-b52c-4d6d-b98f-17fcb0b90090 proposal_id=05023837-800b-4284-996d-8d454cdd1414 code="invalid_proposal"
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent' (16477253) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: public desk reply from a private agent
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": [
+    {
+      "attempts": 1,
+      "available_at": "2026-11-15T11:07:03.193723+00:00",
+      "id": "e5989186-fc50-4cae-9bc3-7246e92849d0",
+      "lease": null,
+      "now": "2026-11-15T11:07:33.228702+00:00",
+      "outcome": "admitted",
+      "reply_settled": false,
+      "state": "done",
+      "updated_at": "2026-11-15T11:07:03.345079+00:00",
+      "worker": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": "562c4560-836a-47dd-b22c-6d83e1598b6f",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:07:03.234769+00:00",
+      "status": "completed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "d559ca0e-b52c-4d6d-b98f-17fcb0b90090",
+      "state": "succeeded",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 90538,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 91866,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 91863,
+      "query": "WITH bounds AS (\n    SELECT transaction_timestamp() AS now, transaction_timestamp() - INTERVAL '24 hours' AS since\n), runs AS (\n    SELECT count(*) FILTER (WHER",
+      "state": "active",
+      "wait": null,
+      "xact_start": "2026-11-15T11:07:33.207758+00:00"
+    },
+    {
+      "blocked_by": [],
+      "pid": 91865,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 91864,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply stdout ----
+2026-11-15T11:07:04.933844Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=44c19c1e-1933-4f5d-b4ad-66cee2562e55 run_id=b857c7e9-5b39-4a24-a2d7-a948a8064ecb proposal_id=b06353ba-0862-4faa-be23-30a8ba450065 code="invalid_proposal"
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply' (16477254) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: SMTP public desk reply by private agent
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": [
+    {
+      "attempts": 1,
+      "available_at": "2026-11-15T11:07:03.884057+00:00",
+      "id": "9ee175d0-f0af-425a-bbed-476e8409624a",
+      "lease": null,
+      "now": "2026-11-15T11:07:33.916952+00:00",
+      "outcome": "admitted",
+      "reply_settled": false,
+      "state": "done",
+      "updated_at": "2026-11-15T11:07:04.037327+00:00",
+      "worker": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": "76046bae-f2eb-4fea-8b79-5111ada31919",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:07:03.925672+00:00",
+      "status": "completed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "b857c7e9-5b39-4a24-a2d7-a948a8064ecb",
+      "state": "succeeded",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 92300,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 92297,
+      "query": "WITH bounds AS (\n    SELECT transaction_timestamp() AS now, transaction_timestamp() - INTERVAL '24 hours' AS since\n), runs AS (\n    SELECT count(*) FILTER (WHER",
+      "state": "active",
+      "wait": null,
+      "xact_start": "2026-11-15T11:07:33.896962+00:00"
+    },
+    {
+      "blocked_by": [],
+      "pid": 92301,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 90540,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 92299,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope stdout ----
+2026-11-15T11:07:05.717717Z  WARN open_bots::application::workflow::channel_reply::publisher: Final reply refused company_id=2e016230-b880-46d4-84c0-b45dcff1e8c0 run_id=41e9f517-1f50-4b54-83b6-9acf6399bca9 proposal_id=df2bbccb-70ea-4779-a205-03e9e90d0262 code="invalid_proposal"
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope' (16477255) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: signed webhook reply from private agent
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": [
+    {
+      "attempts": 1,
+      "available_at": "2026-11-15T11:07:04.626812+00:00",
+      "id": "955c55e3-3a91-4b61-aebe-a34278b1f909",
+      "lease": null,
+      "now": "2026-11-15T11:07:34.67093+00:00",
+      "outcome": "admitted",
+      "reply_settled": false,
+      "state": "done",
+      "updated_at": "2026-11-15T11:07:04.773249+00:00",
+      "worker": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": "8b0f2886-520e-4b9d-98e3-d3702a48847b",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:07:04.680212+00:00",
+      "status": "completed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "41e9f517-1f50-4b54-83b6-9acf6399bca9",
+      "state": "succeeded",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 92760,
+      "query": "WITH bounds AS (\n    SELECT transaction_timestamp() AS now, transaction_timestamp() - INTERVAL '24 hours' AS since\n), runs AS (\n    SELECT count(*) FILTER (WHER",
+      "state": "active",
+      "wait": null,
+      "xact_start": "2026-11-15T11:07:34.645509+00:00"
+    },
+    {
+      "blocked_by": [],
+      "pid": 92759,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 90539,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 92762,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 92761,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope
+
+test result: FAILED. 5 passed; 3 failed; 0 ignored; 0 measured; 4585 filtered out; finished in 34.69s
+

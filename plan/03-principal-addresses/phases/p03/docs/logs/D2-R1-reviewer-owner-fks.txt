@@ -1,0 +1,142 @@
+9510:    ADD CONSTRAINT agent_skills_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9526:    ADD CONSTRAINT agents_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9542:    ADD CONSTRAINT background_tasks_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9550:    ADD CONSTRAINT background_tasks_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
+9598:    ADD CONSTRAINT channel_principal_grants_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9614:    ADD CONSTRAINT channel_schedules_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9645:    ADD CONSTRAINT addresses_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9653:    ADD CONSTRAINT channels_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9679:    ADD CONSTRAINT company_invites_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9687:    ADD CONSTRAINT company_mcp_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9711:    ADD CONSTRAINT company_members_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9727:    ADD CONSTRAINT company_model_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9735:    ADD CONSTRAINT company_resend_api_integrations_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9775:    ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+9783:    ADD CONSTRAINT inbound_events_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9807:    ADD CONSTRAINT integration_installations_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9815:    ADD CONSTRAINT internal_note_tombstones_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+9831:    ADD CONSTRAINT internal_notes_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+9855:    ADD CONSTRAINT internal_notes_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+9862:    ADD CONSTRAINT internal_notes_thread_message_fk FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+9878:    ADD CONSTRAINT message_deliveries_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+9974:    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id);
+9998:    ADD CONSTRAINT messages_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10006:    ADD CONSTRAINT notification_events_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (actor_principal_id);
+10014:    ADD CONSTRAINT notification_events_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10030:    ADD CONSTRAINT notifications_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10055:    ADD CONSTRAINT notifications_recipient_fk FOREIGN KEY (company_id, recipient_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (recipient_principal_id);
+10074:    ADD CONSTRAINT participant_identities_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+10102:    ADD CONSTRAINT principals_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10150:    ADD CONSTRAINT schedule_runs_run_fk FOREIGN KEY (company_id, run_id, binding_id) REFERENCES public.workflow_runs(company_id, id, binding_id) ON DELETE CASCADE;
+10158:    ADD CONSTRAINT skills_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10198:    ADD CONSTRAINT thread_messages_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+10206:    ADD CONSTRAINT thread_principals_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+10214:    ADD CONSTRAINT thread_principals_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+10490:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10498:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10506:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10514:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10522:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10530:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10538:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10546:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10554:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10562:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10570:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10578:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10586:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10594:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10602:    ADD CONSTRAINT workflow_action_owner_lifecycle FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10698:    ADD CONSTRAINT workflow_admissions_company_id_run_id_binding_id_fkey FOREIGN KEY (company_id, run_id, binding_id) REFERENCES public.workflow_runs(company_id, id, binding_id) ON DELETE CASCADE;
+10746:    ADD CONSTRAINT workflow_bindings_company_id_channel_id_thread_id_fkey FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id);
+10754:    ADD CONSTRAINT workflow_bindings_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10794:    ADD CONSTRAINT workflow_control_commands_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10859:    ADD CONSTRAINT workflow_definitions_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10867:    ADD CONSTRAINT workflow_dispatch_demand_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10875:    ADD CONSTRAINT workflow_executions_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10883:    ADD CONSTRAINT workflow_history_members_company_id_channel_id_thread_id_m_fkey FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+10891:    ADD CONSTRAINT workflow_history_members_company_id_run_id_channel_id_thre_fkey FOREIGN KEY (company_id, run_id, channel_id, thread_id) REFERENCES public.workflow_runs(company_id, id, channel_id, thread_id) ON DELETE CASCADE;
+10899:    ADD CONSTRAINT workflow_http_connections_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10923:    ADD CONSTRAINT workflow_tool_registrations_company_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+10964:    ADD CONSTRAINT workflow_message_action_owner FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+10996:    ADD CONSTRAINT workflow_message_destination_message FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+11004:    ADD CONSTRAINT workflow_message_destination_owner FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11028:    ADD CONSTRAINT workflow_message_intent_binding_run FOREIGN KEY (company_id, run_id, binding_id) REFERENCES public.workflow_runs(company_id, id, binding_id) ON DELETE CASCADE;
+11036:    ADD CONSTRAINT workflow_message_intent_company FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+11044:    ADD CONSTRAINT workflow_message_intent_association FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) ON DELETE CASCADE;
+11060:    ADD CONSTRAINT workflow_message_intent_responder FOREIGN KEY (company_id, responder_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responder_principal_id);
+11068:    ADD CONSTRAINT workflow_message_intent_matched_run FOREIGN KEY (company_id, matched_run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11076:    ADD CONSTRAINT workflow_message_destination_principal FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+11098:    ADD CONSTRAINT workflow_message_destination_replied FOREIGN KEY (company_id, channel_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+11114:    ADD CONSTRAINT workflow_message_event_owner FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11138:    ADD CONSTRAINT workflow_message_reopen_owner FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11154:    ADD CONSTRAINT workflow_parent_owner_fk FOREIGN KEY (company_id, child_run_id, parent_run_id, parent_execution_id) REFERENCES public.workflow_runs(company_id, id, parent_run_id, parent_execution_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+11162:    ADD CONSTRAINT workflow_provisioning_commands_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+11177:    ADD CONSTRAINT workflow_poll_companies_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+11193:    ADD CONSTRAINT workflow_root_budgets_company_id_root_run_id_fkey FOREIGN KEY (company_id, root_run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+11217:    ADD CONSTRAINT workflow_run_budgets_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+11225:    ADD CONSTRAINT workflow_run_budgets_company_id_run_id_parent_run_id_fkey FOREIGN KEY (company_id, run_id, parent_run_id) REFERENCES public.workflow_runs(company_id, id, parent_run_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+11241:    ADD CONSTRAINT workflow_run_events_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11257:    ADD CONSTRAINT workflow_rerun_original_fk FOREIGN KEY (company_id, rerun_of_run_id, workflow_id) REFERENCES public.workflow_runs(company_id, id, workflow_id);
+11281:    ADD CONSTRAINT workflow_runs_company_id_channel_id_thread_id_fkey FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id);
+11289:    ADD CONSTRAINT workflow_runs_company_id_fkey FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+11354:    ADD CONSTRAINT workflow_wait_events_company_id_run_id_fkey FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE;
+11828:    FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE
+11985:    FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+12473:    FOREIGN KEY(company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
+12483:    FOREIGN KEY(company_id) REFERENCES public.companies(id) ON DELETE CASCADE,
+12497:    FOREIGN KEY(company_id,root_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+12888:    FOREIGN KEY (company_id,responder_principal_id) REFERENCES public.principals(company_id,id)
+12906:    FOREIGN KEY (company_id,run_id,binding_id) REFERENCES public.workflow_runs(company_id,id,binding_id)
+13656:    FOREIGN KEY (company_id, respondent_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED
+13904:    FOREIGN KEY (company_id,conversation_id) REFERENCES public.threads(company_id,id),
+13905:    FOREIGN KEY (company_id,workflow_run_id) REFERENCES public.workflow_runs(company_id,id),
+14273:        FOREIGN KEY (company_id,live_creator_principal_id) REFERENCES public.principals(company_id,id)
+14276:    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+14285:    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+14308:    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+14310:    FOREIGN KEY (company_id,child_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+15929:    FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE,
+15955:    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+17010:    FOREIGN KEY(company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+17075:    FOREIGN KEY(company_id,run_id,binding_id) REFERENCES public.workflow_runs(company_id,id,binding_id) ON DELETE CASCADE,
+17395:    FOREIGN KEY(company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+17991:    FOREIGN KEY(company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+18184:    FOREIGN KEY(company_id,live_run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE SET NULL(live_run_id),
+18487:    FOREIGN KEY(company_id,source_principal_id) REFERENCES public.principals(company_id,id) ON DELETE CASCADE,
+18488:    FOREIGN KEY(company_id,sender_principal_id) REFERENCES public.principals(company_id,id)
+18947:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18948:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18949:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18950:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18951:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE SET NULL (thread_id);
+18952:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18953:ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+18954:ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18956:ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18958:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18959:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18960:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18961:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_message_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+18962:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18965:ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18966:ALTER TABLE public.notifications ADD CONSTRAINT notifications_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18967:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18968:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18969:ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_thread_fk_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18970:ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id);
+18971:ALTER TABLE public.threads ADD CONSTRAINT threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18972:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18973:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18974:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_company_id_channel_id_thre_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18975:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18976:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_channel__principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18977:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_run_id_c_principal_fk FOREIGN KEY (company_id, run_id, principal_id, thread_id) REFERENCES public.workflow_runs(company_id, id, principal_id, thread_id) ON DELETE CASCADE;
+18978:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18979:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_message_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18980:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_replied_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18981:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destinations_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id);
+18982:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intent_association_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) ON DELETE CASCADE;
+18983:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18984:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_company_id_channel_id_thread_i_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18985:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);

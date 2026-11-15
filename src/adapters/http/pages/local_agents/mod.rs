@@ -50,15 +50,18 @@ fn base(company: Uuid) -> String {
     format!("/ui/companies/{company}/local-agents")
 }
 fn navigation(view: &Page<'_>, query: &str) -> String {
-    let context = view.conversation.map_or_else(String::new, |thread| {
-        format!("&channel={}&conversation={}", thread.channel_id, thread.id)
-    });
+    let context = view
+        .conversation
+        .and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id)))
+        .map_or_else(String::new, |(channel, thread)| {
+            format!("&channel={channel}&conversation={thread}")
+        });
     format!("{}?{query}{context}", base(view.company.id))
 }
 fn conversation_fields(view: &Page<'_>) -> String {
-    view.conversation.map_or_else(String::new, |thread| format!(
+    view.conversation.and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id))).map_or_else(String::new, |(channel, thread)| format!(
         r#"<input type="hidden" name="channel" value="{}"><input type="hidden" name="conversation" value="{}">"#,
-        thread.channel_id, thread.id))
+        channel, thread))
 }
 fn request_id() -> Uuid {
     Uuid::now_v7()

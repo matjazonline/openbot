@@ -1,0 +1,944 @@
+{
+  "prerequisite": "1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa",
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "changes": [
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "before_sha256": "14c9b02a0cb6b838820d5a4f8840748f40aa7bcc3d80f25723893ba49ba17c1b",
+      "after_sha256": "ebe665f121b3107dd5025cc0daee506b4b8ce6d6bdcfaa689109808ac5ff5211",
+      "before_bytes": 1063414,
+      "after_bytes": 1080173
+    },
+    {
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "before_sha256": "a19a20843a1a87f68fe3bb3a6a8c6f367100a1d776d4b525f4856ee1032f50e9",
+      "after_sha256": "98ddffccfda7c870a1f798b436fc3653d23f70b76af0d28f2872d47a7de5eee8",
+      "before_bytes": 50903,
+      "after_bytes": 50851
+    },
+    {
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "before_sha256": "0a25a94fc7586ca8955168cd761816a6c63c532290edfb383bcff19f49ba30a2",
+      "after_sha256": "4bd26313f1f9065fabb887ae48dad7cbf9c31a35992dd8e3509fb6741965bd0a",
+      "before_bytes": 28348,
+      "after_bytes": 28356
+    },
+    {
+      "path": "src/adapters/http/pages/desk_wording_tests.rs",
+      "before_sha256": "e510048ab0b5861d3a6816de8a06cadaea3a4e0e78299697daf646c2234f499a",
+      "after_sha256": "33e8ece0ee38341b1512cd81cd6c1508d1feb629fb11a1e941ed91d743240556",
+      "before_bytes": 14592,
+      "after_bytes": 14595
+    },
+    {
+      "path": "src/adapters/http/pages/onboarding.rs",
+      "before_sha256": "85d94b654a9973b1e56df8d222be1d2164f7d956c37026799ce26cfcc60c27d7",
+      "after_sha256": "7e322c6bda20d357deac7bad401e568fe4aefc63a3995533f55cf23b0d90dc72",
+      "before_bytes": 12703,
+      "after_bytes": 12703
+    },
+    {
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "before_sha256": "e321d49b56d40ed28cc40322efa0090a9e592f2ef14acdabdef1ea83367550fb",
+      "after_sha256": "a21a91dabf9068d09178f566c5b266e596f672e486d337056858f23d02dcb04f",
+      "before_bytes": 13165,
+      "after_bytes": 13141
+    },
+    {
+      "path": "src/adapters/http/routes/assistant_channels.rs",
+      "before_sha256": "f367a91f705bf3ed524f0967a3dbcccad00c17a253bd7bedaa4c62c29ff15e50",
+      "after_sha256": "cca67f183ffe08294fae4c13c0c17e463cbd2eca710691a1a5fcf34ce01c8284",
+      "before_bytes": 5169,
+      "after_bytes": 5161
+    },
+    {
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "before_sha256": "c49d90fe7ccbc9c3577a79c6040befe78a2842720f990bfaf593693eecdf9c91",
+      "after_sha256": "229904c480f609bf377f1adbb1fb9e5a2b90a8748e482ae75f057ee461e5ae59",
+      "before_bytes": 23404,
+      "after_bytes": 22875
+    },
+    {
+      "path": "src/adapters/http/routes/ui_agents/authoring/catalog_tests.rs",
+      "before_sha256": "b9568eca252ff16fb43fd06c5cd8b5a8d300e41246d8ddb2febb0f4f76089f95",
+      "after_sha256": "c577cbc7190f0fe88aa9507227c6f44dfdf0fc21cffcf8aa09ad5659c771175f",
+      "before_bytes": 4711,
+      "after_bytes": 4703
+    },
+    {
+      "path": "src/adapters/http/routes/ui_agents/authoring/test_support.rs",
+      "before_sha256": "8f877e8f01c3bf20029f995f11be58b9be01e66bd93cfa901f6d187be64607fb",
+      "after_sha256": "941804bcfad472c496732d12d80b88f9a7c9bac7077e2df7f66f9f2d6f294482",
+      "before_bytes": 4575,
+      "after_bytes": 4740
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+      "before_sha256": "0537d47bc3603308e121dd5f6f1aefdb94ddeedc1397486529418e51e3e26e5d",
+      "after_sha256": "2b8721a83a3321766b72326fbbfa11b1e2853dd8b24db76996d47132086c3090",
+      "before_bytes": 5354,
+      "after_bytes": 5491
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "before_sha256": "377d4dbbb0c779a1cb61417b21b5d860f9abcb6ba2bf5ad9a782d67087e8e5f1",
+      "after_sha256": "fcb14ea9691a736913e353ef311a578a9b1517b460ad9568359bea7ab037e248",
+      "before_bytes": 23089,
+      "after_bytes": 23267
+    },
+    {
+      "path": "src/adapters/persistence/address_tests.rs",
+      "before_sha256": "c38c7d98b3485c5de1b93b6c4c51b8aac0157648a8ac666597b718f6e58236fa",
+      "after_sha256": "cef3658aacd0711b5308155da1c02e43fbaf602b6832cf0f3b0c6d0305ff551f",
+      "before_bytes": 27508,
+      "after_bytes": 27374
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/identity_races.rs",
+      "before_sha256": "6ea806fb609682ddb198b5270135628c90788df1a921dae2dd44c2ee5ab1536f",
+      "after_sha256": "efdf24adf810da74b5198d9c09278f77b85e5aad1163acb2d13acebf8be5f60f",
+      "before_bytes": 13334,
+      "after_bytes": 13336
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/ingress.rs",
+      "before_sha256": "780f33aa6343b2e105d0782e07b51d6357d77ec70a95af8501da6f661e7bc399",
+      "after_sha256": "4a3aadbd80cd8c49eb572931636b0acd9d93af91d95496cb1afadf5d6451be49",
+      "before_bytes": 16018,
+      "after_bytes": 16560
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_race_tests.rs",
+      "before_sha256": "968e1572fe30d664f32fbfcca142111654dea022fb13b1b27df78959431e29e6",
+      "after_sha256": "5463e83f310d63920d15a39234a742276716153e9036487dac7422292506916f",
+      "before_bytes": 8929,
+      "after_bytes": 8976
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notifications.rs",
+      "before_sha256": "4099ad3feb5147bcd25f3deb96ff92025ea9a5fdbd990609a4ac82304abd5246",
+      "after_sha256": "9aa1547cfdd36227bf55116ca7c8406925cc39f1cb65425c0be2df5602e56de8",
+      "before_bytes": 14402,
+      "after_bytes": 14404
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/validation.rs",
+      "before_sha256": "564dd0a499afeedc6cd86325a11026195fa775e4b2b73c27f4d694795eac0516",
+      "after_sha256": "30af7e2fa7b667fd8c046214b08d22c445e6c0a1dde0df62f45f58f6d82bd536",
+      "before_bytes": 9376,
+      "after_bytes": 9378
+    },
+    {
+      "path": "src/adapters/persistence/agent.rs",
+      "before_sha256": "e574512655cf1be6d02ec540fc47f7f0d222277d2815062016c82e9c938f28a1",
+      "after_sha256": "f3853aee9e70c58a10f10a21e18c26aad1df31ac49a34587880dd967826067a8",
+      "before_bytes": 29617,
+      "after_bytes": 33068
+    },
+    {
+      "path": "src/adapters/persistence/agent_authoring/directory.rs",
+      "before_sha256": "c53fda1f67fd2ef5d8de16f1920665f4f5d553e9cb9e602d98ae15ca602f3660",
+      "after_sha256": "a8a2e2a866eb6fa4a192ffa17cb232b00e7dc2385ae482af6de2512dcfd46cc6",
+      "before_bytes": 3988,
+      "after_bytes": 3916
+    },
+    {
+      "path": "src/adapters/persistence/agent_direct_lifecycle_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "27c0c4e21584e5e7fb1ab11908c09ea678ae158727b7063a0f9e77ba62f83885",
+      "before_bytes": 0,
+      "after_bytes": 6002
+    },
+    {
+      "path": "src/adapters/persistence/agent_publication/tests/authoring.rs",
+      "before_sha256": "6fbd1d0b3fed22395e06c70f45a43c7aa26e9abb1671d667f8e5b167467325ab",
+      "after_sha256": "a7c8a7cb2158626abec3a9e8ecac8cb8406299adefdcb513a10c195a6caea0d5",
+      "before_bytes": 8539,
+      "after_bytes": 8501
+    },
+    {
+      "path": "src/adapters/persistence/agent_publication/tests/support.rs",
+      "before_sha256": "3e0dc4e94732867622ce006ad3f3ec661b922fdcc0e3394e9fb968db96830571",
+      "after_sha256": "e1e90adeee8e460b7d8d6ca19068e2837345b06ed7b444003cc2411b3606c9f3",
+      "before_bytes": 7081,
+      "after_bytes": 7182
+    },
+    {
+      "path": "src/adapters/persistence/agent_publication/tools.rs",
+      "before_sha256": "124b4d2bbc91fd50462d4c40164a0be01453256259e3c013663f73dc5a86304c",
+      "after_sha256": "19cc8d0944e635f3bc7d777364b9d0614d5e6bb5662a7b38568a0ad13ca8677a",
+      "before_bytes": 12946,
+      "after_bytes": 13121
+    },
+    {
+      "path": "src/adapters/persistence/company_agent.rs",
+      "before_sha256": "06ea1b78c2fe42e0f93c5d4e36bce37314712a2f00552fd669d1d696259717d9",
+      "after_sha256": "250bd3bcf624c5696a84e0c3c2072401825eca299a852bbca4b6b362320cab29",
+      "before_bytes": 10224,
+      "after_bytes": 10648
+    },
+    {
+      "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+      "before_sha256": "5fdc909d2203c8a349057b8bda8a00107020cd30517132d90c05a38884427d1c",
+      "after_sha256": "25a0ef2196fd63a821074ba81783cd055735ca374c27640e334a2a4f20e27cc9",
+      "before_bytes": 21923,
+      "after_bytes": 22325
+    },
+    {
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "before_sha256": "66cc51fa75a2f15c1f786cd27c08c3bc75d2cfe8c767fff28172e76f79a2d9e5",
+      "after_sha256": "0789c6fb6f375e2a72f9e7fd6d4e9998ca449dfb06daf6e81c209291035816d7",
+      "before_bytes": 32530,
+      "after_bytes": 32708
+    },
+    {
+      "path": "src/adapters/persistence/department_roster.rs",
+      "before_sha256": "53791824d9183ba3b4c26b6f8288ced6a602286c7dc089faa73c223b30a3e88f",
+      "after_sha256": "50b7db6d193542f635ffc6f1bef2c428662c3a8360bb938451194fe279b23ee9",
+      "before_bytes": 13215,
+      "after_bytes": 13764
+    },
+    {
+      "path": "src/adapters/persistence/department_roster_tests.rs",
+      "before_sha256": "f5b67a4eaad56de6602a5f7a65a460918e5e3ba9d00be36ee2fc27861de4c35f",
+      "after_sha256": "0ba36dd64ef6cef628c1f7ba10c71860759bc4b9e6836d80a0b9bca92231c40e",
+      "before_bytes": 7589,
+      "after_bytes": 7962
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice.rs",
+      "before_sha256": "7aa45315855a5a5b535cabcafd982b610a2623362e5d8c598d02e07b9de485e5",
+      "after_sha256": "c026161df4fbff7f29c4739afcbaa9b3db8e66ee3c51f09e1601bcb26402d4f2",
+      "before_bytes": 6056,
+      "after_bytes": 6408
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_message.rs",
+      "before_sha256": "4099930ecfcaae63441ca259c505c57889a892d6d02eecfa0da89ac738523812",
+      "after_sha256": "7fbaa0e9efad74ebfbdfe04b2edecfa3225359fbd5be44c55af61f489dff09c3",
+      "before_bytes": 4921,
+      "after_bytes": 5830
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_route.rs",
+      "before_sha256": "daeac140347290e3c823d254638597ee4a725ba5697c1a085b261f907c8faf4e",
+      "after_sha256": "c04fc9af802a9b3af9ee8ba083f8538550aca0e7ee4bacdcecddfe41d5a2e947",
+      "before_bytes": 4247,
+      "after_bytes": 4088
+    },
+    {
+      "path": "src/adapters/persistence/notification/escalation_notice.rs",
+      "before_sha256": "ded3d89f06f5bb8c1aeccd80dedfe32a4ab57cd0a0e644807bbd2b4c2b8f5c17",
+      "after_sha256": "90971cca9520acba927102a027144112805fc9b13f3ee6b2f1b1afa5f8ed1865",
+      "before_bytes": 7763,
+      "after_bytes": 8113
+    },
+    {
+      "path": "src/adapters/persistence/notification_tests.rs",
+      "before_sha256": "40ce21c245e119de5e4795c997bcf539d28c4b0fe72d17611215b0b0a3b2a844",
+      "after_sha256": "779f082bee46ed839b3dda800bf48212d155a202ddfcbd1b7f361fd8ecffd3bc",
+      "before_bytes": 13202,
+      "after_bytes": 13237
+    },
+    {
+      "path": "src/adapters/persistence/onboarding.rs",
+      "before_sha256": "ac3f6fcc728d6ffd6930085e51417d60508b367033851b5daffbb7517294a50d",
+      "after_sha256": "17c2d4ec98aae63fd1cdce59fe15fc19ed59d882e47e0ce86c1051f67a8405f4",
+      "before_bytes": 9374,
+      "after_bytes": 9576
+    },
+    {
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "before_sha256": "3b8f78a5d1eb8208db85e4ad56780fc0a23f1ed08b30e9a45071057ec2cb56f5",
+      "after_sha256": "d967d52db4b9d7a116eb02f1036eb4fd50d4c147cc0f2124ad3dfe5210dcec39",
+      "before_bytes": 33968,
+      "after_bytes": 32540
+    },
+    {
+      "path": "src/adapters/persistence/skill_tests.rs",
+      "before_sha256": "0a72b2e6e0b1c4859f0acdfd8a62d3e52ee606bfa229f328cae6877c12166ab2",
+      "after_sha256": "aa5a0c20f6b907a1c27031dd8e3727211a9e1a657e1dde8e4c9c2e1cc5b9c28f",
+      "before_bytes": 17192,
+      "after_bytes": 17335
+    },
+    {
+      "path": "src/adapters/persistence/test_support.rs",
+      "before_sha256": "40745edeb5ca23683df9d90238ced9c9869c5f4a7d1efb6c2f99a9d7af70cc05",
+      "after_sha256": "1a2ceae754c5649081d835dd24db29269f8ee1b23f2dc5d47913cd111ccfb331",
+      "before_bytes": 39152,
+      "after_bytes": 39930
+    },
+    {
+      "path": "src/adapters/persistence/test_support/native_agent.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "ddd00d7d82df0772bd17572d212bb0fc4a15c015b2a3fa743a4a53e0c1f178b2",
+      "before_bytes": 0,
+      "after_bytes": 2429
+    },
+    {
+      "path": "src/adapters/persistence/thread/direct_agent_lifecycle_race_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "792e67f7f15f236464ec8f02bc069809682df7c6a8a93b23da8a0461bec04a2d",
+      "before_bytes": 0,
+      "after_bytes": 3942
+    },
+    {
+      "path": "src/adapters/persistence/thread/direct_company_lifecycle_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "a7cc0f917d377e8146b01b47b0fa017c2173058b3ddc5f5f2e57699e761e5b42",
+      "before_bytes": 0,
+      "after_bytes": 8093
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "before_sha256": "42246f9f578c39796fd071a811dc6af3824cef34dfcd8a5a1678f62ccae6dac3",
+      "after_sha256": "118109d7b57c2786ed4dfd16bc0b558d069def61675158f934ff142e5a892a23",
+      "before_bytes": 38773,
+      "after_bytes": 40849
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_notice.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "b85a57baf54faa34b2564874dacfba03935d0096478bc62f73eaae287ccf8fdc",
+      "before_bytes": 0,
+      "after_bytes": 4926
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_target.rs",
+      "before_sha256": "8db3f63be59697c4aaa8acf7c034c1d5405ac905bbecc10d46d8270de4a85960",
+      "after_sha256": "115789497154cf301a7924ad2fb4d48db0e6a5856c921a81908a2a9c272c22d1",
+      "before_bytes": 6399,
+      "after_bytes": 7179
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "before_sha256": "aa61c43fd5dc941a872647de28f303e671af231e632d07d1050234d9435e1364",
+      "after_sha256": "bdf768006e5f971e861014115d1820e94cb42236ac2537b40b79fed51328e0c4",
+      "before_bytes": 53421,
+      "after_bytes": 53349
+    },
+    {
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "before_sha256": "93cbff786dbb5215c4750a8d82a3f984ee57c89755acb0243dc8276f8643ce07",
+      "after_sha256": "e7382d02b8b433257a8fa072708f8e4ffdfb498703807b329d00d95d73b5be85",
+      "before_bytes": 26950,
+      "after_bytes": 26989
+    },
+    {
+      "path": "src/adapters/persistence/thread/relay.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "65cee5ca65c43bb79c19b1d763d27eaeb12878f2528963367349ce4174e6bf37",
+      "before_bytes": 0,
+      "after_bytes": 4659
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_source.rs",
+      "before_sha256": "c49a975fd7708065417573782f37f10e5e67b31c5ce255819698dab522095b1d",
+      "after_sha256": "772992e4baee6e0b2020454b764f75771fd30b2dab3cfb185e1e6bf1e9293fd0",
+      "before_bytes": 5688,
+      "after_bytes": 6729
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_thread_tests.rs",
+      "before_sha256": "529b19174ec5ea890da50e13a7e7137961eaa3f65442bcce3a1a801a8318fed7",
+      "after_sha256": "01dc2d4603d1fb3bfaecf42fb75fd01716778de81651383f7a14b28ab70766fd",
+      "before_bytes": 15298,
+      "after_bytes": 15398
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_runtime_tests.rs",
+      "before_sha256": "6f164a96c0445264640daa9d01682083119572168ec25c2296c879843740d735",
+      "after_sha256": "24491575c57807e1a56a370ce3e86415995417c176dbbff40fb89ee3b9c9235b",
+      "before_bytes": 33224,
+      "after_bytes": 33320
+    },
+    {
+      "path": "src/adapters/persistence/workflow/autonomous_agent_admission_tests.rs",
+      "before_sha256": "74b854e6dbd32a35769fb97a81b385ad2a9074a1b4f331a0a51b85999b668691",
+      "after_sha256": "4c0314b69f7965e3ba533b25455e1b74625a6154ea3d80d2ad465884aa129665",
+      "before_bytes": 11712,
+      "after_bytes": 11635
+    },
+    {
+      "path": "src/adapters/persistence/workflow/autonomous_agent_storage_support.rs",
+      "before_sha256": "c6dce7aca9b9ee7975ef101bf4b4b298e1b2dc72f75bddd8a2ed3e9dbff9ef20",
+      "after_sha256": "2c59ea2ec4e05de31f273bf3082bb965292ffff4e2f37da2e9f2c8c4600c5f68",
+      "before_bytes": 12030,
+      "after_bytes": 12191
+    },
+    {
+      "path": "src/adapters/persistence/workflow/autonomous_agent_view_tests.rs",
+      "before_sha256": "84398092a3757174b52e200e29fb8f3d401af326f76a1d593e18301cfd340c6e",
+      "after_sha256": "ba6823bc9a130108a339cef8c623bc4e11dc9e513d01f031906c8d37bb52239b",
+      "before_bytes": 8351,
+      "after_bytes": 8431
+    },
+    {
+      "path": "src/adapters/persistence/workflow/batch_commit.rs",
+      "before_sha256": "13d7b07dabff7e21b52d61d9916fe6b8a228c7aef802dfd5b8d1510de41d2500",
+      "after_sha256": "f1b2d6829fee096e6c8b36275f94231991c81b62d1f88bedca2f3effd9fbdce4",
+      "before_bytes": 6593,
+      "after_bytes": 6623
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs",
+      "before_sha256": "53567b4524121421ffe3e3f904492cd529b193e75d7bb8c02452df255931f716",
+      "after_sha256": "ef44dd4c7cd2dcc32eaba48b1a47edd3fe65e5c6394c030283a0629aab753937",
+      "before_bytes": 5781,
+      "after_bytes": 5942
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+      "before_sha256": "f6761351cbab15570ec8b7f9a478becc68aa9139bdd8c662d949783590b01685",
+      "after_sha256": "fdbb1487f61415a0a350879b409ccaabc48cb557a32b6a41fc18f220ab9d3d84",
+      "before_bytes": 4332,
+      "after_bytes": 4727
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish_plan.rs",
+      "before_sha256": "514d4931506b63dbf892118d360fffe277e8e25165acf97bc019e99f6e482241",
+      "after_sha256": "7de893b213238ea3139a2fac83a6b1fd04cd16107fba7697b021933051de3541",
+      "before_bytes": 4612,
+      "after_bytes": 4597
+    },
+    {
+      "path": "src/adapters/persistence/workflow/definitions.rs",
+      "before_sha256": "e095cdd1767dd9f36be008bf039eb343340940d0c0aad281157c80aaa892b67f",
+      "after_sha256": "2323bfed51c94573548682fb0eae890ec00720a5240bb6f01c80fd85f973bb2a",
+      "before_bytes": 10482,
+      "after_bytes": 10612
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_delivery_tests.rs",
+      "before_sha256": "92b9cad2a4dd24effb8135ae1a001f521e580f564f8e4f56ab3fa9b3c7db054f",
+      "after_sha256": "b9133081cddb3c94c23596d472df683d34d634c9029befc8aa3234bcac2020a2",
+      "before_bytes": 9637,
+      "after_bytes": 9635
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_tests.rs",
+      "before_sha256": "236c1781af978ea0961f38fde4af80e15d30ed3fa05f2f278624c2f8640a809f",
+      "after_sha256": "66545741eeeefa108352b6809755c39177505ddb213d27788a0adb832d5482cb",
+      "before_bytes": 19064,
+      "after_bytes": 19036
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_binding_tests.rs",
+      "before_sha256": "ae9469a3ba64915e7670d09a8a8a26e4d2bb563df76a1ba0f1b3a0d09f5f9e1c",
+      "after_sha256": "59133b46bcee0d143a46e2fc52acd542bbd01c76ca2a003cd149dd0f04248ceb",
+      "before_bytes": 18852,
+      "after_bytes": 19135
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_guard_tests.rs",
+      "before_sha256": "0208b296df1825a4adb3f7feb8c786c5fc5fa54c5f881d3c1d428baa03450b04",
+      "after_sha256": "33598263863dca7a61ab4e35d498c4b85e0a7fdfa80b7e44b64a60f98a1a3c5a",
+      "before_bytes": 6449,
+      "after_bytes": 9421
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_lock_tests.rs",
+      "before_sha256": "efc2f64d3378cf71bb189a2042ba708909728f0e7b528eba11e8cb0da07dbedb",
+      "after_sha256": "000f4461c0215cf79e02edae4a3b49e76dea1346506c6e25ab36c06e87fda0d3",
+      "before_bytes": 7496,
+      "after_bytes": 7538
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_native_claim_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "f2216111a1993f7ac71010838a54162846abcb690cabdaa16e69a4c2d90066ba",
+      "before_bytes": 0,
+      "after_bytes": 3801
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs",
+      "before_sha256": "ac1aaac271403221935ef350c535d4217cf74ca5ff6c6dbf69f9ac98adf73068",
+      "after_sha256": "2d634296906d796e92308a7751472b2017e0344831b82510fdc3c599fa69e0f8",
+      "before_bytes": 8295,
+      "after_bytes": 8548
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs",
+      "before_sha256": "82a37adb9d8240f2230f22a488ccef15b2e8061601b46516055498651e4ad6e1",
+      "after_sha256": "c9b657fac809be749067c35c9e7403d11dcc09f86eb27ffae1c0115b9fd8a265",
+      "before_bytes": 6869,
+      "after_bytes": 6393
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+      "before_sha256": "d206de9730e3f64e37e217b5312b186a9965f93acf833bb4037f3c45ec81ee34",
+      "after_sha256": "9cd36ac26c48a39e36d59502fed6c1f22da684a7e4fc9746ff212bf9375e86e4",
+      "before_bytes": 10502,
+      "after_bytes": 10536
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_assignment.rs",
+      "before_sha256": "a5fe615fd602c180c1f61dffea5e0f32ed523c1cfe924f1142f428080dc49790",
+      "after_sha256": "2676559ee387656cafd9c9a01c66da1990216859cdce7dc32c83808cb6bbf484",
+      "before_bytes": 3882,
+      "after_bytes": 3817
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_control_tests.rs",
+      "before_sha256": "921f02b407800155a4362f40be12b8e7e787deba1ebe6621ca3927a020a47230",
+      "after_sha256": "e188c9e88888cc6b4d1267f9db1372846212b9d9c11c4f011ece4b81f9a3f0d5",
+      "before_bytes": 7373,
+      "after_bytes": 7408
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_guard_tests.rs",
+      "before_sha256": "53b528a917f18f11e0ce58e6701e3f962922004cf8e214325b88595e1b9cff73",
+      "after_sha256": "c62ac8028e3edccfdefef5d668ee712ce0acd58524895951c18e3de1c5010e8d",
+      "before_bytes": 9891,
+      "after_bytes": 10036
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs",
+      "before_sha256": "40556b89222fc8bd750b4f9aa229364a6a4b247405ec95934705be22c4e4a872",
+      "after_sha256": "3f1183467011bd3a6070423b9857c215fb8c0a5f829172317291bba520cc3d8d",
+      "before_bytes": 13689,
+      "after_bytes": 13474
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_message_tests.rs",
+      "before_sha256": "3d88616ac00254c1895804bb364006c9f9265726ec358056ca7a5857cb6e7757",
+      "after_sha256": "2cb8adbeb7157d8f80e3579256b2077af266491376095fd6415f0b190611c18d",
+      "before_bytes": 17489,
+      "after_bytes": 17537
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_runtime_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "2db92990da75da7f309c962598dcef5286321cd4eac61e4c903eb86bdcac901e",
+      "before_bytes": 0,
+      "after_bytes": 16242
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "before_sha256": "c70dccc65b591d35f0cfd482737d1f5adba6505795f1bd5b9aca50c864acc7db",
+      "after_sha256": "d67c4082483a6692dc4250aa40d87be225f165a4206c5d56db945f1d4823b5aa",
+      "before_bytes": 48914,
+      "after_bytes": 33742
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_person_tests.rs",
+      "before_sha256": "bfdf5e476568639cf087fd05ec7423491a69bc1f22d0fea440b197aafb95ba66",
+      "after_sha256": "9ab2c96180d340f84033804cdc63e4122ff973427064f17a5da9e32e7ac2af0f",
+      "before_bytes": 17237,
+      "after_bytes": 17272
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_agent_isolation_tests.rs",
+      "before_sha256": "57210d6f0a88e1fb1d12c3eab6ba10bf3c6df9d7b61f0001fde5107cc30b3435",
+      "after_sha256": "85ca158448a537e45e1604499f58a7c36133f8164227d8d9609c6e5bc67eeb73",
+      "before_bytes": 11618,
+      "after_bytes": 11761
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp_agent_tests.rs",
+      "before_sha256": "37b7bbe7d9ec854369617307e8d383654c0fbb5c332d447893bcd8b7177521fc",
+      "after_sha256": "0b19f3d3e3280f4bc40ec37d6807282c7d2894959173b5e795ba03f42d077c0d",
+      "before_bytes": 15187,
+      "after_bytes": 15284
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "before_sha256": "ef6c924980cdc9016c6499ea9876189782aef492cf6a887f794c82401316e428",
+      "after_sha256": "56f3850e824dc445e47deccb1b8e80ddb7d180654ba129810d2357553eceef91",
+      "before_bytes": 21042,
+      "after_bytes": 23688
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_correlation_tests.rs",
+      "before_sha256": "b248150439889bcf907b98713ed70e29690acdba6470a523d59b21850a6fa34d",
+      "after_sha256": "dc433e03f32113ff783e47d7344e13b317ce467a7645aa46dfb4dfe6e64a49b3",
+      "before_bytes": 6555,
+      "after_bytes": 6855
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_delivery_tests.rs",
+      "before_sha256": "33e166045ab09ed0d54885324521b9b2191e4a8b64e7adfb629058176e20a888",
+      "after_sha256": "f513b47537e73b144bad4993cf0dedf6a64b695e85462f71da5789ba71cb4bf9",
+      "before_bytes": 22080,
+      "after_bytes": 22115
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "before_sha256": "05c6bee95eb4f14cab4da040845d9f74ad89ee9381ec047d1606486d07ac4df1",
+      "after_sha256": "c86ae589e0c17195b252f926a6703d7f97ed636895fadeeeda4be515d5fd5e1a",
+      "before_bytes": 24541,
+      "after_bytes": 25167
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "before_sha256": "fd07b77bae6cb94adadd36005f521e0e8f04c4f97b4aca8a311270fddcc2b77b",
+      "after_sha256": "f6b3a97f412de12a4c24b222b6ce61794954b049c61d537e3dd475c59c849ea3",
+      "before_bytes": 36841,
+      "after_bytes": 38021
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "before_sha256": "4b0feabeaa2901604b1884da35cd74dc397022b646c3191a995f2bf9f35b956b",
+      "after_sha256": "a0476b90ab795735504b7e3d59d6fae87636f8dc43babd184ae136c448902a11",
+      "before_bytes": 9080,
+      "after_bytes": 8128
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_builder_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "37fdff031951fe53d4c917de16d5407ee751bb045a47132a93c97973f0c16692",
+      "before_bytes": 0,
+      "after_bytes": 10186
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_department.rs",
+      "before_sha256": "b3c5cc567eb047d926cf66cf2199ef3271179ad05a77dd12839f98b0c6895cdc",
+      "after_sha256": "cdfd6ced5442d7db56aa9a96e52ac06345e9a5654b45888dee397705ba722abb",
+      "before_bytes": 21241,
+      "after_bytes": 21396
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+      "before_sha256": "c82b3169d5c1339560314fc4d16e6dfa4f0faa25efcb737d647b766903c3f008",
+      "after_sha256": "a8f84ae411627dc38e147af4adcddd90d9c203d7190edd8f63b258c6ee38542a",
+      "before_bytes": 10681,
+      "after_bytes": 10257
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "before_sha256": "df81543d1dc53a01120907e8d1a986247c846b03c83ca2dc8256abf9324f39ee",
+      "after_sha256": "bd16a8c3e1c2c7ded07efe7c6a4cbbbafef6e638e0c55a61d5a3892c3b787925",
+      "before_bytes": 43946,
+      "after_bytes": 33242
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_native.rs",
+      "before_sha256": "5ddd3cfe9221e6cacd60cad05fd1bc732e96c870fd48824995a0a592919e66f4",
+      "after_sha256": "adcf72e872bc5b6889bcd2d5698b6d7f963f1491130fcbb82ebb615fa02ea956",
+      "before_bytes": 8331,
+      "after_bytes": 10709
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs",
+      "before_sha256": "dbdcc2c49c928d3620511d66a17e69f140ac4fe47a27c3a164b73b345d2768f6",
+      "after_sha256": "4b45f155ed984c0198832f48135b771bda5258ade335df300a5a6ba6e36e46b3",
+      "before_bytes": 3134,
+      "after_bytes": 3068
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "before_sha256": "0640b17cd9fd89dfb6d201add06b158d1c2a7459b2884da3e6979630af4adbfb",
+      "after_sha256": "44e1fa672ff4d6bb3810557e443c1dc26784b92d3b5453427cc4726017b26c3e",
+      "before_bytes": 32159,
+      "after_bytes": 32231
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_tests.rs",
+      "before_sha256": "2bfc951fb984c5a8a039502c7809117a47fdf411052ad6f55d32d68e37c0a34b",
+      "after_sha256": "439a28d40e59ab73f510c4b484f61d16d4e5e3228bd6aaca83b323f6a3294677",
+      "before_bytes": 8042,
+      "after_bytes": 11047
+    },
+    {
+      "path": "src/adapters/persistence/workflow/relay_identity_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "c32ef9203459588c582a73537d97904d98f3d4ae18a195f982ecc94bd1d69ee0",
+      "before_bytes": 0,
+      "after_bytes": 5902
+    },
+    {
+      "path": "src/adapters/persistence/workflow/relay_system_identity_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "d3fb639ca8953f5ded2396f77fd024f5526f9f6a20d9409e731577c4da8e26c4",
+      "before_bytes": 0,
+      "after_bytes": 3016
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+      "before_sha256": "966c69d66bafd6a5ff2e9ee1b6558dc1d51474560b2e9f7544ee8d27c8060145",
+      "after_sha256": "90b4007eb3f22183cb89450541a922ce2f6d75ff284af61171a609dc265e69db",
+      "before_bytes": 6427,
+      "after_bytes": 6709
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "before_sha256": "40a8bd2bfb70f27b17eecd33ddb82819953aeec26da45bb5509e65c4a21b68c3",
+      "after_sha256": "f94055ee44303e2e6716da32c73f3873490d1dedf2e60f6b7fb0f0d2274cdc1e",
+      "before_bytes": 14980,
+      "after_bytes": 14913
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tool_support.rs",
+      "before_sha256": "de13f6ff4de1162abda78423ad8a852d8caa4b75eb0a93a003a19650655c0f9c",
+      "after_sha256": "5a206c084a651c43e68c784b73ddd3c4d2500817d4f212668046695df83c298c",
+      "before_bytes": 20934,
+      "after_bytes": 21053
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "before_sha256": "cca01635ee83afbcab2855dd528115d63dc8bb6164ad8d301355f4f0e2491ad4",
+      "after_sha256": "4c06a3c8111bea325bd32882c911067dfb1b7a96d582c0483cf63bb5ed760932",
+      "before_bytes": 11603,
+      "after_bytes": 11595
+    },
+    {
+      "path": "src/adapters/protocols/email/egress.rs",
+      "before_sha256": "1d50441057086f0e51d52e153a7f81bf37ce02decce9451ab4d66de6e0e2d37e",
+      "after_sha256": "c3da507da7fcc3cad1e46bce91d8a8e7b7e1ba57899afab313698394dfdeceef",
+      "before_bytes": 30390,
+      "after_bytes": 30943
+    },
+    {
+      "path": "src/application/agent/authoring_reads.rs",
+      "before_sha256": "6013f1bd48e56462e49eecb135153f3b1c9c1a3dde1b14d2f8827b2c27b86410",
+      "after_sha256": "8c88db7c9b7ed98f23852bfbd9240623d3725eca5876ecc7942514bf3aa6dc80",
+      "before_bytes": 6769,
+      "after_bytes": 6785
+    },
+    {
+      "path": "src/application/agent/contract_tests.rs",
+      "before_sha256": "e0b32efb0ed832ebc1d6f383f7274b2865e3584389931d97c4de55bdada04f12",
+      "after_sha256": "6f92b73a064619d7e932bcb9cb26a2026a4853cc87639d0928766a4fbd7ecf43",
+      "before_bytes": 9323,
+      "after_bytes": 9308
+    },
+    {
+      "path": "src/application/notification.rs",
+      "before_sha256": "f38edc365504e716737d902b8ce329ee79e5ed8df39dc4eae01aa6aeee8edf99",
+      "after_sha256": "bd91ec035a78f0ab3568a8c3b20aa60a74b04b381b7626d12d2d6a4d901bc8c0",
+      "before_bytes": 5113,
+      "after_bytes": 5281
+    },
+    {
+      "path": "src/application/services/delivery_worker_tests.rs",
+      "before_sha256": "5215f261acc4736c488511262bdc45a693ad298baaf64bf8c2f6f0ab30bd1ba6",
+      "after_sha256": "62147cf0edc24233457cbf929dcea8b810973e19cebe78ed8a5f5d5f2c5151a9",
+      "before_bytes": 19757,
+      "after_bytes": 20143
+    },
+    {
+      "path": "src/application/services/inbound_event_worker_tests.rs",
+      "before_sha256": "1352bceecbc41e68fab5118120e4d7dbb8c9cb454513a6b53ad49d3855e2b829",
+      "after_sha256": "e93be827c5ffbb5189c1a31f18d7b4ce1350f000165aa614ddd71563487633fd",
+      "before_bytes": 13489,
+      "after_bytes": 13789
+    },
+    {
+      "path": "src/application/services/notification_worker.rs",
+      "before_sha256": "bb02dd24aa227d4fd231a5b0e2ddec8a854be6388ade65267888dd12f0e979ba",
+      "after_sha256": "0c24a4679dfd691aeeed1e06ed38346212b871b971afc3868f68d944b303c47e",
+      "before_bytes": 10332,
+      "after_bytes": 10906
+    },
+    {
+      "path": "src/application/transport/mod.rs",
+      "before_sha256": "fa76f11c9c6e2a0355fc6a1c0e72d30e90bd2ef083e2b334efd6c69e093db132",
+      "after_sha256": "b1fa5324edbc33fd63d2bd74b723e85f14385e6eb4a3b8d0ce2317917955571b",
+      "before_bytes": 4371,
+      "after_bytes": 4397
+    },
+    {
+      "path": "src/application/transport/ports.rs",
+      "before_sha256": "6aca0f7e2a642deed3c28f7043bd26a2360b50ea54522b3d705da371ae59d799",
+      "after_sha256": "14fd889e2540c6b8680864da73de292bd5c15d1c558d9c6d2fd6c0422fd7e823",
+      "before_bytes": 17257,
+      "after_bytes": 18067
+    },
+    {
+      "path": "src/application/transport/tests.rs",
+      "before_sha256": "6d99cb62805ebffa84ce91d3d847800b2850a86dfe6985e565b8ab3169290e2f",
+      "after_sha256": "7836669069a235f315a4ee50a08fa9388e47b91369dc2f0bdec3c19f686e5b57",
+      "before_bytes": 18617,
+      "after_bytes": 19003
+    },
+    {
+      "path": "src/application/use_cases/agent.rs",
+      "before_sha256": "21c8de5e5de39b54cc6f637d41f550d5e8cc75ab046ad6ad093c7a4ec42d3ffa",
+      "after_sha256": "2ed1dc080d1ea8bdc252e6583b66e7b2845ec10f747648d50b54e8fac35595f4",
+      "before_bytes": 29335,
+      "after_bytes": 29362
+    },
+    {
+      "path": "src/application/use_cases/agent_tests.rs",
+      "before_sha256": "4df77b3f7bd03f1272bf16fc0b0bbe26091e373751d3f7fcca331c600ac817cd",
+      "after_sha256": "86d71037748ef015022a9920a740e92520f764307e1057aa8c4858cab0767d3e",
+      "before_bytes": 26758,
+      "after_bytes": 26815
+    },
+    {
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "before_sha256": "1704beb64f3627ca72499113524644b12c4e224dfb2072094e69fc4e835b2b54",
+      "after_sha256": "4fda88d32883bc867d0b7c415971170ffee694df0edc434be5c2c86a0788b3d8",
+      "before_bytes": 10427,
+      "after_bytes": 8202
+    },
+    {
+      "path": "src/application/use_cases/onboarding.rs",
+      "before_sha256": "90acfc0f7dd6915443252077151c1133bfbb3937b2005f16010ffb1253a8f4a8",
+      "after_sha256": "20c7985bd29c187bc959b0f0287b5f8897d1a8f6fd478a83b3e9031e81c7464e",
+      "before_bytes": 12011,
+      "after_bytes": 12341
+    },
+    {
+      "path": "src/application/use_cases/thread/department_desk_relay_tests.rs",
+      "before_sha256": "8ad652d6b6dc24a7ada68caca63d9d77c45df684b35e6b146066c1e82e47f416",
+      "after_sha256": "98fc0fe02d09916baad6fe5afcceca77bd45391b9a5347f15eed24a51006d3eb",
+      "before_bytes": 7417,
+      "after_bytes": 7473
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "before_sha256": "9d3fb4b9613cd40f3558b8e336883be5d9c4eafbb92e022b731175f7241ef707",
+      "after_sha256": "58b6f0c3feed5b1aa1571d01f279b44e3d32858df7a1b5c222c2a1f54c83abc6",
+      "before_bytes": 14695,
+      "after_bytes": 14688
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "before_sha256": "74681684720df685806213d550682fd3d34c4cf7c452b0f7a4a50b436249a01c",
+      "after_sha256": "6ccf9e43ef7c57ae6959f0d5d8b8b7ca0b7f8d23c4e7246c3a7f22fadc484f97",
+      "before_bytes": 20608,
+      "after_bytes": 20616
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "before_sha256": "a2c7af2d751351169aa5afb811301238e7824d423c028a5b1b75896dd11fa3af",
+      "after_sha256": "909e8f423e7959be62b7bfd8c3111b8013985fc17aff44612a91dd07cfcab636",
+      "before_bytes": 20428,
+      "after_bytes": 21368
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "before_sha256": "a777d11ef8887b15e8210b8d02c3b010f610a7be521481b8ffa74a48e06476aa",
+      "after_sha256": "a07deb082c8d7f7483d37c301f4918c8c036d8ea09a4489bb94bd7b36d9e66f6",
+      "before_bytes": 9150,
+      "after_bytes": 9838
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "before_sha256": "b2104b58196e652e82615e47afed5ff3aa01ca334cb10ce58594a6fef1d6ef1d",
+      "after_sha256": "0e03c1378d12447b7055575914da7b191411ae542c3c6d4db174b2e6a936ed49",
+      "before_bytes": 42160,
+      "after_bytes": 42848
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "before_sha256": "173370013cc17047a6de51df4557ce8ec736a5d8679f82cbe461eaefbd9ad749",
+      "after_sha256": "9a6b193c81c99a8d2007b007f79e1f3298d513dc7e27607812f967333153e838",
+      "before_bytes": 66460,
+      "after_bytes": 66981
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support/relay.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "3f89d4cff3484bff92c039b7af420a8f793f3d2527362767f5049484d424ccb9",
+      "before_bytes": 0,
+      "after_bytes": 4068
+    },
+    {
+      "path": "src/application/use_cases/thread/tests.rs",
+      "before_sha256": "d6dce80bf45b25a9890b73ddda03f47238b5cc917e9652f5d01352f4755e5079",
+      "after_sha256": "1c4d436a903cc6cc26bcf666832a73c66e43fa61b5186e5c20f174bf5456d18f",
+      "before_bytes": 139253,
+      "after_bytes": 136399
+    },
+    {
+      "path": "src/application/workflow/agent.rs",
+      "before_sha256": "acbbb38d59a1f44302178ff0cd9c394beede9c9adc6ef12a67357e22ae840752",
+      "after_sha256": "832a33556ea9db07930587b3ee49a6a819c0cc52ae46b495e1d519901d3943e9",
+      "before_bytes": 21073,
+      "after_bytes": 21164
+    },
+    {
+      "path": "src/application/workflow/agent_contract.rs",
+      "before_sha256": "da7f8be0b00ccca2da4648eacdca2a5683c6863b3fea0b0355708aa8f4786d08",
+      "after_sha256": "c3dd0d5d981314e4bad69db3815f28da183c2046184124ac9e81912ffd63e88f",
+      "before_bytes": 6929,
+      "after_bytes": 7012
+    },
+    {
+      "path": "src/application/workflow/agent_department.rs",
+      "before_sha256": "df88dd7c04e276eea75e09dee04966f931f9c39b8722bd503fb81ebf5b6129ea",
+      "after_sha256": "e18d6851eb8d829f4da82bee69aec324bf3dd650f8c9c65352cab79981d22f76",
+      "before_bytes": 4017,
+      "after_bytes": 4240
+    },
+    {
+      "path": "src/application/workflow/agent_department_tests.rs",
+      "before_sha256": "1721d7e825e9ee9dde4da5cd120185c52fbb7f29e2ed489611c5f28fc93e6377",
+      "after_sha256": "8c0b072fe8a4edbca74aeff01c44ea1b5cb91693d85dd476b6082d9c30469793",
+      "before_bytes": 7462,
+      "after_bytes": 8024
+    },
+    {
+      "path": "src/application/workflow/exactness_tests.rs",
+      "before_sha256": "d36cc5279b1147086e983e305c5af867297ff83ca73d39759afa685e89d0bc93",
+      "after_sha256": "daf3ec35d92aca755e318cfb34e56a07920474369ea8779b232ec16cbd6948a1",
+      "before_bytes": 7426,
+      "after_bytes": 7509
+    },
+    {
+      "path": "src/application/workflow/http.rs",
+      "before_sha256": "d2af958d4ab3ce2195c66677d9b2abfc6f77f898f35e0347a530512f18f76a8a",
+      "after_sha256": "6a582b1099cd30f5a8c9f8493363ca52050d43d7ff99c7111ff7de60ce5d09aa",
+      "before_bytes": 9142,
+      "after_bytes": 9134
+    },
+    {
+      "path": "src/application/workflow/message.rs",
+      "before_sha256": "d9a3c6278077afe4f155295063b971469cd99ef4deb85d63b079db2e5b5a7690",
+      "after_sha256": "2ad16b79f86d0f10fabe3ee5b0bdee82c345fbdc2344b99a36dd82cc9e4fa6be",
+      "before_bytes": 16400,
+      "after_bytes": 17910
+    },
+    {
+      "path": "src/application/workflow/message_planner.rs",
+      "before_sha256": "e585ad15d2f9e47b23d591000fdee175276ba8e4e31ff6b1f6cdf446086a2aa3",
+      "after_sha256": "785266e6662176009c613d072955c00431b65627a4a7c089974ac0327214a9f5",
+      "before_bytes": 14013,
+      "after_bytes": 13985
+    },
+    {
+      "path": "src/application/workflow/provisioning.rs",
+      "before_sha256": "1d168a9c2c19e4c703cb77b076d4ccb566fa2f406f20a36cf5f10f3a0f5a0e30",
+      "after_sha256": "130a250a9f9a02bfb9122c725f9cd9605a2a157dcb91f29a1971907bb003c276",
+      "before_bytes": 22572,
+      "after_bytes": 15489
+    },
+    {
+      "path": "src/application/workflow/provisioning_schemas.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "8c97c11eb095638e9c317644513edaf719d6a331f9550ae38c20ee0774929d53",
+      "before_bytes": 0,
+      "after_bytes": 6635
+    },
+    {
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "before_sha256": "33683c06cd745a107b4cebc5a289d9fd8f66b59ea20ab61af80f616d583dbfbb",
+      "after_sha256": "4a88b5a41201b42652396442065f8b6e6abd20fcb8a79c905043a898b1f877a0",
+      "before_bytes": 8702,
+      "after_bytes": 8527
+    },
+    {
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "before_sha256": "0b86bd504bc0dab5f71d69989befafce0ebb2bf80e3648129f4536c3d01d1b3d",
+      "after_sha256": "d8f8d0b30e170f3f7f1b45eba5ed98d0d819212e96726b00a0296e9e798a543b",
+      "before_bytes": 7657,
+      "after_bytes": 7641
+    },
+    {
+      "path": "src/domain/entities/agent_capability.rs",
+      "before_sha256": "8a21344c65050931914f6da2f10346e3a62ceacf13eeb7e618115246217a50d9",
+      "after_sha256": "d47c85da34b94da0c03e00c0df1161ac8f10ab945afc5aed177517ded9bbef51",
+      "before_bytes": 6979,
+      "after_bytes": 7156
+    },
+    {
+      "path": "src/domain/entities/notification.rs",
+      "before_sha256": "b2be2abeea55c3e5b0d559126ed53b9cc1f1cd2e8bb24c0174ddd7fa0fb8ebfc",
+      "after_sha256": "cd733cc703a950694180efb799a60144801ced2449dfd405fa99f4cf02e41015",
+      "before_bytes": 13374,
+      "after_bytes": 13449
+    }
+  ]
+}

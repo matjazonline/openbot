@@ -31,6 +31,7 @@ async fn owner_page(f: &Journey) -> String {
         user: &user,
         company: None,
         pane_html: &content,
+        addresses_html: "",
     })
 }
 #[tokio::test]

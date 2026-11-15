@@ -1,0 +1,339 @@
+{
+  "version": 1,
+  "round": "03PA-P02-B1-R2",
+  "artifact": "30f6b67395ab9b9ec3235a5ca1d80bc78e2b596cebd8fc3ea19bec49a5edc7bb",
+  "checks": [
+    {
+      "criteria": [
+        "B1-AC1",
+        "B1-AC2",
+        "B1-AC3",
+        "B1-AC4",
+        "B1-AC5",
+        "B1-AC6",
+        "B1-AC7",
+        "03PA-P02-B1-R1/F1",
+        "03PA-P02-B1-R1/F2"
+      ],
+      "command": "TEST_DATABASE_URL=<phase test db> RUST_MIN_STACK=16777216 <current lib test binary> adapters::persistence::account_identity::tests adapters::persistence::address_tests adapters::http::routes::agent::api_tests adapters::persistence::agent::tests adapters::persistence::department::tests application::use_cases::agent::tests application::use_cases::channel:: domain::entities::participant::direct_tests",
+      "fixture": "Postgres127.0.0.1:52471; phase-owned pa02_codex_model_tests_20261114 and isolated OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused2.txt",
+          "sha256": "bd7b42c0ca639823f3b58304b7d08b74719a66c12c4bed0fbd2e50b4ab81d415"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03PA-P02-B1-R1/F1",
+        "03PA-P02-B1-R1/F2"
+      ],
+      "command": "<lib test binary> adapters::persistence::address_tests::direct::rejoin:: (unfixed production, added regressions)",
+      "fixture": "unfixed R1 production; two demonstrated failing assertions and one positive reachability control",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-regression-before.txt",
+          "sha256": "72838676a2bcf3e73bf735aeb46fbb40c3c730c7051362f392237290a05fc93e"
+        },
+        {
+          "path": "logs/B1-R2-regression-input-snapshot.txt",
+          "sha256": "d99f8b461d086cd4c49fae8efd5563e410994d96d155beca5eba4d2463bfc2ee"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03PA-P02-B1-R1/F1",
+        "03PA-P02-B1-R1/F2"
+      ],
+      "command": "<lib test binary> B1 focused filters (first correction; replacement invitation fixture error)",
+      "fixture": "first correction;138 pass, duplicate unique invitation fixture failure after security assertions; corrected through production create_invite",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "f0198fbcb2aa95b79161550ffd4c43a54e76122c0a5d5060a5c428fd64a2657e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "CARGO_TARGET_DIR=<phase target> SQLX_OFFLINE=true cargo test --locked --offline --lib --no-run",
+      "fixture": "Postgres127.0.0.1:52471; phase-owned pa02_codex_model_tests_20261114 and isolated OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-build2.txt",
+          "sha256": "c2c5f4b9fc2998cbec942e0d241e02aabac1650d9cc8c32da3300d9640d53808"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "CARGO_TARGET_DIR=<phase target> SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "Postgres127.0.0.1:52471; phase-owned pa02_codex_model_tests_20261114 and isolated OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-offline-check.txt",
+          "sha256": "132d8f9813fd0518ff77c1a062a2e99512c1239c3e418eef63423374de32ac3b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "DATABASE_URL=<phase schema db> SQLX_OFFLINE=false CARGO_NET_OFFLINE=true cargo sqlx prepare -- --all-targets --locked --offline",
+      "fixture": "pa02_codex_schema_20261114 fresh current schema; no schema changes or SQLx cache diff in correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare2.txt",
+          "sha256": "e4fe8e280fa39930592af75a2a3269daa0e8ff5da727c1a5864eaef5f11ec567"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "<unchanged source_modules-7db345602aa56679 test executable>",
+      "fixture": "current worktree scan; checker source/executable unchanged from R1, all8 module/connectivity assertions exercised",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "1c150c04d3d1ed61bfee4f9a804918fdf58c3c10e3e39cf4ef0ee167df4b1b54"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "<current lib test binary> --list; compare R1 inventory",
+      "fixture": "4521\u21924524,3 new regressions, no removed names; competing rejoin name strengthened",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-tests-final2.txt",
+          "sha256": "5c137c7fa9683547b768f8ceeea2dc79103fc8c8ae7fc790ae0bdde9126730d9"
+        },
+        {
+          "path": "logs/B1-R2-tests-final.txt",
+          "sha256": "a2b67b5a2b476f26aca0a91ccc6cd3f18e95853c55a7d4a2e0e1b3cc371d083c"
+        },
+        {
+          "path": "logs/B1-R2-collection-final.json",
+          "sha256": "fa4ae69081c3bb62f9d43a81b40b9325015b6d3229e57ac5b8b559dcfafd6200"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "local static checks on corrected source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-static2.txt",
+          "sha256": "474971bd13e1a037734b9a6bc5bbbaa5f4f2b9f6267bd437a1acf42281785ce8"
+        },
+        {
+          "path": "logs/B1-R2-static2.json",
+          "sha256": "f98ecbf887f8f2a8b9bb60ba71ab9c67b44d012216461e9e1cdc0ec469ef728b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "inherited strict-clippy baseline"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "same7 diagnostics in5 byte-identical inherited sources",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy.txt",
+          "sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014"
+        },
+        {
+          "path": "logs/B1-R2-clippy-disposition.json",
+          "sha256": "79ec83b1aac61b8ad211632cea70cb8a643e675758a98702f13105e97dedd712"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "inherited p01 generated CSS; p04 integration regeneration"
+      ],
+      "command": "npm run build:css; compare assets/app.css (retained R1 diagnostic evidence)",
+      "fixture": "unchanged inherited stylesheet/profile; no CSS-source utility changes in correction",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-foundation-css-regenerate.txt",
+          "sha256": "98b5ceb7be0105d4b9de2347ec7b5a3ca02b5e210c82283bc105fa8ea7723a32"
+        },
+        {
+          "path": "logs/B1-foundation-css-baseline-disposition.json",
+          "sha256": "1795563c0cbfbe7a8b8009d246621170b876a0835c7c46f185ed88304c701310"
+        }
+      ]
+    }
+  ]
+}

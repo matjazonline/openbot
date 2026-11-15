@@ -93,6 +93,8 @@ fn write(payload: AgentJsonPayload) -> Result<AgentWrite, AppError> {
         tool_bindings: None,
         name: payload.name,
         slug: payload.slug,
+        open_to_public: payload.open_to_public,
+        confirm_spam_disabled: payload.confirm_spam_disabled,
         provider: payload.provider,
         model: payload.model,
         system_prompt: payload.system_prompt,

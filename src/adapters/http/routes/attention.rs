@@ -122,15 +122,17 @@ async fn operational_summary(
 /// attention source in a visible channel, or a workflow run in a visible channel or company-wide
 /// (P08-D4 §D4.2).
 fn wakes_attention(event: &MailboxEvent, company_id: Uuid, visible_channel_ids: &[Uuid]) -> bool {
+    let relevant = |target: crate::entities::address::AddressTarget| match target {
+        crate::entities::address::AddressTarget::Desk(id) => visible_channel_ids.contains(&id),
+        crate::entities::address::AddressTarget::Principal(_) => true,
+    };
     event.is_resync()
         || event
             .attention_scope(company_id)
-            .is_some_and(|scope| visible_channel_ids.contains(&scope.channel_id))
-        || event.run_scope(company_id).is_some_and(|scope| {
-            scope
-                .channel_id
-                .is_none_or(|channel| visible_channel_ids.contains(&channel))
-        })
+            .is_some_and(|scope| relevant(scope.target))
+        || event
+            .run_scope(company_id)
+            .is_some_and(|scope| scope.target.is_none_or(relevant))
 }
 
 async fn attention_events(
@@ -283,7 +285,7 @@ mod tests {
     fn run(company_id: Uuid, channel_id: Option<Uuid>) -> MailboxEvent {
         MailboxEvent::WorkflowRunChanged(RunScope {
             company_id,
-            channel_id,
+            target: channel_id.map(crate::entities::address::AddressTarget::Desk),
             thread_id: None,
             run_id: Uuid::new_v4(),
         })

@@ -1,0 +1,23 @@
+
+running 18 tests
+test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+test domain::entities::participant::direct_tests::direct_thread_person_is_private_to_self_and_owner ... ok
+test domain::entities::participant::direct_tests::direct_thread_public_agent_admits_mail_without_granting_reads ... ok
+test domain::entities::participant::direct_tests::direct_thread_retired_person_keeps_only_owner_history_access ... ok
+test adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets ... ok
+test adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse ... ok
+test adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement ... ok
+test adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy ... ok
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+test adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 4503 filtered out; finished in 4.92s
+

@@ -140,6 +140,7 @@ fn action_scope(scope: ActivationRequest) -> ActionScope {
 #[derive(sqlx::FromRow, PartialEq, Eq)]
 pub(in crate::adapters::persistence) struct RunAssociation {
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
 }
 
@@ -150,22 +151,18 @@ pub(in crate::adapters::persistence) async fn authorize_run_on(
     actor: WorkflowActor,
 ) -> AppResult<RunAssociation> {
     let stored = sqlx::query_as::<_, RunAssociation>(
-        "SELECT channel_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",
+        "SELECT channel_id,principal_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",
     )
     .bind(company.as_uuid())
     .bind(run)
     .fetch_optional(&mut *db)
     .await?
     .ok_or_else(missing)?;
-    let association = match (stored.channel_id, stored.thread_id) {
-        (None, None) => RelatedAssociation::Company,
-        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
-            thread_id: RelatedThreadId::new(thread),
-        },
-        _ => return Err(invalid()),
-    };
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: stored.channel_id,
+        principal_id: stored.principal_id,
+        thread_id: stored.thread_id,
+    })?;
     association::authorize_association(db, company, actor, association).await?;
     Ok(stored)
 }

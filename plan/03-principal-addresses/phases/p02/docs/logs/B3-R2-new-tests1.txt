@@ -1,0 +1,19 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts' (15975237) panicked at src/adapters/persistence/workflow/direct_workflow_tests.rs:129:14:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4587 filtered out; finished in 2.23s
+

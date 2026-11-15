@@ -23,6 +23,7 @@ pub enum NotificationSourceKind {
     DecisionReviewer,
     EscalationControl,
     EscalationNotice,
+    DirectMessage,
 }
 
 impl NotificationSourceKind {
@@ -32,6 +33,7 @@ impl NotificationSourceKind {
             Self::DecisionReviewer => "decision_reviewer",
             Self::EscalationControl => "escalation_control",
             Self::EscalationNotice => "escalation_notice",
+            Self::DirectMessage => "direct_message",
         }
     }
 }
@@ -45,6 +47,7 @@ impl FromStr for NotificationSourceKind {
             "decision_reviewer" => Ok(Self::DecisionReviewer),
             "escalation_control" => Ok(Self::EscalationControl),
             "escalation_notice" => Ok(Self::EscalationNotice),
+            "direct_message" => Ok(Self::DirectMessage),
             _ => Err(format!("invalid notification source kind '{value}'")),
         }
     }
@@ -63,14 +66,16 @@ pub enum NotificationActionKind {
     DecisionReview,
     EscalationControl,
     EscalationReview,
+    DirectMessageReceived,
 }
 
 impl NotificationActionKind {
-    pub const ALL: [Self; 4] = [
+    pub const ALL: [Self; 5] = [
         Self::DeliveryFailure,
         Self::DecisionReview,
         Self::EscalationControl,
         Self::EscalationReview,
+        Self::DirectMessageReceived,
     ];
 
     pub const fn as_str(self) -> &'static str {
@@ -79,6 +84,7 @@ impl NotificationActionKind {
             Self::DecisionReview => "decision_review",
             Self::EscalationControl => "escalation_control",
             Self::EscalationReview => "escalation_review",
+            Self::DirectMessageReceived => "direct_message_received",
         }
     }
 
@@ -88,6 +94,7 @@ impl NotificationActionKind {
             Self::DecisionReview => "Workflow decision needs your review",
             Self::EscalationControl => "Advance workflow escalation",
             Self::EscalationReview => "Workflow escalation needs your attention",
+            Self::DirectMessageReceived => "New direct message",
         }
     }
 
@@ -95,7 +102,7 @@ impl NotificationActionKind {
         match self {
             Self::DeliveryFailure => preferences.delivery_failure_email_enabled,
             Self::DecisionReview | Self::EscalationReview => preferences.decision_email_enabled,
-            Self::EscalationControl => false,
+            Self::EscalationControl | Self::DirectMessageReceived => false,
         }
     }
 }
@@ -109,6 +116,7 @@ impl FromStr for NotificationActionKind {
             "decision_review" => Ok(Self::DecisionReview),
             "escalation_control" => Ok(Self::EscalationControl),
             "escalation_review" => Ok(Self::EscalationReview),
+            "direct_message_received" => Ok(Self::DirectMessageReceived),
             _ => Err(format!("invalid notification action kind '{value}'")),
         }
     }
@@ -174,7 +182,7 @@ pub struct ActionableNotification {
     pub id: NotificationId,
     pub company_id: Uuid,
     pub company_label: String,
-    pub channel_id: Option<Uuid>,
+    pub inbox: Option<crate::entities::address::AddressTarget>,
     pub channel_label: String,
     pub source_kind: NotificationSourceKind,
     pub source_id: Uuid,
@@ -209,8 +217,16 @@ pub struct NotificationEvent {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum NotificationTarget {
     DeliveryRecovery,
-    WorkflowDecision { decision_id: Uuid },
-    WorkflowEscalation { decision_id: Uuid },
+    WorkflowDecision {
+        decision_id: Uuid,
+    },
+    WorkflowEscalation {
+        decision_id: Uuid,
+    },
+    DirectThread {
+        principal_id: crate::entities::transport::PrincipalId,
+        thread_id: Uuid,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -220,7 +236,7 @@ pub struct NotificationRecipient {
     pub email: crate::entities::value_objects::EmailAddress,
     pub company_label: String,
     pub channel_label: String,
-    pub channel_id: Option<Uuid>,
+    pub inbox: Option<crate::entities::address::AddressTarget>,
     pub thread_id: Option<Uuid>,
     pub run_id: Option<Uuid>,
     pub correlation_id: CorrelationId,
@@ -236,6 +252,7 @@ pub enum NotificationDisposition {
     Agent {
         principal_id: Uuid,
         company: crate::entities::value_objects::CompanySlug,
+        address_slug: Option<crate::entities::value_objects::ChannelSlug>,
     },
     Resolved,
     Withdrawn,
@@ -298,7 +315,7 @@ mod tests {
                 email: "person@example.com".into(),
                 company_label: "Example".into(),
                 channel_label: "Support".into(),
-                channel_id: Some(Uuid::new_v4()),
+                inbox: Some(crate::entities::address::AddressTarget::Desk(Uuid::new_v4())),
                 thread_id: None,
                 run_id: None,
                 correlation_id: CorrelationId::new(),
@@ -369,7 +386,8 @@ mod followed_notice_tests {
                         NotificationActionKind::DeliveryFailure => delivery,
                         NotificationActionKind::DecisionReview
                         | NotificationActionKind::EscalationReview => decision,
-                        NotificationActionKind::EscalationControl => false,
+                        NotificationActionKind::EscalationControl
+                        | NotificationActionKind::DirectMessageReceived => false,
                     };
                     assert_eq!(action.email_preference(preferences), expected);
                     assert_eq!(action.as_str().parse(), Ok(action));

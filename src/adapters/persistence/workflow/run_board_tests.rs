@@ -5,7 +5,7 @@ use super::run_finished_at_tests::drive;
 use super::run_lineage_tests::admitted;
 use super::*;
 use crate::application::workflow::board::{
-    BOARD_COLUMN_CAP, BoardCount, RunBoardColumn, RunBoardScope, VisibleChannels, assemble_columns,
+    BOARD_COLUMN_CAP, BoardCount, RunBoardColumn, RunBoardScope, VisibleInboxes, assemble_columns,
 };
 use crate::application::workflow::reads::{RunStateName, RunSummary, WorkflowReads};
 use chrono::{DateTime, Duration, SubsecRound, Utc};
@@ -15,8 +15,9 @@ fn data_map() -> Value {
 }
 
 /// Runs without a channel are visible; no channel is.
-fn company_only() -> VisibleChannels {
-    VisibleChannels {
+fn company_only() -> VisibleInboxes {
+    VisibleInboxes {
+        principals: Vec::new(),
         channels: Vec::new(),
         company: true,
     }
@@ -27,7 +28,7 @@ async fn read(
     f: &AdmissionFixture,
     scope: &RunBoardScope,
     cutoff: DateTime<Utc>,
-    visible: &VisibleChannels,
+    visible: &VisibleInboxes,
 ) -> (Vec<BoardCount>, Vec<RunSummary>) {
     let (company, p) = (f.binding.target.company, f.persistence());
     (
@@ -177,7 +178,8 @@ async fn run_board_read_reads_cards_only_from_the_visible_channels() {
     let f = AdmissionFixture::new().await;
     admitted(&f, "company-run").await;
     let cutoff = Utc::now() - Duration::days(1);
-    let elsewhere = VisibleChannels {
+    let elsewhere = VisibleInboxes {
+        principals: Vec::new(),
         channels: vec![Uuid::new_v4()],
         company: false,
     };
@@ -188,7 +190,7 @@ async fn run_board_read_reads_cards_only_from_the_visible_channels() {
         &f,
         &RunBoardScope::default(),
         cutoff,
-        &VisibleChannels::default(),
+        &VisibleInboxes::default(),
     )
     .await;
     assert!(cards.is_empty());

@@ -310,6 +310,118 @@ async fn security_session_profile_failed_change_keeps_session_and_document_redir
     assert!(f.sessions.verify(&f.cookies[0]).await.unwrap().is_none());
 }
 
+/// `address_profile_`: the account renames its own address in a company, and only its own.
+#[tokio::test]
+async fn address_profile_renames_only_the_callers_own_address() {
+    use crate::{
+        application::ports::channel::{ChannelPersistence, ChannelWrite},
+        use_cases::company::{CompanyPersistence, CompanyWrite},
+    };
+    let Some(f) = Fixture::new(AccountKind::Password, Confirmation::Immediate).await else {
+        return;
+    };
+    let persistence = PostgresPersistence::new(f._database.pool.clone());
+    let company = CompanyPersistence::create(
+        &persistence,
+        f.user.id,
+        CompanyWrite {
+            name: "Acme <Profile>".into(),
+            slug: format!("acme-{}", &Uuid::new_v4().simple().to_string()[..8]),
+            ..CompanyWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    ChannelPersistence::create(
+        &persistence,
+        company.id,
+        ChannelWrite {
+            name: "Taken".into(),
+            slug: "taken".into(),
+            ..ChannelWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let rename = |slug: &str| {
+        rename_address(
+            State(f.users.clone()),
+            State(f.config.clone()),
+            f.actor(),
+            Path(company.id),
+            Form(AddressForm { slug: slug.into() }),
+        )
+    };
+    let stored = || async {
+        f.users.person_addresses(f.user.id).await.unwrap()[0]
+            .slug
+            .to_string()
+    };
+
+    let Html(saved) = rename("Front-Office").await.unwrap();
+    assert!(saved.contains("Address saved."), "{saved}");
+    assert!(saved.contains(r#"value="front-office""#), "{saved}");
+    assert!(
+        saved.contains("Acme &lt;Profile&gt;"),
+        "the company name is escaped: {saved}"
+    );
+    assert_eq!(stored().await, "front-office");
+
+    for (slug, reason) in [
+        ("taken", "already in use"),
+        ("bad slug!", "Invalid address"),
+        ("front-quiet", "reserved suffixes"),
+    ] {
+        let Html(refused) = rename(slug).await.unwrap();
+        assert!(refused.contains(reason), "{slug}: {refused}");
+        assert_eq!(stored().await, "front-office", "{slug} changed nothing");
+    }
+
+    // A company the caller is not a person of is not found, whatever its id.
+    let other_owner = persistence
+        .create_user("other_owner", "other_owner@example.test", "hash")
+        .await
+        .unwrap();
+    let foreign = CompanyPersistence::create(
+        &persistence,
+        other_owner.id,
+        CompanyWrite {
+            name: "Elsewhere".into(),
+            slug: format!("elsewhere-{}", &Uuid::new_v4().simple().to_string()[..8]),
+            ..CompanyWrite::default()
+        },
+    )
+    .await
+    .unwrap();
+    let elsewhere = rename_address(
+        State(f.users.clone()),
+        State(f.config.clone()),
+        f.actor(),
+        Path(foreign.id),
+        Form(AddressForm {
+            slug: "mine-now".into(),
+        }),
+    )
+    .await;
+    assert!(
+        matches!(elsewhere, Err(AppError::NotFound(_))),
+        "{:?}",
+        elsewhere.map(|_| ())
+    );
+    let foreign_slug: String = sqlx::query_scalar(
+        "SELECT address.slug::text FROM addresses AS address \
+         JOIN principals AS principal ON principal.company_id = address.company_id \
+          AND principal.id = address.principal_id \
+         WHERE address.company_id = $1 AND principal.user_id = $2",
+    )
+    .bind(foreign.id)
+    .bind(other_owner.id)
+    .fetch_one(&f._database.pool)
+    .await
+    .unwrap();
+    assert_eq!(foreign_slug, "other-owner");
+}
+
 #[tokio::test]
 #[ignore = "writes actual profile responses for the browser protocol check"]
 async fn dump_session_revocation_browser_fixtures() {

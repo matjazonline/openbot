@@ -11,7 +11,11 @@ struct NativeReview {
 
 async fn awaiting_review() -> NativeReview {
     let d = Box::pin(Deployment::new(vec![
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec("reviewed", ReplyMode::Reviewed)),
+        LlmTurn::tool_call(CREATE_AGENT, spec("reviewed-agent")),
+        LlmTurn::tool_call(
+            CREATE_DESK_FOR_AGENT,
+            desk_spec("reviewed-agent", "reviewed", ReplyMode::Reviewed),
+        ),
         LlmTurn::text(r#"{"body":"Created"}"#),
         LlmTurn::text(r#"{"body":"Unapproved draft"}"#),
     ]))
@@ -30,10 +34,12 @@ async fn awaiting_review() -> NativeReview {
         replied(&d, builder_binding).await == 1
     }))
     .await;
-    let created = receipts(&d, builder_binding).await.remove(0);
+    let all = receipts(&d, builder_binding).await;
+    let agent = &all[0];
+    let created = &all[1];
     let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
     register_scripted_agent_base_url(
-        Uuid::parse_str(created["agent"]["id"].as_str().unwrap()).unwrap(),
+        Uuid::parse_str(agent["agent"]["id"].as_str().unwrap()).unwrap(),
         &d.llm.base_url,
     );
     write(
@@ -125,6 +131,6 @@ async fn channel_reply_authoring_native_real_review_closes_reject_and_publishes_
             assert!(message.is_none());
             assert_eq!(output["review"]["choice"], "reject");
         }
-        assert_eq!(f.d.llm.finish().await.unwrap(), 3);
+        assert_eq!(f.d.llm.finish().await.unwrap(), 4);
     }
 }

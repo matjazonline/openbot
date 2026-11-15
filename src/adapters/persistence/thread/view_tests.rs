@@ -320,7 +320,10 @@ async fn the_audit_view_qualifies_provider_keys_by_their_interface() {
         .expect("the message is auditable in its own company");
     assert_eq!(audit.canonical_id, stored.canonical_id);
     assert_eq!(audit.thread_id, fixture.thread.id);
-    assert_eq!(audit.channel_id, fixture.channel_id);
+    assert_eq!(
+        audit.target,
+        crate::entities::address::AddressTarget::Desk(fixture.channel_id)
+    );
     assert_eq!(audit.external_keys.len(), 1);
     assert_eq!(audit.external_keys[0].transport, TransportKind::Email);
     assert_eq!(audit.external_keys[0].key.as_str(), rfc);
@@ -436,7 +439,11 @@ async fn find_thread_for_message_resolves_thread_and_scopes_by_channel() {
 
     let found = fixture
         .persistence
-        .find_thread_for_message(fixture.channel_id, stored.canonical_id)
+        .find_thread_for_message(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            stored.canonical_id,
+        )
         .await
         .unwrap();
     assert!(found.is_some());
@@ -446,7 +453,11 @@ async fn find_thread_for_message_resolves_thread_and_scopes_by_channel() {
     let other_channel_id = Uuid::new_v4();
     let foreign = fixture
         .persistence
-        .find_thread_for_message(other_channel_id, stored.canonical_id)
+        .find_thread_for_message(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(other_channel_id),
+            stored.canonical_id,
+        )
         .await
         .unwrap();
     assert!(foreign.is_none());

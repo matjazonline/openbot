@@ -604,6 +604,8 @@ mod tests {
 }
 
 #[cfg(test)]
+mod address_tests;
+#[cfg(test)]
 mod agent_config_tests;
 #[cfg(test)]
 mod legacy_runtime_schema_tests;

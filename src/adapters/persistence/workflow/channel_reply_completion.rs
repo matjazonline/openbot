@@ -12,7 +12,8 @@ use serde_json::{Value, json};
 pub(super) struct RootReply {
     pub intent_id: Uuid,
     pub message_id: Uuid,
-    pub channel_id: Uuid,
+    pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Uuid,
     pub actor_id: Uuid,
     pub contract: Value,
@@ -22,11 +23,22 @@ pub(super) struct RootReply {
     binding_id: Uuid,
 }
 
+impl RootReply {
+    fn target(&self) -> AppResult<AddressTarget> {
+        AddressTarget::from_parts(
+            self.channel_id,
+            self.principal_id
+                .map(crate::entities::transport::PrincipalId::new),
+        )
+        .ok_or_else(invalid)
+    }
+}
+
 pub(super) async fn root_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<RootReply>> {
-    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.thread_id,context.actor_id, \
+    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.principal_id,context.thread_id,context.actor_id, \
         context.contract,context.approval_policy,context.source,run.deadline,run.binding_id \
         FROM channel_reply_runs AS owned JOIN channel_reply_contexts AS context USING(company_id,intent_id) \
         JOIN workflow_runs AS run ON run.company_id=owned.company_id AND run.id=owned.run_id \
@@ -76,7 +88,7 @@ pub(super) async fn authorize_source_on(
         scope.company,
         actor,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(root.channel_id),
+            target: root.target()?,
             thread_id: RelatedThreadId::new(root.thread_id),
         },
     )
@@ -90,10 +102,12 @@ pub(super) async fn policy_current_on(
 ) -> AppResult<bool> {
     let current: Option<Option<Value>> = sqlx::query_scalar(
         "SELECT approval_policy FROM channel_reply_settings \
-        WHERE company_id=$1 AND channel_id=$2 AND binding_id IS NOT NULL FOR SHARE",
+        WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2::uuid \
+            AND principal_id IS NOT DISTINCT FROM $3::uuid AND binding_id IS NOT NULL FOR SHARE",
     )
     .bind(scope.company.as_uuid())
     .bind(root.channel_id)
+    .bind(root.principal_id)
     .fetch_optional(&mut *db)
     .await?;
     Ok(current.as_ref() == Some(&root.approval_policy))
@@ -245,7 +259,7 @@ async fn stage_on(
             .await?;
     let document = json!({"company":scope.company.as_uuid(),"run":scope.run.as_uuid(),"execution":scope.execution.as_uuid(),
         "proposal":proposal,"intent":root.intent_id,"source":root.source,"source_message":root.message_id,
-        "actor":root.actor_id,"channel":root.channel_id,"thread":root.thread_id,"output":completion.output,
+        "actor":root.actor_id,"target":root.target()?,"thread":root.thread_id,"output":completion.output,
         "content":content,"recipients":recipients,"route_snapshot":route_snapshot,"approval_policy":root.approval_policy,"approval_deadline":approval.as_ref().map(|a|a.deadline)});
     let integrity = integrity_on(db, &document).await?;
     let action = final_action(action_scope, root, proposal, integrity, content.clone())?;

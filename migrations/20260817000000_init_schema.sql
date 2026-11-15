@@ -825,7 +825,7 @@ CREATE FUNCTION public.internal_notes_are_immutable() RETURNS trigger
 BEGIN
     IF TG_OP = 'DELETE' AND NOT EXISTS (
         SELECT 1 FROM threads
-         WHERE company_id = OLD.company_id AND channel_id = OLD.channel_id AND id = OLD.thread_id
+         WHERE company_id = OLD.company_id AND channel_id IS NOT DISTINCT FROM OLD.channel_id AND principal_id IS NOT DISTINCT FROM OLD.principal_id AND id = OLD.thread_id
     ) THEN
         RETURN OLD;
     END IF;
@@ -846,7 +846,8 @@ DECLARE
 BEGIN
     -- A standalone notice has no channel to notify about, and a failed notice must never raise a
     -- notice of its own.
-    IF COALESCE(NEW.channel_id, OLD.channel_id) IS NULL THEN
+    IF COALESCE(NEW.channel_id, OLD.channel_id) IS NULL
+        AND COALESCE(NEW.principal_id, OLD.principal_id) IS NULL THEN
         RETURN COALESCE(NEW, OLD);
     END IF;
     IF TG_OP = 'DELETE' THEN
@@ -957,6 +958,14 @@ CREATE TABLE public.principals (
     user_id uuid,
     agent_id uuid,
     display_label text NOT NULL,
+    open_to_public boolean NOT NULL DEFAULT false,
+    settings_revision bigint NOT NULL DEFAULT 1 CHECK (settings_revision > 0),
+    historical_person_user_id uuid,
+    CONSTRAINT principals_public_agent_check CHECK (NOT open_to_public OR kind = 'agent'),
+    CONSTRAINT principals_historical_person_check CHECK (
+        (kind <> 'person' OR (historical_person_user_id IS NOT NULL AND historical_person_user_id = user_id))
+        AND (historical_person_user_id IS NULL OR kind IN ('person', 'external'))
+    ),
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     CONSTRAINT principals_display_label_check CHECK (((btrim(display_label) <> ''::text) AND (octet_length(display_label) <= 255))),
@@ -1025,11 +1034,13 @@ BEGIN
        AND notification.state = 'active'
        AND (
            notification.recipient_principal_id IS NULL
-           OR NOT notification_principal_can_view(
+           OR NOT notification_target_can_view(
                notification.company_id,
-               notification.channel_id,
+               notification.channel_id, notification.principal_id,
                notification.recipient_principal_id
            )
+           OR (notification.source_kind='direct_message' AND NOT direct_message_notification_can_view(
+               notification.company_id,notification.source_id,notification.recipient_principal_id))
        );
     RETURN COALESCE(NEW, OLD);
 END;
@@ -1087,13 +1098,19 @@ DECLARE
     source_id UUID := NULLIF(row_data->>'id', '')::UUID;
     company UUID := NULLIF(row_data->>'company_id', '')::UUID;
     channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
+    principal UUID := NULLIF(row_data->>'principal_id', '')::UUID;
 BEGIN
-    IF company IS NOT NULL AND channel IS NOT NULL AND source_id IS NOT NULL THEN
+    IF TG_OP = 'UPDATE' THEN
+        IF (row_data->'status') IS NOT DISTINCT FROM (to_jsonb(OLD)->'status') THEN
+            RETURN NEW;
+        END IF;
+    END IF;
+    IF company IS NOT NULL AND ((channel IS NULL) <> (principal IS NULL)) AND source_id IS NOT NULL THEN
         PERFORM pg_notify(
             'attention_changed',
             json_build_object(
                 'company_id', company,
-                'channel_id', channel,
+                'target', public.address_target_json(channel,principal),
                 'source_kind', TG_ARGV[0],
                 'source_id', source_id
             )::TEXT
@@ -1132,19 +1149,24 @@ CREATE FUNCTION public.notify_internal_note_change() RETURNS trigger
 DECLARE
     note_thread UUID;
     note_channel UUID;
+    note_principal UUID;
     note_company UUID;
 BEGIN
     IF TG_TABLE_NAME = 'internal_notes' THEN
         note_thread := NEW.thread_id;
         note_channel := NEW.channel_id;
+        note_principal := NEW.principal_id;
         note_company := NEW.company_id;
     ELSE
-        SELECT thread_id, channel_id, company_id
-          INTO note_thread, note_channel, note_company
+        SELECT thread_id, channel_id, company_id, principal_id
+          INTO note_thread, note_channel, note_company, note_principal
           FROM internal_notes WHERE id = NEW.note_id;
     END IF;
-    PERFORM pg_notify('thread_messages', json_build_object(
-        'thread_id', note_thread, 'channel_id', note_channel, 'company_id', note_company
+    PERFORM pg_notify('thread_message', json_build_object(
+        'thread_id', note_thread, 'company_id', note_company,
+        'target', CASE WHEN note_channel IS NOT NULL
+            THEN json_build_object('kind','desk','id',note_channel)
+            ELSE json_build_object('kind','principal','id',note_principal) END
     )::text);
     RETURN NULL;
 END;
@@ -1163,7 +1185,9 @@ BEGIN
         'thread_activity',
         json_build_object(
             'thread_id', NEW.thread_id,
-            'channel_id', NEW.channel_id,
+            'target', CASE WHEN NEW.channel_id IS NOT NULL
+                THEN json_build_object('kind','desk','id',NEW.channel_id)
+                ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
             'company_id', NEW.company_id
         )::text
     );
@@ -1184,7 +1208,9 @@ BEGIN
         'thread_message',
         json_build_object(
             'thread_id', NEW.thread_id,
-            'channel_id', NEW.channel_id,
+            'target', CASE WHEN NEW.channel_id IS NOT NULL
+                THEN json_build_object('kind','desk','id',NEW.channel_id)
+                ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
             'company_id', NEW.company_id
         )::text
     );
@@ -1478,8 +1504,8 @@ CREATE FUNCTION public.preserve_workflow_run_association() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    IF (NEW.company_id, NEW.id, NEW.channel_id, NEW.thread_id) IS DISTINCT FROM
-       (OLD.company_id, OLD.id, OLD.channel_id, OLD.thread_id) THEN
+    IF (NEW.company_id, NEW.id, NEW.channel_id, NEW.principal_id, NEW.thread_id) IS DISTINCT FROM
+       (OLD.company_id, OLD.id, OLD.channel_id, OLD.principal_id, OLD.thread_id) THEN
         RAISE EXCEPTION 'workflow run association is immutable'
             USING ERRCODE = '23514', CONSTRAINT = 'workflow_guard:workflow_run_association_immutable';
     END IF;
@@ -1768,7 +1794,7 @@ CREATE FUNCTION public.transport_requires_installation(transport text) RETURNS b
 
 CREATE FUNCTION public.valid_binding_change_reason(reason text) RETURNS boolean
     LANGUAGE sql IMMUTABLE
-    RETURN (reason = ANY (ARRAY['manager_request'::text, 'installation_revoked'::text, 'endpoint_removed'::text, 'access_revoked'::text, 'channel_disabled'::text, 'provider_drift'::text]));
+    RETURN (reason = ANY (ARRAY['manager_request'::text, 'installation_revoked'::text, 'endpoint_removed'::text, 'access_revoked'::text, 'channel_disabled'::text, 'provider_drift'::text, 'principal_retired'::text]));
 
 
 --
@@ -1835,6 +1861,7 @@ CREATE FUNCTION public.validate_workflow_job_association() RETURNS trigger
 DECLARE
     owning_run uuid;
     run_channel uuid;
+    run_principal uuid;
     run_thread uuid;
 BEGIN
     -- Link identity is immutable. Discover it before taking locks in run-first order.
@@ -1845,7 +1872,7 @@ BEGIN
         RAISE EXCEPTION 'workflow job requires a visible scoped execution'
             USING ERRCODE = '23503', CONSTRAINT = 'background_tasks_workflow_execution_fk';
     END IF;
-    SELECT run.channel_id, run.thread_id INTO run_channel, run_thread
+    SELECT run.channel_id, run.principal_id, run.thread_id INTO run_channel, run_principal, run_thread
     FROM workflow_runs AS run
     WHERE run.company_id = NEW.company_id AND run.id = owning_run
     FOR SHARE;
@@ -1861,7 +1888,7 @@ BEGIN
         RAISE EXCEPTION 'workflow job requires a visible scoped execution'
             USING ERRCODE = '23503', CONSTRAINT = 'background_tasks_workflow_execution_fk';
     END IF;
-    IF NEW.channel_id IS DISTINCT FROM run_channel OR NEW.thread_id IS DISTINCT FROM run_thread THEN
+    IF NEW.channel_id IS DISTINCT FROM run_channel OR NEW.principal_id IS DISTINCT FROM run_principal OR NEW.thread_id IS DISTINCT FROM run_thread THEN
         RAISE EXCEPTION 'workflow job association must equal its execution run association'
             USING ERRCODE = '23514', CONSTRAINT = 'background_tasks_workflow_association';
     END IF;
@@ -3555,6 +3582,7 @@ CREATE TABLE public.background_tasks (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     correlation_id uuid NOT NULL,
     status text DEFAULT 'pending'::text NOT NULL,
@@ -3570,6 +3598,7 @@ CREATE TABLE public.background_tasks (
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     workflow_execution_id uuid NOT NULL,
+    CONSTRAINT background_tasks_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT background_tasks_lease_check CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL)))),
     CONSTRAINT background_tasks_max_retries_check CHECK ((max_retries > 0)),
     CONSTRAINT background_tasks_retry_count_check CHECK (retry_count BETWEEN 0 AND max_retries),
@@ -3612,7 +3641,8 @@ CREATE TABLE public.binding_audit_events (
 CREATE TABLE public.channel_bindings (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     installation_id uuid,
     transport text NOT NULL,
     namespace text NOT NULL,
@@ -3626,7 +3656,11 @@ CREATE TABLE public.channel_bindings (
     access_snapshot jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT channel_bindings_access_policy_check CHECK ((access_policy = ANY (ARRAY['channel_acl'::text, 'conversation_members_read_and_participate'::text]))),
+    CONSTRAINT channel_bindings_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+    CONSTRAINT channel_bindings_principal_email_check CHECK (
+        principal_id IS NULL OR (transport = 'email' AND installation_id IS NULL AND access_policy = 'target_acl')
+    ),
+    CONSTRAINT channel_bindings_access_policy_check CHECK ((access_policy = ANY (ARRAY['target_acl'::text, 'conversation_members_read_and_participate'::text]))),
     CONSTRAINT channel_bindings_access_snapshot_check CHECK (((jsonb_typeof(access_snapshot) = 'object'::text) AND ((access_snapshot -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((access_snapshot -> 'kind'::text)) = 'string'::text) AND ((access_snapshot ->> 'kind'::text) = ANY (ARRAY['deployment_endpoint'::text, 'provider_conversation'::text])) AND (octet_length((access_snapshot)::text) <= 4096))),
     CONSTRAINT channel_bindings_created_by_check CHECK (public.valid_creation_provenance(created_by)),
     CONSTRAINT channel_bindings_delivery_policy_check CHECK ((delivery_policy = ANY (ARRAY['reply_only'::text, 'reply_and_initiate'::text]))),
@@ -3671,16 +3705,22 @@ CREATE TABLE public.channel_schedules (
 
 
 --
--- Name: channel_slugs; Type: TABLE; Schema: public; Owner: -
+-- Name: addresses; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.channel_slugs (
+-- One address namespace per company: a slug names exactly one desk or one principal. A desk keeps
+-- one primary slug plus aliases; a principal (only a person or an agent) has exactly one address.
+CREATE TABLE public.addresses (
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
     slug public.citext NOT NULL,
+    target_kind text NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     is_primary boolean DEFAULT false NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    CONSTRAINT channel_slugs_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))
+    CONSTRAINT addresses_slug_format CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text))),
+    CONSTRAINT addresses_target_kind_check CHECK ((target_kind = ANY (ARRAY['desk'::text, 'principal'::text]))),
+    CONSTRAINT addresses_target_check CHECK ((((target_kind = 'desk'::text) AND (channel_id IS NOT NULL) AND (principal_id IS NULL)) OR ((target_kind = 'principal'::text) AND (principal_id IS NOT NULL) AND (channel_id IS NULL) AND is_primary)))
 );
 
 
@@ -3853,12 +3893,14 @@ CREATE TABLE public.external_messages (
 CREATE TABLE public.external_threads (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     binding_id uuid NOT NULL,
     external_thread_key text NOT NULL,
     thread_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT external_threads_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
     CONSTRAINT external_threads_key_check CHECK (((btrim(external_thread_key) <> ''::text) AND (octet_length(external_thread_key) <= 998)))
 );
 
@@ -3975,7 +4017,8 @@ CREATE TABLE public.internal_note_tombstones (
 CREATE TABLE public.internal_notes (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     message_audience text DEFAULT 'internal_only'::text NOT NULL,
@@ -3985,6 +4028,7 @@ CREATE TABLE public.internal_notes (
     provenance text NOT NULL,
     supersedes_note_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT internal_notes_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
     CONSTRAINT internal_notes_message_audience_check CHECK ((message_audience = 'internal_only'::text)),
     CONSTRAINT internal_notes_no_self_supersession CHECK ((id IS DISTINCT FROM supersedes_note_id)),
     CONSTRAINT internal_notes_provenance_check CHECK ((provenance = ANY (ARRAY['human_ui'::text, 'api'::text, 'integration'::text, 'email_quiet_ingress'::text])))
@@ -3999,6 +4043,7 @@ CREATE TABLE public.message_deliveries (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
     channel_id uuid,
+    principal_id uuid,
     message_id uuid,
     source_binding_id uuid,
     destination_binding_id uuid,
@@ -4026,8 +4071,9 @@ CREATE TABLE public.message_deliveries (
     cancellation_reason text,
     settled_evidence_id uuid,
     reopen_id uuid,
+    CONSTRAINT message_deliveries_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT message_deliveries_attempt_check CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts))),
-    CONSTRAINT message_deliveries_attribution_check CHECK ((((channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+    CONSTRAINT message_deliveries_attribution_check CHECK ((((num_nonnulls(channel_id, principal_id) = 1) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((num_nonnulls(channel_id, principal_id) = 0) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
     CONSTRAINT message_deliveries_cancellation_check CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text, 'question_closed'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text]))))),
     CONSTRAINT message_deliveries_delivered_at_check CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL))),
     CONSTRAINT message_deliveries_error_check CHECK (
@@ -4142,6 +4188,9 @@ CREATE TABLE public.notification_events (
     action_kind text NOT NULL,
     source_generation bigint NOT NULL,
     actor_principal_id uuid,
+    direct_membership_id uuid,
+    CONSTRAINT notification_events_direct_membership_check CHECK (
+        (source_kind='direct_message') = (direct_membership_id IS NOT NULL)),
     status text DEFAULT 'pending'::text NOT NULL,
     attempt_count integer DEFAULT 0 NOT NULL,
     max_attempts integer DEFAULT 10 NOT NULL,
@@ -4176,19 +4225,23 @@ CREATE TABLE public.notifications (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     company_id uuid NOT NULL,
     recipient_user_id uuid NOT NULL,
+    member_recipient_user_id uuid GENERATED ALWAYS AS (
+        CASE WHEN source_kind='direct_message' THEN NULL ELSE recipient_user_id END) STORED,
     recipient_principal_id uuid,
     event_id uuid NOT NULL,
     source_kind text NOT NULL,
     source_id uuid NOT NULL,
     action_kind text NOT NULL,
     source_generation bigint NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     state text DEFAULT 'active'::text NOT NULL,
     read_at timestamp with time zone,
     state_changed_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     email_delivery_id uuid,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT notifications_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT notifications_action_kind_check CHECK ((action_kind = 'delivery_failure'::text)),
     CONSTRAINT notifications_source_generation_check CHECK ((source_generation > 0)),
     CONSTRAINT notifications_source_kind_check CHECK ((source_kind = 'delivery'::text)),
@@ -4477,11 +4530,13 @@ END AND (jsonb_array_length(jsonb_path_query_array(checkpoint, '$."reservations"
 CREATE TABLE public.thread_messages (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     entry_kind text NOT NULL,
+    CONSTRAINT thread_messages_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
     CONSTRAINT thread_messages_entry_kind_check CHECK ((entry_kind = ANY (ARRAY['conversation'::text, 'note'::text, 'delegation'::text, 'system_event'::text])))
 );
 
@@ -4492,11 +4547,13 @@ CREATE TABLE public.thread_messages (
 
 CREATE TABLE public.thread_principals (
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    target_principal_id uuid,
     thread_id uuid NOT NULL,
     principal_id uuid NOT NULL,
     role text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT thread_principals_address_target_check CHECK (num_nonnulls(channel_id, target_principal_id) = 1),
     CONSTRAINT thread_principals_role_check CHECK ((role = ANY (ARRAY['author'::text, 'participant'::text])))
 );
 
@@ -4508,10 +4565,12 @@ CREATE TABLE public.thread_principals (
 CREATE TABLE public.threads (
     id uuid NOT NULL,
     company_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     subject text NOT NULL,
     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
-    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL
+    updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT threads_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
 );
 
 
@@ -5084,9 +5143,11 @@ CREATE TABLE public.workflow_bindings (
     configuration_revision bigint NOT NULL,
     active boolean DEFAULT false NOT NULL,
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     activated_at timestamp with time zone,
-    company_wide boolean GENERATED ALWAYS AS ((channel_id IS NULL)) STORED NOT NULL,
+    company_wide boolean GENERATED ALWAYS AS ((channel_id IS NULL AND principal_id IS NULL)) STORED NOT NULL,
+    CONSTRAINT workflow_bindings_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT workflow_bindings_activation_shape CHECK ((active = (activated_at IS NOT NULL))),
     CONSTRAINT workflow_bindings_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
     CONSTRAINT workflow_bindings_configuration_revision_check CHECK ((configuration_revision > 0)),
@@ -5280,6 +5341,7 @@ CREATE TABLE public.workflow_definition_events (
 CREATE TABLE public.workflow_definitions (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
+    owner_agent_id uuid,
     revision bigint NOT NULL,
     title text NOT NULL,
     description text NOT NULL,
@@ -5375,10 +5437,12 @@ COMMENT ON COLUMN public.workflow_executions.committed_output IS 'Execution-owne
 CREATE TABLE public.workflow_history_members (
     company_id uuid NOT NULL,
     run_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     ordinal integer NOT NULL,
+    CONSTRAINT workflow_history_members_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
     CONSTRAINT workflow_history_members_ordinal_check CHECK (((ordinal >= 1) AND (ordinal <= 256)))
 );
 
@@ -5541,7 +5605,8 @@ CREATE TABLE public.workflow_message_destinations (
     destination_user_id uuid,
     replied_message_id uuid,
     destination_id uuid GENERATED ALWAYS AS (COALESCE(destination_channel_id, destination_user_id, replied_message_id)) STORED NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    target_principal_id uuid,
     thread_id uuid NOT NULL,
     message_id uuid NOT NULL,
     delivery_id uuid,
@@ -5549,6 +5614,7 @@ CREATE TABLE public.workflow_message_destinations (
     recipient_address text,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     in_app boolean GENERATED ALWAYS AS ((delivery_id IS NULL)) STORED,
+    CONSTRAINT workflow_message_destinations_address_target_check CHECK (num_nonnulls(channel_id, target_principal_id) = 1),
     CONSTRAINT workflow_message_destinations_check CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (principal_id IS NOT NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))))),
     CONSTRAINT workflow_message_destinations_kind_check CHECK ((kind = ANY (ARRAY['channel'::text, 'user'::text, 'reply'::text]))),
     CONSTRAINT workflow_message_destinations_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 19))),
@@ -5580,11 +5646,36 @@ CREATE TABLE public.workflow_message_intent_bindings (
 -- Name: workflow_message_intents; Type: TABLE; Schema: public; Owner: -
 --
 
+-- Every hop preserves its target discriminator; UUID equality alone is not a routing cycle.
+-- Canonical discriminator/id representation shared with AddressTarget.
+CREATE FUNCTION public.address_target_json(desk uuid, principal uuid) RETURNS jsonb
+LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$
+    SELECT CASE WHEN desk IS NOT NULL AND principal IS NULL THEN jsonb_build_object('kind','desk','id',desk)
+        WHEN principal IS NOT NULL AND desk IS NULL THEN jsonb_build_object('kind','principal','id',principal)
+        ELSE NULL END
+$$;
+
+CREATE FUNCTION public.address_target_trace_valid(trace jsonb) RETURNS boolean
+    LANGUAGE sql IMMUTABLE
+    AS $$
+    SELECT CASE WHEN jsonb_typeof(trace) IS DISTINCT FROM 'array' THEN false ELSE
+        jsonb_array_length(trace) <= 5 AND NOT EXISTS (
+            SELECT 1 FROM jsonb_array_elements(trace) AS item(value)
+            WHERE jsonb_typeof(item.value) IS DISTINCT FROM 'object'
+               OR item.value->>'kind' NOT IN ('desk','principal')
+               OR item.value->>'kind' IS NULL
+               OR jsonb_typeof(item.value->'id') IS DISTINCT FROM 'string'
+               OR (item.value->>'id') !~ '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'
+               OR (item.value - 'kind' - 'id') <> '{}'::jsonb
+        ) END
+    $$;
+
 CREATE TABLE public.workflow_message_intents (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
     message_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     thread_id uuid NOT NULL,
     role text NOT NULL,
     mentioned boolean NOT NULL,
@@ -5594,7 +5685,7 @@ CREATE TABLE public.workflow_message_intents (
     reply_settled boolean DEFAULT false NOT NULL,
     responder_principal_id uuid,
     hop_count integer NOT NULL,
-    trace_channels uuid[] NOT NULL,
+    trace_targets jsonb NOT NULL,
     delivery_policy text NOT NULL,
     correlation_id uuid NOT NULL,
     state text DEFAULT 'pending'::text NOT NULL,
@@ -5607,9 +5698,10 @@ CREATE TABLE public.workflow_message_intents (
     matched_run_id uuid,
     created_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
     updated_at timestamp with time zone DEFAULT clock_timestamp() NOT NULL,
+    CONSTRAINT workflow_message_intents_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
     CONSTRAINT workflow_message_intent_attempts CHECK (((attempts >= 0) AND (attempts <= 5))),
     CONSTRAINT workflow_message_intent_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
-    CONSTRAINT workflow_message_intent_hops CHECK (((hop_count >= 0) AND (hop_count <= 64) AND (cardinality(trace_channels) <= 5))),
+    CONSTRAINT workflow_message_intent_hops CHECK (((hop_count >= 0) AND (hop_count <= 64) AND public.address_target_trace_valid(trace_targets))),
     CONSTRAINT workflow_message_intent_origin CHECK ((origin = ANY (ARRAY['external'::text, 'internal'::text, 'application'::text]))),
     CONSTRAINT workflow_message_intent_outcome CHECK ((((outcome IS NULL) OR (outcome = ANY (ARRAY['matched'::text, 'admitted'::text, 'none'::text, 'notification_source_retired'::text]))) AND ((outcome = 'matched'::text) = (matched_run_id IS NOT NULL)))),
     CONSTRAINT workflow_message_intent_role CHECK ((role = ANY (ARRAY['to'::text, 'cc'::text]))),
@@ -5622,7 +5714,7 @@ CREATE TABLE public.workflow_message_intents (
 -- Name: TABLE workflow_message_intents; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.workflow_message_intents IS 'One accepted inbound message x channel association, committed with the message (p08 D1.3). Besides queueing workflow admission it is the only durable owner of the inbound relay trace (hop_count, trace_channels) that workflow replies continue, so rows must not be swept while their message exists.';
+COMMENT ON TABLE public.workflow_message_intents IS 'One accepted inbound message x channel association, committed with the message (p08 D1.3). Besides queueing workflow admission it is the only durable owner of the inbound relay trace (hop_count, trace_targets) that workflow replies continue, so rows must not be swept while their message exists.';
 
 
 --
@@ -5669,7 +5761,7 @@ CREATE TABLE public.workflow_provisioning_commands (
 -- Name: TABLE workflow_provisioning_commands; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create additional desk"; agent:{agent_id} for the default desk a company agent is created with (01-departments p03), which also records which desk that was; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
+COMMENT ON TABLE public.workflow_provisioning_commands IS 'One assistant-desk command per key (p08 D2.4): the request digest decides replay or conflict, and the stored result is what a replay returns. Keys: a client key for "Create additional desk"; department:{department_id} for a department''s desk, recording the desk and the binding the department owns (result.binding_id), which a lead change re-points, pauses or provisions and then records -- so this row is updated, not only replayed. The tool path needs none; its action receipt is the record.';
 
 
 --
@@ -5841,6 +5933,7 @@ CREATE TABLE public.workflow_runs (
     workflow_id uuid NOT NULL,
     version_id uuid NOT NULL,
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     actor_id uuid NOT NULL,
     trigger_id uuid NOT NULL,
@@ -5863,6 +5956,7 @@ CREATE TABLE public.workflow_runs (
     rerun_of_run_id uuid,
     delivery_policy text DEFAULT 'deliver'::text NOT NULL,
     finished_at timestamp with time zone,
+    CONSTRAINT workflow_runs_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT workflow_runs_bundle_fk FOREIGN KEY (company_id,bundle_digest)
         REFERENCES public.workflow_bundles(company_id,digest) DEFERRABLE INITIALLY DEFERRED,
     CONSTRAINT workflow_run_delivery_policy CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text]))),
@@ -6104,19 +6198,11 @@ ALTER TABLE ONLY public.channel_schedules
 
 
 --
--- Name: channel_slugs channel_slugs_company_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: addresses addresses_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.channel_slugs
-    ADD CONSTRAINT channel_slugs_company_slug_key UNIQUE (company_id, slug);
-
-
---
--- Name: channel_slugs channel_slugs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.channel_slugs
-    ADD CONSTRAINT channel_slugs_pkey PRIMARY KEY (channel_id, slug);
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT addresses_pkey PRIMARY KEY (company_id, slug);
 
 
 --
@@ -7920,10 +8006,24 @@ CREATE INDEX channel_schedules_due_idx ON public.channel_schedules USING btree (
 
 
 --
--- Name: channel_slugs_primary_idx; Type: INDEX; Schema: public; Owner: -
+-- Name: addresses_desk_primary_idx; Type: INDEX; Schema: public; Owner: -
 --
 
-CREATE UNIQUE INDEX channel_slugs_primary_idx ON public.channel_slugs USING btree (channel_id) WHERE is_primary;
+CREATE UNIQUE INDEX addresses_desk_primary_idx ON public.addresses USING btree (company_id, channel_id) WHERE (is_primary AND (channel_id IS NOT NULL));
+
+
+--
+-- Name: addresses_channel_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX addresses_channel_idx ON public.addresses USING btree (company_id, channel_id) WHERE (channel_id IS NOT NULL);
+
+
+--
+-- Name: addresses_principal_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX addresses_principal_key ON public.addresses USING btree (company_id, principal_id) WHERE (principal_id IS NOT NULL);
 
 
 --
@@ -8434,7 +8534,7 @@ CREATE TRIGGER background_tasks_preserve_queue_identity BEFORE UPDATE OF workflo
 -- Name: background_tasks background_tasks_validate_workflow_association; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.validate_workflow_job_association();
+CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, principal_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.validate_workflow_job_association();
 
 
 --
@@ -8555,7 +8655,7 @@ CREATE TRIGGER notification_channel_policy_recheck AFTER UPDATE OF access_mode O
 -- Name: company_members notification_membership_recheck; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER notification_membership_recheck AFTER DELETE OR UPDATE OF role ON public.company_members FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_membership();
+CREATE TRIGGER notification_membership_recheck AFTER DELETE OR UPDATE OF role, access_level ON public.company_members FOR EACH ROW EXECUTE FUNCTION public.notification_recheck_membership();
 
 
 --
@@ -9292,7 +9392,7 @@ CREATE TRIGGER workflow_run_finished BEFORE INSERT OR UPDATE OF state ON public.
 -- Name: workflow_runs workflow_runs_preserve_association; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER workflow_runs_preserve_association BEFORE UPDATE OF company_id, id, channel_id, thread_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_run_association();
+CREATE TRIGGER workflow_runs_preserve_association BEFORE UPDATE OF company_id, id, channel_id, principal_id, thread_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_run_association();
 
 -- Live updates for the workflow views (P08-D4 §D4.1): run-level transitions only, never per-step
 -- revision bumps. INSERT and UPDATE are separate because an INSERT trigger's WHEN cannot see OLD.
@@ -9304,7 +9404,7 @@ BEGIN
         'workflow_run_changed',
         json_build_object(
             'company_id', NEW.company_id,
-            'channel_id', NEW.channel_id,
+            'target', public.address_target_json(NEW.channel_id,NEW.principal_id),
             'thread_id', NEW.thread_id,
             'run_id', NEW.id,
             'state', NEW.state,
@@ -9530,11 +9630,19 @@ ALTER TABLE ONLY public.channel_schedules
 
 
 --
--- Name: channel_slugs channel_slugs_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+-- Name: addresses addresses_channel_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
-ALTER TABLE ONLY public.channel_slugs
-    ADD CONSTRAINT channel_slugs_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT addresses_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+
+
+--
+-- Name: addresses addresses_principal_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.addresses
+    ADD CONSTRAINT addresses_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
 
 
 --
@@ -9952,7 +10060,10 @@ ALTER TABLE ONLY public.notifications
 --
 
 ALTER TABLE ONLY public.notifications
-    ADD CONSTRAINT notifications_recipient_member_fk FOREIGN KEY (company_id, recipient_user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
+    ADD CONSTRAINT notifications_recipient_member_fk FOREIGN KEY (company_id, member_recipient_user_id) REFERENCES public.company_members(company_id, user_id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.notifications
+    ADD CONSTRAINT notifications_recipient_account_fk FOREIGN KEY (recipient_user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
 --
@@ -11728,7 +11839,7 @@ BEGIN
     RETURN NEW;
 END $$;
 CREATE TRIGGER workflow_run_snapshot_immutable BEFORE UPDATE OF company_id, id, binding_id,
-    binding_revision, workflow_id, version_id, channel_id, thread_id, actor_id, trigger_id,
+    binding_revision, workflow_id, version_id, channel_id, principal_id, thread_id, actor_id, trigger_id,
     correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
     created_at, parent_run_id, parent_execution_id, rerun_of_run_id, delivery_policy, knowledge_ceiling, escalation
     ON public.workflow_runs
@@ -12259,7 +12370,7 @@ CREATE TABLE public.agent_capability_bindings (
     FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED,
     CHECK(company_id IS NOT NULL OR kind='builtin'),
     CONSTRAINT agent_binding_target_shape CHECK (
-        (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent_channel','search_knowledge',
+        (kind='builtin' AND builtin IS NOT NULL AND builtin IN ('message_send','message_reply','list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
             'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation')
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=1)
         OR (kind='http' AND http_connection_id IS NOT NULL AND operation_name IS NOT NULL
@@ -12269,7 +12380,7 @@ CREATE TABLE public.agent_capability_bindings (
         OR (kind='workflow' AND workflow_registration IS NOT NULL AND workflow_id IS NOT NULL AND version_id IS NOT NULL AND params IS NOT NULL
             AND num_nonnulls(builtin,http_connection_id,mcp_connection_id,operation_name,reviewed_version,remote_name,workflow_registration,workflow_id,version_id,params)=4)),
     CONSTRAINT agent_binding_reserved_alias CHECK (
-        NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent_channel','search_knowledge',
+        NOT (alias LIKE 'message.%' OR alias IN ('list_company_agents','create_agent','create_desk_for_agent','search_knowledge',
             'search_memory','memory_timeline','memory_details','save_memory','read_escalation','respond_to_escalation'))
         OR (kind='builtin' AND alias=CASE builtin WHEN 'message_send' THEN 'message.send' WHEN 'message_reply' THEN 'message.reply' ELSE builtin END))
 );
@@ -12651,7 +12762,7 @@ CREATE TABLE public.agent_publication_requests (
     expected_active_revision uuid,
     result_revision uuid NOT NULL,
     PRIMARY KEY(company_id,agent_id,key),
-    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY(company_id,agent_id,expected_active_revision)
         REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY(company_id,agent_id,result_revision)
@@ -12659,7 +12770,8 @@ CREATE TABLE public.agent_publication_requests (
 );
 CREATE FUNCTION public.guard_agent_publication_request() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
-    IF TG_OP='DELETE' AND NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN
+    IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
+        OR NOT EXISTS(SELECT 1 FROM public.agents WHERE company_id=OLD.company_id AND id=OLD.agent_id)) THEN
         RETURN OLD;
     END IF;
     RAISE EXCEPTION 'agent publication result is immutable' USING ERRCODE='23514';
@@ -12731,7 +12843,8 @@ END $$;
 
 CREATE TABLE public.channel_reply_settings (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     revision bigint NOT NULL CHECK (revision > 0),
     binding_id uuid,
     binding_revision bigint,
@@ -12745,14 +12858,16 @@ CREATE TABLE public.channel_reply_settings (
         REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED,
     CHECK (num_nonnulls(binding_id,binding_revision,contract) IN (0,3)),
     CHECK (contract IS NULL OR (jsonb_typeof(contract)='object' AND octet_length(contract::text)<=16384
-        AND (contract->'format_version'='1'::jsonb) IS TRUE))
+        AND (contract->'format_version'='1'::jsonb) IS TRUE)),
+    CONSTRAINT channel_reply_settings_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
 );
 
 CREATE TABLE public.channel_reply_contexts (
     company_id uuid NOT NULL REFERENCES public.companies(id) ON DELETE CASCADE,
     intent_id uuid NOT NULL,
     message_id uuid NOT NULL,
-    channel_id uuid NOT NULL,
+    channel_id uuid,
+    principal_id uuid,
     thread_id uuid NOT NULL,
     responder_principal_id uuid,
     actor_id uuid NOT NULL REFERENCES public.users(id),
@@ -12773,7 +12888,8 @@ CREATE TABLE public.channel_reply_contexts (
     FOREIGN KEY (company_id,responder_principal_id) REFERENCES public.principals(company_id,id)
         DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY (company_id,binding_id,binding_revision)
-        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED
+        REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision) DEFERRABLE INITIALLY DEFERRED,
+    CONSTRAINT channel_reply_contexts_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
 );
 
 CREATE TABLE public.channel_reply_runs (
@@ -12797,14 +12913,15 @@ CREATE TABLE public.channel_reply_runs (
 CREATE FUNCTION public.guard_channel_reply_settings() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP='DELETE' THEN
-        IF EXISTS (SELECT 1 FROM public.channels WHERE company_id=OLD.company_id AND id=OLD.channel_id)
+        IF (EXISTS (SELECT 1 FROM public.channels WHERE company_id=OLD.company_id AND id=OLD.channel_id)
+            OR EXISTS (SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.principal_id))
             AND EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id)
         THEN
             RAISE EXCEPTION 'clear the responder without deleting its revision' USING ERRCODE='23514';
         END IF;
         RETURN OLD;
     END IF;
-    IF TG_OP='UPDATE' AND ((NEW.company_id,NEW.channel_id) IS DISTINCT FROM (OLD.company_id,OLD.channel_id)
+    IF TG_OP='UPDATE' AND ((NEW.company_id,NEW.channel_id,NEW.principal_id) IS DISTINCT FROM (OLD.company_id,OLD.channel_id,OLD.principal_id)
         OR NEW.revision<>OLD.revision+1) THEN
         RAISE EXCEPTION 'invalid channel response settings revision' USING ERRCODE='23514';
     END IF;
@@ -12813,7 +12930,8 @@ BEGIN
         JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id
             AND configuration.binding_id=binding.id AND configuration.revision=NEW.binding_revision
         WHERE binding.company_id=NEW.company_id AND binding.id=NEW.binding_id
-            AND binding.channel_id=NEW.channel_id AND binding.thread_id IS NULL AND binding.active
+            AND binding.channel_id IS NOT DISTINCT FROM NEW.channel_id
+            AND binding.principal_id IS NOT DISTINCT FROM NEW.principal_id AND binding.thread_id IS NULL AND binding.active
             AND binding.configuration_revision=NEW.binding_revision AND configuration.message_trigger IS NOT NULL
     ) THEN
         RAISE EXCEPTION 'invalid channel responder selection' USING ERRCODE='23514';
@@ -12835,19 +12953,23 @@ BEGIN
     -- after company authorization, so an absent selection cannot race insertion.
     PERFORM 1 FROM public.channels AS channel
         WHERE channel.company_id=NEW.company_id AND channel.id=NEW.channel_id FOR SHARE;
+    PERFORM 1 FROM public.principals AS principal
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id FOR SHARE;
     IF NEW.admissible THEN
         INSERT INTO public.channel_reply_contexts
             (company_id,intent_id,message_id,channel_id,thread_id,responder_principal_id,
-             actor_id,delivery_policy,binding_id,binding_revision,settings_revision,contract,approval_policy,source)
+             actor_id,delivery_policy,binding_id,binding_revision,settings_revision,contract,approval_policy,source,principal_id)
         SELECT NEW.company_id,NEW.id,NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.responder_principal_id,
             configuration.run_as_user_id,NEW.delivery_policy,settings.binding_id,settings.binding_revision,
-            settings.revision,settings.contract,settings.approval_policy,public.channel_reply_source(NEW)
+            settings.revision,settings.contract,settings.approval_policy,public.channel_reply_source(NEW),NEW.principal_id
         FROM public.channel_reply_settings AS settings
         JOIN public.workflow_bindings AS binding ON binding.company_id=settings.company_id
-            AND binding.id=settings.binding_id AND binding.channel_id=settings.channel_id
+            AND binding.id=settings.binding_id AND binding.channel_id IS NOT DISTINCT FROM settings.channel_id
+            AND binding.principal_id IS NOT DISTINCT FROM settings.principal_id
         JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id
             AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision
-        WHERE settings.company_id=NEW.company_id AND settings.channel_id=NEW.channel_id
+        WHERE settings.company_id=NEW.company_id AND settings.channel_id IS NOT DISTINCT FROM NEW.channel_id
+            AND settings.principal_id IS NOT DISTINCT FROM NEW.principal_id
             AND binding.thread_id IS NULL AND configuration.message_trigger IS NOT NULL;
     END IF;
     RETURN NEW;
@@ -12875,12 +12997,13 @@ BEGIN
     IF NOT EXISTS (
         SELECT 1 FROM public.workflow_message_intents AS intent
         JOIN public.channel_reply_settings AS settings ON settings.company_id=intent.company_id
-            AND settings.channel_id=intent.channel_id
+            AND settings.channel_id IS NOT DISTINCT FROM intent.channel_id
+            AND settings.principal_id IS NOT DISTINCT FROM intent.principal_id
         JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=settings.company_id
             AND configuration.binding_id=settings.binding_id AND configuration.revision=settings.binding_revision
         WHERE intent.company_id=NEW.company_id AND intent.id=NEW.intent_id AND intent.admissible
-            AND (intent.message_id,intent.channel_id,intent.thread_id,intent.delivery_policy)
-                =(NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.delivery_policy)
+            AND (intent.message_id,intent.channel_id,intent.principal_id,intent.thread_id,intent.delivery_policy)
+                IS NOT DISTINCT FROM (NEW.message_id,NEW.channel_id,NEW.principal_id,NEW.thread_id,NEW.delivery_policy)
             AND intent.responder_principal_id IS NOT DISTINCT FROM NEW.responder_principal_id
             AND configuration.run_as_user_id=NEW.actor_id
             AND (settings.binding_id,settings.binding_revision,settings.revision,settings.contract)
@@ -12935,8 +13058,8 @@ BEGIN
             AND admission.run_id=run.id AND admission.binding_id=run.binding_id
         WHERE context.company_id=NEW.company_id AND context.intent_id=NEW.intent_id
             AND (context.binding_id,context.binding_revision)=(NEW.binding_id,NEW.binding_revision)
-            AND (run.binding_id,run.binding_revision,run.channel_id,run.thread_id,run.trigger_id,run.actor_id,run.delivery_policy)
-                =(context.binding_id,context.binding_revision,context.channel_id,context.thread_id,
+            AND (run.binding_id,run.binding_revision,run.channel_id,run.principal_id,run.thread_id,run.trigger_id,run.actor_id,run.delivery_policy)
+                IS NOT DISTINCT FROM (context.binding_id,context.binding_revision,context.channel_id,context.principal_id,context.thread_id,
                   context.intent_id,context.actor_id,context.delivery_policy)
             AND run.parent_run_id IS NULL AND run.rerun_of_run_id IS NULL
             AND intent.outcome IS DISTINCT FROM 'matched' AND intent.admissible
@@ -13261,7 +13384,7 @@ BEGIN
             AND NEW.integrity_document->'source'=context.source
             AND NEW.integrity_document->>'source_message'=context.message_id::text
             AND NEW.integrity_document->>'actor'=context.actor_id::text
-            AND NEW.integrity_document->>'channel'=context.channel_id::text
+            AND NEW.integrity_document->'target'=public.address_target_json(context.channel_id,context.principal_id)
             AND NEW.integrity_document->>'thread'=context.thread_id::text
             AND NEW.route_snapshot->'targets'->0->>'source'=context.message_id::text
             AND NEW.route_snapshot->'targets'->0->>'thread'=context.thread_id::text
@@ -13269,10 +13392,11 @@ BEGIN
             AND NEW.route_snapshot->>'correlation_id'=run.correlation_id::text
             AND NEW.route_snapshot->>'company_slug'=company.slug::text
             AND ((NEW.route_snapshot->'targets'->0->>'kind'='reply_internal'
-                    AND NEW.route_snapshot->'targets'->0->>'channel'=context.channel_id::text)
+                    AND NEW.route_snapshot->'targets'->0->'target'=public.address_target_json(context.channel_id,context.principal_id))
                 OR (NEW.route_snapshot->'targets'->0->>'kind'='reply_email'
-                    AND NEW.route_snapshot->'targets'->0->'sender'->>'id'=context.channel_id::text
-                    AND EXISTS(SELECT 1 FROM public.channel_slugs AS alias WHERE alias.channel_id=context.channel_id AND alias.is_primary
+                    AND NEW.route_snapshot->'targets'->0->'sender'->'target'=public.address_target_json(context.channel_id,context.principal_id)
+                    AND EXISTS(SELECT 1 FROM public.addresses AS alias WHERE alias.company_id=context.company_id AND alias.channel_id IS NOT DISTINCT FROM context.channel_id
+                        AND alias.principal_id IS NOT DISTINCT FROM context.principal_id AND alias.is_primary
                         AND alias.slug::text=NEW.route_snapshot->'targets'->0->'sender'->>'slug')))
             AND NEW.approval_policy IS NOT DISTINCT FROM context.approval_policy
             AND ((NEW.approval_policy IS NULL AND action.policy_decision='unevaluated' AND run.state='succeeded'
@@ -13341,9 +13465,10 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
         WHERE final.company_id=tenant AND final.run_id=root AND final.disposition='automatic'
             AND run.state='succeeded' AND run.terminal_execution_id=final.execution_id
             AND message.subject=proposal.content->>'subject' AND message.clean_text_body=proposal.content->>'body'
-            AND message.role='system' AND message.direction='outbound' AND message.correlation_id=run.correlation_id
+            AND public.workflow_message_author_matches(tenant,published_message,root,final.execution_id,proposal.invocation_id)
+            AND message.direction='outbound' AND message.correlation_id=run.correlation_id
             AND message.access_level=run.content_level
-            AND filed.channel_id=context.channel_id AND filed.thread_id=context.thread_id
+            AND filed.channel_id IS NOT DISTINCT FROM context.channel_id AND filed.principal_id IS NOT DISTINCT FROM context.principal_id AND filed.thread_id=context.thread_id
             AND filed.entry_kind=CASE WHEN proposal.route_snapshot->'targets'->0->>'kind'='reply_internal' THEN 'note' ELSE 'conversation' END
             AND NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations AS explicit
                 WHERE explicit.company_id=tenant AND (explicit.message_id=published_message OR explicit.delivery_id=published_delivery))
@@ -13355,7 +13480,7 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
                         OR (proposal.route_snapshot->'targets'->0->>'kind'='reply_email' AND context.delivery_policy='in_app_only')))
                 OR (published_delivery IS NOT NULL AND proposal.route_snapshot->'targets'->0->>'kind'='reply_email'
                     AND context.delivery_policy='deliver' AND message.audience='external_conversation'
-                    AND delivery.message_id=message.id AND delivery.channel_id=context.channel_id
+                    AND delivery.message_id=message.id AND delivery.channel_id IS NOT DISTINCT FROM context.channel_id AND delivery.principal_id IS NOT DISTINCT FROM context.principal_id
                     AND delivery.correlation_id=run.correlation_id AND delivery.transport='email' AND delivery.purpose='workflow_reply'
                     AND delivery.external_destination=proposal.route_snapshot->'targets'->0->>'recipient'
                     AND delivery.status='pending' AND delivery.attempt_count=0
@@ -14063,7 +14188,7 @@ LANGUAGE plpgsql AS $$
 DECLARE related record;
 BEGIN
     FOR related IN
-        SELECT run.company_id,run.id,run.channel_id,run.thread_id,run.state,run.waiting_reason
+        SELECT run.company_id,run.id,run.channel_id,run.principal_id,run.thread_id,run.state,run.waiting_reason
         FROM public.workflow_runs AS run
         WHERE run.company_id=tenant AND (run.id=responding_run OR run.id=(
             SELECT budget.root_run_id FROM public.workflow_run_budgets AS budget
@@ -14071,11 +14196,11 @@ BEGIN
         ORDER BY run.id LIMIT 2
     LOOP
         PERFORM pg_notify('workflow_run_changed',json_build_object(
-            'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id,
+            'company_id',related.company_id,'target',public.address_target_json(related.channel_id,related.principal_id),'thread_id',related.thread_id,
             'run_id',related.id,'state',related.state,'waiting_reason',related.waiting_reason)::text);
         IF related.thread_id IS NOT NULL THEN
             PERFORM pg_notify('thread_activity',json_build_object(
-                'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id)::text);
+                'company_id',related.company_id,'target',public.address_target_json(related.channel_id,related.principal_id),'thread_id',related.thread_id)::text);
         END IF;
     END LOOP;
 END $$;
@@ -14140,9 +14265,11 @@ CREATE TABLE public.agent_history_sessions (
     live_creator_principal_id uuid,
     creator_user_id uuid NOT NULL,
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY (company_id,id),
+    CONSTRAINT agent_history_sessions_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
     CONSTRAINT agent_history_sessions_live_creator_fk
         FOREIGN KEY (company_id,live_creator_principal_id) REFERENCES public.principals(company_id,id)
         ON DELETE SET NULL (live_creator_principal_id) DEFERRABLE INITIALLY DEFERRED,
@@ -14167,6 +14294,7 @@ CREATE TABLE public.agent_history_conversations (
     agent_id uuid NOT NULL,
     scope_kind text NOT NULL CHECK (scope_kind IN ('thread','private_session','child_branch')),
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     session_id uuid,
     child_run_id uuid,
@@ -14186,7 +14314,8 @@ CREATE TABLE public.agent_history_conversations (
         OR (scope_kind='private_session' AND session_id IS NOT NULL
             AND channel_id IS NULL AND thread_id IS NULL AND child_run_id IS NULL)
         OR (scope_kind='child_branch' AND child_run_id IS NOT NULL
-            AND channel_id IS NULL AND thread_id IS NULL AND session_id IS NULL))
+            AND channel_id IS NULL AND thread_id IS NULL AND session_id IS NULL)),
+    CONSTRAINT agent_history_conversations_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1)
 );
 CREATE UNIQUE INDEX agent_history_conversations_thread ON public.agent_history_conversations
     (company_id,agent_id,channel_id,thread_id) WHERE scope_kind='thread';
@@ -14221,6 +14350,7 @@ BEGIN
         WHERE run.company_id=NEW.company_id AND run.id=NEW.id AND run.parent_run_id IS NULL
             AND NEW.creator_user_id=run.actor_id
             AND NEW.channel_id IS NOT DISTINCT FROM run.channel_id
+            AND NEW.principal_id IS NOT DISTINCT FROM run.principal_id
             AND NEW.thread_id IS NOT DISTINCT FROM run.thread_id
     ) THEN
         RAISE EXCEPTION 'agent history session requires genuine root admission' USING ERRCODE='23514';
@@ -14250,6 +14380,7 @@ BEGIN
         WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.parent_run_id IS NULL
             AND session.creator_user_id=run.actor_id
             AND session.channel_id IS NOT DISTINCT FROM run.channel_id
+            AND session.principal_id IS NOT DISTINCT FROM run.principal_id
             AND session.thread_id IS NOT DISTINCT FROM run.thread_id
             AND (session.id=run.id OR (
                 (substring(admission.source_key FROM 4)::jsonb->>0)='manual'
@@ -14261,7 +14392,7 @@ BEGIN
     IF NEW.thread_input_proven AND NOT EXISTS (
         SELECT 1 FROM public.workflow_runs AS run
         JOIN public.workflow_message_intents AS intent ON intent.company_id=run.company_id
-            AND intent.id=run.trigger_id AND intent.channel_id=run.channel_id AND intent.thread_id=run.thread_id
+            AND intent.id=run.trigger_id AND intent.channel_id IS NOT DISTINCT FROM run.channel_id AND intent.principal_id IS NOT DISTINCT FROM run.principal_id AND intent.thread_id=run.thread_id
         JOIN public.workflow_admissions AS admission ON admission.company_id=run.company_id AND admission.run_id=run.id
         WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.parent_run_id IS NULL
             AND (substring(admission.source_key FROM 4)::jsonb)=jsonb_build_array('message',intent.message_id)
@@ -14404,7 +14535,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
       AND NOT EXISTS(SELECT 1 FROM public.workflow_runs AS run
         WHERE run.company_id=conversation.company_id AND run.state IN ('queued','running','waiting') AND (
           (conversation.scope_kind='child_branch' AND run.id=conversation.child_run_id)
-          OR (conversation.scope_kind='thread' AND run.channel_id=conversation.channel_id AND run.thread_id=conversation.thread_id)
+          OR (conversation.scope_kind='thread' AND run.channel_id IS NOT DISTINCT FROM conversation.channel_id AND run.principal_id IS NOT DISTINCT FROM conversation.principal_id AND run.thread_id=conversation.thread_id)
           OR (conversation.scope_kind='private_session' AND EXISTS(SELECT 1 FROM public.workflow_agent_sessions AS mapping
             WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.session_id=conversation.session_id))))
 $$;
@@ -14566,7 +14697,7 @@ BEGIN
                     WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id
                         AND mapping.session_id=conversation.session_id AND session.creator_user_id=run.actor_id))
                 OR (run.parent_run_id IS NULL AND conversation.scope_kind='thread'
-                    AND conversation.channel_id=run.channel_id AND conversation.thread_id=run.thread_id
+                    AND conversation.channel_id IS NOT DISTINCT FROM run.channel_id AND conversation.principal_id IS NOT DISTINCT FROM run.principal_id AND conversation.thread_id=run.thread_id
                     AND EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS mapping
                         WHERE mapping.company_id=run.company_id AND mapping.run_id=run.id AND mapping.thread_input_proven))
             )
@@ -15544,6 +15675,39 @@ CREATE TRIGGER guard_department_member_kind BEFORE INSERT OR UPDATE ON public.de
 CREATE TRIGGER guard_department_role_holder_kind BEFORE INSERT OR UPDATE ON public.department_roles
     FOR EACH ROW EXECUTE FUNCTION public.guard_department_principal_kind();
 
+-- Only people and agents have an address. FOR KEY SHARE waits for a demotion in flight (a key
+-- update of `kind`) and then reads its outcome; a slug-only rename is not a target change and does
+-- not fire this guard, so it never waits on the principal.
+CREATE FUNCTION public.guard_address_principal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE principal_kind text;
+BEGIN
+    IF NEW.principal_id IS NOT NULL THEN
+        SELECT principal.kind INTO principal_kind FROM public.principals AS principal
+         WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id
+           FOR KEY SHARE;
+        IF principal_kind IS NOT NULL AND principal_kind NOT IN ('person', 'agent') THEN
+            RAISE EXCEPTION 'principal % cannot have an address', NEW.principal_id
+                USING ERRCODE='23514', CONSTRAINT='addresses_principal_kind';
+        END IF;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER guard_address_principal BEFORE INSERT OR UPDATE OF target_kind, channel_id, principal_id
+    ON public.addresses FOR EACH ROW EXECUTE FUNCTION public.guard_address_principal();
+
+-- A principal demoted out of person or agent (removed teammate, deleted account, deleted agent)
+-- loses its address in the same transaction, which frees the slug.
+CREATE FUNCTION public.addresses_follow_principal_kind() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF OLD.kind IN ('person', 'agent') AND NEW.kind NOT IN ('person', 'agent') THEN
+        DELETE FROM public.addresses
+         WHERE company_id = NEW.company_id AND principal_id = NEW.id;
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER addresses_follow_principal_kind AFTER UPDATE OF kind ON public.principals
+    FOR EACH ROW EXECUTE FUNCTION public.addresses_follow_principal_kind();
+
 -- Removing a teammate, deleting an agent or deleting an account demotes the principal to
 -- `external` rather than deleting it; it leaves every department with it.
 CREATE FUNCTION public.department_principal_demoted() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -16019,6 +16183,71 @@ ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_run_escalation_policy
 ALTER TABLE public.agent_dependency_manifests ADD CONSTRAINT agent_manifest_role_context_department
     FOREIGN KEY(company_id,role_context_department_id)
     REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED;
+CREATE FUNCTION public.principal_direct_can_view(tenant uuid, target uuid, viewer uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT COALESCE((
+        SELECT CASE recipient.kind
+            WHEN 'agent' THEN true
+            WHEN 'person' THEN actor.id = recipient.id OR actor.user_id = company.user_id
+            WHEN 'external' THEN recipient.historical_person_user_id IS NOT NULL
+                AND actor.user_id = company.user_id
+            ELSE false END
+        FROM public.principals AS recipient
+        JOIN public.companies AS company ON company.id = recipient.company_id
+        JOIN public.principals AS actor ON actor.company_id = recipient.company_id AND actor.id = viewer
+        WHERE recipient.company_id = tenant AND recipient.id = target
+            AND (actor.kind = 'agent' OR (actor.kind = 'person' AND (
+                actor.user_id = company.user_id OR EXISTS (
+                    SELECT 1 FROM public.company_members AS membership
+                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))))
+    ), false)
+$$;
+
+CREATE FUNCTION public.principal_direct_can_participate(tenant uuid, target uuid, writer uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT COALESCE((
+        SELECT CASE recipient.kind
+            WHEN 'agent' THEN recipient.open_to_public OR team.allowed
+            WHEN 'person' THEN team.allowed
+                AND (actor.id = recipient.id OR actor.user_id = company.user_id)
+            ELSE false END
+        FROM public.principals AS recipient
+        JOIN public.companies AS company ON company.id = recipient.company_id
+        LEFT JOIN public.principals AS actor ON actor.company_id = recipient.company_id AND actor.id = writer
+        CROSS JOIN LATERAL (
+            SELECT COALESCE(actor.kind = 'agent' OR (actor.kind = 'person' AND (
+                actor.user_id = company.user_id OR EXISTS (
+                    SELECT 1 FROM public.company_members AS membership
+                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))), false) AS allowed
+        ) AS team
+        WHERE recipient.company_id = tenant AND recipient.id = target
+    ), false)
+$$;
+
+CREATE FUNCTION public.notification_target_can_view(tenant uuid, desk uuid, target uuid, viewer uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT CASE WHEN desk IS NOT NULL AND target IS NOT NULL THEN false
+        WHEN target IS NOT NULL THEN public.principal_direct_can_view(tenant,target,viewer)
+        ELSE public.notification_principal_can_view(tenant,desk,viewer) END
+$$;
+
+-- Current departments of a typed workflow target. Two rows prove ambiguity.
+CREATE FUNCTION public.workflow_target_departments(tenant uuid, desk uuid, target uuid)
+RETURNS SETOF uuid LANGUAGE sql STABLE AS $$
+    SELECT placement.department_id FROM (
+        SELECT channel.department_id FROM public.channels AS channel
+            WHERE channel.company_id=tenant AND channel.id=desk AND target IS NULL AND channel.department_id IS NOT NULL
+        UNION
+        SELECT member.department_id FROM public.department_members AS member
+            JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.id=member.principal_id AND principal.kind='agent'
+            WHERE member.company_id=tenant AND member.principal_id=target AND desk IS NULL
+        UNION
+        SELECT role.department_id FROM public.department_roles AS role
+            JOIN public.principals AS principal ON principal.company_id=role.company_id AND principal.id=role.principal_id AND principal.kind='agent'
+            WHERE role.company_id=tenant AND role.principal_id=target AND desk IS NULL
+    ) AS placement ORDER BY placement.department_id LIMIT 2
+$$;
+
 CREATE FUNCTION public.guard_workflow_role_context() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE saved jsonb; expected uuid; captured uuid;
 BEGIN
@@ -16035,8 +16264,9 @@ BEGIN
         RAISE EXCEPTION 'canonical role context is invalid'
             USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_context';
     END;
-    SELECT channel.department_id INTO expected FROM public.workflow_runs AS run
-        LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+    SELECT CASE WHEN count(*)=1 THEN (array_agg(department.id))[1] END INTO expected
+        FROM public.workflow_runs AS run
+        CROSS JOIN LATERAL public.workflow_target_departments(run.company_id,run.channel_id,run.principal_id) AS department(id)
         WHERE run.company_id=NEW.company_id AND run.id=NEW.root_run_id;
     IF NEW.role_context_department_id IS DISTINCT FROM captured
         OR captured IS DISTINCT FROM expected
@@ -16297,13 +16527,14 @@ CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_ident
         JOIN public.workflow_runs AS run ON run.company_id=principal.company_id AND run.id=run_identity
         LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
         WHERE principal.company_id=company AND principal.id=person AND principal.kind='person'
-          AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND member.role IN ('owner','admin'))
+          AND ((run.principal_id IS NOT NULL AND public.principal_direct_can_view(company,run.principal_id,principal.id))
+            OR (run.principal_id IS NULL AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND run.principal_id IS NULL AND member.role IN ('owner','admin'))
             OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
               OR EXISTS (SELECT 1 FROM public.channel_principal_grants AS access_grant WHERE access_grant.company_id=company
                 AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
-                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view'))))
+                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view'))))))
           AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM public.threads AS thread WHERE thread.company_id=company
-            AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)))
+            AND thread.channel_id IS NOT DISTINCT FROM run.channel_id AND thread.principal_id IS NOT DISTINCT FROM run.principal_id AND thread.id=run.thread_id)))
 $$;
 
 CREATE FUNCTION public.guard_workflow_follow_spec() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -16598,9 +16829,9 @@ ALTER TABLE public.notifications
 CREATE FUNCTION public.guard_notification_event_identity() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF (NEW.company_id,NEW.id,NEW.notification_id,NEW.source_kind,NEW.source_id,NEW.action_kind,
-        NEW.source_generation,NEW.occurred_at)
+        NEW.source_generation,NEW.occurred_at,NEW.direct_membership_id)
         IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.notification_id,OLD.source_kind,OLD.source_id,OLD.action_kind,
-        OLD.source_generation,OLD.occurred_at) THEN
+        OLD.source_generation,OLD.occurred_at,OLD.direct_membership_id) THEN
         RAISE EXCEPTION 'notification event source identity is immutable'
             USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_notification_event_identity';
     END IF;
@@ -16766,6 +16997,7 @@ CREATE TABLE public.workflow_admission_refusals (
     source_key text NOT NULL CHECK (octet_length(source_key) BETWEEN 1 AND 512),
     request_fingerprint text NOT NULL CHECK (request_fingerprint ~ '^[0-9a-f]{64}$'),
     channel_id uuid,
+    principal_id uuid,
     thread_id uuid,
     role_refusal jsonb NOT NULL CHECK (public.valid_workflow_role_refusal(role_refusal)),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -16776,7 +17008,8 @@ CREATE TABLE public.workflow_admission_refusals (
     FOREIGN KEY(company_id,binding_id,binding_revision)
         REFERENCES public.workflow_binding_revisions(company_id,binding_id,revision),
     FOREIGN KEY(company_id,channel_id) REFERENCES public.channels(company_id,id),
-    FOREIGN KEY(company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id)
+    FOREIGN KEY(company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+    CONSTRAINT workflow_admission_refusals_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1)
 );
 ALTER TABLE public.workflow_admission_commands
     ALTER COLUMN run_id DROP NOT NULL,
@@ -16934,13 +17167,14 @@ BEGIN
             USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';
     END IF;
     IF NEW.source_kind='admission' THEN
-        SELECT refusal.binding_id,refusal.binding_revision,revision.escalation AS policy,channel.department_id,
+        SELECT refusal.binding_id,refusal.binding_revision,revision.escalation AS policy,
+            (SELECT CASE WHEN count(*)=1 THEN (array_agg(department.id))[1] END
+             FROM public.workflow_target_departments(refusal.company_id,refusal.channel_id,refusal.principal_id) AS department(id)) AS department_id,
             public.workflow_role_refusal_code(refusal.role_refusal) AS reason_code,
             refusal.role_refusal->>'step' AS step_id,refusal.role_refusal->>'role' AS role INTO actual
         FROM public.workflow_admission_refusals AS refusal
         JOIN public.workflow_binding_revisions AS revision ON revision.company_id=refusal.company_id
             AND revision.binding_id=refusal.binding_id AND revision.revision=refusal.binding_revision
-        LEFT JOIN public.channels AS channel ON channel.company_id=refusal.company_id AND channel.id=refusal.channel_id
         WHERE refusal.company_id=NEW.company_id AND refusal.id=NEW.admission_refusal_id;
         IF NOT FOUND OR actual.policy IS NULL OR NEW.binding_id IS DISTINCT FROM actual.binding_id
             OR NEW.binding_revision IS DISTINCT FROM actual.binding_revision OR NEW.policy IS DISTINCT FROM actual.policy
@@ -17233,12 +17467,13 @@ CREATE TRIGGER workflow_escalation_progress_guard BEFORE UPDATE ON public.workfl
 
 ALTER TABLE public.notification_events DROP CONSTRAINT notification_events_source_kind_check,
     DROP CONSTRAINT notification_events_action_kind_check,
-    ADD CONSTRAINT notification_events_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_control','escalation_notice')),
+    ADD CONSTRAINT notification_events_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_control','escalation_notice','direct_message')),
     ADD CONSTRAINT notification_events_action_kind_check CHECK (
         (source_kind='delivery' AND action_kind='delivery_failure')
         OR (source_kind='decision_reviewer' AND action_kind='decision_review')
         OR (source_kind='escalation_control' AND action_kind='escalation_control' AND source_generation BETWEEN 1 AND 3)
-        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1));
+        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1)
+        OR (source_kind='direct_message' AND action_kind='direct_message_received' AND source_generation=1));
 CREATE TABLE public.workflow_escalation_notices (
     company_id uuid NOT NULL,
     id uuid NOT NULL,
@@ -17333,11 +17568,12 @@ CREATE CONSTRAINT TRIGGER workflow_escalation_notice_source AFTER INSERT ON publ
 -- Person projection proof is separate from canonical agent message/intent receipts.
 ALTER TABLE public.notifications DROP CONSTRAINT notifications_source_kind_check,
     DROP CONSTRAINT notifications_action_kind_check,
-    ADD CONSTRAINT notifications_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_notice')),
+    ADD CONSTRAINT notifications_source_kind_check CHECK (source_kind IN ('delivery','decision_reviewer','escalation_notice','direct_message')),
     ADD CONSTRAINT notifications_action_kind_check CHECK (
         (source_kind='delivery' AND action_kind='delivery_failure')
         OR (source_kind='decision_reviewer' AND action_kind='decision_review')
-        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1));
+        OR (source_kind='escalation_notice' AND action_kind='escalation_review' AND source_generation=1)
+        OR (source_kind='direct_message' AND action_kind='direct_message_received' AND source_generation=1));
 
 -- The same fail-closed source classification as SourceKey::payload_source; tested for equivalence.
 CREATE FUNCTION public.workflow_source_uuid(source text) RETURNS uuid LANGUAGE plpgsql IMMUTABLE STRICT AS $$
@@ -17394,7 +17630,7 @@ CREATE FUNCTION public.workflow_escalation_person_eligible(checked_company uuid,
         LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
         WHERE notice.company_id=checked_company AND notice.id=checked_notice AND notice.principal_kind='person' AND principal.kind='person'
           AND (member.role='owner')=(company.user_id=account.id)
-          AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),principal.id)
+          AND public.notification_target_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),COALESCE(run.principal_id,refusal.principal_id),principal.id)
           AND (CASE WHEN escalation.source_kind='admission'
                 THEN public.workflow_refusal_content_level(checked_company,refusal.source_key)
                 ELSE run.content_level END)<=member.access_level)
@@ -17404,8 +17640,8 @@ CREATE FUNCTION public.guard_escalation_notification() RETURNS trigger LANGUAGE 
 DECLARE source record;
 BEGIN
     IF TG_OP='UPDATE' AND (OLD.source_kind='escalation_notice' OR NEW.source_kind='escalation_notice') THEN
-        IF (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id)
-            IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id)
+        IF (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id,NEW.principal_id)
+            IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id,OLD.principal_id)
             OR (NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
                 NEW.recipient_principal_id IS NULL AND NOT EXISTS (SELECT 1 FROM public.principals
                     WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id))) THEN
@@ -17415,14 +17651,14 @@ BEGIN
     END IF;
     IF TG_OP='UPDATE' AND NOT EXISTS (SELECT 1 FROM public.companies WHERE id=OLD.company_id) THEN RETURN NEW; END IF;
     IF NEW.source_kind<>'escalation_notice' THEN RETURN NEW; END IF;
-    SELECT notice.principal_id,notice.principal_kind,notice.event_id,COALESCE(run.channel_id,refusal.channel_id) AS channel_id
+    SELECT notice.principal_id,notice.principal_kind,notice.event_id,COALESCE(run.channel_id,refusal.channel_id) AS channel_id,COALESCE(run.principal_id,refusal.principal_id) AS target_principal_id
         INTO source FROM public.workflow_escalation_notices AS notice
         JOIN public.workflow_escalation_cases AS escalation ON escalation.company_id=notice.company_id AND escalation.id=notice.case_id
         LEFT JOIN public.workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
         LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
         WHERE notice.company_id=NEW.company_id AND notice.id=NEW.source_id;
     IF NOT FOUND OR source.principal_kind<>'person' OR source.event_id IS DISTINCT FROM NEW.event_id
-        OR source.channel_id IS DISTINCT FROM NEW.channel_id OR NEW.action_kind<>'escalation_review' OR NEW.source_generation<>1
+        OR source.channel_id IS DISTINCT FROM NEW.channel_id OR source.target_principal_id IS DISTINCT FROM NEW.principal_id OR NEW.action_kind<>'escalation_review' OR NEW.source_generation<>1
         OR (NEW.recipient_principal_id IS NOT NULL AND source.principal_id IS DISTINCT FROM NEW.recipient_principal_id)
         OR (NEW.state='active' AND (NEW.recipient_principal_id IS NULL
             OR NOT public.workflow_escalation_notice_active(NEW.company_id,NEW.source_id)
@@ -17456,9 +17692,12 @@ BEGIN
     PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
     SELECT company_id,id,case_id,decision_id,principal_id,principal_kind,principal_label,event_id,source_kind,action_kind,source_generation,created_at
         INTO source FROM public.workflow_escalation_notices WHERE company_id=NEW.company_id AND id=NEW.notice_id;
-    SELECT id,company_id,recipient_user_id,recipient_principal_id,event_id,source_kind,source_id,action_kind,source_generation,channel_id,
-        state,read_at,state_changed_at,email_delivery_id,created_at,updated_at INTO projected
-        FROM public.notifications WHERE company_id=NEW.company_id AND event_id=NEW.event_id;
+    SELECT notification.id,notification.recipient_user_id,notification.recipient_principal_id,
+        notification.state,notification.email_delivery_id
+        INTO projected.id,projected.recipient_user_id,projected.recipient_principal_id,
+            projected.state,projected.email_delivery_id
+        FROM public.notifications AS notification
+        WHERE notification.company_id=NEW.company_id AND notification.event_id=NEW.event_id;
     SELECT actor_principal_id INTO actor FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status IN ('processing','projected');
     IF NOT FOUND OR source IS NULL OR source.principal_kind<>'person' OR source.event_id IS DISTINCT FROM NEW.event_id THEN
         RAISE EXCEPTION 'person escalation receipt requires its exact projected person source'
@@ -17549,23 +17788,21 @@ CREATE CONSTRAINT TRIGGER workflow_escalation_person_receipt_completion AFTER IN
 -- This one reader is shared by lock-free hints, postlock route revalidation and
 -- origin guards. A notification never chooses an arbitrary matching desk binding.
 CREATE FUNCTION public.workflow_escalation_agent_route(checked_company uuid, checked_principal uuid)
-RETURNS TABLE(agent_id uuid,desk_id uuid,binding_id uuid,binding_revision bigint,run_as_user_id uuid,
-    settings_revision bigint,transport_binding_id uuid,address text) LANGUAGE sql STABLE AS $$
-    SELECT agent.id,desk.id,binding.id,configuration.revision,configuration.run_as_user_id,
-        desk.settings_revision,endpoint.id,endpoint.external_endpoint_key
+RETURNS TABLE(agent_id uuid,principal_id uuid,binding_id uuid,binding_revision bigint,run_as_user_id uuid,
+    settings_revision bigint,transport_binding_id uuid,address_slug text) LANGUAGE sql STABLE AS $$
+    SELECT agent.id,principal.id,binding.id,configuration.revision,configuration.run_as_user_id,
+        principal.settings_revision,endpoint.id,address.slug::text
     FROM public.principals AS principal
     JOIN public.agents AS agent ON agent.company_id=principal.company_id AND agent.id=principal.agent_id
     JOIN public.agent_active_revisions AS active ON active.company_id=agent.company_id AND active.agent_id=agent.id
-    JOIN public.workflow_provisioning_commands AS provision ON provision.company_id=agent.company_id
-        AND provision.command_key='agent:'||agent.id::text AND provision.result->'agent'->>'id'=agent.id::text
-    JOIN public.channels AS desk ON desk.company_id=provision.company_id
-        AND desk.id::text=provision.result->'channel'->>'id' AND desk.enabled
-    JOIN public.workflow_bindings AS binding ON binding.company_id=desk.company_id AND binding.channel_id=desk.id
-        AND binding.id::text=provision.result->>'binding_id' AND binding.active AND binding.thread_id IS NULL
+    JOIN public.addresses AS address ON address.company_id=principal.company_id AND address.principal_id=principal.id
+    JOIN public.channel_reply_settings AS response ON response.company_id=principal.company_id AND response.principal_id=principal.id
+    JOIN public.workflow_bindings AS binding ON binding.company_id=response.company_id AND binding.principal_id=principal.id
+        AND binding.id=response.binding_id AND binding.active AND binding.thread_id IS NULL
     JOIN public.workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id
         AND configuration.binding_id=binding.id AND configuration.revision=binding.configuration_revision
-        AND configuration.message_trigger IS NOT NULL
-    JOIN public.channel_bindings AS endpoint ON endpoint.company_id=desk.company_id AND endpoint.channel_id=desk.id
+        AND configuration.revision=response.binding_revision AND configuration.message_trigger IS NOT NULL
+    JOIN public.channel_bindings AS endpoint ON endpoint.company_id=principal.company_id AND endpoint.principal_id=principal.id
         AND endpoint.transport='email' AND endpoint.installation_id IS NULL AND endpoint.status='active'
     WHERE principal.company_id=checked_company AND principal.id=checked_principal AND principal.kind='agent'
 $$;
@@ -17582,8 +17819,8 @@ LANGUAGE sql STABLE AS $$
         LEFT JOIN public.workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
         WHERE notice.company_id=checked_company AND notice.id=checked_notice AND notice.principal_kind='agent'
           AND member.role IN ('owner','admin') AND (member.role='owner')=(company.user_id=actor.user_id)
-          AND public.notification_principal_can_view(checked_company,route.desk_id,actor.id)
-          AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),actor.id)
+          AND public.principal_direct_can_view(checked_company,route.principal_id,actor.id)
+          AND public.notification_target_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),COALESCE(run.principal_id,refusal.principal_id),actor.id)
           AND (CASE WHEN escalation.source_kind='admission'
                 THEN public.workflow_refusal_content_level(checked_company,refusal.source_key)
                 ELSE run.content_level END)<=member.access_level)
@@ -17591,6 +17828,7 @@ $$;
 
 ALTER TABLE public.workflow_escalation_notices ADD UNIQUE(company_id,id,event_id,principal_id,principal_kind);
 ALTER TABLE public.workflow_message_intents ADD UNIQUE(company_id,id,message_id,channel_id);
+ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_principal_receipt_key UNIQUE (company_id, id, message_id, principal_id);
 CREATE TABLE public.workflow_escalation_agent_receipts (
     company_id uuid NOT NULL,
     notice_id uuid NOT NULL,
@@ -17598,19 +17836,20 @@ CREATE TABLE public.workflow_escalation_agent_receipts (
     principal_id uuid NOT NULL,
     principal_kind text GENERATED ALWAYS AS ('agent') STORED,
     agent_id uuid NOT NULL,
-    desk_id uuid NOT NULL,
     binding_id uuid NOT NULL,
     binding_revision bigint NOT NULL CHECK(binding_revision>0),
     message_id uuid NOT NULL,
     intent_id uuid NOT NULL,
+    projection_execution_id uuid NOT NULL,
+    projection_worker_id uuid NOT NULL,
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,notice_id),
     UNIQUE(company_id,message_id),
     UNIQUE(company_id,intent_id),
     FOREIGN KEY(company_id,notice_id,event_id,principal_id,principal_kind)
         REFERENCES public.workflow_escalation_notices(company_id,id,event_id,principal_id,principal_kind) ON DELETE CASCADE,
-    FOREIGN KEY(company_id,intent_id,message_id,desk_id)
-        REFERENCES public.workflow_message_intents(company_id,id,message_id,channel_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    FOREIGN KEY(company_id,intent_id,message_id,principal_id)
+        REFERENCES public.workflow_message_intents(company_id,id,message_id,principal_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
     FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
 );
 COMMENT ON TABLE public.workflow_escalation_agent_receipts IS
@@ -17619,14 +17858,20 @@ COMMENT ON TABLE public.workflow_escalation_agent_receipts IS
 CREATE FUNCTION public.workflow_escalation_agent_route_matches(receipt public.workflow_escalation_agent_receipts)
 RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT EXISTS(SELECT 1 FROM public.workflow_escalation_agent_route(receipt.company_id,receipt.principal_id) AS route
-        WHERE (route.agent_id,route.desk_id,route.binding_id,route.binding_revision)=
-              (receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision))
+        WHERE (route.agent_id,route.principal_id,route.binding_id,route.binding_revision)=
+              (receipt.agent_id,receipt.principal_id,receipt.binding_id,receipt.binding_revision))
 $$;
 
 CREATE FUNCTION public.guard_workflow_escalation_agent_receipt() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
     IF NOT public.workflow_escalation_notice_active(NEW.company_id,NEW.notice_id)
+        OR NOT EXISTS(SELECT 1 FROM public.notification_events AS event
+            JOIN public.workflow_escalation_notices AS notice ON notice.company_id=event.company_id
+              AND notice.event_id=event.id AND notice.id=event.source_id AND notice.source_generation=event.source_generation
+            WHERE event.company_id=NEW.company_id AND event.id=NEW.event_id AND notice.id=NEW.notice_id
+              AND event.execution_id=NEW.projection_execution_id AND event.owner_worker_id=NEW.projection_worker_id
+              AND event.status='processing' AND event.lock_expires_at>clock_timestamp())
         OR NOT public.workflow_escalation_agent_eligible(NEW.company_id,NEW.notice_id)
         OR EXISTS(SELECT 1 FROM public.workflow_escalation_recipient_failures WHERE company_id=NEW.company_id AND notice_id=NEW.notice_id)
         OR NOT public.workflow_escalation_agent_route_matches(NEW)
@@ -17635,10 +17880,13 @@ BEGIN
             JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
             JOIN public.email_message_metadata AS metadata ON metadata.company_id=message.company_id AND metadata.message_id=message.id
             WHERE intent.company_id=NEW.company_id AND intent.id=NEW.intent_id AND intent.message_id=NEW.message_id
-                AND intent.channel_id=NEW.desk_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
+                AND intent.channel_id IS NULL AND intent.principal_id=NEW.principal_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
                 AND intent.admissible AND intent.role='to' AND intent.mentioned AND intent.reply_to_message_id IS NULL
                 AND intent.state='pending' AND intent.attempts=0
                 AND message.audience='internal_only' AND message.role='system' AND author.kind='system'
+                AND message.direction='inbound' AND message.attachments IS NULL
+                AND NOT EXISTS(SELECT 1 FROM public.message_deliveries AS delivery
+                    WHERE delivery.company_id=message.company_id AND delivery.message_id=message.id)
                 AND split_part(metadata.rfc_message_id,'@',1)='<'||NEW.notice_id::text) THEN
         RAISE EXCEPTION 'agent notice origin must prove its exact current private source and default route'
             USING ERRCODE='23514',CONSTRAINT='workflow_escalation_agent_receipt_guard';
@@ -17651,6 +17899,22 @@ CREATE TRIGGER workflow_escalation_agent_receipt_immutable BEFORE UPDATE OR DELE
     FOR EACH ROW EXECUTE FUNCTION public.workflow_escalation_recipient_fact_immutable();
 CREATE CONSTRAINT TRIGGER workflow_escalation_agent_receipt_completion AFTER INSERT ON public.workflow_escalation_agent_receipts
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_notification_receipt_completion();
+
+CREATE FUNCTION public.check_private_agent_notice_message() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF EXISTS(SELECT 1 FROM public.messages AS message
+        JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+        JOIN public.principals AS target ON target.company_id=NEW.company_id AND target.id=NEW.principal_id
+        WHERE message.company_id=NEW.company_id AND message.id=NEW.message_id AND message.direction='inbound'
+          AND author.kind='system' AND target.kind='agent' AND NOT target.open_to_public)
+        AND NOT EXISTS(SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
+            WHERE receipt.company_id=NEW.company_id AND receipt.message_id=NEW.message_id AND receipt.principal_id=NEW.principal_id)
+    THEN RAISE EXCEPTION 'private direct system ingress requires its authenticated notice receipt'
+        USING ERRCODE='23514',CONSTRAINT='private_agent_notice_message_guard'; END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER private_agent_notice_message_guard AFTER INSERT ON public.thread_messages
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_private_agent_notice_message();
 
 CREATE FUNCTION public.guard_workflow_escalation_agent_failure() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
@@ -17693,7 +17957,6 @@ CREATE TABLE public.workflow_escalation_notice_targets (
     live_intent_id uuid,
     principal_id uuid NOT NULL,
     agent_id uuid NOT NULL,
-    desk_id uuid NOT NULL,
     binding_id uuid NOT NULL,
     binding_revision bigint NOT NULL CHECK(binding_revision>0),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -17804,9 +18067,9 @@ BEGIN
         IF NEW.live_intent_id IS DISTINCT FROM NEW.intent_id OR NOT EXISTS (
             SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
             WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
-                   receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision)=
+                   receipt.agent_id,receipt.binding_id,receipt.binding_revision)=
                   (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
-                   NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision)) THEN
+                   NEW.agent_id,NEW.binding_id,NEW.binding_revision)) THEN
             RAISE EXCEPTION 'private target requires its exact authentic receipt' USING ERRCODE='23514';
         END IF;
         RETURN NEW;
@@ -17828,9 +18091,9 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT COALESCE(target.live_intent_id=target.intent_id,false) AND EXISTS (
         SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
         WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
-               receipt.agent_id,receipt.desk_id,receipt.binding_id,receipt.binding_revision)=
+               receipt.agent_id,receipt.binding_id,receipt.binding_revision)=
               (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
-               target.agent_id,target.desk_id,target.binding_id,target.binding_revision))
+               target.agent_id,target.binding_id,target.binding_revision))
 $$;
 
 CREATE FUNCTION public.workflow_escalation_intent_source_retired(checked_company uuid,checked_intent uuid)
@@ -17874,9 +18137,9 @@ CREATE FUNCTION public.seal_workflow_escalation_notice_target() RETURNS trigger 
 BEGIN
     INSERT INTO public.workflow_notification_origins(company_id,id,notice_id) VALUES(NEW.company_id,NEW.notice_id,NEW.notice_id);
     INSERT INTO public.workflow_escalation_notice_targets(company_id,notice_id,message_id,intent_id,live_intent_id,
-        principal_id,agent_id,desk_id,binding_id,binding_revision)
+        principal_id,agent_id,binding_id,binding_revision)
         VALUES(NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.intent_id,
-               NEW.principal_id,NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision);
+               NEW.principal_id,NEW.agent_id,NEW.binding_id,NEW.binding_revision);
     INSERT INTO public.workflow_message_notification_origins(company_id,message_id,origin_id)
         VALUES(NEW.company_id,NEW.message_id,NEW.notice_id);
     RETURN NULL;
@@ -17891,9 +18154,9 @@ BEGIN
         JOIN public.workflow_message_notification_origins AS origin
           ON origin.company_id=target.company_id AND origin.message_id=target.message_id AND origin.origin_id=target.notice_id
         WHERE (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
-               target.agent_id,target.desk_id,target.binding_id,target.binding_revision)=
+               target.agent_id,target.binding_id,target.binding_revision)=
               (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
-               NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision))
+               NEW.agent_id,NEW.binding_id,NEW.binding_revision))
         OR (SELECT count(*) FROM public.workflow_message_intents WHERE company_id=NEW.company_id AND message_id=NEW.message_id)>1 THEN
         RAISE EXCEPTION 'authentic notice must seal its complete private target and message origin' USING ERRCODE='23514';
     END IF;
@@ -17940,6 +18203,7 @@ END $$;
 CREATE FUNCTION public.workflow_escalation_target_admissible(target public.workflow_escalation_notice_targets)
 RETURNS boolean LANGUAGE sql STABLE AS $$
     SELECT public.workflow_escalation_target_source_live(target) IS TRUE
+        AND public.workflow_escalation_notice_active(target.company_id,target.notice_id)
         AND EXISTS(SELECT 1 FROM public.workflow_escalation_agent_receipts AS receipt
             WHERE receipt.company_id=target.company_id AND receipt.notice_id=target.notice_id
               AND public.workflow_escalation_agent_route_matches(receipt)
@@ -17952,6 +18216,19 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
                 WHERE ownership.company_id=target.company_id AND ownership.notice_id=target.notice_id
                   AND ownership.live_run_id=ownership.run_id AND admission.binding_id=target.binding_id
                   AND public.workflow_escalation_source_message(admission.source_key)=target.message_id))
+$$;
+
+CREATE FUNCTION public.workflow_escalation_notice_admission(tenant uuid, checked_intent uuid,
+    checked_principal uuid, checked_binding uuid, checked_revision bigint, checked_worker uuid, checked_generation uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_escalation_notice_targets AS target
+        JOIN public.workflow_message_intents AS intent ON intent.company_id=target.company_id AND intent.id=target.intent_id
+        WHERE target.company_id=tenant AND target.intent_id=checked_intent AND target.principal_id=checked_principal
+          AND target.binding_id=checked_binding AND target.binding_revision=checked_revision
+          AND intent.principal_id=target.principal_id AND intent.channel_id IS NULL
+          AND intent.message_id=target.message_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
+          AND intent.state='claimed' AND intent.worker_id=checked_worker AND intent.claim_generation=checked_generation
+          AND intent.lease_expires_at>clock_timestamp() AND public.workflow_escalation_target_admissible(target))
 $$;
 
 CREATE FUNCTION public.guard_workflow_escalation_handling_root() RETURNS trigger LANGUAGE plpgsql AS $$
@@ -17975,8 +18252,10 @@ BEGIN
         JOIN public.workflow_message_intents AS intent ON intent.company_id=run.company_id AND intent.id=NEW.intent_id
         WHERE run.company_id=NEW.company_id AND run.id=NEW.run_id AND run.binding_id=NEW.binding_id AND run.binding_revision=NEW.binding_revision
           AND run.parent_run_id IS NULL AND run.rerun_of_run_id IS NULL AND run.delivery_policy='in_app_only'
-          AND run.channel_id=intent.channel_id AND run.thread_id=intent.thread_id AND intent.message_id=NEW.message_id
-          AND admission.binding_id=NEW.binding_id AND public.workflow_escalation_source_message(admission.source_key)=NEW.message_id) THEN
+          AND run.channel_id IS NOT DISTINCT FROM intent.channel_id AND run.principal_id IS NOT DISTINCT FROM intent.principal_id AND run.thread_id=intent.thread_id AND intent.message_id=NEW.message_id
+          AND admission.binding_id=NEW.binding_id AND public.workflow_escalation_source_message(admission.source_key)=NEW.message_id
+          AND public.workflow_escalation_notice_admission(NEW.company_id,NEW.intent_id,intent.principal_id,
+              NEW.binding_id,NEW.binding_revision,intent.worker_id,intent.claim_generation)) THEN
         RAISE EXCEPTION 'only the original intended message admission can own a notification root'
             USING ERRCODE='23514',CONSTRAINT='workflow_escalation_handling_root_guard';
     END IF;
@@ -18117,6 +18396,53 @@ CREATE CONSTRAINT TRIGGER workflow_response_notification_origin_complete AFTER U
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (NEW.message_id IS NOT NULL)
     EXECUTE FUNCTION public.check_workflow_generated_message_origin();
 
+CREATE FUNCTION public.workflow_message_sender(tenant uuid, owner_run uuid, owner_execution uuid, invocation uuid)
+RETURNS TABLE(sender_principal_id uuid, agent_required boolean) LANGUAGE sql STABLE AS $$
+    WITH actual AS (
+        SELECT run.principal_id AS target_principal,
+            CASE WHEN action.origin_kind='agent' THEN action.agent_id
+                WHEN action.origin_kind='channel_final' THEN (
+                    SELECT exchange.agent_id FROM public.agent_history_exchanges AS exchange
+                    WHERE exchange.company_id=tenant AND exchange.run_id=owner_run
+                        AND exchange.execution_id=owner_execution AND exchange.state='completed') END AS agent_id
+        FROM public.workflow_action_intents AS action
+        JOIN public.workflow_runs AS run ON run.company_id=action.company_id AND run.id=action.run_id
+        WHERE action.company_id=tenant AND action.run_id=owner_run
+            AND action.execution_id=owner_execution AND action.id=invocation
+    )
+    SELECT principal.id, actual.agent_id IS NOT NULL OR actual.target_principal IS NOT NULL
+    FROM actual LEFT JOIN public.principals AS principal ON principal.company_id=tenant AND principal.kind='agent'
+        AND CASE WHEN actual.agent_id IS NOT NULL THEN principal.agent_id=actual.agent_id
+            ELSE principal.id=actual.target_principal END
+$$;
+
+-- One exact sender check serves pre-settlement final validation and deferred producer proof.
+CREATE FUNCTION public.workflow_message_author_matches(tenant uuid, canonical uuid, owner_run uuid,
+    owner_execution uuid, invocation uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS(SELECT 1 FROM public.workflow_message_sender(tenant,owner_run,owner_execution,invocation) AS sender
+        JOIN public.messages AS message ON message.company_id=tenant AND message.id=canonical
+        JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+        WHERE CASE WHEN sender.agent_required THEN sender.sender_principal_id IS NOT NULL
+            AND author.id=sender.sender_principal_id AND author.kind='agent' AND message.role='agent'
+            ELSE author.kind='system' AND message.role='system' END)
+$$;
+
+CREATE FUNCTION public.workflow_message_author_valid(tenant uuid, canonical uuid, owner_run uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    WITH origins AS (
+        SELECT action.execution_id,action.invocation_id FROM public.workflow_message_destinations AS destination
+        JOIN public.workflow_message_actions AS action ON action.company_id=destination.company_id
+            AND action.run_id=destination.run_id AND action.invocation_id=destination.invocation_id
+        WHERE destination.company_id=tenant AND destination.message_id=canonical AND destination.run_id=owner_run
+        UNION ALL
+        SELECT reply.execution_id,proposal.invocation_id FROM public.channel_reply_decisions AS reply
+        JOIN public.channel_reply_proposals AS proposal ON proposal.company_id=reply.company_id AND proposal.id=reply.proposal_id
+        WHERE reply.company_id=tenant AND reply.message_id=canonical AND reply.run_id=owner_run AND reply.state='published'
+    )
+    SELECT COALESCE(bool_and(public.workflow_message_author_matches(
+        tenant,canonical,owner_run,origins.execution_id,origins.invocation_id)),false) FROM origins
+$$;
+
 CREATE FUNCTION public.check_workflow_message_producer_seal() RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE owner uuid; producer uuid; expected uuid; actual uuid;
 BEGIN
@@ -18129,6 +18455,10 @@ BEGIN
         OR (NOT EXISTS(SELECT 1 FROM public.workflow_message_destinations WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer)
             AND NOT EXISTS(SELECT 1 FROM public.channel_reply_decisions WHERE company_id=NEW.company_id AND message_id=owner AND run_id=producer AND state='published')) THEN
         RAISE EXCEPTION 'canonical workflow producer must prove its exact normalized output' USING ERRCODE='23514';
+    END IF;
+    IF NOT public.workflow_message_author_valid(NEW.company_id,owner,producer) THEN
+        RAISE EXCEPTION 'workflow message must retain its authenticated sending principal' USING ERRCODE='23514',
+            CONSTRAINT='workflow_message_author_guard';
     END IF;
     SELECT origin_id INTO expected FROM public.workflow_run_notification_origins WHERE company_id=NEW.company_id AND run_id=producer;
     SELECT origin_id INTO actual FROM public.workflow_message_notification_origins WHERE company_id=NEW.company_id AND message_id=owner;
@@ -18152,15 +18482,79 @@ CREATE TABLE public.message_internal_relays (
     message_id uuid NOT NULL,
     delivery_id uuid NOT NULL,
     part_index integer NOT NULL,
-    source_channel_id uuid NOT NULL,
+    source_channel_id uuid,
+    source_principal_id uuid,
+    sender_principal_id uuid,
+    CHECK (num_nonnulls(source_channel_id,source_principal_id)=1),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
     PRIMARY KEY(company_id,message_id),
     FOREIGN KEY(company_id,message_id) REFERENCES public.messages(company_id,id) ON DELETE CASCADE,
     FOREIGN KEY(company_id,delivery_id) REFERENCES public.message_deliveries(company_id,id) ON DELETE CASCADE,
     FOREIGN KEY(delivery_id,part_index) REFERENCES public.message_delivery_parts(delivery_id,part_index) ON DELETE CASCADE,
-    FOREIGN KEY(company_id,source_channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE
+    FOREIGN KEY(company_id,source_channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,source_principal_id) REFERENCES public.principals(company_id,id) ON DELETE CASCADE,
+    FOREIGN KEY(company_id,sender_principal_id) REFERENCES public.principals(company_id,id)
 );
 CREATE INDEX message_internal_relays_delivery ON public.message_internal_relays(company_id,delivery_id);
+-- The relay actor is either its real live agent or an unprivileged system source.
+CREATE FUNCTION public.relay_desk_can_participate(tenant uuid, target uuid, writer uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT COALESCE((SELECT desk.enabled AND CASE desk.access_mode
+        WHEN 'public' THEN true
+        WHEN 'team' THEN actor.kind='agent'
+        WHEN 'allowlist' THEN actor.kind='agent' AND EXISTS(
+            SELECT 1 FROM public.channel_principal_grants AS permission
+            WHERE permission.company_id=tenant AND permission.channel_id=desk.id
+                AND permission.principal_id=actor.id AND permission.capability='participate')
+        ELSE false END
+    FROM public.channels AS desk LEFT JOIN public.principals AS actor
+        ON actor.company_id=desk.company_id AND actor.id=writer AND actor.kind='agent'
+    WHERE desk.company_id=tenant AND desk.id=target),false)
+$$;
+
+CREATE FUNCTION public.internal_relay_source(tenant uuid, delivery_id uuid, part_index integer,
+    source_channel uuid, source_principal uuid, claim_from text, claim_to text, claim_message text,
+    claim_subject text, claim_body text, claim_parent text, claim_references jsonb)
+RETURNS TABLE(sender_principal_id uuid) LANGUAGE sql STABLE AS $$
+    SELECT CASE WHEN author.kind='agent' THEN author.id END
+    FROM public.message_deliveries AS delivery
+    JOIN public.message_delivery_parts AS part ON part.company_id=delivery.company_id
+        AND part.delivery_id=delivery.id AND part.part_index=internal_relay_source.part_index
+    JOIN public.messages AS message ON message.company_id=delivery.company_id AND message.id=delivery.message_id
+    JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+    JOIN public.workflow_message_producer_seals AS producer ON producer.company_id=message.company_id
+        AND producer.message_id=message.id AND producer.producer_run_id IS NOT NULL
+    JOIN public.channel_bindings AS binding ON binding.company_id=delivery.company_id AND binding.id=delivery.source_binding_id
+        AND binding.status='active'
+    JOIN public.companies AS company ON company.id=delivery.company_id
+    WHERE delivery.company_id=tenant AND delivery.id=internal_relay_source.delivery_id AND delivery.transport='email'
+        AND num_nonnulls(source_channel,source_principal)=1
+        AND delivery.channel_id IS NOT DISTINCT FROM source_channel
+        AND delivery.principal_id IS NOT DISTINCT FROM source_principal
+        AND part.payload->'body'->'relay'->'source_target'=public.address_target_json(source_channel,source_principal)
+        AND lower(part.payload->'body'->>'from')=lower(claim_from)
+        AND lower(part.payload->'body'->'recipients_to'->>0)=lower(claim_to)
+        AND part.payload->'body'->>'message_id'=claim_message
+        AND part.payload->'body'->>'subject'=claim_subject
+        AND part.payload->'body'->>'in_reply_to' IS NOT DISTINCT FROM claim_parent
+        AND COALESCE(part.payload->'body'->'references','[]'::jsonb)=claim_references
+        AND part.content_digest=encode(sha256(convert_to(claim_body,'UTF8')),'hex')
+        AND ((author.kind='agent' AND message.role='agent' AND EXISTS(
+                SELECT 1 FROM public.agents AS agent WHERE agent.company_id=tenant AND agent.id=author.agent_id))
+            OR (author.kind='system' AND message.role='system'))
+        AND EXISTS(SELECT 1 FROM public.addresses AS address
+            WHERE address.company_id=tenant AND address.is_primary
+                AND lower(split_part(claim_from,'@',1))=address.slug::text
+                AND ((source_channel IS NOT NULL AND address.channel_id=source_channel)
+                    OR (author.kind='agent' AND address.principal_id=author.id)))
+        AND split_part(split_part(claim_from,'@',2),'.',1)=company.slug::text
+        AND (source_channel IS NULL OR EXISTS(SELECT 1 FROM public.channels AS desk
+            WHERE desk.company_id=tenant AND desk.id=source_channel AND desk.enabled))
+        AND (source_principal IS NULL OR EXISTS(SELECT 1 FROM public.principals AS principal
+            WHERE principal.company_id=tenant AND principal.id=source_principal AND principal.kind='agent'
+                AND EXISTS(SELECT 1 FROM public.addresses AS address
+                    WHERE address.company_id=tenant AND address.principal_id=principal.id)))
+$$;
 CREATE FUNCTION public.guard_message_internal_relay() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     IF TG_OP='DELETE' AND (NOT EXISTS(SELECT 1 FROM public.companies WHERE id=OLD.company_id)
@@ -18169,29 +18563,47 @@ BEGIN
         OR NOT EXISTS(SELECT 1 FROM public.message_delivery_parts
             WHERE company_id=OLD.company_id AND delivery_id=OLD.delivery_id AND part_index=OLD.part_index))
         THEN RETURN OLD; END IF;
-    IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM public.message_deliveries AS delivery
-        JOIN public.message_delivery_parts AS part
-          ON part.company_id=delivery.company_id AND part.delivery_id=delivery.id AND part.part_index=NEW.part_index
-        JOIN public.messages AS message ON message.company_id=NEW.company_id AND message.id=NEW.message_id
+    IF TG_OP='INSERT' AND EXISTS(SELECT 1 FROM public.messages AS message
         JOIN public.email_message_metadata AS mail ON mail.company_id=message.company_id AND mail.message_id=message.id
-        WHERE delivery.company_id=NEW.company_id AND delivery.id=NEW.delivery_id
-          AND delivery.transport='email' AND delivery.channel_id=NEW.source_channel_id AND delivery.message_id IS NOT NULL
-          AND delivery.message_id<>NEW.message_id AND message.direction='inbound'
-          AND part.payload->'body'->'relay'->>'source_channel_id'=NEW.source_channel_id::text
-          AND part.payload->'body'->>'message_id'=mail.rfc_message_id
-          AND part.content_digest=encode(sha256(convert_to(COALESCE(mail.raw_text_body,''),'UTF8')),'hex')
-          AND EXISTS(SELECT 1 FROM public.message_participants AS recipient
-              JOIN public.participant_identities AS identity
-                ON identity.company_id=recipient.company_id AND identity.id=recipient.participant_identity_id
-              WHERE recipient.company_id=message.company_id AND recipient.message_id=message.id
-                AND recipient.kind='to' AND identity.transport='email'
-                AND lower(identity.subject)=lower(part.payload->'body'->'recipients_to'->>0)))
+        JOIN public.message_participants AS recipient ON recipient.company_id=message.company_id
+            AND recipient.message_id=message.id AND recipient.kind='to'
+        JOIN public.participant_identities AS recipient_identity ON recipient_identity.company_id=recipient.company_id
+            AND recipient_identity.id=recipient.participant_identity_id AND recipient_identity.transport='email'
+        JOIN public.message_participants AS sender ON sender.company_id=message.company_id
+            AND sender.message_id=message.id AND sender.kind='sender'
+        JOIN public.participant_identities AS sender_identity ON sender_identity.company_id=sender.company_id
+            AND sender_identity.id=sender.participant_identity_id AND sender_identity.transport='email'
+        CROSS JOIN LATERAL public.internal_relay_source(NEW.company_id,NEW.delivery_id,NEW.part_index,
+            NEW.source_channel_id,NEW.source_principal_id,sender_identity.subject,recipient_identity.subject,
+            mail.rfc_message_id,message.subject,COALESCE(mail.raw_text_body,''),mail.in_reply_to,to_jsonb(mail.references_list)) AS source
+        JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+        WHERE message.company_id=NEW.company_id AND message.id=NEW.message_id AND message.direction='inbound'
+            AND message.audience='internal_only'
+            AND source.sender_principal_id IS NOT DISTINCT FROM NEW.sender_principal_id
+            AND ((source.sender_principal_id IS NOT NULL AND message.author_principal_id=source.sender_principal_id AND message.role='agent')
+                OR (source.sender_principal_id IS NULL AND author.kind='system' AND message.role='system')))
         THEN RETURN NEW; END IF;
     RAISE EXCEPTION 'internal relay must prove the exact delivery part it is and is immutable'
         USING ERRCODE='23514',CONSTRAINT='message_internal_relay_guard';
 END $$;
 CREATE TRIGGER message_internal_relay_guard BEFORE INSERT OR UPDATE OR DELETE ON public.message_internal_relays
     FOR EACH ROW EXECUTE FUNCTION public.guard_message_internal_relay();
+CREATE FUNCTION public.check_message_internal_relay_target() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE actor uuid;
+BEGIN
+    SELECT sender_principal_id INTO actor FROM public.message_internal_relays
+        WHERE company_id=NEW.company_id AND message_id=NEW.message_id;
+    IF NOT FOUND THEN RETURN NULL; END IF;
+    IF NOT (CASE WHEN NEW.channel_id IS NOT NULL THEN public.relay_desk_can_participate(NEW.company_id,NEW.channel_id,actor)
+        ELSE public.principal_direct_can_participate(NEW.company_id,NEW.principal_id,actor) END) THEN
+        RAISE EXCEPTION 'internal relay target requires current sender permission' USING ERRCODE='23514',
+            CONSTRAINT='message_internal_relay_target_guard';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER message_internal_relay_target_guard AFTER INSERT ON public.thread_messages
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_message_internal_relay_target();
+
 CREATE FUNCTION public.seal_message_internal_relay_origin() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     INSERT INTO public.workflow_message_notification_origins(company_id,message_id,origin_id)
@@ -18379,3 +18791,400 @@ BEGIN
 END $$;
 CREATE CONSTRAINT TRIGGER workflow_escalation_command_complete AFTER INSERT OR UPDATE ON public.workflow_escalation_decisions
     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_command();
+
+
+-- Personal ownership is an account identity, never a reusable email address.
+-- The historical UUID survives account deletion and conveys no current authority.
+CREATE UNIQUE INDEX principals_historical_person_user_key
+    ON public.principals(company_id, historical_person_user_id)
+    WHERE historical_person_user_id IS NOT NULL;
+
+CREATE FUNCTION public.guard_principal_direct_settings() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.historical_person_user_id IS NOT NULL THEN
+            RAISE EXCEPTION 'personal ownership is assigned by the principal guard'
+                USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
+        END IF;
+        IF NEW.kind = 'person' THEN NEW.historical_person_user_id := NEW.user_id; END IF;
+        NEW.settings_revision := 1;
+        RETURN NEW;
+    END IF;
+    IF NEW.historical_person_user_id IS DISTINCT FROM OLD.historical_person_user_id THEN
+        RAISE EXCEPTION 'historical personal ownership is immutable'
+            USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
+    END IF;
+    IF OLD.historical_person_user_id IS NOT NULL THEN
+        IF NEW.kind NOT IN ('person', 'external')
+            OR (NEW.kind = 'person' AND NEW.user_id IS DISTINCT FROM OLD.historical_person_user_id) THEN
+            RAISE EXCEPTION 'a personal principal cannot be assigned to another account'
+                USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
+        END IF;
+    ELSIF NEW.kind = 'person' THEN
+        NEW.historical_person_user_id := NEW.user_id;
+    END IF;
+    IF OLD.kind = 'agent' AND NEW.kind <> 'agent' THEN NEW.open_to_public := false; END IF;
+    IF NEW.settings_revision NOT IN (OLD.settings_revision, OLD.settings_revision + 1) THEN
+        RAISE EXCEPTION 'invalid principal settings revision'
+            USING ERRCODE = '23514', CONSTRAINT = 'principals_settings_revision';
+    END IF;
+    IF (NEW.kind, NEW.user_id, NEW.agent_id, NEW.open_to_public)
+        IS DISTINCT FROM (OLD.kind, OLD.user_id, OLD.agent_id, OLD.open_to_public) THEN
+        NEW.settings_revision := OLD.settings_revision + 1;
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER principals_direct_settings BEFORE INSERT OR UPDATE ON public.principals
+    FOR EACH ROW EXECUTE FUNCTION public.guard_principal_direct_settings();
+
+-- Mirror Principal's direct policy. Callers still enforce content level and live authority.
+
+
+
+
+
+CREATE FUNCTION public.advance_principal_address_revision() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE tenants uuid[]; targets uuid[]; owned record;
+BEGIN
+    IF TG_OP = 'UPDATE' THEN
+        IF (NEW.company_id, NEW.slug, NEW.principal_id, NEW.channel_id, NEW.is_primary)
+            IS NOT DISTINCT FROM (OLD.company_id, OLD.slug, OLD.principal_id, OLD.channel_id, OLD.is_primary) THEN
+            RETURN NEW;
+        END IF;
+        tenants := ARRAY[OLD.company_id, NEW.company_id];
+        targets := ARRAY[OLD.principal_id, NEW.principal_id];
+    ELSIF TG_OP = 'INSERT' THEN
+        tenants := ARRAY[NEW.company_id]; targets := ARRAY[NEW.principal_id];
+    ELSE tenants := ARRAY[OLD.company_id]; targets := ARRAY[OLD.principal_id]; END IF;
+    FOR owned IN
+        SELECT principal.company_id, principal.id FROM public.principals AS principal
+        WHERE EXISTS (SELECT 1 FROM unnest(tenants, targets) AS affected(company_id, id)
+            WHERE affected.company_id = principal.company_id AND affected.id = principal.id)
+        ORDER BY principal.company_id, principal.id FOR UPDATE OF principal
+    LOOP
+        UPDATE public.principals SET settings_revision = settings_revision + 1,
+            updated_at = CURRENT_TIMESTAMP WHERE company_id = owned.company_id AND id = owned.id;
+    END LOOP;
+    RETURN COALESCE(NEW, OLD);
+END $$;
+CREATE TRIGGER addresses_principal_revision AFTER INSERT OR UPDATE OR DELETE ON public.addresses
+    FOR EACH ROW EXECUTE FUNCTION public.advance_principal_address_revision();
+
+-- A principal's canonical email interface retains its identity across address retirement.
+ALTER TABLE public.channel_bindings
+    ADD CONSTRAINT channel_bindings_principal_fk FOREIGN KEY (company_id, principal_id)
+        REFERENCES public.principals(company_id, id) ON DELETE CASCADE,
+    ADD CONSTRAINT channel_bindings_principal_key UNIQUE (company_id, principal_id),
+    ADD CONSTRAINT channel_bindings_company_principal_id_key UNIQUE (company_id, principal_id, id),
+    ADD CONSTRAINT channel_bindings_principal_transport_key UNIQUE (company_id, principal_id, id, transport);
+
+CREATE FUNCTION public.guard_principal_transport_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'UPDATE' AND (OLD.principal_id IS NOT NULL OR NEW.principal_id IS NOT NULL)
+        AND (NEW.company_id, NEW.channel_id, NEW.principal_id, NEW.transport, NEW.namespace, NEW.installation_id)
+            IS DISTINCT FROM
+            (OLD.company_id, OLD.channel_id, OLD.principal_id, OLD.transport, OLD.namespace, OLD.installation_id) THEN
+        RAISE EXCEPTION 'a principal transport binding has an immutable owner'
+            USING ERRCODE = '23514', CONSTRAINT = 'channel_bindings_principal_owner';
+    END IF;
+    IF NEW.principal_id IS NULL THEN RETURN NEW; END IF;
+    IF EXISTS (SELECT 1 FROM public.principals AS principal WHERE principal.company_id = NEW.company_id
+        AND principal.id = NEW.principal_id AND principal.kind IN ('person', 'agent')) THEN
+        RETURN NEW;
+    END IF;
+    IF TG_OP = 'UPDATE' AND NEW.status = 'orphaned' AND NEW.disabled_reason = 'principal_retired' THEN
+        RETURN NEW;
+    END IF;
+    RAISE EXCEPTION 'a principal transport binding requires a live person or agent'
+        USING ERRCODE = '23514', CONSTRAINT = 'channel_bindings_principal_kind';
+END $$;
+CREATE TRIGGER channel_bindings_principal_guard BEFORE INSERT OR UPDATE ON public.channel_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_principal_transport_binding();
+
+CREATE FUNCTION public.retire_principal_transport_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE retired record;
+BEGIN
+    FOR retired IN
+        UPDATE public.channel_bindings SET status = 'orphaned', disabled_reason = 'principal_retired',
+            updated_at = CURRENT_TIMESTAMP
+        WHERE company_id = NEW.company_id AND principal_id = NEW.id
+            AND (status, disabled_reason) IS DISTINCT FROM ('orphaned', 'principal_retired')
+        RETURNING id, company_id, transport, installation_id, external_endpoint_key, access_policy, access_snapshot
+    LOOP
+        INSERT INTO public.binding_audit_events(id, company_id, binding_id, action, reason, actor, metadata)
+        VALUES (gen_random_uuid(), retired.company_id, retired.id, 'drift_detected', 'principal_retired',
+            jsonb_build_object('actor_type','system','actor_id',NULL,'actor_name','System'),
+            jsonb_build_object('version',1,'transport',retired.transport,'installation_id',retired.installation_id,
+                'external_endpoint_key',retired.external_endpoint_key,'access_policy',retired.access_policy,
+                'access_snapshot',retired.access_snapshot));
+    END LOOP;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER principals_retire_transport AFTER UPDATE ON public.principals
+    FOR EACH ROW WHEN (OLD.kind IN ('person','agent') AND NEW.kind NOT IN ('person','agent'))
+    EXECUTE FUNCTION public.retire_principal_transport_binding();
+
+
+-- Principal counterparts of desk target ownership and membership pins.
+ALTER TABLE public.threads ADD CONSTRAINT threads_company_principal_id_key UNIQUE (company_id, principal_id, id);
+ALTER TABLE public.threads ADD CONSTRAINT threads_principal_id_key UNIQUE (principal_id, id);
+ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_principal_message_key UNIQUE (principal_id, message_id);
+ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_principal_history_key UNIQUE (company_id, principal_id, thread_id, message_id);
+ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_principal_message_key UNIQUE (company_id, message_id, principal_id);
+ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_principal_key UNIQUE (company_id, principal_id, id);
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_principal_thread_key UNIQUE (company_id, id, principal_id, thread_id);
+ALTER TABLE public.workflow_bindings DROP CONSTRAINT workflow_bindings_check;
+ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+ALTER TABLE public.workflow_runs DROP CONSTRAINT workflow_runs_check;
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+ALTER TABLE public.agent_history_sessions DROP CONSTRAINT agent_history_sessions_check;
+ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+ALTER TABLE public.workflow_admission_refusals DROP CONSTRAINT workflow_admission_refusals_check;
+ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_thread_target_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+ALTER TABLE public.thread_principals DROP CONSTRAINT thread_principals_pkey;
+ALTER TABLE public.thread_principals ALTER COLUMN channel_id DROP NOT NULL;
+ALTER TABLE public.thread_principals ADD PRIMARY KEY (company_id, thread_id, principal_id, role);
+ALTER TABLE public.channel_reply_settings DROP CONSTRAINT channel_reply_settings_pkey;
+ALTER TABLE public.channel_reply_settings ALTER COLUMN channel_id DROP NOT NULL;
+ALTER TABLE public.channel_reply_settings ADD UNIQUE (company_id, channel_id), ADD UNIQUE (company_id, principal_id);
+CREATE INDEX threads_principal_updated_idx ON public.threads(principal_id, updated_at, id);
+ALTER TABLE public.agent_history_conversations DROP CONSTRAINT agent_history_conversations_check2;
+ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_check2 CHECK ((scope_kind='thread' AND num_nonnulls(channel_id,principal_id)=1 AND thread_id IS NOT NULL AND session_id IS NULL AND child_run_id IS NULL) OR (scope_kind='private_session' AND session_id IS NOT NULL AND num_nonnulls(channel_id,principal_id)=0 AND thread_id IS NULL AND child_run_id IS NULL) OR (scope_kind='child_branch' AND child_run_id IS NOT NULL AND num_nonnulls(channel_id,principal_id)=0 AND thread_id IS NULL AND session_id IS NULL));
+CREATE UNIQUE INDEX agent_history_conversations_principal_thread_idx ON public.agent_history_conversations(company_id, agent_id, principal_id, thread_id) WHERE scope_kind='thread';
+ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE SET NULL (thread_id);
+ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, binding_id) REFERENCES public.workflow_bindings(company_id, principal_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, binding_id) REFERENCES public.channel_bindings(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_message_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_destination_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, principal_id, id, transport) ON DELETE CASCADE;
+ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_source_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, source_binding_id) REFERENCES public.channel_bindings(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.notifications ADD CONSTRAINT notifications_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_thread_fk_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+-- A direct thread has no channel owner; its company owns teardown in both scopes.
+ALTER TABLE public.threads ADD CONSTRAINT threads_company_fk FOREIGN KEY (company_id) REFERENCES public.companies(id) ON DELETE CASCADE;
+ALTER TABLE public.threads ADD CONSTRAINT threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_company_id_channel_id_thre_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_channel__principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_run_id_c_principal_fk FOREIGN KEY (company_id, run_id, principal_id, thread_id) REFERENCES public.workflow_runs(company_id, id, principal_id, thread_id) ON DELETE CASCADE;
+ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_message_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_replied_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destinations_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intent_association_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) ON DELETE CASCADE;
+ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_company_id_channel_id_thread_i_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+
+-- The generated kind makes concurrent principal retirement subject to a real foreign key,
+-- while the trigger gives a binding-specific error for invalid configuration.
+ALTER TABLE public.workflow_bindings ADD COLUMN target_principal_kind text
+    GENERATED ALWAYS AS (CASE WHEN principal_id IS NOT NULL THEN 'agent'::text END) STORED;
+ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_principal_kind_fk
+    FOREIGN KEY (company_id, principal_id, target_principal_kind)
+    REFERENCES public.principals(company_id, id, kind)
+    ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+CREATE FUNCTION public.guard_workflow_principal_binding() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.principal_id IS NOT NULL AND NOT EXISTS (
+        SELECT 1 FROM public.principals AS principal
+        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id AND principal.kind='agent'
+    ) THEN
+        RAISE EXCEPTION 'a workflow binding requires an agent principal'
+            USING ERRCODE='23514', CONSTRAINT='workflow_bindings_principal_kind';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_bindings_principal_guard BEFORE INSERT OR UPDATE ON public.workflow_bindings
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_principal_binding();
+
+-- Status writers acquire the principal before the binding. A material transport availability
+-- change invalidates old direct preflights even when the same interface is later reactivated.
+CREATE FUNCTION public.bump_principal_transport_revision() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.principals SET settings_revision=settings_revision+1, updated_at=CURRENT_TIMESTAMP
+        WHERE company_id=NEW.company_id AND id=NEW.principal_id;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER channel_bindings_principal_revision AFTER UPDATE OF status ON public.channel_bindings
+    FOR EACH ROW WHEN (NEW.principal_id IS NOT NULL AND NEW.status IS DISTINCT FROM OLD.status)
+    EXECUTE FUNCTION public.bump_principal_transport_revision();
+
+
+-- Direct receipts reuse the durable notification queue, pinned to the exact membership at ingress.
+
+
+CREATE FUNCTION public.direct_message_notification_can_view(tenant uuid, association_id uuid, viewer uuid)
+RETURNS boolean LANGUAGE sql STABLE AS $$
+    SELECT EXISTS (
+        SELECT 1 FROM public.thread_messages AS association
+        JOIN public.messages AS message ON message.company_id=association.company_id AND message.id=association.message_id
+        JOIN public.notification_events AS event ON event.company_id=association.company_id AND event.source_id=association.id
+            AND event.source_kind='direct_message' AND event.action_kind='direct_message_received' AND event.source_generation=1
+        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+        JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+        JOIN public.users AS account ON account.id=target.user_id
+        WHERE association.company_id=tenant AND association.id=association_id AND association.entry_kind='conversation'
+            AND message.direction='inbound' AND target.kind='person' AND target.id=viewer
+            AND target.historical_person_user_id=account.id AND membership.id=event.direct_membership_id
+            AND public.principal_direct_can_view(tenant,target.id,viewer)
+            AND message.access_level<=membership.access_level
+    )
+$$;
+
+CREATE FUNCTION public.guard_direct_message_event() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF NEW.source_kind='direct_message' AND NOT EXISTS (
+        SELECT 1 FROM public.thread_messages AS association
+        JOIN public.messages AS message ON message.company_id=association.company_id AND message.id=association.message_id
+        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+        JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+        WHERE association.company_id=NEW.company_id AND association.id=NEW.source_id
+            AND association.entry_kind='conversation' AND message.direction='inbound'
+            AND target.kind='person' AND target.user_id=target.historical_person_user_id
+            AND membership.id=NEW.direct_membership_id
+            AND NEW.actor_principal_id IS NOT DISTINCT FROM message.author_principal_id
+    ) THEN
+        RAISE EXCEPTION 'direct notification requires the exact personal association and membership'
+            USING ERRCODE='23514',CONSTRAINT='direct_message_event_source';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER direct_message_event_guard BEFORE INSERT ON public.notification_events
+    FOR EACH ROW EXECUTE FUNCTION public.guard_direct_message_event();
+
+CREATE FUNCTION public.notification_from_direct_message() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    INSERT INTO public.notification_events(company_id,source_kind,source_id,action_kind,source_generation,
+        actor_principal_id,direct_membership_id)
+    SELECT NEW.company_id,'direct_message',NEW.id,'direct_message_received',1,message.author_principal_id,membership.id
+    FROM public.messages AS message
+    JOIN public.principals AS target ON target.company_id=message.company_id AND target.id=NEW.principal_id
+    JOIN public.company_members AS membership ON membership.company_id=target.company_id AND membership.user_id=target.user_id
+    WHERE message.company_id=NEW.company_id AND message.id=NEW.message_id
+        AND NEW.entry_kind='conversation' AND message.direction='inbound' AND target.kind='person'
+        AND target.user_id=target.historical_person_user_id
+    ON CONFLICT ON CONSTRAINT notification_events_identity_key DO NOTHING;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER thread_messages_direct_notification AFTER INSERT ON public.thread_messages
+    FOR EACH ROW WHEN (NEW.principal_id IS NOT NULL) EXECUTE FUNCTION public.notification_from_direct_message();
+
+CREATE FUNCTION public.guard_direct_message_notification() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='UPDATE' AND (OLD.source_kind='direct_message' OR NEW.source_kind='direct_message') AND
+        (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,
+         NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id,NEW.principal_id)
+        IS DISTINCT FROM
+        (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,
+         OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id,OLD.principal_id) THEN
+        RAISE EXCEPTION 'direct notification identity is immutable'
+            USING ERRCODE='23514',CONSTRAINT='direct_message_notification_identity';
+    END IF;
+    IF TG_OP='UPDATE' AND OLD.source_kind='direct_message'
+        AND NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+            NEW.recipient_principal_id IS NULL AND OLD.recipient_principal_id IS NOT NULL AND NOT EXISTS (
+                SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id)) THEN
+        RAISE EXCEPTION 'direct recipient can only be cleared by principal deletion'
+            USING ERRCODE='23514',CONSTRAINT='direct_message_notification_identity';
+    END IF;
+    IF NEW.source_kind='direct_message' AND (TG_OP='INSERT' OR NEW.state='active') AND NOT EXISTS (
+        SELECT 1 FROM public.thread_messages AS association
+        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+        WHERE association.company_id=NEW.company_id AND association.id=NEW.source_id
+            AND NEW.channel_id IS NULL AND NEW.principal_id=target.id AND NEW.recipient_principal_id=target.id
+            AND NEW.recipient_user_id=target.user_id
+            AND public.direct_message_notification_can_view(NEW.company_id,NEW.source_id,target.id)
+    ) THEN
+        RAISE EXCEPTION 'direct notification recipient must own the current source membership'
+            USING ERRCODE='23514',CONSTRAINT='direct_message_notification_recipient';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER direct_message_notification_guard BEFORE INSERT OR UPDATE ON public.notifications
+    FOR EACH ROW EXECUTE FUNCTION public.guard_direct_message_notification();
+
+CREATE FUNCTION public.withdraw_direct_message_notifications() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE tenant uuid:=COALESCE(NEW.company_id,OLD.company_id);
+BEGIN
+    UPDATE public.notifications AS notification SET state='withdrawn',state_changed_at=clock_timestamp(),updated_at=clock_timestamp()
+    WHERE notification.company_id=tenant AND notification.source_kind='direct_message' AND notification.state='active'
+        AND (notification.principal_id=COALESCE(NEW.id,OLD.id) OR notification.recipient_principal_id=COALESCE(NEW.id,OLD.id))
+        AND NOT public.direct_message_notification_can_view(tenant,notification.source_id,notification.recipient_principal_id);
+    RETURN COALESCE(NEW,OLD);
+END $$;
+CREATE TRIGGER principals_direct_notification_recheck AFTER UPDATE OF kind,user_id ON public.principals
+    FOR EACH ROW EXECUTE FUNCTION public.withdraw_direct_message_notifications();
+
+CREATE FUNCTION public.resolve_deleted_direct_message_notifications() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    UPDATE public.notifications SET state='resolved',state_changed_at=clock_timestamp(),updated_at=clock_timestamp()
+    WHERE company_id=OLD.company_id AND source_kind='direct_message' AND source_id=OLD.id AND state='active';
+    RETURN OLD;
+END $$;
+CREATE TRIGGER thread_messages_direct_notification_deleted AFTER DELETE ON public.thread_messages
+    FOR EACH ROW WHEN (OLD.principal_id IS NOT NULL) EXECUTE FUNCTION public.resolve_deleted_direct_message_notifications();
+
+-- Principal default workflows have explicit immutable ownership; shared desks remain unowned.
+ALTER TABLE public.workflow_definitions
+    ADD CONSTRAINT workflow_definitions_owner_agent_fk FOREIGN KEY(company_id,owner_agent_id)
+        REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+    ADD CONSTRAINT workflow_definitions_owner_agent_key UNIQUE(company_id,owner_agent_id);
+CREATE FUNCTION public.guard_workflow_definition_owner() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.company_id,NEW.owner_agent_id) IS DISTINCT FROM (OLD.company_id,OLD.owner_agent_id) THEN
+        RAISE EXCEPTION 'workflow ownership is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_definition_owner_immutable';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_definition_owner_immutable BEFORE UPDATE OF company_id,owner_agent_id
+    ON public.workflow_definitions FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_definition_owner();
+
+-- Only owned rows cascade; every incoming publication/history/manifest reference still restricts.
+ALTER TABLE public.agent_revisions DROP CONSTRAINT agent_revisions_company_id_agent_id_fkey;
+ALTER TABLE public.agent_revisions ADD CONSTRAINT agent_revisions_company_id_agent_id_fkey
+    FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED;
+
+CREATE FUNCTION public.check_agent_address_slug() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE tenant uuid; agent uuid;
+BEGIN
+    IF TG_TABLE_NAME='agents' THEN tenant:=NEW.company_id; agent:=NEW.id;
+    ELSE
+        tenant:=NEW.company_id;
+        SELECT principal.agent_id INTO agent FROM public.principals AS principal
+            WHERE principal.company_id=tenant AND principal.id=NEW.principal_id;
+    END IF;
+    IF agent IS NOT NULL AND EXISTS(
+        SELECT 1 FROM public.agents AS owner
+        JOIN public.principals AS principal ON principal.company_id=owner.company_id AND principal.agent_id=owner.id
+        JOIN public.addresses AS address ON address.company_id=principal.company_id AND address.principal_id=principal.id
+        WHERE owner.company_id=tenant AND owner.id=agent AND address.slug<>owner.slug) THEN
+        RAISE EXCEPTION 'agent slug and direct address must agree' USING ERRCODE='23514',
+            CONSTRAINT='agent_address_slug_matches';
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE CONSTRAINT TRIGGER agent_address_slug_matches AFTER INSERT OR UPDATE ON public.agents
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_address_slug();
+CREATE CONSTRAINT TRIGGER address_agent_slug_matches AFTER INSERT OR UPDATE ON public.addresses
+    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_address_slug();

@@ -119,9 +119,21 @@ impl NotificationWorker {
             let key = agent_notice_key(&projection, || {
                 self.deliveries.renderer(TransportKind::Email)
             })?;
-            Ok((email, key))
+            let recipient = match &projection.disposition {
+                crate::entities::notification::NotificationDisposition::Agent {
+                    company,
+                    address_slug: Some(address),
+                    ..
+                } => Some(
+                    self.deliveries
+                        .renderer(TransportKind::Email)?
+                        .application_address(company, address)?,
+                ),
+                _ => None,
+            };
+            Ok((email, key, recipient))
         });
-        let (email, agent_message_key) = match composed {
+        let (email, agent_message_key, agent_recipient) = match composed {
             Ok(composed) => composed,
             Err(error) => {
                 self.fail(&claimed, "composition", &error).await;
@@ -135,6 +147,7 @@ impl NotificationWorker {
                 expected: &projection,
                 email: email.as_ref(),
                 agent_message_key: agent_message_key.as_ref(),
+                agent_recipient: agent_recipient.as_ref(),
                 escalation_ack_hours: self.settings.escalation_ack_hours,
             })
             .await

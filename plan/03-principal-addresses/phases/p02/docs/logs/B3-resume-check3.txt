@@ -1,0 +1,24 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+warning: unused imports: `RelatedAssociation`, `RelatedChannelId`, and `RelatedThreadId`
+ --> src/adapters/persistence/local_agents/protocol/commands.rs:2:36
+  |
+2 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                    ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `RelatedAssociation`, `RelatedChannelId`, and `RelatedThreadId`
+ --> src/adapters/persistence/local_agents/management/mod.rs:4:36
+  |
+4 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                    ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `RelatedChannelId`
+  --> src/application/workflow/message_admission.rs:10:25
+   |
+10 |     RelatedAssociation, RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission,
+   |                         ^^^^^^^^^^^^^^^^
+
+warning: `open_bots` (lib) generated 3 warnings (run `cargo fix --lib -p open_bots` to apply 3 suggestions)
+warning: `open_bots` (lib test) generated 3 warnings (3 duplicates)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 56s

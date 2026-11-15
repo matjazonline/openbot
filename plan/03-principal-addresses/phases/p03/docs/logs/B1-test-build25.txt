@@ -1,0 +1,46 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0433]: cannot find type `TransportRegistry` in this scope
+  --> src/adapters/persistence/workflow/relay_system_identity_tests.rs:34:20
+   |
+34 |     let registry = TransportRegistry::new()
+   |                    ^^^^^^^^^^^^^^^^^ use of undeclared type `TransportRegistry`
+   |
+help: consider importing this struct through its public re-export
+   |
+ 2 + use crate::transport::TransportRegistry;
+   |
+
+error[E0433]: cannot find type `DeliveryWorker` in this scope
+  --> src/adapters/persistence/workflow/relay_system_identity_tests.rs:43:18
+   |
+43 |     let worker = DeliveryWorker::new(Arc::new(d.p().clone()), Arc::new(registry));
+   |                  ^^^^^^^^^^^^^^ use of undeclared type `DeliveryWorker`
+   |
+help: consider importing this struct
+   |
+ 2 + use crate::services::delivery_worker::DeliveryWorker;
+   |
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/relay_system_identity_tests.rs:39:17
+    |
+ 37 |             Arc::new(EmailSender::new(
+    |                      ---------------- arguments to this function are incorrect
+ 38 |                 DeploymentMailTransports::only(smtp.clone()),
+ 39 |                 d.threads.clone(),
+    |                 ^^^^^^^^^^^^^^^^^ expected `Arc<dyn InternalMailRelay>`, found `ThreadUseCases`
+    |
+    = note: expected struct `std::sync::Arc<(dyn application::transport::ports::InternalMailRelay + 'static)>`
+               found struct `application::use_cases::thread::ThreadUseCases`
+note: associated function defined here
+   --> src/adapters/protocols/email/egress.rs:514:12
+    |
+514 |     pub fn new(
+    |            ^^^
+515 |         transports: Arc<dyn CompanyMailTransports>,
+516 |         internal: Arc<dyn InternalMailRelay>,
+    |         ------------------------------------
+
+Some errors have detailed explanations: E0308, E0433.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

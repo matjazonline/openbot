@@ -13,6 +13,7 @@ struct SavedCommand {
 struct SavedInput {
     input: Value,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     rerun_of_run_id: Option<Uuid>,
     delivery_policy: String,
@@ -67,16 +68,18 @@ async fn replay(
     run: Uuid,
 ) -> AppResult<AdmissionResult> {
     let saved = sqlx::query_as::<_, SavedInput>(
-        "SELECT input, channel_id, thread_id, rerun_of_run_id, delivery_policy FROM workflow_runs \
+        "SELECT input, channel_id, principal_id, thread_id, rerun_of_run_id, delivery_policy FROM workflow_runs \
          WHERE company_id = $1 AND id = $2 FOR SHARE",
     )
     .bind(command.company_id().as_uuid())
     .bind(run)
     .fetch_one(&mut **tx)
     .await?;
-    let association = binding_rows::association_columns(command.association());
+    let association = association::association_columns(command.association());
     if saved.input != *command.input()
-        || (saved.channel_id, saved.thread_id) != association
+        || (saved.channel_id != association.channel_id
+            || saved.principal_id != association.principal_id
+            || saved.thread_id != association.thread_id)
         || saved.rerun_of_run_id != command.rerun_of().map(|original| original.as_uuid())
         || saved.delivery_policy != command.delivery_policy().as_str()
     {

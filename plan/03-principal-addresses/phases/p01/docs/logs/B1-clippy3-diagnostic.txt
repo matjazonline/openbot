@@ -1,0 +1,39 @@
+# DIAGNOSTIC ONLY: the 7 pre-plan02 lint-drift findings allowed by name
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error: large size difference between variants
+   --> src/application/use_cases/thread/ingest/routing.rs:886:1
+    |
+886 | / enum AddressedSlug {
+887 | |     Desk(Channel),
+    | |     ------------- the largest variant contains at least 272 bytes
+888 | |     /// Disabled is undeliverable for everyone, so it is decided before the ACL, which rules only
+889 | |     /// on *this sender's* access.
+...   |
+896 | |     Unknown(Vec<ChannelSlug>),
+    | |     ------------------------- the second-largest variant contains at least 24 bytes
+897 | | }
+    | |_^ the entire enum is at least 272 bytes
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#large_enum_variant
+    = note: `-D clippy::large-enum-variant` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::large_enum_variant)]`
+help: consider boxing the large fields or introducing indirection in some other way to reduce the total size of the enum
+    |
+887 -     Desk(Channel),
+887 +     Desk(Box<Channel>),
+    |
+
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src/adapters/persistence/department_lead_desk_tests.rs:306:34
+    |
+306 |     let refused = create_led(&f, &person, None).await;
+    |                                  ^^^^^^^ help: change this to: `person`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#needless_borrow
+    = note: `-D clippy::needless-borrow` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: could not compile `open_bots` (lib test) due to 2 previous errors
+EXIT 101

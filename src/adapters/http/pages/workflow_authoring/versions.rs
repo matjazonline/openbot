@@ -78,10 +78,15 @@ fn compare_form(view: &VersionsView<'_>) -> String {
 pub(super) fn association_label(binding: &BindingUse) -> String {
     match binding.binding.association {
         RelatedAssociation::Company => "Company-wide (manual starts and schedules)".to_owned(),
+        RelatedAssociation::Principal(_) => "Direct address".to_owned(),
         RelatedAssociation::Channel(_) => format!(
             "Desk {}",
             binding.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
+        RelatedAssociation::Thread {
+            target: crate::entities::address::AddressTarget::Principal(_),
+            ..
+        } => "A direct thread".to_owned(),
         RelatedAssociation::Thread { .. } => format!(
             "One thread of desk {}",
             binding.channel_name.as_deref().unwrap_or("(unnamed)")

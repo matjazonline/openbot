@@ -236,12 +236,12 @@ pub fn workflow_source_message_page(
         <h1 class="text-xl font-bold">Source message</h1>
         <p class="break-all text-xs">Message {id}</p>
         <article id="source-message" tabindex="-1" autofocus>{bubble}</article>
-        <a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}">Open latest conversation</a>
+        <a class="link" href="/ui?company_id={company}&amp;{target_query}&amp;thread_id={thread}">Open latest conversation</a>
         </main>"#,
             id = message.canonical_id.as_uuid(),
             bubble = message_bubble_readonly(message, Some(viewer_email), scope, run_access),
             company = scope.company_id,
-            channel = scope.channel_id,
+            target_query = super::inbox_target_query(scope.target),
             thread = message.thread_id
         ),
     )

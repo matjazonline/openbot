@@ -17,17 +17,15 @@ async fn agent_of(f: &Departments, principal: PrincipalId) -> Uuid {
         .unwrap()
 }
 
-/// The agent's default desk, as its `agent:{id}` record names it.
-async fn agent_desk(f: &Departments, agent: Uuid) -> Uuid {
-    sqlx::query_scalar(
-        "SELECT (result->'channel'->>'id')::uuid FROM workflow_provisioning_commands \
-         WHERE company_id = $1 AND command_key = $2",
+async fn principal_for_agent(f: &Departments, agent: Uuid) -> PrincipalId {
+    PrincipalId::new(
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2")
+            .bind(f.company)
+            .bind(agent)
+            .fetch_one(f.pool())
+            .await
+            .unwrap(),
     )
-    .bind(f.company)
-    .bind(format!("agent:{agent}"))
-    .fetch_one(f.pool())
-    .await
-    .unwrap()
 }
 
 async fn address(f: &Departments, slug: &str) -> String {
@@ -115,10 +113,10 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
         )
     );
     assert!(!roster.more_children);
-    let agents: Vec<(&str, bool, Option<RosterDesk>)> = roster
+    let agents: Vec<(&str, bool, Option<crate::application::agent::AgentAddress>)> = roster
         .agents
         .iter()
-        .map(|agent| (agent.slug.as_str(), agent.lead, agent.desk.clone()))
+        .map(|agent| (agent.slug.as_str(), agent.lead, agent.address.clone()))
         .collect();
     assert_eq!(
         agents,
@@ -126,18 +124,18 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
             (
                 "closer",
                 true,
-                at(
-                    agent_desk(&f, closer_agent).await,
-                    address(&f, "closer").await
-                )
+                Some(crate::application::agent::AgentAddress {
+                    principal_id: principal_for_agent(&f, closer_agent).await,
+                    address: address(&f, "closer").await
+                })
             ),
             (
                 "worker",
                 false,
-                at(
-                    agent_desk(&f, worker_agent).await,
-                    address(&f, "worker").await
-                )
+                Some(crate::application::agent::AgentAddress {
+                    principal_id: principal_for_agent(&f, worker_agent).await,
+                    address: address(&f, "worker").await
+                })
             ),
         ]
     );
@@ -146,11 +144,19 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
     let member = context(&f, desk, worker_agent).await.unwrap();
     assert!(!member.lead);
     assert_eq!(member.roster, lead.roster);
-    // A member's own default desk is not the department's: the framing follows ownership.
-    assert_eq!(
-        context(&f, agent_desk(&f, worker_agent).await, worker_agent).await,
-        None
-    );
+    // Explicit unowned shared desks still have no department context.
+    let unowned = crate::application::ports::channel::ChannelPersistence::create(
+        &f.persistence,
+        f.company,
+        crate::application::ports::channel::ChannelWrite {
+            name: "Unowned".into(),
+            slug: "unowned".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    assert_eq!(context(&f, unowned.id, worker_agent).await, None);
 
     sqlx::query("UPDATE channels SET access_mode = 'public' WHERE id = $1")
         .bind(desk)
@@ -210,6 +216,6 @@ async fn department_context_roster_is_bounded() {
     assert_eq!(roster.agents.len(), MAX_ROSTER_AGENTS);
     assert_eq!(roster.agents[0].slug, "agent-00");
     // Bare agents have no default desk record.
-    assert!(roster.agents.iter().all(|agent| agent.desk.is_none()));
+    assert!(roster.agents.iter().all(|agent| agent.address.is_none()));
     assert!(roster.more_agents);
 }

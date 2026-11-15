@@ -1,0 +1,21 @@
+
+running 16 tests
+test adapters::smtp::server::answer_tests::a_failure_of_ours_is_transient_and_a_malformed_message_is_not ... ok
+test adapters::smtp::server::answer_tests::a_message_the_platform_chose_not_to_route_is_accepted_and_dropped ... ok
+test adapters::smtp::server::answer_tests::a_message_refused_on_its_merits_is_a_permanent_rejection ... ok
+test adapters::smtp::server::tests::test_dkim_verification_with_gmail_raw_email ... ignored, optional live DNS smoke; required CI denies external egress
+test adapters::smtp::server::answer_tests::an_accepted_message_is_queued ... ok
+test adapters::smtp::server::tests::test_spf_verification_with_google_ip ... ignored, optional live DNS smoke; required CI denies external egress
+test adapters::smtp::server::tests::smtp_line_limits_accept_boundary_and_reject_one_over ... ok
+test adapters::smtp::server::tests::test_parse_raw_mime_to_payload ... ok
+test adapters::smtp::server::tests::smtp_reuses_the_injected_scanner_across_messages ... ok
+test adapters::smtp::server::tests::declared_size_and_streamed_data_share_the_twenty_mib_limit ... ok
+test adapters::smtp::server::tests::smtp_sender_trust_lookup_failure_is_logged_and_scanned ... ok
+test adapters::smtp::server::tests::test_smtp_rate_limiting_and_monitoring ... ok
+test adapters::smtp::server::tests::stale_dkim_and_submitted_auth_headers_do_not_authorize_smtp_mail ... ok
+test adapters::smtp::server::tests::submitted_authentication_headers_cannot_authorize_smtp_mail ... ok
+test adapters::smtp::server::tests::smtp_sender_trust_matches_routing_aliases_and_distinguishes_strangers ... ok
+test adapters::smtp::server::tests::address_external_ingress_smtp_does_not_confirm_a_members_address ... ok
+
+test result: ok. 14 passed; 0 failed; 2 ignored; 0 measured; 4569 filtered out; finished in 1.64s
+

@@ -1,0 +1,7 @@
+{
+  "added": [
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search: test",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change: test"
+  ],
+  "removed": []
+}

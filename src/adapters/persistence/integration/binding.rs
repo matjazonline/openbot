@@ -44,15 +44,15 @@ impl ChannelBindingPersistence for PostgresPersistence {
             r#"INSERT INTO channel_bindings
                    (id, company_id, channel_id, installation_id, transport, namespace,
                     external_endpoint_key, display_label, access_policy, delivery_policy,
-                    status, created_by, access_snapshot)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12)
+                    status, created_by, access_snapshot, principal_id)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'active', $11, $12, $13)
                RETURNING {}"#,
             binding_columns_for_returning()
         );
         let binding: ChannelBinding = sqlx::query_as::<_, BindingDb>(&query)
             .bind(Uuid::new_v4())
             .bind(write.company_id)
-            .bind(write.channel_id)
+            .bind(write.target.desk_id())
             .bind(write.installation_id.map(Into::<Uuid>::into))
             .bind(write.transport.as_str())
             .bind(write.namespace.as_str())
@@ -62,6 +62,7 @@ impl ChannelBindingPersistence for PostgresPersistence {
             .bind(write.delivery_policy.as_str())
             .bind(&created_by)
             .bind(&access_snapshot)
+            .bind(write.target.principal_id().map(|id| id.as_uuid()))
             .fetch_one(&mut *transaction)
             .await
             .map_err(endpoint_conflict_error)?
@@ -79,19 +80,21 @@ impl ChannelBindingPersistence for PostgresPersistence {
         Ok(binding)
     }
 
-    async fn active_bindings_for_channel(
+    async fn active_bindings_for_target(
         &self,
         company_id: Uuid,
-        channel_id: Uuid,
+        target: crate::entities::address::AddressTarget,
     ) -> AppResult<Vec<ChannelBinding>> {
         let query = format!(
-            "{} AND binding.company_id = $1 AND binding.channel_id = $2 \
+            "{} AND binding.company_id = $1 AND binding.channel_id IS NOT DISTINCT FROM $2 \
+             AND binding.principal_id IS NOT DISTINCT FROM $3 \
              ORDER BY binding.transport, binding.created_at, binding.id",
             active_binding_select()
         );
         sqlx::query_as::<_, BindingDb>(&query)
             .bind(company_id)
-            .bind(channel_id)
+            .bind(target.desk_id())
+            .bind(target.principal_id().map(|id| id.as_uuid()))
             .fetch_all(&self.pool)
             .await
             .map_err(AppError::from)?
@@ -169,6 +172,42 @@ impl ChannelBindingPersistence for PostgresPersistence {
         let action = change.audit_action();
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
 
+        sqlx::query("SET LOCAL lock_timeout='5s'")
+            .execute(&mut *transaction)
+            .await?;
+        // Pin the tenant before child rows, matching the parent locks an audit insert needs.
+        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
+            .bind(change.company_id)
+            .fetch_optional(&mut *transaction)
+            .await?
+            .ok_or_else(|| AppError::NotFound("That company was not found.".into()))?;
+        let principal: Option<Option<Uuid>> = sqlx::query_scalar(
+            "SELECT principal_id FROM channel_bindings WHERE company_id=$1 AND id=$2",
+        )
+        .bind(change.company_id)
+        .bind(change.binding_id.as_uuid())
+        .fetch_optional(&mut *transaction)
+        .await?;
+        if let Some(principal) = principal
+            .ok_or_else(|| AppError::NotFound("That channel binding was not found.".into()))?
+        {
+            sqlx::query("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR UPDATE")
+                .bind(change.company_id)
+                .bind(principal)
+                .fetch_optional(&mut *transaction)
+                .await?
+                .ok_or_else(|| AppError::NotFound("That principal was not found.".into()))?;
+        }
+        let previous: ChannelBinding = sqlx::query_as::<_, BindingDb>(&format!(
+            "SELECT {} FROM channel_bindings AS binding WHERE binding.company_id=$1 AND binding.id=$2 FOR UPDATE",
+            binding_columns_for_returning()))
+            .bind(change.company_id).bind(change.binding_id.as_uuid()).fetch_optional(&mut *transaction).await?
+            .ok_or_else(|| AppError::NotFound("That channel binding was not found.".into()))?.try_into()?;
+        if previous.status == change.status && previous.disabled_reason == change.reason {
+            transaction.commit().await?;
+            return Ok(previous);
+        }
+
         let query = format!(
             r#"UPDATE channel_bindings AS binding
                SET status = $3,
@@ -234,7 +273,7 @@ impl ChannelBindingPersistence for PostgresPersistence {
 /// The metadata comes from [`ChannelBinding::audit_metadata`] rather than from the caller, so no
 /// call site can decide to put something else in it.
 pub(super) async fn append_audit_event(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    transaction: &mut sqlx::PgConnection,
     binding: &ChannelBinding,
     action: BindingAuditAction,
     reason: Option<BindingChangeReason>,
@@ -254,7 +293,7 @@ pub(super) async fn append_audit_event(
     .bind(stored_reason(reason))
     .bind(encoded_provenance(actor)?)
     .bind(metadata)
-    .execute(&mut **transaction)
+    .execute(&mut *transaction)
     .await
     .map_err(AppError::from)?;
     Ok(())

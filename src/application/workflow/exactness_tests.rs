@@ -11,7 +11,8 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
         AgentBuiltinTool::MessageSend,
         AgentBuiltinTool::MessageReply,
         AgentBuiltinTool::ListCompanyAgents,
-        AgentBuiltinTool::CreateAgentChannel,
+        AgentBuiltinTool::CreateAgent,
+        AgentBuiltinTool::CreateDeskForAgent,
         AgentBuiltinTool::SearchKnowledge,
         AgentBuiltinTool::SearchMemory,
         AgentBuiltinTool::MemoryTimeline,
@@ -25,7 +26,8 @@ fn every_builtin() -> Vec<AgentBuiltinTool> {
             AgentBuiltinTool::MessageSend
             | AgentBuiltinTool::MessageReply
             | AgentBuiltinTool::ListCompanyAgents
-            | AgentBuiltinTool::CreateAgentChannel
+            | AgentBuiltinTool::CreateAgent
+            | AgentBuiltinTool::CreateDeskForAgent
             | AgentBuiltinTool::SearchKnowledge
             | AgentBuiltinTool::SearchMemory
             | AgentBuiltinTool::MemoryTimeline

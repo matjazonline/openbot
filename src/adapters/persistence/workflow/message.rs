@@ -44,7 +44,25 @@ impl action_dispatch::SqlActionAuthority for MessageActionAuthority {
         }
         let kind =
             MessageKind::parse(request.contract.contract.name.as_str()).ok_or_else(missing)?;
-        current_message_on(tx, request.scope.company, authority.actor, kind).await
+        let current = current_message_on(tx, request.scope.company, authority.actor, kind).await?;
+        let run = run_route_on(tx, request.scope).await?;
+        association::authorize_association(
+            tx,
+            request.scope.company,
+            authority.actor,
+            run.association,
+        )
+        .await?;
+        if let MessageArguments::Reply { source, .. } =
+            MessageArguments::parse(kind, &request.arguments)?
+        {
+            let source = source_association_on(tx, request.scope.company, source, run.association)
+                .await?
+                .ok_or_else(missing)?;
+            association::authorize_association(tx, request.scope.company, authority.actor, source)
+                .await?;
+        }
+        Ok(current)
     }
 }
 
@@ -217,6 +235,13 @@ impl MessageActionPreparation for PostgresPersistence {
     ) -> AppResult<MessageRoutes> {
         let mut tx = begin_http(self).await?;
         let run = run_route_on(&mut tx, request.scope).await?;
+        let author = message_author_on(
+            &mut tx,
+            request.scope,
+            request.context.origin.into(),
+            run.association,
+        )
+        .await?;
         let targets = match arguments {
             MessageArguments::Send { destinations, .. } => {
                 let mut targets = Vec::with_capacity(destinations.len());
@@ -236,59 +261,131 @@ impl MessageActionPreparation for PostgresPersistence {
             company_slug: run.company_slug,
             correlation_id: run.correlation_id,
             targets,
+            author,
             delivery_policy: run.delivery_policy,
         })
     }
+}
+
+enum MessageAuthorSource {
+    Workflow,
+    Agent(Uuid),
+    Final,
+}
+
+impl From<crate::application::agent::ToolCallOrigin> for MessageAuthorSource {
+    fn from(origin: crate::application::agent::ToolCallOrigin) -> Self {
+        match origin {
+            crate::application::agent::ToolCallOrigin::Agent(origin) => {
+                Self::Agent(origin.agent.as_uuid())
+            }
+            crate::application::agent::ToolCallOrigin::ChannelFinal(_) => Self::Final,
+            crate::application::agent::ToolCallOrigin::Workflow => Self::Workflow,
+        }
+    }
+}
+
+async fn message_author_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    origin: MessageAuthorSource,
+    association: RelatedAssociation,
+) -> AppResult<crate::application::workflow::message::WorkflowMessageAuthor> {
+    use crate::application::workflow::message::WorkflowMessageAuthor;
+    let actual_agent = match origin {
+        MessageAuthorSource::Agent(agent) => Some(agent),
+        MessageAuthorSource::Final => sqlx::query_scalar(
+            "SELECT agent_id FROM agent_history_exchanges WHERE company_id=$1 AND run_id=$2 AND execution_id=$3",
+        ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
+            .fetch_optional(&mut *db).await?,
+        MessageAuthorSource::Workflow => None,
+    };
+    let principal = if let Some(agent) = actual_agent {
+        Some(
+            sqlx::query_scalar::<_, Uuid>(
+                "SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND kind='agent'",
+            )
+            .bind(scope.company.as_uuid())
+            .bind(agent)
+            .fetch_optional(&mut *db)
+            .await?
+            .ok_or_else(missing)?,
+        )
+    } else if let Some(AddressTarget::Principal(principal)) = association.target() {
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id=$1 AND id=$2 AND kind='agent'",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(principal.as_uuid())
+        .fetch_optional(&mut *db)
+        .await?
+        .ok_or_else(missing)
+        .map(Some)?
+    } else {
+        None
+    };
+    Ok(principal.map_or(WorkflowMessageAuthor::System, |id| {
+        WorkflowMessageAuthor::Agent(crate::entities::transport::PrincipalId::new(id))
+    }))
 }
 
 /// The run's explicit channel/thread scope and the company's slug.
 pub(super) struct RunRoute {
     company_slug: CompanySlug,
     correlation_id: CorrelationId,
-    channel: Option<Uuid>,
-    thread: Option<Uuid>,
+    association: RelatedAssociation,
     delivery_policy: DeliveryPolicy,
 }
 
 async fn run_route_on(tx: &mut PgConnection, scope: ActionScope) -> AppResult<RunRoute> {
-    let (slug, correlation, channel, thread, policy): (String, Uuid, Option<Uuid>, Option<Uuid>, String) = sqlx::query_as(
-        "SELECT company.slug, run.correlation_id, run.channel_id, run.thread_id, run.delivery_policy FROM workflow_runs AS run \
-         JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .fetch_optional(&mut *tx)
-    .await?
-    .ok_or_else(missing)?;
+    #[derive(sqlx::FromRow)]
+    struct RunRow {
+        slug: String,
+        correlation_id: Uuid,
+        channel_id: Option<Uuid>,
+        principal_id: Option<Uuid>,
+        thread_id: Option<Uuid>,
+        delivery_policy: String,
+    }
+    let row = sqlx::query_as::<_, RunRow>(
+        "SELECT company.slug::text,run.correlation_id,run.channel_id,run.principal_id,run.thread_id,run.delivery_policy \
+         FROM workflow_runs AS run JOIN companies AS company ON company.id=run.company_id WHERE run.company_id=$1 AND run.id=$2",
+    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(tx).await?.ok_or_else(missing)?;
     Ok(RunRoute {
-        company_slug: CompanySlug::from(slug),
-        correlation_id: CorrelationId::from(correlation),
-        channel,
-        thread,
-        delivery_policy: DeliveryPolicy::parse(&policy)?,
+        company_slug: CompanySlug::from(row.slug),
+        correlation_id: CorrelationId::from(row.correlation_id),
+        association: association::association_from_columns(association::AssociationColumns {
+            channel_id: row.channel_id,
+            principal_id: row.principal_id,
+            thread_id: row.thread_id,
+        })?,
+        delivery_policy: DeliveryPolicy::parse(&row.delivery_policy)?,
     })
 }
 
-pub(super) async fn channel_route_on(
+pub(super) async fn address_route_on(
     tx: &mut PgConnection,
     company: CompanyId,
-    channel: Uuid,
-) -> AppResult<Option<ChannelRoute>> {
-    let row: Option<(Uuid, String, Option<String>)> = sqlx::query_as(
-        "SELECT channel.id, channel.name, (SELECT alias.slug::text FROM channel_slugs AS alias \
-           WHERE alias.channel_id=channel.id AND alias.is_primary) \
-         FROM channels AS channel WHERE channel.company_id=$1 AND channel.id=$2",
-    )
-    .bind(company.as_uuid())
-    .bind(channel)
-    .fetch_optional(&mut *tx)
-    .await?;
-    Ok(row.and_then(|(id, name, slug)| {
-        Some(ChannelRoute {
-            id,
-            slug: ChannelSlug::from(slug?),
-            name,
-        })
+    target: AddressTarget,
+) -> AppResult<Option<MessageSender>> {
+    #[derive(sqlx::FromRow)]
+    struct SenderRow {
+        slug: String,
+        name: String,
+    }
+    let row = sqlx::query_as::<_, SenderRow>(
+        "SELECT address.slug::text AS slug, COALESCE(channel.name,principal.display_label) AS name \
+         FROM addresses AS address \
+         LEFT JOIN channels AS channel ON channel.company_id=address.company_id AND channel.id=address.channel_id \
+         LEFT JOIN principals AS principal ON principal.company_id=address.company_id AND principal.id=address.principal_id \
+         WHERE address.company_id=$1 AND address.channel_id IS NOT DISTINCT FROM $2::uuid \
+           AND address.principal_id IS NOT DISTINCT FROM $3::uuid AND address.is_primary",
+    ).bind(company.as_uuid()).bind(target.desk_id()).bind(target.principal_id().map(|id| id.as_uuid()))
+        .fetch_optional(tx).await?;
+    Ok(row.map(|row| MessageSender {
+        target,
+        slug: ChannelSlug::from(row.slug),
+        name: row.name,
     }))
 }
 
@@ -354,10 +451,11 @@ async fn send_target_on(
         }
         DestinationKind::User => {
             // Never pick a first or default channel: email needs the run's explicit sender.
-            let channel = run
-                .channel
-                .ok_or_else(|| refused("emailing a user requires the run's channel"))?;
-            let sender = channel_route_on(tx, company, channel)
+            let target = run
+                .association
+                .target()
+                .ok_or_else(|| refused("emailing a user requires the run's inbox"))?;
+            let sender = address_route_on(tx, company, target)
                 .await?
                 .ok_or_else(|| refused("the run channel cannot send email"))?;
             let member = member_on(tx, company, destination.id, false)
@@ -379,26 +477,23 @@ pub(super) async fn source_association_on(
     tx: &mut PgConnection,
     company: CompanyId,
     source: CanonicalMessageId,
-    run_channel: Option<Uuid>,
-    run_thread: Option<Uuid>,
-) -> AppResult<Option<(Uuid, Uuid)>> {
-    let rows: Vec<(Uuid, Uuid)> = sqlx::query_as(
-        "SELECT association.thread_id, association.channel_id FROM thread_messages AS association \
+    run: RelatedAssociation,
+) -> AppResult<Option<RelatedAssociation>> {
+    let target = run.target();
+    let rows = sqlx::query_as::<_, association::AssociationColumns>(
+        "SELECT association.thread_id,association.channel_id,association.principal_id FROM thread_messages AS association \
          WHERE association.company_id=$1 AND association.message_id=$2 \
            AND ($3::uuid IS NULL OR association.thread_id=$3) \
-           AND ($4::uuid IS NULL OR association.channel_id=$4) \
+           AND ($4 OR (association.channel_id IS NOT DISTINCT FROM $5::uuid \
+             AND association.principal_id IS NOT DISTINCT FROM $6::uuid)) \
          ORDER BY association.id LIMIT 2",
-    )
-    .bind(company.as_uuid())
-    .bind(source.as_uuid())
-    .bind(run_thread)
-    .bind(run_channel)
-    .fetch_all(&mut *tx)
-    .await?;
-    Ok(match rows.as_slice() {
-        [only] => Some(*only),
-        _ => None,
-    })
+    ).bind(company.as_uuid()).bind(source.as_uuid()).bind(run.thread_id().map(|id| id.as_uuid()))
+        .bind(target.is_none()).bind(target.and_then(AddressTarget::desk_id))
+        .bind(target.and_then(AddressTarget::principal_id).map(|id| id.as_uuid())).fetch_all(tx).await?;
+    match rows.as_slice() {
+        [only] => association::association_from_columns(*only).map(Some),
+        _ => Ok(None),
+    }
 }
 
 #[derive(sqlx::FromRow)]
@@ -416,11 +511,16 @@ async fn reply_target_on(
     run: &RunRoute,
     source: CanonicalMessageId,
 ) -> AppResult<RouteTarget> {
-    let (thread, channel) = source_association_on(tx, company, source, run.channel, run.thread)
-        .await?
-        .ok_or_else(|| {
-            refused("the source message has no unambiguous association in this run's scope")
-        })?;
+    let RelatedAssociation::Thread { target, thread_id } =
+        source_association_on(tx, company, source, run.association)
+            .await?
+            .ok_or_else(|| {
+                refused("the source message has no unambiguous association in this run's scope")
+            })?
+    else {
+        return Err(invalid_message());
+    };
+    let thread = thread_id.as_uuid();
     let facts: SourceFacts = sqlx::query_as(
         "SELECT message.direction, message.audience, email.rfc_message_id, email.references_list, \
            (SELECT identity.subject FROM message_participants AS participant \
@@ -442,7 +542,7 @@ async fn reply_target_on(
         return Ok(RouteTarget::ReplyInternal {
             source,
             thread,
-            channel,
+            target,
         });
     }
     let (Some(rfc), Some(sender)) = (facts.rfc_message_id, facts.sender) else {
@@ -455,14 +555,14 @@ async fn reply_target_on(
             "only received email or internal messages can be answered",
         ));
     }
-    let sender_channel = channel_route_on(tx, company, channel)
+    let sender_inbox = address_route_on(tx, company, target)
         .await?
         .ok_or_else(|| refused("the source channel cannot send email"))?;
-    let relay = source_relay_on(tx, company, source, channel).await?;
+    let relay = source_relay_on(tx, company, source, target).await?;
     Ok(RouteTarget::ReplyEmail {
         source,
         thread,
-        sender: sender_channel,
+        sender: sender_inbox,
         recipient: EmailAddress::from(sender),
         in_reply_to: MessageId::from(rfc),
         references: facts
@@ -482,24 +582,26 @@ async fn source_relay_on(
     tx: &mut PgConnection,
     company: CompanyId,
     source: CanonicalMessageId,
-    channel: Uuid,
+    target: AddressTarget,
 ) -> AppResult<Option<SourceRelay>> {
-    let recorded: Option<(i32, Vec<Uuid>)> = sqlx::query_as(
-        "SELECT hop_count, trace_channels FROM workflow_message_intents \
-         WHERE company_id=$1 AND message_id=$2 AND channel_id=$3",
+    let recorded: Option<(i32, serde_json::Value)> = sqlx::query_as(
+        "SELECT hop_count, trace_targets FROM workflow_message_intents \
+         WHERE company_id=$1 AND message_id=$2 AND channel_id IS NOT DISTINCT FROM $3::uuid AND principal_id IS NOT DISTINCT FROM $4::uuid",
     )
     .bind(company.as_uuid())
     .bind(source.as_uuid())
-    .bind(channel)
+    .bind(target.desk_id())
+    .bind(target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut *tx)
     .await?;
-    let Some((hop_count, trace_channels)) = recorded else {
+    let Some((hop_count, trace_targets)) = recorded else {
         return Ok(None);
     };
     Ok(Some(SourceRelay {
         hop_count: u32::try_from(hop_count)
             .map_err(|_| refused("the source's recorded relay trace cannot be read"))?,
-        trace_channels,
+        trace_targets: serde_json::from_value(trace_targets)
+            .map_err(|_| refused("the source relay trace is invalid"))?,
     }))
 }
 
@@ -511,10 +613,12 @@ pub(super) async fn final_reply_route_on(
 ) -> AppResult<MessageRoutes> {
     let run = run_route_on(db, scope).await?;
     let target = reply_target_on(db, scope.company, &run, source).await?;
+    let author = message_author_on(db, scope, MessageAuthorSource::Final, run.association).await?;
     Ok(MessageRoutes {
         company_slug: run.company_slug,
         correlation_id: run.correlation_id,
         targets: vec![target],
+        author,
         delivery_policy: run.delivery_policy,
     })
 }

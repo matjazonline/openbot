@@ -1,0 +1,51 @@
+[
+  {
+    "level": "warning",
+    "code": "clippy::unneeded_wildcard_pattern",
+    "message": "this pattern is unneeded as the `..` pattern can match that element",
+    "path": "src/adapters/http/routes/ui_schedules.rs",
+    "line": 373
+  },
+  {
+    "level": "warning",
+    "code": "clippy::unneeded_wildcard_pattern",
+    "message": "this pattern is unneeded as the `..` pattern can match that element",
+    "path": "src/adapters/http/routes/ui_schedules.rs",
+    "line": 407
+  },
+  {
+    "level": "warning",
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "path": "src/adapters/http/routes/knowledge/upload.rs",
+    "line": 10
+  },
+  {
+    "level": "warning",
+    "code": "clippy::result_large_err",
+    "message": "the `Err`-variant returned from this function is very large",
+    "path": "src/adapters/http/routes/knowledge/upload.rs",
+    "line": 38
+  },
+  {
+    "level": "warning",
+    "code": "clippy::single_match",
+    "message": "you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`",
+    "path": "src/adapters/persistence/department.rs",
+    "line": 346
+  },
+  {
+    "level": "warning",
+    "code": "clippy::map_or_identity",
+    "message": "expression can be simplified using `Option::unwrap_or()`",
+    "path": "src/application/services/model_usage/mod.rs",
+    "line": 24
+  },
+  {
+    "level": "warning",
+    "code": "clippy::chunks_exact_to_as_chunks",
+    "message": "using `chunks_exact` with a constant chunk size",
+    "path": "src/domain/workflow/reply_integrity.rs",
+    "line": 29
+  }
+]

@@ -84,15 +84,14 @@ async fn scope_access_on(
     let scope = case_scope_on(db, company, EscalationId::new(source.case_id))
         .await?
         .ok_or_else(missing)?;
-    let association = match (scope.channel_id, scope.thread_id) {
-        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
-            thread_id: RelatedThreadId::new(thread),
-        },
-        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        (None, _) if viewer.privileged => RelatedAssociation::Company,
-        _ => return Err(missing()),
-    };
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: scope.channel_id,
+        principal_id: scope.principal_id,
+        thread_id: scope.thread_id,
+    })?;
+    if association == RelatedAssociation::Company && !viewer.privileged {
+        return Err(missing());
+    }
     association::authorize_association(db, company, actor, association).await?;
     let access = payload_access_on(db, &scope, actor).await?;
     Ok((viewer, access))

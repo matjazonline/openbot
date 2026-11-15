@@ -245,6 +245,11 @@ async fn a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relatio
     .await
     .unwrap();
 
+    crate::adapters::persistence::test_support::register_native_agent_address(
+        persistence.as_ref(),
+        &agent,
+    )
+    .await;
     let mut version_a = agent_write("snapshot-agent");
     version_a.name = "Snapshot version A".into();
     version_a.skill_ids = vec![first.id];

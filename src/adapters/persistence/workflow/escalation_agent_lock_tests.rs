@@ -1,9 +1,6 @@
 //! Actual worker attempts at the two nonblocking authority boundaries. Full D3
 //! role-writer and three-claimant schedules remain distinct acceptance obligations.
 use super::*;
-use crate::adapters::persistence::channel_gate::{
-    ChannelGateAccess, ChannelGateKey, acquire_channel_gates_on,
-};
 use crate::adapters::persistence::test_support::minted_agent_notice_key;
 use crate::application::notification::{
     NotificationPersistence, NotificationProjectionCommit, NotificationProjectionCommitOutcome,
@@ -43,16 +40,12 @@ async fn workflow_escalation_agent_company_nowait_defers_once_and_releases_its_g
         .execute(&mut *company_writer)
         .await
         .unwrap();
-    acquire_channel_gates_on(
-        &mut company_writer,
-        [ChannelGateKey::new(
-            f.people.role.company().as_uuid(),
-            f.created.desk_id,
-        )],
-        ChannelGateAccess::ChangeSettings,
-    )
-    .await
-    .expect("the notice's whole rollback released its shared gate before queue backoff");
+    sqlx::query("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR UPDATE")
+        .bind(f.people.role.company().as_uuid())
+        .bind(f.created.principal_id.as_uuid())
+        .execute(&mut *company_writer)
+        .await
+        .expect("the notice rollback releases its principal gate before queue backoff");
     company_writer.rollback().await.unwrap();
     retry_notice(&f).await;
     assert_eq!(notice_queue(&f).await["attempts"], 2);
@@ -135,12 +128,15 @@ async fn workflow_escalation_agent_lost_lease_rolls_back_canonical_message_inten
         .unwrap();
     let before = facts(&f).await;
     let key = minted_agent_notice_key(&expected);
+    let recipient =
+        crate::adapters::persistence::test_support::minted_agent_notice_recipient(&expected);
     let (outcome, _) = p
         .commit_notification_projection(NotificationProjectionCommit {
             fence: &claims[0].lease,
             expected: &expected,
             email: None,
             agent_message_key: key.as_ref(),
+            agent_recipient: recipient.as_ref(),
             escalation_ack_hours: Default::default(),
         })
         .await

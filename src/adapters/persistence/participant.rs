@@ -26,8 +26,11 @@ use crate::entities::transport::PrincipalId;
 use crate::entities::transport::QualifiedIdentity;
 use crate::entities::transport::TransportKind;
 use crate::entities::value_objects::EmailAddress;
+use crate::use_cases::channel::person_address_base;
 use crate::use_cases::participant::IdentityDirectory;
 use crate::use_cases::participant::IdentityResolution;
+
+mod person;
 
 #[derive(sqlx::FromRow)]
 struct PrincipalDb {
@@ -37,6 +40,9 @@ struct PrincipalDb {
     user_id: Option<Uuid>,
     agent_id: Option<Uuid>,
     display_label: String,
+    open_to_public: bool,
+    settings_revision: i64,
+    historical_person_user_id: Option<Uuid>,
     created_at: DateTime<Utc>,
     updated_at: DateTime<Utc>,
 }
@@ -54,6 +60,9 @@ impl TryFrom<PrincipalDb> for Principal {
             user_id: row.user_id,
             agent_id: row.agent_id,
             display_label: row.display_label,
+            open_to_public: row.open_to_public,
+            settings_revision: row.settings_revision,
+            historical_person_user_id: row.historical_person_user_id,
             created_at: row.created_at,
             updated_at: row.updated_at,
         })
@@ -137,7 +146,8 @@ impl TryFrom<IdentityDb> for PrincipalIdentity {
 }
 
 const PRINCIPAL_SELECT: &str = r#"
-    SELECT id, company_id, kind, user_id, agent_id, display_label, created_at, updated_at
+    SELECT id, company_id, kind, user_id, agent_id, display_label, created_at, updated_at,
+           open_to_public, settings_revision, historical_person_user_id
     FROM principals
 "#;
 
@@ -335,71 +345,11 @@ pub(crate) async fn create_person_principal_on(
     email: &str,
 ) -> AppResult<PrincipalId> {
     let qualified = account_email_identity(email)?;
-    lock_identity_key(connection, company_id, &qualified).await?;
 
-    let existing: Option<(Uuid, String, Option<Uuid>)> = sqlx::query_as(
-        r#"SELECT principal.id, principal.kind, principal.user_id
-           FROM participant_identities AS identity
-           JOIN principals AS principal
-             ON (principal.company_id, principal.id) =
-                (identity.company_id, identity.principal_id)
-           WHERE identity.company_id = $1 AND identity.transport = 'email'
-             AND identity.namespace = $2 AND identity.subject = $3
-           FOR UPDATE OF principal, identity"#,
-    )
-    .bind(company_id)
-    .bind(qualified.namespace().as_str())
-    .bind(qualified.subject().as_str())
-    .fetch_optional(&mut *connection)
-    .await
-    .map_err(AppError::from)?;
+    let principal_id =
+        person::resolve_on(connection, company_id, user_id, display_label, &qualified).await?;
 
-    let principal_id = match existing {
-        Some((id, kind, _)) if kind == "external" => {
-            sqlx::query(
-                r#"UPDATE principals
-                   SET kind = 'person', user_id = $3, display_label = $4,
-                       updated_at = CURRENT_TIMESTAMP
-                   WHERE company_id = $1 AND id = $2"#,
-            )
-            .bind(company_id)
-            .bind(id)
-            .bind(user_id)
-            .bind(display_label)
-            .execute(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            PrincipalId::new(id)
-        }
-        Some((id, kind, Some(existing_user_id)))
-            if kind == "person" && existing_user_id == user_id =>
-        {
-            PrincipalId::new(id)
-        }
-        Some((_, kind, existing_user_id)) => {
-            return Err(AppError::Conflict(format!(
-                "Email identity is already attached to a {kind} principal ({existing_user_id:?})."
-            )));
-        }
-        None => {
-            let id = PrincipalId::random();
-            sqlx::query(
-                r#"INSERT INTO principals
-                       (id, company_id, kind, user_id, display_label)
-                   VALUES ($1, $2, 'person', $3, $4)"#,
-            )
-            .bind(id.as_uuid())
-            .bind(company_id)
-            .bind(user_id)
-            .bind(display_label)
-            .execute(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-            id
-        }
-    };
-
-    upsert_account_identity_on(
+    super::account_identity::adopt_new_address(
         connection,
         company_id,
         principal_id,
@@ -407,7 +357,67 @@ pub(crate) async fn create_person_principal_on(
         display_label,
     )
     .await?;
+    ensure_person_address_on(connection, company_id, principal_id, display_label).await?;
+    super::integration::email_binding::sync_principal_email_binding_on(
+        connection,
+        company_id,
+        principal_id,
+    )
+    .await?;
     Ok(principal_id)
+}
+
+/// The most numbered suffixes tried after a derived address's base is taken (`base-2` ..).
+const PERSON_ADDRESS_SUFFIXES: u32 = 50;
+
+/// Give a person principal its one address in the company unless it already has one.
+///
+/// A fresh member and a promoted outsider are given one derived from their account name; a
+/// person who already has one (a repeated join) keeps it, and someone who left and rejoined lost
+/// theirs on demotion and gets a fresh one. A taken base moves to the next suffix rather than
+/// failing the join, up to an explicit bound: `base`, `base-2` .. `base-50`, then one random
+/// suffix, then a conflict.
+async fn ensure_person_address_on(
+    connection: &mut sqlx::PgConnection,
+    company_id: Uuid,
+    principal_id: PrincipalId,
+    username: &str,
+) -> AppResult<()> {
+    let existing: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM addresses WHERE company_id = $1 AND principal_id = $2)",
+    )
+    .bind(company_id)
+    .bind(principal_id.as_uuid())
+    .fetch_one(&mut *connection)
+    .await
+    .map_err(AppError::from)?;
+    if existing {
+        return Ok(());
+    }
+    let base = person_address_base(username);
+    let random = format!("{base}-{}", &Uuid::new_v4().simple().to_string()[..8]);
+    let candidates = std::iter::once(base.clone())
+        .chain((2..=PERSON_ADDRESS_SUFFIXES).map(|n| format!("{base}-{n}")))
+        .chain(std::iter::once(random));
+    for candidate in candidates {
+        let written: Option<String> = sqlx::query_scalar(
+            "INSERT INTO addresses (company_id, slug, target_kind, principal_id, is_primary) \
+             VALUES ($1, $2, 'principal', $3, true) \
+             ON CONFLICT (company_id, slug) DO NOTHING RETURNING slug::text",
+        )
+        .bind(company_id)
+        .bind(&candidate)
+        .bind(principal_id.as_uuid())
+        .fetch_optional(&mut *connection)
+        .await
+        .map_err(AppError::from)?;
+        if written.is_some() {
+            return Ok(());
+        }
+    }
+    Err(AppError::Conflict(format!(
+        "No free address could be derived from '{base}' in this company."
+    )))
 }
 
 /// The company's one system principal: the platform itself, as an author.
@@ -531,6 +541,61 @@ pub(super) fn membership_from_db(value: Option<&str>) -> AppResult<CompanyMember
 
 #[async_trait]
 impl PrincipalAccessPersistence for PostgresPersistence {
+    async fn direct_inboxes(
+        &self,
+        company_id: Uuid,
+        user_id: Uuid,
+        limit: usize,
+    ) -> AppResult<Vec<crate::application::ports::participant::DirectInbox>> {
+        #[derive(sqlx::FromRow)]
+        struct InboxDb {
+            #[sqlx(flatten)]
+            principal: PrincipalDb,
+            slug: Option<String>,
+        }
+        let rows = sqlx::query_as::<_, InboxDb>(
+            "SELECT target.id,target.company_id,target.kind,target.user_id,target.agent_id, \
+             target.display_label,target.created_at,target.updated_at,target.open_to_public, \
+             target.settings_revision,target.historical_person_user_id,address.slug \
+             FROM principals AS target \
+             LEFT JOIN addresses AS address ON address.company_id=target.company_id \
+               AND address.principal_id=target.id \
+             WHERE target.company_id=$1 AND principal_direct_can_view($1,target.id, \
+               (SELECT viewer.id FROM principals AS viewer \
+                WHERE viewer.company_id=$1 AND viewer.user_id=$2 AND viewer.kind='person')) \
+             ORDER BY lower(target.display_label),target.id LIMIT $3",
+        )
+        .bind(company_id)
+        .bind(user_id)
+        .bind(limit.min(201) as i64)
+        .fetch_all(&self.pool)
+        .await?;
+        rows.into_iter()
+            .map(|row| {
+                Ok(crate::application::ports::participant::DirectInbox {
+                    principal: Principal::try_from(row.principal)?,
+                    slug: row.slug.map(Into::into),
+                })
+            })
+            .collect()
+    }
+
+    async fn principal_by_id(
+        &self,
+        company_id: Uuid,
+        principal_id: PrincipalId,
+    ) -> AppResult<Option<Principal>> {
+        sqlx::query_as::<_, PrincipalDb>(&format!(
+            "{PRINCIPAL_SELECT} WHERE company_id = $1 AND id = $2"
+        ))
+        .bind(company_id)
+        .bind(principal_id.as_uuid())
+        .fetch_optional(&self.pool)
+        .await?
+        .map(Principal::try_from)
+        .transpose()
+    }
+
     async fn access_context_for_identity(
         &self,
         company_id: Uuid,

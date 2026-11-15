@@ -16,10 +16,10 @@ struct GatedBindings {
 }
 #[async_trait::async_trait]
 impl ChannelBindingPersistence for GatedBindings {
-    async fn active_bindings_for_channel(
+    async fn active_bindings_for_target(
         &self,
         _: Uuid,
-        _: Uuid,
+        _: crate::entities::address::AddressTarget,
     ) -> AppResult<Vec<ChannelBinding>> {
         let _drop = DropSignal(self.dropped.clone());
         self.entered.notify_one();

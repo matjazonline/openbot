@@ -1,5 +1,5 @@
 use super::super::{
-    CompanyId, RelatedChannelId, RelatedThreadId, WorkflowActor,
+    CompanyId, RelatedThreadId, WorkflowActor,
     lease::{LeasePolicy, WorkflowFence},
 };
 use crate::app_error::AppResult;
@@ -50,7 +50,7 @@ pub struct AgentHistorySessionRef {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AgentConversationBoundary {
     Thread {
-        channel: RelatedChannelId,
+        target: crate::entities::address::AddressTarget,
         thread: RelatedThreadId,
     },
     PrivateSession {

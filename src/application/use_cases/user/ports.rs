@@ -3,9 +3,10 @@ use super::AuthAttemptKey;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::PersonAddress,
         notification::NotificationPreferences,
         user::User,
-        value_objects::{AvatarUrl, EmailAddress},
+        value_objects::{AvatarUrl, ChannelSlug, EmailAddress},
     },
 };
 use async_trait::async_trait;
@@ -128,6 +129,19 @@ pub trait UserPersistence: Send + Sync {
         id: Uuid,
         preferences: NotificationPreferences,
     ) -> AppResult<()>;
+
+    /// The account's own address in every company it is a person of, by company name.
+    async fn person_addresses(&self, user_id: Uuid) -> AppResult<Vec<PersonAddress>>;
+
+    /// Rename the account's own address in one company, in one statement that touches only that
+    /// address row. `Ok(None)` means the account is not a person of that company (or has just
+    /// been removed from it), so nobody can rename an address that is not their own.
+    async fn rename_person_address(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        slug: &ChannelSlug,
+    ) -> AppResult<Option<PersonAddress>>;
 
     /// Stores the account's profile picture, or clears it with `None`. `Ok(None)` means no such
     /// user, so a stale session cannot silently write nothing.

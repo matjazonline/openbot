@@ -1,0 +1,42 @@
+{
+  "status": "FAIL",
+  "diagnostics": [
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 373,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 407,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 10,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 38,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/adapters/persistence/department.rs",
+      "line": 346,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/application/services/model_usage/mod.rs",
+      "line": 24,
+      "diagnostic_context_unchanged_from_HEAD": true
+    },
+    {
+      "path": "src/domain/workflow/reply_integrity.rs",
+      "line": 29,
+      "diagnostic_context_unchanged_from_HEAD": true
+    }
+  ],
+  "affected_three_diagnostics": "resolved; neither diagnostic location remains",
+  "disposition": "unchanged inherited contexts; not a strict clippy pass"
+}

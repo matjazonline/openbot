@@ -83,7 +83,12 @@ impl Fixture {
             .await
             .unwrap();
         let thread = persistence
-            .create_thread(channel.id, "Subject", &[EmailAddress::from(email)])
+            .create_thread(
+                company.id,
+                crate::entities::address::AddressTarget::Desk(channel.id),
+                "Subject",
+                &[EmailAddress::from(email)],
+            )
             .await
             .unwrap();
 
@@ -102,7 +107,8 @@ impl Fixture {
     pub(super) async fn extra_thread(&self, channel_id: Uuid, subject: &str) -> Thread {
         self.persistence
             .create_thread(
-                channel_id,
+                self.company_id,
+                crate::entities::address::AddressTarget::Desk(channel_id),
                 subject,
                 &[EmailAddress::from("someone@partner.test")],
             )

@@ -1,0 +1,38 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0432]: unresolved import `crate::entities::message::CanonicalContent`
+  --> src/adapters/persistence/workflow/direct_delivery_tests.rs:11:5
+   |
+11 | use crate::entities::message::CanonicalContent;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^----------------
+   |                               |
+   |                               no `CanonicalContent` in `domain::entities::message`
+   |
+help: consider importing this struct through its public re-export instead
+   |
+11 - use crate::entities::message::CanonicalContent;
+11 + use crate::transport::CanonicalContent;
+   |
+
+warning: unused import: `StandaloneDeliveryEnqueuer`
+  --> src/adapters/persistence/workflow/direct_delivery_tests.rs:16:5
+   |
+16 |     StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `enqueue_standalone` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/direct_delivery_tests.rs:28:7
+   |
+28 |     p.enqueue_standalone(&notice).await.unwrap();
+   |       ^^^^^^^^^^^^^^^^^^
+   |
+help: there is a method `enqueue_standalone_delivery` with a similar name
+   |
+28 |     p.enqueue_standalone_delivery(&notice).await.unwrap();
+   |                         +++++++++
+
+Some errors have detailed explanations: E0432, E0599.
+For more information about an error, try `rustc --explain E0432`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 1 warning emitted

@@ -95,7 +95,7 @@ fn autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority
     for alias in [
         "message.send",
         "message.unknown",
-        "create_agent_channel",
+        "create_agent",
         "list_company_agents",
         "search_knowledge",
     ] {
@@ -108,7 +108,7 @@ fn autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority
         };
         assert!(binding.validate().is_err(), "{alias}");
     }
-    AgentToolBinding::builtin(AgentBuiltinTool::CreateAgentChannel)
+    AgentToolBinding::builtin(AgentBuiltinTool::CreateAgent)
         .validate()
         .unwrap();
 }

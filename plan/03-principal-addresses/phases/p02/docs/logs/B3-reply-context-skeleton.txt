@@ -1,0 +1,3 @@
+trail skeleton — src/adapters/persistence/workflow/channel_reply_context.rs
+
+no definitions indexed for this file

@@ -293,6 +293,23 @@ impl crate::use_cases::user::UserPersistence for StubUserPersistence {
         Ok(())
     }
 
+    /// No company memberships in this stand-in, so no addresses either.
+    async fn person_addresses(
+        &self,
+        _: uuid::Uuid,
+    ) -> AppResult<Vec<crate::entities::address::PersonAddress>> {
+        Ok(Vec::new())
+    }
+
+    async fn rename_person_address(
+        &self,
+        _: uuid::Uuid,
+        _: uuid::Uuid,
+        _: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<Option<crate::entities::address::PersonAddress>> {
+        Ok(None)
+    }
+
     async fn update_avatar_url(
         &self,
         _: uuid::Uuid,

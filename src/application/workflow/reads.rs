@@ -2,7 +2,7 @@
 //! read grants nothing: the route authorizes the company, and the record's own association,
 //! before it shows a record.
 use super::RelatedAssociation;
-use super::board::{BoardCount, RunBoardScope, VisibleChannels};
+use super::board::{BoardCount, RunBoardScope, VisibleInboxes};
 use crate::app_error::AppResult;
 use crate::domain::workflow::{
     CompanyId, MessageTrigger, RunId, VersionId, WorkflowBindingId, WorkflowId,
@@ -344,7 +344,7 @@ pub trait WorkflowReads: Send + Sync {
         company: CompanyId,
         scope: &RunBoardScope,
         cutoff: DateTime<Utc>,
-        visible: &VisibleChannels,
+        visible: &VisibleInboxes,
     ) -> AppResult<Vec<RunSummary>>;
     /// The direct children of each of `parents` that has any, counted by state, in one read.
     /// More than [`MAX_ROLLUP_PARENTS`] parents is refused rather than cut.

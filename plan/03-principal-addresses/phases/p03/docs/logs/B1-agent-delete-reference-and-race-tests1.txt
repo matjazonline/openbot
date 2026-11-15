@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_binding_restores_every_owned_resource ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_ingress_first_keeps_the_agent_and_direct_history ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_retirement_first_refuses_ingress_atomically ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4600 filtered out; finished in 1.93s
+

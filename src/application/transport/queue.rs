@@ -20,6 +20,7 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
+        address::AddressTarget,
         correlation::CorrelationId,
         message::{CanonicalMessageId, MessageAudience},
         transport::{
@@ -107,7 +108,7 @@ impl Default for DeliveryBackoff {
 pub struct NewDelivery {
     pub id: DeliveryId,
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     /// The canonical message being exposed. Even a platform notice has one: an approval request
     /// is written as a system-authored message in the thread it concerns, so the queue holds
     /// identifiers rather than the only copy of what was sent.
@@ -219,7 +220,7 @@ pub struct DeliveryRecord {
 /// representing a half-attributed delivery.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DeliveryAttribution {
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
     pub message_id: CanonicalMessageId,
     pub source_binding_id: ChannelBindingId,
     pub destination_binding_id: ChannelBindingId,
@@ -486,7 +487,7 @@ mod tests {
             id: DeliveryId::random(),
             company_id: Uuid::new_v4(),
             attribution: Some(DeliveryAttribution {
-                channel_id: Uuid::new_v4(),
+                target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
                 message_id: CanonicalMessageId::random(),
                 source_binding_id: ChannelBindingId::random(),
                 destination_binding_id: ChannelBindingId::random(),

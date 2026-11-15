@@ -344,6 +344,7 @@ async fn assert_failed_attention(setup: &Setup) {
             visible_channel_ids: &[setup.channel],
             manager: true,
             company_items: true,
+            direct_items: true,
             view: AttentionView::MyWork,
             cursor: None,
             limit: 100,

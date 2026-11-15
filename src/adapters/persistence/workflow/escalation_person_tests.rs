@@ -64,6 +64,7 @@ async fn no_run_attention(f: &PeopleFixture, decision: Uuid) {
             visible_channel_ids: &channels,
             manager: true,
             company_items: false,
+            direct_items: true,
             view: AttentionView::MyWork,
             cursor: None,
             limit: 100,
@@ -88,7 +89,7 @@ async fn no_run_attention(f: &PeopleFixture, decision: Uuid) {
     assert_eq!(
         f.role
             .p()
-            .operational_summary(f.role.company().as_uuid(), &channels)
+            .operational_summary(f.role.company().as_uuid(), &channels, f.principals[0])
             .await
             .unwrap()
             .open_decision_count,
@@ -337,6 +338,7 @@ async fn workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_p
             expected: &expected,
             email: None,
             agent_message_key: None,
+            agent_recipient: None,
             escalation_ack_hours: Default::default(),
         })
         .await

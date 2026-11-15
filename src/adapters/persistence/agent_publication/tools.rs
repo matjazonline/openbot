@@ -193,9 +193,13 @@ fn builtin(company: CompanyId, tool: AgentBuiltinTool) -> AppResult<ToolSnapshot
             company,
             provisioning::ProvisioningKind::ListAgents,
         ),
-        AgentBuiltinTool::CreateAgentChannel => provisioning::builtin_provisioning_snapshot(
+        AgentBuiltinTool::CreateAgent => provisioning::builtin_provisioning_snapshot(
             company,
-            provisioning::ProvisioningKind::CreateAgentChannel,
+            provisioning::ProvisioningKind::CreateAgent,
+        ),
+        AgentBuiltinTool::CreateDeskForAgent => provisioning::builtin_provisioning_snapshot(
+            company,
+            provisioning::ProvisioningKind::CreateDeskForAgent,
         ),
         AgentBuiltinTool::SearchKnowledge => knowledge::builtin_knowledge_snapshot(company),
         AgentBuiltinTool::ReadEscalation => {

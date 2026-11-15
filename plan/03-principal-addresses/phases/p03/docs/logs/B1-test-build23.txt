@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0609]: no field `skill` on type `&application::agent::authoring_reads::AgentAuthoringSkill`
+  --> src/adapters/persistence/test_support/native_agent.rs:59:62
+   |
+59 |             skill_ids: state.skills.iter().map(|skill| skill.skill.id).collect(),
+   |                                                              ^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `assignment`, `name`, `description`, `required_tools`
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

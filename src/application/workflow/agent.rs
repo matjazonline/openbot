@@ -91,7 +91,9 @@ impl AgentToolTarget {
             AgentBuiltinTool::MessageSend | AgentBuiltinTool::MessageReply => {
                 Self::Message { name: name()? }
             }
-            AgentBuiltinTool::ListCompanyAgents | AgentBuiltinTool::CreateAgentChannel => {
+            AgentBuiltinTool::ListCompanyAgents
+            | AgentBuiltinTool::CreateAgent
+            | crate::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent => {
                 Self::Provisioning { name: name()? }
             }
             AgentBuiltinTool::SearchKnowledge => Self::Knowledge,

@@ -4,7 +4,7 @@ pub(super) async fn new_agent(
     f: &AdmissionFixture,
     bindings: Vec<AgentToolBinding>,
 ) -> crate::entities::agent::Agent {
-    AgentPersistence::create(
+    let agent = AgentPersistence::create(
         f.persistence(),
         f.binding.target.company.as_uuid(),
         AgentWrite {
@@ -18,7 +18,13 @@ pub(super) async fn new_agent(
         },
     )
     .await
-    .unwrap()
+    .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(
+        f.persistence(),
+        &agent,
+    )
+    .await;
+    agent
 }
 
 pub(super) async fn bindings(f: &AdmissionFixture, agent: Uuid) -> Vec<AgentToolBinding> {

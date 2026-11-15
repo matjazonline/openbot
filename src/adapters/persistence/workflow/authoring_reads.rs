@@ -80,14 +80,7 @@ impl PostgresPersistence {
         let workflows: Vec<Uuid> = bindings.iter().map(|b| b.workflow.as_uuid()).collect();
         let channels: Vec<Uuid> = bindings
             .iter()
-            .filter_map(|b| match b.association {
-                RelatedAssociation::Company => None,
-                RelatedAssociation::Channel(channel)
-                | RelatedAssociation::Thread {
-                    channel_id: channel,
-                    ..
-                } => Some(channel.as_uuid()),
-            })
+            .filter_map(|b| b.association.target().and_then(AddressTarget::desk_id))
             .collect();
         let names: HashMap<Uuid, String> =
             sqlx::query_as("SELECT id, name FROM channels WHERE company_id = $1 AND id = ANY($2)")
@@ -154,14 +147,11 @@ impl PostgresPersistence {
                     let mut schedules = by_binding.remove(&id).unwrap_or_default();
                     let schedules_truncated = schedules.len() > MAX_SCHEDULES_PER_BINDING as usize;
                     schedules.truncate(MAX_SCHEDULES_PER_BINDING as usize);
-                    let channel_name = match binding.association {
-                        RelatedAssociation::Company => None,
-                        RelatedAssociation::Channel(channel)
-                        | RelatedAssociation::Thread {
-                            channel_id: channel,
-                            ..
-                        } => names.get(&channel.as_uuid()).cloned(),
-                    };
+                    let channel_name = binding
+                        .association
+                        .target()
+                        .and_then(AddressTarget::desk_id)
+                        .and_then(|id| names.get(&id).cloned());
                     BindingUse {
                         workflow_title: titles
                             .get(&binding.workflow.as_uuid())

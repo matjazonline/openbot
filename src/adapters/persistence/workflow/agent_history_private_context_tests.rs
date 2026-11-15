@@ -425,7 +425,7 @@ async fn agent_history_level_private_thread_anchor_keeps_authorized_member_above
         &mut connection,
         claim.fence.scope.company,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(f.f.s.channel),
+            target: crate::entities::address::AddressTarget::Desk(f.f.s.channel),
             thread_id: RelatedThreadId::new(f.f.s.thread),
         },
     )

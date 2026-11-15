@@ -1,0 +1,18 @@
+[
+  {
+    "filter": "direct_workflow_attention_summary",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests6-1.txt",
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4582 filtered out; finished in 1.23s"
+    ]
+  },
+  {
+    "filter": "public_desk_private_agent_real_runtime",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests6-2.txt",
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4582 filtered out; finished in 3.26s"
+    ]
+  }
+]

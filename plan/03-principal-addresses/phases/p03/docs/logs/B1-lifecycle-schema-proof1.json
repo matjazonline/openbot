@@ -1,0 +1,12 @@
+{
+  "fixture": "pa03_codex_runtime6_20261115",
+  "schema_sha384": "303b0b201f690ab359d8ab49e0155f8db9d9955b4bf7e57bd0ce933bef4b2ba71536c40c3d280b8f5563d718b2acbaaa",
+  "migration_sha384": "303b0b201f690ab359d8ab49e0155f8db9d9955b4bf7e57bd0ce933bef4b2ba71536c40c3d280b8f5563d718b2acbaaa",
+  "match": true,
+  "shape": {
+    "pins": 15,
+    "publication_owner": "FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED",
+    "thread_company_owner": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+  },
+  "claim": "Schema/native ownership inspection only; behavioral results are in focused runtime logs."
+}

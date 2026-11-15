@@ -1,0 +1,11 @@
+{
+  "before_count": 4610,
+  "after_count": 4610,
+  "removed": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::relay_identity_native_forged_workflow_agent_author_rolls_back_publication"
+  ],
+  "replacement": [
+    "adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication"
+  ],
+  "reason": "New correction test moved from final-publication fixture to explicit message-producer SQL fixture so it reaches its intended deferred native author guard. No R1-reviewed test moved or removed."
+}

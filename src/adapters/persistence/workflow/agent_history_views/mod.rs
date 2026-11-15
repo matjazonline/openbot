@@ -26,7 +26,7 @@ async fn anchor_on(
     // These bounded locks are acquired only after payload reads on the final projection pass.
     let actor = authority::authorize_company(db, scope.company, scope.viewer).await?;
     let row: Option<Anchor> = sqlx::query_as(
-        "SELECT exchange.conversation_id,conversation.expired_count,conversation.expired_through_order,run.channel_id,run.thread_id
+        "SELECT exchange.conversation_id,conversation.expired_count,conversation.expired_through_order,run.channel_id,run.principal_id,run.thread_id
         FROM workflow_runs AS run JOIN agent_history_exchanges AS exchange
           ON exchange.company_id=run.company_id AND exchange.run_id=run.id
         JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id
@@ -35,7 +35,11 @@ async fn anchor_on(
     let Some(anchor) = row else {
         return Ok(None);
     };
-    let association = binding_rows::association_from_columns(anchor.channel_id, anchor.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: anchor.channel_id,
+        principal_id: anchor.principal_id,
+        thread_id: anchor.thread_id,
+    })?;
     association::authorize_association(db, scope.company, scope.viewer, association).await?;
     Ok(Some(AuthorizedAnchor {
         anchor,
@@ -48,7 +52,11 @@ async fn source_allowed(
     scope: RunReadScope,
     row: &Metadata,
 ) -> AppResult<bool> {
-    let association = binding_rows::association_from_columns(row.channel_id, row.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: row.channel_id,
+        principal_id: row.principal_id,
+        thread_id: row.thread_id,
+    })?;
     match association::authorize_association(db, scope.company, scope.viewer, association).await {
         Ok(()) => Ok(true),
         Err(AppError::NotFound(_)) => Ok(false),

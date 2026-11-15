@@ -122,6 +122,8 @@ use super::PostgresPersistence;
 use crate::app_error::{AppError, AppResult};
 use crate::application::workflow::{lifecycle::*, publication::*, templates::*, *};
 use crate::domain::workflow::*;
+use crate::entities::address::AddressTarget;
+use association::{association_columns, association_from_columns};
 use async_trait::async_trait;
 use sqlx::{PgConnection, Postgres, Transaction};
 use std::sync::Arc;

@@ -1,0 +1,5 @@
+84494|open_bots_own_51a0595295db4332a62e755e157cf43b|idle|Client|ClientRead|{}|f|f
+84496|open_bots_own_51a0595295db4332a62e755e157cf43b|active|Client|ClientRead|{}|f|t
+84497|open_bots_own_51a0595295db4332a62e755e157cf43b|idle|Client|ClientRead|{}|f|f
+84398|open_bots_own_51a0595295db4332a62e755e157cf43b|idle|Client|ClientRead|{}|f|f
+84495|open_bots_own_51a0595295db4332a62e755e157cf43b|idle|Client|ClientRead|{}|f|f

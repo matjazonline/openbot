@@ -191,7 +191,7 @@ async fn agent_history_identity_foreign_and_changed_association_reuse_refuse_wit
         request.history_session = Some(AgentHistorySessionRef { from_run });
         if index == 2 {
             request.association = RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(conversation.channel),
+                target: crate::entities::address::AddressTarget::Desk(conversation.channel),
                 thread_id: RelatedThreadId::new(conversation.thread),
             };
         }

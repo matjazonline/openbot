@@ -269,7 +269,7 @@ async fn assert_unverified_team_attention_and_note(h: &Harness, viewer: Viewer, 
         .add_internal_note(
             AddInternalNote {
                 company_id: h.company_id,
-                channel_id: h.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(h.channel_id),
                 thread_id,
                 text: "Unverified team note".into(),
                 command_id: Uuid::new_v4(),
@@ -286,7 +286,7 @@ async fn assert_unverified_team_attention_and_note(h: &Harness, viewer: Viewer, 
         .tombstone_internal_note(
             TombstoneInternalNote {
                 company_id: h.company_id,
-                channel_id: h.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(h.channel_id),
                 thread_id,
                 note_id,
                 command_id: Uuid::new_v4(),
@@ -355,9 +355,9 @@ async fn source_message_outside_window_is_exact_and_authorized() {
         .get_thread_history(
             &h.owner,
             crate::use_cases::thread::ThreadReadScope {
-                channel: crate::use_cases::thread::ChannelReadScope {
+                inbox: crate::use_cases::thread::InboxReadScope {
                     company_id: h.company_id,
-                    channel_id: h.channel_id,
+                    target: crate::entities::address::AddressTarget::Desk(h.channel_id),
                 },
                 thread_id: thread,
             },
@@ -373,7 +373,10 @@ async fn source_message_outside_window_is_exact_and_authorized() {
     );
     let query = MessageQuery {
         company_id: h.company_id,
-        channel_id: h.channel_id,
+        inbox: super::super::InboxSelection {
+            channel_id: Some(h.channel_id),
+            principal_id: None,
+        },
         thread_id: thread,
         message_id: old,
     };
@@ -416,7 +419,10 @@ async fn refuses_other_scopes(h: &Harness, other: &Harness, query: MessageQuery)
             ..query.clone()
         },
         MessageQuery {
-            channel_id: other.channel_id,
+            inbox: super::super::InboxSelection {
+                channel_id: Some(other.channel_id),
+                principal_id: None,
+            },
             ..query.clone()
         },
         MessageQuery {
@@ -464,7 +470,7 @@ async fn note_has_no_mailbox_controls(h: &Harness, query: MessageQuery) {
         .add_internal_note(
             AddInternalNote {
                 company_id: h.company_id,
-                channel_id: h.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(h.channel_id),
                 thread_id: query.thread_id,
                 text: "Source internal note".into(),
                 command_id: Uuid::new_v4(),
@@ -480,7 +486,7 @@ async fn note_has_no_mailbox_controls(h: &Harness, query: MessageQuery) {
         None,
         pages::MessageScope {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(h.channel_id),
         },
         pages::RunLinkAccess::Label,
     );

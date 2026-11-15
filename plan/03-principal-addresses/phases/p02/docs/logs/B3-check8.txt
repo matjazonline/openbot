@@ -1,0 +1,170 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0422]: cannot find struct, variant or union type `AssociationColumns` in this scope
+  --> src/adapters/persistence/workflow/binding_rows.rs:59:48
+   |
+59 |     let association = association_from_columns(AssociationColumns {
+   |                                                ^^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 1 + use crate::adapters::persistence::workflow::association::AssociationColumns;
+   |
+
+error[E0609]: no field `channel_id` on type `&RunScope`
+  --> src/adapters/http/routes/workflows/ui/runs/events.rs:44:35
+   |
+44 |     let association = match scope.channel_id {
+   |                                   ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `target`, `thread_id`, `run_id`
+
+error[E0609]: no field `channel_id` on type `&infra::events::RunScope`
+  --> src/adapters/http/routes/workflows/ui/runs/events.rs:44:35
+   |
+44 |     let association = match scope.channel_id {
+   |                                   ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `company_id`, `target`, `thread_id`, `run_id`
+
+error[E0609]: no field `channel_id` on type `AttentionScope`
+   --> src/adapters/http/routes/attention.rs:128:70
+    |
+128 |             .is_some_and(|scope| visible_channel_ids.contains(&scope.channel_id))
+    |                                                                      ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `target`, `source_kind`, `source_id`
+
+error[E0609]: no field `channel_id` on type `RunScope`
+   --> src/adapters/http/routes/attention.rs:131:18
+    |
+131 |                 .channel_id
+    |                  ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `target`, `thread_id`, `run_id`
+
+error[E0609]: no field `channel_id` on type `infra::events::AttentionScope`
+   --> src/adapters/http/routes/attention.rs:128:70
+    |
+128 |             .is_some_and(|scope| visible_channel_ids.contains(&scope.channel_id))
+    |                                                                      ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `target`, `source_kind`, `source_id`
+
+error[E0609]: no field `channel_id` on type `infra::events::RunScope`
+   --> src/adapters/http/routes/attention.rs:131:18
+    |
+131 |                 .channel_id
+    |                  ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `target`, `thread_id`, `run_id`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/attention.rs:286:13
+    |
+286 |             channel_id,
+    |             ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/live_updates.rs:106:17
+    |
+106 |                 channel_id: None,
+    |                 ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::AttentionScope` has no field named `channel_id`
+   --> src/adapters/http/routes/live_updates.rs:114:13
+    |
+114 |             channel_id: Uuid::new_v4(),
+    |             ^^^^^^^^^^ `infra::events::AttentionScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/live_updates.rs:138:17
+    |
+138 |                 channel_id: Some(Uuid::new_v4()),
+    |                 ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::AttentionScope` has no field named `channel_id`
+   --> src/adapters/http/routes/live_updates.rs:178:13
+    |
+178 |             channel_id,
+    |             ^^^^^^^^^^ `infra::events::AttentionScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::AttentionScope` has no field named `channel_id`
+   --> src/adapters/http/routes/ui_stream_tests.rs:556:13
+    |
+556 |             channel_id: harness.channel_id,
+    |             ^^^^^^^^^^ `infra::events::AttentionScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/ui_run_counts_tests.rs:236:9
+    |
+236 |         channel_id: Some(f.channels[0]),
+    |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:886:9
+    |
+886 |         channel_id: Some(channel),
+    |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs:897:9
+    |
+897 |         channel_id: None,
+    |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+  --> src/adapters/http/routes/workflows/ui/runs/events_tests.rs:19:9
+   |
+19 |         channel_id: None,
+   |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+   |
+   = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+  --> src/adapters/http/routes/workflows/ui/runs/events_tests.rs:25:9
+   |
+25 |         channel_id: Some(board),
+   |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+   |
+   = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+  --> src/adapters/http/routes/workflows/ui/runs/events_tests.rs:31:9
+   |
+31 |         channel_id: None,
+   |         ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+   |
+   = note: available fields are: `target`
+
+error[E0560]: struct `infra::events::RunScope` has no field named `channel_id`
+   --> src/adapters/http/routes/workflows/ui/runs/events_tests.rs:119:17
+    |
+119 |                 channel_id: None,
+    |                 ^^^^^^^^^^ `infra::events::RunScope` does not have this field
+    |
+    = note: available fields are: `target`
+
+Some errors have detailed explanations: E0422, E0609.
+For more information about an error, try `rustc --explain E0422`.
+error: could not compile `open_bots` (lib) due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+Some errors have detailed explanations: E0422, E0560, E0609.
+error: could not compile `open_bots` (lib test) due to 17 previous errors

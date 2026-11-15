@@ -6,14 +6,14 @@ async fn admission_reader_failures_propagate_without_writes() {
     let version_id = version();
     let store = MemoryStore::new(owned(company_id, version_id, 128));
     let channel = channel(company_id, ChannelAccessMode::Team);
-    let thread = thread(channel.id);
+    let thread = thread(&channel);
     {
         let mut state = store.state.lock().unwrap();
         state.channels.insert(channel.id, channel.clone());
         state.threads.insert(thread.id, thread.clone());
     }
     let association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(channel.id),
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
         thread_id: RelatedThreadId::new(thread.id),
     };
     for kind in 0..3 {

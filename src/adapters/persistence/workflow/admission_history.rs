@@ -2,11 +2,7 @@ use super::*;
 use crate::application::workflow::history::{KIND, MAX_HISTORY_ITEMS};
 
 pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) -> AppResult<()> {
-    let RelatedAssociation::Thread {
-        channel_id,
-        thread_id,
-    } = command.association()
-    else {
+    let RelatedAssociation::Thread { target, thread_id } = command.association() else {
         return Ok(());
     };
     if !command
@@ -27,7 +23,8 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
            SELECT member.message_id,member.created_at,member.id FROM thread_messages AS member \
            JOIN messages AS message ON (message.company_id,message.id)=(member.company_id,member.message_id) \
            JOIN workflow_runs AS run ON run.company_id=message.company_id AND run.id=$2 \
-           WHERE member.company_id=$1 AND member.channel_id=$3 AND member.thread_id=$4 \
+           WHERE member.company_id=$1 AND member.channel_id IS NOT DISTINCT FROM $3::uuid AND member.thread_id=$4 \
+             AND member.principal_id IS NOT DISTINCT FROM $6::uuid \
              AND message.access_level<=run.knowledge_ceiling \
              AND NOT EXISTS (SELECT 1 FROM internal_notes AS note \
                  WHERE note.company_id=member.company_id AND note.message_id=member.message_id) \
@@ -36,15 +33,15 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
            SELECT message_id,created_at,id FROM eligible \
            ORDER BY created_at DESC,id DESC LIMIT $5 \
          ), stored_members AS ( \
-           INSERT INTO workflow_history_members (company_id,run_id,channel_id,thread_id,message_id,ordinal) \
-           SELECT $1,$2,$3,$4,message_id,row_number() OVER (ORDER BY created_at,id)::integer \
+           INSERT INTO workflow_history_members (company_id,run_id,channel_id,thread_id,message_id,ordinal,principal_id) \
+           SELECT $1,$2,$3,$4,message_id,row_number() OVER (ORDER BY created_at,id)::integer,$6 \
              FROM newest RETURNING 1 \
          ), stored_count AS ( \
            INSERT INTO workflow_history_snapshots (company_id,run_id,eligible_count) \
            SELECT $1,$2,eligible FROM counts RETURNING 1 \
          ) SELECT (SELECT count(*) FROM stored_members)+(SELECT count(*) FROM stored_count)",
     ).bind(command.company_id().as_uuid()).bind(command.proposed_run_id().as_uuid())
-        .bind(channel_id.as_uuid()).bind(thread_id.as_uuid()).bind(MAX_HISTORY_ITEMS as i64)
+        .bind(target.desk_id()).bind(thread_id.as_uuid()).bind(MAX_HISTORY_ITEMS as i64).bind(target.principal_id().map(|id| id.as_uuid()))
         .execute(db).await?;
     Ok(())
 }

@@ -2,7 +2,7 @@
 //! form's owner fields, desk lists grouped by department, and the agent's desk and departments:
 //! `department_ui_`.
 use super::*;
-use crate::application::agent::{AgentDesk, AgentDirectoryEntry, AgentKey, DepartmentRef};
+use crate::application::agent::{AgentAddress, AgentDirectoryEntry, AgentKey, DepartmentRef};
 use crate::entities::agent_capability::AgentId;
 use crate::entities::creation::CreationProvenance;
 use crate::entities::department::{
@@ -571,7 +571,7 @@ fn department_ui_desk_lists_group_by_department_with_a_badge() {
 }
 
 #[test]
-fn department_ui_agent_settings_show_its_desk_and_departments() {
+fn department_ui_agent_settings_show_its_direct_address_and_departments() {
     let tree = tree();
     let agent = settings_agent(tree.company.id, "Closer", "closer");
     let desk_id = Uuid::new_v4();
@@ -587,8 +587,8 @@ fn department_ui_agent_settings_show_its_desk_and_departments() {
             charter: None,
             roles: vec![DepartmentRole::Lead],
         }],
-        desk: Some(AgentDesk {
-            id: desk_id,
+        address: Some(AgentAddress {
+            principal_id: crate::entities::transport::PrincipalId::new(desk_id),
             address: "closer@acme.example.com".into(),
         }),
     };
@@ -607,10 +607,10 @@ fn department_ui_agent_settings_show_its_desk_and_departments() {
     };
     let html = pane(Some(&entry));
     assert!(html.contains(
-        r#"<code id="agent-default-desk" class="font-mono">closer@acme.example.com</code>"#
+        r#"<code id="agent-direct-address" class="font-mono">closer@acme.example.com</code>"#
     ));
     assert!(html.contains(&format!(
-        r#"href="/ui/channels?company_id={}&amp;channel_id={desk_id}">Open desk settings</a>"#,
+        r#"href="/ui?company_id={}&amp;principal_id={desk_id}">Open direct inbox</a>"#,
         tree.company.id
     )));
     assert!(html.contains(&format!(
@@ -623,18 +623,16 @@ fn department_ui_agent_settings_show_its_desk_and_departments() {
     let card = &card[..card.find("</section>").unwrap()];
     assert!(!card.contains("<form"));
     // The assistant desk action now makes an additional desk.
-    assert!(html.contains("The agent already has its own desk."));
+    assert!(html.contains("The agent has its own direct address."));
     assert!(html.contains(">Create additional desk</button>"));
 
     let gone = AgentDirectoryEntry {
-        desk: None,
+        address: None,
         departments: Vec::new(),
         ..entry.clone()
     };
     let html = pane(Some(&gone));
-    assert!(html.contains(
-        "This agent's own desk was deleted. Create an additional desk below to give it an address again."
-    ));
+    assert!(html.contains("This agent's direct address is unavailable."));
     assert!(html.contains("Not in any department."));
 }
 

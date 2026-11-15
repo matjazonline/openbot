@@ -1,0 +1,1098 @@
+--- B3-R1/migrations/20260817000000_init_schema.sql
++++ B3-R2/migrations/20260817000000_init_schema.sql
+@@ -1100,7 +1100,12 @@
+     channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
+     principal UUID := NULLIF(row_data->>'principal_id', '')::UUID;
+ BEGIN
+-    IF company IS NOT NULL AND channel IS NOT NULL AND source_id IS NOT NULL THEN
++    IF TG_OP = 'UPDATE' THEN
++        IF (row_data->'status') IS NOT DISTINCT FROM (to_jsonb(OLD)->'status') THEN
++            RETURN NEW;
++        END IF;
++    END IF;
++    IF company IS NOT NULL AND ((channel IS NULL) <> (principal IS NULL)) AND source_id IS NOT NULL THEN
+         PERFORM pg_notify(
+             'attention_changed',
+             json_build_object(
+--- B3-R1/src/adapters/http/pages/deliveries.rs
++++ B3-R2/src/adapters/http/pages/deliveries.rs
+@@ -482,7 +482,12 @@
+             "Recipient",
+             entry.external_destination.clone().unwrap_or_else(dash),
+         ),
+-        ("Desk", delivery_channel_name(pane)),
++        match entry.target {
++            crate::entities::address::AddressTarget::Desk(_) => {
++                ("Desk", delivery_channel_name(pane))
++            }
++            crate::entities::address::AddressTarget::Principal(_) => ("Inbox", "Direct".into()),
++        },
+         ("Queued", super::format_time(entry.created_at)),
+         ("Updated", super::format_time(entry.updated_at)),
+         (
+--- B3-R1/src/adapters/http/pages/tests.rs
++++ B3-R2/src/adapters/http/pages/tests.rs
+@@ -3783,7 +3783,7 @@
+     DeliveryEntry {
+         id: DeliveryId::random(),
+         company_id,
+-        channel_id,
++        target: crate::entities::address::AddressTarget::Desk(channel_id),
+         message_id: CanonicalMessageId::random(),
+         correlation_id: CorrelationId::new(),
+         transport: TransportKind::Email,
+--- B3-R1/src/adapters/http/routes/ui_deliveries.rs
++++ B3-R2/src/adapters/http/routes/ui_deliveries.rs
+@@ -189,16 +189,21 @@
+     let view = workspace.view(&company);
+     let filter = query.filter();
+     let channels = view.channels().await?;
+-    let (entries, has_next) = view.page(&filter).await?;
+-
+     // A delivery the filters exclude is still worth showing: the URL named it, and it may well be
+     // on another page of this same list.
+-    let selected = match query.entry_id {
+-        Some(entry_id) => view.entry(entry_id).await?,
+-        None => None,
+-    };
++    record_pagination_observation(view.monitoring, "deliveries", filter.offset());
++    let loaded = view
++        .deliveries
++        .workspace(
++            view.read_scope()?,
++            &filter,
++            query.entry_id.map(DeliveryId::new),
++        )
++        .await?;
++    let (entries, has_next) = filter.split_probe(loaded.entries);
++    let selected = loaded.selected;
+     let pane_html = match &selected {
+-        Some(entry) => view.pane(entry, &channels).await?,
++        Some(entry) => view.pane(entry, &channels)?,
+         None => pages::delivery_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
+     };
+ 
+@@ -248,13 +253,12 @@
+ ) -> AppResult<Html<String>> {
+     let company = workspace.scoped_company(query.company_id).await?;
+     let view = workspace.view(&company);
++    let channels = view.channels().await?;
+     let entry = view
+         .entry(entry_id)
+         .await?
+         .ok_or_else(|| AppError::NotFound("Delivery not found".into()))?;
+-    let channels = view.channels().await?;
+-
+-    Ok(Html(view.pane(&entry, &channels).await?))
++    Ok(Html(view.pane(&entry, &channels)?))
+ }
+ 
+ /// Everything the workspace renders from, so each handler names its data once.
+@@ -324,10 +328,13 @@
+         )
+     }
+ 
+-    async fn pane(&self, entry: &DeliveryEntry, channels: &[Channel]) -> AppResult<String> {
+-        let channel = channels
+-            .iter()
+-            .find(|channel| channel.id == entry.channel_id);
++    fn pane(&self, entry: &DeliveryEntry, channels: &[Channel]) -> AppResult<String> {
++        let channel = match entry.target {
++            crate::entities::address::AddressTarget::Desk(id) => {
++                channels.iter().find(|channel| channel.id == id)
++            }
++            crate::entities::address::AddressTarget::Principal(_) => None,
++        };
+ 
+         Ok(pages::delivery_detail_pane(&pages::DeliveryDetailPane {
+             company_id: self.company.id,
+--- B3-R1/src/adapters/persistence/delivery/mod.rs
++++ B3-R2/src/adapters/persistence/delivery/mod.rs
+@@ -24,12 +24,13 @@
+ use crate::{
+     app_error::{AppError, AppResult},
+     entities::{
++        address::AddressTarget,
+         correlation::CorrelationId,
+         message::CanonicalMessageId,
+         transport::{
+             ChannelBindingId, DeliveryCancellation, DeliveryCancellationReason, DeliveryId,
+             DeliveryPartId, DeliveryPartStatus, DeliveryPurpose, DeliveryStatus,
+-            ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
++            ExternalDestination, ExternalMessageKey, FailureClass, PrincipalId, TransportKind,
+         },
+     },
+     transport::{
+@@ -41,7 +42,7 @@
+ 
+ /// The columns every read of a delivery selects, named once so the claim, the paging read and the
+ /// single-row read cannot select different shapes.
+-pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, message_id,
++pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, principal_id, message_id,
+     source_binding_id, destination_binding_id, external_destination, depends_on_delivery_id, correlation_id, transport, purpose, idempotency_key, status,
+     attempt_count, max_attempts, available_at, last_error_class, last_error_detail,
+     execution_id, owner_worker_id, locked_at, lock_expires_at, delivered_at,
+@@ -143,6 +144,7 @@
+     pub id: Uuid,
+     pub company_id: Uuid,
+     pub channel_id: Option<Uuid>,
++    pub principal_id: Option<Uuid>,
+     pub message_id: Option<Uuid>,
+     pub source_binding_id: Option<Uuid>,
+     pub destination_binding_id: Option<Uuid>,
+@@ -225,20 +227,24 @@
+                 ))
+             })?;
+         let attribution = match (
+-            self.channel_id,
++            AddressTarget::from_parts(self.channel_id, self.principal_id.map(PrincipalId::new)),
+             self.message_id,
+             self.source_binding_id,
+             self.destination_binding_id,
+         ) {
+-            (Some(channel), Some(message), Some(source), Some(destination)) => {
++            (Some(target), Some(message), Some(source), Some(destination)) => {
+                 Some(DeliveryAttribution {
+-                    channel_id: channel,
++                    target,
+                     message_id: CanonicalMessageId::new(message),
+                     source_binding_id: ChannelBindingId::new(source),
+                     destination_binding_id: ChannelBindingId::new(destination),
+                 })
+             }
+-            (None, None, None, None) => None,
++            (None, None, None, None)
++                if self.channel_id.is_none() && self.principal_id.is_none() =>
++            {
++                None
++            }
+             _ => {
+                 return Err(AppError::Internal(format!(
+                     "Delivery {} has partial canonical attribution",
+--- B3-R1/src/adapters/persistence/delivery/read.rs
++++ B3-R2/src/adapters/persistence/delivery/read.rs
+@@ -9,7 +9,7 @@
+ use sqlx::{Postgres, QueryBuilder};
+ use uuid::Uuid;
+ 
+-use super::{DeliveryDb, PART_COLUMNS, PartDb};
++use super::{DeliveryDb, PART_COLUMNS, PartDb, qualified_delivery_columns};
+ use crate::{
+     adapters::persistence::PostgresPersistence,
+     app_error::{AppError, AppResult},
+@@ -18,7 +18,7 @@
+         delivery::{DeliveryEntry, DeliveryFilter, DeliveryPartEntry},
+         transport::{DeliveryId, DeliveryPartId},
+     },
+-    use_cases::delivery::{DeliveryReadScope, DeliveryReader, project_delivery},
++    use_cases::delivery::{DeliveryReadScope, DeliveryReader, DeliveryWorkspace, project_delivery},
+ };
+ 
+ /// The row plus its two joined labels, which is what a reader sees.
+@@ -35,31 +35,62 @@
+ /// Both joins are inner: the composite foreign keys make a delivery whose message or binding is
+ /// missing unrepresentable, so an outer join would only be describing a state the database forbids.
+ ///
+-/// The column list is spelled out qualified rather than derived from [`DELIVERY_COLUMNS`] by
+-/// string surgery -- a `SELECT` list is what the row struct is coupled to, and reconstructing it
+-/// from another string is a decoder ring the reader should not need.
+-const DELIVERY_VIEW_SELECT: &str = r#"
+-    SELECT delivery.id, delivery.company_id, delivery.channel_id, delivery.message_id,
+-           delivery.source_binding_id, delivery.destination_binding_id,
+-           delivery.external_destination, delivery.depends_on_delivery_id,
+-           delivery.correlation_id, delivery.transport, delivery.purpose,
+-           delivery.idempotency_key, delivery.status, delivery.attempt_count,
+-           delivery.max_attempts, delivery.available_at, delivery.last_error_class,
+-           delivery.last_error_detail, delivery.execution_id, delivery.owner_worker_id,
+-           delivery.locked_at, delivery.lock_expires_at, delivery.delivered_at,
+-           delivery.created_at, delivery.updated_at,
+-           delivery.cancellation_requested_at, delivery.cancellation_reason,
+-           message.subject AS subject,
++/// Reuse the queue's named projection so readers and claimants decode the same target shape.
++fn scoped_deliveries(scope: DeliveryReadScope) -> QueryBuilder<'static, Postgres> {
++    let mut query = QueryBuilder::new(format!(
++        r#"
++    SELECT {}, message.subject AS subject,
+            binding.display_label AS destination_label
+       FROM message_deliveries AS delivery
+       JOIN messages AS message
+         ON (message.company_id, message.id) = (delivery.company_id, delivery.message_id)
+       JOIN channel_bindings AS binding
+         ON (binding.company_id, binding.id)
+-           = (delivery.company_id, delivery.destination_binding_id)"#;
++           = (delivery.company_id, delivery.destination_binding_id)
++     WHERE delivery.company_id = "#,
++        qualified_delivery_columns("delivery")
++    ));
++    query.push_bind(scope.company_id);
++    // Filter before paging; hidden personal rows must not displace readable entries.
++    query.push(
++        " AND (delivery.principal_id IS NULL OR EXISTS (\
++        SELECT 1 FROM principals AS viewer WHERE viewer.company_id=delivery.company_id \
++        AND viewer.kind='person' AND viewer.user_id=",
++    );
++    query.push_bind(scope.viewer.user_id());
++    query.push(
++        " AND principal_direct_can_view(delivery.company_id,delivery.principal_id,viewer.id)))",
++    );
++    query
++}
+ 
+ #[async_trait]
+ impl DeliveryReader for PostgresPersistence {
++    async fn workspace(
++        &self,
++        scope: DeliveryReadScope,
++        filter: &DeliveryFilter,
++        selected: Option<DeliveryId>,
++    ) -> AppResult<DeliveryWorkspace> {
++        let mut entries = self.list_company_deliveries(scope, filter).await?;
++        let selected = match selected {
++            Some(id) => self.get_delivery(scope, id).await?,
++            None => None,
++        };
++        let selected_id = selected.as_ref().map(|entry| entry.id);
++        entries.extend(selected);
++        // A selection may be outside the page. Recheck every loaded inbox together,
++        // so its later payload read cannot leave stale private rows in the sidebar.
++        let mut entries = self.project_delivery_entries(scope, entries).await?;
++        let selected = selected_id.and_then(|id| {
++            entries
++                .iter()
++                .rposition(|entry| entry.id == id)
++                .map(|index| entries.remove(index))
++        });
++        Ok(DeliveryWorkspace { entries, selected })
++    }
++
+     async fn list_company_deliveries(
+         &self,
+         scope: DeliveryReadScope,
+@@ -67,10 +98,7 @@
+     ) -> AppResult<Vec<DeliveryEntry>> {
+         // `QueryBuilder` rather than string interpolation: every filter value is a bind parameter,
+         // which `src/adapters/persistence/AGENTS.md` requires of dynamic list filters.
+-        let mut query = QueryBuilder::<Postgres>::new(format!(
+-            "{DELIVERY_VIEW_SELECT} WHERE delivery.company_id = "
+-        ));
+-        query.push_bind(scope.company_id);
++        let mut query = scoped_deliveries(scope);
+         if let Some(channel_id) = filter.channel_id {
+             query
+                 .push(" AND delivery.channel_id = ")
+@@ -119,14 +147,15 @@
+         scope: DeliveryReadScope,
+         delivery_id: DeliveryId,
+     ) -> AppResult<Option<DeliveryEntry>> {
+-        let row = sqlx::query_as::<_, DeliveryViewDb>(&format!(
+-            "{DELIVERY_VIEW_SELECT} WHERE delivery.id = $1 AND delivery.company_id = $2"
+-        ))
+-        .bind(delivery_id.as_uuid())
+-        .bind(scope.company_id)
+-        .fetch_optional(&self.pool)
+-        .await
+-        .map_err(AppError::from)?;
++        let mut query = scoped_deliveries(scope);
++        query
++            .push(" AND delivery.id = ")
++            .push_bind(delivery_id.as_uuid());
++        let row = query
++            .build_query_as::<DeliveryViewDb>()
++            .fetch_optional(&self.pool)
++            .await
++            .map_err(AppError::from)?;
+ 
+         let entries = self.with_parts(row.into_iter().collect()).await?;
+         Ok(self
+@@ -143,25 +172,25 @@
+         scope: DeliveryReadScope,
+         mut entries: Vec<DeliveryEntry>,
+     ) -> AppResult<Vec<DeliveryEntry>> {
+-        let messages = entries
++        let deliveries = entries
+             .iter()
+-            .map(|entry| entry.message_id.as_uuid())
++            .map(|entry| entry.id.as_uuid())
+             .collect::<Vec<_>>();
+         // Parts and provider diagnostics have already loaded; this is the final authority read.
+-        let levels = crate::adapters::persistence::view_visibility::message_levels_on(
++        let levels = crate::adapters::persistence::view_visibility::delivery_levels_on(
+             self.pool(),
+             crate::domain::workflow::CompanyId::new(scope.company_id),
+             scope.viewer,
+-            &messages,
++            &deliveries,
+         )
+         .await?;
+-        for entry in &mut entries {
+-            let visibility = levels
+-                .get(&entry.message_id.as_uuid())
+-                .copied()
+-                .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
+-            project_delivery(entry, visibility);
+-        }
++        entries.retain_mut(|entry| match levels.get(&entry.id.as_uuid()).copied() {
++            Some(visibility) => {
++                project_delivery(entry, visibility);
++                true
++            }
++            None => false,
++        });
+         Ok(entries)
+     }
+     /// Attach every delivery's parts, in one batch read rather than one query per delivery.
+@@ -217,7 +246,7 @@
+     Ok(DeliveryEntry {
+         id: DeliveryId::new(delivery.id),
+         company_id: delivery.company_id,
+-        channel_id: attribution.channel_id,
++        target: attribution.target,
+         message_id: attribution.message_id,
+         correlation_id: CorrelationId::from(delivery.correlation_id),
+         transport: delivery.transport()?,
+--- B3-R1/src/adapters/persistence/test_support.rs
++++ B3-R2/src/adapters/persistence/test_support.rs
+@@ -364,7 +364,7 @@
+ /// What a fixture delivery should look like. Defaults to a plain email reply to one recipient.
+ pub struct DeliveryFixtureRequest<'a> {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: crate::entities::address::AddressTarget,
+     pub thread_id: Uuid,
+     /// Distinguishes one fixture delivery from another within the same interface, which is what
+     /// the unique index is over.
+@@ -381,9 +381,23 @@
+ 
+ impl<'a> DeliveryFixtureRequest<'a> {
+     pub fn new(company_id: Uuid, channel_id: Uuid, thread_id: Uuid, source_key: &'a str) -> Self {
++        Self::for_target(
++            company_id,
++            crate::entities::address::AddressTarget::Desk(channel_id),
++            thread_id,
++            source_key,
++        )
++    }
++
++    pub fn for_target(
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
++        thread_id: Uuid,
++        source_key: &'a str,
++    ) -> Self {
+         Self {
+             company_id,
+-            channel_id,
++            target,
+             thread_id,
+             source_key,
+             recipient: "customer@example.com",
+@@ -408,13 +422,13 @@
+     let binding = ChannelBindingPersistence::active_bindings_for_target(
+         persistence,
+         request.company_id,
+-        crate::entities::address::AddressTarget::Desk(request.channel_id),
++        request.target,
+     )
+     .await
+     .expect("the channel's interfaces are readable")
+     .into_iter()
+     .find(|binding| binding.transport == TransportKind::Email)
+-    .expect("a channel is created with its canonical email interface");
++    .expect("the inbox has its canonical email interface");
+ 
+     let write = MessageWrite::internal(
+         request.thread_id,
+@@ -444,7 +458,7 @@
+         delivery: NewDelivery {
+             id: DeliveryId::random(),
+             company_id: request.company_id,
+-            target: crate::entities::address::AddressTarget::Desk(request.channel_id),
++            target: request.target,
+             message_id,
+             message_audience: crate::entities::message::MessageAudience::ExternalConversation,
+             source_binding_id: binding.id,
+--- B3-R1/src/adapters/persistence/view_visibility.rs
++++ B3-R2/src/adapters/persistence/view_visibility.rs
+@@ -90,3 +90,33 @@
+     .await?;
+     levels(rows)
+ }
++
++/// Recheck the exact inbox and content ceiling together after delivery parts/diagnostics load.
++pub(super) async fn delivery_levels_on<'e>(
++    db: impl sqlx::Executor<'e, Database = Postgres>,
++    company: CompanyId,
++    viewer: WorkflowActor,
++    deliveries: &[Uuid],
++) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
++    let rows = sqlx::query_as::<_, VisibilityRow>(
++        r#"SELECT delivery.id, message.access_level::smallint AS content_level,
++                  member.role AS membership, member.access_level::smallint AS access_level,
++                  company.user_id=account.id AS is_owner
++           FROM message_deliveries AS delivery
++           JOIN messages AS message ON (message.company_id,message.id)=(delivery.company_id,delivery.message_id)
++           JOIN companies AS company ON company.id=delivery.company_id
++           JOIN users AS account ON account.id=$3
++           LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(delivery.company_id,account.id)
++           LEFT JOIN principals AS principal ON principal.company_id=delivery.company_id
++               AND principal.user_id=account.id AND principal.kind='person'
++           WHERE delivery.company_id=$1 AND delivery.id=ANY($2)
++               AND (company.user_id=account.id OR member.user_id IS NOT NULL)
++               AND (delivery.principal_id IS NULL OR principal_direct_can_view(delivery.company_id,delivery.principal_id,principal.id))"#,
++    )
++    .bind(company.as_uuid())
++    .bind(deliveries)
++    .bind(viewer.user_id())
++    .fetch_all(db)
++    .await?;
++    levels(rows)
++}
+--- B3-R1/src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs
++++ B3-R2/src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs
+@@ -0,0 +1,252 @@
++//! Exact personal-target authority and retirement through actual delivery readers.
++//! Canonical delivery rows use the shared fixture; personal publishing is not claimed here.
++use super::*;
++
++async fn join_admin(f: &DirectIntents) -> Uuid {
++    use crate::use_cases::company_invite::CompanyInvitePersistence;
++    use crate::use_cases::user::UserPersistence;
++    let name = format!("delivery_reader_{}", Uuid::new_v4().simple());
++    let email = format!("{name}@example.test");
++    let p = f.s.p();
++    p.create_user(&name, &email, "hash").await.unwrap();
++    let account = p.get_by_email(&email).await.unwrap().unwrap();
++    // Stamp the external verification result, then exercise production invite acceptance.
++    sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
++        .bind(account.id)
++        .execute(f.s.pool())
++        .await
++        .unwrap();
++    let command = crate::adapters::persistence::test_support::invite_command(
++        p,
++        f.s.fixture.target.company.as_uuid(),
++        &email,
++        crate::entities::company_member::CompanyAccessRole::Admin,
++    )
++    .await;
++    let invite = p.create_invite(command).await.unwrap();
++    assert!(
++        p.accept_pending_invite(invite.id, account.id, &email)
++            .await
++            .unwrap()
++            .is_some()
++    );
++    account.id
++}
++
++struct PersonalDelivery {
++    f: DirectIntents,
++    recipient: Uuid,
++    manager: Uuid,
++    target: AddressTarget,
++    private: DeliveryId,
++    desk: DeliveryId,
++}
++
++async fn personal_delivery() -> PersonalDelivery {
++    let f = DirectIntents::new().await;
++    let recipient = join_admin(&f).await;
++    let manager = join_admin(&f).await;
++    let target = AddressTarget::Principal(PrincipalId::new(f.s.fixture.principal(recipient).await));
++    let company = f.s.fixture.target.company.as_uuid();
++    let desk = delivery_fixture(
++        f.s.p(),
++        DeliveryFixtureRequest::new(company, f.s.channel, f.s.thread, "private-reader-desk"),
++    )
++    .await;
++    let mut tx = f.s.pool().begin().await.unwrap();
++    insert_delivery_on(&mut tx, &desk.delivery).await.unwrap();
++    tx.commit().await.unwrap();
++    let thread = f.ingest(target).await.thread.unwrap();
++    let mut private = None;
++    for key in ["private-reader-a", "private-reader-b"] {
++        let fixture = delivery_fixture(
++            f.s.p(),
++            DeliveryFixtureRequest::for_target(company, target, thread.id, key),
++        )
++        .await;
++        let mut tx = f.s.pool().begin().await.unwrap();
++        insert_delivery_on(&mut tx, &fixture.delivery)
++            .await
++            .unwrap();
++        tx.commit().await.unwrap();
++        private = Some(fixture.delivery.id);
++    }
++    PersonalDelivery {
++        f,
++        recipient,
++        manager,
++        target,
++        private: private.unwrap(),
++        desk: desk.delivery.id,
++    }
++}
++
++#[tokio::test]
++async fn direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts()
++ {
++    let state = Box::pin(personal_delivery()).await;
++    let f = &state.f;
++    Box::pin(assert_allowed_readers(&state)).await;
++    Box::pin(assert_manager_refused(&state)).await;
++    Box::pin(retire_during_read(&state)).await;
++    assert!(
++        f.s.p()
++            .get_delivery(read_scope(f, state.recipient), state.private)
++            .await
++            .unwrap()
++            .is_none()
++    );
++    assert_eq!(
++        f.s.p()
++            .get_delivery(read_scope(f, f.s.owner().user_id()), state.private)
++            .await
++            .unwrap()
++            .unwrap()
++            .target,
++        state.target
++    );
++}
++
++async fn assert_allowed_readers(state: &PersonalDelivery) {
++    let f = &state.f;
++    for viewer in [f.s.owner().user_id(), state.recipient] {
++        let found =
++            f.s.p()
++                .get_delivery(read_scope(f, viewer), state.private)
++                .await
++                .unwrap()
++                .unwrap();
++        assert_eq!(found.target, state.target);
++        let workspace =
++            f.s.p()
++                .workspace(
++                    read_scope(f, viewer),
++                    &DeliveryFilter::new(DeliveryQuery::default()),
++                    Some(state.private),
++                )
++                .await
++                .unwrap();
++        assert_eq!(workspace.entries.len(), 3);
++        assert_eq!(workspace.selected.unwrap().target, state.target);
++    }
++}
++
++async fn assert_manager_refused(state: &PersonalDelivery) {
++    let f = &state.f;
++    let scope = read_scope(f, state.manager);
++    assert!(
++        f.s.p()
++            .get_delivery(scope, state.private)
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let entries =
++        f.s.p()
++            .list_company_deliveries(
++                scope,
++                &DeliveryFilter::new(DeliveryQuery {
++                    limit: Some(1),
++                    ..Default::default()
++                }),
++            )
++            .await
++            .unwrap();
++    assert_eq!(entries.len(), 1);
++    assert_eq!(
++        entries[0].id, state.desk,
++        "two newer hidden personal rows must not consume the page"
++    );
++
++    let workspace =
++        f.s.p()
++            .workspace(
++                scope,
++                &DeliveryFilter::new(DeliveryQuery {
++                    limit: Some(1),
++                    ..Default::default()
++                }),
++                Some(state.private),
++            )
++            .await
++            .unwrap();
++    assert_eq!(workspace.entries.len(), 1);
++    assert_eq!(workspace.entries[0].id, state.desk);
++    assert!(workspace.selected.is_none());
++    let foreign_company = crate::use_cases::company::CompanyPersistence::create(
++        f.s.p(),
++        f.s.owner().user_id(),
++        crate::use_cases::company::CompanyWrite {
++            name: "Other delivery company".into(),
++            slug: format!("delivery-other-{}", Uuid::new_v4().simple()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    // The same viewer can read this personal delivery in its real tenant and owns the
++    // second tenant too; refusing here must therefore depend on the tenant boundary.
++    let foreign = DeliveryReadScope {
++        company_id: foreign_company.id,
++        viewer: f.s.owner(),
++    };
++    assert!(
++        f.s.p()
++            .get_delivery(foreign, state.private)
++            .await
++            .unwrap()
++            .is_none()
++    );
++}
++
++async fn retire_during_read(state: &PersonalDelivery) {
++    use crate::use_cases::company_invite::CompanyInvitePersistence;
++    use sqlx::Connection;
++    let f = &state.f;
++    let mut observer = sqlx::PgConnection::connect_with(&f.s.pool().connect_options())
++        .await
++        .unwrap();
++    let mut gate = f.s.pool().begin().await.unwrap();
++    let blocker: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *gate)
++        .await
++        .unwrap();
++    sqlx::query("LOCK TABLE message_delivery_parts IN ACCESS EXCLUSIVE MODE")
++        .execute(&mut *gate)
++        .await
++        .unwrap();
++    let read =
++        f.s.p()
++            .get_delivery(read_scope(f, state.recipient), state.private);
++    let retirement = async {
++        tokio::time::timeout(Duration::from_secs(3),async {
++            loop {
++                let waiting: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND $1=ANY(pg_blocking_pids(pid)) AND query LIKE '%message_delivery_parts%')")
++                    .bind(blocker).fetch_one(&mut observer).await.unwrap();
++                if waiting {break;}
++                tokio::time::sleep(Duration::from_millis(10)).await;
++            }
++        }).await.expect("real reader loaded the private delivery and reached its parts query");
++        f.s.p()
++            .remove_member(f.s.fixture.target.company.as_uuid(), state.recipient)
++            .await
++            .unwrap();
++        assert!(
++            f.s.p()
++                .get_member_by_user_id(f.s.fixture.target.company.as_uuid(), state.recipient)
++                .await
++                .unwrap()
++                .is_none()
++        );
++        gate.commit().await.unwrap();
++    };
++    let (read, ()) = tokio::time::timeout(Duration::from_secs(10), async {
++        tokio::join!(read, retirement)
++    })
++    .await
++    .expect("retirement and the actual reader complete normally");
++    assert!(
++        read.unwrap().is_none(),
++        "authority revoked during the parts read must conceal the loaded private delivery"
++    );
++}
+--- B3-R1/src/adapters/persistence/workflow/direct_delivery_tests.rs
++++ B3-R2/src/adapters/persistence/workflow/direct_delivery_tests.rs
+@@ -0,0 +1,249 @@
++//! Direct final publication through the real global queue, email adapter and fenced worker.
++//! The provider records accepted submissions; it does not claim a remote SMTP/API submission.
++use super::*;
++use crate::adapters::persistence::delivery::enqueue::insert_delivery_on;
++use crate::adapters::persistence::test_support::{DeliveryFixtureRequest, delivery_fixture};
++use crate::adapters::protocols::email::mail::DeploymentMailTransports;
++use crate::adapters::protocols::email::test_support::RecordingTransport;
++use crate::adapters::protocols::email::{EmailRenderer, EmailSender};
++use crate::application::services::delivery_worker::DeliveryWorker;
++use crate::entities::delivery::{DeliveryFilter, DeliveryQuery};
++use crate::entities::transport::{DeliveryId, DeliveryPurpose};
++use crate::transport::ports::{TransportRegistry, TransportRenderers};
++use crate::transport::{
++    CanonicalContent, DeliveryComposer, DeliveryContext, DeliveryRequest, EmailDeliveryContext,
++    EmailThreading, NewStandaloneDelivery, StandaloneDeliveryEnqueuer, StandaloneDeliveryRequest,
++};
++use crate::use_cases::delivery::{DeliveryReadScope, DeliveryReader};
++
++pub(super) async fn assert_delivered(f: &DirectIntents, direct: DeliveryId) {
++    let p = f.s.p();
++    let mut listener = sqlx::postgres::PgListener::connect_with(f.s.pool())
++        .await
++        .unwrap();
++    listener.listen("attention_changed").await.unwrap();
++    let DeliverySiblings { desk, standalone } = Box::pin(queue_siblings(f)).await;
++    assert_readers(f, direct, desk).await;
++    let provider = Arc::new(RecordingTransport::default());
++    let transports = TransportRegistry::new()
++        .register(
++            Arc::new(EmailRenderer::new(DOMAIN)),
++            Arc::new(EmailSender::new(
++                DeploymentMailTransports::only(provider.clone()),
++                Arc::new(crate::adapters::persistence::test_support::thread_use_cases(p, DOMAIN)),
++            )),
++        )
++        .unwrap();
++    let worker = DeliveryWorker::new(Arc::new(p.clone()), Arc::new(transports));
++    let (_shutdown, mut receiver) = tokio::sync::broadcast::channel(1);
++    assert_eq!(
++        Box::pin(worker.drain_once(&mut receiver)).await.unwrap(),
++        3,
++        "direct, desk and standalone rows must all survive one global claim batch"
++    );
++    let sent = provider.sent();
++    assert_eq!(sent.len(), 3);
++    let direct_mail = sent
++        .iter()
++        .find(|mail| mail.body_text == "The direct reply")
++        .unwrap();
++    assert!(
++        direct_mail
++            .from
++            .as_str()
++            .starts_with("workflow-direct-standin@")
++    );
++    let ids = [direct.as_uuid(), desk.as_uuid(), standalone.as_uuid()];
++    let statuses: Vec<String> =
++        sqlx::query_scalar("SELECT status FROM message_deliveries WHERE id=ANY($1)")
++            .bind(ids.as_slice())
++            .fetch_all(f.s.pool())
++            .await
++            .unwrap();
++    assert_eq!(statuses, ["delivered", "delivered", "delivered"]);
++    assert_readers(f, direct, desk).await;
++    let delivered = p
++        .get_delivery(read_scope(f, f.s.owner().user_id()), direct)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(!delivered.parts.is_empty());
++    assert!(
++        delivered.parts.iter().all(|part| part.status
++            == crate::entities::transport::DeliveryPartStatus::Delivered
++            && part.provider_message_key.is_some()),
++        "provider acceptance must commit fenced parts and correlation keys"
++    );
++
++    assert_wakes(f, &mut listener, direct, desk, standalone).await;
++}
++
++struct DeliverySiblings {
++    desk: DeliveryId,
++    standalone: DeliveryId,
++}
++
++async fn queue_siblings(f: &DirectIntents) -> DeliverySiblings {
++    let p = f.s.p();
++    let company = f.s.fixture.target.company.as_uuid();
++    let notice = standalone_delivery(f);
++    let standalone = notice.id;
++    p.enqueue_standalone_delivery(notice).await.unwrap();
++    let fixture = delivery_fixture(
++        p,
++        DeliveryFixtureRequest::new(
++            company,
++            f.s.channel,
++            f.s.thread,
++            "direct-delivery-desk-sibling",
++        ),
++    )
++    .await;
++    let from: String = sqlx::query_scalar("SELECT address.slug::text||'@'||company.slug::text||'.'||$3 FROM addresses AS address JOIN companies AS company ON company.id=address.company_id WHERE address.company_id=$1 AND address.channel_id=$2 AND address.is_primary")
++        .bind(company).bind(f.s.channel).bind(DOMAIN).fetch_one(f.s.pool()).await.unwrap();
++    let content = CanonicalContent::parse("Re: order", "On its way.").unwrap();
++    let delivery = composer(f)
++        .compose(DeliveryRequest {
++            company_id: company,
++            target: AddressTarget::Desk(f.s.channel),
++            message_id: fixture.message_id,
++            correlation_id: fixture.delivery.correlation_id,
++            purpose: DeliveryPurpose::WorkflowReply,
++            source_key: "direct-delivery-desk-sibling".into(),
++            content: &content,
++            context: email_context(from.into()),
++        })
++        .await
++        .unwrap()
++        .delivery;
++    let desk = delivery.id;
++    let mut tx = f.s.pool().begin().await.unwrap();
++    insert_delivery_on(&mut tx, &delivery).await.unwrap();
++    tx.commit().await.unwrap();
++    DeliverySiblings { desk, standalone }
++}
++
++fn composer(f: &DirectIntents) -> DeliveryComposer {
++    let renderers = TransportRenderers::new()
++        .register(Arc::new(EmailRenderer::new(DOMAIN)))
++        .unwrap();
++    DeliveryComposer::new(Arc::new(renderers), Arc::new(f.s.p().clone()))
++}
++
++fn email_context(from: crate::entities::value_objects::EmailAddress) -> DeliveryContext {
++    DeliveryContext::Email(EmailDeliveryContext {
++        from,
++        from_name: None,
++        recipient_to: "customer@partner.test".into(),
++        recipients_cc: Vec::new(),
++        threading: EmailThreading::Standalone,
++        relay: None,
++    })
++}
++
++fn standalone_delivery(f: &DirectIntents) -> NewStandaloneDelivery {
++    let composer = composer(f);
++    let content = CanonicalContent::parse("Queue sibling", "A standalone notification").unwrap();
++    composer
++        .compose_standalone(StandaloneDeliveryRequest {
++            company_id: f.s.fixture.target.company.as_uuid(),
++            correlation_id: crate::entities::correlation::CorrelationId::new(),
++            purpose: DeliveryPurpose::Notification,
++            source_key: format!("direct-delivery-sibling:{}", Uuid::new_v4()),
++            content: &content,
++            context: email_context(format!("notifications@{DOMAIN}").into()),
++        })
++        .unwrap()
++}
++
++fn read_scope(f: &DirectIntents, user: Uuid) -> DeliveryReadScope {
++    DeliveryReadScope {
++        company_id: f.s.fixture.target.company.as_uuid(),
++        viewer: crate::application::workflow::WorkflowActor::authenticated(user).unwrap(),
++    }
++}
++
++async fn assert_readers(f: &DirectIntents, direct: DeliveryId, desk: DeliveryId) {
++    let scope = read_scope(f, f.s.owner().user_id());
++    let entry = f.s.p().get_delivery(scope, direct).await.unwrap().unwrap();
++    assert_eq!(entry.target, f.target());
++    let entries =
++        f.s.p()
++            .list_company_deliveries(scope, &DeliveryFilter::new(DeliveryQuery::default()))
++            .await
++            .unwrap();
++    assert_eq!(
++        entries.len(),
++        2,
++        "standalone notifications have no canonical delivery view"
++    );
++    assert_eq!(
++        entries
++            .iter()
++            .find(|entry| entry.id == direct)
++            .unwrap()
++            .target,
++        f.target()
++    );
++    assert_eq!(
++        entries
++            .iter()
++            .find(|entry| entry.id == desk)
++            .unwrap()
++            .target,
++        AddressTarget::Desk(f.s.channel)
++    );
++}
++
++async fn assert_wakes(
++    f: &DirectIntents,
++    listener: &mut sqlx::postgres::PgListener,
++    direct: DeliveryId,
++    desk: DeliveryId,
++    standalone: DeliveryId,
++) {
++    let mut seen = std::collections::HashMap::new();
++    tokio::time::timeout(Duration::from_secs(3), async {
++        while !seen.contains_key(&direct.as_uuid()) || !seen.contains_key(&desk.as_uuid()) {
++            let event: Value =
++                serde_json::from_str(listener.recv().await.unwrap().payload()).unwrap();
++            assert_eq!(event["source_kind"], "delivery");
++            seen.insert(
++                serde_json::from_value::<Uuid>(event["source_id"].clone()).unwrap(),
++                event["target"].clone(),
++            );
++        }
++    })
++    .await
++    .expect("actual direct and desk delivery transitions emit native wakes");
++    while let Ok(event) = tokio::time::timeout(Duration::from_millis(100), listener.recv()).await {
++        let event: Value = serde_json::from_str(event.unwrap().payload()).unwrap();
++        seen.insert(
++            serde_json::from_value::<Uuid>(event["source_id"].clone()).unwrap(),
++            event["target"].clone(),
++        );
++    }
++    assert_eq!(seen[&direct.as_uuid()], json!(f.target()));
++    assert_eq!(
++        seen[&desk.as_uuid()],
++        json!(AddressTarget::Desk(f.s.channel))
++    );
++    assert!(
++        !seen.contains_key(&standalone.as_uuid()),
++        "targetless standalone rows stay outside attention wakes"
++    );
++    sqlx::query("UPDATE message_deliveries SET status=status WHERE id=$1")
++        .bind(direct.as_uuid())
++        .execute(f.s.pool())
++        .await
++        .unwrap();
++    assert!(
++        tokio::time::timeout(Duration::from_millis(150), listener.recv())
++            .await
++            .is_err(),
++        "an unchanged delivery status must not emit a material-state wake"
++    );
++}
++
++#[path = "direct_delivery_privacy_tests.rs"]
++mod privacy;
+--- B3-R1/src/adapters/persistence/workflow/direct_workflow_tests.rs
++++ B3-R2/src/adapters/persistence/workflow/direct_workflow_tests.rs
+@@ -10,6 +10,9 @@
+ use crate::entities::transport::PrincipalId;
+ 
+ const DOMAIN: &str = "direct-workflow.test";
++
++#[path = "direct_delivery_tests.rs"]
++mod delivery;
+ 
+ struct DirectIntents {
+     s: Intents,
+@@ -350,6 +353,8 @@
+         publisher.publish_claim(claims[0]).await.unwrap(),
+         ReplyPublicationOutcome::Published(receipt)
+     );
++    // Keep the real delivery worker/provider boundary out of the publication future's frame.
++    Box::pin(delivery::assert_delivered(&f, receipt.delivery.unwrap())).await;
+ }
+ 
+ struct DirectReplyRoot {
+--- B3-R1/src/adapters/protocols/email/egress_tests.rs
++++ B3-R2/src/adapters/protocols/email/egress_tests.rs
+@@ -549,7 +549,7 @@
+         id: crate::entities::transport::DeliveryId::random(),
+         company_id: Uuid::new_v4(),
+         attribution: Some(crate::transport::DeliveryAttribution {
+-            channel_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+             message_id: CanonicalMessageId::random(),
+             source_binding_id: ChannelBindingId::random(),
+             destination_binding_id: ChannelBindingId::random(),
+--- B3-R1/src/application/services/delivery_worker_tests.rs
++++ B3-R2/src/application/services/delivery_worker_tests.rs
+@@ -29,7 +29,7 @@
+         id: DeliveryId::random(),
+         company_id,
+         attribution: Some(DeliveryAttribution {
+-            channel_id: uuid::Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(uuid::Uuid::new_v4()),
+             message_id: CanonicalMessageId::random(),
+             source_binding_id: ChannelBindingId::random(),
+             destination_binding_id: ChannelBindingId::random(),
+--- B3-R1/src/application/transport/queue.rs
++++ B3-R2/src/application/transport/queue.rs
+@@ -20,6 +20,7 @@
+ use crate::{
+     app_error::AppResult,
+     entities::{
++        address::AddressTarget,
+         correlation::CorrelationId,
+         message::{CanonicalMessageId, MessageAudience},
+         transport::{
+@@ -219,7 +220,7 @@
+ /// representing a half-attributed delivery.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+ pub struct DeliveryAttribution {
+-    pub channel_id: Uuid,
++    pub target: AddressTarget,
+     pub message_id: CanonicalMessageId,
+     pub source_binding_id: ChannelBindingId,
+     pub destination_binding_id: ChannelBindingId,
+@@ -486,7 +487,7 @@
+             id: DeliveryId::random(),
+             company_id: Uuid::new_v4(),
+             attribution: Some(DeliveryAttribution {
+-                channel_id: Uuid::new_v4(),
++                target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+                 message_id: CanonicalMessageId::random(),
+                 source_binding_id: ChannelBindingId::random(),
+                 destination_binding_id: ChannelBindingId::random(),
+--- B3-R1/src/application/transport/tests.rs
++++ B3-R2/src/application/transport/tests.rs
+@@ -302,7 +302,7 @@
+         id: DeliveryId::random(),
+         company_id: uuid::Uuid::new_v4(),
+         attribution: Some(DeliveryAttribution {
+-            channel_id: uuid::Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(uuid::Uuid::new_v4()),
+             message_id,
+             source_binding_id: ChannelBindingId::random(),
+             destination_binding_id: ChannelBindingId::random(),
+--- B3-R1/src/application/use_cases/delivery.rs
++++ B3-R2/src/application/use_cases/delivery.rs
+@@ -17,6 +17,14 @@
+ 
+ #[async_trait]
+ pub trait DeliveryReader: Send + Sync {
++    /// Load a list and optional selection, then recheck both after all payload reads.
++    async fn workspace(
++        &self,
++        scope: DeliveryReadScope,
++        filter: &DeliveryFilter,
++        selected: Option<DeliveryId>,
++    ) -> AppResult<DeliveryWorkspace>;
++
+     /// One filtered page of the company's deliveries, newest first unless the filter says
+     /// otherwise.
+     ///
+@@ -34,6 +42,11 @@
+         scope: DeliveryReadScope,
+         delivery_id: DeliveryId,
+     ) -> AppResult<Option<DeliveryEntry>>;
++}
++
++pub struct DeliveryWorkspace {
++    pub entries: Vec<DeliveryEntry>,
++    pub selected: Option<DeliveryEntry>,
+ }
+ 
+ #[derive(Debug, Clone, Copy)]
+--- B3-R1/src/domain/entities/delivery.rs
++++ B3-R2/src/domain/entities/delivery.rs
+@@ -15,6 +15,7 @@
+ use uuid::Uuid;
+ 
+ use crate::entities::{
++    address::AddressTarget,
+     correlation::CorrelationId,
+     message::CanonicalMessageId,
+     transport::{
+@@ -31,9 +32,8 @@
+ pub struct DeliveryEntry {
+     pub id: DeliveryId,
+     pub company_id: Uuid,
+-    /// The channel this goes out as. Still present after the channel is renamed; the delivery is
+-    /// deleted with the channel, so this never dangles.
+-    pub channel_id: Uuid,
++    /// The inbox this goes out as, pinned independently of its current address.
++    pub target: AddressTarget,
+     pub message_id: CanonicalMessageId,
+     pub correlation_id: CorrelationId,
+     pub transport: TransportKind,
+@@ -200,7 +200,7 @@
+         DeliveryEntry {
+             id: DeliveryId::random(),
+             company_id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            target: AddressTarget::Desk(Uuid::new_v4()),
+             message_id: CanonicalMessageId::random(),
+             correlation_id: CorrelationId::new(),
+             transport: TransportKind::Email,

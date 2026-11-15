@@ -21,6 +21,7 @@ use crate::application::ports::channel::ChannelUpdate;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::ports::participant::IdentityObservation;
 use crate::domain::workflow::CompanyId;
+use crate::entities::address::{AddressTarget, ResolvedAddress};
 use crate::entities::channel::Channel;
 use crate::entities::channel::ChannelAccessMode;
 use crate::entities::creation::CreationProvenance;
@@ -28,6 +29,7 @@ use crate::entities::department::DepartmentId;
 use crate::entities::participant::IdentityClaimMetadata;
 use crate::entities::participant::IdentityProvenance;
 use crate::entities::participant::PrincipalCapability;
+use crate::entities::transport::PrincipalId;
 use crate::entities::value_objects::ChannelSlug;
 use crate::entities::value_objects::CompanySlug;
 use crate::entities::value_objects::EmailAddress;
@@ -91,12 +93,14 @@ impl TryFrom<ChannelDb> for Channel {
 
 const CHANNEL_SELECT: &str = r#"
     SELECT ch.id, ch.company_id, ch.name, ch.description,
-           (SELECT cs.slug::text FROM channel_slugs cs
-            WHERE cs.channel_id = ch.id AND cs.is_primary) AS slug,
+           (SELECT address.slug::text FROM addresses AS address
+            WHERE address.company_id = ch.company_id AND address.channel_id = ch.id
+              AND address.is_primary) AS slug,
            COALESCE(
-               (SELECT array_agg(cs.slug::text ORDER BY cs.slug::text)
-                FROM channel_slugs cs
-                WHERE cs.channel_id = ch.id AND NOT cs.is_primary),
+               (SELECT array_agg(address.slug::text ORDER BY address.slug::text)
+                FROM addresses AS address
+                WHERE address.company_id = ch.company_id AND address.channel_id = ch.id
+                  AND NOT address.is_primary),
                ARRAY[]::text[]) AS alias_slugs,
            CASE ch.access_mode
                WHEN 'public' THEN ARRAY['@public']::text[] || COALESCE(
@@ -150,11 +154,12 @@ async fn load_channel(persistence: &PostgresPersistence, id: Uuid) -> AppResult<
     db.map(TryInto::try_into).transpose()
 }
 
-/// Write a channel's canonical slug plus its aliases into the shared per-company slug namespace.
+/// Write a channel's canonical slug plus its aliases into the company's address namespace, which
+/// desks share with people and agents.
 ///
-/// One statement per slug so a `UNIQUE (company_id, slug)` violation can name the address that
-/// actually collided; the caller's transaction rolls the partial write back.
-pub(super) async fn insert_channel_slugs(
+/// One statement per slug so a `(company_id, slug)` primary-key violation can name the address
+/// that actually collided; the caller's transaction rolls the partial write back.
+pub(super) async fn insert_desk_addresses(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Uuid,
     channel_id: Uuid,
@@ -165,8 +170,8 @@ pub(super) async fn insert_channel_slugs(
         std::iter::once((slug, true)).chain(alias_slugs.iter().map(|alias| (alias.as_str(), false)))
     {
         sqlx::query(
-            r#"INSERT INTO channel_slugs (company_id, channel_id, slug, is_primary)
-               VALUES ($1, $2, $3, $4)"#,
+            r#"INSERT INTO addresses (company_id, channel_id, slug, is_primary, target_kind)
+               VALUES ($1, $2, $3, $4, 'desk')"#,
         )
         .bind(company_id)
         .bind(channel_id)
@@ -187,7 +192,7 @@ fn slug_conflict_error(err: sqlx::Error, slug: &str) -> AppError {
         && db_err.code().as_deref() == Some("23505")
     {
         return AppError::BadRequest(format!(
-            "Address '{slug}' is already in use by another desk in this company."
+            "Address '{slug}' is already in use by a desk, person or agent in this company."
         ));
     }
     AppError::from(err)
@@ -289,9 +294,9 @@ pub(super) async fn write_channel_email_binding(
         transaction,
         CanonicalEmailBinding {
             company_id,
-            channel_id,
-            channel_slug: &channel_slug,
-            channel_name: &write.name,
+            target: crate::entities::address::AddressTarget::Desk(channel_id),
+            slug: &channel_slug,
+            name: &write.name,
             created_by: &created_by,
         },
     )
@@ -353,7 +358,7 @@ impl ChannelPersistence for PostgresPersistence {
         }
         let participants = insert_channel_row_on(&mut tx, company_id, uuid, &write).await?;
 
-        insert_channel_slugs(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
+        insert_desk_addresses(&mut tx, company_id, uuid, &write.slug, &write.alias_slugs).await?;
 
         write_channel_email_binding(&mut tx, company_id, uuid, &write).await?;
 
@@ -380,8 +385,9 @@ impl ChannelPersistence for PostgresPersistence {
     ) -> AppResult<Option<Channel>> {
         let query = format!(
             "{CHANNEL_SELECT} JOIN companies c ON c.id = ch.company_id \
-             JOIN channel_slugs cs_lookup ON cs_lookup.channel_id = ch.id \
-             WHERE c.slug = $1 AND cs_lookup.slug = $2"
+             JOIN addresses AS lookup ON lookup.company_id = ch.company_id \
+               AND lookup.channel_id = ch.id \
+             WHERE c.slug = $1 AND lookup.slug = $2"
         );
         let db = sqlx::query_as::<_, ChannelDb>(&query)
             .bind(company_slug.as_str())
@@ -402,6 +408,63 @@ impl ChannelPersistence for PostgresPersistence {
             crate::domain::workflow::CompanyId::new(company_id),
         )
         .await
+    }
+
+    async fn address_for_target(
+        &self,
+        company_id: Uuid,
+        target: AddressTarget,
+    ) -> AppResult<Option<ResolvedAddress>> {
+        let slug: Option<String> = sqlx::query_scalar(
+            "SELECT slug::text FROM addresses WHERE company_id=$1 AND is_primary \
+             AND channel_id IS NOT DISTINCT FROM $2 AND principal_id IS NOT DISTINCT FROM $3",
+        )
+        .bind(company_id)
+        .bind(target.desk_id())
+        .bind(target.principal_id().map(PrincipalId::as_uuid))
+        .fetch_optional(&self.pool)
+        .await?;
+        Ok(slug.map(|slug| ResolvedAddress {
+            slug: slug.into(),
+            target,
+        }))
+    }
+
+    async fn address_targets(
+        &self,
+        company_id: Uuid,
+        slugs: &[ChannelSlug],
+    ) -> AppResult<Vec<ResolvedAddress>> {
+        let slugs: Vec<&str> = slugs.iter().map(|slug| slug.as_str()).collect();
+        let rows: Vec<(String, Option<Uuid>, Option<Uuid>)> = sqlx::query_as(
+            "SELECT address.slug::text, address.channel_id, address.principal_id \
+               FROM addresses AS address \
+              WHERE address.company_id = $1 AND address.slug = ANY($2::citext[])",
+        )
+        .bind(company_id)
+        .bind(&slugs)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        rows.into_iter()
+            .map(|(slug, desk, principal)| {
+                let target = match (desk, principal) {
+                    (Some(desk), None) => AddressTarget::Desk(desk),
+                    (None, Some(principal)) => {
+                        AddressTarget::Principal(PrincipalId::new(principal))
+                    }
+                    _ => {
+                        return Err(AppError::Internal(format!(
+                            "Address '{slug}' names neither exactly one desk nor one principal"
+                        )));
+                    }
+                };
+                Ok(ResolvedAddress {
+                    slug: ChannelSlug::from(slug),
+                    target,
+                })
+            })
+            .collect()
     }
 
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -528,12 +591,13 @@ pub(super) async fn write_channel_settings_on(
     .execute(&mut **tx)
     .await
     .map_err(AppError::from)?;
-    sqlx::query("DELETE FROM channel_slugs WHERE channel_id = $1")
+    sqlx::query("DELETE FROM addresses WHERE company_id = $1 AND channel_id = $2")
+        .bind(company_id)
         .bind(id)
         .execute(&mut **tx)
         .await
         .map_err(AppError::from)?;
-    insert_channel_slugs(tx, company_id, id, &write.slug, &write.alias_slugs).await?;
+    insert_desk_addresses(tx, company_id, id, &write.slug, &write.alias_slugs).await?;
 
     // A renamed address moves the channel's canonical email interface rather than replacing
     // it, so the binding's audit history survives the rename.

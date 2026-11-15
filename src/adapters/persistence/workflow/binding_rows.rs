@@ -11,6 +11,7 @@ struct BindingRow {
     configuration_revision: i64,
     active: bool,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     version_id: Uuid,
     params: Value,
@@ -43,7 +44,7 @@ pub(super) async fn read_binding_at(
 ) -> AppResult<Option<BindingState>> {
     let row = sqlx::query_as::<_, BindingRow>(
         "SELECT binding.company_id, binding.id, binding.state_revision, \
-         configuration.revision AS configuration_revision, binding.active, binding.channel_id, binding.thread_id, \
+         configuration.revision AS configuration_revision, binding.active, binding.channel_id, binding.principal_id, binding.thread_id, \
          configuration.version_id, configuration.params, configuration.resources, \
          configuration.run_as_user_id, configuration.message_trigger, configuration.escalation \
          FROM workflow_bindings AS binding JOIN workflow_binding_revisions AS configuration \
@@ -55,7 +56,11 @@ pub(super) async fn read_binding_at(
         .fetch_optional(&mut *db).await?;
     let Some(row) = row else { return Ok(None) };
     let bundle = read_version(db, company, VersionId::new(row.version_id)).await?;
-    let association = association_from_columns(row.channel_id, row.thread_id)?;
+    let association = association_from_columns(association::AssociationColumns {
+        channel_id: row.channel_id,
+        principal_id: row.principal_id,
+        thread_id: row.thread_id,
+    })?;
     let configuration = ConfiguredBinding::new(
         BindingConfiguration {
             escalation: row
@@ -103,31 +108,4 @@ pub(super) async fn read_version(
     .ok_or_else(missing)?
     .restore()
     .map(|command| command.bundle)
-}
-
-pub(super) fn association_columns(association: RelatedAssociation) -> (Option<Uuid>, Option<Uuid>) {
-    match association {
-        RelatedAssociation::Company => (None, None),
-        RelatedAssociation::Channel(channel) => (Some(channel.as_uuid()), None),
-        RelatedAssociation::Thread {
-            channel_id,
-            thread_id,
-        } => (Some(channel_id.as_uuid()), Some(thread_id.as_uuid())),
-    }
-}
-
-/// The inverse of `association_columns`; a thread without its channel is corrupt.
-pub(super) fn association_from_columns(
-    channel: Option<Uuid>,
-    thread: Option<Uuid>,
-) -> AppResult<RelatedAssociation> {
-    Ok(match (channel, thread) {
-        (None, None) => RelatedAssociation::Company,
-        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
-            thread_id: RelatedThreadId::new(thread),
-        },
-        (None, Some(_)) => return Err(invalid()),
-    })
 }

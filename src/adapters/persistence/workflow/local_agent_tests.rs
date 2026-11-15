@@ -88,7 +88,7 @@ impl Setup {
                 let channel:Uuid=sqlx::query_scalar("UPDATE channels SET access_mode='allowlist' WHERE id=(SELECT channel_id FROM threads WHERE id=$1) RETURNING id")
                     .bind(thread).fetch_one(&local.database.pool).await.unwrap();
                 RelatedAssociation::Thread {
-                    channel_id: crate::application::workflow::RelatedChannelId::new(channel),
+                    target: crate::entities::address::AddressTarget::Desk(channel),
                     thread_id: crate::application::workflow::RelatedThreadId::new(thread),
                 }
             }

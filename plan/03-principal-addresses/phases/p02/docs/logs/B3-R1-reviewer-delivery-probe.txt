@@ -1,0 +1,25 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+   Compiling pa02_review_b3_delivery_probe v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/phases/p02/docs/logs/reviewer-b3-delivery-probe)
+error[E0432]: unresolved import `open_bots::transport::DeliveryId`
+ --> main.rs:4:52
+  |
+4 | use open_bots::{transport::{DeliveryQueue,WorkerId,DeliveryId},use_cases::delivery::{DeliveryReader,DeliveryReadScope},application::w...
+  |                                                    ^^^^^^^^^^ no `DeliveryId` in `application::transport`
+  |
+help: a similar name exists in the module
+  |
+4 - use open_bots::{transport::{DeliveryQueue,WorkerId,DeliveryId},use_cases::delivery::{DeliveryReader,DeliveryReadScope},application::workflow::WorkflowActor,entities::delivery::{DeliveryFilter,DeliveryQuery}};
+4 + use open_bots::{transport::{DeliveryQueue,WorkerId,delivery},use_cases::delivery::{DeliveryReader,DeliveryReadScope},application::workflow::WorkflowActor,entities::delivery::{DeliveryFilter,DeliveryQuery}};
+  |
+
+warning: unused imports: `InboxReadScope`, `ThreadReadScope`, and `user::Viewer`
+ --> main.rs:2:400
+  |
+2 | ...ressOrigin,InboxReadScope,ThreadReadScope,ThreadStores,ThreadUseCases}},entities::{address::AddressTarget,user::Viewer},transport:...
+  |               ^^^^^^^^^^^^^^ ^^^^^^^^^^^^^^^                                                                 ^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0432`.
+warning: `pa02_review_b3_delivery_probe` (bin "pa02_review_b3_delivery_probe") generated 1 warning
+error: could not compile `pa02_review_b3_delivery_probe` (bin "pa02_review_b3_delivery_probe") due to 1 previous error; 1 warning emitted

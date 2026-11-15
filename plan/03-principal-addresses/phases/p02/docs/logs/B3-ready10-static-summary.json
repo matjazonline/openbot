@@ -1,0 +1,88 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-format.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "HEAD",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-whitespace.txt"
+  },
+  {
+    "name": "transport-fixtures",
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-transport-fixtures.txt"
+  },
+  {
+    "name": "transport",
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-transport.txt"
+  },
+  {
+    "name": "workflow-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-workflow-fixtures.txt"
+  },
+  {
+    "name": "workflow",
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-workflow.txt"
+  },
+  {
+    "name": "integration-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-integration-fixtures.txt"
+  },
+  {
+    "name": "integration",
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-integration.txt"
+  },
+  {
+    "name": "integration-docs",
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-integration-docs.txt"
+  }
+]

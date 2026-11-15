@@ -370,7 +370,9 @@ async fn channel_reply_completion_policy_change_after_approval_fails_saved_step(
         f.s.p()
             .channel_reply_settings(
                 f.scope.company,
-                RelatedChannelId::new(f.s.channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(f.s.channel)).as_uuid(),
+                ),
                 f.s.owner(),
             )
             .await
@@ -412,7 +414,9 @@ async fn channel_reply_completion_contract_edits_cannot_replace_approved_content
     let selected =
         f.p.channel_reply_settings(
             f.scope.company,
-            RelatedChannelId::new(f.s.channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(f.s.channel)).as_uuid(),
+            ),
             f.s.owner(),
         )
         .await

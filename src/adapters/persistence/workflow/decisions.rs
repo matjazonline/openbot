@@ -417,16 +417,8 @@ async fn eligible_reviewer_row(
         JOIN users AS account ON account.id=principal.user_id \
         JOIN companies AS company ON company.id=principal.company_id \
         JOIN workflow_runs AS run ON run.company_id=principal.company_id AND run.id=$3 \
-        LEFT JOIN channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id \
         WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person' \
-          AND (company.user_id=principal.user_id \
-            OR (run.channel_id IS NULL AND member.role IN ('owner','admin')) \
-            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public') \
-              OR EXISTS (SELECT 1 FROM channel_principal_grants AS access_grant WHERE access_grant.company_id=$1 \
-                AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id \
-                AND account.email_verified_at IS NOT NULL AND access_grant.capability='view')))) \
-          AND (run.thread_id IS NULL OR EXISTS (SELECT 1 FROM threads AS thread WHERE thread.company_id=$1 \
-            AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)) \
+          AND workflow_follow_reviewer_eligible($1,$3,$2) \
         ORDER BY principal.id LIMIT 1 FOR SHARE OF member, principal, account")
         .bind(scope.company.as_uuid()).bind(principal).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
@@ -450,6 +442,7 @@ struct DecisionRow {
 #[derive(sqlx::FromRow)]
 struct RunAssociation {
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
 }
 
@@ -632,25 +625,20 @@ async fn authorize_run_association(
     reviewer: &authority::ReviewerAuthority,
 ) -> AppResult<()> {
     let association: RunAssociation = sqlx::query_as(
-        "SELECT channel_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
+        "SELECT channel_id,principal_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
     .fetch_one(&mut *db)
     .await?;
-    let association = match (association.channel_id, association.thread_id) {
-        (None, _) => {
-            if !reviewer.privileged {
-                return Err(missing());
-            }
-            RelatedAssociation::Company
-        }
-        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        (Some(channel), Some(thread)) => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
-            thread_id: RelatedThreadId::new(thread),
-        },
-    };
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: association.channel_id,
+        principal_id: association.principal_id,
+        thread_id: association.thread_id,
+    })?;
+    if association == RelatedAssociation::Company && !reviewer.privileged {
+        return Err(missing());
+    }
     association::authorize_association(db, scope.company, actor, association).await?;
     Ok(())
 }

@@ -248,6 +248,7 @@ def board_cases(shape: dict) -> list:
             if channels:
                 row["channels"] = f":'{tenant}_{channels[0]}'::uuid[]"
                 row["company_visible"] = channels[1]
+                row["principals"] = "'{}'::uuid[]"
             title = " ".join(part for part in (name, label, tenant, window, visibility) if part)
             cases.append((title, row))
 

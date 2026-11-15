@@ -94,7 +94,7 @@ async fn workflow_admit_sql_message_source_rejects_missing_foreign_and_wrong_mem
     .await;
     let mut wrong_channel = c.request(&f, "wrong-channel", c.message);
     wrong_channel.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(other.channel),
+        target: crate::entities::address::AddressTarget::Desk(other.channel),
         thread_id: RelatedThreadId::new(c.thread),
     };
     rejected(&f, wrong_channel).await;
@@ -211,7 +211,7 @@ async fn workflow_admit_sql_schedule_source_checks_occurrence_owner_and_associat
     }
     let mut wrong_thread = first.request(&f, "wrong-thread");
     wrong_thread.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(c.channel),
+        target: crate::entities::address::AddressTarget::Desk(c.channel),
         thread_id: RelatedThreadId::new(c.thread),
     };
     rejected(&f, wrong_thread).await;

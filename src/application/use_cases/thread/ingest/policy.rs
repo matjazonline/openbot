@@ -65,6 +65,9 @@ pub struct UndeliverableReason {
 pub enum UndeliverableKind {
     UnknownChannel,
     DisabledChannel,
+    /// A person's or agent's address, named by one of the company's own people. Only a team
+    /// sender learns this: anyone else is told the address does not exist.
+    Principal(crate::use_cases::thread::PrincipalRefusal),
 }
 
 impl IngestRejection {
@@ -84,6 +87,7 @@ impl IngestRejection {
             Self::Undeliverable(reason) => match reason.kind {
                 UndeliverableKind::UnknownChannel => "Channel address not found or misspelled",
                 UndeliverableKind::DisabledChannel => "Channel is disabled",
+                UndeliverableKind::Principal(refusal) => refusal.as_str(),
             },
             Self::ThreadInjection(_) => {
                 "Sender is not an authorized participant or delegation target for this thread"
@@ -120,9 +124,10 @@ pub enum IngressOrigin {
     /// Composed by a signed-in principal through an application route.
     TrustedApplication,
     /// Relayed from another channel of this platform over the in-process transport.
-    InternalChannel {
+    Internal {
         company_id: uuid::Uuid,
-        channel_id: uuid::Uuid,
+        source_target: crate::entities::address::AddressTarget,
+        agent_principal: Option<crate::entities::transport::PrincipalId>,
         /// The delivery part the hop is, which the commit proves before storing anything.
         proof: crate::transport::InternalRelayProof,
     },
@@ -130,21 +135,40 @@ pub enum IngressOrigin {
 
 impl IngressOrigin {
     pub const fn is_internal(self) -> bool {
-        matches!(self, Self::InternalChannel { .. })
+        matches!(self, Self::Internal { .. })
     }
 
-    pub const fn internal_channel(self) -> Option<uuid::Uuid> {
+    pub const fn internal_target(self) -> Option<crate::entities::address::AddressTarget> {
         match self {
-            Self::InternalChannel { channel_id, .. } => Some(channel_id),
+            Self::Internal { source_target, .. } => Some(source_target),
             Self::ExternalTransport | Self::TrustedApplication => None,
         }
     }
 
     pub const fn internal_company(self) -> Option<uuid::Uuid> {
         match self {
-            Self::InternalChannel { company_id, .. } => Some(company_id),
+            Self::Internal { company_id, .. } => Some(company_id),
             Self::ExternalTransport | Self::TrustedApplication => None,
         }
+    }
+
+    pub fn internal_context(self) -> Option<crate::entities::participant::PrincipalAccessContext> {
+        let Self::Internal {
+            agent_principal, ..
+        } = self
+        else {
+            return None;
+        };
+        Some(crate::entities::participant::PrincipalAccessContext {
+            principal_id: agent_principal,
+            membership: if agent_principal.is_some() {
+                crate::entities::company_member::CompanyMembership::Member
+            } else {
+                crate::entities::company_member::CompanyMembership::None
+            },
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+            grant_authority: crate::entities::participant::PrincipalGrantAuthority::Available,
+        })
     }
 }
 
@@ -153,7 +177,7 @@ impl IngressOrigin {
 /// Runs before any persistence work, so a forged, looping or machine-generated message costs one
 /// parse and nothing else.
 pub fn guard_ingress(draft: &InboundDraft, origin: IngressOrigin) -> Result<(), IngestRejection> {
-    if origin.is_internal() && draft.directives.source_channel_id != origin.internal_channel() {
+    if origin.is_internal() && draft.directives.source_target != origin.internal_target() {
         return Err(IngestRejection::InternalSourceMismatch);
     }
 
@@ -233,6 +257,7 @@ pub fn thread_participants<T: Clone + Eq>(
 pub struct UndeliverableSlugs {
     invalid: Vec<ChannelSlug>,
     disabled: Vec<ChannelSlug>,
+    principals: Vec<crate::use_cases::thread::PrincipalBounce>,
     suggestions: Vec<crate::use_cases::thread::BounceSuggestion>,
 }
 
@@ -250,11 +275,24 @@ impl UndeliverableSlugs {
         self.disabled.push(slug);
     }
 
-    /// A misspelling is reported ahead of a disabled channel: the sender can act on a typo, and
-    /// the bounce body lists both sets regardless.
+    /// A principal's address, which only a team sender is told about; routing records anyone
+    /// else's as [`Self::unknown`].
+    pub fn principal(
+        &mut self,
+        slug: ChannelSlug,
+        refusal: crate::use_cases::thread::PrincipalRefusal,
+    ) {
+        self.principals
+            .push(crate::use_cases::thread::PrincipalBounce { slug, refusal });
+    }
+
+    /// A misspelling is reported ahead of a principal's address and that ahead of a disabled
+    /// channel: the sender can act on a typo first, and the bounce body lists every set.
     pub fn kind(&self) -> Option<UndeliverableKind> {
         if !self.invalid.is_empty() {
             Some(UndeliverableKind::UnknownChannel)
+        } else if let Some(principal) = self.principals.first() {
+            Some(UndeliverableKind::Principal(principal.refusal))
         } else if !self.disabled.is_empty() {
             Some(UndeliverableKind::DisabledChannel)
         } else {
@@ -267,7 +305,7 @@ impl UndeliverableSlugs {
         source_message_key: ExternalMessageKey,
         recipient_to: EmailAddress,
         company: &crate::entities::company::Company,
-        available_channels: Vec<crate::use_cases::thread::ChannelDirectoryEntry>,
+        available_channels: Vec<crate::use_cases::thread::AddressDirectoryEntry>,
         original_subject: String,
     ) -> BounceInfo {
         BounceInfo {
@@ -277,6 +315,7 @@ impl UndeliverableSlugs {
             company_slug: company.slug.clone(),
             invalid_slugs: self.invalid,
             disabled_slugs: self.disabled,
+            principals: self.principals,
             suggestions: self.suggestions,
             available_channels,
             original_subject,
@@ -390,16 +429,17 @@ mod tests {
     fn an_internal_message_must_prove_which_channel_relayed_it() {
         let company_id = Uuid::new_v4();
         let channel_id = Uuid::new_v4();
-        let origin = IngressOrigin::InternalChannel {
+        let origin = IngressOrigin::Internal {
             company_id,
-            channel_id,
+            source_target: crate::entities::address::AddressTarget::Desk(channel_id),
+            agent_principal: None,
             proof: relay_proof(company_id),
         };
 
         let mismatched = draft(
             IngressPolicyFacts::TrustedApplication,
             IngressDirectives {
-                source_channel_id: Some(Uuid::new_v4()),
+                source_target: Some(crate::entities::address::AddressTarget::Desk(Uuid::new_v4())),
                 ..IngressDirectives::default()
             },
         );
@@ -411,7 +451,7 @@ mod tests {
         let matched = draft(
             IngressPolicyFacts::TrustedApplication,
             IngressDirectives {
-                source_channel_id: Some(channel_id),
+                source_target: Some(crate::entities::address::AddressTarget::Desk(channel_id)),
                 ..IngressDirectives::default()
             },
         );
@@ -425,15 +465,16 @@ mod tests {
                 IngressPolicyFacts::TrustedApplication,
                 IngressDirectives {
                     hop_count: hops,
-                    source_channel_id: Some(Uuid::nil()),
+                    source_target: Some(crate::entities::address::AddressTarget::Desk(Uuid::nil())),
                     ..IngressDirectives::default()
                 },
             )
         };
         let company_id = Uuid::new_v4();
-        let origin = IngressOrigin::InternalChannel {
+        let origin = IngressOrigin::Internal {
             company_id,
-            channel_id: Uuid::nil(),
+            source_target: crate::entities::address::AddressTarget::Desk(Uuid::nil()),
+            agent_principal: None,
             proof: relay_proof(company_id),
         };
         assert!(guard_ingress(&relayed(MAX_INGRESS_HOPS - 1), origin).is_ok());
@@ -447,7 +488,7 @@ mod tests {
             IngressPolicyFacts::TrustedApplication,
             IngressDirectives {
                 is_auto_reply: true,
-                source_channel_id: Some(Uuid::nil()),
+                source_target: Some(crate::entities::address::AddressTarget::Desk(Uuid::nil())),
                 ..IngressDirectives::default()
             },
         );

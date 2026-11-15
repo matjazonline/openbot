@@ -147,19 +147,19 @@ pub fn onboarding_channel_draft_page(
 
 /// What became of one onboarding agent's assistant channel (p08 D4.7).
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum OnboardingChannel {
-    /// The channel that answers for the agent, at this address.
+pub enum OnboardingAddress {
+    /// The agent's direct address.
     Created {
-        channel_id: uuid::Uuid,
+        principal_id: uuid::Uuid,
         address: String,
     },
-    /// No desk is recorded for it.
+    /// No direct address is available.
     Missing,
 }
 
 pub struct OnboardedAgent<'a> {
     pub agent: &'a Agent,
-    pub channel: OnboardingChannel,
+    pub address: OnboardingAddress,
 }
 
 pub fn onboarding_complete_page(
@@ -167,10 +167,10 @@ pub fn onboarding_complete_page(
     company: &Company,
     agents: &[OnboardedAgent<'_>],
 ) -> String {
-    let first_channel = agents
+    let first_principal = agents
         .iter()
-        .find_map(|onboarded| match &onboarded.channel {
-            OnboardingChannel::Created { channel_id, .. } => Some(*channel_id),
+        .find_map(|onboarded| match &onboarded.address {
+            OnboardingAddress::Created { principal_id, .. } => Some(*principal_id),
             _ => None,
         });
     let rows = agents
@@ -178,10 +178,10 @@ pub fn onboarding_complete_page(
         .enumerate()
         .map(|(index, onboarded)| onboarded_agent_row(company, index, onboarded))
         .collect::<String>();
-    let (title, lede, guide_html) = if first_channel.is_some() {
+    let (title, lede, guide_html) = if first_principal.is_some() {
         (
             "Your email agents are ready",
-            "Send work to an agent's desk from your regular inbox.",
+            "Send work to an agent's direct address from your regular inbox.",
             r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-3">
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-primary badge-outline">1 · New request</span><h2 class="mt-3 font-semibold">Send a new email</h2><p class="mt-2 text-sm opacity-70">Put the goal in the subject and include context, constraints, deadline, and desired output.</p></section>
             <section class="rounded-box border border-base-300 p-4"><span class="badge badge-warning badge-outline">2 · Existing work</span><h2 class="mt-3 font-semibold">Forward a message</h2><p class="mt-2 text-sm opacity-70">Forward any email and add your instruction at the top.</p></section>
@@ -191,12 +191,12 @@ pub fn onboarding_complete_page(
     } else {
         (
             "Your agents are created",
-            "None of them has a desk yet, so nothing answers email.",
+            "Their direct addresses are unavailable.",
             "",
         )
     };
-    let finish_href = match first_channel {
-        Some(channel_id) => format!("/ui?company_id={}&channel_id={channel_id}", company.id),
+    let finish_href = match first_principal {
+        Some(principal_id) => format!("/ui?company_id={}&principal_id={principal_id}", company.id),
         None => format!("/ui?company_id={}", company.id),
     };
     let pane = format!(
@@ -209,24 +209,25 @@ pub fn onboarding_complete_page(
     onboarding_shell(title, user, Some(company), 3, &pane)
 }
 
-/// One agent on the completion page: its desk's address, or the agent page to create one from.
+/// One agent on the completion page: its direct address and management link.
 fn onboarded_agent_row(company: &Company, index: usize, onboarded: &OnboardedAgent<'_>) -> String {
     let agent = onboarded.agent;
     let agent_href = format!("/ui/agents?company_id={}&agent_id={}", company.id, agent.id);
-    let create_link = format!(
-        r##"<a href="{agent_href}" class="btn btn-sm btn-ghost">Create an assistant desk</a>"##
-    );
-    let detail = match &onboarded.channel {
-        OnboardingChannel::Created {
-            channel_id,
+    let create_link =
+        format!(r##"<a href="{agent_href}" class="btn btn-sm btn-ghost">Manage agent</a>"##);
+    let detail = match &onboarded.address {
+        OnboardingAddress::Created {
+            principal_id,
             address,
         } => format!(
-            r##"<code id="onboarding-address-{index}" class="block break-all">{address}</code></div><button type="button" class="btn btn-sm" data-action="copy-text" data-copy-from="onboarding-address-{index}" data-copied-label="Copied">Copy address</button><a href="/ui/channels?company_id={company_id}&channel_id={channel_id}" class="btn btn-sm btn-ghost">Manage desk</a>"##,
+            r##"<code id="onboarding-address-{index}" class="block break-all">{address}</code></div><button type="button" class="btn btn-sm" data-action="copy-text" data-copy-from="onboarding-address-{index}" data-copied-label="Copied">Copy address</button><a href="/ui?company_id={company_id}&principal_id={principal_id}" class="btn btn-sm btn-ghost">Open direct inbox</a>"##,
             address = escape_html_text(address),
             company_id = company.id,
         ),
-        OnboardingChannel::Missing => {
-            format!(r##"<p class="text-sm opacity-70">No desk yet.</p></div>{create_link}"##)
+        OnboardingAddress::Missing => {
+            format!(
+                r##"<p class="text-sm opacity-70">Direct address unavailable.</p></div>{create_link}"##
+            )
         }
     };
     format!(

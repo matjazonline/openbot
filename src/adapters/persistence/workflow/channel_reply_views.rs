@@ -3,6 +3,7 @@ use crate::adapters::persistence::PostgresPersistence;
 use crate::app_error::{AppError, AppResult};
 use crate::application::workflow::{WorkflowActor, channel_reply::*, reads::RunStateName};
 use crate::domain::workflow::{CompanyId, RunId, WaitId};
+use crate::entities::address::AddressTarget;
 use crate::entities::message::CanonicalMessageId;
 use crate::entities::transport::{DeliveryId, DeliveryStatus};
 use chrono::{DateTime, Utc};
@@ -14,7 +15,8 @@ struct Row {
     state: String,
     review_run: Option<Uuid>,
     source_message: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Uuid,
     publication_state: Option<String>,
     final_message: Option<Uuid>,
@@ -76,7 +78,12 @@ impl Row {
         let outcome = ChannelResponseOutcome {
             run: RunId::new(self.run_id),
             source: CanonicalMessageId::new(self.source_message),
-            channel: self.channel_id,
+            target: AddressTarget::from_parts(
+                self.channel_id,
+                self.principal_id
+                    .map(crate::entities::transport::PrincipalId::new),
+            )
+            .ok_or_else(invalid)?,
             thread: self.thread_id,
             execution: RunStateName::parse(&self.state).ok_or_else(invalid)?,
             waiting_for_review: false,

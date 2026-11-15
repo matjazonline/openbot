@@ -1,0 +1,40 @@
+{
+  "fixture": "pa03_codex_runtime4_20261115",
+  "results": [
+    {
+      "probe": 1,
+      "exit": 3,
+      "deferred_constraints": [],
+      "transaction": "Always ROLLBACK or aborted-connection rollback; no persistent schema/data changes.",
+      "error": "ERROR:  update or delete on table \"principals\" violates foreign key constraint \"external_threads_target_principal_fk\" on table \"external_threads\"\nDETAIL:  Key (company_id, id)=(6f16cdb7-3bbb-476a-9736-b6f900963267, 0ac636d0-1338-4951-888e-a92620851fc8) is still referenced from table \"external_threads\"."
+    },
+    {
+      "probe": 2,
+      "exit": 3,
+      "deferred_constraints": [
+        [
+          "external_threads",
+          "external_threads_target_principal_fk"
+        ]
+      ],
+      "transaction": "Always ROLLBACK or aborted-connection rollback; no persistent schema/data changes.",
+      "error": "ERROR:  update or delete on table \"principals\" violates foreign key constraint \"threads_target_principal_fk\" on table \"threads\"\nDETAIL:  Key (company_id, id)=(6f16cdb7-3bbb-476a-9736-b6f900963267, 0ac636d0-1338-4951-888e-a92620851fc8) is still referenced from table \"threads\"."
+    },
+    {
+      "probe": 3,
+      "exit": 3,
+      "deferred_constraints": [
+        [
+          "external_threads",
+          "external_threads_target_principal_fk"
+        ],
+        [
+          "threads",
+          "threads_target_principal_fk"
+        ]
+      ],
+      "transaction": "Always ROLLBACK or aborted-connection rollback; no persistent schema/data changes.",
+      "error": "ERROR:  insert or update on table \"threads\" violates foreign key constraint \"threads_target_principal_fk\"\nDETAIL:  Key (company_id, principal_id)=(6f16cdb7-3bbb-476a-9736-b6f900963267, 0ac636d0-1338-4951-888e-a92620851fc8) is not present in table \"principals\"."
+    }
+  ]
+}

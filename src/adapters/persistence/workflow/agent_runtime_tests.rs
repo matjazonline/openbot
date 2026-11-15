@@ -128,6 +128,7 @@ async fn agent_setup_source(
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(p, &agent).await;
     CompanyPersistence::replace_model_connections_for_user(
         p,
         fixture.target.actor.user_id(),

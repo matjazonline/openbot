@@ -201,7 +201,11 @@ pub(super) async fn locked_on(
         .await?
         .ok_or_else(missing)?;
     let facts = scope::facts_on(tx, action, actor).await?;
-    let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: facts.channel_id,
+        principal_id: facts.principal_id,
+        thread_id: facts.thread_id,
+    })?;
     association::authorize_association(tx, action.company, actor, association).await?;
     let selection =
         agent_manifest::execution_selection_on(tx, action, actor, &facts.bundle).await?;

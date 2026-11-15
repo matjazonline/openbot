@@ -1,0 +1,11 @@
+{
+  "manifest_validation": "PASS: retained evidence valid;15 PASS/4 FAIL declarations; declaration counts are not behavioral acceptance",
+  "reviewer_tests": {
+    "command": "TEST_DATABASE_URL=<reviewer pa02_review_b1_tests on127.0.0.1:52471> RUST_MIN_STACK=16777216 /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 adapters::persistence::account_identity::tests adapters::persistence::address_tests::direct",
+    "result": "16 PASS /0 FAIL; exit0",
+    "log": "B1-R2-reviewer-focused.txt",
+    "sha256": "1edbfa243be737c511b798c02ee7c36bfba2d8a9ba26f775f21e5f9e8b7de105"
+  },
+  "clippy_current_source_hashes_match_retained_baseline": true,
+  "reviewer_probe_rerun": false
+}

@@ -1,0 +1,93 @@
+{
+  "method": "read-only per-file git merge-file -p, current worktree vs common ancestor vs fetched main; temporary files removed",
+  "incoming_head": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+  "examined_overlap_paths": 73,
+  "conflicted_paths": [
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/http/pages/tests.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/http/routes/agent.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/agent.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/agent_publication/commands.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_write.rs",
+      "textual_conflicts": 2,
+      "markers": 2
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    },
+    {
+      "path": "src/adapters/persistence/workflow/association.rs",
+      "textual_conflicts": 2,
+      "markers": 2
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+      "textual_conflicts": 2,
+      "markers": 2
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "textual_conflicts": 2,
+      "markers": 2
+    },
+    {
+      "path": "src/application/use_cases/agent_tests.rs",
+      "textual_conflicts": 2,
+      "markers": 2
+    },
+    {
+      "path": "src/application/workflow/mod.rs",
+      "textual_conflicts": 1,
+      "markers": 1
+    }
+  ],
+  "accepted_prerequisite_export_verified": true
+}

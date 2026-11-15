@@ -1,0 +1,21 @@
+
+running 16 tests
+test application::use_cases::thread::ingest::policy::tests::the_hop_limit_applies_to_relayed_traffic_and_the_auto_reply_guard_to_outside_traffic ... ok
+test application::use_cases::thread::ingest::policy::tests::an_internal_message_must_prove_which_channel_relayed_it ... ok
+test adapters::protocols::email::egress::tests::notification_delivery_tenant_notice_uses_the_deployment_relay ... ok
+test adapters::protocols::email::egress::tests::only_one_unambiguous_channel_is_relayed_directly ... ok
+test adapters::protocols::email::egress::tests::a_recipient_of_our_own_is_relayed_rather_than_posted ... ok
+test adapters::protocols::email::egress::tests::the_internal_relay_and_the_wire_agree_on_the_hop_budget ... ok
+test adapters::protocols::email::egress::tests::only_a_relayed_message_carries_the_loop_control_headers ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_an_internal_relay_to_a_person_is_refused_definitely ... ok
+test application::use_cases::thread::tests::a_hop_to_a_plain_channel_is_relayed ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted ... ok
+test application::use_cases::thread::tests::department_desk_relay::department_desk_members_only_thread_party_keeps_replying_after_removal ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace ... ok
+test adapters::persistence::thread::tests::find_outbound_reply_after_sees_answers_and_ignores_relayed_mail ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 4562 filtered out; finished in 19.43s
+

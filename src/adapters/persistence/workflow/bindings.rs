@@ -1,5 +1,5 @@
 use super::*;
-use binding_rows::{association_columns, read_binding, read_version};
+use binding_rows::{read_binding, read_version};
 
 #[derive(Clone, Copy)]
 enum Change {
@@ -47,6 +47,19 @@ pub(super) async fn save_binding_on(
     let company = configuration.company_id();
     authority::authorize_company(tx, company, command.actor()).await?;
     association::authorize_association(tx, company, command.actor(), state.association).await?;
+    if let Some(AddressTarget::Principal(principal)) = state.association.target() {
+        let agent: bool =
+            sqlx::query_scalar("SELECT kind='agent' FROM principals WHERE company_id=$1 AND id=$2")
+                .bind(company.as_uuid())
+                .bind(principal.as_uuid())
+                .fetch_one(&mut **tx)
+                .await?;
+        if !agent {
+            return Err(AppError::BadRequest(
+                "Workflow bindings require an agent's direct address".into(),
+            ));
+        }
+    }
     // All workflow lifecycle mutations serialize on company before their heads.
     let current = read_binding(tx, company, configuration.id()).await?;
     let change = validate_change(command, current.as_ref())?;
@@ -145,11 +158,11 @@ async fn write_head(
 ) -> AppResult<()> {
     let state = command.state();
     let configuration = &state.configuration;
-    let (channel, thread) = association_columns(state.association);
+    let association = association_columns(state.association);
     let count = match command.expected() {
-        None => sqlx::query("INSERT INTO workflow_bindings (company_id, id, state_revision, configuration_revision, active, channel_id, thread_id) VALUES ($1, $2, $3, $4, $5, $6, $7)")
+        None => sqlx::query("INSERT INTO workflow_bindings (company_id, id, state_revision, configuration_revision, active, channel_id, thread_id, principal_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)")
             .bind(configuration.company_id().as_uuid()).bind(configuration.id().as_uuid()).bind(revision(state.revision.get())?)
-            .bind(revision(configuration.revision().get())?).bind(state.active).bind(channel).bind(thread)
+            .bind(revision(configuration.revision().get())?).bind(state.active).bind(association.channel_id).bind(association.thread_id).bind(association.principal_id)
             .execute(&mut **tx).await.map_err(write_error)?.rows_affected(),
         // `activated_at` marks when the current activation began; configuring an active binding
         // keeps it, so message eligibility (`activated_at <= accepted`) is unchanged (p08 D1.2).
@@ -228,23 +241,26 @@ async fn check_message_binding_cap(
 ) -> AppResult<()> {
     let state = command.state();
     let company = state.configuration.company_id();
-    let (Some(channel), _) = association_columns(state.association) else {
+    let Some(target) = state.association.target() else {
         return Err(AppError::BadRequest(
-            "A message trigger needs a channel or thread association".into(),
+            "A message trigger needs an inbox or thread association".into(),
         ));
     };
-    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('workflow_message_bindings:' || $1::text || ':' || $2::text, 0))")
-        .bind(company.as_uuid()).bind(channel).execute(&mut **tx).await?;
+    let association = association_columns(state.association);
+    sqlx::query("SELECT pg_advisory_xact_lock(hashtextextended('workflow_message_bindings:' || $1::text || ':' || $2, 0))")
+        .bind(company.as_uuid()).bind(target.to_string()).execute(&mut **tx).await?;
     let others: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM workflow_bindings AS binding \
          JOIN workflow_binding_revisions AS configuration ON configuration.company_id = binding.company_id \
            AND configuration.binding_id = binding.id AND configuration.revision = binding.configuration_revision \
-         WHERE binding.company_id = $1 AND binding.channel_id = $2 AND binding.active \
-           AND configuration.message_trigger IS NOT NULL AND binding.id <> $3",
+         WHERE binding.company_id = $1 AND binding.channel_id IS NOT DISTINCT FROM $2::uuid AND binding.active \
+           AND configuration.message_trigger IS NOT NULL AND binding.id <> $3 \
+           AND binding.principal_id IS NOT DISTINCT FROM $4::uuid",
     )
     .bind(company.as_uuid())
-    .bind(channel)
+    .bind(association.channel_id)
     .bind(state.configuration.id().as_uuid())
+    .bind(association.principal_id)
     .fetch_one(&mut **tx)
     .await?;
     if others >= MAX_MESSAGE_BINDINGS_PER_CHANNEL {

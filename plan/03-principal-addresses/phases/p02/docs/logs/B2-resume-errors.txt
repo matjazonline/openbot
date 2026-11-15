@@ -1,0 +1,601 @@
+2:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+3-   --> src/application/use_cases/thread/mod.rs:252:14
+4-    |
+5-252 |             .get_thread_by_id(thread_id)
+6-    |              ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+18:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+19-   --> src/application/use_cases/thread/mod.rs:254:37
+20-    |
+21-254 |             .filter(|thread| thread.channel_id == channel.id);
+22-    |                                     ^^^^^^^^^^ unknown field
+--
+26:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+27-   --> src/application/use_cases/thread/reads.rs:124:14
+28-    |
+29-124 |             .list_threads_updated_after(scope.channel_id, after, limit)
+30-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^                   ----- argument #2 of type `AddressTarget` is missing
+--
+45:error[E0599]: no method named `list_threads_by_channel_id` found for struct `std::sync::Arc<(dyn application::ports::thread::ThreadPersistence + 'static)>` in the current scope
+46-   --> src/application/use_cases/thread/reads.rs:108:14
+47-    |
+48-106 |           let threads = self
+49-    |  _______________________-
+--
+66:error[E0407]: method `list_threads_by_channel_id` is not a member of trait `ThreadPersistence`
+67-   --> src/application/use_cases/thread/test_support.rs:440:5
+68-    |
+69-440 |       async fn list_threads_by_channel_id(
+70-    |       ^        -------------------------- help: there is an associated function with a similar name: `list_threads_by_target`
+--
+81:error[E0308]: mismatched types
+82-   --> src/adapters/persistence/thread/inbound.rs:665:9
+83-    |
+84-662 |     super::insert_thread_principals(
+85-    |     ------------------------------- arguments to this function are incorrect
+--
+103:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+104-   --> src/adapters/http/routes/authorization_test_support.rs:105:14
+105-    |
+106-105 |             .create_thread(channel, "Private thread", &[])
+107-    |              ^^^^^^^^^^^^^          ---------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+122:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+123-   --> src/adapters/http/routes/authorization_test_support.rs:110:14
+124-    |
+125-110 |             .create_thread(foreign_channel, "Foreign private thread", &[])
+126-    |              ^^^^^^^^^^^^^                  ------------------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+141:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+142-  --> src/adapters/http/routes/ui_local_agents_tests.rs:89:19
+143-   |
+144-89 |     f.persistence.get_thread_by_id(id).await.unwrap().unwrap()
+145-   |                   ^^^^^^^^^^^^^^^^---- argument #2 of type `uuid::Uuid` is missing
+--
+157:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+158-   --> src/application/use_cases/thread/ingest/routing.rs:450:14
+159-    |
+160-450 |             .get_thread_by_id(thread_id)
+161-    |              ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+173:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+174-   --> src/application/use_cases/thread/ingest/routing.rs:452:37
+175-    |
+176-452 |             .filter(|thread| thread.channel_id == channel.id))
+177-    |                                     ^^^^^^^^^^ unknown field
+--
+181:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+182-   --> src/application/use_cases/thread/ingest/routing.rs:384:18
+183-    |
+184-384 |                 .get_thread_by_id(target_thread_id)
+185-    |                  ^^^^^^^^^^^^^^^^------------------ argument #2 of type `uuid::Uuid` is missing
+--
+197:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+198-   --> src/application/use_cases/thread/ingest/routing.rs:386:23
+199-    |
+200-386 |             && thread.channel_id == candidate.channel.id
+201-    |                       ^^^^^^^^^^ unknown field
+--
+205:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+206-   --> src/application/use_cases/thread/ingest/routing.rs:394:18
+207-    |
+208-394 |                 .find_thread_for_message(candidate.channel.id, reply_to_id)
+209-    |                  ^^^^^^^^^^^^^^^^^^^^^^^                       ----------- argument #2 of type `AddressTarget` is missing
+--
+224:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+225-   --> src/application/use_cases/thread/ingest/routing.rs:396:23
+226-    |
+227-396 |             && thread.channel_id == candidate.channel.id
+228-    |                       ^^^^^^^^^^ unknown field
+--
+232:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+233-   --> src/application/use_cases/thread/ingest/routing.rs:405:59
+234-    |
+235-405 |             && let Some(thread) = self.thread_persistence.get_thread_by_id(thread_id).await?
+236-    |                                                           ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+248:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+249-   --> src/application/use_cases/thread/ingest/routing.rs:406:23
+250-    |
+251-406 |             && thread.channel_id == candidate.channel.id
+252-    |                       ^^^^^^^^^^ unknown field
+--
+256:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+257-   --> src/application/use_cases/thread/ingest/routing.rs:424:14
+258-    |
+259-424 |             .find_thread_by_thread_index(candidate.channel.id, &index)
+260-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                       ------ argument #2 of type `AddressTarget` is missing
+--
+275:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+276-   --> src/application/use_cases/thread/ingest/routing.rs:426:37
+277-    |
+278-426 |             .filter(|thread| thread.channel_id == candidate.channel.id))
+279-    |                                     ^^^^^^^^^^ unknown field
+--
+283:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+284-   --> src/application/use_cases/thread/ingest/mod.rs:412:18
+285-    |
+286-412 |                 .get_thread_by_id(*thread_id)
+287-    |                  ^^^^^^^^^^^^^^^^------------ argument #2 of type `uuid::Uuid` is missing
+--
+299:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+300-   --> src/application/use_cases/thread/ingest/mod.rs:421:23
+301-    |
+302-421 |             if thread.channel_id != prepared_channel.candidate.channel.id {
+303-    |                       ^^^^^^^^^^ unknown field
+--
+307:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+308-   --> src/application/use_cases/thread/ingest/mod.rs:424:28
+309-    |
+310-424 |                     thread.channel_id, prepared_channel.candidate.channel.id
+311-    |                            ^^^^^^^^^^ unknown field
+--
+315:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+316-   --> src/application/use_cases/thread/reads.rs:124:14
+317-    |
+318-124 |             .list_threads_updated_after(scope.channel_id, after, limit)
+319-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^                   ----- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+334:error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+335-   --> src/adapters/http/routes/ui_stream_tests.rs:337:9
+336-    |
+337-337 |         ThreadPersistence::create_thread(self.persistence.as_ref(), self.channel_id, subject, &[])
+338-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                             ------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+--
+353:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+354-   --> src/application/use_cases/thread/mod.rs:321:18
+355-    |
+356-321 |                 .get_thread_by_id(thread_id)
+357-    |                  ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+369:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+370-   --> src/application/use_cases/thread/mod.rs:323:31
+371-    |
+372-323 |                 .filter(|t| t.channel_id == channel_id),
+373-    |                               ^^^^^^^^^^ unknown field
+--
+377:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+378-   --> src/application/use_cases/thread/mod.rs:327:26
+379-    |
+380-327 |                         .find_thread_for_message(channel_id, reply_to)
+381-    |                          ^^^^^^^^^^^^^^^^^^^^^^^             -------- argument #2 of type `AddressTarget` is missing
+--
+396:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+397-   --> src/application/use_cases/thread/mod.rs:403:14
+398-    |
+399-403 |             .get_thread_by_id(command.thread_id)
+400-    |              ^^^^^^^^^^^^^^^^------------------- argument #2 of type `uuid::Uuid` is missing
+--
+412:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+413-   --> src/application/use_cases/thread/mod.rs:405:37
+414-    |
+415-405 |             .filter(|thread| thread.channel_id == channel.id)
+416-    |                                     ^^^^^^^^^^ unknown field
+--
+420:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+421-   --> src/application/use_cases/thread/mod.rs:407:33
+422-    |
+423-407 |         debug_assert_eq!(thread.channel_id, command.channel_id);
+424-    |                                 ^^^^^^^^^^ unknown field
+--
+428:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+429-   --> src/application/use_cases/thread/mod.rs:432:14
+430-    |
+431-432 |             .get_thread_by_id(command.thread_id)
+432-    |              ^^^^^^^^^^^^^^^^------------------- argument #2 of type `uuid::Uuid` is missing
+--
+444:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+445-   --> src/application/use_cases/thread/mod.rs:434:37
+446-    |
+447-434 |             .filter(|thread| thread.channel_id == channel.id)
+448-    |                                     ^^^^^^^^^^ unknown field
+--
+452:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+453-   --> src/application/use_cases/thread/mod.rs:436:33
+454-    |
+455-436 |         debug_assert_eq!(thread.channel_id, command.channel_id);
+456-    |                                 ^^^^^^^^^^ unknown field
+--
+460:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+461-  --> src/adapters/http/pages/local_agents/mod.rs:54:55
+462-   |
+463-54 |         format!("&channel={}&conversation={}", thread.channel_id, thread.id)
+464-   |                                                       ^^^^^^^^^^ unknown field
+--
+468:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+469-  --> src/adapters/http/pages/local_agents/mod.rs:61:16
+470-   |
+471-61 |         thread.channel_id, thread.id))
+472-   |                ^^^^^^^^^^ unknown field
+--
+476:error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+477-   --> src/adapters/persistence/dashboard_tests.rs:149:18
+478-    |
+479-149 |     let thread = ThreadPersistence::create_thread(persistence, fixture.channel, "Dashboard", &[])
+480-    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                               ----------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+--
+495:error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+496-   --> src/adapters/persistence/delivery/tests.rs:103:18
+497-    |
+498-103 |     let thread = ThreadPersistence::create_thread(persistence, channel.id, "Delivery", &[])
+499-    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                          ---------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+--
+514:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+515-   --> src/adapters/persistence/local_agents/management/tests.rs:450:75
+516-    |
+517-450 |         json!({"company":s.f.company,"channel":view.conversation.unwrap().channel_id,
+518-    |                                                                           ^^^^^^^^^^ unknown field
+--
+522:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+523-  --> src/adapters/persistence/thread/test_support.rs:86:14
+524-   |
+525-86 |             .create_thread(channel.id, "Subject", &[EmailAddress::from(email)])
+526-   |              ^^^^^^^^^^^^^             --------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+541:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+542-   --> src/adapters/persistence/thread/test_support.rs:104:14
+543-    |
+544-104 |             .create_thread(
+545-    |              ^^^^^^^^^^^^^
+--
+566:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+567-   --> src/application/workflow/authorization.rs:123:14
+568-    |
+569-123 |         self.get_thread_by_id(id.as_uuid()).await
+570-    |              ^^^^^^^^^^^^^^^^-------------- argument #2 of type `uuid::Uuid` is missing
+--
+582:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+583-   --> src/application/workflow/authorization.rs:187:59
+584-    |
+585-187 |             if thread.id != thread_id.as_uuid() || thread.channel_id != channel_id.as_uuid() {
+586-    |                                                           ^^^^^^^^^^ unknown field
+--
+590:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+591-   --> src/adapters/persistence/workflow/message_reply_tests.rs:297:10
+592-    |
+593-297 |         .create_thread(source, "Delegated", &[])
+594-    |          ^^^^^^^^^^^^^         ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+609:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+610-   --> src/adapters/persistence/workflow/message_intent_tests.rs:129:14
+611-    |
+612-129 |             .create_thread(
+613-    |              ^^^^^^^^^^^^^
+--
+634:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+635-  --> src/adapters/persistence/workflow/agent_history_capacity_tests.rs:38:14
+636-   |
+637-38 |             .create_thread(
+638-   |              ^^^^^^^^^^^^^
+--
+659:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+660-  --> src/adapters/persistence/workflow/message_thread_tests.rs:99:10
+661-   |
+662-99 |         .create_thread(channel, "Question", &[EmailAddress::from(CUSTOMER)])
+663-   |          ^^^^^^^^^^^^^          ---------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+678:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+679-   --> src/adapters/persistence/workflow/message_thread_tests.rs:199:18
+680-    |
+681-199 |                 .create_thread(other, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+682-    |                  ^^^^^^^^^^^^^        ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+697:error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+698-  --> src/adapters/persistence/address_tests/rejoin.rs:83:22
+699-   |
+700-83 |         let thread = ThreadPersistence::create_thread(
+701-   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+--
+723:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+724-   --> src/application/use_cases/thread/ingest/routing.rs:394:18
+725-    |
+726-394 |                 .find_thread_for_message(candidate.channel.id, reply_to_id)
+727-    |                  ^^^^^^^^^^^^^^^^^^^^^^^                       ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+742:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+743-   --> src/application/use_cases/thread/ingest/routing.rs:424:14
+744-    |
+745-424 |             .find_thread_by_thread_index(candidate.channel.id, &index)
+746-    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                       ------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+761:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+762-   --> src/application/use_cases/thread/mod.rs:327:26
+763-    |
+764-327 |                         .find_thread_for_message(channel_id, reply_to)
+765-    |                          ^^^^^^^^^^^^^^^^^^^^^^^             -------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+780:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+781-   --> src/application/workflow/tests/authorization_cases/association.rs:102:11
+782-    |
+783-102 |     wrong.channel_id = Uuid::new_v4();
+784-    |           ^^^^^^^^^^ unknown field
+--
+788:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+789-  --> src/application/workflow/tests/authorization_cases/cancellation.rs:74:58
+790-   |
+791-74 |                 channel_id: RelatedChannelId::new(thread.channel_id),
+792-   |                                                          ^^^^^^^^^^ unknown field
+--
+796:error[E0050]: method `create_thread` has 4 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::create_thread` has 5
+797-   --> src/application/use_cases/thread/test_support.rs:403:9
+798-    |
+799-403 | /         &self,
+800-404 | |         channel_id: Uuid,
+--
+814:error[E0050]: method `get_thread_by_id` has 2 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::get_thread_by_id` has 3
+815-   --> src/application/use_cases/thread/test_support.rs:429:31
+816-    |
+817-429 |     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
+818-    |                               ^^^^^^^^^^^^^^^ expected 3 parameters, found 2
+--
+825:error[E0050]: method `list_threads_updated_after` has 4 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::list_threads_updated_after` has 5
+826-   --> src/application/use_cases/thread/test_support.rs:462:9
+827-    |
+828-462 | /         &self,
+829-463 | |         channel_id: Uuid,
+--
+843:error[E0050]: method `update_thread_participants` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::update_thread_participants` has 4
+844-   --> src/application/use_cases/thread/test_support.rs:483:9
+845-    |
+846-483 | /         &self,
+847-484 | |         id: Uuid,
+--
+859:error[E0050]: method `find_thread_for_message` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::find_thread_for_message` has 4
+860-   --> src/application/use_cases/thread/test_support.rs:523:9
+861-    |
+862-523 | /         &self,
+863-524 | |         channel_id: Uuid,
+--
+875:error[E0050]: method `find_thread_by_thread_index` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::find_thread_by_thread_index` has 4
+876-   --> src/application/use_cases/thread/test_support.rs:561:9
+877-    |
+878-561 | /         &self,
+879-562 | |         channel_id: Uuid,
+--
+891:error[E0046]: not all trait items implemented, missing: `list_threads_by_target`
+892-   --> src/application/use_cases/thread/test_support.rs:382:1
+893-    |
+894-382 |   impl ThreadPersistence for InMemoryThreads {
+895-    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `list_threads_by_target` in implementation
+--
+908:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+909-   --> src/adapters/http/pages/tests.rs:157:9
+910-    |
+911-157 |         channel_id,
+912-    |         ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+916:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+917-   --> src/adapters/http/routes/channel.rs:891:13
+918-    |
+919-891 |             channel_id: Uuid::new_v4(),
+920-    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+924:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+925-   --> src/adapters/http/routes/channel.rs:977:13
+926-    |
+927-977 |             channel_id: channel.id,
+928-    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+932:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+933-    --> src/adapters/http/routes/channel.rs:1137:13
+934-     |
+935-1137 |             channel_id: channel.id,
+936-     |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+940:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+941-  --> src/adapters/http/routes/channel_authorization_tests.rs:80:10
+942-   |
+943-80 |         .create_thread(other_channel.id, "Other channel secret", &[])
+944-   |          ^^^^^^^^^^^^^                   ---------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+959:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+960-   --> src/adapters/http/routes/ui_local_agents_tests.rs:101:43
+961-    |
+962-101 |     let (channel, conversation) = (thread.channel_id, thread.id);
+963-    |                                           ^^^^^^^^^^ unknown field
+--
+969:error: could not compile `open_bots` (lib) due to 31 previous errors
+970-warning: build failed, waiting for other jobs to finish...
+971:error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+972-   --> src/adapters/persistence/dashboard_tests.rs:338:18
+973-    |
+974-338 |     let thread = ThreadPersistence::create_thread(&persistence, a.channel, "Later", &[])
+975-    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                          ------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+--
+990:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+991-   --> src/adapters/persistence/local_agents/management/tests.rs:372:30
+992-    |
+993-372 |     let mut conversation = p.get_thread_by_id(s.conversation).await.unwrap().unwrap();
+994-    |                              ^^^^^^^^^^^^^^^^---------------- argument #2 of type `uuid::Uuid` is missing
+--
+1006:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1007-  --> src/adapters/persistence/thread/read_tests.rs:49:14
+1008-   |
+1009-49 |             .find_thread_by_thread_index(fixture.channel_id, &direct_reply)
+1010-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                     ------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1025:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1026-  --> src/adapters/persistence/thread/read_tests.rs:69:14
+1027-   |
+1028-69 |             .find_thread_by_thread_index(fixture.channel_id, &third_reply)
+1029-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                     ------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1044:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1045-  --> src/adapters/persistence/thread/read_tests.rs:90:14
+1046-   |
+1047-90 |             .find_thread_by_thread_index(foreign_channel, &third_reply)
+1048-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                  ------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1063:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1064-   --> src/adapters/persistence/thread/read_tests.rs:109:10
+1065-    |
+1066-109 |         .find_thread_by_thread_index(Uuid::new_v4(), &ThreadIndex::from("not-base64"))
+1067-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^                 -------------------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1082:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1083-   --> src/adapters/persistence/thread/read_tests.rs:252:10
+1084-    |
+1085-252 |         .list_threads_updated_after(fixture.channel_id, None, 50)
+1086-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     ---- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1101:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1102-   --> src/adapters/persistence/thread/read_tests.rs:264:10
+1103-    |
+1104-264 |         .list_threads_updated_after(fixture.channel_id, Some(all[0].cursor()), 50)
+1105-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1120:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1121-   --> src/adapters/persistence/thread/read_tests.rs:271:10
+1122-    |
+1123-271 |         .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+1124-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1139:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1140-   --> src/adapters/persistence/thread/read_tests.rs:285:10
+1141-    |
+1142-285 |         .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+1143-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1158:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1159-   --> src/adapters/persistence/thread/read_tests.rs:413:10
+1160-    |
+1161-413 |         .create_thread(fixture.channel_id, "Subject", std::slice::from_ref(&author))
+1162-    |          ^^^^^^^^^^^^^                     --------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1177:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1178-   --> src/adapters/persistence/thread/read_tests.rs:436:10
+1179-    |
+1180-436 |         .update_thread_participants(
+1181-    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+--
+1202:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1203-   --> src/adapters/persistence/thread/view_tests.rs:439:10
+1204-    |
+1205-439 |         .find_thread_for_message(fixture.channel_id, stored.canonical_id)
+1206-    |          ^^^^^^^^^^^^^^^^^^^^^^^                     ------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1221:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1222-   --> src/adapters/persistence/thread/view_tests.rs:449:10
+1223-    |
+1224-449 |         .find_thread_for_message(other_channel_id, stored.canonical_id)
+1225-    |          ^^^^^^^^^^^^^^^^^^^^^^^                   ------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1240:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1241-   --> src/adapters/persistence/workflow/channel_reply_membership_tests.rs:199:10
+1242-    |
+1243-199 |         .create_thread(channel, "Target", &[])
+1244-    |          ^^^^^^^^^^^^^          -------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1259:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1260-   --> src/adapters/persistence/workflow/channel_reply_membership_tests.rs:217:10
+1261-    |
+1262-217 |         .create_thread(donor.channel, "Ordinary", &[])
+1263-    |          ^^^^^^^^^^^^^                ---------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1278:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1279-   --> src/adapters/persistence/workflow/message_thread_tests.rs:886:10
+1280-    |
+1281-886 |         .create_thread(setup.channel, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+1282-    |          ^^^^^^^^^^^^^                ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1297:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+1298-   --> src/adapters/persistence/address_tests/rejoin.rs:247:10
+1299-    |
+1300-247 |         .get_thread_by_id(thread.id)
+1301-    |          ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+1313:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+1314-   --> src/adapters/persistence/address_tests/rejoin.rs:292:10
+1315-    |
+1316-292 |         .get_thread_by_id(thread.id)
+1317-    |          ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+--
+1329:error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+1330-   --> src/application/use_cases/thread/test_support.rs:300:34
+1331-    |
+1332-300 |             .map(|thread| thread.channel_id)
+1333-    |                                  ^^^^^^^^^^ unknown field
+--
+1337:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+1338-   --> src/application/use_cases/thread/test_support.rs:410:13
+1339-    |
+1340-410 |             channel_id,
+1341-    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+1345:error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+1346-   --> src/application/use_cases/thread/test_support.rs:452:37
+1347-    |
+1348-452 |             .filter(|thread| thread.channel_id == channel_id)
+1349-    |                                     ^^^^^^^^^^ unknown field
+--
+1353:error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+1354-   --> src/application/use_cases/thread/test_support.rs:473:37
+1355-    |
+1356-473 |             .filter(|thread| thread.channel_id == channel_id)
+1357-    |                                     ^^^^^^^^^^ unknown field
+--
+1361:error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+1362-   --> src/application/use_cases/thread/test_support.rs:537:35
+1363-    |
+1364-537 |             .find(|thread| thread.channel_id == channel_id && thread_ids.contains(&thread.id))
+1365-    |                                   ^^^^^^^^^^ unknown field
+--
+1369:error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+1370-   --> src/application/use_cases/thread/test_support.rs:587:65
+1371-    |
+1372-587 |                 .find(|thread| thread.id == thread_id && thread.channel_id == channel_id)
+1373-    |                                                                 ^^^^^^^^^^ unknown field
+--
+1377:error[E0609]: no field `identity` on type `&&ThreadPrincipalIntent`
+1378-    --> src/application/use_cases/thread/test_support.rs:1488:35
+1379-     |
+1380-1488 |                         && intent.identity.transport() == TransportKind::Email
+1381-     |                                   ^^^^^^^^ unknown field
+--
+1385:error[E0609]: no field `identity` on type `&ThreadPrincipalIntent`
+1386-    --> src/application/use_cases/thread/test_support.rs:1490:57
+1387-     |
+1388-1490 |                 .map(|intent| EmailAddress::from(intent.identity.subject().as_str()))
+1389-     |                                                         ^^^^^^^^ unknown field
+--
+1393:error[E0061]: this method takes 2 arguments but 1 argument was supplied
+1394-    --> src/application/use_cases/thread/test_support.rs:1497:30
+1395-     |
+1396-1497 | ...                   .get_thread_by_id(*thread_id)
+1397-     |                        ^^^^^^^^^^^^^^^^------------ argument #2 of type `uuid::Uuid` is missing
+--
+1409:error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+1410-    --> src/application/use_cases/thread/test_support.rs:1515:30
+1411-     |
+1412-1515 | ...                   .update_thread_participants(*thread_id, &participants)
+1413-     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^             ------------- argument #2 of type `uuid::Uuid` is missing
+--
+1428:error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+1429-    --> src/application/use_cases/thread/test_support.rs:1522:26
+1430-     |
+1431-1522 |                         .create_thread(association.channel_id, subject, &emails)
+1432-     |                          ^^^^^^^^^^^^^                         ------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+--
+1447:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+1448-    --> src/application/use_cases/thread/tests.rs:2794:39
+1449-     |
+1450-2794 |     assert_eq!(result.thread.unwrap().channel_id, channel_id);
+1451-     |                                       ^^^^^^^^^^ unknown field
+--
+1455:error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+1456-    --> src/application/use_cases/thread/tests.rs:3289:32
+1457-     |
+1458-3289 |         result.thread.unwrap().channel_id,
+1459-     |                                ^^^^^^^^^^ unknown field
+--
+1463:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+1464-  --> src/application/workflow/tests/authorization_cases/mod.rs:35:9
+1465-   |
+1466-35 |         channel_id,
+1467-   |         ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+--
+1471:error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+1472-  --> src/domain/entities/thread.rs:72:13
+1473-   |
+1474-72 |             channel_id: Uuid::new_v4(),
+1475-   |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field

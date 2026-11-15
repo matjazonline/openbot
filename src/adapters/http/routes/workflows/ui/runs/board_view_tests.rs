@@ -883,7 +883,7 @@ async fn run_board_view_live_sends_no_wake_up_for_a_hidden_channel() {
     );
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.company,
-        channel_id: Some(channel),
+        target: Some(crate::entities::address::AddressTarget::Desk(channel)),
         thread_id: None,
         run_id: run,
     }));
@@ -894,7 +894,7 @@ async fn run_board_view_live_sends_no_wake_up_for_a_hidden_channel() {
     let seen = Uuid::new_v4();
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.company,
-        channel_id: None,
+        target: None,
         thread_id: None,
         run_id: seen,
     }));

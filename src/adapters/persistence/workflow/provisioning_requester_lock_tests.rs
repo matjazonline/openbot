@@ -5,10 +5,7 @@ use super::*;
 #[tokio::test]
 async fn delegated_provisioning_locks_requester_before_company() {
     let d = Deployment::new(vec![
-        LlmTurn::tool_call(
-            CREATE_AGENT_CHANNEL,
-            spec("locked-helper", ReplyMode::Autonomous),
-        ),
+        LlmTurn::tool_call(CREATE_AGENT, spec("locked-helper")),
         LlmTurn::text(r#"{"body":"Created helper."}"#),
     ])
     .await;

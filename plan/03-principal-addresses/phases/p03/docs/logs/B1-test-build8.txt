@@ -1,0 +1,37 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs:14:42
+    |
+ 14 |         LlmTurn::tool_call(CREATE_AGENT, spec("reviewed", ReplyMode::Reviewed)),
+    |                                          ^^^^             ------------------- unexpected argument #2 of type `application::workflow::provisioning::ReplyMode`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/provisioning_runtime_tests.rs:146:4
+    |
+146 | fn spec(slug: &str) -> Value {
+    |    ^^^^
+help: remove the extra argument
+    |
+ 14 -         LlmTurn::tool_call(CREATE_AGENT, spec("reviewed", ReplyMode::Reviewed)),
+ 14 +         LlmTurn::tool_call(CREATE_AGENT, spec("reviewed")),
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs:8:42
+    |
+  8 |         LlmTurn::tool_call(CREATE_AGENT, spec("locked-helper", ReplyMode::Autonomous)),
+    |                                          ^^^^                  --------------------- unexpected argument #2 of type `application::workflow::provisioning::ReplyMode`
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/provisioning_runtime_tests.rs:146:4
+    |
+146 | fn spec(slug: &str) -> Value {
+    |    ^^^^
+help: remove the extra argument
+    |
+  8 -         LlmTurn::tool_call(CREATE_AGENT, spec("locked-helper", ReplyMode::Autonomous)),
+  8 +         LlmTurn::tool_call(CREATE_AGENT, spec("locked-helper")),
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

@@ -70,6 +70,7 @@ pub struct ResendApiInboundDecoder {
     config: Arc<AppConfig>,
     thread_use_cases: Arc<ThreadUseCases>,
     file_storage: Option<Arc<dyn FileStorage>>,
+    scanner: Arc<dyn crate::services::spam_scanner::SpamScanner>,
 }
 
 impl ResendApiInboundDecoder {
@@ -78,12 +79,14 @@ impl ResendApiInboundDecoder {
         config: Arc<AppConfig>,
         thread_use_cases: Arc<ThreadUseCases>,
         file_storage: Option<Arc<dyn FileStorage>>,
+        scanner: Arc<dyn crate::services::spam_scanner::SpamScanner>,
     ) -> Self {
         Self {
             clients,
             config,
             thread_use_cases,
             file_storage,
+            scanner,
         }
     }
 }
@@ -157,7 +160,14 @@ impl ResendApiInboundDecoder {
                     "this company has no enabled Resend integration".to_string(),
                 )
             })?;
-        let (inbound, attachments) = read_mail(&account, &self.config, event, &email_id).await?;
+        let (inbound, attachments) = read_mail(
+            &account,
+            &self.config,
+            event,
+            &email_id,
+            self.scanner.as_ref(),
+        )
+        .await?;
 
         let preflight = self
             .thread_use_cases
@@ -207,6 +217,7 @@ async fn read_mail(
     config: &AppConfig,
     event: &InboundEventRecord,
     email_id: &str,
+    scanner: &dyn crate::services::spam_scanner::SpamScanner,
 ) -> Result<(InboundMessage, PendingEmailAttachments), Failure> {
     let (email, raw_mime) =
         fetch_raw_mime(account.api.as_ref(), email_id, event.correlation_id).await?;
@@ -234,6 +245,16 @@ async fn read_mail(
         results.dmarc,
     );
 
+    let score = scanner
+        .scan(crate::services::spam_scanner::SpamScanInput {
+            raw_mime: &raw_mime,
+            subject: payload.subject.as_deref(),
+            from: Some(&payload.from),
+            body_text: payload.text.as_deref(),
+            body_html: payload.html.as_deref(),
+        })
+        .await
+        .score;
     let accepted = EmailIngressAdapter::for_config(config)
         .accept(
             payload,
@@ -241,7 +262,7 @@ async fn read_mail(
                 spf: results.spf,
                 dkim: results.dkim,
                 dmarc: results.dmarc,
-                spam_score: None,
+                spam_score: (score > 0.0).then_some(score),
             }),
         )
         .map_err(|error| {

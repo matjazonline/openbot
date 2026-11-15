@@ -1,0 +1,11 @@
+{
+  "status": "FAIL",
+  "command": "current lib binary adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript --exact",
+  "classification": "confirmed inherited CSP scanner false positive on a hostile unit-test literal; unrelated to direct inbox rendering",
+  "source": "src/adapters/http/pages/workflow_authoring/sample.rs",
+  "source_HEAD_equals_current": true,
+  "source_sha256": "c6060c0cb96e5067fa042664bf497eae478736589e43de0a38bf0f746ca6bc88",
+  "scanner_HEAD_equals_current": true,
+  "scanner_sha256": "cfcd72e9efbf20383b8d5d925ce93bd5b2d44ac75560f47f8604c598db1cd5e1",
+  "disposition": "leave source and scanner unchanged in B2; retain failure for integrated plan03 p04 gate"
+}

@@ -1,0 +1,21 @@
+
+running 16 tests
+test adapters::persistence::account_identity::tests::account_email_change_with_an_unparseable_old_address_and_no_company_succeeds ... ok
+test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... ok
+test adapters::persistence::account_identity::tests::account_email_change_refuses_an_address_another_person_holds ... ok
+test adapters::persistence::account_identity::tests::account_email_change_old_address_is_adopted_by_its_next_owner ... ok
+test adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets ... ok
+test adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse ... ok
+test adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider ... ok
+test adapters::persistence::account_identity::tests::account_email_change_bypass_moves_trust_in_every_company ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_invite_acceptance ... ok
+test adapters::persistence::account_identity::tests::account_email_change_confirmed_moves_trust_in_every_company ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_inbound_observation ... ok
+test adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system ... ok
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+
+test result: ok. 16 passed; 0 failed; 0 ignored; 0 measured; 4508 filtered out; finished in 2.00s
+

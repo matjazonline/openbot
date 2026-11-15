@@ -3,7 +3,7 @@ use super::*;
 use crate::entities::access_level::AccessLevel;
 use crate::entities::message::{AttachmentMetadata, CanonicalMessageId, ThreadEntryKind};
 use crate::entities::value_objects::ObjectKey;
-use crate::use_cases::thread::{ChannelReadScope, ThreadReadScope};
+use crate::use_cases::thread::{InboxReadScope, ThreadReadScope};
 use axum::extract::Path;
 
 const SUBJECT: &str = "private-subject-canary";
@@ -12,9 +12,9 @@ const FILENAME: &str = "private-attachment-canary.pdf";
 
 fn scope(h: &Harness, thread_id: Uuid) -> ThreadReadScope {
     ThreadReadScope {
-        channel: ChannelReadScope {
+        inbox: InboxReadScope {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(h.channel_id),
         },
         thread_id,
     }
@@ -107,7 +107,7 @@ async fn knowledge_view_public_reader_has_placeholder_and_restricted_thread_titl
         Some(&viewer.email),
         pages::MessageScope {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(h.channel_id),
         },
         pages::RunLinkAccess::Label,
     );
@@ -115,7 +115,7 @@ async fn knowledge_view_public_reader_has_placeholder_and_restricted_thread_titl
     assert_private_absent(&html);
     let threads = h
         .threads
-        .list_channel_threads(&viewer, scope(&h, thread).channel, None, 10)
+        .list_inbox_threads(&viewer, scope(&h, thread).inbox, None, 10)
         .await
         .unwrap();
     assert_eq!(
@@ -178,7 +178,10 @@ async fn knowledge_view_attachment_denial_precedes_storage_and_filename_access()
             Path((thread, "a".repeat(64))),
             Query(AttachmentQuery {
                 company_id: h.company_id,
-                channel_id: h.channel_id,
+                inbox: crate::adapters::http::routes::ui::InboxSelection {
+                    channel_id: Some(h.channel_id),
+                    principal_id: None,
+                },
             }),
         )
     };
@@ -205,7 +208,10 @@ async fn knowledge_view_live_stream_rechecks_level_after_demotion() {
         HeaderMap::new(),
         Query(ThreadStreamQuery {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            inbox: crate::adapters::http::routes::ui::InboxSelection {
+                channel_id: Some(h.channel_id),
+                principal_id: None,
+            },
             thread_id: thread,
             after: None,
         }),
@@ -224,7 +230,7 @@ async fn knowledge_view_live_stream_rechecks_level_after_demotion() {
     h.events
         .publish(MailboxEvent::MessageCommitted(ThreadScope {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(h.channel_id),
             thread_id: thread,
         }));
     let frame = frames.next_named("message").await;
@@ -310,7 +316,10 @@ async fn knowledge_view_attachment_rechecks_demotion_after_storage_before_return
         Path((thread, "a".repeat(64))),
         Query(AttachmentQuery {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            inbox: crate::adapters::http::routes::ui::InboxSelection {
+                channel_id: Some(h.channel_id),
+                principal_id: None,
+            },
         }),
     )
     .await;
@@ -325,7 +334,10 @@ async fn knowledge_view_attachment_rechecks_demotion_after_storage_before_return
         Path((thread, "a".repeat(64))),
         Query(AttachmentQuery {
             company_id: h.company_id,
-            channel_id: h.channel_id,
+            inbox: crate::adapters::http::routes::ui::InboxSelection {
+                channel_id: Some(h.channel_id),
+                principal_id: None,
+            },
         }),
     )
     .await

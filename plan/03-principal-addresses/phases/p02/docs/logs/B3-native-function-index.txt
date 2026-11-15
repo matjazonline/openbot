@@ -1,0 +1,116 @@
+1941:CREATE FUNCTION public.workflow_action_actual_observation_conflicts() RETURNS trigger
+1967:CREATE FUNCTION public.workflow_action_actual_observation_receipt_guard() RETURNS trigger
+1984:CREATE FUNCTION public.workflow_action_applied_request_guard() RETURNS trigger
+1998:CREATE FUNCTION public.workflow_action_audit_command_guard() RETURNS trigger
+2016:CREATE FUNCTION public.workflow_action_audit_immutable() RETURNS trigger
+2038:CREATE FUNCTION public.workflow_action_bind_schedule() RETURNS trigger
+2059:CREATE FUNCTION public.workflow_action_capture_claim_retirement() RETURNS trigger
+2097:CREATE FUNCTION public.workflow_action_capture_schedule() RETURNS trigger
+2116:CREATE FUNCTION public.workflow_action_capture_state_witness() RETURNS trigger
+2133:CREATE FUNCTION public.workflow_action_claim_budget_refusal_guard() RETURNS trigger
+2173:CREATE FUNCTION public.workflow_action_claim_episode_guard() RETURNS trigger
+2203:CREATE FUNCTION public.workflow_action_claim_refusal_audit_immutable() RETURNS trigger
+2224:CREATE FUNCTION public.workflow_action_claim_retirement_atomic_guard() RETURNS trigger
+2241:CREATE FUNCTION public.workflow_action_claim_retirement_witness_owner() RETURNS trigger
+2267:CREATE FUNCTION public.workflow_action_command_scope_guard() RETURNS trigger
+2295:CREATE FUNCTION public.workflow_action_confirm_claim_retirement() RETURNS trigger
+2316:CREATE FUNCTION public.workflow_action_conflict_park_pending() RETURNS trigger
+2341:CREATE FUNCTION public.workflow_action_consumption_commit_guard() RETURNS trigger
+2360:CREATE FUNCTION public.workflow_action_dispatch_commit_guard() RETURNS trigger
+2483:CREATE FUNCTION public.workflow_action_evidence_commit_guard() RETURNS trigger
+2532:CREATE FUNCTION public.workflow_action_fact_immutable() RETURNS trigger
+2551:CREATE FUNCTION public.workflow_action_has_evidence_conflict(company uuid, execution uuid) RETURNS boolean
+2563:CREATE FUNCTION public.workflow_action_intent_immutable() RETURNS trigger
+2579:CREATE FUNCTION public.workflow_action_link_claim_retirement_audit() RETURNS trigger
+2596:CREATE FUNCTION public.workflow_action_not_applied_available(company uuid, invocation uuid, excluded_entry uuid DEFAULT NULL::uuid) RETURNS uuid
+2662:CREATE FUNCTION public.workflow_action_pending_claim_episode(company uuid, run uuid, execution uuid, job uuid) RETURNS text
+2680:CREATE FUNCTION public.workflow_action_receipt_evidence_guard() RETURNS trigger
+2696:CREATE FUNCTION public.workflow_action_receipt_finality_conflict() RETURNS trigger
+2753:CREATE FUNCTION public.workflow_action_reconciliation_budget_eligible(company uuid, run uuid) RETURNS boolean
+2771:CREATE FUNCTION public.workflow_action_reconciliation_guard() RETURNS trigger
+2794:CREATE FUNCTION public.workflow_action_reconciliation_reopen_safe(company uuid, run uuid, job uuid) RETURNS boolean
+2827:CREATE FUNCTION public.workflow_action_remote_entry_commit_guard() RETURNS trigger
+2873:CREATE FUNCTION public.workflow_action_replay_supported(company uuid, invocation uuid) RETURNS boolean
+2936:CREATE FUNCTION public.workflow_action_reservation_identity() RETURNS trigger
+2951:CREATE FUNCTION public.workflow_action_retry_safe(company uuid, execution uuid) RETURNS boolean
+2979:CREATE FUNCTION public.workflow_action_state_witness_owner() RETURNS trigger
+2993:CREATE FUNCTION public.workflow_control_retry_safe(company uuid, run uuid, job uuid) RETURNS boolean
+3035:CREATE FUNCTION public.workflow_decision_fact_immutable() RETURNS trigger
+3047:CREATE FUNCTION public.workflow_decision_immutable() RETURNS trigger
+3066:CREATE FUNCTION public.workflow_decision_person_snapshot(company uuid, principal_id uuid) RETURNS uuid
+3080:CREATE FUNCTION public.workflow_decision_comment_identity() RETURNS trigger
+3088:CREATE FUNCTION public.workflow_decision_submit_identity() RETURNS trigger
+3099:CREATE FUNCTION public.workflow_decision_reviewer_guard() RETURNS trigger
+3133:CREATE FUNCTION public.workflow_http_identity_immutable() RETURNS trigger
+3159:CREATE FUNCTION public.workflow_job_continuation_limit() RETURNS smallint
+3168:CREATE FUNCTION public.workflow_message_action_capture() RETURNS trigger
+3202:CREATE FUNCTION public.workflow_message_action_guard() RETURNS trigger
+3242:CREATE FUNCTION public.workflow_message_admission_guard() RETURNS trigger
+3261:CREATE FUNCTION public.workflow_message_destination_in_app_guard() RETURNS trigger
+3286:CREATE FUNCTION public.workflow_message_aggregate(company uuid, invocation uuid) RETURNS TABLE(state text, result jsonb, destinations integer)
+3316:CREATE FUNCTION public.workflow_message_delivery_event() RETURNS trigger
+3334:CREATE FUNCTION public.workflow_message_delivery_transition_guard() RETURNS trigger
+3371:CREATE FUNCTION public.workflow_message_destination_state(delivery_id uuid, delivery_status text) RETURNS text
+3385:CREATE FUNCTION public.workflow_tool_child_wait_continuation_guard() RETURNS trigger
+3402:CREATE FUNCTION public.workflow_model_tool_wait_continuation_guard() RETURNS trigger
+3422:CREATE FUNCTION public.workflow_effect_wait_guard() RETURNS trigger
+3455:CREATE FUNCTION public.workflow_message_part_transition_guard() RETURNS trigger
+3490:CREATE FUNCTION public.workflow_message_receipt_guard() RETURNS trigger
+3509:CREATE FUNCTION public.workflow_message_reopen_guard() RETURNS trigger
+11466:CREATE FUNCTION public.workflow_continuation_counter_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+11483:CREATE FUNCTION public.workflow_decision_wait_pair_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+11494:CREATE FUNCTION public.workflow_approval_audit_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+11516:CREATE FUNCTION public.workflow_decision_wait_delete_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+12924:CREATE FUNCTION public.channel_reply_source(intent public.workflow_message_intents) RETURNS jsonb
+13205:CREATE FUNCTION public.workflow_message_slots(tenant uuid, execution uuid) RETURNS bigint
+13215:CREATE OR REPLACE FUNCTION public.workflow_message_admission_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+13420:CREATE FUNCTION public.workflow_delivery_origin(tenant uuid, target uuid) RETURNS text LANGUAGE sql STABLE AS $$
+13429:CREATE FUNCTION public.channel_reply_publication_matches(tenant uuid, root uuid, published_message uuid, published_delivery uuid)
+13479:CREATE FUNCTION public.channel_reply_message_owner(tenant uuid, canonical uuid)
+13635:CREATE FUNCTION public.workflow_channel_message_owner(tenant uuid, canonical uuid)
+13647:CREATE FUNCTION public.workflow_question_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+13689:CREATE FUNCTION public.workflow_question_wait_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+13704:CREATE FUNCTION public.workflow_question_event_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+13731:CREATE FUNCTION public.workflow_question_provider_entry_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+14038:CREATE FUNCTION public.workflow_local_agent_retention_proof_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+14058:CREATE FUNCTION public.workflow_local_agent_call_guard() RETURNS trigger LANGUAGE plpgsql AS $$
+14082:CREATE FUNCTION public.workflow_local_agent_outcome_wake() RETURNS trigger LANGUAGE plpgsql AS $$
+14485:CREATE FUNCTION public.agent_history_limits()
+14490:CREATE FUNCTION public.agent_history_conversation_available(tenant uuid)
+14501:CREATE FUNCTION public.agent_history_conversation_unused(conversation public.agent_history_conversations)
+14531:CREATE FUNCTION public.agent_history_storage_available(tenant uuid, conversation uuid)
+14549:CREATE FUNCTION public.agent_history_payload_expirable(exchange public.agent_history_exchanges)
+14590:CREATE FUNCTION public.agent_history_expiry_allowed(exchange public.agent_history_exchanges)
+14695:CREATE FUNCTION public.agent_history_checkpoint_matches(exchange public.agent_history_exchanges)
+14727:CREATE FUNCTION public.agent_history_selected_pair_matches(
+14743:CREATE FUNCTION public.agent_history_preparation_valid(owner public.agent_history_exchanges)
+14817:CREATE FUNCTION public.agent_history_transition_allowed(
+15067:CREATE FUNCTION public.agent_history_admit(tenant uuid, conversation uuid)
+15146:CREATE FUNCTION public.agent_history_take_turn(tenant uuid, exchange_id uuid)
+15165:CREATE FUNCTION public.agent_history_turn_ready(tenant uuid, exchange_id uuid)
+16001:CREATE FUNCTION public.workflow_publication_role_requirements(payload bytea, selected_version uuid)
+16101:CREATE FUNCTION public.workflow_role_refusal_code(value jsonb) RETURNS text LANGUAGE sql IMMUTABLE STRICT AS $$
+16137:CREATE FUNCTION public.workflow_escalation_policy_valid(value jsonb) RETURNS boolean
+16314:CREATE FUNCTION public.workflow_follow_selection(value jsonb) RETURNS jsonb LANGUAGE plpgsql IMMUTABLE AS $$
+16420:CREATE FUNCTION public.workflow_follow_is_open(company uuid, decision uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+16427:CREATE FUNCTION public.workflow_follow_reviewer_eligible(company uuid, run_identity uuid, person uuid) RETURNS boolean LANGUAGE sql STABLE AS $$
+16505:CREATE FUNCTION public.workflow_follow_role_members(spec public.workflow_follow_decisions, refs jsonb)
+16612:CREATE FUNCTION public.workflow_follow_fact_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+16673:CREATE FUNCTION public.workflow_follow_pending_reviewer(member public.workflow_decision_reviewers)
+16949:CREATE FUNCTION public.workflow_admission_refusal_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+16994:CREATE FUNCTION public.workflow_escalation_run_source_valid(
+17221:CREATE FUNCTION public.workflow_escalation_recipient_facts_valid(value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
+17238:CREATE FUNCTION public.workflow_escalation_role_selection(company uuid, context uuid, selected_role text, scope text)
+17482:CREATE FUNCTION public.workflow_source_uuid(source text) RETURNS uuid LANGUAGE plpgsql IMMUTABLE STRICT AS $$
+17492:CREATE FUNCTION public.workflow_refusal_content_level(checked_company uuid, source_key text) RETURNS smallint
+17515:CREATE FUNCTION public.workflow_escalation_notice_active(checked_company uuid, checked_notice uuid) RETURNS boolean
+17524:CREATE FUNCTION public.workflow_escalation_person_eligible(checked_company uuid, checked_notice uuid) RETURNS boolean
+17640:CREATE FUNCTION public.workflow_escalation_recipient_fact_immutable() RETURNS trigger LANGUAGE plpgsql AS $$
+17690:CREATE FUNCTION public.workflow_escalation_agent_route(checked_company uuid, checked_principal uuid)
+17712:CREATE FUNCTION public.workflow_escalation_agent_eligible(checked_company uuid, checked_notice uuid) RETURNS boolean
+17758:CREATE FUNCTION public.workflow_escalation_agent_route_matches(receipt public.workflow_escalation_agent_receipts)
+17965:CREATE FUNCTION public.workflow_escalation_target_source_live(target public.workflow_escalation_notice_targets)
+17975:CREATE FUNCTION public.workflow_escalation_intent_source_retired(checked_company uuid,checked_intent uuid)
+18067:CREATE FUNCTION public.workflow_escalation_source_message(source_key text) RETURNS uuid LANGUAGE plpgsql IMMUTABLE AS $$
+18079:CREATE FUNCTION public.workflow_escalation_target_admissible(target public.workflow_escalation_notice_targets)
+18375:CREATE FUNCTION public.workflow_escalation_agent_handling_failure(checked_company uuid,checked_notice uuid) RETURNS text LANGUAGE sql STABLE AS $$

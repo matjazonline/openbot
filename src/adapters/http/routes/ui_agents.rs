@@ -666,6 +666,8 @@ impl AgentSettingsView<'_> {
         let stored = pages::AgentDraft {
             name: &agent.name,
             slug: &agent.slug,
+            open_to_public: agent.open_to_public,
+            confirm_spam_disabled: false,
             system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
             description: agent.description.as_deref().unwrap_or(""),
             provider: agent.provider.as_deref().unwrap_or(""),
@@ -796,6 +798,8 @@ impl SubmittedAgent {
             tool_bindings: None,
             name: self.form.name.clone(),
             slug: self.slug.clone(),
+            open_to_public: self.form.open_to_public,
+            confirm_spam_disabled: self.form.confirm_spam_disabled,
             provider: self.form.provider.clone(),
             model: self.form.model.clone(),
             system_prompt: self.form.system_prompt.clone(),
@@ -823,6 +827,8 @@ impl SubmittedAgent {
         pages::AgentDraft {
             name: &self.form.name,
             slug: &self.slug,
+            open_to_public: self.form.open_to_public,
+            confirm_spam_disabled: self.form.confirm_spam_disabled,
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
             description: self.form.description.as_deref().unwrap_or(""),
             provider: self.form.provider.as_deref().unwrap_or(""),

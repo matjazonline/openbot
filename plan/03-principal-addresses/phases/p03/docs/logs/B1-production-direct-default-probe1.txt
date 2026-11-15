@@ -1,0 +1,106 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::agent_address_create_actual_default_binding_answers_a_direct_message ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::agent_address_create_actual_default_binding_answers_a_direct_message stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::agent_address_create_actual_default_binding_answers_a_direct_message' (16522607) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: the production-created agent's direct final was delivered
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": [
+    {
+      "attempts": 1,
+      "available_at": "2026-11-15T11:19:30.245373+00:00",
+      "id": "315f37b8-db0e-464f-8a3a-c288d264370b",
+      "lease": null,
+      "now": "2026-11-15T11:20:00.280631+00:00",
+      "outcome": "admitted",
+      "reply_settled": false,
+      "state": "done",
+      "updated_at": "2026-11-15T11:19:30.39129+00:00",
+      "worker": null
+    }
+  ],
+  "jobs": [
+    {
+      "id": "a2ba3429-d5f6-487f-a242-2dfae21b3f2a",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:19:30.288614+00:00",
+      "status": "completed"
+    },
+    {
+      "id": "b2cbea9b-863e-4b62-97d5-af5a7d03ed67",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:19:30.508305+00:00",
+      "status": "completed"
+    },
+    {
+      "id": "4f755ec4-11d7-4bb6-a846-bfa50b5fb79a",
+      "lock_expires_at": null,
+      "run_at": "2026-11-15T11:19:33.042335+00:00",
+      "status": "completed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "c9a3e2b7-aed1-48f1-988b-41c62110ec70",
+      "state": "succeeded",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 11745,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 11746,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 11645,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 11744,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 11747,
+      "query": "WITH bounds AS (\n    SELECT transaction_timestamp() AS now, transaction_timestamp() - INTERVAL '24 hours' AS since\n), runs AS (\n    SELECT count(*) FILTER (WHER",
+      "state": "active",
+      "wait": null,
+      "xact_start": "2026-11-15T11:20:00.258193+00:00"
+    }
+  ],
+  "waits": null
+}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::agent_address_create_actual_default_binding_answers_a_direct_message
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4593 filtered out; finished in 31.70s
+

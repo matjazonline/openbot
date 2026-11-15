@@ -166,6 +166,7 @@ impl crate::application::attention::AttentionPersistence for RecordedQuery {
         &self,
         _company_id: Uuid,
         _visible_channel_ids: &[Uuid],
+        _viewer: crate::entities::transport::PrincipalId,
     ) -> crate::app_error::AppResult<crate::entities::attention::OperationalSummary> {
         unimplemented!()
     }

@@ -9,7 +9,6 @@
 //! The stream subscribes before it authorizes or reads anything, so a change between the page's
 //! render and this subscription is covered by the first `resync`.
 use super::*;
-use crate::application::workflow::RelatedChannelId;
 use crate::infra::events::{MailboxEvent, RunScope};
 use async_stream::stream;
 use axum::extract::State;
@@ -41,10 +40,9 @@ pub(super) fn run_events(run: Uuid) -> [Event; 2] {
 /// Whether the caller may see a run of this scope: its channel, or the company for a run
 /// without one.
 async fn sees(ui: &Ui, company: Uuid, scope: &RunScope) -> AppResult<bool> {
-    let association = match scope.channel_id {
-        Some(channel) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-        None => RelatedAssociation::Company,
-    };
+    let association = scope
+        .target
+        .map_or(RelatedAssociation::Company, RelatedAssociation::inbox);
     Visibility::new(&ui.engine, super::super::company(company), ui.actor()?)
         .allows(association)
         .await

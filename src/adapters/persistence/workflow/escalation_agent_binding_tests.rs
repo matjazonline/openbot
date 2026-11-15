@@ -36,50 +36,43 @@ struct Configuration {
     run_as_user_id: Uuid,
 }
 
-async fn own_default_desk(f: &AgentCase) {
-    use crate::application::ports::channel::{
-        ChannelOwnershipWrite, ChannelPersistence, ChannelUpdate, ChannelWrite,
-    };
-    let p = f.people.role.p();
-    let channel = ChannelPersistence::get_by_id(p, f.created.desk_id)
-        .await
-        .unwrap()
-        .unwrap();
-    ChannelPersistence::update(
-        p,
-        ChannelUpdate {
-            company_id: f.people.role.company().as_uuid(),
-            channel_id: channel.id,
-            write: ChannelWrite {
-                name: channel.name,
-                slug: channel.slug.to_string(),
-                enabled: true,
-                ownership: Some(ChannelOwnershipWrite {
-                    department_id: Some(Some(f.people.role.department)),
-                    members_only: Some(true),
-                }),
-                ..Default::default()
-            },
-        },
+async fn assert_handler_department(f: &AgentCase) {
+    let placed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM department_members WHERE company_id=$1 AND department_id=$2 AND principal_id=$3)",
+    ).bind(f.people.role.company().as_uuid()).bind(f.people.role.department.as_uuid())
+        .bind(f.created.principal_id.as_uuid()).fetch_one(f.people.role.p().pool()).await.unwrap();
+    assert!(
+        placed,
+        "the production direct agent retains its department placement"
+    );
+}
+
+async fn handler_binding(f: &AgentCase) -> Uuid {
+    sqlx::query_scalar(
+        "SELECT binding_id FROM channel_reply_settings WHERE company_id=$1 AND principal_id=$2",
     )
+    .bind(f.people.role.company().as_uuid())
+    .bind(f.created.principal_id.as_uuid())
+    .fetch_one(f.people.role.p().pool())
     .await
-    .unwrap();
+    .unwrap()
 }
 
 async fn other_bindings(f: &AgentCase, count: usize) -> Vec<WorkflowBindingId> {
     let configuration:Configuration=sqlx::query_as("SELECT configuration.version_id,configuration.params,configuration.resources,configuration.run_as_user_id \
-        FROM workflow_provisioning_commands AS provision JOIN workflow_bindings AS binding \
-          ON binding.company_id=provision.company_id AND binding.id::text=provision.result->>'binding_id' \
+        FROM principals AS principal JOIN channel_reply_settings AS response \
+          ON response.company_id=principal.company_id AND response.principal_id=principal.id \
+        JOIN workflow_bindings AS binding ON binding.company_id=response.company_id AND binding.id=response.binding_id \
         JOIN workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id AND configuration.binding_id=binding.id \
-          AND configuration.revision=binding.configuration_revision WHERE provision.company_id=$1 AND provision.command_key=$2")
-        .bind(f.people.role.company().as_uuid()).bind(crate::adapters::persistence::company_agent::default_desk_key(f.created.agent.id))
+          AND configuration.revision=binding.configuration_revision WHERE principal.company_id=$1 AND principal.agent_id=$2")
+        .bind(f.people.role.company().as_uuid()).bind(f.created.agent.id)
         .fetch_one(f.people.role.p().pool()).await.unwrap();
     let service = f.people.role.admission.binding.service();
     let mut ids = Vec::new();
     for _ in 0..count {
         let mut request = f.people.role.admission.binding.request(None);
         request.target.binding = WorkflowBindingId::new(Uuid::new_v4());
-        request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+        request.association = RelatedAssociation::Principal(f.created.principal_id);
         request.version = VersionId::new(configuration.version_id);
         request.params = configuration.params.clone();
         request.resources = serde_json::from_value(configuration.resources.clone()).unwrap();
@@ -123,16 +116,23 @@ async fn process(
 }
 
 async fn ordinary(f: &AgentCase) {
-    let endpoint:Uuid=sqlx::query_scalar("SELECT id FROM channel_bindings WHERE company_id=$1 AND channel_id=$2 AND transport='email' AND status='active'")
-        .bind(f.people.role.company().as_uuid()).bind(f.created.desk_id).fetch_one(f.people.role.p().pool()).await.unwrap();
-    let settings: i64 =
-        sqlx::query_scalar("SELECT settings_revision FROM channels WHERE company_id=$1 AND id=$2")
-            .bind(f.people.role.company().as_uuid())
-            .bind(f.created.desk_id)
-            .fetch_one(f.people.role.p().pool())
-            .await
-            .unwrap();
-    let request = ordinary_request(f, ChannelBindingId::new(endpoint), settings);
+    let endpoint:Uuid=sqlx::query_scalar("SELECT id FROM channel_bindings WHERE company_id=$1 AND principal_id=$2 AND transport='email' AND status='active'")
+        .bind(f.people.role.company().as_uuid()).bind(f.created.principal_id.as_uuid()).fetch_one(f.people.role.p().pool()).await.unwrap();
+    let settings: i64 = sqlx::query_scalar(
+        "SELECT settings_revision FROM principals WHERE company_id=$1 AND id=$2",
+    )
+    .bind(f.people.role.company().as_uuid())
+    .bind(f.created.principal_id.as_uuid())
+    .fetch_one(f.people.role.p().pool())
+    .await
+    .unwrap();
+    let mut request = ordinary_request(f, ChannelBindingId::new(endpoint), settings);
+    let email: String = sqlx::query_scalar("SELECT email::text FROM users WHERE id=$1")
+        .bind(f.people.role.admission.binding.target.actor.user_id())
+        .fetch_one(f.people.role.p().pool())
+        .await
+        .unwrap();
+    request.envelope.author = qualified_email_identity(email).unwrap();
     f.people.role.p().commit_inbound(request).await.unwrap();
 }
 
@@ -170,7 +170,9 @@ fn ordinary_request(
         associations: BoundedVec::parse(
             "desk",
             vec![ThreadAssociation {
-                channel_id: f.created.desk_id,
+                address_target: crate::entities::address::AddressTarget::Principal(
+                    f.created.principal_id,
+                ),
                 binding_id: binding,
                 target: ThreadTarget::Create {
                     subject: "Ordinary work".into(),
@@ -184,7 +186,7 @@ fn ordinary_request(
         intents: BoundedVec::parse(
             "intent",
             vec![InboundAdmissionIntent {
-                channel_id: f.created.desk_id,
+                target: crate::entities::address::AddressTarget::Principal(f.created.principal_id),
                 role: RecipientRole::To,
                 mentioned: true,
                 reply_to: None,
@@ -304,7 +306,7 @@ async fn workflow_escalation_agent_changed_captured_revision_exposes_no_fallback
     let row:Configuration=sqlx::query_as("SELECT version_id,params,resources,run_as_user_id FROM workflow_binding_revisions WHERE company_id=$1 AND binding_id=$2 AND revision=$3")
         .bind(f.people.role.company().as_uuid()).bind(selected[0].id.as_uuid()).bind(i64::try_from(selected[0].revision.get()).unwrap())
         .fetch_one(f.people.role.p().pool()).await.unwrap();
-    request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+    request.association = RelatedAssociation::Principal(f.created.principal_id);
     request.version = VersionId::new(row.version_id);
     request.params = row.params;
     request.resources = serde_json::from_value(row.resources).unwrap();

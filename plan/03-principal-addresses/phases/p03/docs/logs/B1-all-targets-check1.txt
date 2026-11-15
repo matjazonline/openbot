@@ -1,0 +1,656 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0432]: unresolved import `crate::application::agent::AgentDesk`
+ --> src/adapters/http/pages/department_ui_tests.rs:5:33
+  |
+5 | use crate::application::agent::{AgentDesk, AgentDirectoryEntry, AgentKey, DepartmentRef};
+  |                                 ^^^^^^^^^ no `AgentDesk` in `application::agent`
+  |
+help: a similar name exists in the module
+  |
+5 - use crate::application::agent::{AgentDesk, AgentDirectoryEntry, AgentKey, DepartmentRef};
+5 + use crate::application::agent::{AgentKey, AgentDirectoryEntry, AgentKey, DepartmentRef};
+  |
+
+error[E0432]: unresolved import `crate::adapters::persistence::company_agent::default_desk_key`
+ --> src/adapters/persistence/department_agent_desks_tests.rs:5:72
+  |
+5 | use crate::adapters::persistence::company_agent::{CompanyAgentService, default_desk_key};
+  |                                                                        ^^^^^^^^^^^^^^^^ no `default_desk_key` in `adapters::persistence::company_agent`
+
+error[E0432]: unresolved import `crate::application::agent::AgentDesk`
+ --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:5:45
+  |
+5 |     AgentAuthoringReads, AgentCompanyScope, AgentDesk, AgentKey, DepartmentRef,
+  |                                             ^^^^^^^^^ no `AgentDesk` in `application::agent`
+  |
+help: a similar name exists in the module
+  |
+5 -     AgentAuthoringReads, AgentCompanyScope, AgentDesk, AgentKey, DepartmentRef,
+5 +     AgentAuthoringReads, AgentCompanyScope, AgentKey, AgentKey, DepartmentRef,
+  |
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:470:37
+    |
+470 |                     channel: pages::OnboardingChannel::Created {
+    |                                     ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:477:37
+    |
+477 |                     channel: pages::OnboardingChannel::Missing,
+    |                                     ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:499:33
+    |
+499 |                 channel: pages::OnboardingChannel::Missing,
+    |                                 ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:613:20
+    |
+613 |             pages::OnboardingChannel::Created {
+    |                    ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:622:20
+    |
+622 |             pages::OnboardingChannel::Missing
+    |                    ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:634:20
+    |
+634 |             pages::OnboardingChannel::Missing
+    |                    ^^^^^^^^^^^^^^^^^ could not find `OnboardingChannel` in `pages`
+
+error[E0433]: cannot find type `WorkflowActor` in this scope
+   --> src/adapters/http/routes/onboarding.rs:581:22
+    |
+581 |         let caller = WorkflowActor::authenticated(owner).unwrap();
+    |                      ^^^^^^^^^^^^^ use of undeclared type `WorkflowActor`
+    |
+help: consider importing this struct through its public re-export
+    |
+338 +     use crate::application::workflow::WorkflowActor;
+    |
+
+error[E0433]: cannot find type `CompanyId` in this scope
+   --> src/adapters/http/routes/onboarding.rs:585:17
+    |
+585 |                 CompanyId::new(company),
+    |                 ^^^^^^^^^ use of undeclared type `CompanyId`
+    |
+help: a struct with a similar name exists
+    |
+585 -                 CompanyId::new(company),
+585 +                 Company::new(company),
+    |
+help: consider importing this struct through its public re-export
+    |
+338 +     use crate::application::workflow::CompanyId;
+    |
+
+error[E0433]: cannot find type `WorkflowActor` in this scope
+   --> src/adapters/http/routes/onboarding.rs:629:17
+    |
+629 |                 WorkflowActor::authenticated(outsider).unwrap(),
+    |                 ^^^^^^^^^^^^^ use of undeclared type `WorkflowActor`
+    |
+help: consider importing this struct through its public re-export
+    |
+338 +     use crate::application::workflow::WorkflowActor;
+    |
+
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs:32:100
+   |
+32 | ...ersistence::company_agent::default_desk_key(f.created.agent.id))
+   |                               ^^^^^^^^^^^^^^^^ not found in `crate::adapters::persistence::company_agent`
+
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:49:100
+   |
+49 |         .bind(f.people.role.company().as_uuid()).bind(crate::adapters::persistence::company_agent::default_desk_key(agent))
+   |                                                                                                    ^^^^^^^^^^^^^^^^ not found in `crate::adapters::persistence::company_agent`
+
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:16:56
+   |
+16 |     .bind(crate::adapters::persistence::company_agent::default_desk_key(f.created.agent.id))
+   |                                                        ^^^^^^^^^^^^^^^^ not found in `crate::adapters::persistence::company_agent`
+
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:75:100
+   |
+75 | ...ersistence::company_agent::default_desk_key(f.created.agent.id))
+   |                               ^^^^^^^^^^^^^^^^ not found in `crate::adapters::persistence::company_agent`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs:66:87
+   |
+66 |     request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+   |                                                                                       ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:148:21
+    |
+148 |     .bind(f.created.desk_id)
+    |                     ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:155:29
+    |
+155 |             .bind(f.created.desk_id)
+    |                             ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:206:73
+    |
+206 |         target: crate::entities::address::AddressTarget::Desk(f.created.desk_id),
+    |                                                                         ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:589:59
+    |
+589 |     let desk = ChannelPersistence::get_by_id(p, f.created.desk_id)
+    |                                                           ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:653:83
+    |
+653 |             .bind(company).bind(ordinary).bind(delivery.as_uuid()).bind(f.created.desk_id)
+    |                                                                                   ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs:101:74
+    |
+101 |         ChannelGateKey::new(f.people.role.company().as_uuid(), f.created.desk_id),
+    |                                                                          ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:44:87
+   |
+44 |     request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+   |                                                                                       ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:75:51
+   |
+75 |     let channel = RelatedChannelId::new(f.created.desk_id);
+   |                                                   ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:44:62
+   |
+44 |     let channel = ChannelPersistence::get_by_id(p, f.created.desk_id)
+   |                                                              ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:82:91
+   |
+82 |         request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+   |                                                                                           ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:127:65
+    |
+127 |         .bind(f.people.role.company().as_uuid()).bind(f.created.desk_id).fetch_one(f.people.role.p().pool()).await.unwrap();
+    |                                                                 ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:131:29
+    |
+131 |             .bind(f.created.desk_id)
+    |                             ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0046]: not all trait items implemented, missing: `authenticate_internal_relay`
+   --> src/application/services/inbound_event_worker_tests.rs:344:1
+    |
+344 |   impl InboundMessageCommitter for RefusingCommitter {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `authenticate_internal_relay` in implementation
+    |
+   ::: src/application/transport/ports.rs:44:5
+    |
+ 44 | /     async fn authenticate_internal_relay(
+ 45 | |         &self,
+ 46 | |         mail: &InternalRelayMail<'_>,
+ 47 | |     ) -> AppResult<Option<AuthenticatedRelaySource>>;
+    | |_____________________________________________________- `authenticate_internal_relay` from trait
+
+error[E0046]: not all trait items implemented, missing: `authenticate_internal_relay`
+    --> src/application/use_cases/thread/test_support.rs:1505:1
+     |
+1505 |   impl InboundMessageCommitter for InMemoryIngress {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `authenticate_internal_relay` in implementation
+     |
+    ::: src/application/transport/ports.rs:44:5
+     |
+  44 | /     async fn authenticate_internal_relay(
+  45 | |         &self,
+  46 | |         mail: &InternalRelayMail<'_>,
+  47 | |     ) -> AppResult<Option<AuthenticatedRelaySource>>;
+     | |_____________________________________________________- `authenticate_internal_relay` from trait
+
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/pages/desk_wording_tests.rs:176:13
+    |
+176 |             channel: OnboardingChannel::Missing,
+    |             ^^^^^^^ `adapters::http::pages::onboarding::OnboardedAgent<'_>` does not have this field
+    |
+    = note: available fields are: `address`
+
+error[E0433]: cannot find type `OnboardingChannel` in this scope
+   --> src/adapters/http/pages/desk_wording_tests.rs:176:22
+    |
+176 |             channel: OnboardingChannel::Missing,
+    |                      ^^^^^^^^^^^^^^^^^ use of undeclared type `OnboardingChannel`
+
+error[E0560]: struct `application::agent::authoring_reads::AgentDirectoryEntry` has no field named `desk`
+   --> src/adapters/http/pages/department_ui_tests.rs:590:9
+    |
+590 |         desk: Some(AgentDesk {
+    |         ^^^^ `application::agent::authoring_reads::AgentDirectoryEntry` does not have this field
+    |
+    = note: available fields are: `address`
+
+error[E0560]: struct `application::agent::authoring_reads::AgentDirectoryEntry` has no field named `desk`
+   --> src/adapters/http/pages/department_ui_tests.rs:630:9
+    |
+630 |         desk: None,
+    |         ^^^^ `application::agent::authoring_reads::AgentDirectoryEntry` does not have this field
+    |
+    = note: available fields are: `id`, `key`, `name`, `active_revision`, `address`
+
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:470:21
+    |
+470 |                     channel: pages::OnboardingChannel::Created {
+    |                     ^^^^^^^ `adapters::http::pages::onboarding::OnboardedAgent<'_>` does not have this field
+    |
+    = note: available fields are: `address`
+
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:477:21
+    |
+477 |                     channel: pages::OnboardingChannel::Missing,
+    |                     ^^^^^^^ `adapters::http::pages::onboarding::OnboardedAgent<'_>` does not have this field
+    |
+    = note: available fields are: `address`
+
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:499:17
+    |
+499 |                 channel: pages::OnboardingChannel::Missing,
+    |                 ^^^^^^^ `adapters::http::pages::onboarding::OnboardedAgent<'_>` does not have this field
+    |
+    = note: available fields are: `address`
+
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:608:20
+    |
+608 |         let read = stored_onboarding_channel(&channels, company, caller, &created.agent)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/http/routes/onboarding.rs:614:37
+    |
+614 |                 channel_id: created.desk_id,
+    |                                     ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:619:13
+    |
+619 |             stored_onboarding_channel(&channels, company, caller, &bare)
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:626:13
+    |
+626 |             stored_onboarding_channel(
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:155:30
+    |
+155 |         desk_row(&f, created.desk_id).await,
+    |                              ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:174:56
+    |
+174 |     assert_eq!(command["channel"]["id"], json!(created.desk_id.to_string()));
+    |                                                        ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:185:41
+    |
+185 |     assert_eq!(binding_channel, created.desk_id);
+    |                                         ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:366:34
+    |
+366 |     assert_eq!(desk_row(&f, copy.desk_id).await.0, "copied");
+    |                                  ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:449:37
+    |
+449 |     assert_eq!(desk_row(&f, created.desk_id).await.3, None);
+    |                                     ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/department_agent_desks_tests.rs:484:37
+    |
+484 |     assert_eq!(desk_row(&f, created.desk_id).await.0, "helper");
+    |                                     ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk` on type `&application::workflow::agent::department::RosterAgent`
+   --> src/adapters/persistence/department_roster_tests.rs:121:62
+    |
+121 |         .map(|agent| (agent.slug.as_str(), agent.lead, agent.desk.clone()))
+    |                                                              ^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `lead`, `address`
+
+error[E0609]: no field `desk` on type `&application::workflow::agent::department::RosterAgent`
+   --> src/adapters/persistence/department_roster_tests.rs:213:52
+    |
+213 |     assert!(roster.agents.iter().all(|agent| agent.desk.is_none()));
+    |                                                    ^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `lead`, `address`
+
+error[E0609]: no field `channel` on type `&application::use_cases::onboarding::OnboardedAgent`
+   --> src/adapters/persistence/onboarding/tests.rs:237:48
+    |
+237 |         .map(|result| (result.agent.id, result.channel.clone()))
+    |                                                ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `channel` on type `application::use_cases::onboarding::OnboardedAgent`
+   --> src/adapters/persistence/onboarding/tests.rs:331:44
+    |
+331 |     let channel = Uuid::parse_str(first[0].channel["channel"]["id"].as_str().unwrap()).unwrap();
+    |                                            ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk` on type `&application::agent::authoring_reads::AgentDirectoryEntry`
+   --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:317:16
+    |
+317 |         closer.desk,
+    |                ^^^^ unknown field
+    |
+    = note: available fields are: `id`, `key`, `name`, `active_revision`, `departments`, `address`
+
+error[E0609]: no field `desk` on type `application::agent::authoring_reads::AgentDirectoryEntry`
+   --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:329:22
+    |
+329 |     assert_eq!(entry.desk, closer.desk);
+    |                      ^^^^ unknown field
+    |
+    = note: available fields are: `id`, `key`, `name`, `active_revision`, `departments`, `address`
+
+error[E0609]: no field `desk` on type `&application::agent::authoring_reads::AgentDirectoryEntry`
+   --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:329:35
+    |
+329 |     assert_eq!(entry.desk, closer.desk);
+    |                                   ^^^^ unknown field
+    |
+    = note: available fields are: `id`, `key`, `name`, `active_revision`, `departments`, `address`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_guard_tests.rs:47:51
+   |
+47 |     let channel = RelatedChannelId::new(f.created.desk_id);
+   |                                                   ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:454:64
+    |
+454 |         .bind(company).bind(delivery.as_uuid()).bind(f.created.desk_id).bind(f.people.role.channel)
+    |                                                                ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+    --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:1132:21
+     |
+1132 |     .bind(f.created.desk_id)
+     |                     ^^^^^^^ unknown field
+     |
+     = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:173:89
+    |
+173 |                 address_target: crate::entities::address::AddressTarget::Desk(f.created.desk_id),
+    |                                                                                         ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:187:81
+    |
+187 |                 target: crate::entities::address::AddressTarget::Desk(f.created.desk_id),
+    |                                                                                 ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:307:87
+    |
+307 |     request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+    |                                                                                       ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_lock_tests.rs:50:23
+   |
+50 |             f.created.desk_id,
+   |                       ^^^^^^^ unknown field
+   |
+   = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_tests.rs:232:35
+    |
+232 |     assert_eq!(channel, f.created.desk_id);
+    |                                   ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_tests.rs:254:87
+    |
+254 |     ).bind(f.people.role.company().as_uuid()).bind(f.created.agent.id).bind(f.created.desk_id)
+    |                                                                                       ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0560]: struct `application::use_cases::agent::CreatedAgent` has no field named `desk_id`
+   --> src/application/use_cases/agent_tests.rs:151:13
+    |
+151 |             desk_id: Uuid::new_v4(),
+    |             ^^^^^^^ `application::use_cases::agent::CreatedAgent` does not have this field
+    |
+    = note: available fields are: `principal_id`
+
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/application/use_cases/agent_tests.rs:263:22
+    |
+263 |     assert!(!created.desk_id.is_nil());
+    |                      ^^^^^^^ unknown field
+    |
+    = note: available fields are: `agent`, `principal_id`
+
+error[E0599]: no variant named `InternalChannel` found for enum `ingest::policy::IngressOrigin`
+   --> src/application/use_cases/thread/ingest/policy.rs:432:37
+    |
+121 | pub enum IngressOrigin {
+    | ---------------------- variant `InternalChannel` not found here
+...
+432 |         let origin = IngressOrigin::InternalChannel {
+    |                                     ^^^^^^^^^^^^^^^ variant not found in `ingest::policy::IngressOrigin`
+
+error[E0599]: no variant named `InternalChannel` found for enum `ingest::policy::IngressOrigin`
+   --> src/application/use_cases/thread/ingest/policy.rs:473:37
+    |
+121 | pub enum IngressOrigin {
+    | ---------------------- variant `InternalChannel` not found here
+...
+473 |         let origin = IngressOrigin::InternalChannel {
+    |                                     ^^^^^^^^^^^^^^^ variant not found in `ingest::policy::IngressOrigin`
+
+error[E0599]: no variant named `InternalChannel` found for enum `ingest::policy::IngressOrigin`
+    --> src/application/use_cases/thread/tests.rs:2288:24
+     |
+2288 |         IngressOrigin::InternalChannel {
+     |                        ^^^^^^^^^^^^^^^ variant not found in `ingest::policy::IngressOrigin`
+     |
+    ::: src/application/use_cases/thread/ingest/policy.rs:121:1
+     |
+ 121 | pub enum IngressOrigin {
+     | ---------------------- variant `InternalChannel` not found here
+
+error[E0599]: no variant named `InternalChannel` found for enum `ingest::policy::IngressOrigin`
+    --> src/application/use_cases/thread/tests.rs:2306:24
+     |
+2306 |         IngressOrigin::InternalChannel {
+     |                        ^^^^^^^^^^^^^^^ variant not found in `ingest::policy::IngressOrigin`
+     |
+    ::: src/application/use_cases/thread/ingest/policy.rs:121:1
+     |
+ 121 | pub enum IngressOrigin {
+     | ---------------------- variant `InternalChannel` not found here
+
+error[E0599]: no variant named `InternalChannel` found for enum `ingest::policy::IngressOrigin`
+    --> src/application/use_cases/thread/tests.rs:3471:28
+     |
+3471 |             IngressOrigin::InternalChannel {
+     |                            ^^^^^^^^^^^^^^^ variant not found in `ingest::policy::IngressOrigin`
+     |
+    ::: src/application/use_cases/thread/ingest/policy.rs:121:1
+     |
+ 121 | pub enum IngressOrigin {
+     | ---------------------- variant `InternalChannel` not found here
+
+error[E0609]: no field `reply_mode` on type `application::workflow::provisioning::CreateAgent`
+   --> src/application/workflow/provisioning_tests.rs:142:23
+    |
+142 |     assert_eq!(parsed.reply_mode, ReplyMode::Autonomous);
+    |                       ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `description`, `system_prompt`, `provider` ... and 5 others
+
+error[E0609]: no field `channel_slug` on type `application::workflow::provisioning::CreateAgent`
+   --> src/application/workflow/provisioning_tests.rs:143:23
+    |
+143 |     assert_eq!(parsed.channel_slug, None);
+    |                       ^^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `description`, `system_prompt`, `provider` ... and 5 others
+
+error[E0609]: no field `steps` on type `application::workflow::provisioning::CreateAgent`
+   --> src/application/workflow/provisioning_tests.rs:177:23
+    |
+177 |     assert_eq!(parsed.steps[0].id, "topic");
+    |                       ^^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `description`, `system_prompt`, `provider` ... and 5 others
+
+error[E0609]: no field `steps` on type `application::workflow::provisioning::CreateAgent`
+   --> src/application/workflow/provisioning_tests.rs:178:23
+    |
+178 |     assert_eq!(parsed.steps[0].definition["type"], "ai.classify");
+    |                       ^^^^^ unknown field
+    |
+    = note: available fields are: `name`, `slug`, `description`, `system_prompt`, `provider` ... and 5 others
+
+error[E0560]: struct `application::workflow::agent::department::RosterAgent` has no field named `desk`
+  --> src/application/workflow/publication/../agent_department_tests.rs:39:21
+   |
+39 |                     desk: desk(3, "closer"),
+   |                     ^^^^ `application::workflow::agent::department::RosterAgent` does not have this field
+   |
+   = note: available fields are: `address`
+
+error[E0560]: struct `application::workflow::agent::department::RosterAgent` has no field named `desk`
+  --> src/application/workflow/publication/../agent_department_tests.rs:45:21
+   |
+45 |                     desk: desk(4, "scout"),
+   |                     ^^^^ `application::workflow::agent::department::RosterAgent` does not have this field
+   |
+   = note: available fields are: `address`
+
+error[E0004]: non-exhaustive patterns: `domain::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent` not covered
+  --> src/application/workflow/exactness_tests.rs:24:15
+   |
+24 |         match tool {
+   |               ^^^^ pattern `domain::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent` not covered
+   |
+note: `domain::entities::agent_capability::AgentBuiltinTool` defined here
+  --> src/domain/entities/agent_capability.rs:77:10
+   |
+77 | pub enum AgentBuiltinTool {
+   |          ^^^^^^^^^^^^^^^^
+...
+82 |     CreateDeskForAgent,
+   |     ------------------ not covered
+   = note: the matched value is of type `domain::entities::agent_capability::AgentBuiltinTool`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+35 ~             | AgentBuiltinTool::RespondToEscalation => (),
+36 ~             domain::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent => todo!(),
+   |
+
+Some errors have detailed explanations: E0004, E0046, E0425, E0432, E0433, E0560, E0599, E0609.
+For more information about an error, try `rustc --explain E0004`.
+error: could not compile `open_bots` (lib test) due to 78 previous errors

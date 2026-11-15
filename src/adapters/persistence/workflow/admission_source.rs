@@ -27,6 +27,7 @@ pub(super) async fn authorize(
 #[derive(sqlx::FromRow)]
 struct RerunOriginal {
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     workflow_id: Uuid,
     parent_run_id: Option<Uuid>,
@@ -40,7 +41,7 @@ async fn rerun(tx: &mut Transaction<'_, Postgres>, command: &PreparedAdmission) 
         return Ok(());
     };
     let original = sqlx::query_as::<_, RerunOriginal>(
-        "SELECT channel_id, thread_id, workflow_id, parent_run_id FROM workflow_runs \
+        "SELECT channel_id, principal_id, thread_id, workflow_id, parent_run_id FROM workflow_runs \
          WHERE company_id = $1 AND id = $2 FOR SHARE",
     )
     .bind(command.company_id().as_uuid())
@@ -48,8 +49,11 @@ async fn rerun(tx: &mut Transaction<'_, Postgres>, command: &PreparedAdmission) 
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
-    let association =
-        binding_rows::association_from_columns(original.channel_id, original.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: original.channel_id,
+        principal_id: original.principal_id,
+        thread_id: original.thread_id,
+    })?;
     association::authorize_association(tx, command.company_id(), command.actor(), association)
         .await?;
     if original.parent_run_id.is_some() {
@@ -70,28 +74,67 @@ async fn message(
     command: &PreparedAdmission,
     message: Uuid,
 ) -> AppResult<()> {
-    let RelatedAssociation::Thread {
-        channel_id,
-        thread_id,
-    } = command.association()
-    else {
+    let RelatedAssociation::Thread { target, thread_id } = command.association() else {
         return Err(missing());
     };
-    sqlx::query_scalar::<_, Uuid>(
-        "SELECT message.id FROM messages AS message JOIN thread_messages AS membership \
+    let author = sqlx::query_scalar::<_, Uuid>(
+        "SELECT message.author_principal_id FROM messages AS message JOIN thread_messages AS membership \
            ON membership.company_id = message.company_id AND membership.message_id = message.id \
          WHERE message.company_id = $1 AND message.id = $2 \
-           AND membership.channel_id = $3 AND membership.thread_id = $4 \
+           AND membership.channel_id IS NOT DISTINCT FROM $3::uuid AND membership.thread_id = $4 \
+           AND membership.principal_id IS NOT DISTINCT FROM $5::uuid \
          FOR SHARE OF message, membership",
     )
     .bind(command.company_id().as_uuid())
     .bind(message)
-    .bind(channel_id.as_uuid())
+    .bind(target.desk_id())
     .bind(thread_id.as_uuid())
+    .bind(target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut **tx)
     .await?
     .ok_or_else(missing)?;
+    if let AddressTarget::Principal(principal) = target {
+        // Association authorization holds the target SHARE gate and company serialization.
+        // The original source stays on its exact target after address/policy edits.
+        let ordinary: bool =
+            sqlx::query_scalar("SELECT principal_direct_can_participate($1,$2,$3)")
+                .bind(command.company_id().as_uuid())
+                .bind(principal.as_uuid())
+                .bind(author)
+                .fetch_one(&mut **tx)
+                .await?;
+        if !ordinary && !notice_participation(tx, command, principal).await? {
+            return Err(missing());
+        }
+    }
     Ok(())
+}
+
+async fn notice_participation(
+    tx: &mut Transaction<'_, Postgres>,
+    command: &PreparedAdmission,
+    principal: crate::entities::transport::PrincipalId,
+) -> AppResult<bool> {
+    let Some(AdmissionClaim::Message(claim)) = command.admission_claim() else {
+        return Ok(false);
+    };
+    if claim.company != command.company_id()
+        || claim.intent != command.trigger().trigger_id().as_uuid()
+    {
+        return Ok(false);
+    }
+    Ok(
+        sqlx::query_scalar("SELECT workflow_escalation_notice_admission($1,$2,$3,$4,$5,$6,$7)")
+            .bind(command.company_id().as_uuid())
+            .bind(claim.intent)
+            .bind(principal.as_uuid())
+            .bind(command.binding().id().as_uuid())
+            .bind(i64::try_from(command.binding().revision().get()).map_err(|_| missing())?)
+            .bind(claim.worker.0)
+            .bind(claim.generation)
+            .fetch_one(&mut **tx)
+            .await?,
+    )
 }
 
 async fn schedule(

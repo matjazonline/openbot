@@ -68,7 +68,8 @@ pub fn agent_action_target(
                 crate::entities::agent_capability::AgentBuiltinTool::MessageSend
                 | crate::entities::agent_capability::AgentBuiltinTool::MessageReply => "messaging",
                 crate::entities::agent_capability::AgentBuiltinTool::ListCompanyAgents
-                | crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel => {
+                | crate::entities::agent_capability::AgentBuiltinTool::CreateAgent
+                | crate::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent => {
                     "provisioning"
                 }
                 crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge => "knowledge",

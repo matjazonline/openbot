@@ -105,7 +105,7 @@ async fn pending(f: &ManualHistory, input: Value) -> ActivationRequest {
         actor: f.actor,
         binding_id: f.binding,
         association: RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(f.f.s.channel),
+            target: crate::entities::address::AddressTarget::Desk(f.f.s.channel),
             thread_id: RelatedThreadId::new(f.f.s.thread),
         },
         trigger: TriggerRef::new(

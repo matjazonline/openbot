@@ -1,0 +1,82 @@
+#[tokio::test]
+async fn relay_identity_native_forged_workflow_agent_author_rolls_back_publication() {
+    use crate::use_cases::agent::{AgentPersistence, AgentWrite};
+    let f = FinalFixture::new("data.map", false).await;
+    f.advance().await;
+    let live = claim(&f).await;
+    let plan = plan(&f, live).await;
+    let pretender = AgentPersistence::create(
+        &f.p,
+        f.scope.company.as_uuid(),
+        AgentWrite {
+            name: "Unrelated native agent".into(),
+            slug: "unrelated-native-agent".into(),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    let principal: Uuid =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2")
+            .bind(f.scope.company.as_uuid())
+            .bind(pretender.id)
+            .fetch_one(f.p.pool())
+            .await
+            .unwrap();
+    let before = publication_effects(&f).await;
+    // Corrupt the actual writer's row, bypassing its application check so the deferred native
+    // producer guard must independently reject an agent impersonating this pure workflow.
+    sqlx::raw_sql(&format!(
+        "CREATE FUNCTION forge_workflow_sender() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN \
+         IF NEW.direction='outbound' THEN NEW.author_principal_id='{principal}'::uuid; \
+         NEW.authored_identity_id=NULL; NEW.role='agent'; END IF; RETURN NEW; END $$; \
+         CREATE TRIGGER forge_workflow_sender BEFORE INSERT ON messages FOR EACH ROW \
+         EXECUTE FUNCTION forge_workflow_sender();"
+    ))
+    .execute(f.p.pool())
+    .await
+    .unwrap();
+    let error = f.p.commit_reply_publication(live, &plan).await.unwrap_err();
+    let AppError::Database(error) = error else {
+        panic!("wrong publication refusal: {error}");
+    };
+    assert!(
+        error.ends_with("workflow message must retain its authenticated sending principal"),
+        "must reach workflow_message_author_guard rather than an unrelated constraint: {error}"
+    );
+    assert_eq!(publication_effects(&f).await, before);
+    assert_eq!(f.state().await["decision"], "claimed");
+    sqlx::raw_sql(
+        "DROP TRIGGER forge_workflow_sender ON messages; DROP FUNCTION forge_workflow_sender();",
+    )
+    .execute(f.p.pool())
+    .await
+    .unwrap();
+    assert!(matches!(
+        f.p.commit_reply_publication(live, &plan).await.unwrap(),
+        ReplyPublicationOutcome::Published(_)
+    ));
+}
+
+async fn publication_effects(f: &FinalFixture) -> Value {
+    let mut result = serde_json::Map::new();
+    for table in [
+        "messages",
+        "thread_messages",
+        "external_messages",
+        "message_deliveries",
+        "message_delivery_parts",
+        "workflow_message_destinations",
+        "workflow_message_producer_seals",
+    ] {
+        let count: i64 =
+            sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE company_id=$1"))
+                .bind(f.scope.company.as_uuid())
+                .fetch_one(f.p.pool())
+                .await
+                .unwrap();
+        result.insert(table.into(), count.into());
+    }
+    result.into()
+}
+

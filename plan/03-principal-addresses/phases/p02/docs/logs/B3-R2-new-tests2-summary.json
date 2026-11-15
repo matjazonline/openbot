@@ -1,0 +1,15 @@
+{
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda",
+    "direct_reply_real_ingress_pure_completion",
+    "direct_delivery_private_readers",
+    "--test-threads=4"
+  ],
+  "fixture": "pa02_codex_b3_gate3_20261115 plus OwnDatabase, R2 build2",
+  "exit": 0,
+  "seconds": 1.83,
+  "summary": [
+    "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4587 filtered out; finished in 1.79s"
+  ],
+  "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-new-tests2.txt"
+}

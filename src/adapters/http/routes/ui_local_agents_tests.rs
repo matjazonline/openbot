@@ -86,7 +86,11 @@ async fn readable_conversation(f: &Fixture) -> crate::domain::entities::thread::
     let id = Uuid::new_v4();
     sqlx::query("INSERT INTO threads(id,company_id,channel_id,subject) VALUES($1,$2,$3,'Paging conversation')")
         .bind(id).bind(f.company).bind(channel.id).execute(&f.database.pool).await.unwrap();
-    f.persistence.get_thread_by_id(id).await.unwrap().unwrap()
+    f.persistence
+        .get_thread_by_id(f.company, id)
+        .await
+        .unwrap()
+        .unwrap()
 }
 
 #[tokio::test]
@@ -98,7 +102,7 @@ async fn cloudroom_management_ui_later_profile_page_and_selection_keep_authorize
     let (target,name):(Uuid,String)=sqlx::query_as("SELECT id,name FROM local_agent_profiles WHERE company_id=$1 AND id<>$2 ORDER BY id DESC LIMIT 1")
         .bind(f.company).bind(profile.id.as_uuid()).fetch_one(&f.database.pool).await.unwrap();
     let thread = readable_conversation(&f).await;
-    let (channel, conversation) = (thread.channel_id, thread.id);
+    let (channel, conversation) = (thread.target.desk_id().unwrap(), thread.id);
     let (app, authority) = app(&f);
     let cookie = cookie(&f, &authority, f.owner).await;
     let base = format!("/ui/companies/{}/local-agents", f.company);

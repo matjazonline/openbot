@@ -1,0 +1,167 @@
+{
+ "version": 1,
+ "round": "03PA-P01-B1-R2",
+ "artifact": "dc9329df080197b948e37372460f55476974a800811cb217182826193400ca23",
+ "checks": [
+  {
+   "criteria": [
+    "B1-R1/F2(a,b,c,d,e)",
+    "B1-R1/F3",
+    "D1.6"
+   ],
+   "command": "open_bots lib (corr1) address_ department_lead_desk use_cases::thread sendgrid smtp relay ui_profile -- 192 PASS, 1 FAIL (new department-desk test: its fixture people had no addresses; fixed in corr2)",
+   "fixture": "fresh openbot_pa_p01_b1c; own_database for the competing tests",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/continue-run-corr1.txt",
+     "sha256": "6772fc638ba7a51ba740fd9dbddf879be9a041dfba0e505774285fda4e4bfe39"
+    },
+    {
+     "path": "logs/continue-build-corr1.txt",
+     "sha256": "ce58b5e8c5f1dc2d116f1fa16c62d76db6d57e6e03c05be29247c32499be8d9b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "B1-R1/F2(c)"
+   ],
+   "command": "open_bots lib (corr2) address_ department_lead_desk -- 88 PASS",
+   "fixture": "openbot_pa_p01_b1c",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-corr2.txt",
+     "sha256": "2abb6ee6471c54d42edcb663f2010e2d2b5b143e686db7f2df6306a077ad6a9f"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "B1-R1/F2",
+    "B1-R1/F3",
+    "D1.6"
+   ],
+   "command": "open_bots lib (corr3) address_ department_lead_desk use_cases::thread sendgrid smtp relay ui_profile -- 193 PASS, 3 ignored; after boxing AddressedSlug::Desk",
+   "fixture": "openbot_pa_p01_b1c; own_database for the competing tests",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-corr3.txt",
+     "sha256": "aaccab609ee842c199498d6157aee221900d7864d127d9978994bb5531481ed1"
+    },
+    {
+     "path": "logs/continue-build-corr3.txt",
+     "sha256": "ccddac122a49411ba629f3dd636942dd76be93de17e22ee7ff047f215667f4f9"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "gates"
+   ],
+   "command": "diagnostic clippy (5 pre-plan02 lint names allowed): FAIL on large_enum_variant (AddressedSlug) and needless_borrow (new test)",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/B1-clippy3-diagnostic.txt",
+     "sha256": "0c20cc8e6dd1e92810e7e80e9298ea08c360a76ae6dcb739d63431024b34013a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "gates"
+   ],
+   "command": "the same diagnostic clippy after Box and the borrow fix",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-clippy4-diagnostic.txt",
+     "sha256": "ea567137e6677420eb9d6f2e4fbaeac3777824edbd4459c22c20b5a526ca6ffd"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "gates",
+    "B1-R1/F1"
+   ],
+   "command": "cargo fmt --check, git diff HEAD --check, transport boundary scripts with rg on PATH, CI extra boundary scripts",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-boundaries4.txt",
+     "sha256": "e320ff0d20f7480d4f2da41881113c336131918216ef5c714fefa209567e7174"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "gates"
+   ],
+   "command": "tests/source_modules.rs -- 8 PASS",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-source-modules2.txt",
+     "sha256": "29d2d762314bba1da878d8513c6c003a4d2490b9550f0f965b57006db39de7a0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "gates"
+   ],
+   "command": "test names before (4493) and after (4517): 24 added, 0 removed",
+   "fixture": "cargo test --all-targets -- --list",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-tests-before.txt",
+     "sha256": "4346eab20a050cc477f0e3c23f219e99ea5b83e8473bbb8a40cc08fb3e66291c"
+    },
+    {
+     "path": "logs/B1-tests-after2.txt",
+     "sha256": "e01684715e087ee03fa86c38e5213ce5a89094a8683f4e02f0f5585e624490b8"
+    },
+    {
+     "path": "logs/B1-tests-delta2.txt",
+     "sha256": "fc6927ed2a5a8bb1f8bb93559d2ee457cf1555f64abb56262b4836f684194392"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "B1-R1/F1"
+   ],
+   "command": "address form progress feedback (hx-disabled-elt plus spinner/Saving... spans, the identity form's pattern)",
+   "fixture": "static markup",
+   "status": "NOT EXERCISED",
+   "reason": "markup-only, mirroring the existing profile forms; pages AGENTS keeps class and markup assertions out of tests; the reviewer verifies by inspection"
+  },
+  {
+   "criteria": [
+    "gates"
+   ],
+   "command": "fresh migrate and SQLx prepare (B1-R1, unchanged since: no SQL change in the correction)",
+   "fixture": "openbot_pa_p01_sqlx",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-migrations1.txt",
+     "sha256": "f9cb56963f302bca679bab7d6034e76987ee29194b8a87d09f85023e87d3ad09"
+    },
+    {
+     "path": "logs/B1-sqlx-prepare1.txt",
+     "sha256": "31a8c5943425acfa32806adff0042ff0e78ae5b39cd17c68f1d39f69ee8ad9cd"
+    }
+   ]
+  }
+ ]
+}

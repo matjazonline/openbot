@@ -1,0 +1,33 @@
+
+$ cargo fmt --all -- --check
+
+$ git diff HEAD --check
+
+$ bash scripts/tests/transport-boundary.sh
+runtime boundary gate regression tests passed
+
+$ bash scripts/transport-boundary-check.sh
+transport boundary check passed
+
+$ python3 scripts/tests/workflow-sample-boundary.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.056s
+
+OK
+
+$ python3 scripts/workflow-sample-boundary.py
+workflow sample capability boundary passed
+
+$ python3 scripts/tests/integration-boundary.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.038s
+
+OK
+
+$ python3 scripts/integration-boundary.py
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS
+
+$ python3 scripts/check-integration-docs.py
+integration docs: 3 link sets, 164 startup reset notices, configuration and CI inventory PASS

@@ -23,7 +23,7 @@ pub(super) async fn two_channel_request(fixture: &Fixture, rfc: &str) -> Inbound
     let mut request = request(fixture, rfc, "Please answer from both teams").await;
     let mut associations = request.associations.into_inner();
     associations.push(ThreadAssociation {
-        channel_id: second_channel,
+        address_target: crate::entities::address::AddressTarget::Desk(second_channel),
         binding_id: second_binding,
         target: ThreadTarget::Create {
             subject: "Quick question".into(),
@@ -67,7 +67,7 @@ async fn each_association_gets_one_intent_and_redelivery_adds_none() {
         assert_eq!(
             stored,
             StoredIntent {
-                channel_id: request.intents[index].channel_id,
+                channel_id: request.intents[index].target.desk_id().unwrap(),
                 thread_id: first.thread_ids[index],
                 role: if index == 0 { "to" } else { "cc" }.to_owned(),
             }
@@ -99,17 +99,17 @@ async fn an_intent_records_disposition_policy_origin_and_relay_trace() {
     };
     let rfc = format!("<facts-{}@example.com>", fixture.suffix);
     let mut request = request(&fixture, &rfc, "Filed only").await;
-    let traced = Uuid::new_v4();
+    let traced = crate::entities::address::AddressTarget::Desk(Uuid::new_v4());
     request.envelope.directives.hop_count = 2;
-    request.envelope.directives.trace_channels =
+    request.envelope.directives.trace_targets =
         BoundedVec::parse("trace channels", vec![traced]).unwrap();
     request.envelope.directives.disposition = MessageDisposition::FileOnly;
     request.admissible = false;
     request.origin = InboundOrigin::Application;
     request.reply_delivery = ReplyDelivery::InAppOnly;
     let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
-    let stored: (bool, String, String, i32, Vec<Uuid>) = sqlx::query_as(
-        "SELECT admissible, origin, delivery_policy, hop_count, trace_channels \
+    let stored: (bool, String, String, i32, serde_json::Value) = sqlx::query_as(
+        "SELECT admissible, origin, delivery_policy, hop_count, trace_targets \
          FROM workflow_message_intents WHERE company_id = $1 AND id = $2",
     )
     .bind(fixture.company_id)
@@ -124,7 +124,7 @@ async fn an_intent_records_disposition_policy_origin_and_relay_trace() {
             "application".to_string(),
             "in_app_only".to_string(),
             2,
-            vec![traced]
+            serde_json::json!([traced])
         )
     );
     assert_eq!(
@@ -153,9 +153,9 @@ async fn intent_rows_cannot_reach_across_tenants() {
     // The association of this company's message, claimed by another company.
     let cross = sqlx::query(
         "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, thread_id, \
-           role, mentioned, admissible, origin, hop_count, trace_channels, delivery_policy, \
+           role, mentioned, admissible, origin, hop_count, trace_targets, delivery_policy, \
            correlation_id) \
-         VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'external', 0, '{}', 'deliver', $2)",
+         VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'external', 0, '[]', 'deliver', $2)",
     )
     .bind(foreign)
     .bind(Uuid::new_v4())

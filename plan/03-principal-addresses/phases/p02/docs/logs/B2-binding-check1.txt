@@ -1,0 +1,431 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0407]: method `active_bindings_for_channel` is not a member of trait `ChannelBindingPersistence`
+  --> src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs:19:5
+   |
+19 |       async fn active_bindings_for_channel(
+   |       ^        --------------------------- help: there is an associated function with a similar name: `active_bindings_for_target`
+   |  _____|
+   | |
+20 | |         &self,
+21 | |         _: Uuid,
+22 | |         _: Uuid,
+...  |
+26 | |         std::future::pending().await
+27 | |     }
+   | |_____^ not a member of trait `ChannelBindingPersistence`
+
+error[E0407]: method `active_bindings_for_channel` is not a member of trait `ChannelBindingPersistence`
+   --> src/application/use_cases/integration.rs:293:9
+    |
+293 |           async fn active_bindings_for_channel(
+    |           ^        --------------------------- help: there is an associated function with a similar name: `active_bindings_for_target`
+    |  _________|
+    | |
+294 | |             &self,
+295 | |             _: Uuid,
+296 | |             _: Uuid,
+297 | |         ) -> AppResult<Vec<ChannelBinding>> {
+298 | |             Ok(Vec::new())
+299 | |         }
+    | |_________^ not a member of trait `ChannelBindingPersistence`
+
+error[E0407]: method `active_bindings_for_channel` is not a member of trait `ChannelBindingPersistence`
+    --> src/application/use_cases/thread/test_support.rs:1379:5
+     |
+1379 |       async fn active_bindings_for_channel(
+     |       ^        --------------------------- help: there is an associated function with a similar name: `active_bindings_for_target`
+     |  _____|
+     | |
+1380 | |         &self,
+1381 | |         _company_id: Uuid,
+1382 | |         channel_id: Uuid,
+1383 | |     ) -> AppResult<Vec<ChannelBinding>> {
+1384 | |         Ok(vec![Self::binding_of(channel_id)])
+1385 | |     }
+     | |_____^ not a member of trait `ChannelBindingPersistence`
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `std::sync::Arc<(dyn application::ports::integration::ChannelBindingPersistence + 'static)>` in the current scope
+   --> src/application/use_cases/thread/ingest/routing.rs:289:14
+    |
+288 | /         self.binding_persistence
+289 | |             .active_bindings_for_channel(company.id, channel.id)
+    | |_____________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+289 -             .active_bindings_for_channel(company.id, channel.id)
+289 +             .active_bindings_for_target(company.id, channel.id)
+    |
+
+warning: method call on a diverging inference variable
+   --> src/application/use_cases/thread/ingest/routing.rs:291:14
+    |
+291 |             .iter()
+    |              ^^^^
+    |
+    = help: consider providing a type annotation
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #156047 <https://github.com/rust-lang/rust/issues/156047>
+    = note: `#[warn(method_call_on_diverging_infer_var)]` (part of `#[warn(future_incompatible)]`) on by default
+
+error[E0599]: no method named `iter` found for type `_` in the current scope
+   --> src/application/use_cases/thread/ingest/routing.rs:291:14
+    |
+288 | /         self.binding_persistence
+289 | |             .active_bindings_for_channel(company.id, channel.id)
+290 | |             .await?
+291 | |             .iter()
+    | |_____________-^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `Flags` which provides `iter` is implemented but not in scope; perhaps you want to import it
+    |
+  8 + use bitflags::traits::Flags;
+    |
+help: there is a method `lm_iter` with a similar name
+    |
+291 |             .lm_iter()
+    |              +++
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `std::sync::Arc<(dyn application::ports::integration::ChannelBindingPersistence + 'static)>` in the current scope
+   --> src/application/transport/compose.rs:239:14
+    |
+238 | /         self.bindings
+239 | |             .active_bindings_for_channel(request.company_id, request.channel_id)
+    | |_____________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+239 -             .active_bindings_for_channel(request.company_id, request.channel_id)
+239 +             .active_bindings_for_target(request.company_id, request.channel_id)
+    |
+
+warning: method call on a diverging inference variable
+   --> src/application/transport/compose.rs:241:14
+    |
+241 |             .into_iter()
+    |              ^^^^^^^^^
+    |
+    = help: consider providing a type annotation
+    = warning: this was previously accepted by the compiler but is being phased out; it will become a hard error in a future release!
+    = note: for more information, see issue #156047 <https://github.com/rust-lang/rust/issues/156047>
+
+error[E0277]: `!` is not an iterator
+   --> src/application/transport/compose.rs:241:14
+    |
+241 |             .into_iter()
+    |              ^^^^^^^^^ `!` is not an iterator
+    |
+    = help: the trait `Iterator` is not implemented for `!`
+    = note: required for `!` to implement `IntoIterator`
+
+error[E0599]: no method named `find` found for type `!` in the current scope
+   --> src/application/transport/compose.rs:242:14
+    |
+238 | /         self.bindings
+239 | |             .active_bindings_for_channel(request.company_id, request.channel_id)
+240 | |             .await?
+241 | |             .into_iter()
+242 | |             .find(|binding| binding.transport == transport)
+    | |             -^^^^ method not found in `!`
+    | |_____________|
+    |
+
+warning: unreachable expression
+   --> src/application/transport/compose.rs:242:19
+    |
+238 | /         self.bindings
+239 | |             .active_bindings_for_channel(request.company_id, request.channel_id)
+240 | |             .await?
+241 | |             .into_iter()
+    | |________________________- any code following this expression is unreachable
+242 |               .find(|binding| binding.transport == transport)
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ unreachable expression
+    |
+    = note: `#[warn(unreachable_code)]` (part of `#[warn(unused)]`) on by default
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `std::sync::Arc<(dyn application::ports::integration::ChannelBindingPersistence + 'static)>` in the current scope
+   --> src/application/use_cases/integration.rs:170:14
+    |
+169 | /         self.bindings
+170 | |             .active_bindings_for_channel(company_id, channel_id)
+    | |_____________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+170 -             .active_bindings_for_channel(company_id, channel_id)
+170 +             .active_bindings_for_target(company_id, channel_id)
+    |
+
+error[E0782]: expected a type, found a trait
+   --> src/adapters/persistence/test_support.rs:408:19
+    |
+408 |     let binding = ChannelBindingPersistence::active_bindings_for_channel(
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: you can add the `dyn` keyword if you want a trait object
+    |
+408 |     let binding = <dyn ChannelBindingPersistence>::active_bindings_for_channel(
+    |                   ++++                          +
+help: you may have misspelled this associated item, causing `ChannelBindingPersistence` to be interpreted as a type rather than a trait
+    |
+408 -     let binding = ChannelBindingPersistence::active_bindings_for_channel(
+408 +     let binding = ChannelBindingPersistence::active_bindings_for_target(
+    |
+
+error[E0046]: not all trait items implemented, missing: `active_bindings_for_target`
+   --> src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs:18:1
+    |
+ 18 |   impl ChannelBindingPersistence for GatedBindings {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `active_bindings_for_target` in implementation
+    |
+   ::: src/application/ports/integration.rs:123:5
+    |
+123 | /     async fn active_bindings_for_target(
+124 | |         &self,
+125 | |         company_id: Uuid,
+126 | |         target: AddressTarget,
+127 | |     ) -> AppResult<Vec<ChannelBinding>>;
+    | |________________________________________- `active_bindings_for_target` from trait
+
+error[E0046]: not all trait items implemented, missing: `active_bindings_for_target`
+   --> src/application/use_cases/integration.rs:269:5
+    |
+269 |       impl ChannelBindingPersistence for StubIntegrations {
+    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `active_bindings_for_target` in implementation
+    |
+   ::: src/application/ports/integration.rs:123:5
+    |
+123 | /     async fn active_bindings_for_target(
+124 | |         &self,
+125 | |         company_id: Uuid,
+126 | |         target: AddressTarget,
+127 | |     ) -> AppResult<Vec<ChannelBinding>>;
+    | |________________________________________- `active_bindings_for_target` from trait
+
+error[E0046]: not all trait items implemented, missing: `active_bindings_for_target`
+    --> src/application/use_cases/thread/test_support.rs:1372:1
+     |
+1372 |   impl ChannelBindingPersistence for InMemoryIngress {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `active_bindings_for_target` in implementation
+     |
+    ::: src/application/ports/integration.rs:123:5
+     |
+ 123 | /     async fn active_bindings_for_target(
+ 124 | |         &self,
+ 125 | |         company_id: Uuid,
+ 126 | |         target: AddressTarget,
+ 127 | |     ) -> AppResult<Vec<ChannelBinding>>;
+     | |________________________________________- `active_bindings_for_target` from trait
+
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+warning: `open_bots` (lib) generated 3 warnings
+error: could not compile `open_bots` (lib) due to 6 previous errors; 5 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+error[E0560]: struct `application::ports::integration::BindingWrite` has no field named `channel_id`
+   --> src/adapters/persistence/integration/tests.rs:115:9
+    |
+115 |         channel_id,
+    |         ^^^^^^^^^^ `application::ports::integration::BindingWrite` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0609]: no field `channel_id` on type `domain::entities::transport::integration::ChannelBinding`
+   --> src/adapters/persistence/integration/tests.rs:307:25
+    |
+307 |     assert_eq!(relinked.channel_id, second_channel.id);
+    |                         ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `installation_id`, `transport` ... and 11 others
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:425:10
+    |
+424 |       let active = persistence
+    |  __________________-
+425 | |         .active_bindings_for_channel(acme.id, support.id)
+    | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+425 -         .active_bindings_for_channel(acme.id, support.id)
+425 +         .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:513:14
+    |
+512 | /         persistence
+513 | |             .active_bindings_for_channel(acme.id, support.id)
+    | |_____________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+513 -             .active_bindings_for_channel(acme.id, support.id)
+513 +             .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `std::sync::Arc<persistence::PostgresPersistence>` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:753:10
+    |
+752 |       let bindings = persistence
+    |  ____________________-
+753 | |         .active_bindings_for_channel(acme.id, support.id)
+    | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+753 -         .active_bindings_for_channel(acme.id, support.id)
+753 +         .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:830:10
+    |
+829 |       let before = persistence
+    |  __________________-
+830 | |         .active_bindings_for_channel(acme.id, support.id)
+    | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+830 -         .active_bindings_for_channel(acme.id, support.id)
+830 +         .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:851:10
+    |
+850 |       let after = persistence
+    |  _________________-
+851 | |         .active_bindings_for_channel(acme.id, support.id)
+    | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+851 -         .active_bindings_for_channel(acme.id, support.id)
+851 +         .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/integration/tests.rs:892:10
+    |
+891 |       let binding = persistence
+    |  ___________________-
+892 | |         .active_bindings_for_channel(acme.id, support.id)
+    | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/adapters/persistence/mod.rs:52:1
+    |
+ 52 |   pub struct PostgresPersistence {
+    |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+    |
+help: there is a method `active_bindings_for_target` with a similar name
+    |
+892 -         .active_bindings_for_channel(acme.id, support.id)
+892 +         .active_bindings_for_target(acme.id, support.id)
+    |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+    --> src/adapters/persistence/integration/tests.rs:1046:10
+     |
+1045 |       let before = persistence
+     |  __________________-
+1046 | |         .active_bindings_for_channel(acme.id, support.id)
+     | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+    ::: src/adapters/persistence/mod.rs:52:1
+     |
+  52 |   pub struct PostgresPersistence {
+     |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+     |
+help: there is a method `active_bindings_for_target` with a similar name
+     |
+1046 -         .active_bindings_for_channel(acme.id, support.id)
+1046 +         .active_bindings_for_target(acme.id, support.id)
+     |
+
+error[E0599]: no method named `active_bindings_for_channel` found for struct `persistence::PostgresPersistence` in the current scope
+    --> src/adapters/persistence/integration/tests.rs:1068:10
+     |
+1067 |       let after = persistence
+     |  _________________-
+1068 | |         .active_bindings_for_channel(acme.id, support.id)
+     | |_________-^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+    ::: src/adapters/persistence/mod.rs:52:1
+     |
+  52 |   pub struct PostgresPersistence {
+     |   ------------------------------ method `active_bindings_for_channel` not found for this struct
+     |
+help: there is a method `active_bindings_for_target` with a similar name
+     |
+1068 -         .active_bindings_for_channel(acme.id, support.id)
+1068 +         .active_bindings_for_target(acme.id, support.id)
+     |
+
+error[E0560]: struct `domain::entities::transport::integration::ChannelBinding` has no field named `channel_id`
+  --> src/application/transport/tests.rs:44:9
+   |
+44 |         channel_id: Uuid::new_v4(),
+   |         ^^^^^^^^^^ `domain::entities::transport::integration::ChannelBinding` does not have this field
+   |
+   = note: available fields are: `target`
+
+error[E0560]: struct `domain::entities::transport::integration::ChannelBinding` has no field named `channel_id`
+   --> src/application/use_cases/integration.rs:274:17
+    |
+274 |                 channel_id: write.channel_id,
+    |                 ^^^^^^^^^^ `domain::entities::transport::integration::ChannelBinding` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0609]: no field `channel_id` on type `application::ports::integration::BindingWrite`
+   --> src/application/use_cases/integration.rs:274:35
+    |
+274 |                 channel_id: write.channel_id,
+    |                                   ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `company_id`, `target`, `installation_id`, `transport`, `namespace` ... and 6 others
+
+error[E0560]: struct `application::ports::integration::BindingWrite` has no field named `channel_id`
+   --> src/application/use_cases/integration.rs:417:13
+    |
+417 |             channel_id: Uuid::new_v4(),
+    |             ^^^^^^^^^^ `application::ports::integration::BindingWrite` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0560]: struct `domain::entities::transport::integration::ChannelBinding` has no field named `channel_id`
+    --> src/application/use_cases/thread/test_support.rs:1352:13
+     |
+1352 |             channel_id,
+     |             ^^^^^^^^^^ `domain::entities::transport::integration::ChannelBinding` does not have this field
+     |
+     = note: available fields are: `target`
+
+Some errors have detailed explanations: E0046, E0277, E0407, E0560, E0599, E0609, E0782.
+For more information about an error, try `rustc --explain E0046`.
+warning: `open_bots` (lib test) generated 3 warnings (3 duplicates)
+error: could not compile `open_bots` (lib test) due to 28 previous errors; 5 warnings emitted

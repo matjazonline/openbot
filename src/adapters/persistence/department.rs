@@ -426,6 +426,7 @@ async fn write_placement_on(
         .await?;
     }
     let Some(role) = role else {
+        super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
         return sync_department_grants_on(tx, company, &[department]).await;
     };
     if role.is_single_holder() {
@@ -451,6 +452,7 @@ async fn write_placement_on(
     .bind(principal.as_uuid())
     .execute(&mut **tx)
     .await?;
+    super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
     // The reach contains the department itself, so one sync covers the membership too.
     let reach = role_reach_on(tx, company, department).await?;
     sync_department_grants_on(tx, company, &reach).await
@@ -484,6 +486,7 @@ pub(crate) async fn clear_department_role_on(
             "That principal does not hold the {role} role in this department."
         )));
     }
+    super::workflow::role_binding::check_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let reach = role_reach_on(tx, company, department).await?;
     sync_department_grants_on(tx, company, &reach).await?;
     follow_lead_on(tx, templates, company, actor, department, role, None).await?;
@@ -525,6 +528,7 @@ pub(crate) async fn remove_department_member_on(
             "That principal is not a member of this department.".into(),
         ));
     }
+    super::workflow::role_binding::check_principals_on(tx, company, &[principal.as_uuid()]).await?;
     sync_department_grants_on(tx, company, &[department]).await?;
     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
@@ -919,7 +923,7 @@ impl DepartmentPersistence for PostgresDepartments {
             "SELECT desk.id, desk.name, desk_slug.slug::text, \
                     desk_record.command_key IS NOT NULL AS own \
              FROM channels AS desk \
-             JOIN channel_slugs AS desk_slug ON desk_slug.company_id = desk.company_id \
+             JOIN addresses AS desk_slug ON desk_slug.company_id = desk.company_id \
               AND desk_slug.channel_id = desk.id AND desk_slug.is_primary \
              LEFT JOIN workflow_provisioning_commands AS desk_record \
                ON desk_record.company_id = desk.company_id AND desk_record.command_key = $3 \

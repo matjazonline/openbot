@@ -67,11 +67,12 @@ async fn cancellation_reader_failures(store: &MemoryStore, company_id: CompanyId
                     .channels
                     .values()
                     .next()
-                    .unwrap()
-                    .id,
+                    .unwrap(),
             );
             let association = RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(thread.channel_id),
+                target: crate::entities::address::AddressTarget::Desk(
+                    thread.target.desk_id().unwrap(),
+                ),
                 thread_id: RelatedThreadId::new(thread.id),
             };
             store

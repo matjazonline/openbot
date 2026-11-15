@@ -1,0 +1,34 @@
+agent_active_revisions | FOREIGN KEY (company_id, agent_id, revision_id) REFERENCES agent_revisions(company_id, agent_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_history_exchanges | FOREIGN KEY (company_id, agent_id, revision_id) REFERENCES agent_revisions(company_id, agent_id, id)
+agent_manifest_revisions | FOREIGN KEY (company_id, agent_id, revision_id) REFERENCES agent_revisions(company_id, agent_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_publication_requests | FOREIGN KEY (company_id, agent_id, expected_active_revision) REFERENCES agent_revisions(company_id, agent_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_publication_requests | FOREIGN KEY (company_id, agent_id, result_revision) REFERENCES agent_revisions(company_id, agent_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_revision_bindings | FOREIGN KEY (company_id, agent_id, revision_id) REFERENCES agent_revisions(company_id, agent_id, id) ON DELETE CASCADE
+agent_revision_skills | FOREIGN KEY (company_id, agent_id, revision_id) REFERENCES agent_revisions(company_id, agent_id, id) ON DELETE CASCADE
+workflow_run_role_bindings | FOREIGN KEY (company_id, agent_id, agent_revision_id) REFERENCES agent_revisions(company_id, agent_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_active_revisions | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE
+agent_capability_bindings | FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+agent_capability_bindings | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_draft_bindings | FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+agent_draft_bindings | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_history_conversations | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id)
+agent_publication_requests | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_revisions | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+agent_skill_assignments | FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+agent_skill_assignments | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_skills | FOREIGN KEY (agent_id) REFERENCES agents(id) ON DELETE CASCADE
+memory_agent_capture | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE
+model_usage_calls | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+model_usage_history | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+principals | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id)
+task_harness_runs | FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_definitions | FOREIGN KEY (company_id, owner_agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE
+workflow_definition_events | FOREIGN KEY (company_id, workflow_id) REFERENCES workflow_definitions(company_id, id) ON DELETE CASCADE
+workflow_versions | FOREIGN KEY (company_id, workflow_id) REFERENCES workflow_definitions(company_id, id) ON DELETE CASCADE
+agent_capability_bindings | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_manifest_workflows | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id) DEFERRABLE INITIALLY DEFERRED
+model_usage_history | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_binding_revisions | FOREIGN KEY (company_id, version_id) REFERENCES workflow_versions(company_id, id)
+workflow_definition_events | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id)
+workflow_runs | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id)
+workflow_tool_registrations | FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id)

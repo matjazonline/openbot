@@ -1,0 +1,36 @@
+
+running 18 tests
+test adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department ... ok
+2026-11-15T07:46:48.457585Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b7a44939-43ff-4886-a9a4-5133b5c8fb59)
+2026-11-15T07:46:48.496001Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b7a44939-43ff-4886-a9a4-5133b5c8fb59)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... ok
+2026-11-15T07:46:49.923715Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T07:46:49.931025Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(f21e823d-76d5-43e2-a913-68b73f4406d3)
+2026-11-15T07:46:49.976572Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(5d679e5b-e10f-45dd-8415-a8b12d9516cf)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_association_codec_preserves_every_scope_and_refuses_invalid_null_shapes ... ok
+2026-11-15T07:46:50.761110Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T07:46:50.781038Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(33f9424f-744f-498b-8665-a8d72f80b28c)
+2026-11-15T07:46:50.834223Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(32cacf7f-8a87-485d-85c2-df53d6705a22)
+observed gated transaction pids=[4395] blocker=4412 elapsed_ms=585
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins ... ok
+observed gated transaction pids=[4509] blocker=4520 elapsed_ms=597
+2026-11-15T07:46:54.580852Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=0bd353d1-3143-45da-bb7a-365c6b7b5c87 binding_id=b2d9cc6c-d5e5-4ea5-8ee0-e303eeef44c5 intent_id=95f16136-8057-425f-98c9-00571dbe8c7e reason="unavailable"
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_competing_activation_and_roster_write_preserve_unambiguous_context ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+observed gated transaction pids=[4599] blocker=4613 elapsed_ms=643
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_role_activation_and_roster_mutations_require_exactly_one_department ... ok
+observed gated transaction pids=[4684] blocker=4697 elapsed_ms=560
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 4570 filtered out; finished in 22.26s
+

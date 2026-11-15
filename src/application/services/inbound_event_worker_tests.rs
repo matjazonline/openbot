@@ -342,6 +342,15 @@ struct RefusingCommitter;
 
 #[async_trait]
 impl InboundMessageCommitter for RefusingCommitter {
+    async fn authenticate_internal_relay(
+        &self,
+        _mail: &crate::transport::InternalRelayMail<'_>,
+    ) -> AppResult<Option<crate::transport::AuthenticatedRelaySource>> {
+        Err(AppError::Internal(
+            "no relay authentication is expected here".into(),
+        ))
+    }
+
     async fn commit_inbound(
         &self,
         _request: InboundCommitRequest,

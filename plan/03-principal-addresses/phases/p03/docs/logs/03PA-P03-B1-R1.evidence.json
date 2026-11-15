@@ -1,0 +1,246 @@
+{
+  "version": 1,
+  "round": "03PA-P03-B1-R1",
+  "artifact": "63dc835d92424c643cafcea862aa1afd127e3d121f3f5c9e2de2a14c9a48f866",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda agent_address_ agent_direct_address_ relay_identity_ workflow_escalation_agent_ workflow_escalation_origin_ public_desk_private_agent_ provisioning_dispatch_tests direct_company_lifecycle --nocapture",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-production-command.json",
+          "sha256": "4892dd115ee192710f7931b078252c0a985f85cbd83d3118b131968125e78cb2"
+        },
+        {
+          "path": "logs/B1-R1-production-tests.txt",
+          "sha256": "0940c9d8dc0c767fa695b07c617a342e4ea4f604ffd8989424078e3410a3fa0e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "python3 plan/03-principal-addresses/phases/p03/docs/logs/B1-resume-rerun-failures.py 2",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-original76-correction-tests2.txt",
+          "sha256": "d39c733c676a22e440a2e5f8cb35433a0f811b2fc875527a4af9ad7503fad245"
+        },
+        {
+          "path": "logs/B1-original76-correction-results2.json",
+          "sha256": "6773c8d924b30a19837fde8c86f6be692827104c3b38f294de2d5e5472468d52"
+        },
+        {
+          "path": "logs/B1-current-lib-tests9.txt",
+          "sha256": "531a8a29d94596a33f76f6c7ca01e4a843464a9a0d510f1776025fefb5c4d343"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC3",
+        "AC5",
+        "AC6"
+      ],
+      "command": "current lib test runner; exact 78 selected rename/ingress/notice/default-reply tests recorded in log",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-rename-and-ingress-tests1.txt",
+          "sha256": "5797711e91496c2ca2318c7225b56d14bcb61d0b91083fa0a435c4da7c2013a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "lib runner --list; compare accepted4589 to current4604 and require every removed name has collected replacement",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-test-removal-map.json",
+          "sha256": "98edacef298e486a6b6495dfc39885d80f81a90bd547914057ce39d5bb9d2b4b"
+        },
+        {
+          "path": "logs/B1-before-lib-tests.txt",
+          "sha256": "1f2bc6a98617afd53d752f343e83ca7e3d53e94bc3bc0d98215c0401de2bd341"
+        },
+        {
+          "path": "logs/B1-current-lib-tests9.txt",
+          "sha256": "531a8a29d94596a33f76f6c7ca01e4a843464a9a0d510f1776025fefb5c4d343"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-final-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-final-offline-all-targets.txt",
+          "sha256": "5ecd9986b462fbf5175c95bcfe187ac5f35552e90ed7d6704fc41613b05a9656"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-final-transport-boundary.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-final-transport-fixtures.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-resume-sqlx-prepare3.txt",
+          "sha256": "1a157c8a1503ea038f5f345abc74266167df2ab2b2b49529f1d98658ae6a1e0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-resume-source-modules1.txt",
+          "sha256": "0f9e962c665b7b83fabf62a1d305d32a8eb9e384680c46eb9845811427e3fa03"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "cargo sqlx migrate run on fresh disposable database; compare initSHA384 to migrated database and native company ownership/15 deferred pins",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-resume-migrate1.txt",
+          "sha256": "60df1deda2d5e78329010536f5b361e45d4e8811aacabcb6f83fea58519093d8"
+        },
+        {
+          "path": "logs/B1-resume-schema-proof1.json",
+          "sha256": "1a015936f1da74ca04ec4ceefe98f98e2b02281a73063e6a4aa6997f0073c35b"
+        },
+        {
+          "path": "logs/B1-R1-schema-identity.json",
+          "sha256": "53992024ddab405d0f8611dc90a7d1281b56dbdd23ed8f6b80b231b1cb033562"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6-inherited-lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-resume-clippy2.txt",
+          "sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014"
+        },
+        {
+          "path": "logs/B1-resume-clippy-baseline-disposition1.json",
+          "sha256": "681e46b1cdef0bd9ac2bb58ebdd97930afc19341230c6d77565aa7702c1873d7"
+        }
+      ],
+      "reason": "Seven demonstrated unchanged inherited diagnostics; zero introduced; p04 owns integrated correction/disposition; no full-green claim."
+    },
+    {
+      "criteria": [
+        "AC6-diagnostic-history"
+      ],
+      "command": "earlier affected shared fixture cohort;2 raw rename failures retained and superseded by final78 PASS",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; isolated test-owned databases where required; RUST_MIN_STACK16777216",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-final-affected-fixtures-and-production-tests1.txt",
+          "sha256": "95818b85e6c21440e7f801ddbf9814412a52e2e99b5880ec86a158d0091adc35"
+        }
+      ],
+      "reason": "566PASS/2FAIL/3 inherited ignores; two failed tests explicitly pass in final78 correction log; unchanged pass evidence reused."
+    }
+  ]
+}

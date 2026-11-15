@@ -1,0 +1,13 @@
+{
+  "fixture": "pa03_codex_runtime4_20261115",
+  "schema_sha384": "b52910621e95963847fb9ffa44f6d65c1aa9b597248ec05a3a83935dea8c7e82a6f1a2fa66970d5e6c308b4b9c5d7708",
+  "migration_sha384": "b52910621e95963847fb9ffa44f6d65c1aa9b597248ec05a3a83935dea8c7e82a6f1a2fa66970d5e6c308b4b9c5d7708",
+  "match": true,
+  "shape": {
+    "receipt_fk": "FOREIGN KEY (company_id, intent_id, message_id, principal_id) REFERENCES workflow_message_intents(company_id, id, message_id, principal_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED",
+    "notice_guard": true,
+    "route_result": "TABLE(agent_id uuid, principal_id uuid, binding_id uuid, binding_revision bigint, run_as_user_id uuid, settings_revision bigint, transport_binding_id uuid, address_slug text)",
+    "admission_predicate": true
+  },
+  "claims": "Schema identity and native object inspection only; no runtime notice behavior asserted."
+}

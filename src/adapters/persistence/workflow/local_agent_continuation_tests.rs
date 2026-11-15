@@ -215,7 +215,7 @@ async fn cloudroom_workflow_continuation_refuses_withdrawn_original_private_acce
         .is_ok()
     );
     let association = RelatedAssociation::Thread {
-        channel_id: crate::application::workflow::RelatedChannelId::new(channel),
+        target: crate::entities::address::AddressTarget::Desk(channel),
         thread_id: crate::application::workflow::RelatedThreadId::new(thread),
     };
     let scope = s

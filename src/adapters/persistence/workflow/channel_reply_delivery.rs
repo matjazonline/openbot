@@ -14,7 +14,8 @@ struct FinalDeliveryLink {
     proposal_id: Uuid,
     #[sqlx(try_from = "String")]
     integrity: ReplyIntegrity,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     source_binding_id: Uuid,
     destination_binding_id: Uuid,
 }
@@ -25,7 +26,7 @@ pub(super) async fn admission_on(
 ) -> AppResult<Option<WorkflowDeliveryAdmission>> {
     let link: Option<FinalDeliveryLink> = sqlx::query_as(
         "SELECT final_reply.company_id,final_reply.run_id,final_reply.proposal_id,final_reply.integrity, \
-        delivery.channel_id,delivery.source_binding_id,delivery.destination_binding_id \
+        delivery.channel_id,delivery.principal_id,delivery.source_binding_id,delivery.destination_binding_id \
         FROM message_deliveries AS delivery JOIN channel_reply_decisions AS final_reply \
             ON final_reply.company_id=delivery.company_id AND final_reply.message_id=delivery.message_id \
         WHERE delivery.id=$1 AND final_reply.state='published'",
@@ -63,7 +64,12 @@ pub(super) async fn admission_on(
     if matches!(&authorized, FinalAuthority::Allowed(_)) {
         let binding = channel_reply_binding_authority::BindingScope {
             company: link.company_id,
-            channel: link.channel_id,
+            target: AddressTarget::from_parts(
+                link.channel_id,
+                link.principal_id
+                    .map(crate::entities::transport::PrincipalId::new),
+            )
+            .ok_or_else(invalid)?,
             binding: link.source_binding_id,
             transport: crate::entities::transport::TransportKind::Email,
         };

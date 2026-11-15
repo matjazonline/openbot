@@ -53,7 +53,7 @@ async fn child_question(s: &Intents) -> ChildQuestion {
         &s.fixture,
         target,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(s.channel),
+            target: crate::entities::address::AddressTarget::Desk(s.channel),
             thread_id: RelatedThreadId::new(s.thread),
         },
         "parent-question",

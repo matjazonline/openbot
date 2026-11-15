@@ -59,32 +59,38 @@ pub struct RunBoardScope {
     pub department: Option<crate::entities::department::DepartmentId>,
 }
 
-/// Top-level runs of one state on one channel (`None`: runs without a channel) inside the board's
+/// Top-level runs of one state in one inbox (`None`: company scope) inside the board's
 /// working set — every open run, and runs finished at or after the window's cutoff.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BoardCount {
     pub state: RunStateName,
-    pub channel: Option<Uuid>,
+    pub target: Option<crate::entities::address::AddressTarget>,
     pub runs: u64,
 }
 
-/// The channels whose runs the viewer may see, and whether runs without a channel are among them.
+/// The exact inboxes whose runs the viewer may see, plus separate company scope.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct VisibleChannels {
+pub struct VisibleInboxes {
     pub channels: Vec<Uuid>,
+    pub principals: Vec<crate::entities::transport::PrincipalId>,
     pub company: bool,
 }
 
-impl VisibleChannels {
-    pub fn includes(&self, channel: Option<Uuid>) -> bool {
-        match channel {
-            Some(channel) => self.channels.contains(&channel),
+impl VisibleInboxes {
+    pub fn includes(&self, target: Option<crate::entities::address::AddressTarget>) -> bool {
+        match target {
+            Some(crate::entities::address::AddressTarget::Desk(channel)) => {
+                self.channels.contains(&channel)
+            }
+            Some(crate::entities::address::AddressTarget::Principal(principal)) => {
+                self.principals.contains(&principal)
+            }
             None => self.company,
         }
     }
 
     pub fn is_empty(&self) -> bool {
-        self.channels.is_empty() && !self.company
+        self.channels.is_empty() && self.principals.is_empty() && !self.company
     }
 }
 
@@ -108,7 +114,7 @@ pub struct RunBoardColumn {
 /// it counted; the total then follows the cards, and the next wake-up reconciles.
 pub fn assemble_columns(
     counts: &[BoardCount],
-    visible: &VisibleChannels,
+    visible: &VisibleInboxes,
     cards: Vec<RunSummary>,
 ) -> AppResult<Vec<RunBoardColumn>> {
     let mut by_state: HashMap<RunStateName, Vec<RunSummary>> = HashMap::new();
@@ -119,7 +125,9 @@ pub fn assemble_columns(
                 card.state
             ))
         })?;
-        by_state.entry(state).or_default().push(card);
+        if visible.includes(card.association.target()) {
+            by_state.entry(state).or_default().push(card);
+        }
     }
     Ok(RunStateName::ALL
         .into_iter()
@@ -128,7 +136,7 @@ pub fn assemble_columns(
             let read = cards.len();
             let counted: u64 = counts
                 .iter()
-                .filter(|count| count.state == state && visible.includes(count.channel))
+                .filter(|count| count.state == state && visible.includes(count.target))
                 .map(|count| count.runs)
                 .sum();
             cards.truncate(BOARD_COLUMN_CAP);

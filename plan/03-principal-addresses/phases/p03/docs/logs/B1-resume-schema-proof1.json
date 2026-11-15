@@ -1,0 +1,21 @@
+{
+  "schema": "4cd3e100bb1eaee40c3c7e93ec256d07ee4d33cf9bfbee9c96b73127327199232f9470d3470c70fbfe9cc7cec2a7abc5",
+  "deferred_pins": [
+    "agent_history_conversations_target_principal_fk",
+    "agent_history_sessions_target_principal_fk",
+    "background_tasks_target_principal_fk",
+    "channel_reply_contexts_target_principal_fk",
+    "external_threads_target_principal_fk",
+    "internal_notes_target_principal_fk",
+    "message_deliveries_target_principal_fk",
+    "thread_messages_target_principal_fk",
+    "thread_principals_target_principal_fk",
+    "threads_target_principal_fk",
+    "workflow_admission_refusals_target_principal_fk",
+    "workflow_history_members_target_principal_fk",
+    "workflow_message_destinations_target_principal_fk",
+    "workflow_message_intents_target_principal_fk",
+    "workflow_runs_target_principal_fk"
+  ],
+  "thread_company": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+}

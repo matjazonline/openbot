@@ -1,0 +1,17 @@
+adapters::http::routes::ui::stream_tests::direct_tests::assets::direct_thread_ui_exact_message_diagnostics_and_attachment_scope_refuse_other_targets
+adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_compose_reply_and_sidebar_keep_the_exact_person_target
+adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_live_streams_reconcile_then_close_before_revoked_activity
+adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_notes_preserve_target_pin_and_recheck_lifecycle_even_on_replay
+adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_private_reads_and_retirement_do_not_expose_a_target_to_teammates
+adapters::http::routes::ui::stream_tests::direct_tests::direct_thread_ui_selection_requires_exactly_one_typed_target
+adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system
+adapters::persistence::address_tests::direct::ingress::direct_thread_native_message_and_note_wakes_carry_the_principal_target
+adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_competing_mixed_redelivery_emits_only_each_persons_exact_event
+adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_projected_retirement_withdraws_before_open_and_stays_hidden_on_rejoin
+adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_real_self_ingress_worker_list_open_and_read_state
+adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_source_deletion_resolves_without_an_actionable_link
+adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_unprocessed_retirement_and_rejoin_never_revive_an_old_source
+domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference
+domain::entities::notification::tests::a_delivery_failure_emails_only_when_its_preference_is_on
+domain::entities::notification::tests::only_the_delivery_source_and_action_parse
+domain::entities::notification::tests::self_triggered_actions_keep_in_app_but_suppress_email

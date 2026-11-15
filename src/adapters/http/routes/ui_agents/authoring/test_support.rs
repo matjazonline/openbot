@@ -26,6 +26,11 @@ impl Fixture {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(
+            f.persistence.as_ref(),
+            &agent,
+        )
+        .await;
         let workflow =
             crate::infra::workflow::WorkflowEngine::for_tests(f.persistence.as_ref().clone())
                 .services();

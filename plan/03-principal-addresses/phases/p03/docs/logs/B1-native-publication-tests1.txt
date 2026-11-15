@@ -1,0 +1,7 @@
+
+running 2 tests
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4594 filtered out; finished in 0.51s
+

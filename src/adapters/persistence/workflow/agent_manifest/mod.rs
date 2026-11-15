@@ -116,22 +116,11 @@ async fn context_department_on(
     tx: &mut PgConnection,
     command: &PreparedAdmission,
 ) -> AppResult<Option<crate::entities::department::DepartmentId>> {
-    let channel = match command.association() {
-        RelatedAssociation::Company => return Ok(None),
-        RelatedAssociation::Channel(channel)
-        | RelatedAssociation::Thread {
-            channel_id: channel,
-            ..
-        } => channel,
-    };
-    let department: Option<Uuid> =
-        sqlx::query_scalar("SELECT department_id FROM channels WHERE company_id=$1 AND id=$2")
-            .bind(command.company_id().as_uuid())
-            .bind(channel.as_uuid())
-            .fetch_optional(tx)
+    Ok(
+        super::role_binding::context_on(tx, command.company_id(), command.association())
             .await?
-            .ok_or_else(invalid)?;
-    Ok(department.map(crate::entities::department::DepartmentId::new))
+            .ok(),
+    )
 }
 
 impl Closure {

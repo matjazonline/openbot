@@ -17,7 +17,7 @@ transport-neutral desk selector and then to a canonical desk and email binding. 
 Both slug namespaces are constrained by the database:
 
 ```sql
--- channel_slugs_format
+-- addresses_slug_format
 slug::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
 -- companies_slug_format
 slug::text ~ '^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$'

@@ -1,0 +1,19 @@
+{
+  "baseline_commit": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "current_artifact": "9a87596f69ab851a4535b74373879855a8cec26380107a9083621ad2d2d25442",
+  "same_error_headers": true,
+  "error_headers": [
+    "error: this pattern is unneeded as the `..` pattern can match that element",
+    "error: this pattern is unneeded as the `..` pattern can match that element",
+    "error: the `Err`-variant returned from this function is very large",
+    "error: the `Err`-variant returned from this function is very large",
+    "error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`",
+    "error: expression can be simplified using `Option::unwrap_or()`",
+    "error: using `chunks_exact` with a constant chunk size",
+    "error: could not compile `open_bots` (lib) due to 7 previous errors",
+    "error: could not compile `open_bots` (lib test) due to 7 previous errors"
+  ],
+  "baseline_log_sha256": "e7c8d5acd39e33be4ce9e36b4db15b24a40ede96cf0665b86a95faf32786ce7c",
+  "current_log_sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014",
+  "disposition": "Confirmed pre-existing with the same locked offline all-target clippy command in an isolated HEAD checkout; neither run is green."
+}

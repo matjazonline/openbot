@@ -1,14 +1,6 @@
-//! The canonical email interface every business channel gets when it is created.
-//!
-//! Email is a deployment transport, so this binding needs no installation and no linking gesture:
-//! a channel is reachable the moment it has an address. Keeping it as a real binding row -- rather
-//! than as "the absence of a binding means email" -- is what lets the ingress and delivery paths
-//! ask one question, "which interfaces is this channel carrying?", for every transport.
-//!
-//! It lives here rather than in `channel.rs` so that the SQL for `channel_bindings` stays in one
-//! module; `channel.rs` calls [`write_canonical_email_binding`] inside the transaction that
-//! creates or updates the channel, which is what makes the two facts atomic.
-
+//! Canonical email interfaces for desk and principal addresses.
+//! The caller owns the transaction: address, endpoint and audit changes commit together.
+use sqlx::PgConnection;
 use uuid::Uuid;
 
 use super::{BindingDb, encoded_provenance};
@@ -16,136 +8,185 @@ use crate::{
     adapters::protocols::email::EmailEndpointKey,
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         creation::CreationProvenance,
         transport::{
             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingDeliveryPolicy,
-            ChannelBinding,
+            ChannelBinding, EndpointNamespace, PrincipalId,
         },
         value_objects::ChannelSlug,
     },
 };
 
-/// The longest `display_label` the column accepts. A channel name has no length limit of its own,
-/// so it is truncated here rather than turned into a constraint violation half-way through
-/// creating a channel.
 const MAX_DISPLAY_LABEL_BYTES: usize = 255;
 
-/// Everything the canonical email binding of one channel is derived from.
-///
-/// Deliberately no company slug: the endpoint key is namespaced by the company's immutable id, so
-/// renaming a company moves no binding and this writer never has to be told about it.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct CanonicalEmailBinding<'a> {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
-    pub channel_slug: &'a ChannelSlug,
-    pub channel_name: &'a str,
+    pub target: AddressTarget,
+    pub slug: &'a ChannelSlug,
+    pub name: &'a str,
     pub created_by: &'a CreationProvenance,
 }
 
-/// Create, or move, the channel's one canonical email interface.
-///
-/// Called from inside the caller's transaction. A channel being created has no binding yet and
-/// gets one plus its `linked` audit record; a channel whose primary address changed keeps the same
-/// binding and records that the endpoint moved, so the history of an interface survives a rename.
-///
-/// A company rename is not a case here at all -- see [`EmailEndpointKey`].
-///
-/// Concurrency is settled by `channel_bindings_canonical_deployment_idx`, not by the `FOR UPDATE`
-/// below: two creations racing on the *same* channel have no row to lock, and the second one's
-/// insert is rejected by the partial unique index.
+struct CanonicalEndpoint {
+    key: EmailEndpointKey,
+    namespace: EndpointNamespace,
+    label: String,
+}
+
+fn endpoint_of(binding: &CanonicalEmailBinding<'_>) -> AppResult<CanonicalEndpoint> {
+    let key = EmailEndpointKey::canonical(binding.slug).map_err(|error| {
+        AppError::Internal(format!("Address is not a usable endpoint: {error}"))
+    })?;
+    Ok(CanonicalEndpoint {
+        label: display_label(binding.name, key.as_str()),
+        key,
+        namespace: EmailEndpointKey::namespace(binding.company_id),
+    })
+}
+
+/// Keep the same interface across principal retirement and restoration. Desk interfaces retain
+/// their existing live-set uniqueness; a principal has one canonical email interface for life.
 pub(crate) async fn write_canonical_email_binding(
-    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    db: &mut PgConnection,
     binding: CanonicalEmailBinding<'_>,
 ) -> AppResult<()> {
-    let endpoint_key = EmailEndpointKey::canonical(binding.channel_slug).map_err(|error| {
-        AppError::Internal(format!("Channel address is not a usable endpoint: {error}"))
-    })?;
-    let namespace = EmailEndpointKey::namespace(binding.company_id);
-    let display_label = display_label(binding.channel_name, endpoint_key.as_str());
+    let endpoint = endpoint_of(&binding)?;
+    let previous = existing_on(db, binding.company_id, binding.target).await?;
+    let (row, actions) = match previous {
+        None => (
+            insert_on(db, &binding, &endpoint).await?,
+            vec![BindingAuditAction::Linked],
+        ),
+        Some(previous) => update_on(db, &binding, &endpoint, previous).await?,
+    };
+    let row: ChannelBinding = row.try_into()?;
+    for action in actions {
+        super::binding::append_audit_event(db, &row, action, None, binding.created_by).await?;
+    }
+    Ok(())
+}
 
-    let existing: Option<(Uuid, String)> = sqlx::query_as(
-        r#"SELECT binding.id, binding.external_endpoint_key
-           FROM channel_bindings AS binding
-           WHERE binding.company_id = $1
-             AND binding.channel_id = $2
-             AND binding.transport = 'email'
-             AND binding.installation_id IS NULL
-             AND binding.status IN ('active', 'paused')
-           FOR UPDATE"#,
-    )
-    .bind(binding.company_id)
-    .bind(binding.channel_id)
-    .fetch_optional(&mut **transaction)
+async fn existing_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    target: AddressTarget,
+) -> AppResult<Option<BindingDb>> {
+    sqlx::query_as(&format!(
+        "SELECT {} FROM channel_bindings AS binding WHERE binding.company_id = $1 \
+         AND binding.channel_id IS NOT DISTINCT FROM $2 \
+         AND binding.principal_id IS NOT DISTINCT FROM $3 \
+         AND binding.transport = 'email' AND binding.installation_id IS NULL \
+         AND ($3::uuid IS NOT NULL OR binding.status IN ('active', 'paused')) FOR UPDATE",
+        super::BINDING_COLUMNS,
+    ))
+    .bind(company)
+    .bind(target.desk_id())
+    .bind(target.principal_id().map(PrincipalId::as_uuid))
+    .fetch_optional(db)
     .await
-    .map_err(AppError::from)?;
+    .map_err(AppError::from)
+}
 
-    let created_by = encoded_provenance(binding.created_by)?;
+async fn insert_on(
+    db: &mut PgConnection,
+    binding: &CanonicalEmailBinding<'_>,
+    endpoint: &CanonicalEndpoint,
+) -> AppResult<BindingDb> {
     let snapshot = serde_json::to_value(BindingAccessSnapshot::deployment_endpoint())
         .map_err(|error| AppError::Internal(error.to_string()))?;
+    sqlx::query_as(&format!(
+        "INSERT INTO channel_bindings \
+         (id, company_id, channel_id, principal_id, transport, namespace, external_endpoint_key, \
+          display_label, access_policy, delivery_policy, status, created_by, access_snapshot) \
+         VALUES ($1,$2,$3,$4,'email',$5,$6,$7,$8,$9,'active',$10,$11) RETURNING {}",
+        super::BINDING_COLUMNS.replace("binding.", ""),
+    ))
+    .bind(Uuid::new_v4())
+    .bind(binding.company_id)
+    .bind(binding.target.desk_id())
+    .bind(binding.target.principal_id().map(PrincipalId::as_uuid))
+    .bind(endpoint.namespace.as_str())
+    .bind(endpoint.key.as_str())
+    .bind(&endpoint.label)
+    .bind(BindingAccessPolicy::TargetAcl.as_str())
+    .bind(BindingDeliveryPolicy::ReplyAndInitiate.as_str())
+    .bind(encoded_provenance(binding.created_by)?)
+    .bind(snapshot)
+    .fetch_one(db)
+    .await
+    .map_err(address_conflict_error)
+}
 
-    let (row, action) = match existing {
-        None => {
-            let inserted = sqlx::query_as::<_, BindingDb>(&format!(
-                r#"INSERT INTO channel_bindings
-                       (id, company_id, channel_id, transport, namespace, external_endpoint_key,
-                        display_label, access_policy, delivery_policy, status, created_by,
-                        access_snapshot)
-                   VALUES ($1, $2, $3, 'email', $4, $5, $6, $7, $8, 'active', $9, $10)
-                   RETURNING {}"#,
-                super::BINDING_COLUMNS.replace("binding.", "")
-            ))
-            .bind(Uuid::new_v4())
-            .bind(binding.company_id)
-            .bind(binding.channel_id)
-            .bind(namespace.as_str())
-            .bind(endpoint_key.as_str())
-            .bind(&display_label)
-            // The channel's own principal grants decide who may write to it; the address is not a
-            // grant of its own.
-            .bind(BindingAccessPolicy::ChannelAcl.as_str())
-            // Email carries both agent replies and agent-initiated outreach today, which is what
-            // `reply_and_initiate` names.
-            .bind(BindingDeliveryPolicy::ReplyAndInitiate.as_str())
-            .bind(&created_by)
-            .bind(&snapshot)
-            .fetch_one(&mut **transaction)
-            .await
-            .map_err(address_conflict_error)?;
-            (inserted, Some(BindingAuditAction::Linked))
-        }
-        Some((id, previous_key)) => {
-            let moved = previous_key != endpoint_key.as_str();
-            let updated = sqlx::query_as::<_, BindingDb>(&format!(
-                r#"UPDATE channel_bindings AS binding
-                   SET external_endpoint_key = $2,
-                       display_label = $3,
-                       updated_at = CURRENT_TIMESTAMP
-                   WHERE binding.id = $1
-                   RETURNING {}"#,
-                super::BINDING_COLUMNS.replace("binding.", "")
-            ))
-            .bind(id)
-            .bind(endpoint_key.as_str())
-            .bind(&display_label)
-            .fetch_one(&mut **transaction)
-            .await
-            .map_err(address_conflict_error)?;
-            (
-                updated,
-                moved.then_some(BindingAuditAction::EndpointChanged),
-            )
-        }
-    };
+async fn update_on(
+    db: &mut PgConnection,
+    binding: &CanonicalEmailBinding<'_>,
+    endpoint: &CanonicalEndpoint,
+    previous: BindingDb,
+) -> AppResult<(BindingDb, Vec<BindingAuditAction>)> {
+    let restored = matches!(binding.target, AddressTarget::Principal(_))
+        && previous.status == "orphaned"
+        && previous.disabled_reason.as_deref() == Some("principal_retired");
+    let mut actions = Vec::with_capacity(2);
+    if previous.external_endpoint_key != endpoint.key.as_str() {
+        actions.push(BindingAuditAction::EndpointChanged);
+    }
+    if restored {
+        actions.push(BindingAuditAction::Enabled);
+    }
+    let row = sqlx::query_as(&format!(
+        "UPDATE channel_bindings AS binding SET external_endpoint_key=$3, display_label=$4, \
+         status=CASE WHEN $5 THEN 'active' ELSE binding.status END, \
+         disabled_reason=CASE WHEN $5 THEN NULL ELSE binding.disabled_reason END, \
+         updated_at=CURRENT_TIMESTAMP WHERE binding.company_id=$1 AND binding.id=$2 RETURNING {}",
+        super::BINDING_COLUMNS.replace("binding.", ""),
+    ))
+    .bind(binding.company_id)
+    .bind(previous.id)
+    .bind(endpoint.key.as_str())
+    .bind(&endpoint.label)
+    .bind(restored)
+    .fetch_one(db)
+    .await
+    .map_err(address_conflict_error)?;
+    Ok((row, actions))
+}
 
-    // A rename of the channel's display name is cosmetic and leaves no audit record; a change of
-    // the address it answers on is not.
-    let Some(action) = action else {
-        return Ok(());
-    };
-    let binding_row: ChannelBinding = row.try_into()?;
-    super::binding::append_audit_event(transaction, &binding_row, action, None, binding.created_by)
-        .await
+/// Automatic endpoint synchronization, inside the transaction that registered or renamed the
+/// principal's address. The transport records this automatic action with system provenance.
+pub(crate) async fn sync_principal_email_binding_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    principal: PrincipalId,
+) -> AppResult<()> {
+    #[derive(sqlx::FromRow)]
+    struct AddressRow {
+        slug: String,
+        display_label: String,
+    }
+    let address: AddressRow = sqlx::query_as(
+        "SELECT address.slug::text AS slug, principal.display_label \
+         FROM addresses AS address JOIN principals AS principal \
+           ON principal.company_id=address.company_id AND principal.id=address.principal_id \
+         WHERE address.company_id=$1 AND address.principal_id=$2",
+    )
+    .bind(company)
+    .bind(principal.as_uuid())
+    .fetch_one(&mut *db)
+    .await?;
+    let slug = ChannelSlug::from(address.slug);
+    write_canonical_email_binding(
+        db,
+        CanonicalEmailBinding {
+            company_id: company,
+            target: AddressTarget::Principal(principal),
+            slug: &slug,
+            name: &address.display_label,
+            created_by: &CreationProvenance::system(),
+        },
+    )
+    .await
 }
 
 /// A channel's name, bounded to what the column accepts, or its address when the name is unusable.

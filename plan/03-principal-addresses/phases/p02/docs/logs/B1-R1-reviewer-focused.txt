@@ -1,0 +1,89 @@
+
+running 18 tests
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag ... FAILED
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+test domain::entities::participant::direct_tests::direct_thread_person_is_private_to_self_and_owner ... ok
+test domain::entities::participant::direct_tests::direct_thread_public_agent_admits_mail_without_granting_reads ... ok
+test domain::entities::participant::direct_tests::direct_thread_retired_person_keeps_only_owner_history_access ... ok
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused ... FAILED
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once ... FAILED
+test adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse ... FAILED
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement ... FAILED
+test adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets ... FAILED
+test adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... FAILED
+test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... FAILED
+test adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership ... FAILED
+
+failures:
+
+---- adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag stdout ----
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag' (12565630) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy stdout ----
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy' (12565631) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused' (12565640) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once stdout ----
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once' (12565629) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse stdout ----
+
+thread 'adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse' (12565637) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement stdout ----
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement' (12565632) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets stdout ----
+
+thread 'adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets' (12565638) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk stdout ----
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk' (12565633) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint stdout ----
+
+thread 'adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint' (12565635) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+---- adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership stdout ----
+
+thread 'adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership' (12565639) panicked at src/adapters/persistence/test_support.rs:229:18:
+the test database accepts this checkout's migrations: ExecuteMigration(Database(PgDatabaseError { severity: Error, code: "42723", message: "function \"advance_workflow_owned_revision\" already exists with same argument types", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pg_proc.c"), line: Some(404), routine: Some("ProcedureCreate") }), 20260817000000)
+
+
+failures:
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk
+    adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint
+    adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse
+    adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets
+    adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership
+    adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused
+
+test result: FAILED. 8 passed; 10 failed; 0 ignored; 0 measured; 4503 filtered out; finished in 3.54s
+

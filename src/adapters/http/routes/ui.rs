@@ -34,7 +34,6 @@ use crate::app_error::AppError;
 use crate::app_error::AppResult;
 use crate::application::ports::thread::qualified_email_identity;
 use crate::application::thread_activity::ThreadActivityReader;
-use crate::entities::channel::Channel;
 use crate::entities::company::Company;
 use crate::entities::company::CompanyAccess;
 use crate::entities::company_member::CompanyMembership;
@@ -52,12 +51,15 @@ use crate::use_cases::company::CompanyUseCases;
 use crate::use_cases::thread::CanonicalMessageIngress;
 use crate::use_cases::thread::IngressOrigin;
 use crate::use_cases::thread::ReplyDelivery;
-use crate::use_cases::thread::ThreadUseCases;
+use crate::use_cases::thread::{ReadableInbox, ThreadUseCases};
+
+pub(super) mod inbox;
 use crate::use_cases::user::UserUseCases;
+pub(super) use inbox::InboxSelection;
 
 use super::{
     channel::{ThreadListQuery, ThreadListResponse, load_thread_page},
-    live_updates::{Wake, channel_wake_ups, thread_wake_ups},
+    live_updates::{Wake, thread_wake_ups},
 };
 
 #[path = "ui_message.rs"]
@@ -81,20 +83,23 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct MailboxQuery {
     pub company_id: Option<Uuid>,
-    pub channel_id: Option<Uuid>,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub thread_id: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
 }
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct ThreadPageQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub cursor: Option<String>,
     pub limit: Option<usize>,
 }
@@ -102,7 +107,8 @@ pub struct ThreadPageQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ThreadQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub thread_id: Uuid,
 }
 
@@ -110,7 +116,8 @@ pub struct ThreadQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ChannelStreamQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub after: Option<String>,
 }
 
@@ -118,7 +125,8 @@ pub struct ChannelStreamQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ThreadStreamQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub thread_id: Uuid,
     pub after: Option<String>,
 }
@@ -126,7 +134,8 @@ pub struct ThreadStreamQuery {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ComposeForm {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub subject: Option<String>,
     pub text_body: Option<String>,
     /// Present only when the "deliver by email" toggle is on.
@@ -137,7 +146,8 @@ pub struct ComposeForm {
 #[derive(Debug, Clone, Deserialize)]
 pub struct ReplyForm {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: InboxSelection,
     pub thread_id: Uuid,
     pub reply_to_message_id: Option<Uuid>,
     pub text_body: Option<String>,
@@ -196,32 +206,6 @@ pub(super) async fn load_readable_company(
     Ok((companies, selected))
 }
 
-/// A company and one of its channels, for anyone the channel lets in.
-///
-/// Fails closed through [`Channel::viewer_access`]: a channel with its own participant list is not
-/// the company's to read, it is its participants'. The same guard admits the mailbox's Compose and
-/// Reply, because a channel a participant may read is one they may write into -- whether the
-/// message is *accepted* stays [`Channel::participant_access`]'s call on the inbound path, so the
-/// mailbox and real mail are held to one rule rather than two.
-pub(super) async fn load_viewable_channel(
-    company_use_cases: &CompanyUseCases,
-    channel_use_cases: &ChannelUseCases,
-    viewer: &Viewer,
-    company_id: Uuid,
-    channel_id: Uuid,
-) -> AppResult<(Company, Channel)> {
-    let channel = channel_use_cases
-        .get_readable_channel(viewer, company_id, channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
-    let company = company_use_cases
-        .readable_company(viewer.user_id, company_id)
-        .await?
-        .company;
-
-    Ok((company, channel))
-}
-
 fn empty_thread_page() -> ThreadListResponse {
     ThreadListResponse {
         threads: Vec::new(),
@@ -252,10 +236,10 @@ async fn page_activity(
 async fn first_page_thread_ids(
     thread_use_cases: &ThreadUseCases,
     viewer: &Viewer,
-    channel: &Channel,
+    channel: &ReadableInbox,
 ) -> AppResult<HashSet<Uuid>> {
     Ok(thread_use_cases
-        .list_channel_threads(viewer, channel.into(), None, STREAM_BATCH_LIMIT)
+        .list_inbox_threads(viewer, channel.into(), None, STREAM_BATCH_LIMIT)
         .await?
         .into_iter()
         .map(|thread| thread.id)
@@ -266,7 +250,7 @@ pub(super) async fn render_message_pane(
     thread_use_cases: &ThreadUseCases,
     activity_reader: &dyn ThreadActivityReader,
     company_id: Uuid,
-    channel: &Channel,
+    channel: &ReadableInbox,
     thread: &Thread,
     viewer: &Viewer,
     error: Option<&str>,
@@ -284,9 +268,12 @@ pub(super) async fn render_message_pane(
         .principal_access_for_user(company_id, viewer.user_id)
         .await?
         .map_or(CompanyMembership::None, |access| access.membership);
+    thread_use_cases
+        .readable_inbox(viewer, channel.scope())
+        .await?;
     Ok(pages::message_pane(&pages::MessagePane {
         company_id,
-        channel,
+        inbox: channel,
         thread,
         messages: &messages,
         viewer_email: &viewer.email,
@@ -328,12 +315,26 @@ async fn mailbox_page(
     let channels = channel_use_cases
         .list_readable_channels(&viewer, company.id)
         .await?;
-    // Landing on `/ui` with no `channel_id` opens the first channel and, below, its newest thread,
-    // the way the schedules workspace opens its first schedule and newest run.
-    let selected_channel = query
-        .channel_id
-        .and_then(|id| channels.iter().find(|channel| channel.id == id))
-        .or_else(|| channels.first());
+    let mut direct = thread_use_cases.direct_inboxes(&viewer, company.id).await?;
+    let direct_truncated = direct.len() > 200;
+    direct.truncate(200);
+    let mut inboxes: Vec<_> = channels.into_iter().map(ReadableInbox::from).collect();
+    inboxes.extend(direct);
+    let selected = match query.inbox.target()? {
+        Some(target) => Some(
+            thread_use_cases
+                .readable_inbox(
+                    &viewer,
+                    crate::use_cases::thread::InboxReadScope {
+                        company_id: company.id,
+                        target,
+                    },
+                )
+                .await?,
+        ),
+        None => inboxes.first().cloned(),
+    };
+    let selected_channel = selected.as_ref();
 
     let thread_page = match selected_channel {
         Some(channel) => {
@@ -351,7 +352,7 @@ async fn mailbox_page(
     let selected_thread = match (selected_channel, query.thread_id) {
         (Some(channel), Some(thread_id)) => {
             thread_use_cases
-                .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+                .readable_thread(&viewer, channel.company_id(), channel.target(), thread_id)
                 .await?
         }
         (Some(_), None) => thread_page.threads.first().cloned(),
@@ -380,18 +381,29 @@ async fn mailbox_page(
         }
     };
 
+    let activity =
+        page_activity(activity_reader.as_ref(), company.id, &thread_page.threads).await?;
+    if let Some(inbox) = selected_channel {
+        thread_use_cases
+            .readable_inbox(&viewer, inbox.scope())
+            .await?;
+    } else {
+        company_use_cases
+            .readable_company(viewer.user_id, company.id)
+            .await?;
+    }
     Ok(Html(pages::mailbox_page(&pages::MailboxPage {
         user: &mailbox_user,
         company: &company,
         companies: &companies,
         app_domain_name: &config.app_domain_name,
-        channels: &channels,
-        selected_channel,
+        inboxes: &inboxes,
+        selected_inbox: selected_channel,
+        direct_truncated,
         threads: &thread_page.threads,
         next_cursor: thread_page.next_cursor.as_deref(),
         selected_thread_id: selected_thread.as_ref().map(|thread| thread.id),
-        activity: &page_activity(activity_reader.as_ref(), company.id, &thread_page.threads)
-            .await?,
+        activity: &activity,
         detail_html: &detail_html,
     })))
 }
@@ -399,17 +411,16 @@ async fn mailbox_page(
 /// GET /ui/threads - The thread column for a channel, clearing the detail pane (Protected).
 #[instrument(skip_all)]
 async fn thread_column_fragment(
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ChannelQuery>,
 ) -> AppResult<Html<String>> {
-    let channel = channel_use_cases
-        .get_readable_channel(&viewer, query.company_id, query.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+    let channel = thread_use_cases
+        .readable_inbox(&viewer, query.inbox.scope(query.company_id)?)
+        .await?;
 
     let page = load_thread_page(
         &thread_use_cases,
@@ -420,9 +431,12 @@ async fn thread_column_fragment(
     .await?;
 
     let activity = page_activity(activity_reader.as_ref(), query.company_id, &page.threads).await?;
+    thread_use_cases
+        .readable_inbox(&viewer, channel.scope())
+        .await?;
     let column = pages::thread_column(&pages::ThreadColumn {
         company_id: query.company_id,
-        channel: &channel,
+        inbox: &channel,
         app_domain_name: &config.app_domain_name,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
@@ -435,7 +449,7 @@ async fn thread_column_fragment(
     );
     let actions = pages::channel_actions(
         query.company_id,
-        Some(&channel),
+        channel.desk(),
         pages::FragmentSwap::OutOfBand,
     );
 
@@ -445,17 +459,16 @@ async fn thread_column_fragment(
 /// GET /ui/threads/list - One older page of threads, appended to the open column (Protected).
 #[instrument(skip_all)]
 async fn thread_page_fragment(
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ThreadPageQuery>,
 ) -> AppResult<Html<String>> {
-    let channel = channel_use_cases
-        .get_readable_channel(&viewer, query.company_id, query.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+    let channel = thread_use_cases
+        .readable_inbox(&viewer, query.inbox.scope(query.company_id)?)
+        .await?;
 
     let page = load_thread_page(
         &thread_use_cases,
@@ -469,10 +482,13 @@ async fn thread_page_fragment(
     .await?;
 
     let activity = page_activity(activity_reader.as_ref(), query.company_id, &page.threads).await?;
+    thread_use_cases
+        .readable_inbox(&viewer, channel.scope())
+        .await?;
     Ok(Html(pages::thread_list_fragment(
         &pages::ThreadColumn {
             company_id: query.company_id,
-            channel: &channel,
+            inbox: &channel,
             app_domain_name: &config.app_domain_name,
             threads: &page.threads,
             next_cursor: page.next_cursor.as_deref(),
@@ -486,18 +502,22 @@ async fn thread_page_fragment(
 /// GET /ui/messages - The messages of one thread (Protected).
 #[instrument(skip_all)]
 async fn message_pane_fragment(
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     viewer: Viewer,
     Query(query): Query<ThreadQuery>,
 ) -> AppResult<Html<String>> {
-    let channel = channel_use_cases
-        .get_readable_channel(&viewer, query.company_id, query.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+    let channel = thread_use_cases
+        .readable_inbox(&viewer, query.inbox.scope(query.company_id)?)
+        .await?;
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+        .readable_thread(
+            &viewer,
+            channel.company_id(),
+            channel.target(),
+            query.thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
@@ -541,7 +561,7 @@ fn resume_cursor<C: FromStr>(headers: &HeaderMap, after: Option<&str>) -> Option
 /// exactly where the reader left off.
 #[instrument(skip_all)]
 async fn thread_message_stream(
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(events): State<MailboxEvents>,
@@ -551,12 +571,16 @@ async fn thread_message_stream(
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     // Authorize the stream path; each application message batch repeats current access and level
     // checks, so a long-lived connection never caches a knowledge grant.
-    let channel = channel_use_cases
-        .get_readable_channel(&viewer, query.company_id, query.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+    let channel = thread_use_cases
+        .readable_inbox(&viewer, query.inbox.scope(query.company_id)?)
+        .await?;
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+        .readable_thread(
+            &viewer,
+            channel.company_id(),
+            channel.target(),
+            query.thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
@@ -580,6 +604,7 @@ async fn thread_message_stream(
                     // every time, which is also what makes it correct after a reconnect. A thread
                     // with no run renders as an empty strip, clearing whatever was there.
                     Ok(activity) => {
+                        if thread_use_cases.readable_inbox(&viewer, channel.scope()).await.is_err() { return; }
                         let run_access = pages::RunLinkAccess::Authorized(&activity.inspectable);
                         let html = format!("{}{}", pages::thread_activity_strip(&activity, query.company_id, run_access), pages::thread_run_attribution_updates(&activity, query.company_id, run_access));
                         yield Ok(Event::default()
@@ -604,6 +629,7 @@ async fn thread_message_stream(
                             Ok(ids) => ids,
                             Err(_) => { warn!(%thread_id, "Message run visibility query failed"); return; }
                         };
+                        if thread_use_cases.readable_inbox(&viewer, channel.scope()).await.is_err() { return; }
                         for message in &messages {
                             cursor = Some(message.cursor());
                             yield Ok(Event::default()
@@ -614,7 +640,7 @@ async fn thread_message_stream(
                                     Some(&viewer.email),
                                     pages::MessageScope {
                                         company_id: query.company_id,
-                                        channel_id: channel.id,
+                                        target: channel.target(),
                                     },
                                     pages::RunLinkAccess::Authorized(&inspectable),
                                 )));
@@ -673,7 +699,7 @@ async fn thread_message_stream(
     reason = "Axum handlers receive request state and extractors as parameters"
 )]
 async fn thread_column_stream(
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(events): State<MailboxEvents>,
@@ -683,17 +709,18 @@ async fn thread_column_stream(
     Query(query): Query<ChannelStreamQuery>,
 ) -> AppResult<Sse<impl Stream<Item = Result<Event, Infallible>>>> {
     // Authorize the stream path; application row reads repeat current access and level checks.
-    let channel = channel_use_cases
-        .get_readable_channel(&viewer, query.company_id, query.channel_id)
-        .await?
-        .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+    let channel = thread_use_cases
+        .readable_inbox(&viewer, query.inbox.scope(query.company_id)?)
+        .await?;
 
     let company_id = query.company_id;
     // Owned, because the stream outlives this handler's borrow of the config.
     let app_domain_name = config.app_domain_name.clone();
     let mut cursor = resume_cursor(&headers, query.after.as_deref());
-    let channel_id = channel.id;
-    let mut wake_ups = Box::pin(channel_wake_ups(&events, "threads", channel_id));
+    let target = channel.target();
+    let mut wake_ups = Box::pin(super::live_updates::inbox_wake_ups(
+        &events, "threads", target,
+    ));
     // Subscribe first, then snapshot every badge that can already be on screen. An activity
     // change during this query stays buffered; one before the connection is recovered by the
     // snapshot itself.
@@ -711,6 +738,7 @@ async fn thread_column_stream(
                 let ids: Vec<Uuid> = stale_badges.drain().collect();
                 match activity_reader.thread_activity(company_id, &ids).await {
                     Ok(activity) => {
+                        if thread_use_cases.readable_inbox(&viewer, channel.scope()).await.is_err() { return; }
                         for id in ids {
                             // A thread absent from the map has no run, and an empty payload is
                             // what clears its badge.
@@ -722,7 +750,7 @@ async fn thread_column_stream(
                         }
                     }
                     Err(_) => {
-                        warn!(%channel_id, "Thread activity query failed");
+                        warn!(%target, "Thread activity query failed");
                         return;
                     }
                 }
@@ -730,7 +758,7 @@ async fn thread_column_stream(
 
             if pending_rows {
                 match thread_use_cases
-                    .get_channel_threads_after(&viewer, (&channel).into(), cursor, STREAM_BATCH_LIMIT)
+                    .inbox_threads_after(&viewer, (&channel).into(), cursor, STREAM_BATCH_LIMIT)
                     .await
                 {
                     Ok(threads) => {
@@ -746,7 +774,7 @@ async fn thread_column_stream(
                         {
                             Ok(activity) => activity,
                             Err(_) => {
-                                warn!(%channel_id, "Thread activity query failed");
+                                warn!(%target, "Thread activity query failed");
                                 return;
                             }
                         };
@@ -755,11 +783,12 @@ async fn thread_column_stream(
                         let last_roles = match thread_use_cases.thread_last_roles(&ids).await {
                             Ok(roles) => roles,
                             Err(_) => {
-                                warn!(%channel_id, "Thread last-role query failed");
+                                warn!(%target, "Thread last-role query failed");
                                 return;
                             }
                         };
 
+                        if thread_use_cases.readable_inbox(&viewer, channel.scope()).await.is_err() { return; }
                         // Oldest first, so the newest is inserted last and ends up on top.
                         for thread in &threads {
                             cursor = Some(thread.cursor());
@@ -789,7 +818,7 @@ async fn thread_column_stream(
                         }
                     }
                     Err(_) => {
-                        warn!(%channel_id, "Thread column stream query failed");
+                        warn!(%target, "Thread column stream query failed");
                         return;
                     }
                 }
@@ -815,7 +844,7 @@ async fn thread_column_stream(
                     match first_page_thread_ids(&thread_use_cases, &viewer, &channel).await {
                         Ok(ids) => stale_badges.extend(ids),
                         Err(_) => {
-                            warn!(%channel_id, "Thread column catch-up query failed");
+                            warn!(%target, "Thread column catch-up query failed");
                             return;
                         }
                     }
@@ -832,26 +861,26 @@ async fn thread_column_stream(
 #[instrument(skip_all)]
 async fn compose_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ChannelQuery>,
 ) -> AppResult<Html<String>> {
-    let (company, channel) = load_viewable_channel(
+    let (company, channel) = inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         query.company_id,
-        query.channel_id,
+        query.inbox,
     )
     .await?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
 
     Ok(Html(pages::compose_pane(&pages::ComposePane {
         company_id: company.id,
-        channel: &channel,
-        channel_address: &channel.inbound_address(&company.slug, &config.app_domain_name),
+        inbox: &channel,
+        channel_address: &inbox::send_address(&channel, &company, &config.app_domain_name)?,
         sender_email: &sender_email,
         subject: "",
         text_body: "",
@@ -874,7 +903,7 @@ async fn compose_form(
 )]
 async fn create_thread(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
@@ -882,16 +911,16 @@ async fn create_thread(
     viewer: Viewer,
     Form(form): Form<ComposeForm>,
 ) -> AppResult<Response> {
-    let (company, channel) = load_viewable_channel(
+    let (company, channel) = inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         form.company_id,
-        form.channel_id,
+        form.inbox,
     )
     .await?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
-    let address = channel.inbound_address(&company.slug, &config.app_domain_name);
+    let address = inbox::send_address(&channel, &company, &config.app_domain_name)?;
 
     let subject = form.subject.unwrap_or_default();
     let text_body = form.text_body.unwrap_or_default();
@@ -900,7 +929,7 @@ async fn create_thread(
     let compose_error = |message: String| {
         Html(pages::compose_pane(&pages::ComposePane {
             company_id: company.id,
-            channel: &channel,
+            inbox: &channel,
             channel_address: address.as_str(),
             sender_email: &sender_email,
             subject: &subject,
@@ -920,7 +949,7 @@ async fn create_thread(
     let author = qualified_email_identity(sender_email.as_str())?;
     let ingress = CanonicalMessageIngress::new(
         company.id,
-        channel.id,
+        channel.target(),
         author,
         &text_body,
         IngressOrigin::TrustedApplication,
@@ -954,32 +983,37 @@ async fn create_thread(
 #[instrument(skip_all)]
 async fn reply_form(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     State(config): State<Arc<AppConfig>>,
     viewer: Viewer,
     Query(query): Query<ThreadQuery>,
 ) -> AppResult<Html<String>> {
-    let (company, channel) = load_viewable_channel(
+    let (company, channel) = inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         query.company_id,
-        query.channel_id,
+        query.inbox,
     )
     .await?;
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, query.thread_id)
+        .readable_thread(
+            &viewer,
+            channel.company_id(),
+            channel.target(),
+            query.thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
 
     Ok(Html(pages::reply_pane(&pages::ReplyPane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &channel,
         thread: &thread,
-        channel_address: &channel.inbound_address(&company.slug, &config.app_domain_name),
+        channel_address: &inbox::send_address(&channel, &company, &config.app_domain_name)?,
         sender_email: &sender_email,
         text_body: "",
         deliver: false,
@@ -998,7 +1032,7 @@ async fn reply_form(
 )]
 async fn send_reply(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(activity_reader): State<Arc<dyn ThreadActivityReader>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
@@ -1006,20 +1040,25 @@ async fn send_reply(
     viewer: Viewer,
     Form(form): Form<ReplyForm>,
 ) -> AppResult<Response> {
-    let (company, channel) = load_viewable_channel(
+    let (company, channel) = inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         form.company_id,
-        form.channel_id,
+        form.inbox,
     )
     .await?;
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, form.thread_id)
+        .readable_thread(
+            &viewer,
+            channel.company_id(),
+            channel.target(),
+            form.thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let sender_email = sender_email(&user_use_cases, viewer.user_id).await?;
-    let address = channel.inbound_address(&company.slug, &config.app_domain_name);
+    let address = inbox::send_address(&channel, &company, &config.app_domain_name)?;
 
     let text_body = form.text_body.unwrap_or_default();
     let deliver = delivery_requested(form.deliver.as_deref());
@@ -1027,7 +1066,7 @@ async fn send_reply(
     let reply_error = |message: String| {
         Html(pages::reply_pane(&pages::ReplyPane {
             company_id: company.id,
-            channel: &channel,
+            inbox: &channel,
             thread: &thread,
             channel_address: address.as_str(),
             sender_email: &sender_email,
@@ -1050,7 +1089,7 @@ async fn send_reply(
     let author = qualified_email_identity(sender_email.as_str())?;
     let mut ingress = CanonicalMessageIngress::new(
         company.id,
-        channel.id,
+        channel.target(),
         author,
         &text_body,
         IngressOrigin::TrustedApplication,
@@ -1089,7 +1128,7 @@ async fn sent_message_response(
     thread_use_cases: &ThreadUseCases,
     activity_reader: &dyn ThreadActivityReader,
     company_id: Uuid,
-    channel: &Channel,
+    channel: &ReadableInbox,
     app_domain_name: &str,
     thread: &Thread,
     viewer: &Viewer,
@@ -1112,9 +1151,12 @@ async fn sent_message_response(
     )
     .await?;
     let activity = page_activity(activity_reader, company_id, &page.threads).await?;
+    thread_use_cases
+        .readable_inbox(viewer, channel.scope())
+        .await?;
     let refreshed_list = pages::thread_list_oob(&pages::ThreadColumn {
         company_id,
-        channel,
+        inbox: channel,
         app_domain_name,
         threads: &page.threads,
         next_cursor: page.next_cursor.as_deref(),
@@ -1126,8 +1168,10 @@ async fn sent_message_response(
         [(
             "HX-Push-Url",
             format!(
-                "/ui?company_id={}&channel_id={}&thread_id={}",
-                company_id, channel.id, thread.id
+                "/ui?company_id={}&{}&thread_id={}",
+                company_id,
+                pages::inbox_target_query(channel.target()),
+                thread.id
             ),
         )],
         Html(format!("{pane}{refreshed_list}")),

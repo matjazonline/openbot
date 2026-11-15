@@ -1,0 +1,9 @@
+{
+  "digest": "3247c1f394f32bb86dea1a31f3f1856c0f805ed0c68329149217f9c72fa9230d",
+  "digest_matches": true,
+  "start_final_snapshot_equal": true,
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "head_matches": true,
+  "coordination_live_pin_equal": true,
+  "coordination_sha256": "8ef178c8f5ad3fdc3f98960b87a6b132a4fb781f9dd002b59f4282e7f443951d"
+}

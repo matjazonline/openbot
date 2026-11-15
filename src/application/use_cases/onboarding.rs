@@ -11,6 +11,7 @@ use super::{
         AgentPersistence, AgentWrite,
         model_preparation::{prepare_library_write, prompt_model, validate_model_selection},
     },
+    channel::slugify,
     company::{CompanyPersistence, owned_company},
 };
 use crate::{
@@ -58,6 +59,7 @@ pub trait OnboardingPersistence: Send + Sync {
 #[async_trait]
 pub trait OnboardingSession: Send {
     async fn existing_agents(&mut self, ids: &[Uuid]) -> AppResult<Vec<Agent>>;
+    async fn completed_agents(&mut self, ids: &[Uuid]) -> AppResult<Vec<OnboardedAgent>>;
     async fn model_connections(&mut self) -> AppResult<Vec<CompanyModelConnection>>;
     async fn model_api_key(&mut self, provider: &ModelProvider) -> AppResult<Option<String>>;
     async fn complete(self: Box<Self>, command: OnboardingCommand) -> AppResult<OnboardingOutcome>;
@@ -86,8 +88,7 @@ pub struct OnboardingCommand {
 #[derive(Debug)]
 pub struct OnboardedAgent {
     pub agent: Agent,
-    /// The agent's default desk, as its creation recorded it (`agent:{id}`).
-    pub channel: serde_json::Value,
+    pub principal_id: crate::entities::transport::PrincipalId,
 }
 
 #[derive(Debug)]
@@ -107,6 +108,16 @@ pub struct OnboardingUseCases {
 }
 
 impl OnboardingUseCases {
+    pub async fn completed(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        agents: &[Uuid],
+    ) -> AppResult<Vec<OnboardedAgent>> {
+        let mut session = self.persistence.begin(user_id, company_id).await?;
+        session.completed_agents(agents).await
+    }
+
     pub fn new(
         companies: Arc<dyn CompanyPersistence>,
         agents: Arc<dyn AgentPersistence>,
@@ -232,7 +243,7 @@ impl OnboardingUseCases {
         let (provider, model) = prompt_model(connections, None, None)?;
         let mut write = AgentWrite {
             name: submission.name.clone(),
-            slug: custom_slug(&submission.name),
+            slug: slugify(&submission.name),
             provider: Some(provider.to_string()),
             model: Some(model.to_string()),
             created_by: Some(CreationProvenance::user(user_id)),
@@ -289,7 +300,7 @@ fn selection(
             id: agent_id(
                 company_id,
                 submission.submission_key,
-                &format!("custom:{}", custom_slug(&submission.name)),
+                &format!("custom:{}", slugify(&submission.name)),
             ),
             library: None,
         });
@@ -335,7 +346,7 @@ fn department(
     };
     let mut write = DepartmentWrite {
         name: name.to_owned(),
-        slug: custom_slug(name),
+        slug: slugify(name),
         description: None,
         charter: None,
         parent_id: None,
@@ -350,18 +361,6 @@ fn department(
         )),
         write,
     }))
-}
-
-fn custom_slug(name: &str) -> String {
-    name.trim()
-        .to_lowercase()
-        .chars()
-        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
-        .collect::<String>()
-        .split('-')
-        .filter(|part| !part.is_empty())
-        .collect::<Vec<_>>()
-        .join("-")
 }
 
 fn agent_id(company: Uuid, key: Uuid, role: &str) -> Uuid {

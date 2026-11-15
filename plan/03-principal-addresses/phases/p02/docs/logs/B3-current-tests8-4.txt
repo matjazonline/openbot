@@ -1,0 +1,11 @@
+
+running 6 tests
+test application::services::inbound_event_worker::tests::a_superseded_commit_retries_and_a_conflict_does_not ... ok
+test application::services::inbound_event_worker::tests::shutdown_cancels_and_awaits_active_work ... ok
+test application::services::inbound_event_worker::tests::lease_loss_cancels_the_real_decode_commit_future ... ok
+test application::services::inbound_event_worker::tests::claimed_batches_are_round_robin_by_company_and_installation ... ok
+test application::services::inbound_event_worker::tests::shutdown_between_iterations_returns_without_an_orphaned_loop ... ok
+test application::services::inbound_event_worker::tests::shutdown_during_active_work_cancels_the_decode_future_before_returning ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4579 filtered out; finished in 0.00s
+

@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4582 filtered out; finished in 1.23s
+
