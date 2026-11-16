@@ -1,0 +1,38 @@
+name: Plan03 isolated browser launch diagnosis
+on: [push]
+permissions:
+  contents: read
+jobs:
+  launch:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Record installed Chrome and sandbox restrictions
+        run: |
+          /usr/bin/google-chrome --version
+          cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns
+      - name: Compare actual long clean temporary directory with short owned temporary directory
+        run: |
+          python3 - <<'PYDIAG'
+          import importlib.util, os, subprocess, tempfile
+          from pathlib import Path
+          spec=importlib.util.spec_from_file_location('runner', 'scripts/doop-test.py');runner=importlib.util.module_from_spec(spec);spec.loader.exec_module(runner)
+          setup=Path(os.environ['RUNNER_TEMP'])/'doop-check/source'
+          subprocess.run(['python3','scripts/doop-test.py','setup','--managed','--directory',str(setup)],check=True)
+          probe="import { createRequire } from 'node:module';\nimport { pathToFileURL } from 'node:url';\nconst require = createRequire(process.env.DIAGNOSTIC_SOURCE + '/package.json');\nconst { createBrowserOwner } = await import(pathToFileURL(process.cwd() + '/scripts/doop-test/browser-owner.mjs'));\nconst owner = createBrowserOwner(require('puppeteer-core'));\nconsole.log('DIAGNOSTIC tmp length', process.env.TMPDIR.length, 'profile length', (process.env.DOOP_TEST_PRIVATE_RUNTIME + '/ui-profile').length);\ntry {\n  const browser = await owner.launch();\n  const page = await browser.newPage();\n  await page.goto('about:blank');\n  console.log('DIAGNOSTIC_BROWSER_PASS');\n  await owner.close();\n} catch (error) {\n  const message = String(error.stack).slice(-16384);\n  console.log('::error::' + message.replaceAll('%', '%25').replaceAll('\\r', '%0D').replaceAll('\\n', '%0A'));\n  process.exitCode = 1;\n}\n"
+          results=[]
+          for kind in ['long','short']:
+              runtime=Path(tempfile.mkdtemp(prefix='.private-run-',dir=setup));(runtime/'home/tmp').mkdir(parents=True)
+              env=runner.clean_environment(runtime/'home')
+              env.update(DOOP_TEST_PRIVATE_RUNTIME=str(runtime),DOOP_TEST_PRIVATE_OWNER='a'*32,DOOP_TEST_UI_CHROME=str(Path('/usr/bin/google-chrome').resolve()),DOOP_TEST_TLS_SPKI='AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=',DIAGNOSTIC_SOURCE=str(setup/'managed-source'))
+              if kind=='short':env['TMPDIR']=tempfile.mkdtemp(prefix='doop-ui-')
+              print('CASE',kind,flush=True)
+              result=subprocess.run(['node','--input-type=module'],input=probe,text=True,env=env,timeout=90)
+              results.append((kind,result.returncode))
+          print('DIAGNOSTIC_RESULTS',results)
+          assert results==[('long',1),('short',0)],results
+          PYDIAG
