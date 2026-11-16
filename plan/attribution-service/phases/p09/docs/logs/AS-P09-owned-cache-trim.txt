@@ -1,0 +1,4 @@
+/mnt/lima-colima-as-attribution-integration: 10 GiB (10773946368 bytes) trimmed on /dev/vdb1
+/boot/efi: 91.1 MiB (95547904 bytes) trimmed on /dev/vda15
+/boot: 0 B (0 bytes) trimmed on /dev/vda16
+/: 227.9 MiB (238936064 bytes) trimmed on /dev/vda1

@@ -1,0 +1,170 @@
+{
+  "version": 1,
+  "round": "AS-P04-B1",
+  "artifact": "6837fba3f8f66fb0160bf308ecc0668d25f33be5a70ad3b65a2895fbedea0c0f",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib setup",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-setup-4.txt",
+          "sha256": "a4c6609e15d924837c0eae2a4883a30e40c3290d55a20601f73cbda9beb41e62"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC4"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_setup_browser_ -- --ignored --nocapture",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-browser-5.txt",
+          "sha256": "c3d63c00f83d59e368bd9889f7e02919b559634e7d6a9ecbd5cd03bdbb99f1d0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7",
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::identity:: -- --skip setup_tests",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-identity-1.txt",
+          "sha256": "5cc2a23922412cd3ac7f6269afacf879aa29d0c021d1dd68959f91e76f403851"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3.13 scripts/verify.py prepare",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-prepare-1.txt",
+          "sha256": "dfe773dcf9b3428036de7ea3ff72f8bde07689f605e138ecc8c4e4450a69a4e2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3.13 scripts/verify.py foundation",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-foundation-1.txt",
+          "sha256": "213201d0e70ade78328615f55992bbc3d2c793d2d6ad4ab5265b7bf2daf4d2f6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-format-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-offline-1.txt",
+          "sha256": "abe6ac06ad443dea4ea66b00e0133d31adc87f4b3477ee78b390c43b14113a44"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3.13 scripts/boundary.py",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-boundary-1.txt",
+          "sha256": "7b1bb29e755c446f3635ef5059072c742ebd8828a0f53658fb530f83f0a3a758"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "python3.13 scripts/test_boundary.py",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-boundary-tests-1.txt",
+          "sha256": "7c54d8ddd98bd734c607aa3ba01ffab686d804f668a666a8ea6faf2071de2b9d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "ATTRIBUTION_CONTRACT_PYTHON=/tmp/as-p02-contract-clean/bin/python scripts/check-contracts.sh",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-contract-1.txt",
+          "sha256": "074638ff1147b6f5bff0735d2d8353a1629def22e9fb907fd2f9e2621a95d055"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "trail check",
+      "fixture": "Service cwd, Rust1.95.0; invocation-owned as_test/as_verify PostgreSQL roles/databases, local authority/DNS/browser processes; /tmp/as-attribution-target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P04-trail-check-2.txt",
+          "sha256": "7c1060e4d06a7cbcb04d199168522b84b65a892b47c6371515e3b12b551e9e6e"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+
+---- adapters::postgres::search_tests::memory_search_returns_eligible_rows_behind_twenty_thousand_nearer_ineligible_parts stdout ----
+
+thread 'adapters::postgres::search_tests::memory_search_returns_eligible_rows_behind_twenty_thousand_nearer_ineligible_parts' (26054587) panicked at src/adapters/postgres/search_tests.rs:369:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "53100", message: "could not resize shared memory segment \"/PostgreSQL.1412441820\" to 63999840 bytes: No space left on device", detail: None, hint: None, position: None, where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("dsm_impl.c"), line: Some(307), routine: Some("dsm_impl_posix") })

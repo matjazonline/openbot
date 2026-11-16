@@ -1,0 +1,10 @@
+Applied 20260817000000/migrate init schema (889.594666ms)
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4256 filtered out; finished in 5.20s
+
+
+Exit: 0

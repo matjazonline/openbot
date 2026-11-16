@@ -1,0 +1,18 @@
+{
+  "artifact": "45fc0ad49012ab1f6f58a619c06508430011b0c3a127683196c79ea906c71897",
+  "coordination_revision": 4,
+  "coordination_pinned_copy_match": true,
+  "decision_r2_sha256": "6968a1aa538ec5817939a92198ff2f111da8a581ac7bd17a1d2529645430b722",
+  "reviewer_logs": {
+    "AS-P03-B1-R1-reviewer-boundary-tests.txt": "66916400f0c68c013cf9e83c35c95a368343d58c43d7f2b10b6915b26edfab9f",
+    "AS-P03-B1-R1-reviewer-end.snapshot.txt": "1d9774f8b760f63828f49936ae716b265818e54ab03fd0af4d6ce53be1600b96",
+    "AS-P03-B1-R1-reviewer-page-probe.py": "a4f7b8f4d331d4c5b3ba62fd9e152d4e3c9dca5475d4ae8af696e527f7cec9da",
+    "AS-P03-B1-R1-reviewer-page-probe.txt": "ab209eaac8ae3836045cd05c3c1aad54d4770af771d294d46562064666ae96fe",
+    "AS-P03-B1-R1-reviewer-page-schema.txt": "650aa33e12fb30bbe989de30f31e9fea4f95adeb33b18c0d2392dd956d021d68",
+    "AS-P03-B1-R1-reviewer-root-tests.txt": "3f199965ad35dfb6185f7c762c2f261ef226da0d16e953170dccc74f460105e7",
+    "AS-P03-B1-R1-reviewer-service-tests.txt": "bd6739d4be25caa28d959dd8fbf0cffb25e9ce7d9208ccb5f59a32026afbc7f0",
+    "AS-P03-B1-R1-reviewer-session-probe.py": "9fbc70a24815935ac563d0a6a1648ce576b06c8f6429604408a3dfb28ad9bfbb",
+    "AS-P03-B1-R1-reviewer-session-probe.txt": "381b6dacbd12ca35ef6e78e593217a3883f7b506539618a4f86beeb07f2645ac",
+    "AS-P03-B1-R1-reviewer-start.snapshot.txt": "1d9774f8b760f63828f49936ae716b265818e54ab03fd0af4d6ce53be1600b96"
+  }
+}

@@ -1,0 +1,14 @@
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+warning: method `with_commerce` is never used
+  --> src/adapters/http.rs:41:19
+   |
+40 | impl HttpState {
+   | -------------- method in this implementation
+41 |     pub(crate) fn with_commerce(mut self, commerce: super::commerce::http::CommerceHttp) -> Self {
+   |                   ^^^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `attribution_service` (lib) generated 1 warning
+warning: `attribution_service` (lib test) generated 1 warning (1 duplicate)
+    Finished `dev` profile [unoptimized] target(s) in 4.20s

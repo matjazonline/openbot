@@ -1,0 +1,9 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected; test PostgreSQL at 127.0.0.1:64326 reachable
+    Finished `test` profile [unoptimized] target(s) in 0.80s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+test adapters::identity::http_tests::commerce_tests::e2e_tests::attribution_e2e_two_ads_business_retries_refunds_and_product_reports ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 1.01s
+

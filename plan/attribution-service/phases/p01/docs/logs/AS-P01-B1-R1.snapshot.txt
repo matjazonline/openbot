@@ -1,0 +1,25 @@
+base:   2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+digest: 21bacb27bc5ba0b0d0394310910cbc41e2fc8ba448934876a5a4e9d8196b9001
+files:
+  docs/contracts/attribution-identity.openapi.json
+  plan/attribution-service/01-application-boundaries-and-contracts.md
+  plan/attribution-service/03-single-sign-on-and-company-access.md
+  plan/attribution-service/04-merchant-setup-and-api-credentials.md
+  plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+  plan/attribution-service/07-orders-refunds-and-attribution.md
+  plan/attribution-service/09-operations-retention-and-separate-deployment.md
+  plan/attribution-service/10-integration-verification-and-pilot.md
+  services/attribution/contract/README.md
+  services/attribution/contract/attribution.openapi.json
+  services/attribution/contract/examples/authority-cases.json
+  services/attribution/contract/examples/checkout.json
+  services/attribution/contract/examples/ledger.json
+  services/attribution/contract/examples/lifecycle.json
+  services/attribution/contract/examples/observation.json
+  services/attribution/contract/examples/paid.json
+  services/attribution/contract/examples/refund.json
+  services/attribution/contract/examples/token-request.json
+  services/attribution/contract/openbot-identity.openapi.json
+  services/attribution/contract/requirements.lock
+  services/attribution/contract/test_contracts.py
+  services/attribution/scripts/check-contracts.sh

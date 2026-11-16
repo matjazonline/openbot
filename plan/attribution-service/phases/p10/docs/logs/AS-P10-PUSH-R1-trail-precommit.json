@@ -1,0 +1,315 @@
+{
+  "files": 500,
+  "notes": 23,
+  "skills": 2,
+  "findings": [
+    {
+      "file": "plan/attribution-service/01-application-boundaries-and-contracts.md",
+      "verdict": "conflict",
+      "summary": "brings back fail successful command, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A failing build can then be followed by a successful command and the gate is reported as passing.",
+        "title": "Run grouped verification gates outside Bash conditions",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-run-grouped-verification-gates-outside-bash-mac02.md"
+      },
+      "line": 170
+    },
+    {
+      "file": "plan/attribution-service/03-single-sign-on-and-company-access.md",
+      "verdict": "conflict",
+      "summary": "brings back build command gate, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A failing build can then be followed by a successful command and the gate is reported as passing.",
+        "title": "Run grouped verification gates outside Bash conditions",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-run-grouped-verification-gates-outside-bash-mac02.md"
+      },
+      "line": 105
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back journey check service, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Do not weaken the journey into only checking an href or mock the service redirect.",
+        "title": "Use a local HTTPS destination for redirect browser journeys",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-use-a-local-https-destination-for-mac02.md"
+      },
+      "line": 1,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back test real step, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "The role-selector helper test passed while the real mcp_step_request boundary still blocked; the new genuine originating-workflow test and PostgreSQL wait sampling exposed it.",
+        "title": "Native effect locks must start before shared authority helpers",
+        "author": "Mac02",
+        "date": "2026-11-15",
+        "path": "origin/codex/plan03-p04-r21-private-76925ef6:.trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md"
+      },
+      "line": 5,
+      "why": "on codex/plan03-p04-r21-private-76925ef6, not merged yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back separate chromium rust, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A valid separate CA/leaf pair passed Chromium, Rust and older Python while the production-image topology readiness loop failed on Python3.13.",
+        "title": "Include key identifiers in temporary TLS certificates",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-include-key-identifiers-in-temporary-tls-mac02.md"
+      },
+      "line": 12,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back actual test interval, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "The first actual competing drop/shutdown tests and 115 focused cases passed while leaving the enqueue/publication interval uncontrolled.",
+        "title": "Publish SDK cancellation ownership before cleanup can run",
+        "author": "Mac02",
+        "date": "2026-11-15",
+        "path": "origin/codex/plan03-p04-r21-private-76925ef6:.trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md"
+      },
+      "line": 21,
+      "why": "on codex/plan03-p04-r21-private-76925ef6, not merged yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back separate local two, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Separate localStorage keys per click and a sequential two-tab test both looked sufficient and passed the full merchant journey.",
+        "title": "Shared browser cleanup must preserve writes made after its read",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-shared-browser-cleanup-must-preserve-writes-mac02.md"
+      },
+      "line": 25,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back setup browser journey, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "The setup browser journey repeatedly timed out on getByLabel(\"Verified domain\", {exact:true}) after DNS verification had succeeded.",
+        "title": "Give changing selects a stable explicit label",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-give-changing-selects-a-stable-explicit-mac02.md"
+      },
+      "line": 45,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back browser open fixture, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Serving the self-signed CA itself worked for the browser/OpenSSL fixture but the",
+        "title": "TLS integration fixtures need a separate CA and server certificate",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-tls-integration-fixtures-need-a-separate-mac02.md"
+      },
+      "line": 49,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": ".github/workflows/attribution-service.yml",
+      "verdict": "lead",
+      "summary": "brings back real non local, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A real non-loopback local TCP fixture demonstrates this: the supervisor can connect during group isolation, and changing only the selector back to UID blocks it.",
+        "title": "Scope test egress rules to the command group",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "origin/codex/plan03-p04-r21-private-76925ef6:.trail/learnings/2026-11-16-scope-test-egress-rules-to-the-mac02.md"
+      },
+      "line": 67,
+      "why": "on codex/plan03-p04-r21-private-76925ef6, not merged yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back attribution openbot callback, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "actual attribution-to-Openbot callback failed with HTTP 503.",
+        "title": "TLS integration fixtures need a separate CA and server certificate",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-tls-integration-fixtures-need-a-separate-mac02.md"
+      },
+      "line": 4,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back openbot invalid boundary, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A literal like `<escalation-{id}@openbot.invalid>` built in persistence breaks the transport boundary in two ways: it is a synthetic `.invalid` identity, and it is an RFC id made outside the email adapter.",
+        "title": "Internal platform messages get their Message-ID from the email renderer, never a hand-built one",
+        "author": "Mac02",
+        "date": "2026-11-14",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-14-internal-platform-messages-get-their-message-mac02.md"
+      },
+      "line": 4,
+      "why": "not about this file"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back http miss authority, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A local HTTPS reproduction isolated Missing Authority Key Identifier.",
+        "title": "Include key identifiers in temporary TLS certificates",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-include-key-identifiers-in-temporary-tls-mac02.md"
+      },
+      "line": 6,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back native fact account, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "An inner native source guard with NOWAIT did not prevent the earlier shared facts helper from taking ordinary waiting account/company locks.",
+        "title": "Native effect locks must start before shared authority helpers",
+        "author": "Mac02",
+        "date": "2026-11-15",
+        "path": "origin/codex/plan03-p04-r21-private-76925ef6:.trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md"
+      },
+      "line": 6,
+      "why": "on codex/plan03-p04-r21-private-76925ef6, not merged yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back original schema company, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "The original 64 KiB cap rejected a schema-valid 100-company page with 120 four-byte Unicode characters per name: the reviewer measured 73,530 serialized bytes before adding a cursor.",
+        "title": "Size company-list responses for JSON bytes, not character counts",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-size-company-list-responses-for-json-mac02.md"
+      },
+      "line": 58,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back redirect committed, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "A real redirect committed a click, but a checkout timestamp created immediately with host Date.now() preceded that click, so the service correctly returned no attribution.",
+        "title": "Use one clock for ordered cross-host commerce fixtures",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-use-one-clock-for-ordered-cross-mac02.md"
+      },
+      "line": 66,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back exact maximum, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "The exact maximum export returned 503.",
+        "title": "Aggregate report measures before joining nullable group keys",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-aggregate-report-measures-before-joining-nullable-mac02.md"
+      },
+      "line": 115,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back one read another, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Independent review paused one real Chromium tab between reading candidates and cleanup, let another tab persist a new click, then resumed cleanup: the newer click was deleted.",
+        "title": "Shared browser cleanup must preserve writes made after its read",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/orca/workspaces/openbot/attribution-service/.trail/learnings/2026-11-16-shared-browser-cleanup-must-preserve-writes-mac02.md"
+      },
+      "line": 115,
+      "why": "not on the base branch yet"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back direct exact second, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Direct LaunchServices navigation downloaded the exact artifact successfully within seconds.",
+        "title": "Download signed-in GitHub artifacts directly when accessibility is blocked",
+        "author": "Mac02",
+        "date": "2026-11-16",
+        "path": "/Users/mac02/.trail/repos/github.com/matjazonline/openbot/notes/2026-11-16-download-signed-in-github-artifacts-directly-mac02.md"
+      },
+      "line": 115,
+      "why": "a learning just for you"
+    },
+    {
+      "file": "docs/contracts/attribution-identity.openapi.json",
+      "verdict": "lead",
+      "summary": "brings back grant check exist, which Mac02's learning ruled out",
+      "source": {
+        "kind": "note",
+        "quote": "Granting it SUPERUSER or skipping performance checks were rejected in favour of the existing superuser role.",
+        "title": "On this Mac, run the full check suite as the local superuser role, with Homebrew Python for the validator build",
+        "author": "Mac02",
+        "date": "2026-11-12",
+        "path": "/Users/mac02/.trail/repos/github.com/matjazonline/openbot/notes/2026-11-12-on-this-mac-run-the-full-mac02.md"
+      },
+      "line": 115,
+      "why": "a learning just for you"
+    }
+  ],
+  "overlaps": [
+    {
+      "ref": "origin/anthropic-latest-models",
+      "author": "Matjazonline",
+      "at": 1793971803000,
+      "shared": [
+        "src/main.rs"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+Tab B completed consent/write after tab A read and before tab A cleanup.
+A handoff candidates: 1
+B candidate persisted after A cleanup: false
+Fresh return-visit handoff includes B: false
+REPRODUCED: concurrent new candidate is deleted despite only 2 candidates and no expiry. VM uses actual SDK; storage calls inject a legal cross-tab interleaving, not a real browser scheduling test.

@@ -1,0 +1,34 @@
+[
+  {
+    "label": "baseline",
+    "source": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-baseline-ul2e7k57/source",
+    "binary_sha256": "c7e2ecc3fb3a92e8c790c62b9f124ccce8bb3dea969d0b6c9bc7ad51cf70e8ac",
+    "filters": [
+      "department_directory_filters_by_one_department",
+      "doop_create_bad_receipt_or_read_identity_never_invokes_the_agent",
+      "doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create",
+      "agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor",
+      "agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls"
+    ],
+    "threads": 4,
+    "stack_bytes": 2097152,
+    "database": "as_p10_stockdiag_a6cc57dc06314a359c5808d373874103",
+    "exit": 0
+  },
+  {
+    "label": "current",
+    "source": "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree",
+    "binary_sha256": "7e438d1774a4aebcc0a9d240cca78332edbad0c85c34f9429189c2ab704fe684",
+    "filters": [
+      "department_directory_filters_by_one_department",
+      "doop_create_bad_receipt_or_read_identity_never_invokes_the_agent",
+      "doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create",
+      "agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor",
+      "agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls"
+    ],
+    "threads": 4,
+    "stack_bytes": 2097152,
+    "database": "as_p10_stockdiag_84b83438920147d1a9cdd81a3c1fc434",
+    "exit": 101
+  }
+]

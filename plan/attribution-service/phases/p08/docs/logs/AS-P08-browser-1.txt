@@ -1,0 +1,24 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 6.84s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+
+
+thread 'adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry' (24028812) panicked at src/adapters/identity/../commerce/../analytics/browser_tests.rs:31:5:
+FAIL: dashboard stage keyboard form, product breakdown and escaping: TimeoutError: locator.selectOption: Timeout 30000ms exceeded.
+Call log:
+[2m  - waiting for getByLabel('Breakdown', { exact: true })[22m
+
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 110 filtered out; finished in 31.71s
+
+error: test failed, to rerun pass `--lib`

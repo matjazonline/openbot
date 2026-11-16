@@ -1,0 +1,21 @@
+    Finished `test` profile [unoptimized] target(s) in 0.31s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 2 tests
+
+thread 'adapters::identity::http_tests::commerce_tests::restore_tests::attribution_recovery_real_dump_restore_auth_ledger_pending_and_isolation' (24369262) panicked at src/adapters/identity/../commerce/../retention/restore_tests.rs:46:5:
+assertion `left == right` failed
+  left: Conflict
+ right: Accepted
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_recovery_retention_competing_claims_poison_and_cancellation ... ok
+test adapters::identity::http_tests::commerce_tests::restore_tests::attribution_recovery_real_dump_restore_auth_ledger_pending_and_isolation ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::commerce_tests::restore_tests::attribution_recovery_real_dump_restore_auth_ledger_pending_and_isolation
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 119 filtered out; finished in 1.07s
+
+error: test failed, to rerun pass `--lib`

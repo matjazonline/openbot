@@ -1,0 +1,95 @@
+{
+  "baseline": "542b32ae822314eb5a16050b153fa4e7a625cfc7380d2b66a9298d79fbdb5d9d",
+  "files": [
+    {
+      "path": ".github/workflows/attribution-service.yml",
+      "before": "312e55cf0d9badc3d337fd5dea65177f3d2fe019997149bd9c08a83f7a8354a3",
+      "after": "6503fd82bf47591ee85279305867d688bb8100f374ba0e37e5f97474b184f4e8"
+    },
+    {
+      "path": "plan/attribution-service/10-integration-verification-and-pilot.md",
+      "before": "2807d5678cf2bcc10cc93294b3e46dc32dba25d093a82fc5b85db20048d9cb59",
+      "after": "5e869ed7960f5080cee25c54546a7a69d959e22d1ec6f1266d0655cb7281e94b"
+    },
+    {
+      "path": "services/attribution/README.md",
+      "before": "1025e4445a060bc64910119dacde47979b6a137026d5566e904fc0fe13b97f33",
+      "after": "7b9b815e91caabb558f5d0b31287677e3c8007ffe22761f4fd297b00c1bb6246"
+    },
+    {
+      "path": "services/attribution/scripts/extracted-build.py",
+      "before": "d00c6bad3a981ba66f372064b8061440b8947f6e77ba1d2d3b0bb2ab8a5885c5",
+      "after": "29ceada75984bc6c629c524ffff58bb16e45dfbcb86fd272c7bc8c161d25e45c"
+    },
+    {
+      "path": "services/attribution/scripts/network-isolation.py",
+      "before": null,
+      "after": "0430efda879ab320f7d00b451d9b8315c5c5a5c2a98a845254be95aaf9a2328d"
+    },
+    {
+      "path": "services/attribution/scripts/test-network-isolation.sh",
+      "before": null,
+      "after": "09dec9d0f98c16bb171a0aff11d9128f49677a1c3e0037afe2fd0c87300011d9"
+    },
+    {
+      "path": "services/attribution/scripts/verify.py",
+      "before": "086c8d68a9a47fb03155f1fea1a942cec8b2c38cfff11264edaeb7804fa344a1",
+      "after": "87771b414f235921c7d1cf2e9e3e57ade0339c480708f597699ac5e314692f4b"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/e2e_tests.rs",
+      "before": null,
+      "after": "5d0ed1a0f16944d0f96d89e898a1aacf3f988865b7d2d11b1226cef66e3144ac"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/http_tests.rs",
+      "before": "c042848c0e5fcf9e891991c5130b1ff2181be5a200e51a15dd3c1ed6a4debd22",
+      "after": "8c7883718f9ee431ed27f0f08f1b2ecf302d9c05f1df591c8beaf7d7f24eca8e"
+    },
+    {
+      "path": "services/attribution/src/adapters/commerce/ledger_tests.rs",
+      "before": "ef074fb86bb4e9430f1f5e873e1bc4e989d96adc2f39dda640694a07a7f6d300",
+      "after": "082f199124559864b0f2f0cfc5725a069a1a629a9388b6a4bb64297c380b3201"
+    },
+    {
+      "path": "services/attribution/src/adapters/identity/http.rs",
+      "before": "8f15174e3e430a0b81d2c6dde18c02b3516f8194ec9713abc16df39f2bda98f7",
+      "after": "11bbdad7d0e919496a9644542d92368b395c6cd44027ca6f87fd8055d12e486a"
+    },
+    {
+      "path": "services/attribution/src/adapters/identity/tests.rs",
+      "before": "bcc008c23e0cf06c890be187aad3b8bf221fcadac5eb113dfdad36696ea54363",
+      "after": "40470bc8249b3ab3bd2cef7b8aba64265ddf65534a176daf35cfd4288fda3b85"
+    },
+    {
+      "path": "services/attribution/src/adapters/setup/admission.rs",
+      "before": "cb2268f2770e713b35940022f3fb5c0006ae68b1dc59df3f70738ce893ef2ada",
+      "after": "872c8cb162c7279e821cd3d6e15046818053e14bb54cbbcca7143309b20891a3"
+    },
+    {
+      "path": "services/attribution/src/adapters/website/http.rs",
+      "before": "6e3e40a96f2ec9bbb11b101313b35dde42f761318d7e99b5e995aed5adf5e4ba",
+      "after": "fa838d84db5e1cdf16e7950a89af2296815ece749a547cf2de272600258fea6c"
+    },
+    {
+      "path": "services/attribution/src/adapters/website/postgres.rs",
+      "before": "68520f8fd34661c2867620830149789e0e7eed85df26725fc4f7a6cf32f7b1f6",
+      "after": "d2409cb7b8dbe75bf0f5c64d972962cdf568e7ad9287ba8854de879aceb64312"
+    },
+    {
+      "path": "services/attribution/src/application/freshness.rs",
+      "before": "997f3e9086ceba86cf897174b22947a386aaee40178ad3c8b69c34a00d85bf83",
+      "after": "95ab84aad16e59402f20409006f41a7e6551139ed06e0b665832fcc14a504574"
+    },
+    {
+      "path": "services/attribution/src/infra/identity.rs",
+      "before": "771c41f0af4cad1eedfe8933045ec0449eca961ca9b63cc0c84b50b0ad5c11fe",
+      "after": "1397c6fc6cb75b690ddadffd48968cd01558b778d9ad8a1d0f20391527167cf5"
+    },
+    {
+      "path": "src/adapters/http/attribution/mod.rs",
+      "before": "94984fc773bb70b7a149b8b4761df5d006de084de23655cdfce1ed7340e8006e",
+      "after": "bcb36edb90a5bdd85eca8b50da96cec602034c6cd4ea2118ff98825887ff54e3"
+    }
+  ]
+}

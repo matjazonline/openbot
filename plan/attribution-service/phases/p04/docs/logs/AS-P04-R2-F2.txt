@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+test adapters::identity::http_tests::setup_tests::attribution_credentials_replay_after_original_payload_expiry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 54 filtered out; finished in 2.45s
+

@@ -1,0 +1,23 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 6.72s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 14 tests
+redirect fixture warm concurrency8 n100: p50=6ms p95=29ms p99=44ms (implementation budget, not production SLO)
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_client_disconnect_after_real_commit_is_durable ... ok
+test application::catalog::tests::attribution_links_product_clear_has_distinct_normalized_content ... ok
+test application::catalog::tests::attribution_links_reserved_parameter_and_canonical_expansion_bound ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_existing_foreign_dimensions_never_cross_scope ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_storage_rejection_and_freshness_fail_closed ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_merchant_scope_principal_collision_and_revoke_before_replay ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_unknown_commit_outcome_retains_row_without_location ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_destination_and_parent_eligibility ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_public_admission_competing_requests_and_recovery ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_links_http_roles_scope_retry_and_competing_claimants ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_tenant_admission_competing_requests_and_recovery ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_headers_head_classification_and_immutable_history ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_concurrent_distinct_ids_and_latency_budget ... ok
+test adapters::identity::http_tests::catalog_tests::attribution_redirect_competing_disable_serializes_both_orders ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 55 filtered out; finished in 2.16s
+

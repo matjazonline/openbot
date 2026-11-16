@@ -1,0 +1,49 @@
+[package]
+name = "attribution_service"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.95"
+
+[workspace]
+
+[[bin]]
+name = "attribution-service"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1"
+async-trait = "0.1"
+base64 = "0.22"
+chacha20poly1305 = "0.11"
+oauth2 = { version = "5", default-features = false }
+sha2 = "0.10"
+subtle = "2"
+serde_urlencoded = "0.7"
+reqwest = { version = "=0.13.4", default-features = false, features = ["json", "rustls", "form", "query", "stream"] }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "query", "tokio"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "=0.8.6", default-features = false, features = ["postgres", "runtime-tokio-rustls", "macros", "migrate", "uuid", "chrono", "json"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "signal", "net", "time", "sync", "io-util"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+tower-http = { version = "0.6", features = ["limit"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["env-filter", "fmt", "json", "std"] }
+url = "2"
+hickory-resolver = { version = "=0.26.3", default-features = false, features = ["tokio"] }
+ipnet = "2"
+chrono-tz = "0.10"
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["test-util", "process"] }
+tower = { version = "0.5", features = ["util"] }
+
+[profile.dev]
+debug = 0
+incremental = false
+
+[profile.test]
+debug = 0
+incremental = false

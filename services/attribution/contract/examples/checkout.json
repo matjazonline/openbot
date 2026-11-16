@@ -1,0 +1,9 @@
+{
+  "checkout_id": "checkout-1",
+  "order_created_at": "2026-11-15T12:00:00Z",
+  "consent": true,
+  "candidate_click_ids": [
+    "cccccccc-cccc-4ccc-8ccc-ccccccccccc1",
+    "cccccccc-cccc-4ccc-8ccc-ccccccccccc2"
+  ]
+}

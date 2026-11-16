@@ -1,0 +1,37 @@
+   Compiling tokio v1.54.1
+   Compiling hyper v1.12.0
+   Compiling tokio-stream v0.1.19
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.6
+   Compiling tokio-util v0.7.20
+   Compiling hickory-net v0.26.3
+   Compiling sqlx-core v0.8.6
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.21
+   Compiling hickory-resolver v0.26.3
+   Compiling hyper-rustls v0.27.10
+   Compiling axum v0.8.9
+   Compiling reqwest v0.13.4
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 8.83s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+
+
+thread 'adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres' (22523611) panicked at src/adapters/identity/../setup/http_tests.rs:260:5:
+FAIL: setup browser stage launch: Error
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 1.31s
+
+error: test failed, to rerun pass `--lib`

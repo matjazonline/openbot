@@ -1,0 +1,16 @@
+/private/tmp/attribution-service-contract-env/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 1.010s
+
+OK

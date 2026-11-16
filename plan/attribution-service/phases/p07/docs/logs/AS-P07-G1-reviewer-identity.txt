@@ -1,0 +1,7 @@
+Decision AS-P07-D1/r1 SHA256 2760673dc2838a177c22686a1502ec4aa62f28c2ae66c6dff6a35793512e16cf verified at start/end.
+Main coordination authority matches immutable revision19 pin at start/end.
+HEAD6e55258cbbdc7633940805f366fb17fe240f02aa; detached.
+Final source87a2d3e588289d3e35d7023cd0b42ac21b42ac69293e46aa362797c6dccb1aa9 exactly matches assigned snapshot under eight exclusions.
+Initial reviewer snapshot0c819921... includes two author-owned imported-check .pyc files; root acknowledged and removed those disposable outputs, restoring original source identity. No exclusion expanded.
+git diff --check PASS.
+Architecture-only gate; no runtime checks executed.

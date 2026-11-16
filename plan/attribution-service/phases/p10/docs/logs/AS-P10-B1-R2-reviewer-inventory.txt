@@ -1,0 +1,1 @@
+PASS R1→R2:20 reviewed source paths unchanged; target symlink removed from nonignored inventory by /target; strict verify flag and CA/leaf SKI+AKI only topology changes; one new TLS learning. Additional unrelated-owner hashes independently match HEAD.

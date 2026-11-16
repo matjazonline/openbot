@@ -1,0 +1,15 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 8.17s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 7 tests
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::tests::attribution_company_lifecycle_lost_reconciliation_lease_cannot_store_observation ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_body_limit_follows_header_authentication ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 20 filtered out; finished in 2.06s
+

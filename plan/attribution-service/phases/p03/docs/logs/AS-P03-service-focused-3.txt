@@ -1,0 +1,19 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 8.96s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 11 tests
+test adapters::identity::tests::attribution_session_encryption_rotation_and_return_paths ... ok
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted ... ok
+test adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+test adapters::identity::tests::attribution_sso_login_binding_and_competing_consumers ... ok
+test adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation ... ok
+test adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 5.58s
+

@@ -1,0 +1,52 @@
+{
+  "version": 1,
+  "round": "AS-P10-B1-R2-doop",
+  "artifact": "55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97",
+  "checks": [
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/check-doop.py --output <owned gate directory>; explicit system Chrome",
+      "fixture": "Pinned managed Doop, owned database. 2701 tests passed; private S3 setup failed in two files; 26 skipped. See exact retained outcomes.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-doop-complete-gate-1.txt",
+          "sha256": "c38846299dc04ef584f827ca2567309a69c284fa336d259c0c1357ccf6d42852"
+        },
+        {
+          "path": "logs/AS-P10-doop-complete-gate-results.txt",
+          "sha256": "d70d13660bfcf2dfdca6bc49ffe019a35f2e57134b9902cf15f2178f39461350"
+        },
+        {
+          "path": "logs/AS-P10-doop-fixture.json",
+          "sha256": "9b1be890e7ed5e5c87cc42d42a013d2629a66d97e6743f86e814512c855d1a31"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "docker info under actual runner.clean_environment(service-home)",
+      "fixture": "Existing runner drops DOCKER_HOST and DOCKER_CONFIG; absent /var/run/docker.sock; both owners identical HEAD",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-doop-clean-environment-diagnostic.json",
+          "sha256": "8cd3a2da9718d8fd761f251932663e730fd4155c0337c81a492b7420027c4ae4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Remaining managed Doop build/image/private acceptance stages",
+      "fixture": "No attribution changes in managed Doop source or its existing runner",
+      "status": "NOT EXERCISED",
+      "reason": "Upstream required private-storage fixture test failed under sanitized environment before these dependent stages."
+    }
+  ]
+}

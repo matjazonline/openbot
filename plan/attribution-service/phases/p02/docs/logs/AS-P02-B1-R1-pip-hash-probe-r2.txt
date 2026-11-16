@@ -1,0 +1,4 @@
+Collecting attrs==26.1.0 (from -r services/attribution/contract/requirements.lock (line 1))
+  Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+ERROR: Hashes are required in --require-hashes mode, but they are missing from some requirements. Here is a list of those requirements along with the hashes their downloaded archives actually had. Add lines like these to your requirements files to prevent tampering. (If you did not enable --require-hashes manually, note that it turns on automatically when any package has a hash.)
+    attrs==26.1.0 --hash=sha256:c647aa4a12dfbad9333ca4e71fe62ddc36f4e63b2d260a37a8b83d2f043ac309

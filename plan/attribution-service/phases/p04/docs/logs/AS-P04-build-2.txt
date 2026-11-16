@@ -1,0 +1,11 @@
+    Checking attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+error[E0599]: no method named `txt_data` found for reference `&hickory_resolver::hickory_proto::rr::rdata::TXT` in the current scope
+  --> src/adapters/setup/dns.rs:25:100
+   |
+25 | ...hes!(&record.data, RData::TXT(value) if value.txt_data().concat()==challenge.as_bytes())) {return Err(Failure::Invalid);}
+   |                                                  ^^^^^^^^-- help: remove the arguments
+   |                                                  |
+   |                                                  field, not a method
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `attribution_service` (lib) due to 1 previous error

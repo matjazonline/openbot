@@ -1,0 +1,11 @@
+{
+  "worker_pid": 39348,
+  "fixture": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//openbot-check.u0qCyC/knowledge",
+  "descendants": [
+    39363,
+    39385,
+    39389,
+    39407
+  ],
+  "reason": "Knowledge browser test remained active without overall timeout after other browser workers completed; retain failure and run isolated bounded diagnostic."
+}

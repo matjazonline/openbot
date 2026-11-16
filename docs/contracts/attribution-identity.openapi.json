@@ -1,0 +1,990 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Openbot attribution identity",
+    "version": "1.0.0",
+    "description": "API-first contract. See contract README for bounds, authority, retries and interpretation; no native platform adapter is implied."
+  },
+  "servers": [
+    {
+      "url": "https://openbot.example.invalid"
+    }
+  ],
+  "paths": {
+    "/api/attribution/v1/authorize": {
+      "get": {
+        "operationId": "authorize",
+        "summary": "authorize",
+        "security": [
+          {
+            "OpenbotSession": []
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "parameters": [
+          {
+            "name": "client_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "const": "attribution"
+            }
+          },
+          {
+            "name": "redirect_uri",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2048,
+              "format": "uri"
+            }
+          },
+          {
+            "name": "response_type",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "const": "code"
+            }
+          },
+          {
+            "name": "state",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 128,
+              "pattern": "^[A-Za-z0-9_-]+$"
+            }
+          },
+          {
+            "name": "code_challenge",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 43,
+              "maxLength": 43,
+              "pattern": "^[A-Za-z0-9_-]{43}$"
+            }
+          },
+          {
+            "name": "code_challenge_method",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "const": "S256"
+            }
+          }
+        ],
+        "description": "Authenticate with existing Openbot login if needed using a bounded server continuation. Exact registered callback only. Issue one-use 60-second code bound to live actor/session/revision/client/callback and S256 challenge. No user_id parameter."
+      }
+    },
+    "/api/attribution/v1/token": {
+      "post": {
+        "operationId": "redeem_code",
+        "summary": "redeem code",
+        "security": [
+          {
+            "Client": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Token"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/OAuthError400"
+          },
+          "401": {
+            "$ref": "#/components/responses/OAuthError401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/OAuthError503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "$ref": "#/components/schemas/TokenRequest"
+              }
+            }
+          }
+        },
+        "description": "Atomically redeem once; concurrent redeemers cannot both succeed. Validate client/callback/verifier and current originating session before minting a grant. No refresh token. No-store and no-referrer."
+      }
+    },
+    "/api/attribution/v1/identity": {
+      "get": {
+        "operationId": "identity",
+        "summary": "identity",
+        "security": [
+          {
+            "IdentityGrant": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Identity"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "description": "Derive user/client from opaque grant; check original session revocation, account auth_revision and expiry each time."
+      }
+    },
+    "/api/attribution/v1/companies": {
+      "get": {
+        "operationId": "accessible_companies",
+        "summary": "accessible companies",
+        "security": [
+          {
+            "IdentityGrant": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyPage"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100,
+              "default": 25
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512
+            }
+          }
+        ],
+        "description": "Current live memberships; keyset pagination maximum 100. No cached permission grants."
+      }
+    },
+    "/api/attribution/v1/companies/{company_id}/access": {
+      "get": {
+        "operationId": "company_access",
+        "summary": "company access",
+        "security": [
+          {
+            "IdentityGrant": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyAccess"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CompanyId"
+            }
+          }
+        ],
+        "description": "Current account and membership authority. Missing or foreign company returns 404; unavailable storage returns 503. Body/path identity cannot select another user."
+      }
+    },
+    "/api/attribution/v1/companies/{company_id}/status": {
+      "get": {
+        "operationId": "company_status",
+        "summary": "company status",
+        "security": [
+          {
+            "Client": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CompanyId"
+            }
+          }
+        ],
+        "description": "Current lifecycle state/version only; no membership or user impersonation. Retained deleted-company tombstone survives both direct company and owner-account deletion."
+      },
+      "post": {
+        "operationId": "set_attribution_company_status",
+        "summary": "Set attribution company status",
+        "description": "Existing Openbot owner/admin session and its CSRF boundary required. Suspend/resume attribution access for the live company; terminal deletion uses the existing company/account deletion use cases. Commit status/version and durable notification atomically. Cannot change another company or supply an actor. Compare-and-set expected_version; mismatch is 409. After an ambiguous response read status, never automatically submit a new version to repeat the old change.",
+        "security": [
+          {
+            "OpenbotSession": []
+          }
+        ],
+        "x-user-permission": "integrations:manage",
+        "x-max-body-bytes": 4096,
+        "parameters": [
+          {
+            "name": "company_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/CompanyId"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CompanyStatusWrite"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Committed current status",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyStatus"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        }
+      }
+    },
+    "/api/attribution/v1/revoke": {
+      "post": {
+        "operationId": "revoke_identity_grant",
+        "summary": "revoke identity grant",
+        "security": [
+          {
+            "IdentityGrant": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Success"
+          },
+          "400": {
+            "$ref": "#/components/responses/Error400"
+          },
+          "401": {
+            "$ref": "#/components/responses/Error401"
+          },
+          "403": {
+            "$ref": "#/components/responses/Error403"
+          },
+          "404": {
+            "$ref": "#/components/responses/Error404"
+          },
+          "409": {
+            "$ref": "#/components/responses/Error409"
+          },
+          "410": {
+            "$ref": "#/components/responses/Error410"
+          },
+          "413": {
+            "$ref": "#/components/responses/Error413"
+          },
+          "429": {
+            "$ref": "#/components/responses/Error429"
+          },
+          "503": {
+            "$ref": "#/components/responses/Error503"
+          }
+        },
+        "x-max-body-bytes": 4096,
+        "description": "Revoke this opaque grant; cannot revoke arbitrary user/session IDs."
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "CompanyId": {
+        "type": "string",
+        "format": "uuid",
+        "not": {
+          "const": "00000000-0000-0000-0000-000000000000"
+        },
+        "description": "CompanyId; never interchangeable with another resource identity."
+      },
+      "UserId": {
+        "type": "string",
+        "format": "uuid",
+        "not": {
+          "const": "00000000-0000-0000-0000-000000000000"
+        },
+        "description": "UserId; never interchangeable with another resource identity."
+      },
+      "Permission": {
+        "type": "string",
+        "enum": [
+          "read",
+          "links:manage",
+          "integrations:manage"
+        ]
+      },
+      "CompanyStatus": {
+        "type": "object",
+        "properties": {
+          "company_id": {
+            "$ref": "#/components/schemas/CompanyId"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended",
+              "deleted"
+            ]
+          },
+          "changed_at": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "company_id",
+          "version",
+          "state",
+          "changed_at"
+        ],
+        "additionalProperties": false
+      },
+      "CompanyAccess": {
+        "type": "object",
+        "properties": {
+          "company_id": {
+            "$ref": "#/components/schemas/CompanyId"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "permissions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Permission"
+            },
+            "minItems": 0,
+            "maxItems": 3
+          },
+          "lifecycle": {
+            "$ref": "#/components/schemas/CompanyStatus"
+          }
+        },
+        "required": [
+          "company_id",
+          "name",
+          "permissions",
+          "lifecycle"
+        ],
+        "additionalProperties": false
+      },
+      "CompanyPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CompanyAccess"
+            },
+            "minItems": 0,
+            "maxItems": 100
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 512
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64
+          },
+          "message": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          },
+          "correlation_id": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": [
+          "code",
+          "message",
+          "correlation_id"
+        ],
+        "additionalProperties": false
+      },
+      "Identity": {
+        "type": "object",
+        "properties": {
+          "user_id": {
+            "$ref": "#/components/schemas/UserId"
+          },
+          "display_name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "expires_at": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40,
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "user_id",
+          "display_name",
+          "expires_at"
+        ],
+        "additionalProperties": false
+      },
+      "TokenRequest": {
+        "type": "object",
+        "properties": {
+          "grant_type": {
+            "const": "authorization_code"
+          },
+          "code": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "redirect_uri": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2048,
+            "format": "uri"
+          },
+          "code_verifier": {
+            "type": "string",
+            "minLength": 43,
+            "maxLength": 128,
+            "pattern": "^[A-Za-z0-9._~-]+$"
+          }
+        },
+        "required": [
+          "grant_type",
+          "code",
+          "redirect_uri",
+          "code_verifier"
+        ],
+        "additionalProperties": false
+      },
+      "Token": {
+        "type": "object",
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "token_type": {
+            "const": "Bearer"
+          },
+          "expires_in": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 28800
+          }
+        },
+        "required": [
+          "access_token",
+          "token_type",
+          "expires_in"
+        ],
+        "additionalProperties": false
+      },
+      "OAuthError": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string",
+            "enum": [
+              "invalid_request",
+              "invalid_client",
+              "invalid_grant",
+              "unsupported_grant_type",
+              "temporarily_unavailable"
+            ]
+          },
+          "error_description": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 256
+          }
+        },
+        "required": [
+          "error",
+          "error_description"
+        ],
+        "additionalProperties": false
+      },
+      "CompanyStatusWrite": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "state",
+          "expected_version"
+        ],
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "active",
+              "suspended"
+            ]
+          },
+          "expected_version": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9223372036854775807
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "Client": {
+        "type": "http",
+        "scheme": "basic",
+        "description": "Dedicated registered confidential attribution client."
+      },
+      "IdentityGrant": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Opaque user/client/session-bound grant; never a submitted user ID or Openbot browser token."
+      },
+      "OpenbotSession": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "session"
+      }
+    },
+    "responses": {
+      "Error400": {
+        "description": "Invalid request",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error401": {
+        "description": "Invalid or missing credential",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error403": {
+        "description": "Permission/scope denied",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error404": {
+        "description": "Missing or foreign object",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error409": {
+        "description": "Conflicting immutable/idempotent facts",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error410": {
+        "description": "Expired ingestion horizon or deleted public resource",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error413": {
+        "description": "Payload bound exceeded",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Error429": {
+        "description": "Admission limit; retry after Retry-After",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "Retry delay in seconds.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        }
+      },
+      "Error503": {
+        "description": "Storage/authority unavailable; retry after Retry-After",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "Retry delay in seconds.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        }
+      },
+      "OAuthError400": {
+        "description": "OAuth token error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OAuthError"
+            }
+          }
+        }
+      },
+      "OAuthError401": {
+        "description": "OAuth token error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OAuthError"
+            }
+          }
+        }
+      },
+      "OAuthError503": {
+        "description": "OAuth token error",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/OAuthError"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "description": "Retry delay in seconds.",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 60
+            }
+          }
+        }
+      }
+    }
+  }
+}

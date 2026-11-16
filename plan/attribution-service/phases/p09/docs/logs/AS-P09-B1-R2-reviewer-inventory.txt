@@ -1,0 +1,1 @@
+PASS R1→R2 exact delta: fixture commerce-clock branch; control returns JSON; checkout/payment/refund timestamps use awaited database clock; one new Trail learning. All other R1 source hashes/inventory unchanged.

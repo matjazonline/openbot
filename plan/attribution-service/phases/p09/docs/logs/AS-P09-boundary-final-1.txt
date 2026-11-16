@@ -1,0 +1,17 @@
+attribution boundary passed: resolved dependencies, source/assets/config, owned SQL
+test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source (__main__.BoundaryTests.test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source) ... ok
+test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected (__main__.BoundaryTests.test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected) ... ok
+test_attribution_boundary_foreign_sql_is_rejected (__main__.BoundaryTests.test_attribution_boundary_foreign_sql_is_rejected) ... ok
+test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout (__main__.BoundaryTests.test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout) ... ok
+test_attribution_boundary_local_source_and_owned_sql_pass (__main__.BoundaryTests.test_attribution_boundary_local_source_and_owned_sql_pass) ... ok
+test_attribution_boundary_locking_and_separate_ctes_keep_table_checks (__main__.BoundaryTests.test_attribution_boundary_locking_and_separate_ctes_keep_table_checks) ... ok
+test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks (__main__.BoundaryTests.test_attribution_boundary_materialized_ctes_and_lateral_keep_nested_checks) ... ok
+test_attribution_boundary_private_import_and_parent_asset_are_rejected (__main__.BoundaryTests.test_attribution_boundary_private_import_and_parent_asset_are_rejected) ... ok
+test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers (__main__.BoundaryTests.test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers) ... ok
+test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency (__main__.BoundaryTests.test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency) ... ok
+test_attribution_boundary_unpinned_git_is_rejected (__main__.BoundaryTests.test_attribution_boundary_unpinned_git_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 11 tests in 0.057s
+
+OK

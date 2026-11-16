@@ -1,0 +1,17 @@
+{"application": "ob", "base_image": "sha256:23fd1df4f0edbfe3a8205513523d466605ac0da2dc474844f254a2522ab46b4e", "trusted_image": "sha256:8835b6249b60ecf171ec68adde083b6df57bb69ed7ef3f9d3bff2feb6c3b6062"}
+{"application": "as", "base_image": "sha256:76154a6f0260239afe4e2b987d8f83f4b0ab1d9b3310258bd1a7fd1605557d29", "trusted_image": "sha256:c7954c92caa1674e6118e215a05ecced9649b04b52ae0406edfe188738ea82e2"}
+Topology: containers
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 275, in <module>
+    tag = "as-topology-trust-" + uuid.uuid4().hex
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 266, in main
+    # nginx's unprivileged process must be able to read the copied fixture key.
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 120, in start
+    self.sql(app, f"CREATE ROLE \"{app}\" LOGIN PASSWORD '{self.passwords[app]}' NOSUPERUSER NOCREATEDB NOCREATEROLE; CREATE DATABASE \"{app}\" OWNER \"{app}\"; REVOKE ALL ON DATABASE \"{app}\" FROM PUBLIC;", "postgres")
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 88, in sql
+    return docker("exec", "-i", self.db[app], "psql", "-U", "postgres", "-d", database or app, "-X", "-At", "-v", "ON_ERROR_STOP=1", input=statement)
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 37, in docker
+    return run("docker", *args, **kwargs).stdout.strip()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 32, in run
+    raise RuntimeError(f"fixture command failed: {args[0]} {args[1]} (exit {r.returncode})")
+RuntimeError: fixture command failed: docker exec (exit 3)

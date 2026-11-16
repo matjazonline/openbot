@@ -1,0 +1,17 @@
+{
+  "kind": "refund",
+  "event_id": "refund-delivery-1",
+  "order_id": "order-1",
+  "occurred_at": "2026-11-16T10:00:00Z",
+  "refund_id": "refund-1",
+  "currency": "EUR",
+  "lines": [
+    {
+      "line_id": "line-x",
+      "returned_quantity": 1,
+      "merchandise_amount": 1200
+    }
+  ],
+  "tax_amount": 240,
+  "shipping_amount": 0
+}

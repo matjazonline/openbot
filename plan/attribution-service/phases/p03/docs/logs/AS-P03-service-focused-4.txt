@@ -1,0 +1,61 @@
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.47.0
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.17
+   Compiling aws-lc-rs v1.19.0
+   Compiling sqlx-core v0.8.6
+   Compiling sqlx-postgres v0.8.6
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling reqwest v0.13.4
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 14.82s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 18 tests
+test adapters::identity::http_tests::attribution_company_lifecycle_body_limit_follows_header_authentication ... ok
+test adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+test adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids ... ok
+test adapters::identity::tests::attribution_session_encryption_rotation_and_return_paths ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_shutdown_cancels_inflight_status_and_joins ... ok
+test adapters::identity::http_tests::attribution_company_lifecycle_reconciliation_repairs_missed_delete_and_records_denial ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login ... FAILED
+test adapters::identity::tests::attribution_company_lifecycle_lost_reconciliation_lease_cannot_store_observation ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::tests::attribution_company_lifecycle_waiting_writer_rechecks_expiry_and_suspension ... ok
+test adapters::identity::tests::attribution_sso_login_binding_and_competing_consumers ... ok
+test adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted ... FAILED
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout ... ok
+test adapters::identity::http_tests::boundary_tests::attribution_company_lifecycle_cold_expired_evicted_and_concurrent_access ... ok
+
+failures:
+
+---- adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login stdout ----
+
+thread 'adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login' (21849188) panicked at src/adapters/identity/http_boundary_tests.rs:77:5:
+assertion `left == right` failed
+  left: 302
+ right: 303
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted stdout ----
+
+thread 'adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted' (21849386) panicked at src/adapters/identity/tests.rs:132:57:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"attribution_sessions\" violates check constraint \"attribution_sessions_check\"", detail: Some("Failing row contains (9d12b678-8862-47ad-9a71-2b4137d11a94, \\x58f2a53cfb6b76a0dfeb60bebd409b03e74f9dfa80e168cc68bcb068965de8..., 9cc16ec8-67d9-4135-b5f7-81043fd9e6be, \\x00000001f3a033077ec0503a7d0f379f39afa497e56a2586b751cf3a2863e5..., 2026-11-16 08:59:06.282024+00, 2026-11-16 08:59:05.282368+00, 2026-11-16 09:29:06.282024+00, null)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("attribution_sessions"), column: None, data_type: None, constraint: Some("attribution_sessions_check"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+
+
+failures:
+    adapters::identity::http_tests::boundary_tests::attribution_sso_callback_rejects_unbound_browser_and_limits_login
+    adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted
+
+test result: FAILED. 16 passed; 2 failed; 0 ignored; 0 measured; 14 filtered out; finished in 3.71s
+
+error: test failed, to rerun pass `--lib`

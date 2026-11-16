@@ -1,0 +1,18 @@
+{
+  "command": "docker info --format {{.ServerVersion}} under actual runner.clean_environment(service-home)",
+  "exit": 1,
+  "stdout": "\n",
+  "stderr": "failed to connect to the docker API at unix:///var/run/docker.sock; check if the path is correct and if the daemon is running: dial unix /var/run/docker.sock: connect: no such file or directory\n",
+  "DOCKER_HOST_retained": false,
+  "DOCKER_CONFIG_retained": false,
+  "unchanged_owners": {
+    "scripts/check-doop.py": {
+      "matches_HEAD": true,
+      "sha256": "4dee95cc932aedcb33b75ce2a9533102bf87115ee33215ad35cc4ef2b159e4f6"
+    },
+    "scripts/doop-test.py": {
+      "matches_HEAD": true,
+      "sha256": "87db0bfb43eabcf50b6b5320b5ed75223492a2fb516c7777e8de0d89a10dc457"
+    }
+  }
+}

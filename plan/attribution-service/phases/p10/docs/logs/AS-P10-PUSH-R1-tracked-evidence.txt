@@ -1,0 +1,61 @@
+plan/attribution-service/phases/p01/docs/logs/AS-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 4}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p01/docs/logs/AS-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p02/docs/logs/AS-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 5}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p02/docs/logs/AS-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p03/docs/logs/AS-P03-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p03/docs/logs/AS-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 5, "NOT EXERCISED": 0, "PASS": 15}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p03/docs/logs/AS-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 17}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p04/docs/logs/AS-P04-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 13}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p04/docs/logs/AS-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 13}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p04/docs/logs/AS-P04-B1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 11}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p05/docs/logs/AS-P05-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 12}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p05/docs/logs/AS-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p06/docs/logs/AS-P06-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p06/docs/logs/AS-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p06/docs/logs/AS-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p06/docs/logs/AS-P06-B1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p07/docs/logs/AS-P07-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 0, "PASS": 5}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p07/docs/logs/AS-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 0, "PASS": 5}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p08/docs/logs/AS-P08-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 10}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p08/docs/logs/AS-P08-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 7}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p08/docs/logs/AS-P08-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 10}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p09/docs/logs/AS-P09-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 13}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p09/docs/logs/AS-P09-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 1}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-ACCEPT-R1.evidence.json: retained evidence valid {"FAIL": 8, "NOT EXERCISED": 1, "PASS": 10}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 2, "PASS": 6}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-controls.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-doop.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 0}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-final.evidence.json: retained evidence valid {"FAIL": 8, "NOT EXERCISED": 1, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2.evidence.json: retained evidence valid {"FAIL": 6, "NOT EXERCISED": 1, "PASS": 11}
+1 evidence manifest(s) validated; declared results are not acceptance
+plan/attribution-service/phases/p10/docs/logs/AS-P10-PUSH-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance
+Validated 30 attribution manifests with tracked evidence.

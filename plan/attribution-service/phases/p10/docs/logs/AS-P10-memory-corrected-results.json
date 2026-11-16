@@ -1,0 +1,20 @@
+[
+  {
+    "check": "memory-extracted",
+    "exit": 101
+  },
+  {
+    "check": "memory-backup",
+    "exit": 0
+  },
+  {
+    "check": "memory-journey",
+    "exit": 0
+  },
+  {
+    "check": "memory-integration",
+    "exit": 0,
+    "database": "as_p10_mem_bridge_1b6a965d941a4277819b287b1878f3af",
+    "fixture": "Openbot and memory role databases on same owned vector PG18, as required by this script"
+  }
+]

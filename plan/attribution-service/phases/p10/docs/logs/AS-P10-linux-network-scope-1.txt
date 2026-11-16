@@ -1,0 +1,20 @@
+Unable to find image 'python:3.13-slim-bookworm' locally
+3.13-slim-bookworm: Pulling from library/python
+1d3acbec7eb9: Pulling fs layer
+275133d18a0a: Pulling fs layer
+6566b82365dd: Pulling fs layer
+2d66c782e484: Pulling fs layer
+14226bd4164b: Download complete
+1d3acbec7eb9: Download complete
+b92dbfba8606: Download complete
+6566b82365dd: Download complete
+275133d18a0a: Download complete
+2d66c782e484: Download complete
+2d66c782e484: Pull complete
+6566b82365dd: Pull complete
+1d3acbec7eb9: Pull complete
+275133d18a0a: Pull complete
+Digest: sha256:a5a7017efc5969e00ae2b91c8eb0631049a569652aa4ffc4501769049ae45c72
+Status: Downloaded newer image for python:3.13-slim-bookworm
+debconf: delaying package configuration, since apt-utils is not installed
+python3: can't open file '/work/scripts/test-network-isolation-scope.py': [Errno 2] No such file or directory

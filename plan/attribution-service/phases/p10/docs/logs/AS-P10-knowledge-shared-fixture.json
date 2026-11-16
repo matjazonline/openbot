@@ -1,0 +1,10 @@
+{
+  "directory": "/Users/mac02/as-p10-knowledge-pnc6k864",
+  "reason": "Run byte-identical checker with its negative-test bind mounts inside Docker-shared /Users instead of unshared /private/var",
+  "source_hashes": {
+    "scripts/check-knowledge-image.py": "95eb2995c0f042c5433f8f3b10369ac71bfd1e10de6536a3f04bf0f2ae8497a2",
+    "assets/knowledge/model-manifest.json": "09630d32bee5d5b8ed3068d0e700d8cf0a46b8c8a7f0b9e04430d242c28cd7d8",
+    "fly.toml": "c9bd5a41bcd76858065b7f21606ee20eb02ae907cdc6f717a0f997623ee242a0"
+  },
+  "image": "as-openbot-production:local"
+}

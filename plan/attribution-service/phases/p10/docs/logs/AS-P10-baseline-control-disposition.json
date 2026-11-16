@@ -1,0 +1,33 @@
+{
+  "baseline_control": "6e55258c plus accepted compile-only invalid visibility repair",
+  "reproduced_failures": [
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers"
+  ],
+  "current_not_reproduced_by_this_control": [
+    "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript",
+    "adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup",
+    "adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create"
+  ],
+  "additional_baseline_failures": [],
+  "baseline_result": "1 passed; 16 failed",
+  "knowledge_inputs": "All seven compared actual inputs byte-identical",
+  "new_root_tests": 12,
+  "new_root_ignored_browser_tests": 1,
+  "removed_tests": 0
+}

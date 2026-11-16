@@ -1,0 +1,421 @@
+{
+  "source": "/Users/mac02/orca/workspaces/openbot/attribution-service",
+  "worktree": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree",
+  "head": "2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee",
+  "preserved_main_identities": {
+    ".github/workflows/attribution-service.yml": {
+      "sha256": "c6871b68ebdb1a219b6241d0b9d3e2df6740ce2678acc07bc798a2c8487cbcff"
+    },
+    ".trail/learnings/2026-11-16-give-changing-selects-a-stable-explicit-mac02.md": {
+      "sha256": "8e1cca84c30323281874b9c6236d12270c7b6368d4df3bc5bef39dfc74d62058"
+    },
+    ".trail/learnings/2026-11-16-size-company-list-responses-for-json-mac02.md": {
+      "sha256": "5da5441f89f900ae7668d6290f2c06b279f7539cdfbaf48b8b0f3734684713ee"
+    },
+    ".trail/learnings/2026-11-16-use-a-local-https-destination-for-mac02.md": {
+      "sha256": "c67ab14deb34e4c8afe79446bc2a5d8db53c304648d177b49a011ee0c9495d51"
+    },
+    "Cargo.lock": {
+      "sha256": "e8edf6baf3977b7e324f55fa49641b3026234bf085afeeda1c3bfad22ef44857"
+    },
+    "Cargo.toml": {
+      "sha256": "dc0a9bfd19660c2288ebc7be2c4c9e586bee9e465a02f71c14706795f26442e9"
+    },
+    "docs/contracts/attribution-identity.openapi.json": {
+      "sha256": "39e060487885f8b635289f65a0678aab2c183dd61c7afbffd692c152d8a67ba0"
+    },
+    "migrations/20260817000000_init_schema.sql": {
+      "sha256": "ff440b84a308d4af8c832c01943b845fdb7d03a866ac65ab2d06b568f9f3dc7a"
+    },
+    "plan/attribution-service/01-application-boundaries-and-contracts.md": {
+      "sha256": "e1e0cc00df973cdb2528b1932d83e40b32cb64f8d11e60b03feea9cd6780b886"
+    },
+    "plan/attribution-service/03-single-sign-on-and-company-access.md": {
+      "sha256": "58b7b781f01007e590e55123fe3541b3054cd06926972aa9d8bc3ff7285ea1e5"
+    },
+    "plan/attribution-service/04-merchant-setup-and-api-credentials.md": {
+      "sha256": "7e757e64227e09d0706ad97a24133875084b3cb357aebc810117eb292f09b769"
+    },
+    "plan/attribution-service/06-website-tracking-and-checkout-handoff.md": {
+      "sha256": "5e4b493caf36ec33fc6059372da2a730b5b2b62f7c2353015c89510f40cf7dfb"
+    },
+    "plan/attribution-service/07-orders-refunds-and-attribution.md": {
+      "sha256": "8ec8f0a2cd30cdfe353bb6ada4501ef78726c2a8299fa293bf87e74d754da14f"
+    },
+    "plan/attribution-service/09-operations-retention-and-separate-deployment.md": {
+      "sha256": "96c59bcc5327d378268abf39764ee4f7d00fe074dc4c75fd75245b4c9636827e"
+    },
+    "plan/attribution-service/10-integration-verification-and-pilot.md": {
+      "sha256": "2807d5678cf2bcc10cc93294b3e46dc32dba25d093a82fc5b85db20048d9cb59"
+    },
+    "services/attribution/.cargo/config.toml": {
+      "sha256": "c1b24ac802b85ae61f25bf50c417994018f150c5ebba87675e7d8131e6ef8588"
+    },
+    "services/attribution/.dockerignore": {
+      "sha256": "5a953bfba380a8ced450fdb4eeba50f990e30f49553d4ffb2391a2c0a1f34aa3"
+    },
+    "services/attribution/.gitignore": {
+      "sha256": "cf688a32149b66ff9f35fe72f7745de9525f33a3f291cbc4e330c6b253290e2c"
+    },
+    "services/attribution/.sqlx/query-543e26842177f26513bf38fd1ded9443e88a179f5a9904460ec11f2e65f8a475.json": {
+      "sha256": "17cf2ce1113f4a2010cc8d06689ebd83d799a3dbe1f477c736823e2d6c19fb3c"
+    },
+    "services/attribution/AGENTS.md": {
+      "sha256": "06ea1ddcceecaf8a8b2cbc5207e65a3c520b91a552af458b9dd986fbe1e81ba7"
+    },
+    "services/attribution/Cargo.lock": {
+      "sha256": "0291473ddaf1a11d1811b201a85b5f5083a44b240df0b8ede9d3ee09ed12f19b"
+    },
+    "services/attribution/Cargo.toml": {
+      "sha256": "4eb42e7a098aaa05dc7986c89756821192032db2690627f965264401742e5e80"
+    },
+    "services/attribution/Dockerfile": {
+      "sha256": "7c34ca5ab6b77668472243ba80b1e989dbb59700815719dc523a38c84f5bf40a"
+    },
+    "services/attribution/README.md": {
+      "sha256": "6d4282c31d75e022b4a9afa20f4924fc428ecde0f4045063df1212bfd360ced3"
+    },
+    "services/attribution/WEBSITE.md": {
+      "sha256": "26b0c3dda210611249ad9a6b4e43a49b6813af2719701b39a06b27e6b3083bb8"
+    },
+    "services/attribution/assets/app.css": {
+      "sha256": "c4d464f8c3aab12864bd5f0d2e750a7b3cd37cf9790c8cec929e97dd201ae98c"
+    },
+    "services/attribution/assets/app.js": {
+      "sha256": "6e4ede1a111ea7c41bec3eee90de29d496f3bada1256cb21a0ef77835ac8b6b3"
+    },
+    "services/attribution/assets/sdk-1.0.0.js": {
+      "sha256": "b2f31fae370582797c4eb83ce8c918b2ae783c8f300963e61b0cf66c37b08d3d"
+    },
+    "services/attribution/assets/setup.html": {
+      "sha256": "2fd79d938e662a9304afa0d52450c532302d58f93b695d14610420e6ad14ac1d"
+    },
+    "services/attribution/assets/setup.js": {
+      "sha256": "eb75dab19dbe9c729383a65df196cb1c4a5c42a50e447e3550ed39cd8d01b5d4"
+    },
+    "services/attribution/browser/package-lock.json": {
+      "sha256": "160b3e2a00679aa41b36d0eefd6d5fca8b45385752468e63742794243ff82df7"
+    },
+    "services/attribution/browser/package.json": {
+      "sha256": "312b6dde58f3ab4b8ac220c08a3770b95bea1aeaa78dcbaec5f9eb50ecfbcd4c"
+    },
+    "services/attribution/browser/setup.mjs": {
+      "sha256": "2767040ce6f005eb60ff4d1456590a06af1f8146fdcb51b593392bff9a63e60a"
+    },
+    "services/attribution/browser/sso.mjs": {
+      "sha256": "b6e974fe86da456e6735011e91b6c6ce301d48088f6df7edd6f363a98137afbb"
+    },
+    "services/attribution/browser/website.mjs": {
+      "sha256": "a09aa3944a5c2f630a25965f3c939efcdd525c44402b62bd98adbfeccf890010"
+    },
+    "services/attribution/config.env.example": {
+      "sha256": "9cd6137ace29986fe30233775cc7078f1d23b9f5f15b24a2c891c993c311df22"
+    },
+    "services/attribution/contract/README.md": {
+      "sha256": "69c72601c7bcf2c3bdb281dcbcd3f2045cc46fde0ea3eadeb50702df3b823271"
+    },
+    "services/attribution/contract/attribution.openapi.json": {
+      "sha256": "7126e1ea1c49cffa49fa4dcd5df61cab8bc2bcb84b111475859dff2972e43c3e"
+    },
+    "services/attribution/contract/examples/analytics.json": {
+      "sha256": "58fd2005b07014506644fa4278741bd051f5cb89e1f97d10b4017daa4144e310"
+    },
+    "services/attribution/contract/examples/authority-cases.json": {
+      "sha256": "d8f3e0ab953504875860c05fbc095f4883e78cc61c4eecbd885081420c39a2cd"
+    },
+    "services/attribution/contract/examples/checkout.json": {
+      "sha256": "1a66967e43a6962f7963aa2a32be8362137cbc736a9fb4390f202b88f3f7a906"
+    },
+    "services/attribution/contract/examples/credential-replay.json": {
+      "sha256": "dd243d1ddaac436a8c2fe69823c70795e660838d2fa08011d30caaae1e796abc"
+    },
+    "services/attribution/contract/examples/ledger.json": {
+      "sha256": "cfd6004b13cf810a9a73d1998a862817b10485f27e473d02ef9b934a463b9b40"
+    },
+    "services/attribution/contract/examples/lifecycle.json": {
+      "sha256": "b7f50e0d29245101ccf63acb8585160b579a16f1f07cdb52ad10c08db0f53ce9"
+    },
+    "services/attribution/contract/examples/observation.json": {
+      "sha256": "b51a45034c0cba6b0ac6a8d0b9bfb2fca53ce2b5adb806e529bf551ddb1e1a19"
+    },
+    "services/attribution/contract/examples/paid.json": {
+      "sha256": "b2f9ed934043c68dcafca6b908b79268059ebf9ba5a077715ee756e588932640"
+    },
+    "services/attribution/contract/examples/refund.json": {
+      "sha256": "c8ea80441590d53ac4e3b233877ee39ad2908af3d4b48825b8ee7b8aa3b1a626"
+    },
+    "services/attribution/contract/examples/token-request.json": {
+      "sha256": "7b6d8e79550a401dfaee614736c045ff7fba5ceef7e432ea39d9abbdfd3428fb"
+    },
+    "services/attribution/contract/openbot-identity.openapi.json": {
+      "sha256": "39e060487885f8b635289f65a0678aab2c183dd61c7afbffd692c152d8a67ba0"
+    },
+    "services/attribution/contract/requirements.lock": {
+      "sha256": "16a7a776fcf767d118ad4f8fd9e27459029200c3a109953d20604ceeca8aa4bb"
+    },
+    "services/attribution/contract/test_contracts.py": {
+      "sha256": "685daf8688d42b4accf829ae173a7e5f8d7604a39876c25b452bc7c0aa4a5e5c"
+    },
+    "services/attribution/migrations/202611150001_foundation.sql": {
+      "sha256": "f3c61b96e17cd0817a1f18c88128cb2e053d1bd83b5a7449b003cfe6a80af8ab"
+    },
+    "services/attribution/rust-toolchain.toml": {
+      "sha256": "7d21c66a15f41bad66b82ed06a289f5dc8a6e3751951d2696bbf20ce296f2b0f"
+    },
+    "services/attribution/scripts/boundary.py": {
+      "sha256": "d6a5a84c067a617288e9bd6b740db1db08bcd2bc98ae70a7dd46043f82b19710"
+    },
+    "services/attribution/scripts/browser-sso.py": {
+      "sha256": "44d3e3942c6cf21a0d7a8c570916410c45695abf67d9ab4cef68373f7ccf193d"
+    },
+    "services/attribution/scripts/check-contracts.sh": {
+      "sha256": "cd3e1d7676ad273dce58ecab4b278548d62ea7cf4d094b9f286b72f0eb3efb5b"
+    },
+    "services/attribution/scripts/container-smoke.py": {
+      "sha256": "ce6e66015df95bda4e045334aa0b4cfeaab6e920b273567ac1f67451d672134c"
+    },
+    "services/attribution/scripts/extracted-build.py": {
+      "sha256": "d00c6bad3a981ba66f372064b8061440b8947f6e77ba1d2d3b0bb2ab8a5885c5"
+    },
+    "services/attribution/scripts/fixture.py": {
+      "sha256": "c0bfabd0e578d8c8da2729d21902f0a336cad2e5baf3c8e9b72cc499ce850e1c"
+    },
+    "services/attribution/scripts/test_boundary.py": {
+      "sha256": "8d8eefadc3778a0ca3df99121987e40355facffd202112443f33e3fd0c80961f"
+    },
+    "services/attribution/scripts/verify.py": {
+      "sha256": "086c8d68a9a47fb03155f1fea1a942cec8b2c38cfff11264edaeb7804fa344a1"
+    },
+    "services/attribution/scripts/verify.sh": {
+      "sha256": "d1cb158d483001dd36899267184368af9410f38ee302c6e01e5c3f312a6c8539"
+    },
+    "services/attribution/src/adapters/catalog/http.rs": {
+      "sha256": "e32b5be385be8ce6a357ce7b0b5d967f70a3e15af677a03fe7342cea09364ed9"
+    },
+    "services/attribution/src/adapters/catalog/http_tests.rs": {
+      "sha256": "4084351c5c11c383201ec6fcb18d470f3d691c9c0f7859cbd78308058c9719f6"
+    },
+    "services/attribution/src/adapters/catalog/mod.rs": {
+      "sha256": "e0842dfa9014a04c69d8e8936b81d6fb80be9af8016750df5ded0d7201d6e7ef"
+    },
+    "services/attribution/src/adapters/catalog/postgres.rs": {
+      "sha256": "9a531797c82d359b8e58bbbb0d92a8480dce46892a0d524b7c8a45098a8755b0"
+    },
+    "services/attribution/src/adapters/catalog/wire_proxy.rs": {
+      "sha256": "5899c7615f28fb742b22047afc347095c386bb868a9b461f0b16c2129ba9e169"
+    },
+    "services/attribution/src/adapters/http.rs": {
+      "sha256": "05793d36b0ecc0457df7c6cbb5bdf9c087ea04a548fc4d4bd79349c0d304dc92"
+    },
+    "services/attribution/src/adapters/http_tests.rs": {
+      "sha256": "02416538de02eee2c5b8e5fe132cc075b13e9479bac2488d64679dbd11cb1762"
+    },
+    "services/attribution/src/adapters/identity/authority.rs": {
+      "sha256": "5eaf2224452eff3d82b63bbab86158d69dc4267c895391fe7487a426c4ef9e64"
+    },
+    "services/attribution/src/adapters/identity/authority_tests.rs": {
+      "sha256": "ea95aa2c0aff5a988195d3d9110a3e7ed887b53c205c8de527c04c2596bbd7a2"
+    },
+    "services/attribution/src/adapters/identity/crypto.rs": {
+      "sha256": "75f01c3ef7adfb8bd1327f615fea8e019f9afb6c5392650e351b3fe6fb130f65"
+    },
+    "services/attribution/src/adapters/identity/http.rs": {
+      "sha256": "81cc8fe6399d1cfc3145ce23995a058460c35991181f2eef37be96759f180067"
+    },
+    "services/attribution/src/adapters/identity/http_boundary_tests.rs": {
+      "sha256": "491a366014a59cd0e29f1c769531adfa163f108e9ea67874c74994496c04c611"
+    },
+    "services/attribution/src/adapters/identity/http_tests.rs": {
+      "sha256": "f33a94bcba68d1ddece28782326c2f1fe9ca59a17d57e8afb277d69a4c2cda74"
+    },
+    "services/attribution/src/adapters/identity/mod.rs": {
+      "sha256": "904aca8cf5a20b336ba898aaa1ad27b207de6c4eae636f54a29735b098ccfcbb"
+    },
+    "services/attribution/src/adapters/identity/postgres.rs": {
+      "sha256": "3b13c7793117ccf773e5f8081f1399bf1817889ed2e963f29ef95575d437642f"
+    },
+    "services/attribution/src/adapters/identity/tenants.rs": {
+      "sha256": "9a9b1f7b84bcfaa1258be7a8bbe91bf5a4c3c6461c8d0a5b6a2175031d1a9c0d"
+    },
+    "services/attribution/src/adapters/identity/tests.rs": {
+      "sha256": "bcc008c23e0cf06c890be187aad3b8bf221fcadac5eb113dfdad36696ea54363"
+    },
+    "services/attribution/src/adapters/identity/worker.rs": {
+      "sha256": "eb60a69893d356d7261a112dfc04124ce853f53687bcaae14f6c7cd2380f1e95"
+    },
+    "services/attribution/src/adapters/management.rs": {
+      "sha256": "f145e9f6486124abbd9ed062b8367766be98a59fb78c893fe609def306713c33"
+    },
+    "services/attribution/src/adapters/mod.rs": {
+      "sha256": "969968d8ce08a6b8123e79858a17566e0db11ea44d3b61f9dc5630d95b941457"
+    },
+    "services/attribution/src/adapters/postgres.rs": {
+      "sha256": "5bf73f2f8109f1506251fdb06d01ac0b3d20ddfcdd9abaa344fc86365dfac9f9"
+    },
+    "services/attribution/src/adapters/postgres_tests.rs": {
+      "sha256": "7b3de228e03327866dcb8896a30dac506af6e991db50921815d01e0970adff89"
+    },
+    "services/attribution/src/adapters/setup/admission.rs": {
+      "sha256": "cb2268f2770e713b35940022f3fb5c0006ae68b1dc59df3f70738ce893ef2ada"
+    },
+    "services/attribution/src/adapters/setup/dns.rs": {
+      "sha256": "fc227dd119c1c5a57ca6fe0aef747dbc467a71747bd6e6cd3076b4adf5b7f6bc"
+    },
+    "services/attribution/src/adapters/setup/http.rs": {
+      "sha256": "516b3d86c5083993ed0b36f6920deb0233238380d8d56fb216e10738ede8b3a7"
+    },
+    "services/attribution/src/adapters/setup/http_tests.rs": {
+      "sha256": "fba4dd1600e1c4460300c5cc37112f5b59a03b6a751310c828c830f596e9ab8f"
+    },
+    "services/attribution/src/adapters/setup/merchant.rs": {
+      "sha256": "0021b940ebacce2248c31570322aff0836cb8b347aa0f324d48e5484e4653c82"
+    },
+    "services/attribution/src/adapters/setup/mod.rs": {
+      "sha256": "43ddda99f4f2c350c66700d43300a55ae4ceb89db4457103d388efcd4086b215"
+    },
+    "services/attribution/src/adapters/setup/postgres.rs": {
+      "sha256": "93c2d26d51bf8fc710f0324d82f53a834b47edd10df3a0e64c12df309493a9fc"
+    },
+    "services/attribution/src/adapters/setup/tests.rs": {
+      "sha256": "15b0ea5abf57c9c73aaa1872aa14771144986b7d1448a5dfbc189d9ffbaf5f60"
+    },
+    "services/attribution/src/adapters/website/http.rs": {
+      "sha256": "6e3e40a96f2ec9bbb11b101313b35dde42f761318d7e99b5e995aed5adf5e4ba"
+    },
+    "services/attribution/src/adapters/website/http_tests.rs": {
+      "sha256": "1b0f450da4eefdd42511b846d716a75e4e9caeb4bb25bc74efda24de2a8c07fc"
+    },
+    "services/attribution/src/adapters/website/mod.rs": {
+      "sha256": "e0842dfa9014a04c69d8e8936b81d6fb80be9af8016750df5ded0d7201d6e7ef"
+    },
+    "services/attribution/src/adapters/website/postgres.rs": {
+      "sha256": "68520f8fd34661c2867620830149789e0e7eed85df26725fc4f7a6cf32f7b1f6"
+    },
+    "services/attribution/src/application/catalog.rs": {
+      "sha256": "ffc30bdec4ee5d013d122bb79860d84571e5888f24a498f644defd82b2d246c0"
+    },
+    "services/attribution/src/application/freshness.rs": {
+      "sha256": "997f3e9086ceba86cf897174b22947a386aaee40178ad3c8b69c34a00d85bf83"
+    },
+    "services/attribution/src/application/identity.rs": {
+      "sha256": "72198bef0453957fea3ea5f56b0e10521b6427cb33402f04f635a3e5995ceba4"
+    },
+    "services/attribution/src/application/ids.rs": {
+      "sha256": "20b9c5a83c3c36231a50dc89e6449b6622f47be1cb58fa0dd527a33c62a67f89"
+    },
+    "services/attribution/src/application/mod.rs": {
+      "sha256": "44e31767f666ed973597bef6867fea06a086c6fe74340e8c28c46a7731f02a17"
+    },
+    "services/attribution/src/application/setup.rs": {
+      "sha256": "1c1693e417f18bea5036c560572c0b4279b28cb2f6c6af4ad6012ea49b697215"
+    },
+    "services/attribution/src/application/website.rs": {
+      "sha256": "fd40a766028963f004993ef7bc34d6d9380d4ff9ab2942d4f986e0327a6f5fcb"
+    },
+    "services/attribution/src/infra/config.rs": {
+      "sha256": "bf3e4d9d23b5edd87070c4b24ddf182cb7fa94f522f79e2763348cbf6bb87a4d"
+    },
+    "services/attribution/src/infra/connection.rs": {
+      "sha256": "e90db7d43cb51e939b979d120351f074b46c7cc02e4d972dfeec65bc929ea439"
+    },
+    "services/attribution/src/infra/connection_tests.rs": {
+      "sha256": "7517268274cd11a8d7879896144d6219a348021c56d5e9eb1d8a8e1e2c59190c"
+    },
+    "services/attribution/src/infra/identity.rs": {
+      "sha256": "771c41f0af4cad1eedfe8933045ec0449eca961ca9b63cc0c84b50b0ad5c11fe"
+    },
+    "services/attribution/src/infra/mod.rs": {
+      "sha256": "dbeaedf626afc814d0878776f6ecf1a676654386267906454c3f50daaa6bedcf"
+    },
+    "services/attribution/src/infra/startup.rs": {
+      "sha256": "a82324512c329693ca23eafb42a7ea3b8640391798e7b633304f59d1430efa40"
+    },
+    "services/attribution/src/lib.rs": {
+      "sha256": "11f0928b94ebaff68e89b28aa7e2341458a07782ffba816577f5ef14cd2dfa97"
+    },
+    "services/attribution/src/main.rs": {
+      "sha256": "5b949b12d7f052e6a35c0716abfffd6e3ea2b66e985b86777ad02ffe82c05395"
+    },
+    "services/attribution/src/test_support.rs": {
+      "sha256": "a0ba042eb39d2eed82775fa884f5546c8f9ae8712058362a906b709eb19f328b"
+    },
+    "src/adapters/http/app_state.rs": {
+      "sha256": "1f352e7dd43e9b9ab342530a51a225563b79dd7d0a719447d5b2509354fead1c"
+    },
+    "src/adapters/http/attribution/mod.rs": {
+      "sha256": "94984fc773bb70b7a149b8b4761df5d006de084de23655cdfce1ed7340e8006e"
+    },
+    "src/adapters/http/attribution/worker.rs": {
+      "sha256": "524098399f3736005bd7b04c5254dad7cac1d0d818e4de775ec155b3b2f2463c"
+    },
+    "src/adapters/http/mod.rs": {
+      "sha256": "3e7e797408d3db1785463c283d8fbbf976ea6e399ea76c9b3293ee0b98c89da5"
+    },
+    "src/adapters/http/routes/assets.rs": {
+      "sha256": "26e8019a5075bb1fc19dcf248a4909dc392125aa288700e4352d6fda68bcbe4b"
+    },
+    "src/adapters/http/routes/user.rs": {
+      "sha256": "4887eafeb8b9809eb83819b7239a68fac62c7a559a8f873ee6e1968472049711"
+    },
+    "src/adapters/http/routes/user_attribution_tests.rs": {
+      "sha256": "c450c7fc3c153a807a524ebb57e0d4c8414f7a8ee4eb43832a6690ef85473da4"
+    },
+    "src/adapters/persistence/attribution/access_tests.rs": {
+      "sha256": "458204cbb38439602d2831ffa1605e73e2aa6da80ed32097ef227be9d77d8901"
+    },
+    "src/adapters/persistence/attribution/http_tests.rs": {
+      "sha256": "b1ed5e895cb30c21abb1ea5e678549a4553af9820eb70349882169c8c6a1f3bc"
+    },
+    "src/adapters/persistence/attribution/mod.rs": {
+      "sha256": "ee78d3f6d75e4ef277db08258f6161e7841643c6a455e9cca5085122c72e1552"
+    },
+    "src/adapters/persistence/attribution/outbox.rs": {
+      "sha256": "ce39ee62e374954a5527493d56e2f1ebf2db50d9652939e755d5d0676e36dfb1"
+    },
+    "src/adapters/persistence/attribution/tests.rs": {
+      "sha256": "5943cea525b054d093381cb02f1bdd2be3266e85003cceca5cd2c618ddb169aa"
+    },
+    "src/adapters/persistence/attribution/worker_tests.rs": {
+      "sha256": "8ffa0f4abb103fe2c87c19608aee0959fe0fc910be7cf8d192facd7c0cc8953e"
+    },
+    "src/adapters/persistence/mod.rs": {
+      "sha256": "6e4e8d3e9798bd798d9a5c968f88ae688257bde23d3a30fdc6b5bdbd126e8cf1"
+    },
+    "src/application/attribution.rs": {
+      "sha256": "ed99742577b98fe439efce4d25ffb628ed0bc820618f49956c128f73224cf328"
+    },
+    "src/application/mod.rs": {
+      "sha256": "fe139f3fe4b610ae97925c151fa65570c82aab3319f0ec7263d2cbf2a5b8827f"
+    },
+    "src/application/workflow/actions/reconciliation/contracts.rs": {
+      "sha256": "fbe5aabe822831bad8e6115e28897e4fa6e4a311ced034ca624fdf6f8db67629"
+    },
+    "src/infra/app.rs": {
+      "sha256": "635f7d4afaf7f2b3d4454d4e79d588bf6ebd1c16a533d43464f33544209cc163"
+    },
+    "src/infra/attribution.rs": {
+      "sha256": "f30ff2bfc5dc885c705a5ef3cea486a8856610678341dfa3698f2569e2d54d3e"
+    },
+    "src/infra/mod.rs": {
+      "sha256": "00e03a7f2a2999ae6142793aa7d9f3c9bd96d9518207381cbdc6f7f188281dfa"
+    },
+    "src/infra/setup.rs": {
+      "sha256": "3ddc863ac2128cab5c44a9a3fa038c037ec157ce7ba87ceb472ac81a1b0a60dc"
+    },
+    "src/infra/setup/foundation.rs": {
+      "sha256": "31b14f38a54770e815fab83f7114400e51ab0c7fd2af321c60b30db83e501c8f"
+    },
+    "src/infra/setup/workers.rs": {
+      "sha256": "a9e5ea6739e022ea84d9c6c6fffdfd0559fb636ac51ca2a30c340b63e48208eb"
+    },
+    "src/main.rs": {
+      "sha256": "6b18280102f2cb3b89110e44cffeda062b1f08be1d65fa4b2908a55b0ee463e9"
+    }
+  },
+  "excluded_external_work": [
+    "scripts/check.sh",
+    "scripts/check-support.sh"
+  ],
+  "note": "Passing F1 complete read-clock/cleanup correction synchronized under own-file hash guards; user test-fix commit preserved.",
+  "main_head_at_sync": "6e55258cbbdc7633940805f366fb17fe240f02aa"
+}

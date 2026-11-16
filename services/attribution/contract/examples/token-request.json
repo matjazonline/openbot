@@ -1,0 +1,6 @@
+{
+  "grant_type": "authorization_code",
+  "code": "ccccccccccccccccccccccccccccccccccccccccccc",
+  "redirect_uri": "https://attribution.example.invalid/auth/callback",
+  "code_verifier": "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+}

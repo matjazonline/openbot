@@ -1,0 +1,49 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (13.837292ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+    Checking aws-lc-sys v0.47.0
+    Checking ring v0.17.14
+    Checking aws-lc-rs v1.19.0
+    Checking rustls-webpki v0.103.17
+    Checking rustls v0.23.46
+    Checking sqlx-core v0.8.6
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+    Checking sqlx-postgres v0.8.6
+    Checking sqlx v0.8.6
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_d0xfsulh/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 7.65s
++ cargo fmt --all -- --check
++ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized] target(s) in 0.17s
++ /opt/homebrew/opt/python@3.13/bin/python3.13 scripts/boundary.py
+SQL table outside owned migrations/catalog: select in src/adapters/identity/tenants.rs
+SQL table outside owned migrations/catalog: select in src/adapters/identity/tenants.rs
+SQL table outside owned migrations/catalog: skip in src/adapters/identity/tenants.rs
+SQL table outside owned migrations/catalog: skip in src/adapters/identity/tenants.rs
+SQL table outside owned migrations/catalog: skip in src/adapters/identity/tenants.rs
+SQL table outside owned migrations/catalog: update in src/adapters/identity/tests.rs
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_d0xfsulh/attribution/scripts/verify.py", line 51, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_d0xfsulh/attribution/scripts/verify.py", line 37, in main
+    run(sys.executable, "scripts/boundary.py", env=offline)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as_extract_d0xfsulh/attribution/scripts/verify.py", line 15, in run
+    result = subprocess.run(args, cwd=ROOT, env=env, check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('/opt/homebrew/opt/python@3.13/bin/python3.13', 'scripts/boundary.py')' returned non-zero exit status 1.
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/extracted-build.py", line 19, in <module>
+    subprocess.run([sys.executable, "scripts/verify.py", mode], cwd=isolated, check=True)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '['/opt/homebrew/opt/python@3.13/bin/python3.13', 'scripts/verify.py', 'foundation']' returned non-zero exit status 1.

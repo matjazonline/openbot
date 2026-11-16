@@ -1,0 +1,7 @@
+{
+  "accepted_suffix_sha256": "398e63b2db854ed702b201c7d2cb3c3c3f4e765053c058ac60e51facdcd26ae3",
+  "accepted_suffix_exact": true,
+  "incoming_prefix_exact": true,
+  "assertion": "merged bytes equal complete incoming migration plus byte-identical accepted attribution append over common base",
+  "appended_bytes": 6684
+}

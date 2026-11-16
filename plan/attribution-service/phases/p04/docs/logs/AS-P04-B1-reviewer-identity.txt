@@ -1,0 +1,13 @@
+Source start/end digest: 6837fba3f8f66fb0160bf308ecc0668d25f33be5a70ad3b65a2895fbedea0c0f
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+Branch: attribution-service
+Immutable AS-P04-D1/r1 hash: PASS
+Coordination revision6 pinned byte comparison: PASS
+AS-C001/r1, AS-C002/r1 unchanged; AS-C003/r1 future-phase dependency acknowledged
+git diff --check: PASS
+AS-P04-B1-reviewer-browser.txt: 398e091f2aa6037c4b7aad09c567c5014788e46abc20a8fd6a3010e537db5b0c
+AS-P04-B1-reviewer-coverage.txt: e95ab69f241be001b0b0cc4056de554c6d8b03f55b336e34b6e49a0bbbab61d1
+AS-P04-B1-reviewer-end.snapshot.txt: c08b007214f76b01fb5ba08552ca5718a2b48701788a609b0bef87a74e6278ce
+AS-P04-B1-reviewer-manifest.txt: 7f1ef6ba6b24c158a3384f995261c6150ba8c030b9800d6eec27571420f8611f
+AS-P04-B1-reviewer-setup.txt: 8372e0422c989aa65db6da741f63145e42f43a6b97d2721ff36a47891b133df6
+AS-P04-B1-reviewer-start.snapshot.txt: c08b007214f76b01fb5ba08552ca5718a2b48701788a609b0bef87a74e6278ce

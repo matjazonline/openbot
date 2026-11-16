@@ -1,0 +1,6 @@
+{
+  "binary": "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/target/debug/attribution-service",
+  "sha256": "69301c1781088162c9dde73064e774f3bf41372bb050cac15c18a31ed53b0e46",
+  "build": "AS-P10-PUSH-R1-service-build.txt",
+  "source_identity": "AS-P10-PUSH-R1-service-identity.json"
+}

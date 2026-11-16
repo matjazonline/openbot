@@ -1,0 +1,5 @@
+AS-P08-B1-R2-reviewer-start.snapshot.txt 99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e PASS
+AS-P08-B1-R2-reviewer-end.snapshot.txt 99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e PASS
+Main coordination23 equals unchanged retained R1 pin: f50dc572fb3854d8eb8b4d2eaca247b51c3278a4fa142df8f7194134fde24e7f
+HEAD/start/base 6e55258cbbdc7633940805f366fb17fe240f02aa
+git diff --check PASS

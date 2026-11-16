@@ -1,0 +1,14 @@
+==> Downloading bottle manifests
+✔︎ Bottle Manifest docker-buildx (0.39.0)
+==> Fetching downloads for: docker-buildx
+✔︎ Bottle docker-buildx (0.39.0)
+==> Pouring docker-buildx--0.39.0.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/docker-buildx/0.39.0: 48 files, 65.9MB
+==> Caveats
+zsh completions have been installed to:
+  /opt/homebrew/share/zsh/site-functions
+==> docker-buildx
+docker-buildx is a Docker plugin. For Docker to find the plugin, add "cliPluginsExtraDirs" to ~/.docker/config.json:
+  "cliPluginsExtraDirs": [
+      "/opt/homebrew/lib/docker/cli-plugins"
+  ]

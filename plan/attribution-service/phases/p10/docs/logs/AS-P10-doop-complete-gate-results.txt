@@ -1,0 +1,61 @@
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   parallel  tests/privateMediaStorage.test.ts [ tests/privateMediaStorage.test.ts ]
+Error: Private S3 fixture requires Docker, Python3, the pinned Garage image and a Docker-shared checkout parent; setup failed
+ ❯ startPrivateStorageFixture tests/privateStorageFixture.ts:96:11
+     94|   } catch {
+     95|     await close()
+     96|     throw new Error(
+       |           ^
+     97|       'Private S3 fixture requires Docker, Python3, the pinned Garage …
+     98|     )
+ ❯ tests/privateMediaStorage.test.ts:19:12
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   parallel  tests/privatePdfRendering.test.ts > renders real private images and an embedded font on both PDF pages through bucket storage
+Error: Private S3 fixture requires Docker, Python3, the pinned Garage image and a Docker-shared checkout parent; setup failed
+ ❯ startPrivateStorageFixture tests/privateStorageFixture.ts:96:11
+     94|   } catch {
+     95|     await close()
+     96|     throw new Error(
+       |           ^
+     97|       'Private S3 fixture requires Docker, Python3, the pinned Garage …
+     98|     )
+ ❯ tests/privatePdfRendering.test.ts:16:42
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 300 passed | 1 skipped (303)
+      Tests  1 failed | 2701 passed | 26 skipped (2728)
+   Start at  19:15:35
+   Duration  965.38s (tests 80%, import 16%, environment 2%, transform 2%)
+
+close timed out after 10000ms
+Tests closed successfully but something prevents 2 Vite servers from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter
+error: script "test" exited with code 1
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/check-doop.py", line 97, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/check-doop.py", line 82, in main
+    service_gate(runner, setup, output, chrome, database)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/check-doop.py", line 33, in service_gate
+    run(*command, cwd=source, env=environment, timeout=1200)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/check-doop.py", line 16, in run
+    subprocess.run(args, cwd=kwargs.pop("cwd", ROOT), check=True, **kwargs)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-doop-2ta28kun/gate/source/tools/node_modules/.bin/bun', 'run', 'test', '--', '--maxWorkers=2')' returned non-zero exit status 1.
+
+Exit: 1

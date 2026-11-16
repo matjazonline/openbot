@@ -43,16 +43,49 @@ domain/configuration updates. Verify the UI never embeds a privileged credential
    Listing returns metadata only. Document intentional overlap during secret rotation, expiry,
    last use, and who may administer keys. Rotation is not a schema compatibility mechanism.
 4. Authenticate before trusting or fully parsing merchant payloads, impose request/tenant limits,
-   and return consistent authentication/permission failures. Native provider webhooks use verified
-   signatures over bounded raw bytes and replay protections, not an assumed bearer-key wrapper.
+   and return consistent authentication/permission failures. Native provider webhooks are deferred; future adapters must verify signatures over bounded raw
+   bytes and replay protections before calling the trusted ingestion path.
 5. Audit key creation/revocation and important configuration changes with trusted actor/company
    identifiers. Local key revocation and company suspension are checked at the ingestion boundary.
 
 Focused checks: `attribution_credentials_` for missing/invalid/expired/revoked keys, wrong scope,
 foreign store, secret non-disclosure, rotation overlap, and concurrent revoke versus use with a
-documented transaction boundary. Provider signature fixtures include altered bytes, stale timestamps
-where supported, and oversized bodies. Keep public event endpoints unable to call trusted sales paths.
+documented transaction boundary. Generic merchant fixtures include invalid bearer keys and oversized bodies. Native provider
+signature fixtures belong to the later adapter integration. Keep public event endpoints unable to call trusted sales paths.
 
 Completion: browser sessions, merchant keys, public installation IDs, and lifecycle/identity service
 credentials have disjoint purposes. Record exact focused commands/counts/results here. Full-suite
 verification is reserved for [10](10-integration-verification-and-pilot.md).
+
+
+## Implementation evidence — phase04 batch
+
+Implemented setup UI/API, exact DNS-approved domains and installations, hash-only
+scoped credentials, rotation/revocation, transactional management receipts and
+credential/tenant authorization boundaries. Architecture decision AS-P04-D1/r1 passed
+independent Astra review AS-P04-G1-N1. Code review/phase acceptance is recorded in
+[phase04 REVIEW](phases/p04/docs/REVIEW.md); passing implementation checks alone is
+not whole-plan acceptance.
+
+Commands run from `services/attribution` with isolated fixtures/cache:
+
+- `cargo test --locked --offline --lib setup`: 18 passed; the explicitly ignored
+  browser test is run separately below. PostgreSQL concurrency and local DNS included.
+- `cargo test --locked --offline --lib attribution_setup_browser_ -- --ignored --nocapture`:
+  1 passed, eight browser checks, actual setup/PG/DNS with an identity fixture.
+- `cargo test --locked --offline --lib adapters::identity:: -- --skip setup_tests`:
+  21 existing identity/lifecycle tests passed.
+- `python3.13 scripts/verify.py prepare`: fresh owned migration and SQLx regeneration passed.
+- `python3.13 scripts/verify.py foundation`: formatting, offline all-target compilation,
+  fresh migrations/SQLx check, boundary checks and 14 foundation tests passed.
+- `ATTRIBUTION_CONTRACT_PYTHON=<dedicated interpreter> scripts/check-contracts.sh`:
+  12 passed. Boundary checker tests: 10 passed.
+
+Retained logs and criterion mapping: [phase04 TASK](phases/p04/docs/TASK.md).
+Native-provider adapters, external/public DNS availability, production deployment
+and whole-plan full-suite verification remain outside this phase's acceptance claim.
+
+Independent review AS-P04-B1-N1 required two additional discriminating checks.
+Both now exercise production transactions: competing store-disable/use in both
+orders, and exact key-creation replay after the original submitted expiry passes
+in database time. Recheck and final acceptance remain in the phase review record.

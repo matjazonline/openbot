@@ -1,0 +1,9 @@
+Owned same-clock isolated PostgreSQL database; current root test binary.
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4256 filtered out; finished in 1.56s
+
+Exit: 0

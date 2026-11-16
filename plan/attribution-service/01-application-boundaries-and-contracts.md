@@ -24,10 +24,10 @@ Run the final full-suite gate in phase 10 after all implementation is integrated
 | [04 — Merchant setup and credentials](04-merchant-setup-and-api-credentials.md) | Store setup, approved domains, scoped keys, administration UI |
 | [05 — Links and clicks](05-links-and-durable-clicks.md) | Campaigns, ads, link API/UI, durable redirects |
 | [06 — Website tracking](06-website-tracking-and-checkout-handoff.md) | Pixel, browser events, consent-aware checkout handoff |
-| [07 — Orders and attribution](07-orders-refunds-and-attribution.md) | First merchant integration, deduplication, refunds, attribution |
+| [07 — Orders and attribution](07-orders-refunds-and-attribution.md) | Store-neutral merchant API, deduplication, refunds, attribution |
 | [08 — Reports and dashboard](08-analytics-and-attribution-dashboard.md) | Reconciled reporting API and attribution-owned dashboard |
 | [09 — Operations and relocation](09-operations-retention-and-separate-deployment.md) | Retention, monitoring, backup restore, separate-server proof |
-| [10 — Verification and pilot](10-integration-verification-and-pilot.md) | End-to-end acceptance, final CI gates, pilot evidence |
+| [10 — Verification and pilot](10-integration-verification-and-pilot.md) | End-to-end API acceptance, final CI gates, deployment evidence |
 
 ## Mandatory application separation
 
@@ -106,24 +106,27 @@ Defaults to carry through the plan:
 - Merchandise revenue uses actual line amounts after discounts; taxes and shipping stay separate.
   Refunds reduce merchandise revenue according to their line allocation. Never add currencies.
 - Fail a redirect with a retryable 503 if its click cannot be durably stored; never issue an
-  apparently tracked click ID whose row was not committed. Confirm this pilot behavior explicitly.
+  apparently tracked click ID whose row was not committed. The user confirmed this behavior on 2026-11-15.
 
 Before dependent implementation, record these decisions and the responsible owner in this file:
 
-- The first real checkout platform/store and its paid-order/refund signature and retry contracts.
-  A generic signed merchant adapter can be a test fixture, but does not count as the promised
-  first production checkout integration.
-- The supported SSO provider arrangement and maintained protocol components. Prefer standard
-  OIDC Authorization Code with PKCE. Determine how the provider maps to Openbot's authoritative
-  users; do not assume Openbot is already an OIDC issuer or silently build a new identity platform.
-  If provider adoption changes account ownership, resolve that architectural choice before phase 03.
-- Expected daily events, peak requests, retention periods, deployment region, consent behavior,
-  allowed tracking placements, and numeric redirect/report/error-budget targets for the pilot.
-- The exact mapping from existing Openbot roles to attribution read, link-management, and
-  integration-administration permissions; company suspend/delete propagation deadline.
+- The first release is API-first, as selected by the user on 2026-11-15. Implement and test a
+  store-neutral merchant API; defer native platform adapters, native webhook signatures, and a
+  real-store purchase/refund pilot. Do not claim any native platform is supported.
+- The user selected Sign in with Openbot on 2026-11-15. Keep account ownership in Openbot and
+  implement a dedicated authorization-code handoff with PKCE and a confidential registered
+  attribution client. Use maintained protocol/cryptographic components; do not claim this is an
+  existing or general-purpose OIDC issuer. Attribution creates its own revocable local session.
+- Browser tracking requires explicit consent; do not retain raw IPs. Implementation/load fixtures
+  have explicit measured budgets. Production region, retention periods and traffic/SLO targets
+  are deployment decisions to finalize before a real pilot, not blockers on the API implementation.
+- The user confirmed: owner/admin have read, link-management and integration-administration;
+  members have read only; non-members have no access. User operations check live authority.
+  Machine/public operations fail closed no later than five minutes after the last successful
+  company status observation. Suspension/deletion push delivery attempts begin immediately.
 
-These are explicit implementation prerequisites, not reasons to leave this planning task unsaved.
-Record unanswered items as open; do not advertise defaults as approved deployment policy.
+Record decisions and unresolved deployment items explicitly. Test targets are not approved
+production deployment policy. The selected API-first scope supersedes native-store pilot requirements.
 
 Evaluate Shlink only against a demonstrated per-request click-ID checkout handoff and total
 maintenance cost. A native Rust implementation is the baseline; adoption must reduce overall
@@ -132,7 +135,7 @@ Official platform impressions/spend, app installs, affiliate payouts, cross-devi
 additional commerce adapters, currency conversion, and click-cohort reporting remain later scope.
 
 Focused checks: reconcile a concrete two-ad, multi-product, refund example on paper; validate the
-selected merchant can supply reliable payment/order/refund identifiers and checkout linkage. Record
+merchant API requires reliable payment/order/refund identifiers and checkout linkage. Record
 the SSO choice and pilot assumptions before starting the batches that depend on them.
 
 ## Current repository anchors and evidence discipline
@@ -151,3 +154,42 @@ record exact commands, nonzero selected/executed test counts, outcomes, and unav
 the corresponding phase file. List filtered tests before running them. Use disposable databases;
 regenerate SQLx metadata in the owning application after SQL edits. Keep final full-suite work in
 [10](10-integration-verification-and-pilot.md); broaden checks earlier at shared identity boundaries.
+
+## Implementation decision register — 2026-11-15
+
+Execution records: [p01 TASK](phases/p01/docs/TASK.md). Shared authority:
+[COORDINATION.md](COORDINATION.md). Phase acceptance and verification are tracked in the phase records.
+
+| Decision | Owner / evidence | Disposition |
+| --- | --- | --- |
+| API-first commerce | User: stores can integrate later through the API | Native adapters and real-store pilot deferred; core commerce API and integration fixture required |
+| Sign in with Openbot | User selected existing Openbot login | Dedicated code/PKCE bridge, independent attribution sessions; no shared cookies or account migration |
+| Read/manage roles | User explicitly accepted implementation defaults | Owner/admin: read/manage/integrations; member: read; non-member: none |
+| Browser consent | User explicitly accepted implementation defaults | Explicit consent required; no raw IP storage; 30-day attribution window |
+| Click-storage failure | User explicitly accepted HTTP 503 | Commit before 302; storage/commit uncertainty returns retryable 503 |
+| Company-status freshness | User explicitly accepted implementation defaults | Fail closed after five minutes without a successful current-status observation |
+| Production region, retention and load/SLO targets | Deployment owner, before real pilot | Open deployment decisions; implementation uses explicit fixture budgets and configuration |
+| Domain control | Implementation owner, subject to independent review | DNS TXT proof, bounded public-only DNS resolution; no submitted destination fetch |
+| Workflow roles | User confirmed xhigh and Sol 6.1 | Root authors; independent Astra/high reviews |
+
+Detailed protocol decisions and examples travel with the service under
+`services/attribution/contract/`. They are reviewable contracts, not a claim that the handlers
+already exist. Every later phase must reconcile its implementation with those contracts.
+
+
+### Phase 01 contract checks
+
+- `ATTRIBUTION_CONTRACT_PYTHON=/tmp/attribution-service-contract-env/bin/python services/attribution/scripts/check-contracts.sh --list`: 9 tests selected.
+- Same command without `--list`: 9 executed, 9 passed; both OpenAPI documents,
+  credential/tenant payload boundaries, bounds, and the concrete ledger checked.
+- Service-only temporary copy: same 9 tests passed without parent repository files.
+- Plan-link/reset-note/startup-registration audit, identity-contract copy comparison,
+  and `git diff --check`: passed.
+- Architecture AS-P01-D1/r2 passed independent review after two corrected findings;
+  full batch review and runtime obligations are recorded in the phase TASK/REVIEW.
+  These checks do not prove any unimplemented HTTP/database/browser behavior.
+
+
+Phase 01 correction verification: the B1-R2 contract suite selects and executes 12
+checks (the original nine plus management retry, lost-key-response and report-metric
+cases). These remain contract/fixture proofs; dependent runtime checks remain required.

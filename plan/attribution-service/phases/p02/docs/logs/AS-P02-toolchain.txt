@@ -1,0 +1,7 @@
+info: syncing channel updates for 1.95.0-aarch64-apple-darwin
+info: latest update on 2026-04-16 for version 1.95.0 (59807616e 2026-04-14)
+info: downloading 5 components
+
+  1.95.0-aarch64-apple-darwin installed - rustc 1.95.0 (59807616e 2026-04-14)
+
+info: checking for self-update (current version: 1.29.3)

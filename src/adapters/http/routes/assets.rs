@@ -12,8 +12,6 @@ use axum::{
     routing::get,
 };
 
-use crate::adapters::http::app_state::AppState;
-
 /// The dark-ink wordmark, for a light background.
 const LOGO_DARK_PNG: &[u8] = include_bytes!("../../../../assets/busybots-logo-dark-hor.png");
 
@@ -79,7 +77,7 @@ pub fn theme_init_js_url() -> &'static str {
     &THEME_INIT_JS_URL
 }
 
-pub fn router() -> Router<AppState> {
+pub fn router<S: Clone + Send + Sync + 'static>() -> Router<S> {
     Router::new()
         .route(
             "/assets/busybots-logo-dark-hor.png",

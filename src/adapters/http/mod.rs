@@ -1,5 +1,6 @@
 pub mod app_error_impl;
 pub mod app_state;
+pub mod attribution;
 pub mod auth;
 pub mod auth_admission;
 pub mod pages;

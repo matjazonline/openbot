@@ -1,0 +1,20 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 3.73s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-d0aa8ae47557e0eb)
+
+running 12 tests
+test adapters::setup::tests::attribution_destination_special_ranges_and_public_addresses ... ok
+test application::setup::tests::attribution_destination_exact_idna_and_unsafe_urls ... ok
+test adapters::setup::tests::attribution_credentials_tenant_admission_is_bounded_and_releases ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_scope_keysets_and_foreign_constraints ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_auth_classes_scope_expiry_store_and_company ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_competing_revoke_and_use_serializes_both_orders ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_logout_and_authority_recheck_before_replay ... ok
+test adapters::identity::http_tests::setup_tests::attribution_destination_verification_expiry_revoke_and_exact_scope ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_concurrent_receipts_conflicts_and_pruned_horizon ... ok
+test adapters::identity::http_tests::setup_tests::attribution_credentials_once_replay_rotation_revocation_and_hash_only ... ok
+test adapters::identity::http_tests::setup_tests::attribution_installation_http_roles_csrf_strict_json_and_limits ... ok
+test adapters::setup::tests::attribution_destination_dns_transport_all_addresses_and_timeout ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 36 filtered out; finished in 4.01s
+

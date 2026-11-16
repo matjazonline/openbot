@@ -1,0 +1,50 @@
+{
+  "head": "6e55258cbbdc7633940805f366fb17fe240f02aa",
+  "rust": "rustc 1.99.1 (58cf8f9c3 2026-10-13)",
+  "python_full_gate": "Python3.13.18",
+  "files": [
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "unchanged": true,
+      "sha256": "096685082b59bacc0a6f14747c3bc3daee771d4fa9edf7aff69eb22cbc6f5ffe"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reconciliation_fixture.rs",
+      "unchanged": true,
+      "sha256": "562c5e9aaaa4622c1535f6fce8fae184fc2642ca0e0018a1839b3fd1837c2dee"
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "unchanged": true,
+      "sha256": "374c22a7a0d9b45d8952799edb20cb0e584ee25bea5f282011b63f9e228ea0a1"
+    },
+    {
+      "path": "src/application/services/model_usage/mod.rs",
+      "unchanged": true,
+      "sha256": "1d7bd8974cd4617248587189569a80508adb63891916ef9c57e2d1a659f7c285"
+    },
+    {
+      "path": "src/domain/workflow/reply_integrity.rs",
+      "unchanged": true,
+      "sha256": "1de31bb71786e68dea6d9960d87edb85d26f509387f6fd3ea69bd0fe3259b579"
+    },
+    {
+      "path": "scripts/doop-test/private_deployment.py",
+      "unchanged": true,
+      "sha256": "94d2c5644540fa46d5019c259ee2953af1495b57ceae7bfea5ece6daa8b02478"
+    },
+    {
+      "path": "scripts/tests/doop-test.py",
+      "unchanged": true,
+      "sha256": "6b87c4292045d60bbd1890347c13adaa58b1b74df4c89ebf58ffecf98fc12c0f"
+    }
+  ],
+  "lock_versions_added": [
+    [
+      "oauth2",
+      "5.0.0"
+    ]
+  ],
+  "lock_versions_removed": [],
+  "disposition": "Unchanged root lint owners fail current stable1.99 warnings; Doop fixture fails Python3.13 strict certificate verification with missing Authority Key Identifier. Existing package versions unchanged; sole new package oauth2. Attribution cookie lint is owned and corrected separately. Do not claim full repository suite passes."
+}

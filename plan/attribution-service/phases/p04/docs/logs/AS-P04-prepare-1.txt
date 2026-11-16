@@ -1,0 +1,22 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (13.979292ms)
++ cargo sqlx prepare -- --locked --offline --all-targets
+    Checking tokio v1.54.1
+    Checking hyper v1.12.0
+    Checking tokio-stream v0.1.19
+    Checking tower v0.5.3
+    Checking tokio-rustls v0.26.6
+    Checking hickory-net v0.26.3
+    Checking tokio-util v0.7.20
+    Checking sqlx-core v0.8.6
+    Checking tower-http v0.6.11
+    Checking hyper-util v0.1.21
+    Checking hickory-resolver v0.26.3
+    Checking hyper-rustls v0.27.10
+    Checking axum v0.8.9
+    Checking reqwest v0.13.4
+    Checking sqlx-postgres v0.8.6
+    Checking sqlx v0.8.6
+    Checking attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 5.65s
+query data written to .sqlx in the current directory; please check this into version control

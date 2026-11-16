@@ -386,6 +386,16 @@ async fn serve() -> anyhow::Result<()> {
         shutdown_tx.subscribe(),
     );
     let mut workflow_handles = workflow.spawn(&workflow_shutdown);
+    if let Some(attribution) = workers.attribution {
+        let stop = workflow_shutdown.clone();
+        workflow_handles.push((
+            "attribution lifecycle",
+            tokio::spawn(open_bots::adapters::http::attribution::worker::run(
+                attribution,
+                stop,
+            )),
+        ));
+    }
 
     // The runtime panel samples the workflow worker slots and the jobs they hold (p08 D4.8).
     let runtime_source = LinuxRuntimeMetricSource::new(

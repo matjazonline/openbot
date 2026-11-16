@@ -1,0 +1,220 @@
+{
+  "version": 1,
+  "round": "AS-P08-ACCEPT-R1",
+  "artifact": "99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib analytics_tests -- --test-threads=2 --nocapture",
+      "fixture": "UUID-owned PostgreSQL18, stock2MiB, Rust1.95.0;8 pass,1 browser selected separately",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-analytics-3.txt",
+          "sha256": "5d2dd3ceaa77acb518043996a7ecf7878d5b9b0f35a339b743b756eced35f834"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib attribution_dashboard_browser_reports_filters_details_and_retry -- --ignored --nocapture",
+      "fixture": "Pinned Playwright Chromium, owned PG and ephemeral service/authority ports;fixture upstream, real HTTP/dashboard/SQL",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-browser-3.txt",
+          "sha256": "1b212f9932a37141c42b4e65d17eed29c8e68c4db9e6ee6345396beb4ba3c454"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib catalog_tests -- --test-threads=2",
+      "fixture": "12 PG catalog regressions, shared authorization owner",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-catalog-1.txt",
+          "sha256": "6552900d5083c2f7d48fb96b9fd54d5efa6d28c2c04f96691d5fb91b989aef87"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib commerce_tests -- --test-threads=2",
+      "fixture": "28 PG ledger/report cases; current query semantics separately rerun by analytics-3",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-commerce-1.txt",
+          "sha256": "6a28611ac9c8044c665585688aaa39b7452a53710b09f1cd2a339b0909d63dad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "PYTHON=/tmp/as-p02-contract-clean/bin/python RUSTUP_TOOLCHAIN=1.95.0 scripts/verify.sh foundation",
+      "fixture": "UUID-owned migration/SQLx metadata check,fmt,offline all targets,11 boundary fixtures,13 startup+2 DB boundary",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-foundation-3.txt",
+          "sha256": "c372902c89acb8fd2d5cf24e9b873d17caf16c933c19e0788b531b295dbc52b9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "ATTRIBUTION_CONTRACT_PYTHON=/tmp/as-p02-contract-clean/bin/python scripts/check-contracts.sh",
+      "fixture": "Portable contract schema/examples;15 cases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-contracts-1.txt",
+          "sha256": "0cbe075ae526e7ed92020de5efc4fb95015f85e720ecd7f3fda97f634d8d9d34"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "Earlier focused development checks (see each output)",
+      "fixture": "Compile visibility;export10000 timeout;wrapping select label;CTE/LATERAL guard;HTML error boundary. Corrected by later PASS evidence.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P08-bounds-1.txt",
+          "sha256": "02463f0cb2d784ac875183dbcb6b8af2df43a67caea8aada45e1b0d6162c8ff9"
+        },
+        {
+          "path": "logs/AS-P08-bounds-2.txt",
+          "sha256": "0eb1d0f46bdb65fb7a872c1f4f4dacb75ac77e15ef1f99f26abcacc821d9faba"
+        },
+        {
+          "path": "logs/AS-P08-browser-1.txt",
+          "sha256": "53b686f13439962dfe3550b7185828830d5e9aebbf5bbcd3569876f17c53a551"
+        },
+        {
+          "path": "logs/AS-P08-foundation-1.txt",
+          "sha256": "b30ca90f44a949063c0ddcaafd762cbe3275644df692bba1234dd9d3f3f9640d"
+        },
+        {
+          "path": "logs/AS-P08-foundation-2.txt",
+          "sha256": "b662cee272b3669da5ee24415c66cddfe6d9395070d4a7ba814fed72782655a7"
+        },
+        {
+          "path": "logs/AS-P08-http-tests-1.txt",
+          "sha256": "cb761b89e4c32167a7f540546fb32e2a1cb5d7c23a941ebc860ed119566fa4dc"
+        },
+        {
+          "path": "logs/AS-P08-http-tests-2.txt",
+          "sha256": "0752b8a5edac391b89e03b7bfc4fd4d3cdef1effba946c711936e009e7d0ffd4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "workflow"
+      ],
+      "command": "trail check",
+      "fixture": "Two lexical false positives in unchanged acceptedp01/p03 records;TASK disposition",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P08-trail-check-1.txt",
+          "sha256": "1765f8c06b0f3cfb89de2d98debc5f5aac235baafb67d9595f9ab4cfff26a7a9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "workflow"
+      ],
+      "command": "git diff --check",
+      "fixture": "Current worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-diff-check-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5",
+        "AS-P08-B1-F1",
+        "AS-P08-B1-F2"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib analytics_tests -- --test-threads=2 --nocapture",
+      "fixture": "9 PG tests including stdlib parsed real HTTP CSV for2currencies and2products, exact10000/10001 rows",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-R2-analytics-1.txt",
+          "sha256": "f1325b165f1aa5fe297e6e10c1c7b54d70ef1eea9475b7b85e6fde4c63f8cd50"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib attribution_dashboard_browser_reports_filters_details_and_retry -- --ignored --nocapture",
+      "fixture": "Real Chromium /reports CSV download and existing dashboard journey",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-R2-browser-1.txt",
+          "sha256": "4ae1b62cffd80dd10332db64f4a1b4e2edcba54a7be1d010da155fbfd35bc94f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo +1.95.0 check --locked --offline --all-targets; cargo +1.95.0 fmt --all -- --check; scripts/check-contracts.sh; git diff --check",
+      "fixture": "Current correction code plus inherited unchanged foundation migration/boundary proof",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P08-R2-check-1.txt",
+          "sha256": "5cef56825403dbf102d278ba0138487df9573e85b00590416a3ec6e292d7add9"
+        },
+        {
+          "path": "logs/AS-P08-R2-fmt-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/AS-P08-R2-contracts-1.txt",
+          "sha256": "78588575ed2afb61fafee95df36ca1e329594c3d1ee1e9fc86f915d693b0332a"
+        },
+        {
+          "path": "logs/AS-P08-R2-diff-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

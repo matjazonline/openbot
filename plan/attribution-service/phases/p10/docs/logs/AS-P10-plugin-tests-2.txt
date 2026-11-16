@@ -1,0 +1,242 @@
+
+> bb-plugin-openbot-local@0.2.0 test
+> node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+
+built 1 plugin entry
+built 18 test entries
+✔ bundle transport uses trusted TLS and live identity with exact maximum streaming bytes (247.364333ms)
+✔ bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies (36.0625ms)
+✔ bundle body cancellation closes the active request and joins promptly (37.701084ms)
+node:internal/modules/cjs/loader:2087
+  return process.dlopen(module, path.toNamespacedPath(filename));
+                 ^
+
+Error: The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/build/Release/fs_ext.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 147. This version of Node.js requires
+NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+    at Object..node (node:internal/modules/cjs/loader:2087:18)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/fs-ext.js:22:15)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+
+Node.js v24.22.3
+✖ build-tests/connector.test.js (276.063291ms)
+✔ configuration refuses non-origin URL http:// (0.609458ms)
+✔ configuration refuses non-origin URL https:// (0.076333ms)
+✔ configuration refuses non-origin URL https://path (0.056ms)
+✔ configuration refuses non-origin URL https:// (0.050083ms)
+✔ configuration refuses non-origin URL https:// (0.063792ms)
+✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (3.619292ms)
+✔ user UTF8 prompt bound remains32KiB with fixed native operation header (15.86275ms)
+✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.99875ms)
+✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (48.464917ms)
+✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (21.268958ms)
+✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (50.438459ms)
+✔ competing stale intent claimants have exactly one durable SDK entry marker (12.792417ms)
+✔ missing command under reconcile enters durable recovery without a fresh SDK claim (47.875917ms)
+✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (8.640917ms)
+✔ preflight refusal is durable but cannot follow the SDK intent cut (13.858542ms)
+✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (2438.37675ms)
+✔ real process interruption at enrollment before-pending recovers the same durable claim (297.749209ms)
+✔ real process interruption at enrollment pending recovers the same durable claim (170.356ms)
+✔ real process interruption at enrollment server-commit recovers the same durable claim (153.458125ms)
+✔ real process interruption at enrollment receipt recovers the same durable claim (268.163209ms)
+✔ real process interruption at enrollment journal recovers the same durable claim (143.978417ms)
+✔ real process interruption at enrollment paired recovers the same durable claim (126.818458ms)
+✔ real process interruption at enrollment cleaned recovers the same durable claim (137.500875ms)
+✔ changed origin never receives a saved pending credential or pairing claim (3.813958ms)
+✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (6.823792ms)
+✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (5.26425ms)
+✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (5.200542ms)
+✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (4.991583ms)
+✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (4.000958ms)
+✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (7.667875ms)
+✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (131.564625ms)
+✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (123.9715ms)
+✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (4.168334ms)
+node:internal/modules/cjs/loader:2087
+  return process.dlopen(module, path.toNamespacedPath(filename));
+                 ^
+
+Error: The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/build/Release/fs_ext.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 147. This version of Node.js requires
+NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+    at Object..node (node:internal/modules/cjs/loader:2087:18)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/fs-ext.js:22:15)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+
+Node.js v24.22.3
+✖ build-tests/lock.test.js (240.182708ms)
+✔ native MCP arguments bound hostile objects before cloning or durable intent and preserve valid Unicode (5.2295ms)
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (107.486209ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (17.080333ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (22.960125ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (38.819667ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (16.958167ms)
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (281.028375ms)
+✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (126.637542ms)
+✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16737.825709ms)
+✔ native abort cancels the immutable invocation even when the admission response was lost (55.93125ms)
+✔ only a proven first-attempt admission rejection retires after restart; ambiguous errors retain the intent (607.873416ms)
+✔ a positively received first rejection is durable even if native cancellation races its response cleanup (17.987333ms)
+✔ unknown outcome survives a physical plugin journal restart; status from B resolves A without another admission (28.52775ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (87.815583ms)
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (395.284167ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (94.143292ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (56.088959ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (47.962041ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (44.1015ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (6.277625ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (72.529458ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (38.001542ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (5.626292ms)
+✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (56.612708ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (18.88925ms)
+✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (42.60375ms)
+✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (33.82625ms)
+✔ MCP contracts retain exact schema bytes and reject substituted binding/source identities before cache writes (45.380292ms)
+✔ create sends explicit full native permissions (102.584667ms)
+✔ send sends explicit full native permissions (10.839ms)
+✔ create sends explicit auto native permissions (4.971ms)
+✔ send sends explicit auto native permissions (12.76325ms)
+✔ create sends explicit accept_edits native permissions (12.04ms)
+✔ send sends explicit accept_edits native permissions (60.785792ms)
+✔ unsupported full access at provider refuses before native intent (23.017458ms)
+✔ unsupported full access at server refuses before native intent (5.5155ms)
+✔ unsupported full access at host refuses before native intent (14.142958ms)
+✔ unsupported full access at manual refuses before native intent (21.090625ms)
+✔ catalog advertises only permission modes allowed by provider and both ceilings (5.440375ms)
+✔ permission policy has no implicit default or legacy permission decoder (0.141084ms)
+✔ native idle admission preserves prompt order, queue identity and separate originating turns (73.821417ms)
+✔ native human admission preserves prompt order, queue identity and separate originating turns (116.335625ms)
+✔ native openbot admission preserves prompt order, queue identity and separate originating turns (19.950208ms)
+✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (7.183333ms)
+✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (12.575417ms)
+✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (43.70425ms)
+✔ bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history (515.723ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (4096) (6209.564333ms)
+✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (205) (9042.210458ms)
+✔ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (30.865875ms)
+✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (10.372333ms)
+✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (9.936042ms)
+✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (106.348083ms)
+✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (94.81225ms)
+✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (69.872ms)
+✔ full mapping history pauses new creates while existing native work completes and ACKs drain (713.106292ms)
+✔ lost read-only deliveries reconcile without poisoning native admission (48.412916ms)
+✔ native startup error before turn acceptance stays uncertain across restart without resubmission (36.935167ms)
+✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (16.060084ms)
+✔ lost send response reopens intent and recovers exact turn without sending again (6.010417ms)
+✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (6.245542ms)
+✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (11.099209ms)
+✔ persistent missing native thread coalesces evidence and retains effect capacity (41.613792ms)
+✔ resolved matching permission updates running without item event across journal reopen (12.204625ms)
+✔ preflight model refusal is durable before any SDK mutation (5.157583ms)
+✔ preflight provider refusal is durable before any SDK mutation (4.941542ms)
+✔ preflight project refusal is durable before any SDK mutation (4.10075ms)
+✔ preflight expired refusal is durable before any SDK mutation (5.73475ms)
+✔ preflight gate refusal is durable before any SDK mutation (4.631667ms)
+✔ preflight foreign refusal is durable before any SDK mutation (4.073916ms)
+✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (65.315125ms)
+✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (10.568709ms)
+✔ matching terminal output stays within UTF8 bound and unknown usage remains null (27.541291ms)
+✔ ambiguous duplicate matching requests cannot attribute a human or second turn (7.217458ms)
+✔ compacted sparse native replay survives restart and uses completed snapshots (28.21425ms)
+✔ sparse native replay never invents missing request correlation (4.233917ms)
+✔ sparse native replay never invents missing acceptance correlation (5.953667ms)
+✔ prunable partial or started text cannot become final output without a completed snapshot (4.443833ms)
+node:internal/modules/cjs/loader:2087
+  return process.dlopen(module, path.toNamespacedPath(filename));
+                 ^
+
+Error: The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/build/Release/fs_ext.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 147. This version of Node.js requires
+NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+    at Object..node (node:internal/modules/cjs/loader:2087:18)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/fs-ext.js:22:15)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+
+Node.js v24.22.3
+✖ build-tests/startup.test.js (184.705083ms)
+node:internal/modules/cjs/loader:2087
+  return process.dlopen(module, path.toNamespacedPath(filename));
+                 ^
+
+Error: The module '/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/build/Release/fs_ext.node'
+was compiled against a different Node.js version using
+NODE_MODULE_VERSION 147. This version of Node.js requires
+NODE_MODULE_VERSION 137. Please try re-compiling or re-installing
+the module (for instance, using `npm rebuild` or `npm install`).
+    at Object..node (node:internal/modules/cjs/loader:2087:18)
+    at Module.load (node:internal/modules/cjs/loader:1651:32)
+    at Module._load (node:internal/modules/cjs/loader:1443:12)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:261:19)
+    at Module.require (node:internal/modules/cjs/loader:1674:12)
+    at require (node:internal/modules/helpers:157:16)
+    at Object.<anonymous> (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/integrations/cloudroom-plugin/node_modules/fs-ext/fs-ext.js:22:15)
+    at Module._compile (node:internal/modules/cjs/loader:1929:14)
+    at Object..js (node:internal/modules/cjs/loader:2060:10)
+    at Module.load (node:internal/modules/cjs/loader:1651:32) {
+  code: 'ERR_DLOPEN_FAILED'
+}
+
+Node.js v24.22.3
+✖ services/lifecycle.test.mjs (83.22025ms)
+ℹ tests 118
+ℹ suites 0
+ℹ pass 114
+ℹ fail 4
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 18259.111
+
+✖ failing tests:
+
+test at build-tests/connector.test.js:1:1
+✖ build-tests/connector.test.js (276.063291ms)
+  'test failed'
+
+test at build-tests/lock.test.js:1:1
+✖ build-tests/lock.test.js (240.182708ms)
+  'test failed'
+
+test at build-tests/startup.test.js:1:1
+✖ build-tests/startup.test.js (184.705083ms)
+  'test failed'
+
+test at services/lifecycle.test.mjs:1:1
+✖ services/lifecycle.test.mjs (83.22025ms)
+  'test failed'

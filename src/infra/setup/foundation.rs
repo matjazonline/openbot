@@ -1,6 +1,7 @@
 //! Fallible deployment resources, before any supervised loop is spawned.
 use super::*;
 pub(super) struct Foundation {
+    pub(super) attribution: Option<Arc<crate::adapters::http::attribution::Bridge>>,
     pub(super) knowledge: Arc<crate::application::knowledge::KnowledgeLibrary>,
     pub(super) config: Arc<AppConfig>,
     pub(super) persistence: Arc<crate::adapters::persistence::PostgresPersistence>,
@@ -50,8 +51,10 @@ pub(super) async fn build(config: Arc<AppConfig>) -> anyhow::Result<Foundation> 
     let sessions = Arc::new(
         SessionAuthority::new(&config, persistence.clone()).with_monitoring(monitoring.clone()),
     );
+    let attribution = crate::infra::attribution::build(persistence.clone(), sessions.clone())?;
     install_builtin_agent_library(persistence.as_ref()).await?;
     Ok(Foundation {
+        attribution,
         knowledge,
         config,
         persistence,

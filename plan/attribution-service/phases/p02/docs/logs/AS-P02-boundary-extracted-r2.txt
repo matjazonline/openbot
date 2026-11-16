@@ -1,0 +1,36 @@
++ /opt/homebrew/bin/python3.13 scripts/test_boundary.py
+test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source (__main__.BoundaryTests.test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source) ... ok
+test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected (__main__.BoundaryTests.test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected) ... ok
+test_attribution_boundary_foreign_sql_is_rejected (__main__.BoundaryTests.test_attribution_boundary_foreign_sql_is_rejected) ... ok
+test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout (__main__.BoundaryTests.test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout) ... ok
+test_attribution_boundary_local_source_and_owned_sql_pass (__main__.BoundaryTests.test_attribution_boundary_local_source_and_owned_sql_pass) ... ok
+test_attribution_boundary_private_import_and_parent_asset_are_rejected (__main__.BoundaryTests.test_attribution_boundary_private_import_and_parent_asset_are_rejected) ... ok
+test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers (__main__.BoundaryTests.test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers) ... ok
+test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency (__main__.BoundaryTests.test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency) ... ok
+test_attribution_boundary_unpinned_git_is_rejected (__main__.BoundaryTests.test_attribution_boundary_unpinned_git_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.186s
+
+OK
++ /opt/homebrew/bin/python3.13 scripts/boundary.py
+attribution boundary passed: resolved dependencies, source/assets/config, owned SQL
++ bash scripts/check-contracts.sh
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts.test_attribution_contract_both_openapi_documents_validate) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts.test_attribution_contract_bounds_and_errors_are_declared_for_all_routes) ... ok
+test_attribution_contract_every_management_mutation_has_a_retry_identity (__main__.AttributionContracts.test_attribution_contract_every_management_mutation_has_a_retry_identity) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts.test_attribution_contract_examples_match_wire_schemas) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts.test_attribution_contract_identity_pkce_and_credential_classes) ... ok
+test_attribution_contract_lost_key_response_replays_metadata_without_secret (__main__.AttributionContracts.test_attribution_contract_lost_key_response_replays_metadata_without_secret) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts.test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts.test_attribution_contract_money_currency_and_collection_bounds) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts.test_attribution_contract_public_observations_cannot_describe_sales) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts.test_attribution_contract_refund_business_identity_example_is_discriminating) ... ok
+test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds (__main__.AttributionContracts.test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts.test_attribution_contract_two_ad_product_refund_ledger_reconciles) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 2.121s
+
+OK
+correction boundaries and contracts passed from service-only copy

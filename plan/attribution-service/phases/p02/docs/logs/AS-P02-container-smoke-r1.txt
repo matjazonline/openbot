@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/container-smoke.py", line 85, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/container-smoke.py", line 52, in main
+    docker("exec", "-i", db, "psql", "-U", "postgres", "-v", "ON_ERROR_STOP=1", input=f"CREATE ROLE attribution LOGIN PASSWORD '{password}';\nCREATE DATABASE attribution OWNER attribution;\nREVOKE ALL ON DATABASE attribution FROM PUBLIC;\n")
+    ~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/container-smoke.py", line 17, in docker
+    raise RuntimeError("container command failed: " + args[0])
+RuntimeError: container command failed: exec

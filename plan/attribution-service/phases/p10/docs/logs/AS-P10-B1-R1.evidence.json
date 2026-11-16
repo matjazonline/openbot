@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "round": "AS-P10-B1-R1",
+  "artifact": "0c42f5f05564bd55bbef877a43380925536f135111e1e33dc8f195b815607fa6",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7"
+      ],
+      "command": "python3 scripts/extracted-build.py",
+      "fixture": "Fresh independent service copy, Rust1.95, owned PG18 on64326, 120tests/3browser/15contracts/11boundary",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-extracted-full-1.txt",
+          "sha256": "81f1ac8f5f7806ddc25a8b507e1c5d586bce192036a829c3bf5dda4723c0f00b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "python3 -I scripts/test-network-isolation-scope.py",
+      "fixture": "Disposable Debian Linux container, unprivileged asfixture user, real firewall/sockets, concurrent isolated guards and UID counterexample",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-linux-network-scope-3.txt",
+          "sha256": "f76234862de0397efb0200c53e050b3234d76f7830fbd05e4c31144bf0fb6209"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "compiled source_modules test binary --nocapture",
+      "fixture": "Current root binary identity retained;8module-reachability checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-source-modules-1.txt",
+          "sha256": "a97affc829136896d4d4131146dda88fde86adf8143b3ae7806aab8fc30e29af"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_e2e_",
+      "fixture": "Phase-owned actual PostgreSQL/API/DNS commerce fixture",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-e2e-1.txt",
+          "sha256": "8090b6c81058fb91474485e9c1f6c495a446d7defaf6ee34be76988b4606eb73"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_session_",
+      "fixture": "Single-clock expiry correction; current complete suite also passes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-session-expiry-1.txt",
+          "sha256": "ed0eea62f02b13e2a2d7cc8ee9479f6ba5ddcc4afdf547cf640753d5ef3fa43c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "Both production images, two isolated layouts. Root pending-cookie style correction postdates this image; current-image recheck pending",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-production-topologies-1.txt",
+          "sha256": "6282170000a63a045ef33b6db493957b8e27d81f3a1223f2ce8735e118b82b88"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "fixture": "Current Rust1.99.1; unchanged baseline lint owners plus owned cookie lint subsequently corrected",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-clippy-1.txt",
+          "sha256": "951e8264cfa25f63203f424a957f4f06ce7d9dee4258a461dfc8618de904348c"
+        },
+        {
+          "path": "logs/AS-P10-baseline-failure-audit.json",
+          "sha256": "1773b3e7d2f61a340f51c7e22a7cc7f96550c980365d6f373194c6aef4bfa6e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/tests/doop-test.py",
+      "fixture": "Python3.13 strict TLS validation; unchanged Doop certificate fixture",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-doop-boundaries-1.txt",
+          "sha256": "651bb300702f62ed4f1bc56c5d81737db10be2c1b73f1a203c696f97d66320e9"
+        },
+        {
+          "path": "logs/AS-P10-baseline-failure-audit.json",
+          "sha256": "1773b3e7d2f61a340f51c7e22a7cc7f96550c980365d6f373194c6aef4bfa6e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/check.sh final completion",
+      "fixture": "Owned native PG18 root DB, vector service separate pinned container",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Runner is ongoing; individual completed stages do not establish the final full/stack/lease/browser/service gates. Final evidence to follow before acceptance."
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "current-source production root image and both topology layouts",
+      "fixture": "Owned task Colima and isolated UUID networks",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Current root image rebuilding after the mechanical pending-cookie lint correction. Final evidence to follow before acceptance."
+    }
+  ]
+}

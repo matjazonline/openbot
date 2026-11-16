@@ -1,0 +1,306 @@
+{
+  "version": 1,
+  "round": "AS-P10-B1-R2",
+  "artifact": "55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7"
+      ],
+      "command": "python3 scripts/extracted-build.py",
+      "fixture": "Fresh independent service copy, Rust1.95, owned PG18 on64326, 120tests/3browser/15contracts/11boundary",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-extracted-full-1.txt",
+          "sha256": "81f1ac8f5f7806ddc25a8b507e1c5d586bce192036a829c3bf5dda4723c0f00b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "python3 -I scripts/test-network-isolation-scope.py",
+      "fixture": "Disposable Debian Linux container, unprivileged asfixture user, real firewall/sockets, concurrent isolated guards and UID counterexample",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-linux-network-scope-3.txt",
+          "sha256": "f76234862de0397efb0200c53e050b3234d76f7830fbd05e4c31144bf0fb6209"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "compiled source_modules test binary --nocapture",
+      "fixture": "Current root binary identity retained;8module-reachability checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-source-modules-1.txt",
+          "sha256": "a97affc829136896d4d4131146dda88fde86adf8143b3ae7806aab8fc30e29af"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_e2e_",
+      "fixture": "Phase-owned actual PostgreSQL/API/DNS commerce fixture",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-e2e-1.txt",
+          "sha256": "8090b6c81058fb91474485e9c1f6c495a446d7defaf6ee34be76988b4606eb73"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_session_",
+      "fixture": "Single-clock expiry correction; current complete suite also passes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-session-expiry-1.txt",
+          "sha256": "ed0eea62f02b13e2a2d7cc8ee9479f6ba5ddcc4afdf547cf640753d5ef3fa43c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "Both production images, two isolated layouts. Root pending-cookie style correction postdates this image; current-image recheck pending",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-production-topologies-1.txt",
+          "sha256": "6282170000a63a045ef33b6db493957b8e27d81f3a1223f2ce8735e118b82b88"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --all-targets -- -D warnings",
+      "fixture": "Current Rust1.99.1; unchanged baseline lint owners plus owned cookie lint subsequently corrected",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-clippy-1.txt",
+          "sha256": "951e8264cfa25f63203f424a957f4f06ce7d9dee4258a461dfc8618de904348c"
+        },
+        {
+          "path": "logs/AS-P10-baseline-failure-audit.json",
+          "sha256": "1773b3e7d2f61a340f51c7e22a7cc7f96550c980365d6f373194c6aef4bfa6e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "python3 scripts/tests/doop-test.py",
+      "fixture": "Python3.13 strict TLS validation; unchanged Doop certificate fixture",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-doop-boundaries-1.txt",
+          "sha256": "651bb300702f62ed4f1bc56c5d81737db10be2c1b73f1a203c696f97d66320e9"
+        },
+        {
+          "path": "logs/AS-P10-baseline-failure-audit.json",
+          "sha256": "1773b3e7d2f61a340f51c7e22a7cc7f96550c980365d6f373194c6aef4bfa6e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AS-P10-B1-F1"
+      ],
+      "command": "git check-ignore -v services/attribution/target; nonignored inventory check",
+      "fixture": "Generated cache still available to active rootrunner; omitted from source by service ignore rule",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-F1-target-ignore-proof.txt",
+          "sha256": "1daf0100aeec8d850d0a9340ab1b08e9e745b3e599fe15db51139a5de79effd5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "docker build --tag as-openbot-production:local .",
+      "fixture": "Current root release image3878bace; pinned build images and source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-openbot-production-current-2.txt",
+          "sha256": "653de2d9b9d39146284c354d247d36e9047228a72b4d639f3b85af1f771b372c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "Current release images; Python3.13 rejects original fixture missing Authority Key Identifier",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-production-topologies-current-2.txt",
+          "sha256": "6507f21b92dae6f1aedd6060e91548b7e7b393e7c0e57724483cd3a213ea796f"
+        },
+        {
+          "path": "logs/AS-P10-topology-certificate-diagnostic.txt",
+          "sha256": "d9ed13efaf7ba3217d7deabd8f679483944c93c9085bdc653743475b86387b50"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC7"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "Current release images3878bace/5930cc9c; strict CA/leaf TLS; both layouts and actual complete journeys",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-production-topologies-current-3.txt",
+          "sha256": "a23b376e286cee167ae5bcc2670977a963c788f0cc6047eaeeee8818161d32df"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current root;6lib/7test diagnostics in unchanged baselineowners; attribution lint corrected",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-clippy-current-2.txt",
+          "sha256": "840711559990c33a5c0c33c2db2dafc10f80f61ba23bf06743554905eef76dce"
+        },
+        {
+          "path": "logs/AS-P10-baseline-failure-audit.json",
+          "sha256": "1773b3e7d2f61a340f51c7e22a7cc7f96550c980365d6f373194c6aef4bfa6e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC5"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --all-targets",
+      "fixture": "Native PG18;4210pass/20fail/27ignored. Root attribution26pass/1ignored. Failure disposition in TASK",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-lib-results-1.txt",
+          "sha256": "63dc877c67cb397243cddec6a7ca200142b7c1f672cdb76bc53b953ed3a825b4"
+        },
+        {
+          "path": "logs/AS-P10-root-attribution-tests-1.txt",
+          "sha256": "e8e623c98d2527ea11ab2e164fe643d38fbf0c1cf3543494e1e76f6e15657b7e"
+        },
+        {
+          "path": "logs/AS-P10-root-test-baseline-audit.json",
+          "sha256": "519ce201330b6d3907bf7fb461113782d5f0e5daee4598e212d99d7b8c561878"
+        },
+        {
+          "path": "logs/AS-P10-additional-failure-owner-hashes.json",
+          "sha256": "414fff297d876a85cf688f7de19b426235347266aef02f3d0ee1617210636fa2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "current compiled root test binary isolated targeted failures",
+      "fixture": "Fresh same-clock native PG18: inbox1; provisioning and Doop2; network guarded",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-inbound-diagnostic-1.txt",
+          "sha256": "f39842a2b0660045b6f9f13d1dcf366370f06c11f9985a49c5225fd27c9da673"
+        },
+        {
+          "path": "logs/AS-P10-workflow-diagnostic-1.txt",
+          "sha256": "c4865d5cdcee059b7b9da6d351fd341717b60b36286e7002b3f3f0b79710f641"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test [all registered browser fixtures]",
+      "fixture": "16pass/1owned knowledge worker terminated after218s held navigation; other workers completed",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-browser-results-1.txt",
+          "sha256": "685410b1f59eebb6ffb1b897ae2e7be8779332fa32edc31b3800b4cd8db1fc9f"
+        },
+        {
+          "path": "logs/AS-P10-knowledge-browser-stall.json",
+          "sha256": "fdc9600d6a98e15ac4e761b4289878a9623959935273479ae6af10ae4a58e84e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "node --test --test-timeout=120000 scripts/tests/knowledge-browser.mjs",
+      "fixture": "Same generated fixture and unchanged source, isolated browser run,1pass in1.25s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-knowledge-browser-diagnostic-1.txt",
+          "sha256": "81a8345f432deabda319b9b9805dee251f296e4637bdccffed386195bcedcbf8"
+        },
+        {
+          "path": "logs/AS-P10-knowledge-browser-baseline.txt",
+          "sha256": "e8d6d3330229d9857e7ff74a1133c352f15cb8778dd6be501d264d109cdaf78d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/check.sh final completion",
+      "fixture": "Rootrunner now executes stock2MiB stack, then lease/service/deployment gates",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Final runner completion remains pending; final supplement required before acceptance."
+    }
+  ]
+}

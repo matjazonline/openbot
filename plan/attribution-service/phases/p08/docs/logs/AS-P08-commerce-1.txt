@@ -1,0 +1,36 @@
+    Finished `test` profile [unoptimized] target(s) in 0.14s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 29 tests
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_clocks_half_open_dst_and_refund_only_negative_net ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_bounds_unicode_keysets_filters_and_invalid_queries ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_scope_roles_keys_and_foreign_filters ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_ledger_independent_counts_money_and_product_bases ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_dashboard_pages_details_escaping_roles_and_exports ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_export_limit_formula_and_numeric_overflow ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_bounds_representative_plan_and_timeout ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::browser_tests::attribution_dashboard_browser_reports_filters_details_and_retry ... ignored, Requires pinned Playwright Chromium; CI and final gate run explicitly
+test adapters::identity::http_tests::commerce_tests::analytics_tests::bounds_tests::attribution_analytics_ledger_reasons_observations_full_refund_and_frozen_dimensions ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_merchant_ingress_competing_event_retries_and_conflicting_envelopes ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_order_paid_business_identity_immutable_lines_and_checkout ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_reconciliation_refund_before_paid_and_cancellation_converge ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_refund_independent_business_identity_and_exact_balances ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_auth_before_body_and_strict_money ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_atomic_failure_and_real_commit_ack_loss ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_order_competing_business_facts_count_once ... ok
+test adapters::identity::http_tests::commerce_tests::ingress_tests::attribution_merchant_ingress_original_horizon_survives_pruning ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_competing_balances_money_only_and_units_only ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_policy_frozen_checkout_reasons_and_exact_window ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_cleanup_and_store_disable_compete_with_settlement ... ok
+test adapters::identity::http_tests::commerce_tests::ledger_tests::attribution_refund_currencies_unknown_line_time_and_atomic_rejection ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_current_tenant_and_refund_window_rechecked ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_competing_claims_crash_recovery_and_stale_token ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_final_lease_fence_rolls_back_financial_effect ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_deadline_attempts_manual_retry_and_receipt ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_pending_refund_identity_and_ingress_age ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_poison_company_does_not_fill_claim_batch ... ok
+test adapters::identity::http_tests::commerce_tests::recovery_tests::attribution_reconciliation_shutdown_leases_recover_and_backoff ... ok
+test adapters::identity::http_tests::commerce_tests::scope_tests::attribution_order_and_event_lists_scope_all_objects_for_multi_company_member ... ok
+
+test result: ok. 28 passed; 0 failed; 1 ignored; 0 measured; 83 filtered out; finished in 9.47s
+

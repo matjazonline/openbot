@@ -1,0 +1,33 @@
+checking 7 changed files against 7 learnings and 2 skills
+
+● plan/attribution-service/01-application-boundaries-and-contracts.md:114
+  brings back native account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r7-957de863, not merged yet
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:165
+  brings back first test case, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r7-957de863, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:166
+  brings back check exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows Mac02's learning: The worktree always carries the user's own uncommitted edits,
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows Mac02's learning: scripts/transport-boundary-check.sh (`rg --files`, `scan_production`)
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows skill implement-opus-reviewed-2_4: Do not run unrelated tests or a full suite
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows skill implement-opus-2_4-system-improvement: phases only when requested, and keep evidence identities and
+✓ plan/attribution-service/07-orders-refunds-and-attribution.md
+  follows Mac02's learning: The full check suite runs against the local Homebrew
+✓ plan/attribution-service/10-integration-verification-and-pilot.md
+  follows Mac02's learning: The full check suite runs against the local Homebrew
+
+· no conflicts · 3 worth a look

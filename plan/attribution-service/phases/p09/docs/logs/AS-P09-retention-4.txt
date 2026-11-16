@@ -1,0 +1,14 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 9.72s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 6 tests
+test infra::config::tests::attribution_retention_config_requires_explicit_protocol_safe_horizons ... ok
+test adapters::retention::cutoff_tests::attribution_retention_exact_cutoffs_and_protected_delivery_evidence ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_retirement_hides_all_financial_surfaces_before_chunks ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_raw_prune_preserves_frozen_money_and_rejects_old_delivery ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_deleted_tenant_chunks_keep_terminal_fence ... ok
+test adapters::identity::http_tests::commerce_tests::retention_tests::attribution_retention_pending_unresolved_leased_evidence_survives_competing_settlement ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 115 filtered out; finished in 1.32s
+

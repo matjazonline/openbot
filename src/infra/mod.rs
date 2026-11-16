@@ -34,4 +34,5 @@ pub fn argon2_password_hasher() -> ArgonPasswordHasher {
     ArgonPasswordHasher::default()
 }
 
+pub mod attribution;
 mod integrations;

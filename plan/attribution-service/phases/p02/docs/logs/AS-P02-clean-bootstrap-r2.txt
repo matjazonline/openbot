@@ -1,0 +1,61 @@
+Collecting attrs==26.1.0 (from -r services/attribution/contract/requirements.lock (line 1))
+  Downloading attrs-26.1.0-py3-none-any.whl (67 kB)
+Collecting certifi==2026.10.23 (from -r services/attribution/contract/requirements.lock (line 4))
+  Downloading certifi-2026.10.23-py3-none-any.whl (135 kB)
+Collecting charset-normalizer==3.5.2 (from -r services/attribution/contract/requirements.lock (line 7))
+  Downloading charset_normalizer-3.5.2-cp313-cp313-macosx_10_13_universal2.whl (366 kB)
+Collecting idna==3.20 (from -r services/attribution/contract/requirements.lock (line 180))
+  Downloading idna-3.20-py3-none-any.whl (69 kB)
+Collecting jsonschema==4.23.0 (from -r services/attribution/contract/requirements.lock (line 183))
+  Downloading jsonschema-4.23.0-py3-none-any.whl (88 kB)
+Collecting jsonschema-path==0.3.4 (from -r services/attribution/contract/requirements.lock (line 186))
+  Downloading jsonschema_path-0.3.4-py3-none-any.whl (14 kB)
+Collecting jsonschema-specifications==2025.9.1 (from -r services/attribution/contract/requirements.lock (line 189))
+  Downloading jsonschema_specifications-2025.9.1-py3-none-any.whl (18 kB)
+Collecting lazy-object-proxy==1.12.0 (from -r services/attribution/contract/requirements.lock (line 192))
+  Downloading lazy_object_proxy-1.12.0-cp313-cp313-macosx_11_0_arm64.whl (26 kB)
+Collecting openapi-schema-validator==0.6.3 (from -r services/attribution/contract/requirements.lock (line 237))
+  Downloading openapi_schema_validator-0.6.3-py3-none-any.whl (8.8 kB)
+Collecting openapi-spec-validator==0.7.2 (from -r services/attribution/contract/requirements.lock (line 240))
+  Downloading openapi_spec_validator-0.7.2-py3-none-any.whl (39 kB)
+Collecting pathable==0.4.4 (from -r services/attribution/contract/requirements.lock (line 243))
+  Downloading pathable-0.4.4-py3-none-any.whl (9.6 kB)
+Collecting PyYAML==6.0.3 (from -r services/attribution/contract/requirements.lock (line 246))
+  Downloading pyyaml-6.0.3-cp313-cp313-macosx_11_0_arm64.whl (173 kB)
+Collecting referencing==0.36.2 (from -r services/attribution/contract/requirements.lock (line 320))
+  Downloading referencing-0.36.2-py3-none-any.whl (26 kB)
+Collecting requests==2.32.5 (from -r services/attribution/contract/requirements.lock (line 323))
+  Downloading requests-2.32.5-py3-none-any.whl (64 kB)
+Collecting rfc3339-validator==0.1.4 (from -r services/attribution/contract/requirements.lock (line 326))
+  Downloading rfc3339_validator-0.1.4-py2.py3-none-any.whl (3.5 kB)
+Collecting rpds-py==0.27.1 (from -r services/attribution/contract/requirements.lock (line 329))
+  Downloading rpds_py-0.27.1-cp313-cp313-macosx_11_0_arm64.whl (345 kB)
+Collecting six==1.17.0 (from -r services/attribution/contract/requirements.lock (line 485))
+  Downloading six-1.17.0-py2.py3-none-any.whl (11 kB)
+Collecting typing_extensions==4.16.0 (from -r services/attribution/contract/requirements.lock (line 488))
+  Downloading typing_extensions-4.16.0-py3-none-any.whl (45 kB)
+Collecting urllib3==2.6.3 (from -r services/attribution/contract/requirements.lock (line 491))
+  Downloading urllib3-2.6.3-py3-none-any.whl (131 kB)
+Installing collected packages: urllib3, typing_extensions, six, rpds-py, PyYAML, pathable, lazy-object-proxy, idna, charset-normalizer, certifi, attrs, rfc3339-validator, requests, referencing, jsonschema-specifications, jsonschema-path, jsonschema, openapi-schema-validator, openapi-spec-validator
+
+Successfully installed PyYAML-6.0.3 attrs-26.1.0 certifi-2026.10.23 charset-normalizer-3.5.2 idna-3.20 jsonschema-4.23.0 jsonschema-path-0.3.4 jsonschema-specifications-2025.9.1 lazy-object-proxy-1.12.0 openapi-schema-validator-0.6.3 openapi-spec-validator-0.7.2 pathable-0.4.4 referencing-0.36.2 requests-2.32.5 rfc3339-validator-0.1.4 rpds-py-0.27.1 six-1.17.0 typing_extensions-4.16.0 urllib3-2.6.3
+
+[notice] A new release of pip is available: 26.2.2 -> 26.3
+[notice] To update, run: /private/tmp/as-p02-contract-clean/bin/python3.13 -m pip install --upgrade pip
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts.test_attribution_contract_both_openapi_documents_validate) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts.test_attribution_contract_bounds_and_errors_are_declared_for_all_routes) ... ok
+test_attribution_contract_every_management_mutation_has_a_retry_identity (__main__.AttributionContracts.test_attribution_contract_every_management_mutation_has_a_retry_identity) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts.test_attribution_contract_examples_match_wire_schemas) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts.test_attribution_contract_identity_pkce_and_credential_classes) ... ok
+test_attribution_contract_lost_key_response_replays_metadata_without_secret (__main__.AttributionContracts.test_attribution_contract_lost_key_response_replays_metadata_without_secret) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts.test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts.test_attribution_contract_money_currency_and_collection_bounds) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts.test_attribution_contract_public_observations_cannot_describe_sales) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts.test_attribution_contract_refund_business_identity_example_is_discriminating) ... ok
+test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds (__main__.AttributionContracts.test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts.test_attribution_contract_two_ad_product_refund_ledger_reconciles) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 1.364s
+
+OK

@@ -1,0 +1,28 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 4.58s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+tracking response 302 http://127.0.0.1:56159/r/B932VDQxpz3D8qCIc4Bca2CL
+tracking navigation failed https://shop.merchant.com/product?a=1&a=2&ob_click=ed4d4562-4c0e-4b38-a270-351a66d25642 net::ERR_NAME_NOT_RESOLVED
+
+
+thread 'adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres' (22845328) panicked at src/adapters/identity/../setup/http_tests.rs:1244:5:
+FAIL: setup browser stage catalog edits and tracked browser navigation: TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for navigation until "load"
+============================================================
+Setup status: Saved.
+Setup error: The response could not be confirmed. Retry the same request if offered; otherwise refresh the current setup.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 66 filtered out; finished in 31.65s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,20 @@
+    Finished `test` profile [unoptimized] target(s) in 0.13s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 13 tests
+test infra::connection::tests::attribution_startup_forced_shutdown_wakes_blocked_io ... ok
+test infra::config::tests::attribution_startup_loopback_development_and_stock_budgets ... ok
+test infra::config::tests::attribution_startup_rejects_bad_config_without_echoing_secrets ... ok
+test adapters::http::tests::attribution_startup_safe_html_errors_preserve_redaction_and_headers ... ok
+test adapters::http::tests::attribution_startup_body_and_error_boundaries_are_safe_and_correlated ... ok
+test adapters::http::tests::attribution_startup_request_deadline_cancels_handler_and_returns_slot ... ok
+test adapters::http::tests::attribution_startup_competing_requests_are_bounded_and_health_stays_cheap ... ok
+test infra::connection::tests::attribution_startup_competing_connections_wait_for_owned_slot ... ok
+test infra::connection::tests::attribution_startup_idle_connection_times_out ... ok
+test infra::connection::tests::attribution_startup_connection_lifetime_bounds_slow_progress ... ok
+test adapters::postgres::tests::attribution_startup_refuses_foreign_schema_and_privileged_role ... ok
+test adapters::http::tests::attribution_startup_readiness_assets_and_shutdown_use_the_own_database ... ok
+test adapters::postgres::tests::attribution_startup_migration_checksum_failure_is_not_ready_success ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 95 filtered out; finished in 0.49s
+

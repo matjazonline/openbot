@@ -1,0 +1,3 @@
+container smoke passed: non-root/read-only, assets, migrations, DB loss, graceful exit, redaction
+container smoke passed: non-root/read-only, assets, migrations, DB loss, graceful exit, redaction
+sha256:ff8df74f600c431b8234111731d3985f49caa50c3bd5b7f00b1cdce7f4554a5c arm64 attribution:attribution

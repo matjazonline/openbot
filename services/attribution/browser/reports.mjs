@@ -1,0 +1,68 @@
+import assert from "node:assert/strict";
+import {pathToFileURL} from "node:url";
+const {chromium}=process.env.ATTRIBUTION_PLAYWRIGHT_MODULE ? await import(pathToFileURL(process.env.ATTRIBUTION_PLAYWRIGHT_MODULE).href):await import("playwright");
+const origin=process.env.ATTRIBUTION_BROWSER_ORIGIN,company=process.env.ATTRIBUTION_BROWSER_COMPANY;
+let browser,page,stage="launch";
+try {
+  browser=await chromium.launch({headless:true});
+  const context=await browser.newContext({viewport:{width:390,height:844}});
+  await context.addCookies([{name:"__Host-attribution",value:process.env.ATTRIBUTION_BROWSER_SESSION,domain:new URL(origin).hostname,path:"/",secure:true,httpOnly:true,sameSite:"Lax"}]);
+  page=await context.newPage();
+  stage="overview and API reconciliation";
+  await page.goto(`${origin}/reports?company_id=${company}`);
+  await page.getByRole("heading",{name:"Reports",exact:true}).waitFor();
+  const body=await page.locator("body").innerText();assert.ok(body.includes("Company <script>"));
+  assert.equal(await page.evaluate(()=>window.injected),undefined);
+  const row=page.locator("table").first().locator("tbody tr").first();
+  assert.deepEqual(await row.locator("th,td").allTextContents(),["EUR","1","3","1","1","59.00","12.00","47.00","11.80","2.40","5.00","0.00"]);
+  const report=await page.evaluate(async company=>{const q=new URLSearchParams({start:new Date(Date.now()-86400000).toISOString(),end:new Date(Date.now()+86400000).toISOString(),timezone:"UTC"});return(await fetch("/v1/analytics?"+q,{headers:{"X-Company-ID":company}})).json()},company);
+  assert.equal(report.groups[0].currencies[0].net_merchandise_amount,4700);
+  assert.ok(await page.locator('a[href$="ui/profile"]').count());
+  assert.ok(await page.getByRole("link",{name:"Tracking setup and keys"}).count());
+  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  stage="keyboard form, product breakdown and escaping";
+  await page.getByLabel("Breakdown",{exact:true}).selectOption("sold_product");
+  await page.getByRole("button",{name:"Update report"}).focus();await page.keyboard.press("Enter");
+  await page.waitForURL(url=>url.searchParams.get("group_by")==="sold_product");
+  assert.equal(await page.locator(".report-group").count(),2);
+  assert.equal(await page.evaluate(()=>window.injected),undefined);
+  assert.ok((await page.locator("body").innerText()).includes("Omitted for purchased-product"));
+  const downloadPromise=page.waitForEvent("download");await page.getByRole("link",{name:"Download CSV",exact:false}).click();
+  const download=await downloadPromise;assert.equal(download.suggestedFilename(),"attribution.csv");
+  stage="DST form and error/empty states";
+  await page.getByLabel("From date",{exact:false}).fill("2026-03-29");await page.getByLabel("Until date",{exact:false}).fill("2026-03-30");
+  await page.getByLabel("Reporting zone",{exact:true}).fill("Europe/Berlin");
+  await page.getByRole("button",{name:"Update report"}).click();await page.waitForURL(url=>url.searchParams.get("timezone")==="Europe/Berlin");
+  assert.ok((await page.locator("body").innerText()).includes("2026-03-28T23:00:00+00:00"));
+  assert.ok((await page.locator("body").innerText()).includes("No activity"));
+  const invalid=await page.goto(`${origin}/reports?company_id=${company}&timezone=bad`);assert.equal(invalid.status(),400);await page.getByRole("alert").waitFor();
+  stage="order/refund detail";
+  await page.goto(`${origin}/reports/orders?company_id=${company}`);
+  await page.getByRole("link",{name:"Inspect order order-1"}).click();await page.getByRole("heading",{name:"Applied refunds"}).waitFor();
+  assert.ok((await page.locator("body").innerText()).includes("1200"));assert.equal(await page.evaluate(()=>window.injected),undefined);
+  stage="live role controls and CSRF";
+  await page.goto(`${origin}/reports/events?company_id=${company}&state=unresolved`);
+  const retry=page.locator(".event-retry");await retry.waitFor();
+  assert.equal(await page.getByLabel("Event state",{exact:true}).inputValue(),"unresolved");
+  const id=await retry.getAttribute("data-event");
+  assert.equal(await page.evaluate(async({id,company})=>(await fetch(`/v1/merchant-events/${id}/retry`,{method:"POST",headers:{"X-Company-ID":company}})).status,{id,company}),403);
+  await page.evaluate(()=>fetch("/fixture/role/3",{method:"POST"}));await page.reload();assert.equal(await page.locator(".event-retry").count(),0);
+  await page.evaluate(()=>fetch("/fixture/role/0",{method:"POST"}));await page.reload();
+  stage="durable retry response loss and navigation";
+  let attempts=0,identity;
+  await page.route("**/v1/merchant-events/*/retry",async route=>{
+    const request=route.request(),current=[request.headers()["idempotency-key"],request.headers()["idempotency-created-at"]];
+    attempts++;if(!identity){identity=current;const response=await route.fetch();assert.equal(response.status(),200);return route.abort("failed");}
+    assert.deepEqual(current,identity);return route.continue();
+  });
+  await page.locator(".event-retry").click();await page.waitForFunction(()=>!document.querySelector(".event-retry").disabled);
+  await page.locator(".event-retry").click();await page.getByRole("button",{name:"Retry recorded"}).waitFor();assert.equal(attempts,2);
+  await page.getByRole("link",{name:"Reports",exact:true}).click();
+  stage="two-company report isolation";
+  await page.evaluate(()=>fetch("/fixture/role/7",{method:"POST"}));
+  await page.goto(`${origin}/reports?company_id=${process.env.ATTRIBUTION_BROWSER_FOREIGN}`);
+  assert.equal(await page.locator("table tbody tr").count(),0);
+  await page.goto(`${origin}/reports?company_id=${company}`);assert.ok((await page.locator("body").innerText()).includes("47.00"));
+  console.log("PASS: dashboard Chromium journey: independent API/ledger totals, responsive table, keyboard filters, product escaping, CSV download, DST/empty/error states, order/refund details, live roles, CSRF, stable lost-response retry, navigation and tenant isolation");
+}catch(error){console.error(`FAIL: dashboard stage ${stage}: ${error.name}: ${String(error.message).replaceAll(process.env.ATTRIBUTION_BROWSER_SESSION||"unused","[redacted]")}`);process.exitCode=1;}
+finally{await browser?.close();}

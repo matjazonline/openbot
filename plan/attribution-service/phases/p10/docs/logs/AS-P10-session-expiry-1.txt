@@ -1,0 +1,9 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 19.04s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-3847f4dce20b5e8b)
+
+running 1 test
+test adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 122 filtered out; finished in 0.61s
+

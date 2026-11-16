@@ -1,0 +1,5 @@
+Tab A paused after capturing now, before reading shared storage.
+Tab B granted consent and persisted its distinct click.
+B localStorage entry after A resumes: null
+Return visit retains B: false
+REPRODUCED in two real Chromium tabs using the unmodified production SDK; only 2 candidates, neither expired. CDP fixes the interleaving; service response is a 204 stand-in.

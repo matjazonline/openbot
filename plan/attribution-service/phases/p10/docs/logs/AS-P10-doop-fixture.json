@@ -1,0 +1,7 @@
+{
+  "directory": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-doop-2ta28kun",
+  "database": "as_p10_doop_226479d4cd2944ba862477924b6f0147",
+  "chrome": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "owner": "attribution p10 final verification",
+  "reason": "Original fullrunner lacks required DOOP_TEST_UI_CHROME; equivalent gate with explicit installed Chrome and fresh owned database"
+}

@@ -1,0 +1,155 @@
+{
+  "version": 1,
+  "round": "AS-P07-B1-R1",
+  "artifact": "2712efab34ac16d2a2d368b4d83909d04b57b6e93eaf0740ef8262d6fbfd091d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib commerce_tests -- --test-threads=2",
+      "fixture": "UUID-owned service PostgreSQL DBs, stock 2MiB stacks, local maintenance access",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P07-commerce-tests-5.txt",
+          "sha256": "71cc8c8f20b5f7c4b76d5c33274885a4c2bf755484846538de4cc653aab86c63"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib commerce_tests -- --test-threads=2",
+      "fixture": "Prior compile/test fixture failures corrected in -5; see TASK",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P07-commerce-tests-1.txt",
+          "sha256": "386b6c4e53665e31a35a01004a6b29bdaa1b4dc39759acabde86270a249ce367"
+        },
+        {
+          "path": "logs/AS-P07-commerce-tests-3.txt",
+          "sha256": "805686191bde017b76daf785eac4278ce07e3e199e9dcb02f1811ee25df77a6f"
+        },
+        {
+          "path": "logs/AS-P07-commerce-tests-4.txt",
+          "sha256": "781cdf8c4c385ad34426acd7519bf8096dac783b04494dde393114d6539ce1d4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC7"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib attribution_checkout_handoff_browser_sdk_cart_and_freeze -- --ignored --nocapture",
+      "fixture": "UUID PG database, local HTTPS merchant + real Chromium, fixture upstream authority; service origin ephemeral",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P07-browser-1.txt",
+          "sha256": "8796df1b5eefcf5da35de76b3b8e69bca14871f4e39a125fa205df21bd139c32"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "PYTHON=/tmp/as-p02-contract-clean/bin/python RUSTUP_TOOLCHAIN=1.95.0 scripts/verify.sh foundation",
+      "fixture": "UUID-owned fresh database/role; shared service build cache, Rust1.95.0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P07-foundation-2.txt",
+          "sha256": "5543312609fb6c1bb75d437128f320a7185d06e12164fc54ab482c747e55b7b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "scripts/verify.sh foundation",
+      "fixture": "Initial host Python3.9 unsupported; corrected interpreter in -2",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P07-foundation-1.txt",
+          "sha256": "e44ec3565d83ffe04936e112b7413bdef5096a5c7b7085ee9e6659ce1d576cf1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo +1.95.0 test --locked --offline --lib adapters::identity:: -- --test-threads=2",
+      "fixture": "78 passed;1 confirmed unrelated unchanged session expiry fixture failure;2 ignored browser cases; see TASK, fix owning integrationp10",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P07-inherited-1.txt",
+          "sha256": "5e792f6578389157b36975df26cac047cf95e87b2f51595d876745a1b0d3ed3f"
+        },
+        {
+          "path": "logs/AS-P07-unrelated-session-fixture.txt",
+          "sha256": "572463448335b0b4eb084a43d0f3fa4f5258d70047c1a3d46258be1e76803869"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "ATTRIBUTION_CONTRACT_PYTHON=/tmp/as-p02-contract-clean/bin/python scripts/check-contracts.sh",
+      "fixture": "Portable wire schemas/examples,15 cases, no runtime substitution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P07-contract-1.txt",
+          "sha256": "65c0e95bb9b26d7f50c7e87048b9ce37a5e747859b4659f658bf674d5d32b94a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "workflow"
+      ],
+      "command": "trail check",
+      "fixture": "Two false lexical matches against preserved preexisting plan docs; TASK dispositions",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P07-trail-check-1.txt",
+          "sha256": "72db1bfb0c5c04915eca38b9cf43c95a066bbf8f7aa3913a38a2ce396f90a2ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "workflow"
+      ],
+      "command": "git diff --check",
+      "fixture": "Current worktree",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P07-diff-check-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

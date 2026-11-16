@@ -1,0 +1,13 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 6.84s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 5 tests
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_clocks_half_open_dst_and_refund_only_negative_net ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_bounds_unicode_keysets_filters_and_invalid_queries ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_scope_roles_keys_and_foreign_filters ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_analytics_ledger_independent_counts_money_and_product_bases ... ok
+test adapters::identity::http_tests::commerce_tests::analytics_tests::attribution_dashboard_pages_details_escaping_roles_and_exports ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 103 filtered out; finished in 1.23s
+
