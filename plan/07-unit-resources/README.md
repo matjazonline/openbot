@@ -7,6 +7,7 @@
 Status: proposed, 2026-11-09. Seventh of the organization plans; depends on
 [05-scopes](../05-scopes/README.md) for the run scope snapshot and on
 [06-delegated-administration](../06-delegated-administration/README.md) for who may configure.
+Followed by [08-goals](../08-goals/README.md).
 
 ## Intended behavior
 

@@ -11,6 +11,9 @@ Status: proposed, 2026-11-13. Eighth of the organization plans. It has two start
 [07-unit-resources](../07-unit-resources/README.md), and 03 also needs `channel.call` from
 [agent-workflow-call](../agent-workflow-call/README.md).
 
+Followed by [09-rooms](../09-rooms/README.md), which adds shared conversations among people and
+agents while retaining this plan's unit lifecycle, goal attribution and implemented budget policy.
+
 ## Intended behavior
 
 Departments are standing capabilities: repeatable work that benefits from its own knowledge,

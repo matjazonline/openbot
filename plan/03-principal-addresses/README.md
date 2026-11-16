@@ -4,7 +4,7 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09. Third of seven organization plans; depends on
+Status: proposed, 2026-11-09. Third of nine organization plans; depends on
 [01-departments](../01-departments/README.md) and
 [02-workflow-roles](../02-workflow-roles/README.md). Followed by
 [04-root-unit](../04-root-unit/README.md).
