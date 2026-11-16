@@ -1,0 +1,33 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.675625ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (1.553375ms)
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (8.903666ms)
+✔ ordinary page links release every stream before navigation (2.498042ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (2.035041ms)
+✔ anchors and non-document protocols keep streams (0.991459ms)
+✔ native filter submissions release all streams on every navigation (5.71825ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.558167ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 7
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 323.238667
+
+✖ failing tests:
+
+test at scripts/tests/channel-response-authoring.mjs:16:1
+✖ response form supports keyboard navigation and submit and shows request progress without dropping form fields (8.903666ms)
+  browserType.launch: Executable doesn't exist at /Users/mac02/Library/Caches/ms-playwright/chromium_headless_shell-1193/chrome-mac/headless_shell
+  ╔═════════════════════════════════════════════════════════════════════════╗
+  ║ Looks like Playwright Test or Playwright was just installed or updated. ║
+  ║ Please run the following command to download new browsers:              ║
+  ║                                                                         ║
+  ║     npx playwright install                                              ║
+  ║                                                                         ║
+  ║ <3 Playwright Team                                                      ║
+  ╚═════════════════════════════════════════════════════════════════════════╝
+      at TestContext.<anonymous> (/Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/channel-response-authoring.mjs:33:34) {
+    name: 'Error'
+  }

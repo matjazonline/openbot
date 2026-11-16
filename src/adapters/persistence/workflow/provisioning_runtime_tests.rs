@@ -17,29 +17,22 @@ mod channel_reply_native_runtime_tests;
 /// by the owner). Returns the Builder channel's binding.
 async fn builder(d: &Deployment) -> Uuid {
     let p = d.p();
-    let company = d.fixture.target.company.as_uuid();
-    let agent = AgentPersistence::create(
-        p,
-        company,
-        AgentWrite {
-            name: "Agent Builder".into(),
-            slug: "agent-builder".into(),
-            provider: Some(SCRIPTED_PROVIDER.into()),
-            model: Some(SCRIPTED_MODEL.into()),
-            system_prompt: Some("Design and create agents.".into()),
-            tool_bindings: Some(vec![
-                crate::entities::agent_capability::AgentToolBinding::builtin(
-                    crate::entities::agent_capability::AgentBuiltinTool::ListCompanyAgents,
-                ),
-                crate::entities::agent_capability::AgentToolBinding::builtin(
-                    crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,
-                ),
-            ]),
-            ..Default::default()
-        },
+    let mut write =
+        crate::application::use_cases::builtin_agent_library::agent_builder_definition().write;
+    write.provider = Some(SCRIPTED_PROVIDER.into());
+    write.model = Some(SCRIPTED_MODEL.into());
+    // Real company provisioning publishes the built-in definition's complete capability set.
+    let agent = Box::pin(
+        crate::adapters::persistence::test_support::company_agents(p).create(
+            d.fixture.target.actor,
+            d.fixture.target.company,
+            write,
+            None,
+        ),
     )
     .await
-    .unwrap();
+    .unwrap()
+    .agent;
     register_scripted_agent_base_url(agent.id, &d.llm.base_url);
     let created = d
         .engine
@@ -142,18 +135,15 @@ async fn receipts(d: &Deployment, binding: Uuid) -> Vec<Value> {
     .unwrap()
 }
 
-/// An agent answering the desk at `slug`. The agent's own address is its autonomous default desk
-/// (01DEP-P03-D5), so a reviewed desk at `slug` belongs to the agent `{slug}-agent`.
-fn spec(slug: &str, mode: ReplyMode) -> Value {
-    let mut spec = json!({
-        "name": "Helper", "slug": slug, "system_prompt": "Answer the team briefly.",
-        "provider": SCRIPTED_PROVIDER, "model": SCRIPTED_MODEL, "reply_mode": mode.as_str()
-    });
-    if mode == ReplyMode::Reviewed {
-        spec["slug"] = json!(format!("{slug}-agent"));
-        spec["channel_slug"] = json!(slug);
-    }
-    spec
+/// A directly addressable agent, independent of any shared intake desk.
+fn spec(slug: &str) -> Value {
+    json!({"name":"Helper", "slug":slug, "system_prompt":"Answer the team briefly.",
+        "provider":SCRIPTED_PROVIDER, "model":SCRIPTED_MODEL})
+}
+
+fn desk_spec(agent: &str, desk: &str, mode: ReplyMode) -> Value {
+    json!({"agent_slug":agent, "channel_slug":desk, "channel_name":"Shared intake",
+        "reply_mode":mode.as_str()})
 }
 
 /// D2 verification: a signed-in admin's request runs the Builder, which lists, then creates the
@@ -163,7 +153,7 @@ fn spec(slug: &str, mode: ReplyMode) -> Value {
 async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
     let d = Deployment::new(vec![
         LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec("helper", ReplyMode::Autonomous)),
+        LlmTurn::tool_call(CREATE_AGENT, spec("helper")),
         LlmTurn::text(r#"{"body": "Created helper."}"#),
         LlmTurn::text(r#"{"body": "Hello from helper."}"#),
     ])
@@ -203,7 +193,7 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
     );
     let created = &receipts[1];
     assert_eq!(created["agent"]["slug"], "helper", "{created}");
-    assert_eq!(created["channel"]["address"], d.address("helper"), "F051");
+    assert_eq!(created["address"], d.address("helper"), "F051");
     let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
     let (run_as, actor, active): (Uuid, Uuid, bool) = sqlx::query_as(
         "SELECT revision.run_as_user_id, revision.actor_id, binding.active \
@@ -224,12 +214,16 @@ async fn builder_provisions_an_assistant_for_a_signed_in_admin() {
     .await
     .unwrap();
     assert_eq!(builder_run_as, d.fixture.target.actor.user_id());
-    let access: String = sqlx::query_scalar("SELECT access_mode FROM channels WHERE id = $1")
-        .bind(Uuid::parse_str(created["channel"]["id"].as_str().unwrap()).unwrap())
-        .fetch_one(d.p().pool())
-        .await
-        .unwrap();
-    assert_eq!(access, "team");
+    let (principal, channel): (Uuid, Option<Uuid>) =
+        sqlx::query_as("SELECT principal_id,channel_id FROM workflow_bindings WHERE id=$1")
+            .bind(binding)
+            .fetch_one(d.p().pool())
+            .await
+            .unwrap();
+    assert_eq!(json!(principal), created["principal_id"]);
+    assert!(channel.is_none());
+    assert!(created.get("channel").is_none());
+    assert_eq!(d.count("SELECT count(*) FROM addresses WHERE company_id=$1 AND slug='helper' AND target_kind='desk'").await, 0);
 
     // The new assistant answers its channel through the provisioned workflow.
     register_scripted_agent_base_url(
@@ -321,10 +315,9 @@ async fn builder_sees_the_conversation_so_far() {
 /// that order.
 #[tokio::test]
 async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
-    let mut spec = spec("helper", ReplyMode::Autonomous);
-    spec["channel_slug"] = json!("billing");
+    let mut desk = desk_spec("helper", "billing", ReplyMode::Autonomous);
     let labels = json!({"literal": {"type": "string", "enum": ["billing", "other"]}});
-    spec["steps"] = json!([
+    desk["steps"] = json!([
         {"id": "topic", "slot": "before_draft", "type": "ai.classify", "with": {
             "agent": {"literal": "helper"},
             "context": {"object": {"untrusted_message": {"ref": "/input/message"}}},
@@ -336,7 +329,8 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
             "routes": {"choices": {"send": "$next", "hold": "$next"}}}
     ]);
     let mut d = Deployment::new(vec![
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec),
+        LlmTurn::tool_call(CREATE_AGENT, spec("helper")),
+        LlmTurn::tool_call(CREATE_DESK_FOR_AGENT, desk),
         LlmTurn::text(r#"{"body": "Created helper."}"#),
         LlmTurn::text(r#""billing""#),
         LlmTurn::text(r#"{"body": "Your invoice is attached."}"#),
@@ -356,12 +350,14 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
         replied(&d, builder).await == 1
     })
     .await;
-    let created = receipts(&d, builder).await.remove(0);
-    assert_eq!(created["agent"]["slug"], "helper", "{created}");
+    let all = receipts(&d, builder).await;
+    let agent = &all[0];
+    let created = &all[1];
+    assert_eq!(agent["agent"]["slug"], "helper", "{agent}");
     let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
 
     register_scripted_agent_base_url(
-        Uuid::parse_str(created["agent"]["id"].as_str().unwrap()).unwrap(),
+        Uuid::parse_str(agent["agent"]["id"].as_str().unwrap()).unwrap(),
         &d.llm.base_url,
     );
     write(
@@ -392,12 +388,12 @@ async fn builder_adds_custom_steps_to_the_new_agents_workflow() {
         ["context", "topic", "draft", "billing_only", "reply"],
         "the custom steps run in their slots"
     );
-    let draft = d.llm.observed().remove(3).to_string();
+    let draft = d.llm.observed().remove(4).to_string();
     assert!(
         draft.contains(r#"\"untrusted_topic\":\"billing\""#),
         "{draft}"
     );
-    assert_eq!(d.llm.finish().await.unwrap(), 4);
+    assert_eq!(d.llm.finish().await.unwrap(), 5);
 }
 
 /// An admin's message the Builder cannot act on yet, and a model that keeps listing: the listing
@@ -470,9 +466,9 @@ async fn builder_stops_a_listing_loop_once_its_result_repeats() {
 async fn builder_refuses_members_and_emailed_requests() {
     let d = Deployment::new(vec![
         LlmTurn::tool_call(LIST_COMPANY_AGENTS, json!({})),
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec("helper", ReplyMode::Autonomous)),
+        LlmTurn::tool_call(CREATE_AGENT, spec("helper")),
         LlmTurn::text(r#"{"body": "Not allowed."}"#),
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec("helper", ReplyMode::Reviewed)),
+        LlmTurn::tool_call(CREATE_AGENT, spec("helper")),
         LlmTurn::text(r#"{"body": "Not allowed."}"#),
     ])
     .await;
@@ -540,7 +536,11 @@ async fn builder_refuses_members_and_emailed_requests() {
 #[tokio::test]
 async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
     let d = Deployment::new(vec![
-        LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec("reviewed", ReplyMode::Reviewed)),
+        LlmTurn::tool_call(CREATE_AGENT, spec("reviewed-agent")),
+        LlmTurn::tool_call(
+            CREATE_DESK_FOR_AGENT,
+            desk_spec("reviewed-agent", "reviewed", ReplyMode::Reviewed),
+        ),
         LlmTurn::text(r#"{"body": "Created."}"#),
         LlmTurn::text(r#"{"body": "A draft for review."}"#),
     ])
@@ -559,10 +559,12 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
         replied(&d, builder).await == 1
     })
     .await;
-    let created = receipts(&d, builder).await.remove(0);
+    let all = receipts(&d, builder).await;
+    let agent = &all[0];
+    let created = &all[1];
     assert_eq!(created["reply_mode"], "reviewed", "{created}");
     register_scripted_agent_base_url(
-        Uuid::parse_str(created["agent"]["id"].as_str().unwrap()).unwrap(),
+        Uuid::parse_str(agent["agent"]["id"].as_str().unwrap()).unwrap(),
         &d.llm.base_url,
     );
     let binding = Uuid::parse_str(created["binding_id"].as_str().unwrap()).unwrap();
@@ -596,8 +598,12 @@ async fn reviewed_assistants_park_their_answer_until_the_run_deadline() {
     .await
     .unwrap();
     assert!(expires_with_run);
-    assert_eq!(reviewer, json!(admin.to_string()));
-    assert_eq!(d.llm.finish().await.unwrap(), 3);
+    // The reviewer is the requester's person principal, which the decision resolves.
+    assert_eq!(
+        reviewer,
+        json!(d.fixture.principal(admin).await.to_string())
+    );
+    assert_eq!(d.llm.finish().await.unwrap(), 4);
 }
 
 #[derive(sqlx::FromRow)]
@@ -856,7 +862,14 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
         }
     };
     let ops = binding(format!("department:{}", department.id)).await;
-    let helper = binding(format!("agent:{}", created[1].0)).await;
+    let helper: Uuid = sqlx::query_scalar(
+        "SELECT binding_id FROM channel_reply_settings WHERE company_id=$1 AND principal_id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(created[1].1.as_uuid())
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
     let (_, email) = person(&d, "admin").await;
     write(
         &d,

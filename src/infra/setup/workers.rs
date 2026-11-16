@@ -29,11 +29,8 @@ pub(super) fn build(
         crate::services::delivery_worker::DeliveryWorker::new(f.persistence.clone(), c.transports)
             .with_monitoring(f.monitoring.clone()),
     );
-    let scanner = Arc::new(crate::adapters::spam_scanner::SpamScannerAdapter::new(
-        f.config.spam_scanner_settings(),
-    )?);
     let smtp = Arc::new(
-        crate::adapters::smtp::SmtpServer::new(c.threads, f.config.clone(), scanner)
+        crate::adapters::smtp::SmtpServer::new(c.threads, f.config.clone(), f.scanner.clone())
             .with_file_storage(f.storage.clone())
             .with_monitoring(f.monitoring.clone()),
     );

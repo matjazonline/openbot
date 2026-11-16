@@ -56,7 +56,7 @@ async fn cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_app
     let p = &s.fixture.persistence;
     let session = original(&s).await;
     let mut with = inputs(s.profile.id, session);
-    with["approval"] = json!({"literal":{"reviewers":[{"kind":"user","id":s.fixture.target.actor.user_id()}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
+    with["approval"] = json!({"literal":{"reviewers":[{"kind":"principal","id":s.fixture.principal(s.fixture.target.actor.user_id()).await}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
     let scope = s
         .activate(s.fixture.target.actor, with, RelatedAssociation::Company)
         .await;
@@ -215,7 +215,7 @@ async fn cloudroom_workflow_continuation_refuses_withdrawn_original_private_acce
         .is_ok()
     );
     let association = RelatedAssociation::Thread {
-        channel_id: crate::application::workflow::RelatedChannelId::new(channel),
+        target: crate::entities::address::AddressTarget::Desk(channel),
         thread_id: crate::application::workflow::RelatedThreadId::new(thread),
     };
     let scope = s
@@ -390,8 +390,8 @@ async fn select_native_agent(s: &mut Setup) -> crate::entities::agent_capability
     revision.id
 }
 
-fn native_approval(actor: Uuid) -> Value {
-    json!({"literal":{"reviewers":[{"kind":"user","id":actor}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}})
+fn native_approval(actor: crate::entities::transport::PrincipalId) -> Value {
+    json!({"literal":{"reviewers":[{"kind":"principal","id":actor}],"deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}})
 }
 
 async fn frozen_native(s: &Setup, scope: ActivationRequest) -> Value {
@@ -472,7 +472,9 @@ async fn cloudroom_native_workflow_continuation_keeps_original_agent_before_its_
         .await
         .unwrap();
     let mut with = inputs(s.profile.id, session);
-    with["approval"] = native_approval(s.fixture.target.actor.user_id());
+    with["approval"] = native_approval(crate::entities::transport::PrincipalId::new(
+        s.fixture.principal(s.fixture.target.actor.user_id()).await,
+    ));
     let scope = s
         .activate(s.fixture.target.actor, with, RelatedAssociation::Company)
         .await;

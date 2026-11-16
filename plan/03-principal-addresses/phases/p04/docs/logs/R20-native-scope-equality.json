@@ -1,0 +1,10 @@
+{
+  "from": "581576e7e6918393480e5eb1004f11b6a51e5de6",
+  "to": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd",
+  "changed_material": [
+    ".github/workflows/ci.yml",
+    "scripts/check-doop.py",
+    "scripts/tests/check-runner.py"
+  ],
+  "claim": "All source/test/config besides listed diagnostics byte-identical. NativeRust/Cargo/migrations/Memory unchanged; R18/R19 evidence reusable only under corresponding source/environment/fixture scope."
+}

@@ -1,0 +1,28 @@
+5178:-- Name: workflow_decision_reviewers; Type: TABLE; Schema: public; Owner: -
+5181:CREATE TABLE public.workflow_decision_reviewers (
+5190:    CONSTRAINT workflow_decision_reviewers_notice_check CHECK (((notice_delivery_id IS NULL) = notice_opted_out)),
+5191:    CONSTRAINT workflow_decision_reviewers_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 15)))
+7236:-- Name: workflow_decision_reviewers workflow_decision_reviewer_notice; Type: CONSTRAINT; Schema: public; Owner: -
+7239:ALTER TABLE ONLY public.workflow_decision_reviewers
+7244:-- Name: workflow_decision_reviewers workflow_decision_reviewer_ordinal; Type: CONSTRAINT; Schema: public; Owner: -
+7247:ALTER TABLE ONLY public.workflow_decision_reviewers
+7252:-- Name: workflow_decision_reviewers workflow_decision_reviewers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7255:ALTER TABLE ONLY public.workflow_decision_reviewers
+7256:    ADD CONSTRAINT workflow_decision_reviewers_pkey PRIMARY KEY (company_id, decision_id, principal_id);
+9352:-- Name: workflow_decision_reviewers workflow_decision_reviewer_guard; Type: TRIGGER; Schema: public; Owner: -
+9355:CREATE TRIGGER workflow_decision_reviewer_guard BEFORE INSERT ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_reviewer_guard();
+9359:-- Name: workflow_decision_reviewers workflow_decision_reviewer_immutable; Type: TRIGGER; Schema: public; Owner: -
+9362:CREATE TRIGGER workflow_decision_reviewer_immutable BEFORE UPDATE ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+10687:-- Name: workflow_decision_reviewers workflow_decision_reviewers_decision_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10690:ALTER TABLE ONLY public.workflow_decision_reviewers
+10691:    ADD CONSTRAINT workflow_decision_reviewers_decision_fkey FOREIGN KEY (company_id, decision_id) REFERENCES public.workflow_decisions(company_id, id) ON DELETE CASCADE;
+10695:-- Name: workflow_decision_reviewers workflow_decision_reviewers_notice_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10698:ALTER TABLE ONLY public.workflow_decision_reviewers
+10699:    ADD CONSTRAINT workflow_decision_reviewers_notice_fkey FOREIGN KEY (company_id, notice_delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+15762:CREATE TABLE public.workflow_run_role_bindings (
+15791:CREATE UNIQUE INDEX workflow_role_binding_one_agent ON public.workflow_run_role_bindings
+15795:CREATE INDEX workflow_role_bindings_by_agent ON public.workflow_run_role_bindings
+15799:COMMENT ON TABLE public.workflow_run_role_bindings IS
+15830:CREATE TRIGGER workflow_role_binding_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_role_bindings
+15919:        FROM public.workflow_run_role_bindings WHERE company_id=owner_company AND manifest_id=manifest
+15929:CREATE CONSTRAINT TRIGGER workflow_role_members_complete AFTER INSERT ON public.workflow_run_role_bindings

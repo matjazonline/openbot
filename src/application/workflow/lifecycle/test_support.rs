@@ -310,6 +310,7 @@ pub(super) fn binding_target() -> BindingTarget {
 }
 pub(super) fn configuration(expected: Option<BindingStateRevision>) -> ConfigureBinding {
     ConfigureBinding {
+        escalation: None,
         target: binding_target(),
         expected,
         association: RelatedAssociation::Company,

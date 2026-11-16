@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4468 filtered out; finished in 2.47s
+

@@ -1,0 +1,23 @@
+diff --git a/src/adapters/persistence/doop_live_workflow.rs b/src/adapters/persistence/doop_live_workflow.rs
+index bdf5a1cb..ff1ccbc1 100644
+--- a/src/adapters/persistence/doop_live_workflow.rs
++++ b/src/adapters/persistence/doop_live_workflow.rs
+@@ -170,9 +170,15 @@ async fn drive(p: &PostgresPersistence, engine: &WorkflowEngine, scope: RunReadS
+     let workers = engine.spawn(&shutdown);
+     let result = tokio::time::timeout(Duration::from_secs(25), async {
+         loop {
+-            let view = p.run_view(scope).await?.unwrap();
+-            if matches!(view.detail.summary.state.as_str(), "succeeded" | "failed") {
+-                return crate::app_error::AppResult::Ok(view);
++            // Poll progress cheaply; load and validate the complete inspection once it settles.
++            let state: String =
++                sqlx::query_scalar("SELECT state FROM workflow_runs WHERE company_id=$1 AND id=$2")
++                    .bind(scope.company.as_uuid())
++                    .bind(scope.run.as_uuid())
++                    .fetch_one(p.pool())
++                    .await?;
++            if matches!(state.as_str(), "succeeded" | "failed") {
++                return crate::app_error::AppResult::Ok(p.run_view(scope).await?.unwrap());
+             }
+             tokio::time::sleep(Duration::from_millis(20)).await;
+         }

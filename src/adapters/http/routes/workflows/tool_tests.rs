@@ -92,6 +92,7 @@ async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
         shared.clone(),
         shared.clone(),
         shared.clone(),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     ));
     let skills = Arc::new(SkillUseCases::new(
         shared.clone(),
@@ -109,6 +110,11 @@ async fn autonomous_agent_authoring_competing_json_draft_writes_apply_once() {
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(
+        &f.persistence,
+        &agent,
+    )
+    .await;
     let departments =
         crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
     let save = |user, tool| {

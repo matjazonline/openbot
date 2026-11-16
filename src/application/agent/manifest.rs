@@ -1,7 +1,10 @@
 use super::definition::invalid;
 use crate::app_error::AppResult;
 use crate::domain::entities::agent_capability::{AgentId, AgentRevisionId, DependencyManifestId};
+use crate::domain::workflow::StepId;
 use crate::domain::workflow::{CompanyId, RunId, VersionId, WorkflowId};
+use crate::entities::department::{DepartmentId, DepartmentRole};
+use crate::entities::transport::PrincipalId;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -24,14 +27,36 @@ pub struct WorkflowVersionSelection {
     pub version_id: VersionId,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RolePrincipalSelection {
+    pub principal_id: PrincipalId,
+    pub agent_id: Option<AgentId>,
+    pub revision_id: Option<AgentRevisionId>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleResolution {
+    pub version_id: VersionId,
+    pub step: StepId,
+    pub role: DepartmentRole,
+    pub department_id: DepartmentId,
+    pub principals: Vec<RolePrincipalSelection>,
+}
+
 /// Durable identity selections only. Closure assembly is the admission transaction's job.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct DependencyManifest {
     pub company_id: CompanyId,
     pub root_run_id: RunId,
+    /// The original desk context, distinct from a selected ancestor role department.
+    #[serde(deserialize_with = "Option::deserialize")]
+    pub role_context_department_id: Option<DepartmentId>,
     pub agents: Vec<AgentRevisionSelection>,
     pub workflows: Vec<WorkflowVersionSelection>,
+    pub roles: Vec<RoleResolution>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -67,6 +92,45 @@ impl DependencyManifest {
         if agents.len() != self.agents.len() || workflows.len() != self.workflows.len() {
             return Err(invalid("Duplicate agent or workflow dependency selection"));
         }
+        self.validate_roles(&workflows)?;
+        Ok(())
+    }
+
+    fn validate_roles(&self, workflows: &BTreeSet<VersionId>) -> AppResult<()> {
+        if !self.roles.is_empty() && self.role_context_department_id.is_none() {
+            return Err(invalid(
+                "Captured roles require their original department context",
+            ));
+        }
+        let mut identities = BTreeSet::new();
+        for role in &self.roles {
+            if !workflows.contains(&role.version_id)
+                || !identities.insert((role.version_id, &role.step, role.role.as_str()))
+                || role.principals.is_empty()
+                || role.principals.len() > crate::domain::workflow::TokenAllowance::MAX_REVIEWERS
+            {
+                return Err(invalid("Invalid or duplicate captured role requirement"));
+            }
+            let mut principals = BTreeSet::new();
+            for holder in &role.principals {
+                if !principals.insert(holder.principal_id) {
+                    return Err(invalid("Duplicate captured role principal"));
+                }
+                match (holder.agent_id, holder.revision_id) {
+                    (None, None) => {}
+                    (Some(agent), Some(revision))
+                        if role.principals.len() == 1
+                            && self.agents.iter().any(|selected| {
+                                selected.agent_id == agent && selected.revision_id == revision
+                            }) => {}
+                    _ => {
+                        return Err(invalid(
+                            "Role holder does not match the captured agent revision",
+                        ));
+                    }
+                }
+            }
+        }
         Ok(())
     }
 
@@ -77,6 +141,12 @@ impl DependencyManifest {
         manifest
             .workflows
             .sort_by_key(|entry| (entry.workflow_id, entry.version_id));
+        manifest
+            .roles
+            .sort_by_key(|entry| (entry.version_id, entry.step.clone(), entry.role.as_str()));
+        for role in &mut manifest.roles {
+            role.principals.sort_by_key(|entry| entry.principal_id);
+        }
         let value =
             serde_json::to_value(manifest).map_err(|_| invalid("Invalid dependency manifest"))?;
         let bytes =

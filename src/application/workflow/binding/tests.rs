@@ -35,6 +35,7 @@ fn bundle() -> Arc<PublishedBundle> {
 }
 fn configuration() -> BindingConfiguration {
     BindingConfiguration {
+        escalation: None,
         id: WorkflowBindingId::new(Uuid::from_u128(4)),
         revision: BindingRevision::new(1).unwrap(),
         company_id: company(),

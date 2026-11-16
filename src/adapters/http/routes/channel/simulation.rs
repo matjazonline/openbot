@@ -107,7 +107,12 @@ async fn load_simulation_thread_fragment(
     let thread_id = Uuid::parse_str(thread_id_input.trim())
         .map_err(|_| AppError::BadRequest("A valid thread UUID is required.".into()))?;
     let thread = thread_use_cases
-        .readable_thread(viewer, company.id, channel.id, thread_id)
+        .readable_thread(
+            viewer,
+            company.id,
+            crate::entities::address::AddressTarget::Desk(channel.id),
+            thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let messages = thread_use_cases
@@ -244,7 +249,7 @@ impl SimulationCommand<'_> {
         .into_response()
     }
     fn preview_recipient(&self, sender: &str) -> Result<PreviewRecipient, String> {
-        let selection = EmailChannelSelectorParser::new(&self.config.app_domain_name)
+        let selection = EmailAddressParser::new(&self.config.app_domain_name)
             .parse(&self.form.to)
             .ok_or_else(|| "Invalid simulation recipient".to_string())?;
         let selector = selection
@@ -403,7 +408,12 @@ pub(super) async fn simulation_stream(
         .parse::<Uuid>()
         .map_err(|_| AppError::NotFound("Thread not found".into()))?;
     let thread = thread_use_cases
-        .readable_thread(&viewer, company_id, channel_id, thread_id)
+        .readable_thread(
+            &viewer,
+            company_id,
+            crate::entities::address::AddressTarget::Desk(channel_id),
+            thread_id,
+        )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
 
@@ -492,7 +502,7 @@ fn simulation_recipient_matches(
     channel: &Channel,
     app_domain_name: &str,
 ) -> bool {
-    EmailChannelSelectorParser::new(app_domain_name)
+    EmailAddressParser::new(app_domain_name)
         .parse(to)
         .is_some_and(|selection| {
             let selectors = selection.selectors();

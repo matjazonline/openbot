@@ -125,6 +125,7 @@ async fn native_mcp_ingress_auth_and_admission_never_wait_for_current_source_own
     };
     for (table, column) in [
         ("companies", "id"),
+        ("principals", "company_id"),
         ("threads", "company_id"),
         ("agent_binding_grants", "company_id"),
         ("local_machines", "company_id"),

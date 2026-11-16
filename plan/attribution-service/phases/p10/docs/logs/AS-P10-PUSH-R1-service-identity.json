@@ -1,0 +1,7 @@
+{
+  "source_files_compared": 143,
+  "result": "PASS",
+  "scope": "All tracked attribution service files byte-identical to accepted isolated author tree",
+  "binary": "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/target/debug/attribution-service",
+  "binary_sha256": "69301c1781088162c9dde73064e774f3bf41372bb050cac15c18a31ed53b0e46"
+}

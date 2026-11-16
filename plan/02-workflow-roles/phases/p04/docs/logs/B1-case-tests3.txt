@@ -1,0 +1,28 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+warning: function `invalid` is never used
+   --> src/application/workflow/escalation.rs:210:15
+    |
+210 | pub(crate) fn invalid() -> AppError {
+    |               ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 53s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 11 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 4252 filtered out; finished in 5.97s
+

@@ -23,6 +23,8 @@ mod history_reader_tests;
 pub(in crate::adapters::persistence::workflow) mod lease_tests;
 #[path = "model_usage_tests.rs"]
 mod model_usage_tests;
+#[path = "role_snapshot_tests.rs"]
+mod role_snapshot_tests;
 #[path = "run_board_tests.rs"]
 mod run_board_tests;
 #[path = "run_finished_at_tests.rs"]
@@ -427,7 +429,7 @@ async fn workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_chang
     let expected = |state: &str| {
         (
             "workflow_run_changed".to_string(),
-            json!({"company_id":company,"channel_id":null,"thread_id":null,"run_id":run,
+            json!({"company_id":company,"target":null,"thread_id":null,"run_id":run,
                 "state":state,"waiting_reason":null}),
         )
     };
@@ -461,3 +463,6 @@ mod knowledge_admission_tests;
 
 #[path = "agent_history_session_tests.rs"]
 mod agent_history_sessions;
+
+#[path = "direct_workflow_read_tests.rs"]
+mod direct_reads;

@@ -1,0 +1,50 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/0d3e4a43682241183a27e5ec1f35fd4e9027a8cd/.github",
+    "start_line": 2,
+    "start_column": null,
+    "end_line": 2,
+    "end_column": null,
+    "annotation_level": "warning",
+    "title": "",
+    "message": "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, docker/setup-docker-action@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/0d3e4a43682241183a27e5ec1f35fd4e9027a8cd/.github",
+    "start_line": 244,
+    "start_column": null,
+    "end_line": 244,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/0d3e4a43682241183a27e5ec1f35fd4e9027a8cd/.github",
+    "start_line": 230,
+    "start_column": null,
+    "end_line": 230,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Doop gate failed: check-doop.py\nCommand '('/home/runner/work/_temp/doop-check/source/tools/node_modules/.bin/bun', 'run', 'test', '--', '--maxWorkers=2')' returned non-zero exit status 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/0d3e4a43682241183a27e5ec1f35fd4e9027a8cd/.github",
+    "start_line": 195,
+    "start_column": null,
+    "end_line": 195,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Doop gate failed: /home/runner/work/_temp/doop-check/source/tools/node_modules/.bin/bun run test -- --maxWorkers=2\n[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/exportModal.test.tsx \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 208\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/frameLockActivity.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 15\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/frameActorClientId.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 3539\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/localAgentEffort.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 3555\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/commentHandBack.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2663\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/syncMigrations.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 2580\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m\u2713\u001b[22m\u001b[39m upgrades an existing OSS database without the deferred Figma migration\u001b[33m 2578\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/privateMcpLifetime.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 30426\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m\u2713\u001b[22m\u001b[39m the actual default 30s preview deadline retains all four slots until begun current-reader leaves settle\u001b[33m 30424\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/canvasShares.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/workspaceCache.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/panelWidths.test.ts \u001b[2m(\u001b[22m\u001b[2m5 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/componentLayerLint.test.ts \u001b[2m(\u001b[22m\u001b[2m20 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 803\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[32m\u2713\u001b[39m component-layer lint rule \u001b[2m(20)\u001b[22m\n     \u001b[33m\u001b[2m\u2713\u001b[22m\u001b[39m reports raw button\u001b[33m 751\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/frameLock.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 8597\u001b[2mms\u001b[22m\u001b[39m\n   \u001b[33m\u001b[2m\u2713\u001b[22m\u001b[39m keeps the lock across a server restart\u001b[33m 4372\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/notificationPrefs.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 77\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/shell.test.ts \u001b[2m(\u001b[22m\u001b[2m15 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 8\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/spaceScroll.test.ts \u001b[2m(\u001b[22m\u001b[2m3 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 18\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/webpageImport.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 11\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/geminiCloudImport.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 8946\u001b[2mms\u001b[22m\u001b[39m\n\u001b[90mstderr\u001b[2m | tests/accountMenu.test.tsx\n\u001b[22m\u001b[39mVITE_POSTHOG_KEY is unset \u2014 PostHog is disabled and no events will be sent.\n\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/avatarFace.test.tsx \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 57\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/accountMenu.test.tsx \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 185\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/frameSnapshot.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 12\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/translateGuard.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 10\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/presentShortcut.test.ts \u001b[2m(\u001b[22m\u001b[2m2 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/chatgptTokenRefresh.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 18\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/composerPlacement.test.ts \u001b[2m(\u001b[22m\u001b[2m4 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n \u001b[32m\u2713\u001b[39m \u001b[30m\u001b[46m parallel \u001b[49m\u001b[39m tests/locate.test.ts \u001b[2m(\u001b[2",
+    "raw_details": ""
+  }
+]

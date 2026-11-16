@@ -1,0 +1,84 @@
+error[E0432]: unresolved import `crate::application::agent::AgentDesk`
+ --> src/adapters/http/pages/department_ui_tests.rs:5:33
+error[E0432]: unresolved import `crate::adapters::persistence::company_agent::default_desk_key`
+ --> src/adapters/persistence/department_agent_desks_tests.rs:5:72
+error[E0432]: unresolved import `crate::application::agent::AgentDesk`
+ --> src/adapters/persistence/workflow/provisioning_directory_tests.rs:5:45
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:470:37
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:477:37
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:499:33
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:613:20
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:622:20
+error[E0433]: cannot find `OnboardingChannel` in `pages`
+   --> src/adapters/http/routes/onboarding.rs:634:20
+error[E0433]: cannot find type `WorkflowActor` in this scope
+   --> src/adapters/http/routes/onboarding.rs:581:22
+error[E0433]: cannot find type `CompanyId` in this scope
+   --> src/adapters/http/routes/onboarding.rs:585:17
+error[E0433]: cannot find type `WorkflowActor` in this scope
+   --> src/adapters/http/routes/onboarding.rs:629:17
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs:32:100
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:49:100
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:16:56
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:75:100
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs:66:87
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:148:21
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:155:29
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:206:73
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:589:59
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:653:83
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs:101:74
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:44:87
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs:75:51
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:44:62
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+  --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:82:91
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:127:65
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:131:29
+error[E0046]: not all trait items implemented, missing: `authenticate_internal_relay`
+   --> src/application/services/inbound_event_worker_tests.rs:344:1
+error[E0046]: not all trait items implemented, missing: `authenticate_internal_relay`
+    --> src/application/use_cases/thread/test_support.rs:1505:1
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/pages/desk_wording_tests.rs:176:13
+error[E0433]: cannot find type `OnboardingChannel` in this scope
+   --> src/adapters/http/pages/desk_wording_tests.rs:176:22
+error[E0560]: struct `application::agent::authoring_reads::AgentDirectoryEntry` has no field named `desk`
+   --> src/adapters/http/pages/department_ui_tests.rs:590:9
+error[E0560]: struct `application::agent::authoring_reads::AgentDirectoryEntry` has no field named `desk`
+   --> src/adapters/http/pages/department_ui_tests.rs:630:9
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:470:21
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:477:21
+error[E0560]: struct `adapters::http::pages::onboarding::OnboardedAgent<'_>` has no field named `channel`
+   --> src/adapters/http/routes/onboarding.rs:499:17
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:608:20
+error[E0609]: no field `desk_id` on type `application::use_cases::agent::CreatedAgent`
+   --> src/adapters/http/routes/onboarding.rs:614:37
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:619:13
+error[E0425]: cannot find function `stored_onboarding_channel` in this scope
+   --> src/adapters/http/routes/onboarding.rs:626:13

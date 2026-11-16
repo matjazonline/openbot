@@ -316,3 +316,6 @@ pub(crate) fn status_banner(message: &str) -> String {
         escape_html_text(message)
     )
 }
+
+mod reviewer_picker;
+pub use reviewer_picker::*;

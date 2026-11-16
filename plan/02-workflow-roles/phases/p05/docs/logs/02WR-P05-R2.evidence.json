@@ -1,0 +1,60 @@
+{
+ "version": 1,
+ "round": "02WR-P05-R2",
+ "artifact": "c3ababd836dafa6d285e16e7d4f884254439f50cdc6b30e7efc1ba39b9a8035e",
+ "checks": [
+  {
+   "criteria": [
+    "R1/F2",
+    "R1/F3",
+    "C-AGENT-KEY"
+   ],
+   "command": "open_bots lib (f4fixes) escalation notification message_reply a_dead_workflow_delivery_notifies_its_run_actor_once -- 179 PASS incl. workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice, 1 ignored (manual browser journey)",
+   "fixture": "fresh openbot_roles_p05_focus3 migrated by test support",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-f4fixes.txt",
+     "sha256": "3f892c9bdeb14eeab00f8a9c23b7fa46e4c7654ee0f647944e439823f48f675e"
+    },
+    {
+     "path": "logs/continue-build-f4fixes.txt",
+     "sha256": "2f103af5d50a7e933d0ea9bed71bf0b8dfe56451bba35e231b282755494c72e0"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "R1/F2",
+    "R1/F3"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets --keep-going -- -D warnings, allowing only the 5 pre-plan02 lint names (diagnostic, not a gate substitute)",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-clippy4-diagnostic.txt",
+     "sha256": "59d78d908371bda1429549a24baec6d873cec273ff320119476ccf223fd15932"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "scripts/check.sh run 2, stopped mid-suite after the R1 corrections changed sources; .sqlx regeneration showed no change",
+   "fixture": "openbot_roles_p05_gate2",
+   "status": "NOT EXERCISED",
+   "reason": "stopped before completion; superseded by gate run 3 on the final artifact"
+  },
+  {
+   "criteria": [
+    "R1/F1"
+   ],
+   "command": "docs/departments.md claims traced to roles.rs::resolve_role, escalation_recipients.rs, agent_notice_message.rs::commit_on",
+   "fixture": "static",
+   "status": "NOT EXERCISED",
+   "reason": "static docs correction; the reviewer verifies it against the code"
+  }
+ ]
+}

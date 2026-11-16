@@ -1,0 +1,9 @@
+{
+  "run": 43883869265,
+  "check_suite_id": 118799329580,
+  "archive_name": "logs_118799329580.zip",
+  "archive_sha256": "97ca230cdf710fe4638849736838add15c5255b783ff4110411b4e39724bdbae",
+  "archive_bytes": 1939493,
+  "source_commit": "581576e7e6918393480e5eb1004f11b6a51e5de6",
+  "acquisition": "Authenticated Chrome direct /suites/CHECK_SUITE_ID/logs; route confirmed from task-specific earlier download metadata, no cookie/token access"
+}

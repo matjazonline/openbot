@@ -8,6 +8,7 @@ pub struct AgentReferenceStep {
     pub id: StepId,
     pub model_step: ModelStep,
     pub key: Option<AgentKey>,
+    pub role: Option<crate::entities::department::DepartmentRole>,
 }
 
 pub fn agent_reference_steps(
@@ -30,6 +31,12 @@ pub fn agent_reference_steps(
                 id: id.clone(),
                 model_step,
                 key,
+                role: match step.inputs.get("role") {
+                    Some(Binding::Literal(value)) => {
+                        value.as_str().and_then(|value| value.parse().ok())
+                    }
+                    _ => None,
+                },
             })
         })
         .collect())
@@ -56,5 +63,9 @@ pub fn select_agent_reference(
             parsed.locations[""],
         ));
     }
-    retarget_agent(decoder, source, step.as_str(), agent.as_str())
+    if parsed.definition.steps[step].inputs.contains_key("role") {
+        super::role_selection::select_pinned_reference(decoder, source, step, agent)
+    } else {
+        retarget_agent(decoder, source, step.as_str(), agent.as_str())
+    }
 }

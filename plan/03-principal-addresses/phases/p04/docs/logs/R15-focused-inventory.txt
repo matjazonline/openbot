@@ -1,0 +1,6 @@
+adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model
+adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order
+adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor
+adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant

@@ -143,8 +143,8 @@ async fn write_destinations_on(
         let written = Box::pin(super::writer::write_destination_on(tx, scope, destination)).await?;
         let target = DestinationTarget::of(destination.kind, destination.destination_id);
         sqlx::query(
-            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)",
+            "INSERT INTO workflow_message_destinations (company_id,run_id,invocation_id,ordinal,kind,destination_channel_id,destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address,target_principal_id) \
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)",
         )
         .bind(scope.company.as_uuid())
         .bind(scope.run.as_uuid())
@@ -154,12 +154,13 @@ async fn write_destinations_on(
         .bind(target.channel)
         .bind(target.user)
         .bind(target.replied_message)
-        .bind(destination.channel_id)
+        .bind(destination.target.desk_id())
         .bind(destination.thread_id)
         .bind(written.message.as_uuid())
         .bind(written.delivery.map(|id| id.as_uuid()))
         .bind(destination.principal_id)
         .bind(destination.recipient.as_ref().map(|address| address.as_str().to_string()))
+        .bind(destination.target.principal_id().map(|id| id.as_uuid()))
         .execute(&mut **tx)
         .await?;
     }
@@ -279,6 +280,32 @@ struct PublicationWrite<'a> {
 }
 
 impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
+    async fn authorize_publication_on(
+        &self,
+        tx: &mut Transaction<'_, Postgres>,
+        request: &ActionDispatchRequest,
+        plan: &MessagePlan,
+        bound: &WriteBound,
+    ) -> AppResult<AuthorizedAction> {
+        let actor = super::super::action_authority::prelock_message_on(
+            tx,
+            request,
+            plan,
+            self.decision_notices.as_ref(),
+        )
+        .await?;
+        self.authorize_prelocked_on(
+            tx,
+            request,
+            bound.server_timeout(),
+            action_authority::AccountPrefix {
+                actor,
+                locks: super::row_locks::RowLocks::Wait,
+            },
+        )
+        .await
+    }
+
     async fn publish_on(
         &self,
         tx: &mut Transaction<'_, Postgres>,
@@ -292,7 +319,10 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             action,
             current_policy,
             approval_required,
-        } = match self.authorize_on(tx, request, bound.server_timeout()).await {
+        } = match self
+            .authorize_publication_on(tx, request, plan, bound)
+            .await
+        {
             Ok(authorized) => authorized,
             Err(error) => {
                 return Self::rejected_on(tx, request, error)

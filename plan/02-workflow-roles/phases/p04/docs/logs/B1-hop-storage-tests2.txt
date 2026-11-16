@@ -1,0 +1,60 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+warning: unused import: `HopRecipients`
+ --> src/adapters/persistence/workflow/escalations.rs:9:34
+  |
+9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+  |                                  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 47s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 18 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_does_not_change_agent_or_people_modes ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor' (50415896) panicked at src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs:42:6:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"label\" does not exist")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders' (50415937) panicked at src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs:42:6:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"label\" does not exist")
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset' (50415972) panicked at src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs:42:6:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: column \"label\" does not exist")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset
+
+test result: FAILED. 15 passed; 3 failed; 0 ignored; 0 measured; 4251 filtered out; finished in 8.09s
+
+error: test failed, to rerun pass `--lib`

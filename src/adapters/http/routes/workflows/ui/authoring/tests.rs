@@ -63,6 +63,7 @@ impl Fixture {
                 shared.clone(),
                 shared.clone(),
                 shared.clone(),
+                crate::use_cases::agent::SpamScanning::Unavailable,
             )),
             departments: reads.0,
             attention: reads.1,
@@ -199,7 +200,7 @@ impl Fixture {
         .execute(self.persistence.pool())
         .await
         .unwrap();
-        AgentPersistence::create(
+        let agent = AgentPersistence::create(
             &self.persistence,
             self.company,
             AgentWrite {
@@ -211,8 +212,13 @@ impl Fixture {
             },
         )
         .await
-        .unwrap()
-        .id
+        .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(
+            &self.persistence,
+            &agent,
+        )
+        .await;
+        agent.id
     }
 
     async fn publish_agent(&self, agent: Uuid) {
@@ -678,3 +684,6 @@ async fn run_board_view_filter_workflow_pages_link_to_the_board() {
         "{page}"
     );
 }
+
+#[path = "reviewer_picker_tests.rs"]
+mod reviewer_picker_tests;

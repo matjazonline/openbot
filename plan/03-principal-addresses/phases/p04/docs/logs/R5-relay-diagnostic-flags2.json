@@ -1,0 +1,124 @@
+{
+  "query": "SELECT jsonb_build_object('delivery',d.id,'sourceauthor',a.kind,'sourcerole',s.role,'primary',address.is_primary,'slug',company.slug,'binding',binding.status,'parent',mail.in_reply_to,'references',mail.references_list,'digestmatch',part.content_digest=encode(sha256(convert_to(mail.raw_text_body,'UTF8')),'hex'),'sender',si.subject,'recipient',ri.subject,'copyrole',copy.role,'copyauthor',ca.kind,'audience',copy.audience,'source_count',(SELECT count(*) FROM internal_relay_source(d.company_id,d.id,0,d.channel_id,NULL,si.subject,ri.subject,mail.rfc_message_id,copy.subject,COALESCE(mail.raw_text_body,''),mail.in_reply_to,to_jsonb(mail.references_list))))::text FROM message_deliveries AS d JOIN messages AS s ON s.id=d.message_id JOIN principals AS a ON a.id=s.author_principal_id JOIN companies AS company ON company.id=d.company_id JOIN channel_bindings AS binding ON binding.id=d.source_binding_id JOIN addresses AS address ON address.channel_id=d.channel_id JOIN message_delivery_parts AS part ON part.delivery_id=d.id JOIN messages AS copy ON copy.direction='inbound' AND copy.role='system' JOIN principals AS ca ON ca.id=copy.author_principal_id JOIN email_message_metadata AS mail ON mail.message_id=copy.id JOIN message_participants AS sender ON sender.message_id=copy.id AND sender.kind='sender' JOIN participant_identities AS si ON si.id=sender.participant_identity_id JOIN message_participants AS recipient ON recipient.message_id=copy.id AND recipient.kind='to' JOIN participant_identities AS ri ON ri.id=recipient.participant_identity_id",
+  "installed": true,
+  "captures": [
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [
+        "{\"slug\": \"workflow-tests\", \"parent\": \"<relay-source-1@partner.test>\", \"sender\": \"runs@workflow-tests.agents.test\", \"binding\": \"active\", \"primary\": true, \"audience\": \"internal_only\", \"copyrole\": \"system\", \"delivery\": \"697e324e-754e-443f-a9e3-a69691ae51d3\", \"recipient\": \"notices-53cdd26e85464d6baa0748bbf8d27270@workflow-tests.agents.test\", \"copyauthor\": \"system\", \"references\": [\"<relay-source-1@partner.test>\"], \"sourcerole\": \"system\", \"digestmatch\": true, \"source_count\": 0, \"sourceauthor\": \"system\"}"
+      ],
+      "error": ""
+    },
+    {
+      "db": "open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2",
+      "rows": [],
+      "error": "psql: error: connection to server at \"127.0.0.1\", port 51167 failed: FATAL:  database \"open_bots_own_03eafc7ebc0c4ccdb8f3392f350b11d2\" does not exist\nDETAIL:  It seems to have just been dropped or renamed."
+    }
+  ],
+  "exit": 101
+}

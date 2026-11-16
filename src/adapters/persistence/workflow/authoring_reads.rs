@@ -80,14 +80,7 @@ impl PostgresPersistence {
         let workflows: Vec<Uuid> = bindings.iter().map(|b| b.workflow.as_uuid()).collect();
         let channels: Vec<Uuid> = bindings
             .iter()
-            .filter_map(|b| match b.association {
-                RelatedAssociation::Company => None,
-                RelatedAssociation::Channel(channel)
-                | RelatedAssociation::Thread {
-                    channel_id: channel,
-                    ..
-                } => Some(channel.as_uuid()),
-            })
+            .filter_map(|b| b.association.target().and_then(AddressTarget::desk_id))
             .collect();
         let names: HashMap<Uuid, String> =
             sqlx::query_as("SELECT id, name FROM channels WHERE company_id = $1 AND id = ANY($2)")
@@ -154,14 +147,11 @@ impl PostgresPersistence {
                     let mut schedules = by_binding.remove(&id).unwrap_or_default();
                     let schedules_truncated = schedules.len() > MAX_SCHEDULES_PER_BINDING as usize;
                     schedules.truncate(MAX_SCHEDULES_PER_BINDING as usize);
-                    let channel_name = match binding.association {
-                        RelatedAssociation::Company => None,
-                        RelatedAssociation::Channel(channel)
-                        | RelatedAssociation::Thread {
-                            channel_id: channel,
-                            ..
-                        } => names.get(&channel.as_uuid()).cloned(),
-                    };
+                    let channel_name = binding
+                        .association
+                        .target()
+                        .and_then(AddressTarget::desk_id)
+                        .and_then(|id| names.get(&id).cloned());
                     BindingUse {
                         workflow_title: titles
                             .get(&binding.workflow.as_uuid())
@@ -209,6 +199,38 @@ impl PostgresPersistence {
 
 #[async_trait]
 impl AuthoringReads for PostgresPersistence {
+    async fn reviewer_choice(
+        &self,
+        company: CompanyId,
+        principal: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<ReviewerChoice>> {
+        let label: Option<String> = sqlx::query_scalar("SELECT principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person'")
+            .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_optional(self.pool()).await?;
+        Ok(label.map(|label| ReviewerChoice { principal, label }))
+    }
+
+    async fn reviewer_choices(
+        &self,
+        company: CompanyId,
+        after: Option<crate::entities::transport::PrincipalId>,
+    ) -> AppResult<ReviewerChoices> {
+        let mut rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT principal.id,principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.kind='person' AND ($2::uuid IS NULL OR principal.id>$2) ORDER BY principal.id LIMIT 51")
+            .bind(company.as_uuid()).bind(after.map(|id| id.as_uuid())).fetch_all(self.pool()).await?;
+        let next =
+            (rows.len() > 50).then(|| crate::entities::transport::PrincipalId::new(rows[49].0));
+        rows.truncate(50);
+        Ok(ReviewerChoices {
+            items: rows
+                .into_iter()
+                .map(|(id, label)| ReviewerChoice {
+                    principal: crate::entities::transport::PrincipalId::new(id),
+                    label,
+                })
+                .collect(),
+            next,
+        })
+    }
+
     async fn version_source(
         &self,
         company: CompanyId,

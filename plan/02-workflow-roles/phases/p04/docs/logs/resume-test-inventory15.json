@@ -1,0 +1,33 @@
+{
+  "before": 4283,
+  "after": 4309,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_competing_deadline_owners_create_one_terminal_source: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_case_failure_rolls_back_expiry_and_job: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_requires_actual_expiry_and_delivers_one_notice: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_competing_decision_sweepers_commit_one_failure_case: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_authored_handler_suppresses_ladder_even_at_end: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_deadline_fails_real_wait_and_delivers_once: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_case_failure_rolls_back_run_and_wait: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_preserves_real_source_and_delivers_once: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_repairs_without_changing_context: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_desk_ownership_writer_refreshes_derived_visibility: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_competing_channel_writers_commit_matching_visibility_and_assignment: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_refresh_failure_rolls_back_channel_settings_grants_and_assignments: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_empty_case_is_atomic_and_repair_never_restarts_it: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_empty_case_sql_rejects_false_source_fields_and_repaired_reviewers: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email: test",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision: test",
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_deferred_identity_rejects_mismatches_and_orphans_at_commit: test",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action: test"
+  ],
+  "removed": []
+}

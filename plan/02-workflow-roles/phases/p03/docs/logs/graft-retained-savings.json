@@ -1,0 +1,747 @@
+{
+  "description": "Conservative deduplicated retained p03 packs; excludes missing/overwritten packs and calls without savings lines. No dollar figures reported.",
+  "total_saved_tokens": 4091777,
+  "pack_count": 148,
+  "packs": [
+    {
+      "path": "logs/openbot-02-p03-account-delete-sites.txt",
+      "sha256": "8bb241c0dafe843182d060a49fca6d34524beae52a7656ceb8cb9691b8b98cd5",
+      "tokens_saved": 10677
+    },
+    {
+      "path": "logs/openbot-02-p03-action-http-api.txt",
+      "sha256": "7e34ba301b6b201687b40d470f784e19cf8f1a97e831041526e0b54968f1754f",
+      "tokens_saved": 4176
+    },
+    {
+      "path": "logs/openbot-02-p03-admission-api.txt",
+      "sha256": "a5589120fd35d8e1023b1e2dedd2ee31d249dd739cf1948f0d4cab29a2b82f29",
+      "tokens_saved": 3685
+    },
+    {
+      "path": "logs/openbot-02-p03-agent-setup-callers.txt",
+      "sha256": "72a6816ca870d323630919d7a81b4ce9447813ac43bf9abe8f7216f7e971e77e",
+      "tokens_saved": 69075
+    },
+    {
+      "path": "logs/openbot-02-p03-agent-setup-context.txt",
+      "sha256": "5f5a4abbd219b8cfeed39d212cc2044bd117de904c0329794796d40f94c97c51",
+      "tokens_saved": 29156
+    },
+    {
+      "path": "logs/openbot-02-p03-all-reviewer-context.txt",
+      "sha256": "1f84d25c374f504e6ccd899cb41d8dd70e673b41bf67f67337c8198d71e9f9d4",
+      "tokens_saved": 194993
+    },
+    {
+      "path": "logs/openbot-02-p03-all-reviewer-readers.txt",
+      "sha256": "ac4db823bfb8836d03ca6d5d68edcc2f25704c70f823a47dd69dcb1b46c3a87a",
+      "tokens_saved": 43996
+    },
+    {
+      "path": "logs/openbot-02-p03-applied-selector-sites.txt",
+      "sha256": "b53b2b7427348a78b729e15899c5cee99eaf2ae3418b1f52a3ab13e9f2944666",
+      "tokens_saved": 7589
+    },
+    {
+      "path": "logs/openbot-02-p03-approvals-all.txt",
+      "sha256": "2daa8a857a7213a322527ad9a5c873e592b0bd4cb39a3cd3150d94cf15988bf9",
+      "tokens_saved": 158472
+    },
+    {
+      "path": "logs/openbot-02-p03-attention-callers.txt",
+      "sha256": "f8e8f7d4c6a481c23894fba7fc7f972f7b04ffbac48bf05a4dcf14e1edaa1567",
+      "tokens_saved": 6534
+    },
+    {
+      "path": "logs/openbot-02-p03-attention-references.txt",
+      "sha256": "046f059ca5d1a9afb81e6ca8204b8bd0232b7336abaaa34688c44661cb8a0aa2",
+      "tokens_saved": 6423
+    },
+    {
+      "path": "logs/openbot-02-p03-authoring-reads-all.txt",
+      "sha256": "5f19c5125ac9e2403ed096b5ab907325e1ff2e66b21c6e8e5fdcef13702c47e2",
+      "tokens_saved": 4881
+    },
+    {
+      "path": "logs/openbot-02-p03-bind-child-callers.txt",
+      "sha256": "3ba733fda9c455cbca027b7c2d0039fe2f5c39400041fb5f6d19be8aaa324d08",
+      "tokens_saved": 21749
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-banner.txt",
+      "sha256": "d9b5a6320147858a74f65e46b4184d4a23dfb95be5a720040933df020dac2457",
+      "tokens_saved": 14350
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-enum-context-r2.txt",
+      "sha256": "39aea1dee93dda04bb24e075f62218e0417f9d5ec1ed25c4349a960c89a03d3f",
+      "tokens_saved": 30836
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-fixture-api.txt",
+      "sha256": "a5109f34f738045743bddc78d875bc4155c0b00b46f6bfa7e2ad28dea521186c",
+      "tokens_saved": 3723
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-fixture-context.txt",
+      "sha256": "fd951e977a1770faf7c946e6b6f0b1c8689dfcfd722c3d6751850be01ccb5c5e",
+      "tokens_saved": 120152
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-fixture.txt",
+      "sha256": "cbdbb993bcc70fb02c7ed6d210f8d95b8c197f00d2369e23b0b58fe822a2cd2e",
+      "tokens_saved": 4333
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-route-api.txt",
+      "sha256": "3dddb8a147f22c60898c2f0f29888dbad41a61eb2ed64c9fcc78994e7cc2214b",
+      "tokens_saved": 6629
+    },
+    {
+      "path": "logs/openbot-02-p03-binding-symbol.txt",
+      "sha256": "288a2341034544418ff00708c4b4c0f8dfd5b863a2be927af886569be854b036",
+      "tokens_saved": 30811
+    },
+    {
+      "path": "logs/openbot-02-p03-business-authority-evidence-audit.txt",
+      "sha256": "ba0437aae9bf8acb6e2585f1b3accca85940f7b67f33c8e19dc8ff15e010281a",
+      "tokens_saved": 3776
+    },
+    {
+      "path": "logs/openbot-02-p03-cancel-notice-callers.txt",
+      "sha256": "2ea7edcad482e86bde94ee5d2658e76043909388bb6de80d40ea86ac324f3d9b",
+      "tokens_saved": 22124
+    },
+    {
+      "path": "logs/openbot-02-p03-cancel-notice-sites.txt",
+      "sha256": "4a37a2c66f57355fab57ccbd300d6cd7105c837b53abae6bc75a5bf147ae8c36",
+      "tokens_saved": 12527
+    },
+    {
+      "path": "logs/openbot-02-p03-cancellation-test-patterns.txt",
+      "sha256": "a1181e8e48dbd676812df36a40e8bc2dd5689b066bb33cbcd0f654f6590ce49d",
+      "tokens_saved": 49050
+    },
+    {
+      "path": "logs/openbot-02-p03-capture-role-api.txt",
+      "sha256": "520ba7914f6607fc17b6d78998a67b0166466377eace939a47205bf5752ce108",
+      "tokens_saved": 1950
+    },
+    {
+      "path": "logs/openbot-02-p03-child-handler-context.txt",
+      "sha256": "297471aa65963be71b427e46a32b7a5f11ab120aad3ea189a6b122fcf06fa268",
+      "tokens_saved": 20204
+    },
+    {
+      "path": "logs/openbot-02-p03-child-human-api.txt",
+      "sha256": "b6aee17a622a0bf27c501b9dec2841309a01d54c0f4a187a1c0bbe37acdf2e62",
+      "tokens_saved": 3392
+    },
+    {
+      "path": "logs/openbot-02-p03-child-runtime-api.txt",
+      "sha256": "c50337327480ac1a7e534db1902876ab0c8c22c5a3c7f543eeed47ff3cafa18f",
+      "tokens_saved": 700
+    },
+    {
+      "path": "logs/openbot-02-p03-clearance-all.txt",
+      "sha256": "32e663ac53aeef913d4058c62b16f0523e4907f496d8526746079dda8d87be91",
+      "tokens_saved": 27585
+    },
+    {
+      "path": "logs/openbot-02-p03-clearance.txt",
+      "sha256": "68303336a5743dcb457ba7246788fce93670970ac9d6d128315abddc0025dc3f",
+      "tokens_saved": 9807
+    },
+    {
+      "path": "logs/openbot-02-p03-closure-api.txt",
+      "sha256": "cf9789045c30771391f3fb99f296661867b41656129ca2d3f67973f69866a18d",
+      "tokens_saved": 1163
+    },
+    {
+      "path": "logs/openbot-02-p03-collect-people-callers-r2.txt",
+      "sha256": "91a61c02d115e06d3786faa4bed1931881bf7c9cab871687c42f7a2df991b16b",
+      "tokens_saved": 1275
+    },
+    {
+      "path": "logs/openbot-02-p03-company-write.txt",
+      "sha256": "3ed67254fe4f01a359a32770d69d9d0341760bbe7bf54cbc45109e742b6b3bf0",
+      "tokens_saved": 6838
+    },
+    {
+      "path": "logs/openbot-02-p03-compiler-role-api-r2.txt",
+      "sha256": "c91782127e720659c92b9b613fce571d41b263f4041c6f02319dd8c8a8e3ade0",
+      "tokens_saved": 1205
+    },
+    {
+      "path": "logs/openbot-02-p03-completion-fixture-api.txt",
+      "sha256": "3ac3a3ee06f9e9698b72cc2860dcfaec640facff23d402f4bd72f3d078525f5a",
+      "tokens_saved": 4100
+    },
+    {
+      "path": "logs/openbot-02-p03-configure-reply-all.txt",
+      "sha256": "d93b47332b23e6f422f6b0848174567b86773067ad434b7b50fb5e21d37e0ff1",
+      "tokens_saved": 35174
+    },
+    {
+      "path": "logs/openbot-02-p03-deadline-uses.txt",
+      "sha256": "88876b11d6e4159d32585f4466e75d4498c1e447ddc92031f0181570b500e43b",
+      "tokens_saved": 14834
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-authority-tests-api.txt",
+      "sha256": "2b9ffbb7b71252f9fa7677c5dee74e69fc8359116e7f9a2edf3a664485d4f72a",
+      "tokens_saved": 3772
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-check-sites.txt",
+      "sha256": "96b060d66001359df27e8b7496ba749cc6a07eee6082e373dd9e3d0fb3cc0b58",
+      "tokens_saved": 2774
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-page2.txt",
+      "sha256": "f99aa3828c5a6c812b5076b876d9548c006bc52ff19ef857d2f38270150bcd1a",
+      "tokens_saved": 2594
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-provenance-tests-api.txt",
+      "sha256": "d81662cee1958ece95df77dc480b95726e807e7e93daa835dcdb773c58ebee28",
+      "tokens_saved": 2441
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-storage-api.txt",
+      "sha256": "104c31d00fc3f8a8925e724734dc91bb41b7e69aff100e080b99936cd2a10620",
+      "tokens_saved": 6456
+    },
+    {
+      "path": "logs/openbot-02-p03-decision-view-constructors.txt",
+      "sha256": "ebd71a9c5823dff0cc1a7be0ee464605efac31dab35c617dee4cf8dd03310df0",
+      "tokens_saved": 33850
+    },
+    {
+      "path": "logs/openbot-02-p03-decoder-api.txt",
+      "sha256": "48877aed9e591c0ff2cd38c2ab552a4f9bece2e3f7b48fefc2f227e30c07a1d4",
+      "tokens_saved": 2055
+    },
+    {
+      "path": "logs/openbot-02-p03-department-refusal-callers.txt",
+      "sha256": "26d6d5f1b09eda4822647b980648e813d683725b2226af7f12440bcf5aa3094e",
+      "tokens_saved": 89019
+    },
+    {
+      "path": "logs/openbot-02-p03-departments-accessor.txt",
+      "sha256": "1447376c9a5c72f19ca3a1aa5f0bd58e6160cf42d9416dffdb405fc693d29ba0",
+      "tokens_saved": 167749
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-detail.txt",
+      "sha256": "f88c10d921bf4bbaaec9276ca4a319676d9e6bf235ff3119e76ee570a3355301",
+      "tokens_saved": 6995
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-port.txt",
+      "sha256": "262a6af131d08485ded5eba0b7c364d0f593164738420ab43e14aa75d6432530",
+      "tokens_saved": 24021
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-principal-label.txt",
+      "sha256": "5bfdf183aebb766f474786b7c53fa30e44e1085ff96be0310a939ea024813a25",
+      "tokens_saved": 8361
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-principal.txt",
+      "sha256": "d5d613974499596e913e6b61476d74a741dd4a82f83ebd8bdb67d3e752f6059b",
+      "tokens_saved": 2919
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-ui-api.txt",
+      "sha256": "60e024db7ab89f2ab8a4cf635330fa31a83122882cf73a5e08b31811aae55beb",
+      "tokens_saved": 4587
+    },
+    {
+      "path": "logs/openbot-02-p03-dept-usecases.txt",
+      "sha256": "fa61ae89e863da3826f85995cc34350094d25db17d3b79637a27c9342bfd962b",
+      "tokens_saved": 3373
+    },
+    {
+      "path": "logs/openbot-02-p03-doop-drive-calls.txt",
+      "sha256": "c7bad799714d06e8a1295f28336095356dfaae7e34743defc1e0f6678d26001c",
+      "tokens_saved": 91191
+    },
+    {
+      "path": "logs/openbot-02-p03-doop-params-callers.txt",
+      "sha256": "e399e6748c13d304dc40b3ced2dd6dd48efe75ad0496b44f5db8507d50501383",
+      "tokens_saved": 8731
+    },
+    {
+      "path": "logs/openbot-02-p03-doop-request-callers.txt",
+      "sha256": "7e469e8a8fa8484212c0eadc8fbaaa446c5da0b45aae4460e65ea920af18b4b8",
+      "tokens_saved": 468147
+    },
+    {
+      "path": "logs/openbot-02-p03-draft-revision-literal.txt",
+      "sha256": "b3be56860150667354a43f56297f7e96e59ae408a1e56d42c621cbb0fa8adf44",
+      "tokens_saved": 7001
+    },
+    {
+      "path": "logs/openbot-02-p03-eligible-all.txt",
+      "sha256": "6ea459f2d1dfb1147ad0a9800e436c08b13aef41ecebcf65c1ad7e2a01ce6a6b",
+      "tokens_saved": 34241
+    },
+    {
+      "path": "logs/openbot-02-p03-eligible-reviewer-context.txt",
+      "sha256": "a27c98ed5cfd93e8f07ea82c51c03409a4e3f2905dbb79398e4a0abdaeb9b9fa",
+      "tokens_saved": 11502
+    },
+    {
+      "path": "logs/openbot-02-p03-eligible-uses.txt",
+      "sha256": "e488d07631d7d3522fa4bcc2883000d9c52f3a73e8612ebed08249d2df967eba",
+      "tokens_saved": 11301
+    },
+    {
+      "path": "logs/openbot-02-p03-example-api.txt",
+      "sha256": "a8e9e772f93452e79f8184495bc9e0c2130cdbc552634f095628193070e78a6c",
+      "tokens_saved": 1717
+    },
+    {
+      "path": "logs/openbot-02-p03-fixture-current.txt",
+      "sha256": "59727cda03ec823f1ec0ba1b851ceed33064b91f2e8845e11ecb77e1d15c2313",
+      "tokens_saved": 12325
+    },
+    {
+      "path": "logs/openbot-02-p03-fixture-type.txt",
+      "sha256": "f0a4f0c65c395bfa338263a89ba0a964dcc0acffe5cd927b08c13b1711252acb",
+      "tokens_saved": 7645
+    },
+    {
+      "path": "logs/openbot-02-p03-history-runtime-context.txt",
+      "sha256": "f646f6acecaea61ac259600a7ba0c562393f3fb667ce71026e23737dd9658626",
+      "tokens_saved": 20068
+    },
+    {
+      "path": "logs/openbot-02-p03-idempotency-type.txt",
+      "sha256": "a91d919ea3c983dcb2bea37509e21328e95c57b553236d7c62253c0d92715f7c",
+      "tokens_saved": 3692
+    },
+    {
+      "path": "logs/openbot-02-p03-indicator-context.txt",
+      "sha256": "1e55a961fc7b0710ae70715434fd351a25225bd7acc0ed9ad78c76261ae1b8f0",
+      "tokens_saved": 18546
+    },
+    {
+      "path": "logs/openbot-02-p03-inputcheck-api.txt",
+      "sha256": "d088721f237f208f20e467ad195bdb230ba2785fb02094b66c751c11b10e61f6",
+      "tokens_saved": 1289
+    },
+    {
+      "path": "logs/openbot-02-p03-inputcheck-type.txt",
+      "sha256": "f0f5bf948feb1f914c1a35aaa9dda5fd61e386af2577ca287b244de669bfe0ee",
+      "tokens_saved": 1351
+    },
+    {
+      "path": "logs/openbot-02-p03-intents-impl.txt",
+      "sha256": "ee9156335cd04f3b3cdddbe991b02b54c1c89a1cbf16d946b5f534a6a5599801",
+      "tokens_saved": 15827
+    },
+    {
+      "path": "logs/openbot-02-p03-intents-type.txt",
+      "sha256": "8059ad033f276d59be50e74d35b2271148d277665b070f20d5911e7747d0cf2f",
+      "tokens_saved": 15822
+    },
+    {
+      "path": "logs/openbot-02-p03-job-id.txt",
+      "sha256": "58cdc19c811b81a986fa40b45efbc9099bfeb5614b53cacb43639fa63f0afe06",
+      "tokens_saved": 1323
+    },
+    {
+      "path": "logs/openbot-02-p03-lease-fence-context.txt",
+      "sha256": "35855f67bdd4ba1e9584437af7957d9da2d91a3ea55e335cc001b303c91fb78a",
+      "tokens_saved": 60360
+    },
+    {
+      "path": "logs/openbot-02-p03-lock-scope-context.txt",
+      "sha256": "050d2cb2f6e9c20e7a7b7bbac071cb629ff5f5ad932abc51848d1b1c53670406",
+      "tokens_saved": 15182
+    },
+    {
+      "path": "logs/openbot-02-p03-member-fixture-callers-r2.txt",
+      "sha256": "5ef8fb5fb5227d789b2e49263ce35310a9c96200e8c940075e7666327eab98ce",
+      "tokens_saved": 37579
+    },
+    {
+      "path": "logs/openbot-02-p03-model-admission-port.txt",
+      "sha256": "152ea0440ebd9585ecf575de8c5bc76c9bd2e42409adbc8618c8770f5496bb42",
+      "tokens_saved": 33340
+    },
+    {
+      "path": "logs/openbot-02-p03-native-bind-callers.txt",
+      "sha256": "a69ca5d16d6ec081a722b5cc68382adc1b29fb3142dd7d08b19cd3ad923cb097",
+      "tokens_saved": 33436
+    },
+    {
+      "path": "logs/openbot-02-p03-new-reply-policies.txt",
+      "sha256": "8de24ebefdfe260af75dbc74caf4b8890f4a479229492f0f7ad050f86dbc2eea",
+      "tokens_saved": 32005
+    },
+    {
+      "path": "logs/openbot-02-p03-options-trait.txt",
+      "sha256": "1ba063adeb70f9fe14098f74ada8050f8760a5e2c45299d33a4b43ce0e06e81c",
+      "tokens_saved": 4898
+    },
+    {
+      "path": "logs/openbot-02-p03-owner-principal-context.txt",
+      "sha256": "09b9af9a23f8a68ef64c0562080f474d4e302cb1b137e3c622ee47f43e9b2307",
+      "tokens_saved": 93370
+    },
+    {
+      "path": "logs/openbot-02-p03-person-principal-sites.txt",
+      "sha256": "a5fc09ca2ce57cc2056410c6f65a9906da895f6f6b1d08c84a9442625d9181a7",
+      "tokens_saved": 73657
+    },
+    {
+      "path": "logs/openbot-02-p03-picker-loader-callers.txt",
+      "sha256": "79af2da7b95852feb6b4ec4c9cdfe83876fefdf812d57deff6383f8304724b74",
+      "tokens_saved": 9562
+    },
+    {
+      "path": "logs/openbot-02-p03-picker-surfaces.txt",
+      "sha256": "fda1a59e8a000243f287d358103daf9925af9e343a9ced110bfd8808fda3d7fc",
+      "tokens_saved": 19684
+    },
+    {
+      "path": "logs/openbot-02-p03-picker-tests-api.txt",
+      "sha256": "92d6c0c8171f58aea87701a5227b95101891ea6a2f5a0c6ace5e39a60026e56e",
+      "tokens_saved": 2319
+    },
+    {
+      "path": "logs/openbot-02-p03-policy-reviewer-methods.txt",
+      "sha256": "74030ed61d450636fdca52a6f892122aeabc4f1307ab09e79e767a0516c4f552",
+      "tokens_saved": 23469
+    },
+    {
+      "path": "logs/openbot-02-p03-prelock-all.txt",
+      "sha256": "fc99e80592055ef520a9dd16f81a341997700d781513ecbf020f5d44df2d2b35",
+      "tokens_saved": 56448
+    },
+    {
+      "path": "logs/openbot-02-p03-prelock-context.txt",
+      "sha256": "dfa58370565d9dc66bfa35aed4f540d6dbe81b752836fea6e41329f87b6f78a9",
+      "tokens_saved": 76209
+    },
+    {
+      "path": "logs/openbot-02-p03-prelock-sites.txt",
+      "sha256": "d0157806ad7709b9fca70f42b177d8e45eca601851901e05b923e18cb3705152",
+      "tokens_saved": 18045
+    },
+    {
+      "path": "logs/openbot-02-p03-prepare-input-sites.txt",
+      "sha256": "cca99ad9f17019f7332d8ee23d6851fec470d875436854a01ee49a89a72bb354",
+      "tokens_saved": 11886
+    },
+    {
+      "path": "logs/openbot-02-p03-prepared-inputs-context-r2.txt",
+      "sha256": "f5107ca0610ac6f61959f785582dd77f79c0d7bfbc65504e0f1d7f047f3a96aa",
+      "tokens_saved": 15650
+    },
+    {
+      "path": "logs/openbot-02-p03-progress-style-sites.txt",
+      "sha256": "2c49a4e064a82fd88c7fd6108efa01bdc4c8ccbd237968e816df001f5c990196",
+      "tokens_saved": 5749
+    },
+    {
+      "path": "logs/openbot-02-p03-protected-publish-context.txt",
+      "sha256": "01c8020828594bcbbdfd394d2863c546f2563efffe23b585ec222f2c4bf2cf55",
+      "tokens_saved": 7870
+    },
+    {
+      "path": "logs/openbot-02-p03-publication-lock-callers.txt",
+      "sha256": "6579574831a60ac0d9c3815ba5cc30a092d7ea56a890aa33ce0878665cae95bf",
+      "tokens_saved": 9638
+    },
+    {
+      "path": "logs/openbot-02-p03-publication-privilege-evidence-audit.txt",
+      "sha256": "41b92354efe354b0f5779496fc0dbe6d210f5846af9a443fca448a7611059722",
+      "tokens_saved": 1971
+    },
+    {
+      "path": "logs/openbot-02-p03-publication-test-api.txt",
+      "sha256": "edce6b004f5f71cc6a5170c213a289e2ccd0285d8752c954ae1f9ca4a30c13c3",
+      "tokens_saved": 1303
+    },
+    {
+      "path": "logs/openbot-02-p03-reads-implementations.txt",
+      "sha256": "d71279688706db564b99475bca5b4ebf2592e704ca44cb3422bfe0726f4773d7",
+      "tokens_saved": 4456
+    },
+    {
+      "path": "logs/openbot-02-p03-reads-trait.txt",
+      "sha256": "8efb00079177d4c498eea5f244f11f6051951b52801087f7474a9b20a41439c1",
+      "tokens_saved": 4907
+    },
+    {
+      "path": "logs/openbot-02-p03-remove-member-all.txt",
+      "sha256": "897b9a0af2baca7e2dd81ba6e06e00764eaaf86637e14e5cd4e43861913c5451",
+      "tokens_saved": 46680
+    },
+    {
+      "path": "logs/openbot-02-p03-reply-policy-callers.txt",
+      "sha256": "43b70aa982c049fac828e71e267f0a7ada1f7fe24c6534275a9be7a9c165e49a",
+      "tokens_saved": 833
+    },
+    {
+      "path": "logs/openbot-02-p03-reply-policy-consumers.txt",
+      "sha256": "ab32e508db212d44675c9d07bd54f62db6dedac3a9d57e755a1b2ebb074cd9dd",
+      "tokens_saved": 1014
+    },
+    {
+      "path": "logs/openbot-02-p03-reserve-on-callers.txt",
+      "sha256": "ec126d06a9309504c6e83f4eae828c1bada530954dd5d62a16700b6d0bf6b168",
+      "tokens_saved": 5845
+    },
+    {
+      "path": "logs/openbot-02-p03-response-reviewer-page.txt",
+      "sha256": "e6984f9643191c6e1fc3458f9ef4691f6ee8cf0c42a82bdec67df15294efd8ba",
+      "tokens_saved": 1400
+    },
+    {
+      "path": "logs/openbot-02-p03-retarget-agent.txt",
+      "sha256": "0e2fc54a17e2d71842ac06ab633701b844fbd0694424ff35402d342583b59220",
+      "tokens_saved": 31481
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewed-callers.txt",
+      "sha256": "b5c99b81324d0b15b545c7cb776ca2a855896f50ac02b333531488f0dca99f72",
+      "tokens_saved": 26627
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-bound.txt",
+      "sha256": "1deaa39bf5ded5d56c214ba854f277a62f34fdb2b6ed36ea49e1d0a0269a18b6",
+      "tokens_saved": 22626
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-callers.txt",
+      "sha256": "a3c4e60c84ac6d8559ad5696ccd24b86f090b9a28ffe804bd636ac85b1dd8d01",
+      "tokens_saved": 12932
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-fields.txt",
+      "sha256": "6a8a100a2037b8f5bc0f57abc21c74dd34cff188fdc117d419d5e8aded12fa3f",
+      "tokens_saved": 26219
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-iteration.txt",
+      "sha256": "82859d0caea7093ba7bd72a669cdad8610be91dc1521c47543cde387d94a34c8",
+      "tokens_saved": 9267
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-pagination-context.txt",
+      "sha256": "93b87c7791b471b6a41b7ce21f2549d4ebe9ae29722e020bcb59b9e1b6c5e111",
+      "tokens_saved": 17910
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-param-context.txt",
+      "sha256": "ab5f6a991070a710d4572e12a202f8f94dc781ad789c0757266e0271fae50a82",
+      "tokens_saved": 114399
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-producers.txt",
+      "sha256": "04d36d1b1353c092e3dfd9bcba17debdba62c5361537077f7ec76ca8597ffe18",
+      "tokens_saved": 159111
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-rows-all.txt",
+      "sha256": "d6f63f89d9d26c22d18d71422c5f59f615c38b289042c7cc3ca9a46972559d96",
+      "tokens_saved": 6146
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-rows-sites.txt",
+      "sha256": "1b91571114fdf109b1d59df1ff24fa5770a954427150c0d536f01e9dc57c22bc",
+      "tokens_saved": 6113
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-sql-consumers.txt",
+      "sha256": "8233928ef4203b7d2ecd9f6a7724c44b00b408194f7ed5399b33fd04ffe4ca29",
+      "tokens_saved": 34637
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-user-relations.txt",
+      "sha256": "f0a341118142e33b213c5163186cfbc2194665648970d3f013e54bbf9d3dce67",
+      "tokens_saved": 55869
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-view-uses.txt",
+      "sha256": "5543f57283c42566eac322a6653daf5f906d08c96090e29de0b61381e5fdc658",
+      "tokens_saved": 13649
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewer-wires-final.txt",
+      "sha256": "ab6c1be2e49f0953ae3571ace6c36d375628f097f8d8e2284adb10897871c04f",
+      "tokens_saved": 154702
+    },
+    {
+      "path": "logs/openbot-02-p03-reviewers-all.txt",
+      "sha256": "b75810609c0f91e9458fcd756ef19f5ef1b1dc9e4e5d2bd810160cf94b60129a",
+      "tokens_saved": 6394
+    },
+    {
+      "path": "logs/openbot-02-p03-role-binding-api.txt",
+      "sha256": "951c0c7ad3de529ab5cbb4a4f658e5c782d1009998dc6fbed019ab31a09cb583",
+      "tokens_saved": 623
+    },
+    {
+      "path": "logs/openbot-02-p03-role-capture-uses.txt",
+      "sha256": "58af3da58bcdc8ec0ed92eab305ef20258b0726c1ed0951ea8cb91fbea63eece",
+      "tokens_saved": 3390
+    },
+    {
+      "path": "logs/openbot-02-p03-role-child-fixture-api.txt",
+      "sha256": "edc266a0dde7969b196de9055207a41a06f257b00f18f08331719b8a58cbb05d",
+      "tokens_saved": 1614
+    },
+    {
+      "path": "logs/openbot-02-p03-role-preview.txt",
+      "sha256": "b4102d711d879d352d500630d97e6c6ad2bcc33bd4c551f563927f586e68981f",
+      "tokens_saved": 32104
+    },
+    {
+      "path": "logs/openbot-02-p03-role-ref-callers.txt",
+      "sha256": "5ddf850483cef1c69162832439db6215908ff6489f17827011d4c35ad29da3f4",
+      "tokens_saved": 152332
+    },
+    {
+      "path": "logs/openbot-02-p03-role-reference-all.txt",
+      "sha256": "b0524f490343dc8914a13ea0fe64cc49b36d4f5b869e32fbc8968d42c5887eb4",
+      "tokens_saved": 1204
+    },
+    {
+      "path": "logs/openbot-02-p03-role-reference-sites.txt",
+      "sha256": "d8da214291638f0ef7dcd80f6259131c4f95bd60a39fc0c4a7e4099d00e90dde",
+      "tokens_saved": 22507
+    },
+    {
+      "path": "logs/openbot-02-p03-role-sql-api.txt",
+      "sha256": "cf47ea737a0d74199d1ad501528af3ffe75754caa2b86df243f4a105001176cf",
+      "tokens_saved": 3514
+    },
+    {
+      "path": "logs/openbot-02-p03-role-views-api.txt",
+      "sha256": "a0f4f6ca9548e275226f4f367deb7a505250b30efa073c291ed8963db61ae44c",
+      "tokens_saved": 1065
+    },
+    {
+      "path": "logs/openbot-02-p03-schemas-api.txt",
+      "sha256": "224fec2f46d75eb38a77f9387d129b6e0e3bacc6e6503e5e7d0a8743de68be13",
+      "tokens_saved": 966
+    },
+    {
+      "path": "logs/openbot-02-p03-select-agent-callers.txt",
+      "sha256": "55db437ca24e4c0215a42672087cd7662cf66213fb25b3cf652b80c2c26e294f",
+      "tokens_saved": 2338
+    },
+    {
+      "path": "logs/openbot-02-p03-select-agent-uses.txt",
+      "sha256": "33143b5cb30e18cd4743bd3c05db0e82cf9fc60da26472f6005b4be4c4c8be56",
+      "tokens_saved": 2665
+    },
+    {
+      "path": "logs/openbot-02-p03-settings-accounts-all.txt",
+      "sha256": "3cb138acfcc8ccbc10a8ce3c9cd303dfbd6583b8fcecf6b0ac768fdd1dc73883",
+      "tokens_saved": 34927
+    },
+    {
+      "path": "logs/openbot-02-p03-setup-with-owner-sites.txt",
+      "sha256": "aa620f01f381969635e01e19ede85dcd0de2aff8b4431bd840d8eb740e719dfe",
+      "tokens_saved": 13371
+    },
+    {
+      "path": "logs/openbot-02-p03-source-node-file.txt",
+      "sha256": "6f647a38c505ac711e509656d8da608fef5df076c77f2c34a46a9b19a689c464",
+      "tokens_saved": 543
+    },
+    {
+      "path": "logs/openbot-02-p03-static-reviewer-sites.txt",
+      "sha256": "cea8210bf31215dd77878c43173d800653239bf6f9396a33f8943c2795bbb0e8",
+      "tokens_saved": 10666
+    },
+    {
+      "path": "logs/openbot-02-p03-syntax-api.txt",
+      "sha256": "04e11410e935aa3c8ca21d6eb0abf7f27cafe09bf3d01f77edea349bc535b244",
+      "tokens_saved": 631
+    },
+    {
+      "path": "logs/openbot-02-p03-test-fixture-api.txt",
+      "sha256": "42e5c778818dfcf0f32510f61e899046d95ee64eeb5d584c6282b78a62cf64c6",
+      "tokens_saved": 5242
+    },
+    {
+      "path": "logs/openbot-02-p03-token-park-context.txt",
+      "sha256": "7b08f3d979f5015de9381bb5dbbe149a03ffbba28d492eea88cf512fd7d98dd1",
+      "tokens_saved": 33681
+    },
+    {
+      "path": "logs/openbot-02-p03-token-policy-callers.txt",
+      "sha256": "8cae740b495129b9d5e5cf98e46d62d249ba2043d23cc0e5241dacc46cc6384c",
+      "tokens_saved": 1529
+    },
+    {
+      "path": "logs/openbot-02-p03-token-prelock-callers.txt",
+      "sha256": "4bc74d846cd4b8ad4c0427eee1d581f7efa9f9520fbbd62c58c78533de116bc2",
+      "tokens_saved": 4772
+    },
+    {
+      "path": "logs/openbot-02-p03-token-reviewers-all.txt",
+      "sha256": "e874ed6e7a1ea6ed1947b020dc76b0ec2feca29f07a197a00b38fe22886445a0",
+      "tokens_saved": 2568
+    },
+    {
+      "path": "logs/openbot-02-p03-token-sql-context.txt",
+      "sha256": "c8d3d4f26dde570bd08873ea194700b67b7c702ac667631d9a64ccd7db7efcdb",
+      "tokens_saved": 3768
+    },
+    {
+      "path": "logs/openbot-02-p03-ui-activation-sites.txt",
+      "sha256": "ce1954432699e45d22ee72696fd092d94327b82bbc4651d96818c208dcb1a522",
+      "tokens_saved": 18519
+    },
+    {
+      "path": "logs/openbot-02-p03-ui-fixture-type.txt",
+      "sha256": "199d304b92893015ebc353e7f17d556b2741babaff010e53788259a6650a1507",
+      "tokens_saved": 13572
+    },
+    {
+      "path": "logs/openbot-02-p03-ui-test-api.txt",
+      "sha256": "e6e5011814da7f4627e36e578186bba541cc961d650b4ee1e263b2a407c1e572",
+      "tokens_saved": 4904
+    },
+    {
+      "path": "logs/openbot-02-p03-ui-type.txt",
+      "sha256": "781c0586b6a55e83bcd05ffc2f81c9d762c662ff28f4d57a2f39e9986c3af7ee",
+      "tokens_saved": 42651
+    },
+    {
+      "path": "logs/openbot-02-p03-user-delete-entrances.txt",
+      "sha256": "57d8bb217367933e587488887329bf767f730ca12858d78e658175e3f5a5d463",
+      "tokens_saved": 16263
+    },
+    {
+      "path": "logs/openbot-02-p03-user-selector-sites.txt",
+      "sha256": "472a7b30e577ea6d1ab4718fcb31fcd3ccc64c2c19ab172383222ea334526db5",
+      "tokens_saved": 138382
+    },
+    {
+      "path": "logs/openbot-02-p03-value-helpers.txt",
+      "sha256": "b5412f0cdfdadc2a22b57579d2bd6180f2464ec8a6593bf6072312e606658591",
+      "tokens_saved": 12317
+    },
+    {
+      "path": "logs/openbot-02-p03-with-inputs-callers.txt",
+      "sha256": "c3f30aac3b0b634b9d56422db11647235586cfe6e98b6f97280fb4e5cc38aed4",
+      "tokens_saved": 10680
+    },
+    {
+      "path": "logs/openbot-02-p03-with-inputs-context.txt",
+      "sha256": "75d1a2973daf0e83e1b833431bf43e82f4e7740b2902d797a574d021a3ea64ad",
+      "tokens_saved": 10993
+    }
+  ]
+}

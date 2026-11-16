@@ -1,0 +1,13 @@
+{
+  "owner": "/root 02-workflow-roles p02",
+  "cluster": "/Users/mac02/openbot-workflow-roles-tjdv6uy3",
+  "port": 60242,
+  "migration_database": "openbot_roles_p02_indexed",
+  "test_database": "openbot_roles_p02_test",
+  "retained_earlier_migration_databases": [
+    "openbot_roles_p02",
+    "openbot_roles_p02_final"
+  ],
+  "status": "stopped cleanly; retained databases/data for continuation",
+  "restart_script": "plan/02-workflow-roles/phases/p02/docs/logs/CP1-restart-db.sh"
+}

@@ -1,0 +1,15 @@
+   Compiling pa02_review_b3_delivery_probe v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/phases/p02/docs/logs/reviewer-b3-delivery-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1.39s
+     Running `/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/pa02_review_b3_delivery_probe`
+Native valid canonical direct delivery inserted: 1793d06f-79d7-4350-a4b4-4f714890c725
+Production delivery INSERT attention event: Err(Elapsed(()))
+Actual get_delivery: Err(Internal("Delivery 1793d06f-79d7-4350-a4b4-4f714890c725 has partial canonical attribution"))
+Actual list_company_deliveries: Err(Internal("Delivery 1793d06f-79d7-4350-a4b4-4f714890c725 has partial canonical attribution"))
+Actual claim_deliveries: Err(Internal("Delivery 1793d06f-79d7-4350-a4b4-4f714890c725 has partial canonical attribution"))
+Status after failed claim: pending
+Unrelated standalone status after failed global batch: pending
+Positive control: unrelated standalone claims successfully when direct row is not eligible
+
+thread 'main' (15894659) panicked at main.rs:39:2:
+Direct canonical delivery must be readable and claimable
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

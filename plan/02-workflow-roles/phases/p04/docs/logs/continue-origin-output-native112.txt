@@ -1,0 +1,20 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention' (5029702) panicked at src/adapters/persistence/workflow/agent_history_retention_fixture.rs:67:5:
+assertion failed: p.expire_history(candidate(p, scope).await).await.unwrap()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention' (5029946) panicked at src/adapters/persistence/workflow/escalation_origin_message_tests.rs:154:54:
+called `Result::unwrap_err()` on an `Ok` value: Deferred
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4465 filtered out; finished in 29.04s
+

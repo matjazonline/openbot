@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "round": "02WR-P03-B1-R1-schema",
+  "artifact": "e46aef026ae60bc4156ebb3b5f8436f63972e99fca2049d5200fd09bef7d0331",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "STATIC"
+      ],
+      "command": "cargo sqlx migrate run against two fresh phase-owned v2 databases",
+      "fixture": "owned PG18.6 localhost60242; empty openbot_roles_p03_v2 and openbot_roles_p03_test_v2; unchanged current init schema since these migrations",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migration2.txt",
+          "sha256": "7b5bc6145d541198ad72558acd7e03b0de260000c924bbcdc64a8ee651a91e7d"
+        },
+        {
+          "path": "logs/B1-test-migration2.txt",
+          "sha256": "f57cdaca82be009efeb38fedac4819f071171b6729fbc9e6addf203578e92f3e"
+        }
+      ]
+    }
+  ]
+}

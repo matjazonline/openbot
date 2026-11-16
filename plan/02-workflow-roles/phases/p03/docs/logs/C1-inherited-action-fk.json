@@ -1,0 +1,8 @@
+{
+  "accepted_p02_clause": "ADD CONSTRAINT workflow_decisions_action_identity\n    FOREIGN KEY(company_id,run_id,execution_id,action_invocation_id,argument_digest,operation_digest)\n    REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest);",
+  "current_clause": "ADD CONSTRAINT workflow_decisions_action_identity\n    FOREIGN KEY(company_id,run_id,execution_id,action_invocation_id,argument_digest,operation_digest)\n    REFERENCES public.workflow_action_intents(company_id,run_id,execution_id,id,argument_digest,operation_digest);",
+  "identical": true,
+  "clause_sha256": "5d548fd5b5173256d43a65c920eaab6a45007d29e77cb731c350817d48d6efa0",
+  "owned_company_and_account_deletion_tail_identical_to_HEAD": true,
+  "owned_deletion_tail_sha256": "89f61d670a1cdd1771e56e932186496b0b562730b9311c85b55bba40d994cedd"
+}

@@ -13,11 +13,14 @@ use crate::{
     application::notification::{
         ClaimedNotificationEvent, NOTIFICATION_EVENT_CLAIM_BATCH, NOTIFICATION_EVENT_LEASE_SECONDS,
         NotificationPersistence, NotificationProjectionCommit, NotificationProjectionCommitOutcome,
-        NotificationProjectionFailure,
+        NotificationProjectionFailure, agent_notice_key,
     },
     application::settings::NotificationMailSettings,
     domain::monitoring::MonitoringService,
-    entities::{notification::NotificationDisposition, transport::DeliveryPurpose},
+    entities::{
+        notification::NotificationDisposition,
+        transport::{DeliveryPurpose, TransportKind},
+    },
     transport::{
         CanonicalContent, DeliveryComposer, DeliveryContext, EmailDeliveryContext, EmailThreading,
         StandaloneDeliveryRequest, WorkerId,
@@ -112,8 +115,26 @@ impl NotificationWorker {
                 return;
             }
         };
-        let email = match self.compose_email(&projection) {
-            Ok(email) => email,
+        let composed = self.compose_email(&projection).and_then(|email| {
+            let key = agent_notice_key(&projection, || {
+                self.deliveries.renderer(TransportKind::Email)
+            })?;
+            let recipient = match &projection.disposition {
+                crate::entities::notification::NotificationDisposition::Agent {
+                    company,
+                    address_slug: Some(address),
+                    ..
+                } => Some(
+                    self.deliveries
+                        .renderer(TransportKind::Email)?
+                        .application_address(company, address)?,
+                ),
+                _ => None,
+            };
+            Ok((email, key, recipient))
+        });
+        let (email, agent_message_key, agent_recipient) = match composed {
+            Ok(composed) => composed,
             Err(error) => {
                 self.fail(&claimed, "composition", &error).await;
                 return;
@@ -125,6 +146,9 @@ impl NotificationWorker {
                 fence: &claimed.lease,
                 expected: &projection,
                 email: email.as_ref(),
+                agent_message_key: agent_message_key.as_ref(),
+                agent_recipient: agent_recipient.as_ref(),
+                escalation_ack_hours: self.settings.escalation_ack_hours,
             })
             .await
         {
@@ -151,7 +175,11 @@ impl NotificationWorker {
                     );
                 }
             }
-            Ok((NotificationProjectionCommitOutcome::Stale, _)) => {}
+            Ok((
+                NotificationProjectionCommitOutcome::Stale
+                | NotificationProjectionCommitOutcome::Deferred,
+                _,
+            )) => {}
             Ok((NotificationProjectionCommitOutcome::LeaseLost, _)) => warn!(
                 event_id = %claimed.event.id,
                 "Notification projection lost its execution fence"

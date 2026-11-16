@@ -1,0 +1,110 @@
+[
+  {
+    "name": "publication",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::workflow::publication::"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "registry",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::workflow::registry::"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "compiler",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::workflow::compiler::"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "fixtures",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "application::workflow::fixtures::"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "department-enum",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "entities::department::"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "forged-agent",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "workflow_agent_publication_refuses_forged_snapshot"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "binding-regression",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "workflow_binding_sql_"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "lead-write",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "department_write_assigns_replaces_and_clears_the_lead"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "lead-competing",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--lib",
+      "department_competing_lead_assignments_leave_one_holder"
+    ],
+    "exit_code": 0
+  }
+]

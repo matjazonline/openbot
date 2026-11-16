@@ -1,0 +1,33 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0433]: cannot find `delivery` in `super`
+   --> src/adapters/persistence/notification/projection.rs:291:20
+    |
+291 |             super::delivery::enqueue::insert_standalone_delivery_on(tx, delivery).await?;
+    |                    ^^^^^^^^ could not find `delivery` in `super`
+    |
+help: consider importing this module
+    |
+  1 + use crate::adapters::persistence::delivery::enqueue;
+    |
+help: if you import `enqueue`, refer to it directly
+    |
+291 -             super::delivery::enqueue::insert_standalone_delivery_on(tx, delivery).await?;
+291 +             enqueue::insert_standalone_delivery_on(tx, delivery).await?;
+    |
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/message_delivery_tests.rs:423:38
+    |
+423 |     assert_eq!(recipient.channel_id, channel);
+    |                                      ^^^^^^^ expected `Option<Uuid>`, found `Uuid`
+    |
+    = note: expected enum `std::option::Option<uuid::Uuid>`
+             found struct `uuid::Uuid`
+help: try wrapping the expression in `Some`
+    |
+423 |     assert_eq!(recipient.channel_id, Some(channel));
+    |                                      +++++       +
+
+Some errors have detailed explanations: E0308, E0433.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

@@ -1,0 +1,58 @@
+Actual audit/event table definitions from the init schema (line numbers):
+3592: CREATE TABLE public.binding_audit_events (
+3870: CREATE TABLE public.inbound_events (
+4136: CREATE TABLE public.notification_events (
+5039: CREATE TABLE public.workflow_binding_events (
+5261: CREATE TABLE public.workflow_definition_events (
+5479: CREATE TABLE public.workflow_message_delivery_events (
+5755: CREATE TABLE public.workflow_run_events (
+5933: CREATE TABLE public.workflow_wait_events (
+
+Transport-specific audit schema:
+CREATE TABLE public.binding_audit_events (
+    id uuid NOT NULL,
+    company_id uuid NOT NULL,
+    binding_id uuid NOT NULL,
+    action text NOT NULL,
+    reason text,
+    actor jsonb NOT NULL,
+    metadata jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    CONSTRAINT binding_audit_events_action_check CHECK ((action = ANY (ARRAY['linked'::text, 'endpoint_changed'::text, 'enabled'::text, 'paused'::text, 'disabled'::text, 'drift_detected'::text, 'unlinked'::text]))),
+    CONSTRAINT binding_audit_events_actor_check CHECK (public.valid_creation_provenance(actor)),
+    CONSTRAINT binding_audit_events_metadata_check CHECK (((jsonb_typeof(metadata) = 'object'::text) AND ((metadata -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((metadata -> 'transport'::text)) = 'string'::text) AND (octet_length((metadata)::text) <= 4096))),
+    CONSTRAINT binding_audit_events_reason_check CHECK (((reason IS NULL) OR public.valid_binding_change_reason(reason)))
+);
+
+
+--
+-- Name: channel_bindings; Type: TABLE; Schema: public; Owner: -
+--
+
+
+Existing demotion cleanup and trigger:
+CREATE FUNCTION public.department_principal_demoted() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    DELETE FROM public.department_members AS member
+     WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
+    DELETE FROM public.department_roles AS holder
+     WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id;
+    -- The members-only access those rows gave goes too, or an address that still resolves to the
+    -- demoted principal would keep it; the provenance is scoped deliberately, so an allowlist
+    -- entry stays. The desks' settings move on as any grant re-derivation's do.
+    WITH removed AS (
+        DELETE FROM public.channel_principal_grants AS derived
+         WHERE derived.company_id = NEW.company_id AND derived.principal_id = NEW.id
+           AND derived.provenance = 'department_membership'
+        RETURNING derived.channel_id
+    )
+    UPDATE public.channels AS channel SET settings_revision = channel.settings_revision + 1
+     WHERE channel.company_id = NEW.company_id AND channel.id IN (SELECT channel_id FROM removed);
+    RETURN NEW;
+END $$;
+CREATE TRIGGER department_principal_demoted AFTER UPDATE OF kind ON public.principals
+    FOR EACH ROW WHEN (NEW.kind NOT IN ('person', 'agent'))
+    EXECUTE FUNCTION public.department_principal_demoted();
+
+-- Memory service client configuration (plan/.archive/memory-service implementation-decisions E2).
+-- OpenBot stores only connection state, per-namespace client credentials and the remote

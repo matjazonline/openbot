@@ -1,0 +1,35 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0618]: expected function, found `sqlx::Transaction<'_, sqlx::Postgres>`
+   --> src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs:105:26
+    |
+ 97 |         let competitor = competitor(&a.source, owners(&a.source)[index]).await;
+    |             ---------- `competitor` has type `sqlx::Transaction<'_, sqlx::Postgres>`
+...
+105 |         let competitor = competitor(&a.source, owners(&a.source)[index]).await;
+    |                          ^^^^^^^^^^-------------------------------------
+    |                          |
+    |                          call expression requires function
+    |
+   ::: src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs:246:1
+    |
+246 | async fn competitor(source: &Source, owner: Owner) -> sqlx::Transaction<'static, sqlx::Postgres> {
+    | ------------------------------------------------------------------------------------------------ this function of the same name is available here, but it's shadowed by the local binding
+
+error[E0618]: expected function, found `sqlx::Transaction<'_, sqlx::Postgres>`
+   --> src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs:155:26
+    |
+144 |         let competitor = competitor(&a.source, owners(&a.source)[index]).await;
+    |             ---------- `competitor` has type `sqlx::Transaction<'_, sqlx::Postgres>`
+...
+155 |         let competitor = competitor(&a.source, owners(&a.source)[index]).await;
+    |                          ^^^^^^^^^^-------------------------------------
+    |                          |
+    |                          call expression requires function
+    |
+   ::: src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs:246:1
+    |
+246 | async fn competitor(source: &Source, owner: Owner) -> sqlx::Transaction<'static, sqlx::Postgres> {
+    | ------------------------------------------------------------------------------------------------ this function of the same name is available here, but it's shadowed by the local binding
+
+For more information about this error, try `rustc --explain E0618`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

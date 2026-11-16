@@ -1,0 +1,91 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0599]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/role_binding_tests.rs:81:19
+   |
+81 |     assert!(error.to_string().contains("binding.role_needs_department"));
+   |                   ^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 | pub enum LifecycleError {
+   | ----------------------- method `to_string` not found for this enum because it doesn't satisfy `_: Display` or `_: ToString`
+   |
+   = note: the following trait bounds were not satisfied:
+           `application::workflow::lifecycle::contracts::LifecycleError: std::fmt::Display`
+           which is required by `application::workflow::lifecycle::contracts::LifecycleError: ToString`
+note: the trait `std::fmt::Display` must be implemented
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:1186:0
+note: the method `to_string` exists on the type `application::app_error::AppError`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2880:4
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+           candidate #1: `ToString`
+
+error[E0599]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/role_binding_tests.rs:82:19
+   |
+82 |     assert!(error.to_string().contains("start"));
+   |                   ^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 | pub enum LifecycleError {
+   | ----------------------- method `to_string` not found for this enum because it doesn't satisfy `_: Display` or `_: ToString`
+   |
+   = note: the following trait bounds were not satisfied:
+           `application::workflow::lifecycle::contracts::LifecycleError: std::fmt::Display`
+           which is required by `application::workflow::lifecycle::contracts::LifecycleError: ToString`
+note: the trait `std::fmt::Display` must be implemented
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:1186:0
+note: the method `to_string` exists on the type `application::app_error::AppError`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2880:4
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+           candidate #1: `ToString`
+
+error[E0599]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/role_binding_tests.rs:96:19
+   |
+96 |     assert!(error.to_string().contains("binding.role_needs_department"));
+   |                   ^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 | pub enum LifecycleError {
+   | ----------------------- method `to_string` not found for this enum because it doesn't satisfy `_: Display` or `_: ToString`
+   |
+   = note: the following trait bounds were not satisfied:
+           `application::workflow::lifecycle::contracts::LifecycleError: std::fmt::Display`
+           which is required by `application::workflow::lifecycle::contracts::LifecycleError: ToString`
+note: the trait `std::fmt::Display` must be implemented
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:1186:0
+note: the method `to_string` exists on the type `application::app_error::AppError`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2880:4
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+           candidate #1: `ToString`
+
+error[E0599]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/role_binding_tests.rs:97:19
+   |
+97 |     assert!(error.to_string().contains("start"));
+   |                   ^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   |
+  ::: src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 | pub enum LifecycleError {
+   | ----------------------- method `to_string` not found for this enum because it doesn't satisfy `_: Display` or `_: ToString`
+   |
+   = note: the following trait bounds were not satisfied:
+           `application::workflow::lifecycle::contracts::LifecycleError: std::fmt::Display`
+           which is required by `application::workflow::lifecycle::contracts::LifecycleError: ToString`
+note: the trait `std::fmt::Display` must be implemented
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/fmt/mod.rs:1186:0
+note: the method `to_string` exists on the type `application::app_error::AppError`
+  --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/alloc/src/string.rs:2880:4
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+           candidate #1: `ToString`
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

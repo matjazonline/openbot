@@ -13,7 +13,11 @@ async fn channel_reply_authoring_native_bootstrap_selects_once_and_replay_preser
         RelatedChannelId::new(Uuid::parse_str(created["channel"]["id"].as_str().unwrap()).unwrap());
     let selected = f
         .persistence()
-        .channel_reply_settings(company(&f), channel, owner(&f))
+        .channel_reply_settings(
+            company(&f),
+            crate::entities::address::AddressTarget::Desk((channel).as_uuid()),
+            owner(&f),
+        )
         .await
         .unwrap()
         .unwrap();
@@ -32,7 +36,7 @@ async fn channel_reply_authoring_native_bootstrap_selects_once_and_replay_preser
     f.persistence()
         .configure_channel_reply(ConfigureChannelReply {
             company: company(&f),
-            channel,
+            target: AddressTarget::Desk(channel.as_uuid()),
             actor: owner(&f),
             expected: Some(selected.revision),
             responder: None,
@@ -50,7 +54,11 @@ async fn channel_reply_authoring_native_bootstrap_selects_once_and_replay_preser
     );
     let cleared = f
         .persistence()
-        .channel_reply_settings(company(&f), channel, owner(&f))
+        .channel_reply_settings(
+            company(&f),
+            crate::entities::address::AddressTarget::Desk((channel).as_uuid()),
+            owner(&f),
+        )
         .await
         .unwrap()
         .unwrap();
@@ -98,11 +106,19 @@ async fn channel_reply_authoring_native_competing_commands_share_one_selection()
 #[tokio::test]
 async fn channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource() {
     let (f, claim) = Box::pin(claimed(false)).await;
-    let mut invalid = spec("no-partial-native");
+    let create = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgent,
+        spec("native-agent"),
+    )
+    .await;
+    let agent = committed(&dispatch(&f), &create).await;
+    let mut invalid = json!({"agent_slug":"native-agent", "channel_slug":"no-partial-native", "channel_name":"Native", "reply_mode":"autonomous"});
     invalid["steps"] = json!([{"id":"early","slot":"before_reply","type":"data.map",
         "with":{"value":{"literal":{"body":"Should never send"}},"output_schema":{"literal":true}},
         "routes":{"success":"$end"}}]);
-    let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, invalid).await;
+    let request = call(&f, &claim, ProvisioningKind::CreateDeskForAgent, invalid).await;
     let before = written(&f).await;
     let receipt = committed(&dispatch(&f), &request).await;
     assert_eq!(receipt["error"]["code"], PROVISIONING_INVALID);
@@ -116,5 +132,6 @@ async fn channel_reply_authoring_native_invalid_custom_end_rolls_back_every_reso
             .fetch_one(f.persistence().pool())
             .await
             .unwrap();
-    assert_eq!(count, 0);
+    assert_eq!(count, 1, "the agent retains its original direct selection");
+    assert!(agent.get("principal_id").is_some());
 }

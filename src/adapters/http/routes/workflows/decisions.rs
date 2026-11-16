@@ -34,6 +34,7 @@ fn view_json(view: &DecisionView) -> Value {
         "deadline": view.deadline,
         "state": view.state,
         "reviewers": view.reviewers,
+        "reviewer_labels": view.reviewer_labels,
         "choices": view.choices,
         "submission": view.submission.as_ref().map(|submission| json!({
             "submitted_by": submission.submitted_by,

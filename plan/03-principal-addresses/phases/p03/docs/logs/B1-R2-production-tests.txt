@@ -1,0 +1,122 @@
+
+running 100 tests
+test adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_direct_thread_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_binding_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_retained_principal_delete_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_insert_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_update_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_retirement_first_refuses_ingress_atomically ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::agent_races::agent_address_delete_competing_ingress_first_keeps_the_agent_and_direct_history ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_company_delete_waits_for_ingress_then_cascades_every_direct_effect ... ok
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_ingress_waits_for_company_delete_then_refuses_without_effects ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refuses_implicit_desk_configuration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_returns_direct_binding_without_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_competing_builder_claimants_make_one_direct_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_bootstrap_selects_once_and_replay_preserves_clear ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_competing_commands_share_one_selection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_agent_reference_keeps_its_own_published_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_competing_expiry_owners_record_one_exhausted_handling_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_expiry_keeps_one_bounded_mixed_page_and_ordinary_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_authenticated_projector_ignores_unobserved_wire_identity_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_origin_policy_stays_private_without_a_reply_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_database_requires_authentic_complete_immutable_target_and_links ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_existing_root_failure_after_source_retention_never_restarts_the_ladder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_missing_message_seal_aborts_real_fenced_completion_and_retries_atomically ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_bounds_scanned_pages_skips_locked_prefix_and_collectors_delete_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_missing_child_or_rerun_seal_rolls_back_real_creation_then_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_admission_first_preserves_its_only_root_when_source_retention_retries ... ok
+2026-11-15T13:36:17.144942Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=e7bd9f07-e44d-474a-81a3-d6b7354031da binding_id=e9d50c0c-f986-82fd-8945-8d6f5ec3c75a intent_id=e198b475-94f1-4d1a-aa63-0139755776ed reason="unavailable"
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_retention_first_closes_the_competing_actual_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_real_child_recovery_and_authorized_rerun_keep_origin_across_source_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_former_root_retention_keeps_the_one_root_seal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_department_member_uses_its_agent_grant_and_keeps_its_author ... ok
+2026-11-15T13:36:27.905370Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b2b223b8-25d2-4d6e-9018-8a961972c83e)
+2026-11-15T13:36:27.912330Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=c09fc56f-a933-4861-9479-bbb877adf3dd correlation_id=93c08811-41ee-41d5-8467-f6499b618621 transport=email status=dead_letter
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_nonmember_agent_is_refused_without_a_canonical_hop_or_smtp ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_running_agent_cannot_send_as_another_agents_address ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_notice_before_real_role_writer_commits_captured_root_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_account_update_role_writer_and_notice_all_finish ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_source_rename_after_observation_refuses_commit_and_redelivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_target_revocation_after_observation_refuses_commit_and_redelivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_actual_source_retention_closes_pending_and_claimed_private_intents_without_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::runtime::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::native_claims::workflow_escalation_agent_native_receipt_rejects_forged_fence_route_and_principal ... ok
+test application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+2026-11-15T13:36:47.256654Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b99586bd-3c86-4a6c-b774-1d172b9faeb2)
+2026-11-15T13:36:47.296379Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b99586bd-3c86-4a6c-b774-1d172b9faeb2)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... ok
+2026-11-15T13:36:47.876613Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T13:36:47.885271Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(e2ab7eac-2fef-44bd-81bb-e50bd1a21b65)
+2026-11-15T13:36:47.938100Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(0130221f-f811-468f-8e24-ed92dbd2a80a)
+2026-11-15T13:36:48.122991Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(02813bc5-6a71-401b-86f3-cb7d75e71714)
+2026-11-15T13:36:48.131286Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=c332ef5f-e776-46fb-a886-b2802e6e6080 correlation_id=844b29da-a153-47c9-86b7-20acf265989c transport=email status=dead_letter
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::system_relay::relay_identity_pure_workflow_system_reply_cannot_enter_a_team_only_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal ... ok
+2026-11-15T13:36:49.331455Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T13:36:49.349641Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(f7553dd7-8e87-4937-ae36-20921d4ee5b6)
+2026-11-15T13:36:49.404129Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b9281f34-d071-4fba-bbca-84e2bb1c9e54)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope ... ok
+observed gated transaction pids=[3202] blocker=3249 elapsed_ms=593
+test adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::agent_address_create_actual_default_binding_answers_a_direct_message ... ok
+observed gated transaction pids=[3294] blocker=3305 elapsed_ms=546
+observed gated transaction pids=[3367] blocker=3378 elapsed_ms=561
+observed gated transaction pids=[3391] blocker=3409 elapsed_ms=566
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::direct_history_teardown::direct_company_teardown_removes_populated_agent_history_notes_and_transport ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search ... ok
+
+test result: ok. 100 passed; 0 failed; 0 ignored; 0 measured; 4510 filtered out; finished in 80.09s
+

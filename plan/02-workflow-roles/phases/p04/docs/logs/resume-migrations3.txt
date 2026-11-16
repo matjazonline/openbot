@@ -1,0 +1,2 @@
+Applied 20260817000000/migrate init schema (563.495584ms)
+Applied 20260817000000/migrate init schema (500.563625ms)

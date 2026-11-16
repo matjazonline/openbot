@@ -1,0 +1,7 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 4.08s
+

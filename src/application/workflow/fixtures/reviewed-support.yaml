@@ -50,7 +50,7 @@ steps:
     type: decision.human
     with:
       proposal: {ref: /steps/draft/output}
-      reviewers: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
+      reviewers: {array: [{object: {kind: {literal: principal}, id: {ref: /params/reviewer}}}]}
       deadline: {ref: /run/deadline}
       data_schema:
         literal:

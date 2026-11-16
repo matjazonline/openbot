@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4609 filtered out; finished in 1.74s
+

@@ -84,7 +84,7 @@ fn parsing_router() -> Router {
     async fn parse(request: Request) -> Response {
         match upload::files(Multipart::from_request(request, &()).await.unwrap()).await {
             Ok(_) => StatusCode::OK.into_response(),
-            Err(error) => error,
+            Err(error) => *error,
         }
     }
     Router::new()

@@ -1,0 +1,13 @@
+
+running 8 tests
+test comments_and_strings_do_not_declare_modules ... ok
+test cfg_attr_paths_and_literal_includes_are_connected ... ok
+test conditional_inline_paths_keep_the_ordinary_directory_reachable ... ok
+test included_files_resolve_nested_modules_and_includes_like_rustc ... ok
+test inline_path_and_conditional_modules_are_connected ... ok
+test removed_module_and_removed_ancestor_leave_detectable_orphans ... ok
+test unresolved_forms_and_recursive_includes_fail_explicitly ... ok
+test every_rust_source_is_connected_to_a_cargo_target ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 6.83s
+

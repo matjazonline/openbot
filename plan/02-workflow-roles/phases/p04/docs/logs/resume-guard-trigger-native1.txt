@@ -1,0 +1,26 @@
+$ /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 workflow_escalation_trigger_guard workflow_escalation_competing_guard workflow_guard_error_ --test-threads=2 --nocapture
+RUST_MIN_STACK=2097152
+
+running 19 tests
+test adapters::harness::rig::workflow::guard_tests::workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_database_error_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_guard_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_cancel_and_guard_failure_compete_for_one_terminal_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_completion_never_reexecutes_the_handler ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_ordinary_connection_error_is_retried ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pending_job_is_never_control_retry_safe ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_retirement_first_keeps_the_competing_owners_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_run_expiry_handles_processing_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_transient_completion_confirmation_keeps_one_handler_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once ... ok
+test application::workflow::actions::failure::tests::workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case ... ok
+
+test result: ok. 19 passed; 0 failed; 0 ignored; 0 measured; 4271 filtered out; finished in 9.86s
+

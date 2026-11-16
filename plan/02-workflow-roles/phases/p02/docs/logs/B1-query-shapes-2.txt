@@ -1,0 +1,380 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/agent.rs:458:9
+    |
+458 |         sqlx::query_scalar!("SELECT company_id FROM agents WHERE id = $1 FOR UPDATE", id)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/agent.rs:486:9
+    |
+486 | /         sqlx::query!(
+487 | |             r#"UPDATE principals
+488 | |                    SET kind = 'external', agent_id = NULL, updated_at = CURRENT_TIMESTAMP
+489 | |                    WHERE company_id = $1 AND agent_id = $2"#,
+490 | |             company_id,
+491 | |             id
+492 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/agent.rs:497:5
+    |
+497 |     sqlx::query!("DELETE FROM agents WHERE id = $1", id)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:162:23
+    |
+162 |   ...   let db_list = sqlx::query_as!(
+    |  _____________________^
+163 | | ...       CompanyInviteDb,
+164 | | ...       r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
+165 | | ...                 invite.role, invite.access_level::smallint AS "access_level!: i16", invite.status, invite.created_at AS "crea...
+...   |
+170 | | ...       company_id
+171 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:180:21
+    |
+180 |           let owned = sqlx::query_scalar!(
+    |  _____________________^
+181 | |             r#"SELECT EXISTS (
+182 | |                    SELECT 1 FROM companies AS company
+183 | |                    JOIN users AS account ON account.id = company.user_id
+...   |
+187 | |             email
+188 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:320:9
+    |
+320 |         sqlx::query!("DELETE FROM company_invites WHERE id = $1", id)
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:333:23
+    |
+333 |   ...   let db_list = sqlx::query_as!(
+    |  _____________________^
+334 | | ...       CompanyInviteDb,
+335 | | ...       r#"SELECT invite.id, invite.company_id, company.name AS "company_name?", invite.email,
+336 | | ...                 invite.role, invite.access_level::smallint AS "access_level!: i16", invite.status, invite.created_at AS "crea...
+...   |
+344 | | ...       expected_email
+345 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:489:23
+    |
+489 |           let db_list = sqlx::query_as!(
+    |  _______________________^
+490 | |             CompanyMemberDb,
+491 | |             r#"SELECT member.id, member.company_id, member.user_id,
+492 | |                       account.username AS "username?", account.email AS "email?", account.avatar_url,
+...   |
+498 | |             company_id
+499 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:513:18
+    |
+513 |           let db = sqlx::query_as!(
+    |  __________________^
+514 | |             CompanyMemberDb,
+515 | |             r#"WITH updated AS (
+516 | |                    UPDATE company_members
+...   |
+528 | |             role.as_str(),
+529 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:564:9
+    |
+564 | /         sqlx::query!(
+565 | |             r#"UPDATE principals
+566 | |                SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
+567 | |                WHERE company_id = $1 AND user_id = $2
+...   |
+574 | |             user_id
+575 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:579:25
+    |
+579 |           let removable = sqlx::query_scalar!(
+    |  _________________________^
+580 | |             "SELECT id FROM company_members
+581 | |              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
+582 | |              FOR UPDATE",
+583 | |             company_id,
+584 | |             user_id
+585 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite.rs:614:9
+    |
+614 | /         sqlx::query!(
+615 | |             "DELETE FROM company_members
+616 | |              WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
+617 | |             company_id,
+618 | |             user_id
+619 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite_tests.rs:427:34
+    |
+427 |       let principal_before: Uuid = sqlx::query_scalar!(
+    |  __________________________________^
+428 | |         "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2",
+429 | |         company.id,
+430 | |         member.id
+431 | |     )
+    | |_____^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/company_invite_tests.rs:459:30
+    |
+459 |       let owner_kind: String = sqlx::query_scalar!(
+    |  ______________________________^
+460 | |         "SELECT kind FROM principals WHERE company_id = $1 AND user_id = $2",
+461 | |         company.id,
+462 | |         owner.id
+463 | |     )
+    | |_____^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:253:22
+    |
+253 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+254 | | ...       UserDb,
+255 | | ...       r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!"...
+256 | | ...       email
+257 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:266:22
+    |
+266 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+267 | | ...       UserDb,
+268 | | ...       r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!"...
+269 | | ...       username
+270 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:279:22
+    |
+279 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+280 | | ...       UserDb,
+281 | | ...       r#"SELECT id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_at!"...
+282 | | ...       id
+283 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:296:22
+    |
+296 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+297 | | ...       UserDb,
+298 | | ...       r#"UPDATE users SET avatar_url = $2 WHERE id = $1
+299 | | ...          RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_a...
+300 | | ...       id,
+301 | | ...       avatar_url.map(AvatarUrl::as_str)
+302 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:322:22
+    |
+322 |           let result = sqlx::query_as!(
+    |  ______________________^
+323 | |             UserDb,
+324 | |             r#"UPDATE users
+325 | |                SET username = $2, email = $3, avatar_url = $4,
+...   |
+333 | |             profile.avatar_url.map(AvatarUrl::as_str)
+334 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:353:22
+    |
+353 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+354 | | ...       UserDb,
+355 | | ...       r#"UPDATE users SET username = $2, avatar_url = $3 WHERE id = $1
+356 | | ...          RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_a...
+...   |
+359 | | ...       avatar_url.map(AvatarUrl::as_str)
+360 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:368:22
+    |
+368 |   ...   let result = sqlx::query_as!(
+    |  ____________________^
+369 | | ...       UserDb,
+370 | | ...       r#"UPDATE users SET password_hash = $2 WHERE id = $1
+371 | | ...          RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_a...
+372 | | ...       id,
+373 | | ...       password_hash
+374 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:653:9
+    |
+653 | /         sqlx::query!(
+654 | |             r#"INSERT INTO pending_account_changes
+655 | |                    (user_id, kind, new_email, new_password_hash, confirmation_code_hash, expires_at)
+656 | |                VALUES ($1, $2, $3, $4, $5, $6)
+...   |
+668 | |             pending.expires_at,
+669 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:708:23
+    |
+708 |           let claimed = sqlx::query!(
+    |  _______________________^
+709 | |             r#"DELETE FROM pending_account_changes
+710 | |                WHERE user_id = $1
+711 | |                  AND kind = $2
+...   |
+717 | |             confirmation_code_hash,
+718 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:735:31
+    |
+735 |   ...   let updated = sqlx::query_as!(
+    |  _____________________^
+736 | | ...       UserDb,
+737 | | ...       r#"UPDATE users SET email = $2, email_verified_at = CURRENT_TIMESTAMP WHERE id = $1
+738 | | ...          RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_a...
+739 | | ...       user_id,
+740 | | ...       claimed.new_email,
+741 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:757:31
+    |
+757 |   ...   let updated = sqlx::query_as!(
+    |  _____________________^
+758 | | ...       UserDb,
+759 | | ...       r#"UPDATE users SET password_hash = $2 WHERE id = $1
+760 | | ...          RETURNING id, username, email, password_hash, avatar_url, email_verified_at, auth_revision, created_at as "created_a...
+761 | | ...       user_id,
+762 | | ...       claimed.new_password_hash,
+763 | | ...   )
+    | |_______^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:786:20
+    |
+786 |           let rows = sqlx::query_as!(
+    |  ____________________^
+787 | |             PendingAccountChangeDb,
+788 | |             r#"SELECT kind, new_email as "new_email: String", expires_at
+789 | |                FROM pending_account_changes
+...   |
+792 | |             user_id,
+793 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_as` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:809:9
+    |
+809 | /         sqlx::query!(
+810 | |             "DELETE FROM pending_account_changes WHERE user_id = $1 AND kind = $2",
+811 | |             user_id,
+812 | |             kind.as_str(),
+813 | |         )
+    | |_________^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: `SQLX_OFFLINE=true` but there is no cached data for this query, run `cargo sqlx prepare` to update the query cache or unset `SQLX_OFFLINE`
+   --> src/adapters/persistence/user.rs:829:5
+    |
+829 | /     sqlx::query_scalar!(
+830 | |         r#"SELECT email::text AS "email!" FROM users WHERE id = $1 FOR UPDATE"#,
+831 | |         user_id
+832 | |     )
+    | |_____^
+    |
+    = note: this error originates in the macro `$crate::sqlx_macros::expand_query` which comes from the expansion of the macro `sqlx::query_scalar` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: could not compile `open_bots` (lib test) due to 28 previous errors

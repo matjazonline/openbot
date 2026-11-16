@@ -17,7 +17,6 @@ use crate::{
     app_error::{AppError, AppResult},
     application::thread_activity::ThreadActivityReader,
     entities::{
-        channel::Channel,
         internal_note::{
             AddInternalNote, InternalNoteProvenance, MAX_INTERNAL_NOTE_BYTES, TombstoneInternalNote,
         },
@@ -28,7 +27,9 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::{load_viewable_channel, render_message_pane};
+use super::ui::{InboxSelection, render_message_pane};
+use crate::entities::address::AddressTarget;
+use crate::use_cases::thread::ReadableInbox;
 
 const NOTE_BODY_LIMIT: usize = MAX_INTERNAL_NOTE_BYTES + 16 * 1024;
 
@@ -53,7 +54,8 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 struct InternalNoteForm {
     company_id: Uuid,
-    channel_id: Uuid,
+    #[serde(flatten)]
+    inbox: InboxSelection,
     thread_id: Uuid,
     command_id: Uuid,
     text_body: String,
@@ -63,7 +65,8 @@ struct InternalNoteForm {
 #[derive(Debug, Clone, Deserialize)]
 struct TombstoneNoteForm {
     company_id: Uuid,
-    channel_id: Uuid,
+    #[serde(flatten)]
+    inbox: InboxSelection,
     thread_id: Uuid,
     command_id: Uuid,
 }
@@ -89,30 +92,31 @@ struct NoteApiResponse {
 
 struct NoteScope {
     company_id: Uuid,
-    channel: Channel,
+    channel: ReadableInbox,
     thread: Thread,
     actor: PrincipalAccessContext,
 }
 
 async fn load_scope(
     company_use_cases: &CompanyUseCases,
-    channel_use_cases: &ChannelUseCases,
+    _channel_use_cases: &ChannelUseCases,
     thread_use_cases: &ThreadUseCases,
     viewer: &Viewer,
     company_id: Uuid,
-    channel_id: Uuid,
+    target: AddressTarget,
     thread_id: Uuid,
 ) -> AppResult<NoteScope> {
-    let (_, channel) = load_viewable_channel(
-        company_use_cases,
-        channel_use_cases,
-        viewer,
-        company_id,
-        channel_id,
-    )
-    .await?;
+    company_use_cases
+        .readable_company(viewer.user_id, company_id)
+        .await?;
+    let channel = thread_use_cases
+        .readable_inbox(
+            viewer,
+            crate::use_cases::thread::InboxReadScope { company_id, target },
+        )
+        .await?;
     let thread = thread_use_cases
-        .readable_thread(viewer, channel.company_id, channel.id, thread_id)
+        .readable_thread(viewer, channel.company_id(), channel.target(), thread_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
     let actor = thread_use_cases
@@ -162,7 +166,7 @@ async fn add_note_ui(
         &thread_use_cases,
         &viewer,
         form.company_id,
-        form.channel_id,
+        form.inbox.scope(form.company_id)?.target,
         form.thread_id,
     )
     .await?;
@@ -170,7 +174,7 @@ async fn add_note_ui(
         .add_internal_note(
             AddInternalNote {
                 company_id: form.company_id,
-                channel_id: form.channel_id,
+                target: scope.channel.target(),
                 thread_id: form.thread_id,
                 text: form.text_body,
                 command_id: form.command_id,
@@ -207,7 +211,7 @@ async fn tombstone_note_ui(
         &thread_use_cases,
         &viewer,
         form.company_id,
-        form.channel_id,
+        form.inbox.scope(form.company_id)?.target,
         form.thread_id,
     )
     .await?;
@@ -215,7 +219,7 @@ async fn tombstone_note_ui(
         .tombstone_internal_note(
             TombstoneInternalNote {
                 company_id: form.company_id,
-                channel_id: form.channel_id,
+                target: scope.channel.target(),
                 thread_id: form.thread_id,
                 note_id,
                 command_id: form.command_id,
@@ -249,7 +253,7 @@ async fn add_note_api(
         &thread_use_cases,
         &viewer,
         company_id,
-        channel_id,
+        AddressTarget::Desk(channel_id),
         thread_id,
     )
     .await?;
@@ -257,7 +261,7 @@ async fn add_note_api(
         .add_internal_note(
             AddInternalNote {
                 company_id,
-                channel_id,
+                target: AddressTarget::Desk(channel_id),
                 thread_id,
                 text: body.text,
                 command_id: body.command_id,
@@ -294,7 +298,7 @@ async fn tombstone_note_api(
         &thread_use_cases,
         &viewer,
         company_id,
-        channel_id,
+        AddressTarget::Desk(channel_id),
         thread_id,
     )
     .await?;
@@ -302,7 +306,7 @@ async fn tombstone_note_api(
         .tombstone_internal_note(
             TombstoneInternalNote {
                 company_id,
-                channel_id,
+                target: AddressTarget::Desk(channel_id),
                 thread_id,
                 note_id,
                 command_id: body.command_id,

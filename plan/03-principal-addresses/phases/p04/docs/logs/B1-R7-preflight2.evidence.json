@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R7-preflight2",
+  "artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362",
+  "checks": [
+    {
+      "criteria": [
+        "FC2"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib autonomous_agent_contract_ -- --nocapture",
+      "fixture": "Current source / real bounded decoder, canonical digest and schema/secret rejection;9 assertions cases, no DB stand-in",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R6-definition-contract-focused.txt",
+          "sha256": "86c748d84738d43f45c487d0ee7c3f69ac4cd2308774ce83fa8d74636781f146"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-reader-corrected-libtest autonomous_agent_resolution_ autonomous_agent_native_definition_ autonomous_agent_views_ doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas --nocapture",
+      "fixture": "Exact bc5bb926 binary; owned PG51167/diag plus own UUID DBs;4 parallel threads;20 exercised cases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-reader-doop-focused1.txt",
+          "sha256": "cff4956cf2ca097a782ff33cabd354842f577969ba88708a1d4942b1dcc8302e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-reader-corrected-libtest adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_identity_failures_stop_at_distinct_steps_without_writes adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer --exact --nocapture",
+      "fixture": "Same current binary/process;33 original R5 failures,4 parallel threads; all guards/deadlines retained",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-original33-replay.txt",
+          "sha256": "d56793c5ba6ba84c9d6ff9c3c6d86220acaa9eb1e86341a15f39d673584bc017"
+        },
+        {
+          "path": "logs/R7-original33-replay-summary.json",
+          "sha256": "309e7b5e3cea7661c64eb6a98baed88cf4d8c277c14842fcdc9afe6322bfbf30"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Current source; exit0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current source/all target offline compilation; owned external cache; exit0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-clippy-check.txt",
+          "sha256": "74bb8f9ed7a17b21e98dd5b86f3c30314f21608b6cd1fb1461e726a4c687830e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-reader-corrected-libtest --list",
+      "fixture": "4704\u21924705; exactly1 new canonical decoder test;0 removed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-inventory.txt",
+          "sha256": "7a394b4f267ecfdf1f996b57e0c23bfb2446da7465c3f0aee91971977e6af4ac"
+        },
+        {
+          "path": "logs/R7-inventory-delta.json",
+          "sha256": "2884e49663786725270b6d80ac1345ff28545fcf150111f6a908455c86b13357"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "trail check; trail build",
+      "fixture": "Current source/learnings; no conflicts; graph refreshed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-trail-check.txt",
+          "sha256": "9d81c8f454f500bdd5d2fc6324ef19bfc104d14c93dd3baa1cd510ddc04d9042"
+        },
+        {
+          "path": "logs/R7-trail-build.txt",
+          "sha256": "506f7bb47e649fceff06019bf76372f3f1d13cf9bd2335d10815895fb6019bea"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "git -c 'core.sshCommand=ssh -o BatchMode=yes' push git@github.com:matjazonline/openbot.git 957de863ede7b0c8bb432937287842865ec862c3:refs/heads/codex/plan03-p04-r7-957de863",
+      "fixture": "Alternate index only;39 changed blobs byte-identical to current files, all others HEAD; actual root HEAD/index unchanged. This proves source identity/push, not workflow success",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-ci-source.json",
+          "sha256": "84848041e9db300c36200a0cf5570f3bc4569e0fe272d9f40a14a0fe0bd14291"
+        },
+        {
+          "path": "logs/R7-ci-push.txt",
+          "sha256": "d1de08df9c230f37b18ccc9817fd899de02eba43d5b9aaf7e17b845ce700510c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "scripts/check.sh; complete required CI/private Doop/memory/browser gates; final independent acceptance",
+      "fixture": "Corrected final current artifact: local full gate not yet restarted; CI43772170617/Memory43772170696 running",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Only focused correction checks pass. Earlier full R5 failed33 cases; all33 now pass focused, but the required complete final gate and CI/private acceptance remain pending."
+    }
+  ]
+}

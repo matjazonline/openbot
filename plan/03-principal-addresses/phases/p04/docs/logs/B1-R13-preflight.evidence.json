@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R13-preflight",
+  "artifact": "207bed93e1e421549788667ef611b642da9860b6640e619d42336dad217247f2",
+  "checks": [
+    {
+      "criteria": [
+        "command-diagnostics",
+        "stderr-preservation",
+        "stdout-preservation",
+        "exit-status",
+        "bounded-tail",
+        "escaping"
+      ],
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "10 isolatedcases including actual child success/exit7 with oversizedstderr and independentstdout",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R20-check-runner-tests4.txt",
+          "sha256": "4709dfd5383defebbbbee162a9a3a03584704bbe92688b18dd843f5f5f652591"
+        },
+        {
+          "path": "logs/R20-source-final.snapshot.txt",
+          "sha256": "f1067878482dc7899fe3352910931f3d3818e57ed3c05d947c7d463b00042e02"
+        },
+        {
+          "path": "logs/R20-native-scope-equality.json",
+          "sha256": "1d9091510c286fc00be5c4c3e2bddc1c10b031243330c2830fdedcec517a9c9c"
+        },
+        {
+          "path": "logs/R20-ci-source.json",
+          "sha256": "f651b4e1eb808b98c097b1a3008b596ca28ee112b2a728ed3aa03be5b5fe9b59"
+        },
+        {
+          "path": "logs/R20-coordination54.md",
+          "sha256": "9ada14418bc40f643b116c053f6009738a959e356036d5909864de90f1e91f99"
+        },
+        {
+          "path": "logs/R20-whitespace2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "retained-private-failure"
+      ],
+      "command": "ActualR19CI43883869265 privatejob133356622982",
+      "fixture": "Exact581576e7; laterfailureunknown; service-tailabsent; artifactretentionPASS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R20-private-job.json",
+          "sha256": "2fa938690b7dc73c0c8ec9ed312db4471414dde6d37322cbd1377d3064b339e0"
+        },
+        {
+          "path": "logs/R20-failed-133356622982-annotations.json",
+          "sha256": "124e5b0394ace57bc7c0af1c3bbe8952217595fc6d275d3bc81c89e7731b1799"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "current-private-proof",
+        "required-final-gates"
+      ],
+      "command": "ActualR20CI43888466155 plus retainedR19verify; Memory43888465965",
+      "fixture": "Exact0d3e4a43 currentdiagnostics; nativebyteidentity toR19 andR18 scopedproof",
+      "status": "NOT EXERCISED",
+      "reason": "Actualprivateandfinalgates active; no phaseacceptance.",
+      "files": [
+        {
+          "path": "logs/R20-ci-runs1.json",
+          "sha256": "0f5e646e8780f29d029b2318a0a9cfb6bb4daa087e1bd7772523df4da27b64da"
+        },
+        {
+          "path": "logs/R20-ci-43883869265-jobs6.json",
+          "sha256": "27b8419d14f8881fd0de5ea60a862b9a5e6a6dbcccfcd6cee94d241d91c36310"
+        }
+      ]
+    }
+  ]
+}

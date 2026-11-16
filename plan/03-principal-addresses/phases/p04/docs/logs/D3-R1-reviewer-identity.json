@@ -1,0 +1,23 @@
+{
+  "decision_sha256": "61d108373b190c52802eec281abdca7e00466f409dd339270d0e981ab7066b45",
+  "coordination42_matches": true,
+  "head": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "snapshot": [
+    "base:   f059f49808777abf0367d3a7f82d11e14bbd4e20",
+    "digest: 88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362"
+  ],
+  "runtime_checks": "NOT EXERCISED: decision-only review; root owns running full suite",
+  "inspected_paths": [
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation.py",
+    "services/memory/scripts/test-network-isolation.sh",
+    "services/memory/scripts/network-isolation.py",
+    "scripts/check.sh",
+    "services/memory/scripts/verify.sh",
+    "services/memory/scripts/extracted-build.sh",
+    "services/memory/scripts/standalone-journey.sh",
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    "plan/03-principal-addresses/04-integration-and-final-verification.md"
+  ]
+}

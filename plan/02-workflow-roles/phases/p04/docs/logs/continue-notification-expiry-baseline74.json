@@ -1,0 +1,15 @@
+{
+  "build": 74,
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "notification_failure_",
+    "--test-threads=2"
+  ],
+  "exit": 101,
+  "seconds": 4.86,
+  "source_sha256": {
+    "src/adapters/persistence/notification.rs": "679866f7e092a3a1ae41e7a3901c9992cccd21fa0f3448351bbad7e3584172b3",
+    "src/adapters/persistence/notification_tests.rs": "d8b5f4ee04b91ac2f2355929bb5621b2c973e05b2ad83308ad975c54b0bbb802",
+    "src/adapters/persistence/notification_lease_tests.rs": "e3c820fddd835e67d10748b6af36cca8764991b2cd2f59618fb061310840d73b"
+  }
+}

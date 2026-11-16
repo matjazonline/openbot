@@ -1,7 +1,6 @@
 use super::*;
 use crate::application::local_agents::management::*;
 use crate::application::local_agents::protocol::{LogicalInvocationKey, OperationAdmission};
-use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
 
 #[cfg(test)]
 mod tests;
@@ -15,21 +14,11 @@ async fn authorize_association_on(
 ) -> AppResult<()> {
     match association {
         SessionAssociation::Conversation { conversation_id } => {
-            let channel: Uuid =
-                sqlx::query_scalar("SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2")
-                    .bind(company)
-                    .bind(conversation_id)
-                    .fetch_optional(&mut *db)
-                    .await?
-                    .ok_or_else(missing)?;
-            super::super::workflow::association::authorize_association(
+            super::super::workflow::association::authorize_thread(
                 db,
                 CompanyId::new(company),
                 WorkflowActor::authenticated(actor)?,
-                RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(channel),
-                    thread_id: RelatedThreadId::new(*conversation_id),
-                },
+                *conversation_id,
             )
             .await?;
         }

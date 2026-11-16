@@ -1,0 +1,8 @@
+{
+  "commit": "0f6d2589353fd89a279a5a665d5e6a55dcab95bb",
+  "parent": "2f218c86fe13a1de5b32d995ff7102f47e9680e9",
+  "tree": "857e33ef35bd376bc6d1ba21387fd37e3efe4500",
+  "branch": "codex/plan03-doop-image-diagnostic-2f218c86",
+  "scope": "Image-only diagnostic; only exporter driver configuration added; all Doop source bytes unchanged; not full acceptance",
+  "workflow": "name: Plan03 Doop image diagnostic\non: push\npermissions:\n  contents: read\njobs:\n  image:\n    runs-on: ubuntu-24.04\n    timeout-minutes: 20\n    steps:\n      - uses: actions/checkout@v4\n      - uses: actions/setup-node@v4\n        with:\n          node-version: 24.21.0\n      - name: Prepare the pinned managed source\n        run: python3 scripts/doop-test.py setup --managed --directory \"$RUNNER_TEMP/doop\"\n      - name: Enable the OCI image exporter\n        uses: docker/setup-buildx-action@v3\n      - name: Build the actual private image and retain build errors\n        run: |\n          if ! python3 scripts/doop-test.py image --managed --directory \"$RUNNER_TEMP/doop\" --output \"$RUNNER_TEMP/doop-image\"; then\n            for log in build.log load.log; do\n              if test -f \"$RUNNER_TEMP/doop-image/$log\"; then\n                cat \"$RUNNER_TEMP/doop-image/$log\"\n              fi\n            done\n            exit 1\n          fi\n"
+}

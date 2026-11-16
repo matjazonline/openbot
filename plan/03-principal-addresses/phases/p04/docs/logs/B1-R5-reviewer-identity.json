@@ -1,0 +1,11 @@
+{
+  "artifact": "00f75666fcf805963dcdd73ee01e7d745f87573d0f4777ef6f9826813c5d32e4",
+  "head": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "review_base": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+  "r4_comparison_commit": "7e255028ca8f808f78d99144c0820c1ac4839726",
+  "binary_sha256": "67a04e45d0e22f375dc0fa32d6fff25bd996dc573e77178a631b4d5fca566b80",
+  "mutation_verified": "Only registration lock line removed; actual source equals retained corrected backup",
+  "corrected_source_sha256": "895ce7b711a576542a21e69d5c5baff40e4278ccc0c355586945fc13b364403e",
+  "mutation_sha256": "f15ed941d490836b50b09c442df2ba086291a6d31cf44d494e48d93279d52457",
+  "reviewer_focused_log_sha256": "33b844b3dbb98e54159b8075c36dffbcec0dfc944b15130e8f1a462f54e00cde"
+}

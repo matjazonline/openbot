@@ -1,0 +1,14 @@
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.051s
+
+OK
+workflow sample capability boundary passed
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.034s
+
+OK
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS
+integration docs: 3 link sets, 164 startup reset notices, configuration and CI inventory PASS
+EXIT 0

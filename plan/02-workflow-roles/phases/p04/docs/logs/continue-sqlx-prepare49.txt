@@ -1,0 +1,50 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0599]: no method named `complete_io` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/reviewer_agent_effect_hint_tests.rs:126:11
+    |
+126 |         p.complete_io(FencedWorkflowResult {
+    |         --^^^^^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowCompletion` which provides `complete_io` is implemented but not in scope; perhaps you want to import it
+    |
+  2 + use crate::application::workflow::completion::WorkflowCompletion;
+    |
+help: there is a method `complete_inbound_event` with a similar name
+    |
+126 -         p.complete_io(FencedWorkflowResult {
+126 +         p.complete_inbound_event(FencedWorkflowResult {
+    |
+
+error[E0599]: no method named `delete_user_account` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/reviewer_agent_turn_hint_tests.rs:33:7
+   |
+33 |     p.delete_user_account(retired).await.unwrap();
+   |       ^^^^^^^^^^^^^^^^^^^ method not found in `&persistence::PostgresPersistence`
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `HostAccountDeletion` which provides `delete_user_account` is implemented but not in scope; perhaps you want to import it
+   |
+ 2 + use crate::application::ports::account_deletion::HostAccountDeletion;
+   |
+
+error[E0599]: no method named `complete_io` found for reference `&persistence::PostgresPersistence` in the current scope
+   --> src/adapters/persistence/workflow/reviewer_agent_effect_hint_tests.rs:262:11
+    |
+262 |         p.complete_io(FencedWorkflowResult {
+    |         --^^^^^^^^^^^
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `WorkflowCompletion` which provides `complete_io` is implemented but not in scope; perhaps you want to import it
+    |
+  2 + use crate::application::workflow::completion::WorkflowCompletion;
+    |
+help: there is a method `complete_inbound_event` with a similar name
+    |
+262 -         p.complete_io(FencedWorkflowResult {
+262 +         p.complete_inbound_event(FencedWorkflowResult {
+    |
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors
+error: `cargo check` failed with status: exit status: 101

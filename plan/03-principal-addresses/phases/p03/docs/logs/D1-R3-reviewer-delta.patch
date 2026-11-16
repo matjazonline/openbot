@@ -1,0 +1,62 @@
+--- D1/r2
++++ D1/r3
+@@ -1,9 +1,9 @@
+-# 03PA-P03 D1/r2 — Production principal provisioning and authenticated relay
++# 03PA-P03 D1/r3 — Production principal provisioning and authenticated relay
+ 
+ > No backward compatibility. Edit init schema and reset owned disposable databases.
+ 
+ Original criteria and contract/verification mapping are in ../TASK.md. This is a combined
+-pre-implementation gate; source remains the accepted p02 artifact. This revision corrects R1/F1 and F2 together; unchanged decisions retain R1 review coverage. All runtime proof remains pending.
++pre-implementation gate; source remains the accepted p02 artifact. This revision retains accepted D1/r2 and corrects the ownership assumption contradicted by the first real unused-agent deletion test. Unchanged decisions retain prior review coverage. Whole-B1 implementation acceptance and remaining runtime proof are pending.
+ 
+ ## 1. One company-agent creation transaction, no automatic desk
+ 
+@@ -45,8 +45,13 @@
+ if the principal has any direct thread or any retained run; no cleanup commits on refusal.
+ Remove the principal's workflow bindings/reply selection in the same transaction. Deleting the
+ agent then deletes its owned definition and own agent revisions by native cascade, whose existing
+-immutable-row guards allow parent teardown. Change only the agent_revisions→agent delete action
++immutable-row guards allow parent teardown. Change the agent_revisions→agent and agent_publication_requests→agent owner delete actions
+ to cascade; retain every incoming revision/version/run/history/manifest/capability FK and guard.
++The publication request is the agent's own immutable publication idempotency receipt, keyed by
++(company,agent,key), not an external published consumer. Its expected-active/result revision FKs
++remain same-agent and unchanged. Permit its immutable DELETE guard only after its actual agent
++parent is absent (or company teardown), so standalone DELETE/UPDATE still refuses; no direct
++pre-deletion audit purge or broad revision cascade is introduced.
+ External bindings to the owned workflow, retained runs, history or publications that reference an
+ agent revision/version therefore abort the whole delete. Do not delete external references or
+ broaden cascade actions on their FKs to make deletion succeed.
+@@ -191,3 +196,32 @@
+   evidence and baseline disposition. No thresholds raised and no full-plan green before p04.
+ 
+ This gate approves decisions only. Runtime implementation and checks remain NOT EXERCISED.
++
++
++## 8. D1/r3 ownership correction and discriminating proof
++
++The first p03 actual production creation/deletion run reached the parent delete and failed on
++agent_publication_requests_company_id_agent_id_fkey. Every production-created published agent
++has such an immutable owned request. D1/r2's instruction to change only agent_revisions' owner
++cascade therefore made its own unused-deletion criterion impossible. Retained evidence:
++B1-agent-direct-tests1.txt and B1-delete-owned-fks.txt. This is a required ownership correction,
++not permission to delete external publication consumers.
++
++Native ownership follows the existing agent_active_revisions and agent_revision_bindings pattern:
++the request's agent FK cascades on the actual parent deletion, and its immutable trigger permits
++only that parent teardown. Both request→revision FKs stay unchanged; so do all other incoming
++revision, workflow-version, history, run, manifest, role and capability constraints. The responsible
++application deletion transaction still owns company→agent→principal locks, current direct-thread/run
++refusal, reply-selection clear, direct-binding removal and principal retirement. No receipt may be
++removed merely to make a still-live agent's deletion possible. Any retained outside reference aborts
++the full transaction and restores addresses, settings, endpoints, bindings, ownership and request rows.
++
++Required focused proof: production-created unused agent can be deleted and removes its own request,
++revision and owned workflow; standalone request mutation/deletion is refused while the agent lives;
++native same-agent/tenant request result references still refuse invalid rows; retained external
++workflow publication/manifest/history/direct-thread/run consumers refuse deletion with exact unchanged
++resource inventory. Keep original both-order admission/delete race and competing-claimant obligations.
++Inspect the full native incoming FK inventory against this narrow delta. No dependent owner-FK or
++immutable-guard edit is permitted until independent explicit PASS of this revision. Independent notice,
++relay, test-fixture and other unchanged-contract work may continue while this gate is pending, but
++source is frozen for the review assignment identity.

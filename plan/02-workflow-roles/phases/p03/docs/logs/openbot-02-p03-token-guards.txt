@@ -1,0 +1,60 @@
+5684--- Name: workflow_root_budgets; Type: TABLE; Schema: public; Owner: -
+5685---
+5686-
+5687--- Frozen optional token allowance; current reviewer authority is checked at admission/use.
+5688:CREATE FUNCTION public.valid_workflow_token_policy(policy jsonb) RETURNS boolean
+5689-    LANGUAGE plpgsql IMMUTABLE
+5690-    AS $$
+5691-DECLARE reviewer jsonb; seen uuid[] = '{}'; reviewer_id uuid; amount bigint;
+5692-BEGIN
+5693-    IF jsonb_typeof(policy) IS DISTINCT FROM 'object'
+5694-       OR NOT policy ?& ARRAY['max_tokens','reviewers']
+--
+5718-    root_run_id uuid NOT NULL,
+5719-    activations integer NOT NULL,
+5720-    model_calls integer NOT NULL,
+5721-    repetitions integer NOT NULL,
+5722:    token_policy jsonb,
+5723:    CONSTRAINT workflow_root_token_policy_check CHECK (token_policy IS NULL OR public.valid_workflow_token_policy(token_policy)),
+5724-    CONSTRAINT workflow_root_budgets_check CHECK (activations BETWEEN 1 AND 100000 AND model_calls BETWEEN 1 AND 1000 AND repetitions BETWEEN 1 AND 1000)
+5725-);
+5726-
+5727-
+5728---
+5729--- Name: workflow_run_budgets; Type: TABLE; Schema: public; Owner: -
+--
+11518-BEGIN
+11519-    IF NEW.subject_kind<>'token_allowance' THEN RETURN NEW; END IF;
+11520-    IF NOT public.valid_workflow_token_proposal(NEW.token_proposal,NEW.token_stage,NEW.token_request_id) THEN
+11521-        RAISE EXCEPTION 'invalid token proposal' USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_token_proposal'; END IF;
+11522:    SELECT usage.root_run_id,budget.token_policy,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint),usage.token_refusal
+11523-        INTO STRICT root,policy,allowance,refused FROM workflow_run_budgets AS link
+11524-        JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
+11525-        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+11526-        WHERE link.company_id=NEW.company_id AND link.run_id=NEW.run_id FOR UPDATE OF usage;
+11527-    IF policy IS NULL OR refused IS NOT NULL OR (NEW.token_proposal->>'original_allowance')::bigint<>(policy->>'max_tokens')::bigint
+11528-        OR (NEW.token_proposal->>'old_allowance')::bigint<>allowance THEN
+--
+11608-
+11609-CREATE FUNCTION public.require_workflow_token_progression(company uuid, run uuid) RETURNS void LANGUAGE plpgsql AS $$
+11610-DECLARE refused text; allowance bigint; observed numeric;
+11611-BEGIN
+11612:    SELECT usage.token_refusal,GREATEST(usage.authorized_tokens,(budget.token_policy->>'max_tokens')::bigint)
+11613-        INTO refused,allowance FROM workflow_run_budgets AS link
+11614-        JOIN workflow_root_budget_usage AS usage USING(company_id,root_run_id)
+11615-        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+11616-        WHERE link.company_id=company AND link.run_id=run FOR UPDATE OF usage;
+11617-    -- Invalid associations remain the composite foreign keys' responsibility.
+11618-    -- Every valid run creates its immutable budget link in its insert trigger.
+--
+11621-        RAISE EXCEPTION 'workflow token continuation refused: %',refused USING ERRCODE='23514', CONSTRAINT='workflow_guard:require_workflow_token_progression';
+11622-    END IF;
+11623-    IF NOT EXISTS(SELECT 1 FROM workflow_run_budgets AS link
+11624-        JOIN workflow_root_budgets AS budget USING(company_id,root_run_id)
+11625:        WHERE link.company_id=company AND link.run_id=run AND budget.token_policy IS NOT NULL) THEN RETURN; END IF;
+11626-    SELECT COALESCE(sum(CASE WHEN call.settled_at IS NULL THEN call.reserved_input+call.reserved_output
+11627-        ELSE call.input_tokens+call.output_tokens END),0) INTO observed FROM model_usage_calls AS call
+11628-        JOIN workflow_run_budgets AS link ON link.company_id=call.company_id AND link.root_run_id=call.root_run_id
+11629-        WHERE link.company_id=company AND link.run_id=run;
+11630-    IF observed>allowance THEN
+11631-        RAISE EXCEPTION 'workflow token approval required' USING ERRCODE='23514', CONSTRAINT='workflow_guard:require_workflow_token_progression';

@@ -1,0 +1,17 @@
+
+running 3 tests
+test application::workflow::native_mcp::tests::native_broker_refuses_postgres_nul_values_and_keys_before_publication ... ok
+
+thread 'application::workflow::native_mcp::tests::native_broker_compiles_real_mcp_contract_and_binds_original_reviewer' (17340766) panicked at src/application/workflow/native_mcp/tests.rs:55:10:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid native MCP workflow: Diagnostic { code: \"registry.role\", message: \"Choose person principals or literal department roles as reviewers\", field_path: \"/steps/start/with/reviewers\", span: SourceSpan { start: 580, end: 581, line: 1, column: 581 }, instance_path: None, schema_path: None }")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test application::workflow::native_mcp::tests::native_broker_refuses_invalid_arguments_and_non_mcp_sources ... ok
+test application::workflow::native_mcp::tests::native_broker_compiles_real_mcp_contract_and_binds_original_reviewer ... FAILED
+
+failures:
+
+failures:
+    application::workflow::native_mcp::tests::native_broker_compiles_real_mcp_contract_and_binds_original_reviewer
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 4687 filtered out; finished in 0.79s
+

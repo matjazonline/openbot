@@ -78,13 +78,16 @@ pub enum AgentBuiltinTool {
     MessageSend,
     MessageReply,
     ListCompanyAgents,
-    CreateAgentChannel,
+    CreateAgent,
+    CreateDeskForAgent,
     SearchKnowledge,
     /// The memory service tools (phase 05 E5), offered only while memory is enabled.
     SearchMemory,
     MemoryTimeline,
     MemoryDetails,
     SaveMemory,
+    ReadEscalation,
+    RespondToEscalation,
 }
 impl AgentBuiltinTool {
     pub const fn name(self) -> &'static str {
@@ -92,12 +95,15 @@ impl AgentBuiltinTool {
             Self::MessageSend => "message.send",
             Self::MessageReply => "message.reply",
             Self::ListCompanyAgents => "list_company_agents",
-            Self::CreateAgentChannel => "create_agent_channel",
+            Self::CreateAgent => "create_agent",
+            Self::CreateDeskForAgent => "create_desk_for_agent",
             Self::SearchKnowledge => "search_knowledge",
             Self::SearchMemory => "search_memory",
             Self::MemoryTimeline => "memory_timeline",
             Self::MemoryDetails => "memory_details",
             Self::SaveMemory => "save_memory",
+            Self::ReadEscalation => "read_escalation",
+            Self::RespondToEscalation => "respond_to_escalation",
         }
     }
     pub fn parse(name: &str) -> Option<Self> {
@@ -105,17 +111,23 @@ impl AgentBuiltinTool {
             "message.send" => Some(Self::MessageSend),
             "message.reply" => Some(Self::MessageReply),
             "list_company_agents" => Some(Self::ListCompanyAgents),
-            "create_agent_channel" => Some(Self::CreateAgentChannel),
+            "create_agent" => Some(Self::CreateAgent),
+            "create_desk_for_agent" => Some(Self::CreateDeskForAgent),
             "search_knowledge" => Some(Self::SearchKnowledge),
             "search_memory" => Some(Self::SearchMemory),
             "memory_timeline" => Some(Self::MemoryTimeline),
             "memory_details" => Some(Self::MemoryDetails),
             "save_memory" => Some(Self::SaveMemory),
+            "read_escalation" => Some(Self::ReadEscalation),
+            "respond_to_escalation" => Some(Self::RespondToEscalation),
             _ => None,
         }
     }
     pub const fn is_provisioning(self) -> bool {
-        matches!(self, Self::ListCompanyAgents | Self::CreateAgentChannel)
+        matches!(
+            self,
+            Self::ListCompanyAgents | Self::CreateAgent | Self::CreateDeskForAgent
+        )
     }
     pub const fn is_memory(self) -> bool {
         matches!(

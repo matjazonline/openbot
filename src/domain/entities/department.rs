@@ -42,18 +42,20 @@ pub struct Department {
 
 /// A role a principal holds in a department. `Lead` has exactly one holder; later plans add
 /// roles that may have several.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepartmentRole {
     Lead,
+    Reviewer,
 }
 
 impl DepartmentRole {
-    pub const ALL: [Self; 1] = [Self::Lead];
+    pub const ALL: [Self; 2] = [Self::Lead, Self::Reviewer];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Lead => "lead",
+            Self::Reviewer => "reviewer",
         }
     }
 
@@ -62,6 +64,7 @@ impl DepartmentRole {
     pub const fn is_single_holder(self) -> bool {
         match self {
             Self::Lead => true,
+            Self::Reviewer => false,
         }
     }
 }
@@ -89,6 +92,7 @@ impl FromStr for DepartmentRole {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "lead" => Ok(Self::Lead),
+            "reviewer" => Ok(Self::Reviewer),
             _ => Err(InvalidDepartmentRole(value.to_string())),
         }
     }
@@ -99,6 +103,75 @@ impl FromStr for DepartmentRole {
 pub struct DepartmentRoleHolder {
     pub role: DepartmentRole,
     pub principal_id: PrincipalId,
+}
+
+/// A bounded admission refusal. It deliberately carries no holder identities or labels.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoleRefusalKind {
+    NoHolder,
+    WrongKind,
+    Ambiguous,
+    DepthBound,
+    TooMany,
+    Unavailable,
+    MissingDepartment,
+}
+
+impl RoleRefusalKind {
+    pub const fn code(self) -> &'static str {
+        match self {
+            Self::NoHolder => "workflow.role_no_holder",
+            Self::WrongKind => "workflow.role_wrong_kind",
+            Self::Ambiguous => "workflow.role_ambiguous",
+            Self::DepthBound => "workflow.role_depth_bound",
+            Self::TooMany => "workflow.role_too_many",
+            Self::Unavailable => "workflow.role_unavailable",
+            Self::MissingDepartment => "workflow.role_needs_department",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleAdmissionRefusal {
+    format: RoleRefusalFormat,
+    pub step: crate::domain::workflow::StepId,
+    pub role: DepartmentRole,
+    pub kind: RoleRefusalKind,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+enum RoleRefusalFormat {
+    #[serde(rename = "workflow-role-refusal-v1")]
+    V1,
+}
+
+impl RoleAdmissionRefusal {
+    pub fn new(
+        step: crate::domain::workflow::StepId,
+        role: DepartmentRole,
+        kind: RoleRefusalKind,
+    ) -> Self {
+        Self {
+            format: RoleRefusalFormat::V1,
+            step,
+            role,
+            kind,
+        }
+    }
+}
+
+impl fmt::Display for RoleAdmissionRefusal {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{}: step {} requires role {}",
+            self.kind.code(),
+            self.step,
+            self.role
+        )
+    }
 }
 
 /// One role a principal holds, as that principal's role list shows.
@@ -276,5 +349,6 @@ mod tests {
     #[test]
     fn the_lead_has_a_single_holder() {
         assert!(DepartmentRole::Lead.is_single_holder());
+        assert!(!DepartmentRole::Reviewer.is_single_holder());
     }
 }

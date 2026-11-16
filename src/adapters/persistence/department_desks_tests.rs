@@ -554,7 +554,7 @@ async fn department_desk_members_only_keeps_an_allowlist_entry_and_a_membership_
 
 /// DEP-P02-D2 (G1-F2): every save applies the members-only rule to the desk's ownership.
 #[tokio::test]
-async fn department_desk_members_only_form_saves_keep_allowlist_and_refuse_public() {
+async fn department_desk_public_selection_clears_members_only_and_keeps_ownership() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -565,8 +565,6 @@ async fn department_desk_members_only_form_saves_keep_allowlist_and_refuse_publi
         (saved.access_mode, saved.members_only),
         (ChannelAccessMode::Allowlist, true)
     );
-    let public = save(&f, &saved, None, Some(vec!["@public"])).await;
-    assert!(matches!(public, Err(AppError::BadRequest(_))), "{public:?}");
     let unowned = save(
         &f,
         &saved,
@@ -586,6 +584,13 @@ async fn department_desk_members_only_form_saves_keep_allowlist_and_refuse_publi
         Some(hr.id),
         "nothing changed"
     );
+    let public = save(&f, &saved, None, Some(vec!["@public"])).await.unwrap();
+    assert_eq!(
+        (public.access_mode, public.members_only),
+        (ChannelAccessMode::Public, false)
+    );
+    assert_eq!(public.department_id, Some(hr.id));
+    assert_eq!(reload(&f, people.id).await, public);
 }
 
 /// DEP-P02-D5: a teammate removed from the company loses their derived grants with their
@@ -809,4 +814,44 @@ async fn department_desk_competing_removal_and_demotion_of_one_principal_both_co
         "still lead until demoted, then nothing"
     );
     assert!(f.roles(unit.id).await.is_empty());
+}
+
+#[tokio::test]
+async fn department_desk_raw_public_with_members_only_is_refused() {
+    let Some(f) = Departments::new().await else {
+        return;
+    };
+    let hr = f.create("HR", None).await;
+    let people = desk(&f, "raw-private", owned(hr.id, true)).await;
+    let result = ChannelPersistence::update(
+        &f.persistence,
+        crate::application::ports::channel::ChannelUpdate {
+            company_id: f.company,
+            channel_id: people.id,
+            write: ChannelWrite {
+                participant_emails: Some(vec!["@public".into()]),
+                ..desk_write(people.slug.as_str(), owned(hr.id, true))
+            },
+        },
+    )
+    .await;
+    assert!(matches!(result, Err(AppError::BadRequest(_))), "{result:?}");
+    let error =
+        sqlx::query("UPDATE channels SET access_mode='public' WHERE company_id=$1 AND id=$2")
+            .bind(f.company)
+            .bind(people.id)
+            .execute(f.persistence.pool())
+            .await
+            .unwrap_err();
+    assert_eq!(
+        error.as_database_error().unwrap().constraint(),
+        Some("channels_members_only_allowlist")
+    );
+    let stored = reload(&f, people.id).await;
+    assert_eq!(
+        (stored.access_mode, stored.members_only),
+        (ChannelAccessMode::Allowlist, true)
+    );
+    assert_eq!(stored.settings_revision, people.settings_revision);
+    assert_eq!(stored.department_id, Some(hr.id));
 }

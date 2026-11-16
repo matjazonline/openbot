@@ -1,0 +1,34 @@
+{
+  "round": "02WR-P04-D4-R2",
+  "note": "02WR-P04-D4-R2/N1",
+  "decision": "02WR-P04-D4/r2",
+  "stage": "architecture correction recheck; whole decision",
+  "worktree": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot",
+  "branch": "room/check-last-handoff-md-under-plan-02-work-qc8d",
+  "review_base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "head": "2bbe2649024aa6a4617b74b0c0c7868b14590b5f",
+  "artifact": "4c0a3396c2af07a24a9a9dc19894f032cb3ebb13839ffad17ca8bcb216192ba4",
+  "excludes": [
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p01/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p04/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/COORDINATION.md",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md"
+  ],
+  "coordination_revision": 37,
+  "coordination_path": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/COORDINATION.md",
+  "reviewer_thread": "thr_9t82uwgsiu",
+  "model": "gpt-6-astra",
+  "effort": "high",
+  "settings_evidence": "Coordinator reports actual Cloudroom execution metadata; no direct reviewer-side provider telemetry.",
+  "inputs": {
+    "logs/D4-r2.md": "7240993d7cf2aeddd4de19a11337269fefc39c6f2d2e746b3e20ff2de637a042",
+    "logs/D4-r2-coordination.md": "02330f8392710ad45fed74eff1b647eea9bbe88dd1f4a848934189e6b9c83386",
+    "logs/D4-r2-inputs.json": "a39f73898dac0658e835fc2673c62fe024585bf7d3ad362e430301245995d712",
+    "logs/D1-r3.md": "4108fc4f34238bc9ebb5dbd28397ca50b6d72022a871e7fb0d9bd6561d9716e6",
+    "logs/D2-r2.md": "9d356f988ef5059d3703804837db066fe34d52a9a95331135dab1dbf1c8be448",
+    "logs/D3-r1.md": "08eb7ffb51a1e2e7f6165265b0f510f83e71a7b39d70dc625bae8de47b36764c",
+    "logs/reviewer-D4-R1-inspection.md": "9336e08b310e596c02f4028a062649c310228f59b14a0a8de9c854e83ab9b176"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "parent_pid": 66037,
+  "primary_artifact": "3adf4b435a51f0b482d3d372c43398a57cbc20c1823394f14fbfa3ab2a29ec8b",
+  "subsequent_artifact": "9938338fb72334eb61bf07926c6747ab91f09c594dcd0660f9d836ac36fdf438",
+  "reason": "Primary all-target main gate PASS retained immutably; exact candidate60341d25 adopted; source frozen; Rust/Cargo/migration and Darwin wrapper projection identical. Resume parent for stock-stack/lease only. Linux proof from candidate CI; two extra Trail notes nonruntime and independently reviewed.",
+  "proof": [
+    "R8-main-complete-before-adoption.txt",
+    "R9b-adoption-equality.json",
+    "R9b-runtime-projection.json",
+    "R9b-final-material-equality.json",
+    "R9b-local-focused.txt"
+  ]
+}

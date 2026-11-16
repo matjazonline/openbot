@@ -48,7 +48,11 @@ async fn channel_reply_completion_opposite_reviewers_have_one_formal_winner() {
     let s = Intents::new().await;
     let a = member(&s.fixture, "admin").await;
     let b = member(&s.fixture, "admin").await;
-    let policy = ReplyApprovalPolicy::new(vec![a, b], 60).unwrap();
+    let policy = ReplyApprovalPolicy::new(
+        vec![s.fixture.principal(a).await, s.fixture.principal(b).await],
+        60,
+    )
+    .unwrap();
     let f = FinalFixture::from_case(
         s,
         FinalCase {
@@ -91,7 +95,7 @@ async fn channel_reply_completion_opposite_reviewers_have_one_formal_winner() {
 #[tokio::test]
 async fn channel_reply_completion_review_timeout_never_publishes_unapproved_output() {
     let s = Intents::new().await;
-    let policy = ReplyApprovalPolicy::new(vec![s.owner().user_id()], 1).unwrap();
+    let policy = ReplyApprovalPolicy::new(vec![s.owner_principal()], 1).unwrap();
     let f = FinalFixture::from_case(
         s,
         FinalCase {
@@ -213,7 +217,8 @@ async fn channel_reply_completion_privileged_reviewers_still_require_payload_cle
         let reviewer = member(&s.fixture, "admin").await;
         sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2")
             .bind(s.fixture.target.company.as_uuid()).bind(reviewer).bind(initial_level as i16).execute(s.pool()).await.unwrap();
-        let policy = ReplyApprovalPolicy::new(vec![reviewer], 60).unwrap();
+        let policy =
+            ReplyApprovalPolicy::new(vec![s.fixture.principal(reviewer).await], 60).unwrap();
         let f = FinalFixture::from_case(
             s,
             FinalCase {

@@ -57,6 +57,7 @@ impl HistoryThread {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(p, &agent).await;
         s.fixture.publish_agent(agent.id).await;
         let binding = history_contract_binding(
             &mut s,
@@ -178,8 +179,8 @@ async fn agent_history_identity_real_message_roots_share_thread_across_agent_rev
     let first = f.next().await;
     let original = f.identity(&first).await;
     assert!(
-        matches!(original.boundary,AgentConversationBoundary::Thread {channel,thread}
-        if channel.as_uuid()==f.s.channel && thread.as_uuid()==f.s.thread)
+        matches!(original.boundary,AgentConversationBoundary::Thread {target,thread}
+        if target==AddressTarget::Desk(f.s.channel) && thread.as_uuid()==f.s.thread)
     );
     sqlx::query("UPDATE agents SET system_prompt='New revision, same conversation' WHERE company_id=$1 AND id=$2")
         .bind(f.s.fixture.target.company.as_uuid()).bind(f.agent).execute(f.s.pool()).await.unwrap();
@@ -211,7 +212,7 @@ async fn agent_history_identity_manual_thread_attachment_is_private_and_scope_up
         actor: f.s.owner(),
         binding_id: f.binding,
         association: RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(f.s.channel),
+            target: crate::entities::address::AddressTarget::Desk(f.s.channel),
             thread_id: RelatedThreadId::new(f.s.thread),
         },
         trigger: TriggerRef::new(

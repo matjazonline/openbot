@@ -1,0 +1,22 @@
+[
+  {
+    "case": "receipt-failure",
+    "launch_returned": true,
+    "close_entered": false,
+    "harness_had_to_terminate": false,
+    "exit_status": 1,
+    "PASS_report_written": false,
+    "runtime_retained": true,
+    "native_browser_used": false
+  },
+  {
+    "case": "stalled-close",
+    "launch_returned": true,
+    "close_entered": true,
+    "harness_had_to_terminate": true,
+    "exit_status": -15,
+    "PASS_report_written": false,
+    "runtime_retained": true,
+    "native_browser_used": false
+  }
+]

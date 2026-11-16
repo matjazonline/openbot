@@ -14,7 +14,7 @@
 //! instead; the read stays bounded by the window.
 use super::reads::RUN_COLUMNS;
 use super::*;
-use crate::application::workflow::board::{BOARD_COLUMN_CAP, RunBoardScope, VisibleChannels};
+use crate::application::workflow::board::{BOARD_COLUMN_CAP, RunBoardScope, VisibleInboxes};
 use crate::application::workflow::reads::RunStateName;
 use chrono::{DateTime, Utc};
 use sqlx::QueryBuilder;
@@ -63,13 +63,21 @@ fn push_scope(
         query
             .push(keyword)
             .push(
-                "version_id IN (SELECT version.id FROM workflow_versions AS version \
+                "(version_id IN (SELECT version.id FROM workflow_versions AS version \
                  WHERE version.company_id = ",
             )
             .push_bind(company.as_uuid())
             .push(" AND ")
             .push_bind(agent)
             .push(" = ANY(version.agent_ids))");
+        query.push(" OR ");
+        super::reads::push_role_agent_scope(
+            query,
+            company,
+            agent,
+            super::reads::RoleAgentScope::BoardWindow,
+        );
+        query.push(")");
         keyword = " AND ";
     }
     if let Some(department) = scope.department {
@@ -89,8 +97,7 @@ pub(super) fn board_counts_query(
     scope: &RunBoardScope,
     cutoff: DateTime<Utc>,
 ) -> QueryBuilder<'static, Postgres> {
-    let working =
-        "SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
+    let working = "SELECT id, state, channel_id, principal_id, binding_id, workflow_id, version_id FROM workflow_runs";
     let mut query = QueryBuilder::new(format!(
         "WITH working AS MATERIALIZED ({working} WHERE company_id = "
     ));
@@ -104,10 +111,10 @@ pub(super) fn board_counts_query(
         .push_bind(cutoff)
         .push(
             " AND parent_run_id IS NULL) \
-             SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working",
+             SELECT state, channel_id, principal_id, COUNT(*)::bigint AS runs FROM working AS run_scope",
         );
     push_scope(&mut query, company, scope);
-    query.push(" GROUP BY state, channel_id");
+    query.push(" GROUP BY state, channel_id, principal_id");
     query
 }
 
@@ -119,7 +126,7 @@ pub(super) fn board_cards_query(
     company: CompanyId,
     scope: &RunBoardScope,
     cutoff: DateTime<Utc>,
-    visible: &VisibleChannels,
+    visible: &VisibleInboxes,
 ) -> QueryBuilder<'static, Postgres> {
     let mut query = QueryBuilder::new("");
     if scoped(scope) {
@@ -140,7 +147,7 @@ pub(super) fn board_cards_query(
         }
         query.push(format!("(SELECT {RUN_COLUMNS} FROM "));
         if scoped(scope) {
-            query.push(state.as_str());
+            query.push(state.as_str()).push(" AS run_scope");
             push_scope(&mut query, company, scope);
         } else {
             push_column(&mut query, company, state, cutoff, visible);
@@ -162,7 +169,7 @@ fn push_column(
     company: CompanyId,
     state: RunStateName,
     cutoff: DateTime<Utc>,
-    visible: &VisibleChannels,
+    visible: &VisibleInboxes,
 ) {
     query
         .push("workflow_runs WHERE company_id = ")
@@ -173,7 +180,15 @@ fn push_column(
         ))
         .push(" AND (channel_id = ANY(")
         .push_bind(visible.channels.clone())
-        .push(") OR (channel_id IS NULL AND ")
+        .push(") OR principal_id = ANY(")
+        .push_bind(
+            visible
+                .principals
+                .iter()
+                .map(|id| id.as_uuid())
+                .collect::<Vec<_>>(),
+        )
+        .push(") OR (channel_id IS NULL AND principal_id IS NULL AND ")
         .push_bind(visible.company)
         .push("))");
     if !state.is_open() {
@@ -186,5 +201,6 @@ fn push_column(
 pub(super) struct BoardCountRow {
     pub(super) state: String,
     pub(super) channel_id: Option<Uuid>,
+    pub(super) principal_id: Option<Uuid>,
     pub(super) runs: i64,
 }

@@ -49,7 +49,10 @@ async fn read(
     config: &AppConfig,
     event: &InboundEventRecord,
 ) -> Result<(InboundMessage, PendingEmailAttachments), Failure> {
-    super::read_mail(&account(api), config, event, EVENT_KEY).await
+    let scanner =
+        crate::adapters::spam_scanner::SpamScannerAdapter::new(config.spam_scanner_settings())
+            .unwrap();
+    super::read_mail(&account(api), config, event, EVENT_KEY, &scanner).await
 }
 
 fn event(payload: serde_json::Value) -> InboundEventRecord {
@@ -188,6 +191,26 @@ async fn the_recipient_is_the_address_the_mail_was_received_for() {
         "routing should name the received-for channel: {:?}",
         inbound.routing
     );
+}
+
+/// The adapter states a person's address exactly as it states a desk's: one platform selector.
+/// Which one the slug names is the company namespace's answer, read when the message is routed.
+#[tokio::test]
+async fn address_external_ingress_resend_names_a_person_the_way_it_names_a_desk() {
+    let mut routings = Vec::new();
+    for local in ["support", "alice"] {
+        let mut email = received_email();
+        email.received_for = vec![format!("{local}@acme.localhost")];
+        let api = FakeResendApi::new()
+            .retrieving(Ok(email))
+            .with_raw(Ok(raw_mime(RESEND_API_PASS)));
+        let (inbound, _) = read(api, &config(), &received_event())
+            .await
+            .expect("the mail reads");
+        routings.push(format!("{:?}", inbound.routing));
+    }
+    assert!(routings[0].contains("Platform"), "{}", routings[0]);
+    assert_eq!(routings[1], routings[0].replace("support", "alice"));
 }
 
 #[tokio::test]
@@ -338,7 +361,11 @@ async fn only_the_receiving_companys_authserv_id_is_believed() {
     };
     let event = received_event();
 
-    let (inbound, _) = super::read_mail(&elsewhere, &config(), &event, EVENT_KEY)
+    let config = config();
+    let scanner =
+        crate::adapters::spam_scanner::SpamScannerAdapter::new(config.spam_scanner_settings())
+            .unwrap();
+    let (inbound, _) = super::read_mail(&elsewhere, &config, &event, EVENT_KEY, &scanner)
         .await
         .expect("the mail reads");
 

@@ -1,0 +1,25 @@
+{
+  "total_count": 1,
+  "artifacts": [
+    {
+      "id": 14237355566,
+      "node_id": "MDg6QXJ0aWZhY3QxNDIzNzM1NTU2Ng==",
+      "name": "doop-integration-evidence",
+      "size_in_bytes": 27955,
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/artifacts/14237355566",
+      "archive_download_url": "https://api.github.com/repos/matjazonline/openbot/actions/artifacts/14237355566/zip",
+      "expired": false,
+      "digest": "sha256:faa2c78afed054526d67b230bdf583b75e6a98c1a863b52b3c440adcca238719",
+      "created_at": "2026-11-16T14:55:25Z",
+      "updated_at": "2026-11-16T14:55:25Z",
+      "expires_at": "2027-02-14T14:41:58Z",
+      "workflow_run": {
+        "id": 43888466155,
+        "repository_id": 1328738369,
+        "head_repository_id": 1328738369,
+        "head_branch": "codex/plan03-p04-r20-0d3e4a43",
+        "head_sha": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd"
+      }
+    }
+  ]
+}

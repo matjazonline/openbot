@@ -45,7 +45,7 @@ async fn workflow_action_approval_digest_fk_rejects_each_mismatch() {
         } else {
             setup.claim.fence.attempt.0
         };
-        sqlx::query("SET CONSTRAINTS workflow_decisions_company_id_execution_id_job_id_fkey, workflow_decisions_job_id_parked_attempt_number_fkey IMMEDIATE").execute(&mut *tx).await.unwrap();
+        sqlx::query("SET CONSTRAINTS workflow_decisions_action_identity, workflow_decisions_company_id_execution_id_job_id_fkey, workflow_decisions_job_id_parked_attempt_number_fkey IMMEDIATE").execute(&mut *tx).await.unwrap();
         let error=sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest,job_id,parked_attempt_number) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9,$10,$11)")
             .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(Uuid::new_v4()).bind(wait)
             .bind("0".repeat(64)).bind(invocation).bind(argument).bind(operation).bind(job).bind(attempt).execute(&mut *tx).await.unwrap_err();
@@ -59,6 +59,68 @@ async fn workflow_action_approval_digest_fk_rejects_each_mismatch() {
             "{field}: {error}"
         );
         tx.rollback().await.unwrap();
+    }
+}
+
+#[tokio::test]
+async fn workflow_action_approval_deferred_identity_rejects_mismatches_and_orphans_at_commit() {
+    let setup = Box::pin(protected("http://127.0.0.1:1", Entrance::Http)).await;
+    let p = &setup.fixture.persistence;
+    let request = p
+        .http_step_request(&setup.claim, &setup.kind)
+        .await
+        .unwrap();
+    let frozen = FrozenAction::restore(serde_json::to_value(&request).unwrap()).unwrap();
+    let intent = ActionService::new(p.clone())
+        .prepare_step(request)
+        .await
+        .unwrap();
+    let scope = setup.claim.fence.scope;
+    let deferred: bool = sqlx::query_scalar(
+        "SELECT condeferrable AND condeferred FROM pg_constraint \
+         WHERE conrelid='workflow_decisions'::regclass AND conname='workflow_decisions_action_identity'",
+    )
+    .fetch_one(p.pool())
+    .await
+    .unwrap();
+    assert!(
+        deferred,
+        "owned-tenant teardown needs the unchanged identity relation checked at commit"
+    );
+
+    for field in ["argument", "operation", "invocation"] {
+        let mut tx = p.pool().begin().await.unwrap();
+        let wait = Uuid::new_v4();
+        sqlx::query("INSERT INTO workflow_waits(company_id,run_id,execution_id,id,reason,deadline,notification_intent) VALUES($1,$2,$3,$4,'decision',clock_timestamp()+interval '1 minute',$5)")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait)
+            .bind(json!({"version":1,"kind":"wait_registered","wait_id":wait,"run_id":scope.run.as_uuid(),"execution_id":scope.execution.as_uuid()})).execute(&mut *tx).await.unwrap();
+        let argument = if field == "argument" {
+            "0".repeat(64)
+        } else {
+            frozen.argument_digest().as_str().to_owned()
+        };
+        let operation = if field == "operation" {
+            "0".repeat(64)
+        } else {
+            frozen.operation_digest().as_str().to_owned()
+        };
+        let invocation = if field == "invocation" {
+            Uuid::new_v4()
+        } else {
+            intent.approval_subject().invocation.as_uuid()
+        };
+        sqlx::query("INSERT INTO workflow_decisions(company_id,run_id,execution_id,id,wait_id,subject_kind,proposal_digest,action_invocation_id,argument_digest,operation_digest,job_id,parked_attempt_number) VALUES($1,$2,$3,$4,$5,'action_approval',$6,$7,$8,$9,$10,$11)")
+            .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(Uuid::new_v4()).bind(wait)
+            .bind("0".repeat(64)).bind(invocation).bind(argument).bind(operation).bind(scope.job.0)
+            .bind(setup.claim.fence.attempt.0).execute(&mut *tx).await.unwrap();
+        let error = tx.commit().await.unwrap_err();
+        let error = error.as_database_error().unwrap();
+        assert_eq!(error.code().as_deref(), Some("23503"), "{field}");
+        assert_eq!(
+            error.constraint(),
+            Some("workflow_decisions_action_identity"),
+            "{field}"
+        );
     }
 }
 

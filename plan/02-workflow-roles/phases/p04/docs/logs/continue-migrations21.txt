@@ -1,0 +1,4 @@
+CREATE DATABASE
+Applied 20260817000000/migrate init schema (539.53275ms)
+CREATE DATABASE
+Applied 20260817000000/migrate init schema (472.399917ms)

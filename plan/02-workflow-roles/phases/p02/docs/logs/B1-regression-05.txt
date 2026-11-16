@@ -1,0 +1,17 @@
+$ cargo test --locked --offline --lib autonomous_agent_admission_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.23s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 9 tests
+test adapters::persistence::workflow::agent_manifest::tests::autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_an_extra_member ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::closure::autonomous_agent_admission_checks_resources_of_agent_owned_child_workflows ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_revisions_are_selected_at_admission_and_replay_before_activation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_admission::autonomous_agent_admission_competing_duplicates_and_publication_share_one_complete_selection ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_registration_tests::references::autonomous_agent_admission_rejects_a_newly_published_self_workflow_binding ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_combined_depth_is_bounded_across_agent_workflow_edges ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_node_limit_covers_the_complete_dynamic_universe ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4191 filtered out; finished in 5.44s
+

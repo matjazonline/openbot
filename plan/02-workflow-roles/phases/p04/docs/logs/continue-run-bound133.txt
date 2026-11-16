@@ -1,0 +1,22 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::bounds::workflow_reviewer_follow_park_at_the_256_bound_refuses_the_next_without_a_partial_park ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::bounds::workflow_reviewer_follow_park_at_the_256_bound_refuses_the_next_without_a_partial_park stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::bounds::workflow_reviewer_follow_park_at_the_256_bound_refuses_the_next_without_a_partial_park' (6148454) panicked at src/adapters/persistence/workflow/follow_bound_tests.rs:45:5:
+assertion `left == right` failed: the refused park left nothing behind and the run is still claimable work
+  left: Object {"decisions": Number(0), "follows": Number(0), "state": String("queued"), "waits": Number(0)}
+ right: Object {"decisions": Number(0), "follows": Number(0), "state": String("running"), "waits": Number(0)}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::bounds::workflow_reviewer_follow_park_at_the_256_bound_refuses_the_next_without_a_partial_park
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4474 filtered out; finished in 19.15s
+
+EXIT 101

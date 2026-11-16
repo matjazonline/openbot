@@ -1,0 +1,12 @@
+{
+  "candidate": "957de863ede7b0c8bb432937287842865ec862c3",
+  "checked_files": 39,
+  "byte_mismatches": [],
+  "delta_since_R5_candidate": [
+    ".github/workflows/ci.yml",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/run_provenance/mod.rs",
+    "src/application/agent/contract_tests.rs",
+    "src/application/agent/definition.rs"
+  ]
+}

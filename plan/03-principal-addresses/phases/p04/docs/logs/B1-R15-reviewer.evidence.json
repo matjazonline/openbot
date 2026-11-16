@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R15-reviewer",
+  "artifact": "dc5b28cd2cee6eb9281ef6ed583d20682bfc9ecacd0afe597e4aa4a83f726c14",
+  "checks": [
+    {
+      "criteria": [
+        "R14-F1-removal",
+        "source-projection",
+        "retained-focused-protocol-proof"
+      ],
+      "command": "Independent2488file bytecomparison and removal/pin assertions; inspect author26Node/10Python outputs",
+      "fixture": "Read-only source assertions and retained author execution; no additional native/runtime command by B",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R15-reviewer-identity.json",
+          "sha256": "c7fd49f0f8af370d875787b62a7a8fa700009795f3559ac0c113c670cfd03594"
+        },
+        {
+          "path": "logs/B1-R15-reviewer-entry.snapshot.txt",
+          "sha256": "90fc65029fcf2eafe8317a4eafc101d36a041c81a256837b3027550b7b2d8169"
+        },
+        {
+          "path": "logs/R22-doop-probe.txt",
+          "sha256": "9ac3495e6cc47cf940d50a677fad8d57df86af78ccf5ed5e694cb9ff89f21a5c"
+        },
+        {
+          "path": "logs/R22-check-runner.txt",
+          "sha256": "210291689cf9c05b65fdc4be1664c228e107c93d620e03c4dec3742aadee11ce"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "actual-private-proof",
+        "final-native-gates",
+        "phase-acceptance"
+      ],
+      "command": "Review completed actual CI and final criterion mapping",
+      "fixture": "R19native/R21private actualgates pending",
+      "status": "NOT EXERCISED",
+      "reason": "Source/focused checkpoint only; actual required final evidence still outstanding."
+    }
+  ]
+}

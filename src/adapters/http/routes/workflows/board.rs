@@ -7,9 +7,8 @@
 //! the next read.
 use super::bindings::{Visibility, company_agent, company_workflow, run_json, visible_binding};
 use super::*;
-use crate::application::workflow::RelatedChannelId;
 use crate::application::workflow::board::{
-    BoardCount, BoardWindow, RunBoardColumn, RunBoardScope, VisibleChannels, assemble_columns,
+    BoardCount, BoardWindow, RunBoardColumn, RunBoardScope, VisibleInboxes, assemble_columns,
 };
 use crate::application::workflow::reads::ChildCounts;
 use crate::domain::workflow::RunId;
@@ -82,7 +81,7 @@ pub(super) async fn visible_board(
     trace.eligible_runs = counts.iter().map(|count| count.runs).sum();
 
     let phase = Instant::now();
-    let visible = visible_channels(engine, company, actor, &counts, &mut trace).await?;
+    let visible = visible_inboxes(engine, company, actor, &counts, &mut trace).await?;
     trace.visibility = phase.elapsed();
 
     let phase = Instant::now();
@@ -92,21 +91,34 @@ pub(super) async fn visible_board(
         .await?;
     trace.cards = phase.elapsed();
     trace.cards_read = cards.len();
-    let columns = assemble_columns(&counts, &visible, cards)?;
 
     let phase = Instant::now();
-    let shown: Vec<RunId> = columns
-        .iter()
-        .flat_map(|column| column.cards.iter().map(|card| card.run))
+    let shown: Vec<RunId> = crate::application::workflow::reads::RunStateName::ALL
+        .into_iter()
+        .flat_map(|state| {
+            cards
+                .iter()
+                .filter(move |card| card.state == state.as_str())
+                .take(crate::application::workflow::board::BOARD_COLUMN_CAP)
+                .map(|card| card.run)
+        })
         .collect();
     trace.cards_shown = shown.len();
-    let children = if shown.is_empty() {
+    let mut children = if shown.is_empty() {
         HashMap::new()
     } else {
         engine.reads().child_rollup(company, &shown).await?
     };
     trace.rollup = phase.elapsed();
 
+    let visible = visible_inboxes(engine, company, actor, &counts, &mut trace).await?;
+    let columns = assemble_columns(&counts, &visible, cards)?;
+    let shown: BTreeSet<_> = columns
+        .iter()
+        .flat_map(|column| column.cards.iter().map(|card| card.run))
+        .collect();
+    children.retain(|run, _| shown.contains(run));
+    trace.cards_shown = shown.len();
     warn_if_run_board_is_slow(company, scope, window, &trace);
     Ok(RunBoard {
         window,
@@ -118,26 +130,30 @@ pub(super) async fn visible_board(
 
 /// The counted channels `actor` may see, each authorized once; runs without a channel are the
 /// company's.
-async fn visible_channels(
+async fn visible_inboxes(
     engine: &WorkflowServices,
     company: CompanyId,
     actor: WorkflowActor,
     counts: &[BoardCount],
     trace: &mut BoardReadTrace,
-) -> AppResult<VisibleChannels> {
-    let channels: BTreeSet<Option<Uuid>> = counts.iter().map(|count| count.channel).collect();
-    trace.channels_checked = channels.len();
+) -> AppResult<VisibleInboxes> {
+    let targets: BTreeSet<Option<crate::entities::address::AddressTarget>> =
+        counts.iter().map(|count| count.target).collect();
+    trace.channels_checked = targets.len();
     let mut visibility = Visibility::new(engine, company, actor);
-    let mut visible = VisibleChannels::default();
-    for channel in channels {
-        let association = channel.map_or(RelatedAssociation::Company, |channel| {
-            RelatedAssociation::Channel(RelatedChannelId::new(channel))
-        });
+    let mut visible = VisibleInboxes::default();
+    for target in targets {
+        let association = target.map_or(RelatedAssociation::Company, RelatedAssociation::inbox);
         if !visibility.allows(association).await? {
             continue;
         }
-        match channel {
-            Some(channel) => visible.channels.push(channel),
+        match target {
+            Some(crate::entities::address::AddressTarget::Desk(channel)) => {
+                visible.channels.push(channel)
+            }
+            Some(crate::entities::address::AddressTarget::Principal(principal)) => {
+                visible.principals.push(principal)
+            }
             None => visible.company = true,
         }
     }

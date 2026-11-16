@@ -15,8 +15,9 @@ parameter_schema:
   type: object
   properties:
     reviewer: {type: string, maxLength: 128}
+    recipient: {type: string, maxLength: 128}
     deadline: {type: string, maxLength: 64}
-  required: [reviewer, deadline]
+  required: [reviewer, recipient, deadline]
   additionalProperties: false
 output_schema: true
 resources: []
@@ -105,6 +106,6 @@ steps:
     type: message.send
     with:
       content: {literal: {body: Human revision needs further attention.}}
-      destinations: {array: [{object: {kind: {literal: user}, id: {ref: /params/reviewer}}}]}
+      destinations: {array: [{object: {kind: {literal: user}, id: {ref: /params/recipient}}}]}
     routes: {success: $end}
 limits: {max_steps: 40, max_context_bytes: 65536}

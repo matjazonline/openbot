@@ -1,0 +1,8 @@
+{
+  "run": 43888466155,
+  "artifact": 14237355566,
+  "name": "doop-integration-evidence (1).zip",
+  "bytes": 27955,
+  "sha256": "faa2c78afed054526d67b230bdf583b75e6a98c1a863b52b3c440adcca238719",
+  "acquisition": "Direct authenticated Chrome artifact URL; API size/digestmatch"
+}

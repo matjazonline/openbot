@@ -1,0 +1,18 @@
+
+running 13 tests
+test adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal ... ok
+test application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_direct_thread_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_binding_restores_every_owned_resource ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once ... ok
+test adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4591 filtered out; finished in 1.65s
+

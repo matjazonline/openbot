@@ -33,7 +33,7 @@ pub(super) async fn prepare_on(
         .await?
         .ok_or_else(missing)?;
     for reviewer in policy.reviewers() {
-        require_clearance_on(db, scope, *reviewer).await?;
+        require_principal_clearance_on(db, scope, *reviewer).await?;
     }
     let context: decisions::NoticeContext=sqlx::query_as("SELECT run.company_id,version.title,company.name AS company_label,run.correlation_id \
         FROM workflow_runs AS run JOIN workflow_versions AS version ON version.company_id=run.company_id AND version.id=run.version_id \
@@ -63,6 +63,22 @@ pub(super) async fn prepare_on(
         reviewers,
         notices,
     }))
+}
+
+pub(super) async fn require_principal_clearance_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    principal: Uuid,
+) -> AppResult<()> {
+    let user: Uuid = sqlx::query_scalar(
+        "SELECT user_id FROM principals WHERE company_id=$1 AND id=$2 AND kind='person'",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(principal)
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
+    require_clearance_on(db, scope, user).await
 }
 
 pub(super) async fn require_clearance_on(

@@ -1,0 +1,20 @@
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_lease_renewal_ignores_unused_retired_final_reviewers' (1820506) panicked at src/adapters/persistence/workflow/reviewer_history_hint_tests.rs:175:14:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_reservation_and_replay_ignore_unused_retired_final_reviewers' (1820505) panicked at src/adapters/persistence/workflow/reviewer_history_hint_tests.rs:203:14:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_lease_renewal_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_reservation_and_replay_ignore_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_reservation_and_replay_ignore_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_lease_renewal_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4334 filtered out; finished in 1.57s
+

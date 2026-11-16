@@ -1,0 +1,9 @@
+{
+  "src/adapters/persistence/workflow/agent_history/preparation.rs": "40e0ce38d02fd57d55ff37267c9880af3fac5b4241742c57b6c2c2ee8275f7eb",
+  "src/adapters/persistence/department_roster.rs": "ed90bb7f97eb2d7123c5da6ed2f0c2758a9e30b7df8345355229f73a19ded798",
+  "src/application/workflow/agent.rs": "3899414abaa0c0d90893e0397b701d5994ea0156c3b2767c20ccfb84c4f6f96e",
+  "src/adapters/persistence/workflow/agent_history/frozen.rs": "686dc37b008d963c02a372e6ea39b7f1f195c3d3890e4ff235e4a589cd885da4",
+  "plan/02-workflow-roles/README.md": "03a82e9d0a0bce19971adccdb09059a54b0045798d8345f8bd7696306345200f",
+  "plan/02-workflow-roles/02-admission-resolution-and-snapshots.md": "14f86f15303a4707ec29557e1cb8e0d0be44ff041e1535346d514b1bd0892aba",
+  "plan/01-departments/COORDINATION.md": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37"
+}

@@ -1,5 +1,8 @@
 use super::persistence_bound::{Attempt, End, Evidence, WriteBound};
 use super::*;
+
+#[path = "completion_accounts.rs"]
+mod accounts;
 use crate::application::workflow::{activation::*, completion::*, lease::*};
 use crate::domain::workflow::{ChoiceName, RouteSelection, TransitionTarget};
 use serde_json::Value;
@@ -17,6 +20,54 @@ struct CompletionExecution {
     committed_route: Option<String>,
     route_target: Option<String>,
     successor_execution_id: Option<Uuid>,
+}
+
+#[derive(Clone, Copy)]
+enum CompletionRead {
+    Observe,
+    Lock,
+}
+
+impl CompletionRead {
+    fn lock_clause(self) -> &'static str {
+        match self {
+            Self::Observe => "",
+            Self::Lock => " FOR UPDATE",
+        }
+    }
+}
+
+async fn run_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    read: CompletionRead,
+) -> AppResult<Option<CompletionRun>> {
+    let query = format!(
+        "SELECT binding_id,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2{}",
+        read.lock_clause(),
+    );
+    Ok(sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_optional(db)
+        .await?)
+}
+
+async fn execution_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    read: CompletionRead,
+) -> AppResult<Option<CompletionExecution>> {
+    let query = format!(
+        "SELECT response_disposition,completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3{}",
+        read.lock_clause(),
+    );
+    Ok(sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .fetch_optional(db)
+        .await?)
 }
 
 #[async_trait]
@@ -83,23 +134,17 @@ pub(super) async fn complete_on(
 ) -> AppResult<Option<CommittedWorkflowStep>> {
     // The caller's transaction already carries the server lock/statement bound.
     let scope = result.fence.scope;
-    channel_reply_completion::prelock_on(db, scope).await?;
-    let run = sqlx::query_as::<_, CompletionRun>(
-        "SELECT binding_id,max_steps FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .fetch_optional(&mut *db)
-    .await?;
+    // Box purpose preparation/restore rather than adding it to the worker's debug frame.
+    let accounts = Box::pin(accounts::prelock_on(db, &result)).await?;
+    let run = Box::pin(run_on(db, scope, CompletionRead::Lock)).await?;
     let Some(run) = run else {
         return Ok(None);
     };
-    let row = sqlx::query_as::<_, CompletionExecution>("SELECT response_disposition,completed_at,committed_output,committed_route,route_target,successor_execution_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 FOR UPDATE")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).fetch_optional(&mut *db).await?;
+    let row = Box::pin(execution_on(db, scope, CompletionRead::Lock)).await?;
     let Some(row) = row else {
         return Ok(None);
     };
-    if !lock_job(db, result.fence, &row).await? {
+    if !job_on(db, result.fence, &row, CompletionRead::Lock).await? {
         return Ok(None);
     }
     super::persistence_bound::locks_held();
@@ -137,6 +182,8 @@ pub(super) async fn complete_on(
                 return Ok(None);
             }
         };
+    // Check the actual writer purpose under its row locks without new account acquisition.
+    Box::pin(accounts::ensure_on(db, scope, accounts, &completion)).await?;
     let successor = batch_commit::complete(
         db,
         scope,
@@ -231,6 +278,7 @@ enum Settled {
 /// execution and our attempt row. complete_on can commit a retirement without completing.
 async fn completed(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<Settled> {
     let scope = fence.scope;
+    lease::lock_lease_company_on(db, scope.company).await?;
     sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(scope.company.as_uuid())
         .bind(scope.run.as_uuid())
@@ -250,21 +298,47 @@ async fn completed(db: &mut PgConnection, fence: WorkflowFence) -> AppResult<Set
     })
 }
 
-async fn lock_job(
+async fn job_on(
     db: &mut PgConnection,
     fence: WorkflowFence,
     row: &CompletionExecution,
+    read: CompletionRead,
 ) -> AppResult<bool> {
     let scope = fence.scope;
-    let execution: Option<Uuid> = sqlx::query_scalar("SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status=$4 FOR UPDATE")
-        .bind(scope.company.as_uuid()).bind(scope.job.0).bind(scope.execution.as_uuid())
-        .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(&mut *db).await?;
+    let job_query = format!(
+        "SELECT workflow_execution_id FROM background_tasks WHERE company_id=$1 AND id=$2 AND workflow_execution_id=$3  AND status=$4{}",
+        read.lock_clause()
+    );
+    let execution: Option<Uuid> = sqlx::query_scalar(&job_query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.job.0)
+        .bind(scope.execution.as_uuid())
+        .bind(if row.completed_at.is_some() {
+            "completed"
+        } else {
+            "processing"
+        })
+        .fetch_optional(&mut *db)
+        .await?;
     let Some(_) = execution else {
         return Ok(false);
     };
-    let attempt: Option<Uuid> = sqlx::query_scalar("SELECT id FROM task_attempts WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status=$5 FOR UPDATE")
-        .bind(scope.job.0).bind(fence.attempt.0).bind(fence.worker.0).bind(fence.generation.0)
-        .bind(if row.completed_at.is_some() { "completed" } else { "processing" }).fetch_optional(db).await?;
+    let attempt_query = format!(
+        "SELECT id FROM task_attempts WHERE task_id=$1 AND attempt_number=$2 AND worker_id=$3 AND execution_generation=$4 AND status=$5{}",
+        read.lock_clause()
+    );
+    let attempt: Option<Uuid> = sqlx::query_scalar(&attempt_query)
+        .bind(scope.job.0)
+        .bind(fence.attempt.0)
+        .bind(fence.worker.0)
+        .bind(fence.generation.0)
+        .bind(if row.completed_at.is_some() {
+            "completed"
+        } else {
+            "processing"
+        })
+        .fetch_optional(db)
+        .await?;
     Ok(attempt.is_some())
 }
 

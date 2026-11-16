@@ -278,6 +278,11 @@ impl CompanyInvitePersistence for PostgresPersistence {
             .fetch_optional(&mut *tx)
             .await
             .map_err(authority::database)?;
+        Box::pin(super::workflow::refresh_member_dependents_on(
+            &mut tx,
+            crate::domain::workflow::CompanyId::new(scope.company_id),
+        ))
+        .await?;
         tx.commit().await.map_err(authority::database)?;
         row.map(TryInto::try_into).transpose()
     }
@@ -510,6 +515,15 @@ impl CompanyInvitePersistence for PostgresPersistence {
         user_id: Uuid,
         role: CompanyAccessRole,
     ) -> AppResult<Option<CompanyMember>> {
+        let mut tx = self.pool.begin().await?;
+        sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
+            .bind(user_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+            .bind(company_id)
+            .execute(&mut *tx)
+            .await?;
         let db = sqlx::query_as!(
             CompanyMemberDb,
             r#"WITH updated AS (
@@ -527,10 +541,18 @@ impl CompanyInvitePersistence for PostgresPersistence {
             user_id,
             role.as_str(),
         )
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *tx)
         .await
         .map_err(AppError::from)?;
 
+        if db.is_some() {
+            Box::pin(super::workflow::refresh_member_dependents_on(
+                &mut tx,
+                crate::domain::workflow::CompanyId::new(company_id),
+            ))
+            .await?;
+        }
+        tx.commit().await?;
         db.map(TryInto::try_into).transpose()
     }
 
@@ -561,6 +583,12 @@ impl CompanyInvitePersistence for PostgresPersistence {
             .bind(company_id)
             .fetch_optional(&mut *transaction)
             .await?;
+        let notice_recipient = super::delivery::cancellation::member_notice_recipient_on(
+            &mut transaction,
+            company_id,
+            user_id,
+        )
+        .await?;
         sqlx::query!(
             r#"UPDATE principals
                SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
@@ -594,7 +622,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
         super::delivery::cancellation::cancel_member_notices_on(
             &mut transaction,
             company_id,
-            user_id,
+            notice_recipient,
         )
         .await?;
         // After the membership lock (memory E9): the user's namespace in this company goes.
@@ -620,6 +648,11 @@ impl CompanyInvitePersistence for PostgresPersistence {
         .execute(&mut *transaction)
         .await
         .map_err(AppError::from)?;
+        Box::pin(super::workflow::refresh_member_dependents_on(
+            &mut transaction,
+            crate::domain::workflow::CompanyId::new(company_id),
+        ))
+        .await?;
         transaction.commit().await.map_err(AppError::from)?;
 
         Ok(())

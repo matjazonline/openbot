@@ -1,0 +1,10 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.20s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 3 tests
+test domain::entities::department::tests::the_lead_has_a_single_holder ... ok
+test domain::entities::department::tests::an_unknown_department_role_is_refused_by_name ... ok
+test domain::entities::department::tests::every_department_role_round_trips_through_its_stored_string ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4173 filtered out; finished in 0.00s
+

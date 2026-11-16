@@ -651,27 +651,60 @@ async fn selected_agent_summary(
     run: RunId,
     step: &StepRow,
 ) -> AppResult<Option<SelectedAgentSummary>> {
-    let Some(key) = step
-        .frozen_inputs
-        .as_ref()
-        .and_then(|inputs| inputs["agent"].as_str())
-        .and_then(crate::application::agent::AgentKey::parse)
-    else {
+    let Some(inputs) = step.frozen_inputs.as_ref() else {
         return Ok(None);
     };
+    if inputs.get("agent").is_none() && inputs.get("role").is_none() {
+        return Ok(None);
+    }
     let bundle = persistence
         .run_bundle(company, run)
         .await?
         .ok_or_else(missing)?;
-    let reference = bundle.agent_reference(company, &key)?;
+    let id = StepId::parse(&step.step_id).map_err(|_| invalid())?;
+    let definition = bundle.compiled().graph().definition();
+    let Some(kind) = definition
+        .steps
+        .get(&id)
+        .and_then(|step| registry::ModelStep::of(step.step_type.as_str()))
+    else {
+        return Ok(None);
+    };
+    let agent = super::agent_manifest::agent_for_step_on(
+        &mut *persistence.pool().acquire().await?,
+        company,
+        run,
+        &bundle,
+        &id,
+        inputs,
+    )
+    .await?;
     let mut summary = persistence
-        .selected_agent_metadata(company, run, reference.agent_id)
+        .selected_agent_metadata(company, run, agent)
         .await?;
-    summary.key = reference.key.as_str().to_owned();
-    let model_only = !reference
-        .uses
+    if bundle
+        .compiled()
+        .role_references()
         .iter()
-        .any(|usage| usage.step.as_str() == step.step_id && usage.mode == AgentUseMode::Tools);
+        .any(|reference| reference.step == id && reference.mode.agent_mode().is_some())
+    {
+        summary.via_role = Some(
+            super::role_views::for_step(persistence, company, run, definition.version_id, &id)
+                .await?
+                .ok_or_else(missing)?,
+        );
+    } else {
+        let key = inputs["agent"]
+            .as_str()
+            .and_then(crate::application::agent::AgentKey::parse)
+            .ok_or_else(missing)?;
+        summary.key = bundle
+            .agent_reference(company, &key)?
+            .key
+            .as_str()
+            .to_owned();
+    }
+    let model_only = !kind.uses_capabilities();
     if model_only {
         summary.tools.clear();
         summary.skills.clear();

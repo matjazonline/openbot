@@ -75,14 +75,13 @@ async fn control(
 ) -> AppResult<Option<(String, RunRevision)>> {
     let mut tx = p.pool.begin().await?;
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)").execute(&mut *tx).await?;
+    // Controls act for the current operator. Historical actors/requesters add no authority.
+    let operator: Option<Uuid> = sqlx::query_scalar("SELECT id FROM users WHERE id=$1 FOR SHARE")
+        .bind(command.actor.user_id())
+        .fetch_optional(&mut *tx)
+        .await?;
+    operator.ok_or_else(missing)?;
     // Admission takes company authority before its parent run. Inverting this order deadlocks.
-    channel_reply_completion::prelock_control_on(
-        &mut tx,
-        command.company_id,
-        command.run_id,
-        command.actor,
-    )
-    .await?;
     authority::authorize_company(&mut tx, command.company_id, command.actor).await?;
     let head = sqlx::query_as::<_, inspection::HeadRow>(&format!(
         "{} FOR UPDATE OF run",
@@ -174,7 +173,7 @@ async fn audit(
         .bind(command.company_id.as_uuid()).bind(command.run_id.as_uuid()).bind(match operation { Operation::Cancel => "control_cancel", Operation::Retry => "control_retry" }).bind(command.actor.user_id()).fetch_one(db).await?)
 }
 
-async fn cancel_on(db: &mut PgConnection, command: &CancelCommand) -> AppResult<()> {
+pub(super) async fn cancel_on(db: &mut PgConnection, command: &CancelCommand) -> AppResult<()> {
     cancel_tree_on(
         db,
         command.company_id,

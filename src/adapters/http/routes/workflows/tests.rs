@@ -388,6 +388,8 @@ fn workflow_routes_mount_in_the_app_router() {
 
 #[path = "decision_tests.rs"]
 mod decision_tests;
+#[path = "escalation_tests.rs"]
+mod escalation_tests;
 #[path = "lifecycle_tests.rs"]
 mod lifecycle_tests;
 #[path = "reconciliation_tests.rs"]

@@ -1,0 +1,29 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 47s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 2 tests
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication ... FAILED
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor ... FAILED
+
+failures:
+
+---- application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication stdout ----
+
+thread 'application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication' (48643633) panicked at src/application/workflow/compiler/role_selection_tests.rs:76:6:
+called `Result::unwrap()` on an `Err` value: Diagnostic { code: "source.yaml", message: "Invalid or unsupported YAML; check syntax, duplicate keys, tags, aliases and limits", field_path: "", span: SourceSpan { start: 0, end: 0, line: 1, column: 579 }, instance_path: None, schema_path: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor stdout ----
+
+thread 'application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor' (48643632) panicked at src/application/workflow/compiler/role_selection_tests.rs:26:18:
+called `Result::unwrap()` on an `Err` value: Diagnostic { code: "source.yaml", message: "Invalid or unsupported YAML; check syntax, duplicate keys, tags, aliases and limits", field_path: "", span: SourceSpan { start: 0, end: 0, line: 1, column: 449 }, instance_path: None, schema_path: None }
+
+
+failures:
+    application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor
+    application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4204 filtered out; finished in 0.07s
+
+error: test failed, to rerun pass `--lib`

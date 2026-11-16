@@ -414,7 +414,7 @@ fn review_gate(draft: &Map<String, Value>, answer: &str) -> Result<Map<String, V
         "with": {
             "proposal": {"ref": answer},
             "reviewers": {"array": [{"object": {
-                "kind": {"literal": "user"}, "id": {"ref": "/params/reviewer"}}}]},
+                "kind": {"literal": "principal"}, "id": {"ref": "/params/reviewer"}}}]},
             "deadline": {"ref": "/run/deadline"},
             "data_schema": data_schema,
             "feedback_required": {"literal": ["reject"]}

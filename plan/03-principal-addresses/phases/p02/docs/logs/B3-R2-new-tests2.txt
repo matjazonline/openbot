@@ -1,0 +1,7 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::privacy::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4587 filtered out; finished in 1.79s
+

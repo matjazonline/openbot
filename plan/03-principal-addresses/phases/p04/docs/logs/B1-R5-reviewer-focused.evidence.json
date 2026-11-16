@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R5-reviewer-focused",
+  "artifact": "00f75666fcf805963dcdd73ee01e7d745f87573d0f4777ef6f9826813c5d32e4",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-B1-R5-libtest adapters::mcp::tests::cleanup_tests:: mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup mcp_authentication_preparation_cancelled_before_admission_sends_no_credential --nocapture --test-threads=2",
+      "fixture": "Copied immutable libtest SHA25667a04e45d0e22f375dc0fa32d6fff25bd996dc573e77178a631b4d5fca566b80; real loopback HTTP and SDK; no database/Cargo used;6PASS/0FAIL/0ignored in0.05s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R5-reviewer-focused.txt",
+          "sha256": "33b844b3dbb98e54159b8075c36dffbcec0dfc944b15130e8f1a462f54e00cde"
+        }
+      ]
+    }
+  ]
+}

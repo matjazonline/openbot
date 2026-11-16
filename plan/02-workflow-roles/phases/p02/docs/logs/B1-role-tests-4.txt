@@ -1,0 +1,115 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 27s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 24 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_missing_holder_has_no_run_or_partial_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_company_teardown_releases_the_complete_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_rows_and_future_resolution_revision_are_immutable ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_has_requirements_without_agent_capture_and_restores_exactly ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_mixed_steps_keep_only_the_pinned_agent ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_sample_and_help_explain_the_same_requirement ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind ... ok
+test application::workflow::roles::tests::workflow_role_admission_input_preparation_uses_the_frozen_requirement_and_sample_refuses_contextless_execution ... ok
+test application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents ... ok
+test application::workflow::roles::tests::workflow_role_resolve_missing_depth_and_cycle_are_bounded ... ok
+test application::workflow::roles::tests::workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through ... ok
+test application::workflow::roles::tests::workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_captures_exact_principal_revision_and_canonical_membership ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_every_domain_kind ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_sealed_set_rejects_late_people_and_extra_requirements ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again' (48348238) panicked at src/adapters/persistence/workflow/role_runtime_tests.rs:174:5:
+assertion `left != right` failed: pool size 5 idle 4
+{
+  "events": null,
+  "intents": null,
+  "jobs": [
+    {
+      "id": "a50733b5-d072-49fd-884d-6e3bb6b05cf6",
+      "lock_expires_at": null,
+      "run_at": "2026-11-11T22:09:10.552036+00:00",
+      "status": "failed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "ff56bb94-a1a9-4c77-9a73-7958a55e5a3e",
+      "state": "failed",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 44456,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 44508,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 44509,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 44510,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 44511,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+  left: "failed"
+ right: "failed"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root' (48348232) panicked at src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:113:5:
+WorkflowGuard(WorkflowGuardViolation { guard: WorkflowGuardName("check_workflow_role_manifest"), message: "error returned from database: role members must exactly match immutable canonical resolution" })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again
+
+test result: FAILED. 22 passed; 2 failed; 0 ignored; 0 measured; 4168 filtered out; finished in 7.98s
+
+error: test failed, to rerun pass `--lib`

@@ -100,7 +100,7 @@ for **resolved values**; every `with` field still needs a binding wrapper.
 | `ai.classify` | `agent`, `context`, literal `output_schema` | Tool-free call with the agent's instructions and model; direct schema result; finite string enum, or required `label` enum property |
 | `agent.run` | `agent`, `context`, literal `output_schema` | Runs with exactly the agent's saved tools and skills; direct schema result |
 | `decision.rule` | `data`, literal `data_schema` | Top-level ordered `rule`; result `{choice, data}` |
-| `decision.human` | `proposal`, `reviewer`, `deadline`, literal `data_schema` | Optional literal `feedback_required` choice list; result `{choice, feedback, data}` |
+| `decision.human` | `proposal`, `reviewers`, `deadline`, literal `data_schema` | Optional literal `feedback_required` choice list and literal `reviewers_follow_role`; result `{choice, feedback, data}` |
 | `decision.agent` | `agent`, `context`, literal `data_schema` | Result `{choice, data}` |
 | `data.map` | `value`, literal `output_schema` | Direct constructed value, validated against the schema |
 | `http.request` | literal `connection`, `method`, `path` | Optional `headers`, `body`; result `{status, headers, body}` |
@@ -121,8 +121,7 @@ finite `label` enum; scalar alternatives are rejected. There is no second
 `config` authority.
 
 Registration-owned objects reject unknown fields. Scope is `{kind, id?}` where
-kind is company/agent/user and agent/user require an ID. Reviewer is `{kind, id}`
-with user/group kind. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
+kind is company/agent/user and agent/user require an ID. A reviewer is a person principal `{kind: principal, id: UUID}` or a literal department role string (`lead` or `reviewer`). Human and action-review roles are frozen at admission; parameter-selected reviewers use pinned principal objects. Effective reviewers are deduplicated and limited to 16 after role expansion. Token allowance and final-response policies use pinned person principals. Destinations are `{kind, id}` with `user`, `group` or `channel` kind (a `channel` destination is a desk).
 Content is `{subject?, body}`. MCP content accepts bounded text (including empty text), image/audio base64, embedded
 text/blob resources and resource links, with protocol annotations, icons and `_meta`.
 Resource links and icon URIs remain data and are never automatically fetched. These fields follow
@@ -451,3 +450,46 @@ leave the generic script `tokens` at zero. Samples charge one simulated model ca
 and enforce their token allowance, without billing or external access.
 Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
 and [Box](https://docs.typesafe.ai/primitives/box).
+
+## Roles
+
+`agent.run`, `decision.agent` and `ai.classify` take exactly one of `agent` or a
+literal `role`, using the fixed vocabulary `lead` and `reviewer`:
+
+```yaml
+role: {literal: lead}
+```
+
+The published procedure freezes the role requirement. At admission it resolves
+against the desk's owning department, walking to the nearest ancestor that holds
+the role within depth 8, and freezes the selected principal and agent revision.
+An agent step requires exactly one agent holder; missing, ambiguous or person
+holders refuse admission. Later role changes affect later runs. Active bindings
+for a role procedure require a department-owned desk; remove or deactivate those
+bindings before clearing its department. Pinned agent selection remains available.
+
+A message accepted by the desk stays delivered when role resolution refuses workflow admission.
+The message's workflow outcome identifies the step and role that could not be resolved; the
+refused workflow creates no run and its intent settles without retrying. Scheduled occurrences
+record the same typed refusal, and manual starts return a named bad request.
+
+Agent identity, revision and grants freeze at admission, including requirements in pinned child
+workflows. Informational department framing (roster, current lead and charter) freezes when the
+agent is first prepared; it cannot select another agent or grant capabilities. Run inspection
+and board cards label captured holders with “via role”. Agent filters include the root's frozen
+role selections for its children as well as the published pinned-agent universe.
+
+A `decision.human` whose `reviewers` name a role asks that role's person holders frozen at
+admission. With `reviewers_follow_role: {literal: true}` (default `false`) a parked decision follows
+the role instead: when the role's holders change (assigned, cleared, or removed from the company)
+or the department tree above the desk changes, its role reviewers are replaced in the same commit
+and the new holders are notified. Pinned
+principal reviewers stay. The proposal, its digest and earlier submissions are unchanged, and a
+settled decision is not affected. A decision left with no reviewers stays parked until its
+deadline and, on a binding with `escalation`, escalates (see
+[departments](departments.md#escalation)). A company can have at most 256 parked decisions that
+follow their role; parking another is refused with `workflow.pending_follow_limit` and the job
+retries later.
+
+See `src/application/workflow/fixtures/role-lead-response.yaml` for the reusable
+`context.history` → role-based `agent.run` → reply example.

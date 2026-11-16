@@ -1,0 +1,32 @@
+﻿2026-11-16T14:45:59.4195291Z ##[group]Run cargo test --locked --offline --lib dump_skill_bundle_browser_fixtures -- --ignored
+2026-11-16T14:45:59.4196228Z [36;1mcargo test --locked --offline --lib dump_skill_bundle_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:59.4196834Z [36;1mnode --test scripts/tests/skill-bundle-browser.mjs[0m
+2026-11-16T14:45:59.4223600Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:59.4224085Z env:
+2026-11-16T14:45:59.4224480Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:59.4225052Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:59.4225643Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:59.4226291Z   SQLX_OFFLINE: true
+2026-11-16T14:45:59.4226700Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:59.4227235Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:59.4227587Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:59.4227956Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:59.4228365Z   SKILL_BUNDLE_BROWSER_FIXTURES: /tmp/skill-bundle-browser
+2026-11-16T14:45:59.4228793Z ##[endgroup]
+2026-11-16T14:45:59.6178163Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:59.6358391Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:59.6426159Z 
+2026-11-16T14:45:59.6426855Z running 1 test
+2026-11-16T14:45:59.6458823Z test adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures ... ok
+2026-11-16T14:45:59.6459377Z 
+2026-11-16T14:45:59.6459958Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.00s
+2026-11-16T14:45:59.6460431Z 
+2026-11-16T14:46:00.5489167Z ✔ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (632.095896ms)
+2026-11-16T14:46:00.5612610Z ℹ tests 1
+2026-11-16T14:46:00.5613232Z ℹ suites 0
+2026-11-16T14:46:00.5613775Z ℹ pass 1
+2026-11-16T14:46:00.5614223Z ℹ fail 0
+2026-11-16T14:46:00.5614728Z ℹ cancelled 0
+2026-11-16T14:46:00.5615189Z ℹ skipped 0
+2026-11-16T14:46:00.5616108Z ℹ todo 0
+2026-11-16T14:46:00.5616626Z ℹ duration_ms 883.234649

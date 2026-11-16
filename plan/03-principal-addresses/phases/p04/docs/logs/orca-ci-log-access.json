@@ -1,0 +1,8 @@
+{
+  "REST_job_logs": 403,
+  "reason": "Must have admin rights to Repository",
+  "public_job_page": "Sign in to view logs",
+  "public_step_log_endpoints": 404,
+  "job": "132889528631",
+  "retained": "sanitized metadata only; disposable unauthenticated HTML removed"
+}

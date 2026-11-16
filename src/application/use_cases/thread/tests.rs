@@ -87,6 +87,32 @@ impl ChannelPersistence for MockChannelPersistence {
         Ok(self.departments.lock().unwrap().clone())
     }
 
+    async fn address_for_target(
+        &self,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
+    ) -> AppResult<Option<crate::entities::address::ResolvedAddress>> {
+        Ok(self
+            .list_by_company_id(company_id)
+            .await?
+            .into_iter()
+            .find(|desk| target == crate::entities::address::AddressTarget::Desk(desk.id))
+            .map(|desk| crate::entities::address::ResolvedAddress {
+                slug: desk.slug,
+                target,
+            }))
+    }
+    async fn address_targets(
+        &self,
+        company_id: Uuid,
+        slugs: &[crate::entities::value_objects::ChannelSlug],
+    ) -> AppResult<Vec<crate::entities::address::ResolvedAddress>> {
+        Ok(crate::entities::address::desk_addresses(
+            &self.list_by_company_id(company_id).await?,
+            slugs,
+        ))
+    }
+
     async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
         Ok(self
             .channels
@@ -108,83 +134,9 @@ impl ChannelPersistence for MockChannelPersistence {
     }
 }
 
-/// One inter-channel hop, as the email sender hands it to the relay.
-///
-/// The relay is reached through [`InternalMailRelay`] with the mail already frozen. The shape this
-/// replaces rendered an `OutboundEmail` to RFC 5322 first, purely so the ingress path had
-/// something email-shaped to read back -- so a test had to build a full outbound email to exercise
-/// a hop budget.
-struct InternalHop {
-    source_channel_id: Uuid,
-    from: EmailAddress,
-    to: EmailAddress,
-    subject: String,
-    body: String,
-    message_id: MessageId,
-    in_reply_to: Option<MessageId>,
-    references: Vec<MessageId>,
-    /// The hop count this message *carries*, which is what the sender hands the relay: the
-    /// renderer has already added one for the hop the mail itself is.
-    hop_count: u32,
-    trace_channels: Vec<Uuid>,
-    correlation_id: CorrelationId,
-}
-
-impl InternalHop {
-    fn new(source_channel_id: Uuid, from: &str, to: &str, subject: &str, body: &str) -> Self {
-        Self {
-            source_channel_id,
-            from: EmailAddress::from(from),
-            to: EmailAddress::from(to),
-            subject: subject.to_string(),
-            body: body.to_string(),
-            message_id: MessageId::from(format!("<{}@mailagents.com>", Uuid::new_v4())),
-            in_reply_to: None,
-            references: Vec::new(),
-            hop_count: 0,
-            trace_channels: Vec::new(),
-            correlation_id: CorrelationId::new(),
-        }
-    }
-}
-
-/// Hand one hop to the relay, the way the email sender does before reaching SMTP.
-async fn relay_hop(
-    use_cases: &ThreadUseCases,
-    hop: &InternalHop,
-) -> crate::transport::RelayDisposition {
-    let target =
-        crate::adapters::protocols::email::EmailChannelSelectorParser::new("mailagents.com")
-            .parse(hop.to.as_str())
-            .expect("the test recipient is internal")
-            .primary()
-            .clone();
-    use_cases
-        .relay_internal(&crate::transport::InternalRelayMail {
-            target: &target,
-            from: &hop.from,
-            recipient_to: &hop.to,
-            subject: &hop.subject,
-            body_text: &hop.body,
-            message_id: &hop.message_id,
-            in_reply_to: hop.in_reply_to.as_ref(),
-            references: &hop.references,
-            source_channel_id: hop.source_channel_id,
-            hop_count: hop.hop_count,
-            trace: hop.trace_channels.clone(),
-            correlation_id: hop.correlation_id,
-        })
-        .await
-        .expect("the relay reached a verdict")
-}
-
-/// The refusal a relayed hop carries, or `None` when it was accepted.
-fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
-    match disposition {
-        crate::transport::RelayDisposition::Refused(reason) => Some(reason.as_str()),
-        _ => None,
-    }
-}
+#[path = "test_support/relay.rs"]
+mod relay_support;
+use relay_support::{InternalHop, refusal, relay_hop};
 
 #[tokio::test]
 async fn test_inter_channel_hop_limit_rejection() {
@@ -340,7 +292,7 @@ async fn test_spf_authentication_failure_rejection() {
         from: "forged@acme.mailagents.com".to_string(),
         subject: Some("Spoofed email".to_string()),
         text: Some("Hello".to_string()),
-        headers: Some(format!("X-MailAgents-Channel-ID: {channel_id}\n")),
+        headers: Some(format!("X-MailAgents-Source-Target: desk:{channel_id}\n")),
         spf: crate::entities::auth::AuthVerdict::Fail,
         dmarc: crate::entities::auth::AuthVerdict::Unknown,
         ..Default::default()
@@ -807,9 +759,9 @@ async fn test_multi_channel_to_and_cc_execution() {
 
     assert!(ingest.accepted);
     assert_eq!(ingest.channel_matches.len(), 2);
-    assert_eq!(ingest.channel_matches[0].channel.slug, "support");
+    assert_eq!(ingest.channel_matches[0].inbox.slug().as_str(), "support");
     assert_eq!(ingest.channel_matches[0].recipient_role, RecipientRole::To);
-    assert_eq!(ingest.channel_matches[1].channel.slug, "billing");
+    assert_eq!(ingest.channel_matches[1].inbox.slug().as_str(), "billing");
     assert_eq!(ingest.channel_matches[1].recipient_role, RecipientRole::Cc);
 
     // Verify thread creation for both channels
@@ -828,13 +780,13 @@ async fn test_multi_channel_to_and_cc_execution() {
     let roles: Vec<_> = request
         .intents
         .iter()
-        .map(|intent| (intent.channel_id, intent.role))
+        .map(|intent| (intent.target, intent.role))
         .collect();
     assert_eq!(
         roles,
         vec![
-            (ingest.channel_matches[0].channel.id, RecipientRole::To),
-            (ingest.channel_matches[1].channel.id, RecipientRole::Cc),
+            (ingest.channel_matches[0].inbox.target(), RecipientRole::To),
+            (ingest.channel_matches[1].inbox.target(), RecipientRole::Cc),
         ]
     );
 }
@@ -946,12 +898,12 @@ async fn test_pipeline_address_chaining_execution() {
 
     assert!(ingest.accepted);
     assert_eq!(ingest.channel_matches.len(), 3);
-    assert_eq!(ingest.channel_matches[0].channel.slug, "support");
+    assert_eq!(ingest.channel_matches[0].inbox.slug().as_str(), "support");
     assert_eq!(ingest.channel_matches[0].step.index, 0);
     assert_eq!(ingest.channel_matches[0].step.total, 3);
-    assert_eq!(ingest.channel_matches[1].channel.slug, "billing");
+    assert_eq!(ingest.channel_matches[1].inbox.slug().as_str(), "billing");
     assert_eq!(ingest.channel_matches[1].step.index, 1);
-    assert_eq!(ingest.channel_matches[2].channel.slug, "legal");
+    assert_eq!(ingest.channel_matches[2].inbox.slug().as_str(), "legal");
     assert_eq!(ingest.channel_matches[2].step.index, 2);
 
     // Verify threads were created for all 3 step channels
@@ -1558,7 +1510,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
         &use_cases,
         &InternalHop {
             hop_count: 1,
-            trace_channels: vec![channel_a_id],
+            trace_targets: vec![crate::entities::address::AddressTarget::Desk(channel_a_id)],
             in_reply_to: Some("<unsolicited@example.com>".into()),
             references: vec!["<unsolicited@example.com>".into()],
             ..InternalHop::new(
@@ -1582,7 +1534,7 @@ async fn uncorrelated_inter_channel_cycle_is_rejected() {
 /// so the relay accepts a well-formed hop to a plain channel rather than refusing it for having
 /// no configured agent.
 #[tokio::test]
-async fn a_hop_to_a_plain_channel_is_relayed() {
+async fn a_pure_workflow_hop_to_a_public_channel_is_relayed() {
     let company_id = Uuid::new_v4();
     let channel_a_id = Uuid::new_v4();
     let channel_b_id = Uuid::new_v4();
@@ -1625,8 +1577,8 @@ async fn a_hop_to_a_plain_channel_is_relayed() {
                 description: None,
                 slug: "agent-b".into(),
                 alias_slugs: Vec::new(),
-                participant_emails: None,
-                access_mode: ChannelAccessMode::Team,
+                participant_emails: Some(vec!["@public".into()]),
+                access_mode: ChannelAccessMode::Public,
                 principal_grants: Vec::new(),
                 created_by: crate::entities::creation::CreationProvenance::system(),
                 created_at: Utc::now(),
@@ -2249,15 +2201,17 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
     let hop = channel_fixture(TestChannel::default());
     let mut payload = rejection_message("reject-hop");
     payload.headers = Some(format!(
-        "Message-ID: <reject-hop@example.com>\nX-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: {MAX_INGRESS_HOPS}\n",
+        "Message-ID: <reject-hop@example.com>\nX-MailAgents-Source-Target: desk:{}\nX-MailAgents-Hop-Count: {MAX_INGRESS_HOPS}\n",
         hop.channel_id
     ));
     assert_rejected_without_writes(
         &hop,
         payload,
-        IngressOrigin::InternalChannel {
+        IngressOrigin::Internal {
             company_id: hop.company_id,
-            channel_id: hop.channel_id,
+            source_target: crate::entities::address::AddressTarget::Desk(hop.channel_id),
+            agent_principal: None,
+            proof: crate::transport::test_support::relay_proof(hop.company_id),
         },
         "Max inter-channel hop count reached",
     )
@@ -2266,15 +2220,17 @@ async fn ingress_rejections_create_no_identity_thread_message_task_delivery_or_a
     let cycle = channel_fixture(TestChannel::default());
     let mut payload = rejection_message("reject-cycle");
     payload.headers = Some(format!(
-        "Message-ID: <reject-cycle@example.com>\nX-MailAgents-Channel-ID: {}\nX-MailAgents-Hop-Count: 1\nX-MailAgents-Trace: {}\n",
+        "Message-ID: <reject-cycle@example.com>\nX-MailAgents-Source-Target: desk:{}\nX-MailAgents-Hop-Count: 1\nX-MailAgents-Trace: desk:{}\n",
         cycle.channel_id, cycle.channel_id
     ));
     assert_rejected_without_writes(
         &cycle,
         payload,
-        IngressOrigin::InternalChannel {
+        IngressOrigin::Internal {
             company_id: cycle.company_id,
-            channel_id: cycle.channel_id,
+            source_target: crate::entities::address::AddressTarget::Desk(cycle.channel_id),
+            agent_principal: None,
+            proof: crate::transport::test_support::relay_proof(cycle.company_id),
         },
         "Inter-channel loop cycle detected",
     )
@@ -2430,6 +2386,9 @@ fn participants_of(result: &InboundIngestResult) -> Vec<String> {
 #[path = "address_grouping_tests.rs"]
 mod address_grouping;
 
+#[path = "address_resolution_tests.rs"]
+mod address_resolution;
+
 #[path = "department_desk_relay_tests.rs"]
 mod department_desk_relay;
 
@@ -2451,7 +2410,9 @@ fn committed_intent(fixture: &ChannelFixture) -> crate::transport::InboundAdmiss
     *request
         .intents
         .iter()
-        .find(|intent| intent.channel_id == fixture.channel_id)
+        .find(|intent| {
+            intent.target == crate::entities::address::AddressTarget::Desk(fixture.channel_id)
+        })
         .expect("the channel was associated, so it has an intent")
 }
 
@@ -2771,7 +2732,7 @@ async fn enabled_channel_still_accepts_the_same_message() {
         .unwrap();
 
     assert!(result.accepted, "reason: {:?}", result.reason());
-    assert_eq!(result.thread.unwrap().channel_id, channel_id);
+    assert_eq!(result.thread.unwrap().target.desk_id().unwrap(), channel_id);
 }
 
 #[tokio::test]
@@ -2790,8 +2751,8 @@ async fn alias_address_reaches_the_channel_and_is_replied_from() {
     assert_eq!(result.channel_matches.len(), 1);
 
     let matched = &result.channel_matches[0];
-    assert_eq!(matched.channel.id, channel_id);
-    assert_eq!(matched.channel.slug, "support");
+    assert_eq!(matched.inbox.target().desk_id().unwrap(), channel_id);
+    assert_eq!(matched.inbox.slug().as_str(), "support");
     // The reply must go back out on the address the sender wrote to, not the canonical slug.
     assert_eq!(matched.reply_slug(), ChannelSlug::from("sales"));
 }
@@ -2814,7 +2775,10 @@ async fn alias_and_canonical_slug_in_one_pipeline_ingest_once() {
         1,
         "two names for one channel are still one delivery"
     );
-    assert_eq!(result.channel_matches[0].channel.id, channel_id);
+    assert_eq!(
+        result.channel_matches[0].inbox.target(),
+        crate::entities::address::AddressTarget::Desk(channel_id)
+    );
     // The first address on the envelope wins, so the reply stays on the alias.
     assert_eq!(
         result.channel_matches[0].reply_slug(),
@@ -3149,6 +3113,7 @@ fn the_bounce_body_omits_the_directory_section_when_there_is_nothing_to_list() {
         company_slug: CompanySlug::from("acme"),
         invalid_slugs: vec![ChannelSlug::from("suport")],
         disabled_slugs: Vec::new(),
+        principals: vec![],
         suggestions: vec![BounceSuggestion {
             invalid_slug: ChannelSlug::from("suport"),
             suggestions: vec![ChannelSlug::from("support")],
@@ -3265,7 +3230,7 @@ async fn help_cc_d_alongside_a_real_channel_still_reaches_that_channel() {
         result.reason()
     );
     assert_eq!(
-        result.thread.unwrap().channel_id,
+        result.thread.unwrap().target.desk_id().unwrap(),
         result.channel.unwrap().id
     );
 }
@@ -3322,7 +3287,8 @@ async fn department_views_directory_orders_desks_by_department_root_first() {
 /// heading in the order they arrive (root first, "No department" last); without, it is flat.
 #[test]
 fn department_views_help_and_bounce_list_desks_under_their_department() {
-    let entry = |address: &str, name: &str, department: Option<&str>| ChannelDirectoryEntry {
+    let entry = |address: &str, name: &str, department: Option<&str>| AddressDirectoryEntry {
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         department: department.map(str::to_owned),
         address: EmailAddress::from(address),
         name: name.to_string(),
@@ -3358,7 +3324,8 @@ fn department_views_help_and_bounce_list_desks_under_their_department() {
 
 #[test]
 fn the_help_body_lists_channels_and_teaches_the_address_syntax() {
-    let entries = vec![ChannelDirectoryEntry {
+    let entries = vec![AddressDirectoryEntry {
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         department: None,
         address: EmailAddress::from("support@acme.mailagents.com"),
         name: "Support Desk".to_string(),
@@ -3415,7 +3382,7 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
                 headers: Some(format!(
                     "Message-ID: <internal-help@acme.com>\nX-MailAgents-Channel-Id: \
                      {source_channel_id}\nX-MailAgents-Hop-Count: 1\nX-MailAgents-Trace: \
-                     {source_channel_id}"
+                     desk:{source_channel_id}"
                 )),
                 ..RawInboundPayload::default()
             },
@@ -3425,9 +3392,11 @@ async fn an_agent_cannot_use_help_to_enumerate_its_company() {
 
     let result = use_cases
         .ingest(draft.into_inbound(
-            IngressOrigin::InternalChannel {
+            IngressOrigin::Internal {
                 company_id,
-                channel_id: source_channel_id,
+                source_target: crate::entities::address::AddressTarget::Desk(source_channel_id),
+                agent_principal: None,
+                proof: crate::transport::test_support::relay_proof(company_id),
             },
             ReplyDelivery::Send,
         ))
@@ -3674,7 +3643,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     let author = qualified_email_identity("user@example.com").unwrap();
     let compose_ingress = CanonicalMessageIngress::new(
         company_id,
-        channel_id,
+        crate::entities::address::AddressTarget::Desk(channel_id),
         author.clone(),
         "Initial inquiry",
         IngressOrigin::TrustedApplication,
@@ -3698,7 +3667,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     // 2. Reply to that thread using target_thread_id
     let reply_ingress = CanonicalMessageIngress::new(
         company_id,
-        channel_id,
+        crate::entities::address::AddressTarget::Desk(channel_id),
         author.clone(),
         "Second turn continuing conversation",
         IngressOrigin::TrustedApplication,
@@ -3719,7 +3688,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     // 3. Reply targeting specific message turn via reply_to_message_id (without explicit target_thread_id)
     let reply_msg_ingress = CanonicalMessageIngress::new(
         company_id,
-        channel_id,
+        crate::entities::address::AddressTarget::Desk(channel_id),
         author.clone(),
         "Third turn replying to turn 1",
         IngressOrigin::TrustedApplication,
@@ -3740,7 +3709,7 @@ async fn ingest_canonical_threads_correctly_with_target_thread_and_reply_to() {
     // 4. Quiet message (FileOnly)
     let quiet_ingress = CanonicalMessageIngress::new(
         company_id,
-        channel_id,
+        crate::entities::address::AddressTarget::Desk(channel_id),
         author,
         "Quiet note for history",
         IngressOrigin::TrustedApplication,
@@ -3805,7 +3774,10 @@ async fn an_outside_reply_to_an_existing_thread_records_an_admissible_intent() {
     assert!(request.admissible);
     assert_eq!(request.origin, InboundOrigin::External);
     assert_eq!(request.intents.len(), 1);
-    assert_eq!(request.intents[0].channel_id, fixture.channel_id);
+    assert_eq!(
+        request.intents[0].target.desk_id().unwrap(),
+        fixture.channel_id
+    );
     assert_eq!(request.intents[0].role, RecipientRole::To);
 }
 

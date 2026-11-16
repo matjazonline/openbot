@@ -188,7 +188,7 @@ impl Fixture {
     async fn totals(&self) -> (i64, i64, i64) {
         sqlx::query_as(
             "SELECT (SELECT count(*) FROM agents WHERE company_id IS NOT NULL), \
-            (SELECT count(*) FROM channels), (SELECT count(*) FROM workflow_provisioning_commands)",
+            (SELECT count(*) FROM channels), (SELECT count(*) FROM workflow_definitions WHERE owner_agent_id IS NOT NULL)",
         )
         .fetch_one(&self.db.pool)
         .await
@@ -211,6 +211,7 @@ fn service(
             persistence.clone(),
             persistence.clone(),
             persistence.clone(),
+            crate::use_cases::agent::SpamScanning::Unavailable,
         )
         .with_prompt_classifier(classifier),
     );
@@ -230,15 +231,15 @@ fn completed(outcome: OnboardingOutcome) -> AppResult<Vec<OnboardedAgent>> {
         OnboardingOutcome::Rejected(message) => Err(AppError::BadRequest(message)),
     }
 }
-fn ids(results: &[OnboardedAgent]) -> Vec<(Uuid, serde_json::Value)> {
+fn ids(results: &[OnboardedAgent]) -> Vec<(Uuid, crate::entities::transport::PrincipalId)> {
     results
         .iter()
-        .map(|result| (result.agent.id, result.channel.clone()))
+        .map(|result| (result.agent.id, result.principal_id))
         .collect()
 }
 
 #[tokio::test]
-async fn onboarding_second_channel_error_rolls_back_every_effect() {
+async fn onboarding_second_principal_workflow_error_rolls_back_every_effect() {
     let f = Fixture::new(false).await;
     let first = f.library("first", "First").await;
     let second = f.library("second", "Second").await;
@@ -267,12 +268,12 @@ async fn onboarding_second_channel_error_rolls_back_every_effect() {
     .await
     .unwrap();
 
-    sqlx::raw_sql("CREATE FUNCTION fail_second_onboarding_channel() RETURNS trigger LANGUAGE plpgsql AS $$ \
-        DECLARE observed bigint; BEGIN IF NEW.name = 'Second' THEN \
+    sqlx::raw_sql("CREATE FUNCTION fail_second_onboarding_workflow() RETURNS trigger LANGUAGE plpgsql AS $$ \
+        DECLARE observed bigint; BEGIN IF NEW.owner_agent_id=(SELECT id FROM agents WHERE company_id=NEW.company_id AND slug='second') THEN \
         SELECT count(*) INTO observed FROM agents WHERE company_id = NEW.company_id; \
-        RAISE EXCEPTION 'onboarding-second-channel-after-%-agents', observed USING ERRCODE = 'P0001'; \
-        END IF; RETURN NEW; END $$; CREATE TRIGGER fail_second BEFORE INSERT ON channels \
-        FOR EACH ROW EXECUTE FUNCTION fail_second_onboarding_channel();")
+        RAISE EXCEPTION 'onboarding-second-workflow-after-%-agents', observed USING ERRCODE = 'P0001'; \
+        END IF; RETURN NEW; END $$; CREATE TRIGGER fail_second BEFORE INSERT ON workflow_definitions \
+        FOR EACH ROW EXECUTE FUNCTION fail_second_onboarding_workflow();")
         .execute(&f.db.pool).await.expect("fault installation must succeed");
     let error = f
         .onboard(Uuid::new_v4(), &[first, second], false)
@@ -281,7 +282,7 @@ async fn onboarding_second_channel_error_rolls_back_every_effect() {
     assert!(
         error
             .to_string()
-            .contains("onboarding-second-channel-after-2-agents"),
+            .contains("onboarding-second-workflow-after-2-agents"),
         "{error:?}"
     );
     assert!(matches!(error, AppError::Database(_)));
@@ -319,77 +320,36 @@ async fn agent_default_desk_onboarding_taken_address_rejects_and_commits_nothing
 }
 
 #[tokio::test]
-async fn onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh()
-{
+async fn onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh() {
     let f = Fixture::new(false).await;
     let library = f.library("desk", "Desk").await;
     let key = Uuid::new_v4();
     let first = f.onboard(key, &[library], false).await.unwrap();
     let again = f.onboard(key, &[library], false).await.unwrap();
     assert_eq!(ids(&first), ids(&again));
-    assert_eq!(f.totals().await, (1, 1, 1));
-    let channel = Uuid::parse_str(first[0].channel["channel"]["id"].as_str().unwrap()).unwrap();
-    // A channel with workflow configuration is intentionally retained. This private fixture has
-    // no runs; explicitly clear its selected response, then remove the unused binding.
-    use crate::application::workflow::channel_reply::{ChannelReplies, ConfigureChannelReply};
-    let actor = crate::application::workflow::WorkflowActor::authenticated(f.owner).unwrap();
-    let company = crate::domain::workflow::CompanyId::new(f.company);
-    let response_channel = crate::application::workflow::RelatedChannelId::new(channel);
-    let selected = f
-        .persistence
-        .channel_reply_settings(company, response_channel, actor)
-        .await
-        .unwrap()
-        .unwrap();
-    assert!(selected.responder.is_some());
-    f.persistence
-        .configure_channel_reply(ConfigureChannelReply {
-            company,
-            channel: response_channel,
-            actor,
-            expected: Some(selected.revision),
-            responder: None,
-            approval_policy: None,
-        })
-        .await
-        .unwrap();
-    let removed =
-        sqlx::query("DELETE FROM workflow_bindings WHERE company_id = $1 AND channel_id = $2")
-            .bind(f.company)
-            .bind(channel)
-            .execute(&f.db.pool)
-            .await
-            .unwrap()
-            .rows_affected();
-    assert_eq!(removed, 1);
-    ChannelPersistence::delete(f.persistence.as_ref(), channel)
-        .await
-        .unwrap();
-    assert!(matches!(
-        AgentPersistence::delete(f.persistence.as_ref(), first[0].agent.id).await,
-        Err(AppError::Conflict(_))
-    ));
+    assert_eq!(f.totals().await, (1, 0, 1));
+    // There is no automatic desk to remove; renaming moves the canonical principal address.
     f.rename_agent(first[0].agent.id).await;
     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
     assert_ne!(ids(&first), ids(&fresh));
     assert_ne!(first[0].agent.id, fresh[0].agent.id);
-    assert_eq!(f.totals().await, (2, 1, 2));
+    assert_eq!(f.totals().await, (2, 0, 2));
 }
 
 /// A new key after the first agent's rename does not replay its desk: the new agent's own address
 /// is still the first desk's, so the submission is refused and nothing more is written.
 #[tokio::test]
-async fn onboarding_new_key_after_rename_does_not_replay_an_old_channel() {
+async fn onboarding_new_key_after_rename_creates_a_fresh_principal() {
     let f = Fixture::new(false).await;
     let library = f.library("desk", "Desk").await;
     let first = f.onboard(Uuid::new_v4(), &[library], false).await.unwrap();
     f.rename_agent(first[0].agent.id).await;
     let fresh = f.onboard(Uuid::new_v4(), &[library], false).await;
-    assert!(
-        matches!(&fresh, Err(AppError::BadRequest(message)) if message.contains("'desk'")),
-        "{fresh:?}"
-    );
-    assert_eq!(f.totals().await, (1, 1, 1));
+    let fresh = fresh.unwrap();
+    assert_ne!(first[0].agent.id, fresh[0].agent.id);
+    assert_ne!(first[0].principal_id, fresh[0].principal_id);
+    assert_eq!(fresh[0].agent.slug, "desk");
+    assert_eq!(f.totals().await, (2, 0, 2));
 }
 
 #[tokio::test]
@@ -433,7 +393,7 @@ async fn onboarding_same_key_custom_competitors_wait_for_company_and_generate_on
         first[0].agent.system_prompt.as_deref(),
         Some("You help customers.")
     );
-    assert_eq!(f.totals().await, (1, 1, 1));
+    assert_eq!(f.totals().await, (1, 0, 1));
 }
 
 async fn company_waiter(pool: &sqlx::PgPool) {
@@ -509,7 +469,7 @@ async fn onboarding_one_connection_progresses_with_real_custom_library_and_compe
     .unwrap();
     assert_eq!(ids(&first), ids(&second));
     assert_eq!(f.classifier.calls.load(Ordering::SeqCst), 1);
-    assert_eq!(f.totals().await, (2, 2, 2));
+    assert_eq!(f.totals().await, (2, 0, 2));
     one.close().await;
 }
 
@@ -701,6 +661,7 @@ async fn onboarding_library_model_lookup_failure_remains_an_infrastructure_error
         f.persistence.clone(),
         f.persistence.clone(),
         f.persistence.clone(),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     );
     let error = agents
         .create_agent_from_library(f.owner, f.company, library, None)
@@ -755,7 +716,7 @@ async fn onboarding_selection_is_bounded_and_custom_fields_are_paired() {
         .await
         .unwrap();
     assert_eq!(boundary.len(), 10);
-    assert_eq!(f.totals().await, (10, 10, 10));
+    assert_eq!(f.totals().await, (10, 0, 10));
 }
 
 #[tokio::test]
@@ -795,11 +756,14 @@ async fn onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_c
         )
         .await
         .unwrap();
-    assert!(
-        matches!(&fresh, OnboardingOutcome::Rejected(message) if message.contains("'desk'")),
-        "{fresh:?}"
-    );
-    assert_eq!(f.totals().await, (1, 1, 1));
+    let OnboardingOutcome::Completed(fresh) = fresh else {
+        panic!("{fresh:?}");
+    };
+    assert_eq!(fresh.len(), 1);
+    assert_ne!(fresh[0].principal_id, first[0].principal_id);
+    assert_ne!(fresh[0].agent.id, first[0].agent.id);
+    assert_eq!(fresh[0].agent.slug, "desk");
+    assert_eq!(f.totals().await, (2, 0, 2));
 }
 
 /// 01DEP-P03-D4, 03C.0: a named department is created with the submission and the first agent
@@ -841,7 +805,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
         created[0].agent.id,
     )];
     assert_eq!(placements().await, placed);
-    assert_eq!(f.totals().await, (2, 3, 3));
+    assert_eq!(f.totals().await, (2, 1, 2));
     for name in ["Customer Care", "Renamed Care"] {
         let replayed = completed(
             f.service
@@ -852,7 +816,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
         .unwrap();
         assert_eq!(ids(&replayed), ids(&created));
         assert_eq!(placements().await, placed);
-        assert_eq!(f.totals().await, (2, 3, 3));
+        assert_eq!(f.totals().await, (2, 1, 2));
     }
     let departments: i64 =
         sqlx::query_scalar("SELECT count(*) FROM departments WHERE company_id = $1")
@@ -877,7 +841,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
             .unwrap(),
     );
     assert!(matches!(taken, Err(AppError::BadRequest(_))), "{taken:?}");
-    assert_eq!(f.totals().await, (2, 3, 3));
+    assert_eq!(f.totals().await, (2, 1, 2));
 }
 
 /// D4, F3: with no model connection (none exists without a key), onboarding is refused and
@@ -951,7 +915,7 @@ async fn agent_default_desk_onboarding_names_the_department_on_a_resubmission() 
     .await
     .unwrap();
     assert_eq!(placed, [("support".to_owned(), first[0].agent.id)]);
-    assert_eq!(f.totals().await, (1, 2, 2));
+    assert_eq!(f.totals().await, (1, 1, 1));
 }
 
 /// 01DEP-P03-D8 in onboarding: the named department's desk takes its address first, so an agent

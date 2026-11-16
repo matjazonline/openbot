@@ -2,7 +2,7 @@
 //! `list_company_agents` and the authoring picker's entries, `department_directory_`.
 use super::*;
 use crate::application::agent::{
-    AgentAuthoringReads, AgentCompanyScope, AgentDesk, AgentKey, DepartmentRef,
+    AgentAddress, AgentAuthoringReads, AgentCompanyScope, AgentKey, DepartmentRef,
 };
 use crate::application::ports::channel::ChannelPersistence;
 use crate::application::use_cases::agent::AgentPlacement;
@@ -46,16 +46,13 @@ async fn agent(f: &AdmissionFixture, slug: &str, placement: Option<AgentPlacemen
         .id
 }
 
-async fn desk_of(f: &AdmissionFixture, agent: Uuid) -> Uuid {
-    sqlx::query_scalar(
-        "SELECT (result->'channel'->>'id')::uuid FROM workflow_provisioning_commands \
-         WHERE company_id = $1 AND command_key = $2",
-    )
-    .bind(company(f).as_uuid())
-    .bind(format!("agent:{agent}"))
-    .fetch_one(f.persistence().pool())
-    .await
-    .unwrap()
+async fn principal_of(f: &AdmissionFixture, agent: Uuid) -> Uuid {
+    sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2")
+        .bind(company(f).as_uuid())
+        .bind(agent)
+        .fetch_one(f.persistence().pool())
+        .await
+        .unwrap()
 }
 
 async fn address(f: &AdmissionFixture, slug: &str) -> String {
@@ -124,18 +121,6 @@ async fn department_directory_lists_departments_roles_and_desks() {
     .unwrap()
     .id;
     sqlx::query(
-        "INSERT INTO workflow_provisioning_commands \
-         (company_id, command_key, request_digest, actor_id, result) \
-         VALUES ($1, $2, repeat('0', 64), $3, $4)",
-    )
-    .bind(company(&f).as_uuid())
-    .bind(format!("agent:{drifter}"))
-    .bind(owner(&f).user_id())
-    .bind(json!({"channel": {"id": plain.to_string(), "slug": "drifting"}, "binding_id": null}))
-    .execute(f.persistence().pool())
-    .await
-    .unwrap();
-    sqlx::query(
         "INSERT INTO department_members (company_id, department_id, principal_id) \
          SELECT company_id, $2, id FROM principals WHERE company_id = $1 AND agent_id = $3",
     )
@@ -155,14 +140,15 @@ async fn department_directory_lists_departments_roles_and_desks() {
             .cloned()
             .unwrap()
     };
-    let desk = |id: Uuid, address: String| json!({"id": id.to_string(), "address": address});
+    let direct =
+        |id: Uuid, address: String| json!({"principal_id": id.to_string(), "address": address});
     assert_eq!(
         entry("closer")["departments"],
         json!([{"slug": "sales", "name": "Sales", "roles": ["lead"]}])
     );
     assert_eq!(
-        entry("closer")["desk"],
-        desk(desk_of(&f, closer).await, address(&f, "closer").await)
+        entry("closer")["address"],
+        direct(principal_of(&f, closer).await, address(&f, "closer").await)
     );
     assert_eq!(
         entry("scout")["departments"],
@@ -174,13 +160,10 @@ async fn department_directory_lists_departments_roles_and_desks() {
         "an agent in no department lists none"
     );
     assert_eq!(
-        entry("loner")["desk"],
-        desk(desk_of(&f, loner).await, address(&f, "loner").await)
+        entry("loner")["address"],
+        direct(principal_of(&f, loner).await, address(&f, "loner").await)
     );
-    assert_eq!(
-        listed_desk(&listing, "drifter"),
-        desk(plain, address(&f, "drifting").await)
-    );
+    assert_eq!(listed_address(&listing, "drifter"), Value::Null);
     assert_eq!(listing["truncated"], false);
 
     let _ = scout;
@@ -198,10 +181,10 @@ async fn department_directory_lists_departments_roles_and_desks() {
     let before = desks().await;
     // Another request: a repeated call replays its first receipt.
     let after = listed(&f, &claim, json!({"department": "sales"})).await;
-    assert_eq!(listed_desk(&after, "drifter"), Value::Null);
+    assert_eq!(listed_address(&after, "drifter"), Value::Null);
     assert_eq!(
-        listed_desk(&after, "scout"),
-        desk(desk_of(&f, scout).await, address(&f, "scout").await)
+        listed_address(&after, "scout"),
+        direct(principal_of(&f, scout).await, address(&f, "scout").await)
     );
     assert_eq!(desks().await, before, "a listing recreates no desk");
 }
@@ -215,13 +198,13 @@ async fn agent_id(f: &AdmissionFixture, slug: &str) -> Uuid {
         .unwrap()
 }
 
-fn listed_desk(listing: &Value, slug: &str) -> Value {
+fn listed_address(listing: &Value, slug: &str) -> Value {
     listing["agents"]
         .as_array()
         .unwrap()
         .iter()
         .find(|agent| agent["slug"] == slug)
-        .unwrap_or_else(|| panic!("{slug} is listed: {listing}"))["desk"]
+        .unwrap_or_else(|| panic!("{slug} is listed: {listing}"))["address"]
         .clone()
 }
 
@@ -314,9 +297,11 @@ async fn department_directory_picker_entries_name_departments_and_the_desk() {
     assert_eq!(closer.departments, expected);
     let closer_agent = agent_id(&f, "closer").await;
     assert_eq!(
-        closer.desk,
-        Some(AgentDesk {
-            id: desk_of(&f, closer_agent).await,
+        closer.address,
+        Some(AgentAddress {
+            principal_id: crate::entities::transport::PrincipalId::new(
+                principal_of(&f, closer_agent).await
+            ),
             address: address(&f, "closer").await,
         })
     );
@@ -326,6 +311,6 @@ async fn department_directory_picker_entries_name_departments_and_the_desk() {
         .unwrap()
         .unwrap();
     assert_eq!(entry.departments, expected);
-    assert_eq!(entry.desk, closer.desk);
+    assert_eq!(entry.address, closer.address);
     assert_eq!(page.next, None);
 }

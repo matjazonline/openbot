@@ -1,0 +1,39 @@
+
+running 34 tests
+test adapters::harness::rig::workflow::guard_tests::workflow_guard_error_agent_handler_mapping_names_the_guard_and_stays_retryable ... ok
+test adapters::persistence::tests::workflow_guard_error_is_typed_by_its_constraint_name ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_database_error_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::compensation_tests::workflow_guard_error_io_compensation_guard_propagates_without_reentering_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_cancel_and_guard_failure_compete_for_one_terminal_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_decision_timeout_fails_instead_of_deferring_to_itself ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_io_completion_never_reexecutes_the_handler ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_ordinary_connection_error_is_retried ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_parent_failure_cancels_its_live_child_subtree ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pending_job_is_never_control_retry_safe ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_pure_step_fails_once_and_stops_polling ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_retirement_first_keeps_the_competing_owners_result ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_run_expiry_handles_processing_expired_lease ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::guard_tests::workflow_guard_error_transient_completion_confirmation_keeps_one_handler_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::memory_access_level_routed_failure_passes_the_exactness_hook ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_commit_failure_rolls_back_all_retirement_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_exhausted_expiry_routes_and_deadline_delay_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_competes_with_completion_without_duplicate_successor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_live_retirement_cannot_commit_after_lease_expiry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_interrupted_and_expired_effects_cannot_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_retry_debits_once_preserves_input_and_poison_backoff ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_unknown_effect_suspends_even_with_final_error ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::workflow_io_real_competing_claims_lost_ack_crash_backoff_and_frozen_retry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::recovery_tests::workflow_failure_terminal_routes_or_fails_without_reexecuting ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_actual_terminal_attempt_creates_one_case_and_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_case_failure_rolls_back_actual_attempt_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_authored_handlers_do_not_start_an_automatic_ladder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_source_uses_the_actual_last_retired_attempt_not_old_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_retry_and_unknown_effect_do_not_claim_terminal_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_case_failure_rolls_back_terminal_and_job ... ok
+test application::workflow::actions::failure::tests::workflow_guard_error_action_handler_mapping_is_typed_bounded_and_retryable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_invalid_output_enqueues_one_actual_case ... ok
+
+test result: ok. 34 passed; 0 failed; 0 ignored; 0 measured; 4399 filtered out; finished in 23.67s
+

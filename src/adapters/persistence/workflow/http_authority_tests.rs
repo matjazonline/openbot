@@ -28,6 +28,7 @@ async fn workflow_http_binding_checks_exact_selected_connection_contract() {
     );
     let result = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target: BindingTarget {
                 company: fixture.target.company,
                 actor: fixture.target.actor,

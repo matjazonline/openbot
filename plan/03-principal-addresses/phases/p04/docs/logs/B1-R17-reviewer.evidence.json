@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R17-reviewer",
+  "artifact": "d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb",
+  "checks": [
+    {
+      "criteria": [
+        "completed-core-CI-gates",
+        "migrations",
+        "sqlx-metadata",
+        "actual-Linux-isolation",
+        "conformance-registration",
+        "frontend-browser-gates",
+        "knowledge-image-budget"
+      ],
+      "command": "Inspect completed steps of actual CI run 43883869265, candidate 581576e7e6918393480e5eb1004f11b6a51e5de6",
+      "fixture": "Only individually successful steps: plugin/package, frontend protocols, runner/deployment/boundaries, Linux isolation, Knowledge image/budget, format, evidence, offline build/Clippy, fresh migrations/SQLx, test compilation, registration, vault/HTML/knowledge/memory/agent/local-agent/skill/workflow/session browsers. Overall verify job FAIL; DB and skipped later steps excluded from this PASS.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R24-poll-154453-43883869265.json",
+          "sha256": "534ee8e03818005131d008fa1cc4cc97aee308aa8b020eb819c845fc21194b6a"
+        },
+        {
+          "path": "logs/B1-R17-reviewer-identity.json",
+          "sha256": "cdc82308862b0e2edc22c9cfece70479cae393bb0dd10e7d9645ed8f41ffaee8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "memory-integration",
+        "memory-standalone",
+        "memory-image"
+      ],
+      "command": "Inspect successful main memory-integration job 43883869265 and separate Memory verify/image jobs 43883869063",
+      "fixture": "R19 candidate; current Memory and native inputs unchanged except startup warning inventory. Pinned model, extracted-copy suite, backup/restore, standalone journey and non-root/network-denied/read-only image assertions actually completed.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R24-poll-154453-43883869265.json",
+          "sha256": "534ee8e03818005131d008fa1cc4cc97aee308aa8b020eb819c845fc21194b6a"
+        },
+        {
+          "path": "logs/R20-ci-43883869063-jobs2.json",
+          "sha256": "5d7051dc81698eefc6c686e6ba66ed3fbb050080e4756ec39d74d46ca6f5d83c"
+        },
+        {
+          "path": "logs/B1-R17-reviewer-identity.json",
+          "sha256": "cdc82308862b0e2edc22c9cfece70479cae393bb0dd10e7d9645ed8f41ffaee8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "decision-browser"
+      ],
+      "command": "Historical exact native decision_browser_markup_and_closed_draft_recovery and source_message_outside_window_is_exact_and_authorized fixtures; node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "Retained R5-reviewed native 2 cases plus actual browser 1 PASS, 0 FAIL, 0 SKIP. Producer paths, assets, script and package lock unchanged from 3d186172a778602dd82d790eb2ef230c80cc045d. R19 decision-browser step skipped after DB failure; this is explicit historical reuse.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-decisions-decision_browser_markup_and_closed_draft_recovery.txt",
+          "sha256": "99e6fafcc3e84b9d1dad4d8910c44d60135fa5d7e797c5f8d7296c723a37a51f"
+        },
+        {
+          "path": "logs/D2-r4-browser-decisions-source_message_outside_window_is_exact_and_authorized.txt",
+          "sha256": "9922b05ec1e237dfd2c15135187b602831bd5f9a7089586f4074b7f361c15ce9"
+        },
+        {
+          "path": "logs/D2-r4-browser-decisions-node.txt",
+          "sha256": "1f7dbf85011dbe12ac2fcd3074503449729ea0d7a38f383362b2cec87ddbdbd6"
+        },
+        {
+          "path": "logs/D2-r4-browser-extras.json",
+          "sha256": "0817c039cee38ada96b688513ee93648b8ab594d03b5e34985b900b414fd3da7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "historical-full-primary",
+        "historical-full-stock",
+        "historical-lease-measurements"
+      ],
+      "command": "Inspect retained R8 full primary, stock stack-budget and lease-budget sections in final local check",
+      "fixture": "Historical primary 4678 library / 5 binary / 8 source cases PASS; stock 4678 PASS; lease 139 PASS. Overall historical script later failed browser; do not relabel whole script PASS. R16/N2 documents unchanged protocol projection plus current 67-case stock proof.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-final-check5.txt",
+          "sha256": "2d9ce11e8d42861a3ca815313c1cbf7ca8ef35ed717f1a259f8dde62f04ba412"
+        },
+        {
+          "path": "logs/B1-R16-stock-proof-check.json",
+          "sha256": "e41853b01b9e1f201fb2ab1143aa7f03d6d84c04a2b02e2c1f3286bef08d990b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "independent-integration-identity",
+        "tracked-evidence-retention"
+      ],
+      "command": "Independent byte projection, merge inventory, pin checks; check-evidence.py --tracked-manifests --require-tracked",
+      "fixture": "Current c1cc/d275 artifact; only main startup inventory differs in native R19 projection, 14 incoming planning docs match upstream; 119 tracked manifests validate, declared results remain distinct.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R17-reviewer-identity.json",
+          "sha256": "cdc82308862b0e2edc22c9cfece70479cae393bb0dd10e7d9645ed8f41ffaee8"
+        },
+        {
+          "path": "logs/B1-R17-reviewer-entry.snapshot.txt",
+          "sha256": "7d4eae165b64513c31a0c54005f67bdde8c761bbcc59707f27855af0e40ab6de"
+        },
+        {
+          "path": "logs/B1-R17-reviewer-tracked-evidence.txt",
+          "sha256": "345b5c564d2364a915cfc2fb5787b25dfc073d0d73099de812323f0d4b235b5a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "current-full-library-result"
+      ],
+      "command": "Inspect actual isolated-network database-backed suite from CI 43883869265",
+      "fixture": "4677 PASS / 1 FAIL / 27 IGNORE; sole Cloudroom setup failure traced independently in R16/N1, outside affected Plan03 source. Current focused exact case PASS does not erase failed full invocation.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R24-core-50_Database-backed test suite (isolated network).txt",
+          "sha256": "2a9a21d7378902d838f8d1b0072a078e0db706fd204fb07d07a8ede280d60470"
+        },
+        {
+          "path": "logs/B1-R16-cloudroom-source-assessment.json",
+          "sha256": "9525157477b77eb1c636d2a2db70b403d4d05946b889d152f867370207929c93"
+        }
+      ]
+    }
+  ]
+}

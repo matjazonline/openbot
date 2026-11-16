@@ -49,7 +49,7 @@ fn conversations_identify_each_run_and_its_own_reply() {
         };
         let html = message_pane(&MessagePane {
             company_id: company.id,
-            channel: &channel,
+            inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             thread: &thread,
             messages: &messages,
             viewer_email: &mailbox_account_email(),

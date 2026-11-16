@@ -1,0 +1,11 @@
+{
+  "before": 4467,
+  "after": 4467,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention"
+  ],
+  "removed": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_and_active_consumer_keep_origin_after_actual_producer_retention"
+  ],
+  "disposition": "Renamed the new109 native message journey to describe actual canonical output/producer retention. The active-consumer proof remains required through the real internal relay; direct channel publication does not enqueue an intent."
+}

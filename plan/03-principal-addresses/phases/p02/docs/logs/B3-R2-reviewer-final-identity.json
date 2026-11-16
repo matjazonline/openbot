@@ -1,0 +1,6 @@
+{
+  "digest": "1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa",
+  "snapshot_start_equals_final": true,
+  "coordination_live_equals_pin": true,
+  "coordination_sha256": "b67026d05ad7dd8e2643f40d32ef3e69a89a669628cbc6279cbfe2a3733fb063"
+}

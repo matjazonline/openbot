@@ -1,0 +1,6 @@
+{
+  "commit": "f27b317101bd310a4f92ba55d810eab757cdca30",
+  "parent": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd",
+  "branch": "codex/plan03-browser-launch-f27b3171",
+  "scope": "Diagnostic-only; all material runtime/probe code equals current0d3e. Original workflow YAML removed only from diagnosticcandidate to avoid repeating required checks, one supplementary actual Chrome workflow. No authentication/accounts/provider data created; safe full launch-error output. Long/shortTMPDIR counterexample hypothesis only."
+}

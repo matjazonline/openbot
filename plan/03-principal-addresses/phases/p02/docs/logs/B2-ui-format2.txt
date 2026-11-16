@@ -1,0 +1,13 @@
+error: unexpected closing delimiter: `}`
+   --> /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/mod.rs:452:1
+    |
+169 | impl ThreadUseCases {
+    |                     - the nearest open delimiter
+...
+415 |     ) -> AppResult<()> {
+    |     - missing open `(` for this delimiter
+...
+452 | }
+    | ^ unexpected closing delimiter
+
+Error writing files: failed to resolve mod `thread`: cannot parse /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/mod.rs

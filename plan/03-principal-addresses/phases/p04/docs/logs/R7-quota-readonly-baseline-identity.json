@@ -1,0 +1,68 @@
+{
+  "files": [
+    {
+      "path": "src/adapters/persistence/knowledge/bounds.rs",
+      "main_blob": "9d503799a774006e0c774a8ee27afe819b8f7495",
+      "current_blob": "9d503799a774006e0c774a8ee27afe819b8f7495",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/mod.rs",
+      "main_blob": "1f588bc178b8a8cd0438c9917ce125452017eeed",
+      "current_blob": "1f588bc178b8a8cd0438c9917ce125452017eeed",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/rows.rs",
+      "main_blob": "7a0cd1eaa3b452f2dc4169ec2739c5532897feee",
+      "current_blob": "7a0cd1eaa3b452f2dc4169ec2739c5532897feee",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/search.rs",
+      "main_blob": "65cbb0385dc15626c063dfa9a35f06dad1dd7879",
+      "current_blob": "65cbb0385dc15626c063dfa9a35f06dad1dd7879",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/search_quota_tests.rs",
+      "main_blob": "88e28ae4fecc561718da202adc60162ed1711ce2",
+      "current_blob": "88e28ae4fecc561718da202adc60162ed1711ce2",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/search_tests.rs",
+      "main_blob": "16b7e073cf0d4ef5d9fb19141dac02d778730f1b",
+      "current_blob": "16b7e073cf0d4ef5d9fb19141dac02d778730f1b",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/tests.rs",
+      "main_blob": "5f383a67aa6edf79f2ea51e2aa0353b79f6ab88a",
+      "current_blob": "5f383a67aa6edf79f2ea51e2aa0353b79f6ab88a",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/tests/constraints.rs",
+      "main_blob": "cd2d98cf3c3e6da333af5b373201967cb8327817",
+      "current_blob": "cd2d98cf3c3e6da333af5b373201967cb8327817",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/tests/races.rs",
+      "main_blob": "b9e1f4d33510ac2187bdf623da641cdfaa84305f",
+      "current_blob": "b9e1f4d33510ac2187bdf623da641cdfaa84305f",
+      "equal": true
+    },
+    {
+      "path": "src/adapters/persistence/knowledge/writes.rs",
+      "main_blob": "87bd4fe2d04c5b2f1865fdd8c993ca63dff1841e",
+      "current_blob": "87bd4fe2d04c5b2f1865fdd8c993ca63dff1841e",
+      "equal": true
+    }
+  ],
+  "prior_full_r5_case": [
+    "test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok"
+  ],
+  "disposition": "Read-only identity evidence only. Await actual current panic and baseline/isolated diagnostics; no unrelated or regression conclusion."
+}

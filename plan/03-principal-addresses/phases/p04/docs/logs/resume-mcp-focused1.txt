@@ -1,0 +1,51 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0425]: cannot find type `ScriptedRequest` in this scope
+  --> src/adapters/mcp/cleanup_tests.rs:13:23
+   |
+13 | fn protocol(request: &ScriptedRequest, session: Option<&str>) -> Result<(), &'static str> {
+   |                       ^^^^^^^^^^^^^^^
+   |
+  ::: src/application/services/test_support/scenario.rs:33:1
+   |
+33 | pub struct ScriptedResponse {
+   | --------------------------- similarly named struct `ScriptedResponse` defined here
+   |
+help: a struct with a similar name exists
+   |
+13 - fn protocol(request: &ScriptedRequest, session: Option<&str>) -> Result<(), &'static str> {
+13 + fn protocol(request: &ScriptedResponse, session: Option<&str>) -> Result<(), &'static str> {
+   |
+help: consider importing this struct through its public re-export
+   |
+ 2 + use crate::services::test_support::ScriptedRequest;
+   |
+
+error[E0433]: cannot find `test_support` in `super`
+   --> src/adapters/persistence/skill_tests.rs:205:12
+    |
+205 |     super::test_support::register_native_agent_address(&persistence, &agent).await;
+    |            ^^^^^^^^^^^^ could not find `test_support` in `super`
+    |
+help: consider importing this module
+    |
+  1 + use crate::adapters::persistence::test_support;
+    |
+help: if you import `test_support`, refer to it directly
+    |
+205 -     super::test_support::register_native_agent_address(&persistence, &agent).await;
+205 +     test_support::register_native_agent_address(&persistence, &agent).await;
+    |
+
+error[E0639]: cannot create non-exhaustive struct using struct expression
+  --> src/adapters/mcp/http.rs:87:28
+   |
+87 |           let notification = rmcp::model::CancelledNotification {
+   |  ____________________________^
+88 | |             params: rmcp::model::CancelledNotificationParam {
+89 | |                 request_id,
+90 | |                 reason: Some("Local execution cancelled".into()),
+...  |
+93 | |             extensions: Default::default(),
+94 | |         };
+   | |_________^
+

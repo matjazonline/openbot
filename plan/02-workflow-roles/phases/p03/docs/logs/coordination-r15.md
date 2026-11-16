@@ -1,0 +1,132 @@
+# Plan coordination: 02-workflow-roles
+
+- Authority: /Users/mac02/.codex/worktrees/2050/openbot/plan/02-workflow-roles/COORDINATION.md
+- Writer: `/root` in `/Users/mac02/.codex/worktrees/2050/openbot`
+- Revision: 15
+
+## Plan-wide instructions
+
+### I001 / r1
+No backward compatibility; edit the init schema and use fresh disposable databases.
+
+### I002 / r1
+Root/A is Sol 6.1/xhigh, confirmed by the user earlier in this session. Independent reviewer B is Astra/high with no inherited conversation. Execute phases sequentially, accepting each before dependent work. Existing authorization covers implementation; no new publishing or deployment request is inferred.
+
+### I003 / r1
+Run focused checks in implementation phases and the full repository/CI gate once at this plan's final integration phase. Retain failed checks. Do not raise limits or weaken assertions.
+
+## Phase directory
+
+| Phase | Owner/session | Worktree | Authoritative TASK/HANDOFF paths |
+| --- | --- | --- | --- |
+| p01 | /root; accepted in phase; integration pending p05 | /Users/mac02/.codex/worktrees/2050/openbot | phases/p01/docs/TASK.md; HANDOFF.md |
+| p02 | /root; accepted in phase; integration pending p05 | /Users/mac02/.codex/worktrees/2050/openbot | phases/p02/docs/TASK.md; HANDOFF.md |
+| p03 | /root; B1 implementation | /Users/mac02/.codex/worktrees/2050/openbot | phases/p03/docs/TASK.md; HANDOFF.md |
+| p04 | /root; queued | /Users/mac02/.codex/worktrees/2050/openbot | phases/p04/docs/TASK.md; HANDOFF.md |
+| p05 | /root; queued | /Users/mac02/.codex/worktrees/2050/openbot | phases/p05/docs/TASK.md; HANDOFF.md |
+
+## Cross-phase notices
+
+### 02WR-C001 / r1
+- State: active
+- Origin: user scope clarification, 2026-11-11
+- Targets: p01–p05
+- Instruction/change: Defer only the denied `channel.call` escalation trigger until `channel.call` exists. Implement all escalation triggers available today. The user explicitly selected this disposition. Do not introduce `channel.call` or revive deferred automated `message.send` dispatch.
+- Dependencies/order: Applies throughout this plan and final completeness report.
+- Evidence/review: User reply in this session; p04 must record the deferred criterion explicitly.
+- Verification: Existing triggers exercised; unavailable child-call trigger clearly deferred.
+- Responses: p01 r1 satisfied for its scope (phases/p01/docs/TASK.md, B1-A1); p02 acknowledges r1 at startup; p03–p05 evaluate at startup.
+
+## Accepted prerequisite handoff (revision 2)
+
+p01 B1-A1 accepted artifact91741e066ae90284ca17ba5163cbc89561eef3ac1fb728daec3645392d1f473d at HEAD103004a8ac2fd643cf14bde7e09022ae79f72053. Source archive/byte map retained in p01 logs; no commit required to recover it. B PASS02WR-P01-B1-R1/N1. Explicit p02 runtime carry-forward is in p01 HANDOFF/TASK; publication input preparation still needs its role branch. Full-plan final acceptance remains p05.
+
+### 02WR-C002 / r1
+- State: superseded
+- Origin: p02 /root, phases/p02/docs/TASK.md D1/r1
+- Targets: p02, p03, p04, p05
+- Instruction/change: Root admission captures role holders for each reachable workflow version and step under the existing dependency closure. Frozen role rows include root-run/version identity and resolution_revision0, not an ambiguous step-only key. Agent execution never consults live roles and always reads0; future human follow-role may append later resolutions. Typed role refusals retain the64-byte static reason-code bound and carry bounded step/role details through message/schedule/manual consumers.
+- Dependencies/order: Blocks affected p02 schema/runtime edits until B passes D1/r1 and root activates this notice. p03/p04 must reuse accepted schema/contracts and independently gate any required change.
+- Evidence/review: Proposed decision in p02 TASK; independent gate pending.
+- Verification: p02 resolver/admission/runtime/immutability/child/refusal/race/view tests; p03/p04 add their own behavior evidence; p05 combined final gate.
+- Responses: p02 acknowledges r2 and implements under D1/r2; p03–p05 evaluate at startup.
+
+### 02WR-C003 / r1
+- State: superseded
+- Origin: independent p02 clarification02WR-P02-C2-R1/N1, finding C2-R1/F1
+- Targets: p02, p03, p04, p05
+- Instruction/change: Resolve02A.3's literal relay-refusal clause before accepting p02. Existing ingestion returns successful delivery before workflow admission. Definite named refusal on the intent is implemented, but does not itself change that delivery into the disabled-desk terminal-refusal outcome. A pending user question offers preserving asynchronous delivery with workflow refusal, or requiring relay delivery to fail too. No narrower semantics or changed ingestion boundary is authorized by silence.
+- Dependencies/order: p02 acceptance and dependent phases wait for this disposition. If literal relay failure remains required, gate the changed delivery/admission transaction contract before implementation. Other focused verification may continue.
+- Evidence/review: phases/p02/docs/logs/02WR-P02-C2-R1-disposition.md and saved finding/notes; user question pending in the session. No whole B1 review/PASS or p02 acceptance.
+- Verification: Record the selected semantics, affected production path and decisive tests before activation; retain the unresolved criterion meanwhile.
+- Responses: p02 acknowledges r1 as unresolved at coordination revision6; p03–p05 remain queued.
+
+### 02WR-C003 / r2
+- State: active
+- Origin: user decision, 2026-11-12, replying "do as recommended" after the explanation of missing role holders and the two delivery outcomes
+- Targets: p02, p03, p04, p05
+- Instruction/change: Preserve successful message delivery when a role-dependent workflow cannot start. Keep the accepted message on its desk and record a definite, named workflow refusal on its admission intent; the refusal identifies the step and role and admits no run. Workflow admission failure does not turn the completed relay delivery into a terminal delivery refusal. This explicit user disposition replaces02A.3's literal same-relay-refusal-path clause. Existing ingress refusals (disabled desk, access policy, spent hop budget) retain their transport behavior.
+- Dependencies/order: Effective before p02 B1 review. Preserve existing asynchronous ingestion/admission boundaries; no new delivery/admission protocol is required. Later phases reuse this outcome and may escalate the workflow refusal under their own accepted contracts.
+- Evidence/review: User's explanation/decision in this session; originating ambiguity and open finding02WR-P02-C2-R1/F1 retained in p02 records. B must independently assess closure under this authorized disposition in whole B1 review.
+- Verification: Successful ingest retains the message, one definite typed intent refusal names the step/role, no run/capture/provider call, no retry; message outcome reader/display carries the refusal. Existing relay ingress refusal tests remain applicable.
+- Responses: p02 acknowledges r2 at revision7 and updates its deliverable docs and acceptance mapping; p03–p05 evaluate at startup.
+
+### 02WR-C002 / r2
+- State: active
+- Origin: p02 /root, D1/r2 correction of architecture findings F1–F3
+- Targets: p02, p03, p04, p05
+- Instruction/change: Capture each root/version/step role requirement through the existing bounded dependency closure. Canonical immutable manifest content seals the complete admission requirement/principal sets; normalized role rows must match exactly, including inserts. Only resolution0 is supported in p02; future human reassignment requires a separate immutable canonical resolution and exact membership before enabling later revisions. Company-scoped agent deletion takes company NO KEY UPDATE before agent UPDATE, serializing demotion/channel cleanup with admission and department writers; preserve library behavior and all retained-history guards. Keep the64-byte static refusal-code bound and separate bounded typed step/role details through message/schedule/manual consumers.
+- Dependencies/order: Blocks affected p02 schema/runtime/retirement edits until B passes D1/r2 and root activates. p03/p04 reuse the accepted contract and independently gate any required extension.
+- Evidence/review: D1/r1 retained; F1–F3 closed at decision level by independent PASS02WR-P02-D1-R2/N1 for D1/r2, source91741e066ae90284ca17ba5163cbc89561eef3ac1fb728daec3645392d1f473d. Root activates at revision5 before implementation.
+- Verification: deterministic both-order admission/delete schedules with exact business refusal, a committing role/revision race, canonical set mutation/refusal tests, runtime/child/view checks and affected memory/lifecycle concurrency regressions. p03 adds published People-set cases; p04 adds later-resolution sealing and empty-set behavior; p05 final combined gates.
+- Responses: p02 acknowledges r2 and implements under D1/r2; p03–p05 evaluate at startup.
+
+## Accepted p02 prerequisite (revision8)
+
+p02 accepted02WR-P02-B1-A1, artifactbe7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba at HEAD103004a8ac2fd643cf14bde7e09022ae79f72053, B PASS02WR-P02-B1-R1/N1. Complete source archive/byte map and author/independent evidence retained in p02 logs. D1 findings verified implemented; C2/F1 closed under user-authorized active C003/r2. p03 may consume this artifact and independently gate its extension to People resolutions. C001/r1, C002/r2 and C003/r2 remain active.
+
+## p03 startup (revision9)
+
+p03 root acknowledges I001–I003/r1 and active C001/r1, C002/r2, C003/r2; accepted p02 source consumed via pinned archive/byte map. Its phase-local TASK/HANDOFF hold discovery and the upcoming People/reviewer contract gate. No cross-phase extension proposed or implemented yet.
+
+### 02WR-C004 / r1
+- State: superseded
+- Origin: p03 /root, phases/p03/docs/TASK.md 02WR-P03-D1/r1
+- Targets: p03, p04, p05
+- Instruction/change: Reviewer identities use person principals, with literal role selectors frozen as People requirements at root admission. Exact canonical membership sealing extends to multiple person holders and multiple roles per version/step. Agent and People requirements remain distinct; model selectors ignore People. Park merges/deduplicates pinned principals and sealed role members under effective16 bound. User-account lookup is notice/auth enrichment only; no stored reviewer user_id. Future followRole must preserve this principal-only contract and gate later immutable resolutions.
+- Dependencies/order: Blocks affected p03 source edits until B explicitly passes D1 current revision and root activates. Original D1 defines literal-role and parameter-principal behavior; no new user scope is inferred.
+- Evidence/review: Proposed D1/r1; architecture review pending.
+- Verification: p03 TASK AC1–AC5, canonical-set SQL mutations, role/park/reassignment/notice/submit/UI tests; p04 extends sealing/followRole; p05 combined full gate.
+- Responses: p03 acknowledges proposed r1 for gate; p04/p05 evaluate at startup.
+
+### 02WR-C004 / r2
+- State: superseded
+- Origin: p03 /root, phases/p03/docs/TASK.md D1/r2, correction of02WR-P03-D1-R1/F1–F3
+- Targets: p03, p04, p05
+- Instruction/change: Reuse C004/r1 principal-only reviewer/People sealing contract. Preserve recipient principal identity across lifecycle demotion for notice cancellation. Identity resolution does not relax subject-specific admin/owner approval or account-based payload clearance, including publication-time revalidation. Principal-valued reply policies discover account mappings without locks, lock sorted accounts before company authorization, then revalidate exact mappings/policy under company serialization; no principal-before-account lock edge. Future p04 respects these authority/retirement contracts.
+- Dependencies/order: Blocks affected edits until B passes D1/r2 and root activates.
+- Evidence/review: D1/r1 findings retained; revised D1/r2 immutable at p03 logs/D1-r2.md; recheck pending.
+- Verification: p03 AC1–AC5 plus production pending/in-flight cancellation for both lifecycle callers, subject-specific authority/clearance revocation and deterministic both-order retirement/prelock races. p04 extends sealed reassignment; p05 combined final gates.
+- Responses: p03 acknowledges proposed r2 for gate; p04/p05 evaluate at startup.
+
+## p03 D1 activation (revision12)
+
+Root activates C004/r2 after independent PASS02WR-P03-D1-R2/N1 for D1/r2 and unchangedbe7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba. FindingsF1–F3 fixed at decision level; implementation/behavioral checks remain B1 obligations. p03 acknowledges active C004/r2 with I001–3/r1,C001/r1,C002/r2,C003/r2 before dependent edits.
+
+### 02WR-C004 / r3
+- State: active
+- Origin: p03 root observed inherited history regression; TASK D1/r3 and logs/B1-inherited-decision-tests1.txt
+- Targets: p03,p04,p05
+- Instruction/change: Extend principal-only identity with a bounded immutable reviewer-label display snapshot derived from the already-locked person principal on insert. Read labels from historical reviewer rows so principal deletion preserves the existing whole decision view. No account/user_id snapshot, authority relaxation or additional account lock. Future p04 replacements derive labels for new rows while retaining older facts. D1/r2 F1–F3 protocols remain unchanged.
+- Dependencies/order: Only label schema/projection edits wait for B PASS D1/r3 and activation; current C004/r2 remains active until then. Fresh owned schema DBs, no backfill.
+- Evidence/review: D1/r3 proposed; original whole-view preservation assertion retained, gate pending.
+- Verification: existing stable-history equality plus actual label projection, deletion/demotion retention, forged/updated label rejection, bounded multibyte labels and escaped rendering; all original p03 obligations remain.
+- Responses: p03 acknowledges proposedr3 for reopened gate; p04/p05 evaluate at startup.
+
+## D1/r3 activation (revision14)
+
+Root activates C004/r3 after independent PASS02WR-P03-D1-R3/N1 for D1/r3 and unchangedpartial-source63df976b49daad3df412d828c3086d92a519fdf92e19d1a5c1df1bb5a7e3829e. C004/r3 carries forward r2 identity/sealing and F1–F3 authority/lock/cancellation contracts, adding the bounded immutable label. Known regressionD1-R3/F1 remains implementation/verification open until B1. p03 acknowledges activeI001–3/r1,C001/r1,C002/r2,C003/r2,C004/r3 before affected edits. No B1 implementation acceptance.
+
+## p03 verification clarification pending (revision15)
+
+Root requests independent02WR-P03-C1/r1 assessment of a confirmed inherited owned-tenant action-identity FK failure and a bounded F3 coverage disposition. Currentactive notices unchanged. Decision/evidence in p03 TASK/logs; no product/schema contract change or unrelated fix proposed. Owning-run-company retirement commit stays a reported gap; alternative full account-retirement schedules and an owner-company lock-prefix schedule are proposed. Future p05 must consume the resulting reviewed disposition explicitly.

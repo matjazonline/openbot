@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 50s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 1 test
+
+thread 'adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session' (19308319) panicked at src/adapters/mcp/cleanup_tests.rs:165:5:
+assertion `left == right` failed
+  left: Err("request mismatch: exactly the dispatched request must be cancelled")
+ right: Ok(5)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session ... FAILED
+
+failures:
+
+failures:
+    adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,85 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/direct_delivery_tests.rs:78:35
+    |
+ 78 |     p.enqueue_standalone_delivery(&notice).await.unwrap();
+    |       --------------------------- ^^^^^^^ expected `NewStandaloneDelivery`, found `&NewStandaloneDelivery`
+    |       |
+    |       arguments to this method are incorrect
+    |
+note: method defined here
+   --> src/application/transport/queue.rs:436:14
+    |
+436 |     async fn enqueue_standalone_delivery(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+437 |         &self,
+438 |         delivery: NewStandaloneDelivery,
+    |         --------
+help: consider removing the borrow
+    |
+ 78 -     p.enqueue_standalone_delivery(&notice).await.unwrap();
+ 78 +     p.enqueue_standalone_delivery(notice).await.unwrap();
+    |
+
+error[E0283]: type annotations needed
+   --> src/adapters/persistence/workflow/direct_delivery_tests.rs:134:49
+    |
+134 |         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+    |         -----------------------                 ^^^^
+    |         |
+    |         required by a bound introduced by this call
+    |
+    = note: multiple `impl`s satisfying `_: Into<std::string::String>` found in the following crates: `core`, `unicase`:
+            - impl<'a> Into<std::string::String> for unicase::UniCase<std::string::String>;
+            - impl<T, U> Into<U> for T
+              where U: std::convert::From<T>;
+note: required by a bound in `application::transport::ingress::CanonicalContent::parse`
+   --> src/application/transport/ingress.rs:111:23
+    |
+110 |     pub fn parse(
+    |            ----- required by a bound in this associated function
+111 |         subject: impl Into<String>,
+    |                       ^^^^^^^^^^^^ required by this bound in `CanonicalContent::parse`
+help: try using a fully qualified path to specify the expected types
+    |
+134 -         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+134 +         CanonicalContent::parse(<&str as Into<T>>::into("Queue sibling"), "A standalone notification".into())
+    |
+help: consider removing this method call, as the receiver has type `&'static str` and `&'static str: Into<std::string::String>` trivially holds
+    |
+134 -         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+134 +         CanonicalContent::parse("Queue sibling", "A standalone notification".into())
+    |
+
+error[E0283]: type annotations needed
+   --> src/adapters/persistence/workflow/direct_delivery_tests.rs:134:85
+    |
+134 |         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+    |         ----------------------- required by a bound introduced by this call         ^^^^
+    |
+    = note: multiple `impl`s satisfying `_: Into<std::string::String>` found in the following crates: `core`, `unicase`:
+            - impl<'a> Into<std::string::String> for unicase::UniCase<std::string::String>;
+            - impl<T, U> Into<U> for T
+              where U: std::convert::From<T>;
+note: required by a bound in `application::transport::ingress::CanonicalContent::parse`
+   --> src/application/transport/ingress.rs:112:25
+    |
+110 |     pub fn parse(
+    |            ----- required by a bound in this associated function
+111 |         subject: impl Into<String>,
+112 |         body_text: impl Into<String>,
+    |                         ^^^^^^^^^^^^ required by this bound in `CanonicalContent::parse`
+help: try using a fully qualified path to specify the expected types
+    |
+134 -         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+134 +         CanonicalContent::parse("Queue sibling".into(), <&str as Into<T>>::into("A standalone notification"))
+    |
+help: consider removing this method call, as the receiver has type `&'static str` and `&'static str: Into<std::string::String>` trivially holds
+    |
+134 -         CanonicalContent::parse("Queue sibling".into(), "A standalone notification".into())
+134 +         CanonicalContent::parse("Queue sibling".into(), "A standalone notification")
+    |
+
+Some errors have detailed explanations: E0283, E0308.
+For more information about an error, try `rustc --explain E0283`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

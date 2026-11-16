@@ -1,0 +1,55 @@
+[
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "reachability",
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "source_modules"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "sqlx-prepare",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  },
+  {
+    "name": "offline-final",
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit_code": 0
+  }
+]

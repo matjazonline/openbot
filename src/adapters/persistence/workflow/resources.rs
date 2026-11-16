@@ -80,6 +80,10 @@ pub(super) async fn check_readiness(
                 authority::builtin_provisioning_tool(tool)?;
                 continue;
             }
+            ToolKind::Escalation => {
+                authority::builtin_escalation_tool(tool)?;
+                continue;
+            }
             ToolKind::Knowledge => {
                 authority::builtin_knowledge_tool(tool)?;
                 continue;

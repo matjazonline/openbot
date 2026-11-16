@@ -1,0 +1,14 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 7 tests
+test adapters::persistence::workflow::tests::binding_association_tests::workflow_binding_sql_grant_revocation_thread_scope_and_fixed_association ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_final_event_failure_rolls_back_head_and_history ... ok
+test adapters::persistence::workflow::tests::binding_association_tests::workflow_binding_sql_association_matches_domain_visibility_and_management ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_archive_and_actor_revocation_after_preflight ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_changed_configuration_roundtrips_without_mutating_history ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_competing_creation_edit_activity_and_aba ... ok
+test adapters::persistence::workflow::tests::binding_tests::workflow_binding_sql_mcp_revocation_readiness_and_contract_scope ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4169 filtered out; finished in 4.16s
+

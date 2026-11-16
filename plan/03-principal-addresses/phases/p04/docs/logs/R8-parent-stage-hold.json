@@ -1,0 +1,10 @@
+{
+  "parent_pid": 66037,
+  "command": "bash scripts/check.sh",
+  "reason": "Hold only check parent before the following stock-stack stage, so completed primary suite can be retained and externally Linux-proven R8/F1-F2 corrections adopted at a controlled artifact boundary. Main Cargo/test child continues unchanged.",
+  "source_artifact": "3adf4b435a51f0b482d3d372c43398a57cbc20c1823394f14fbfa3ab2a29ec8b",
+  "children_continuing": [
+    "79902 66037 S    /Users/mac02/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --locked --offline --all-targets"
+  ],
+  "next": "Wait primary gate finishes, inspect actual results, apply exact draft overrides, snapshot/equality/affected checks; resume held parent for unchanged Darwin stock/lease paths. No Rust source or Darwin behavior changes."
+}

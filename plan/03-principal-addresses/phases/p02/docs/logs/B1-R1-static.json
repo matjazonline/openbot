@@ -1,0 +1,85 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "HEAD",
+      "--check"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-evidence.py"
+    ],
+    "status": "PASS"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-workflow-evidence.py",
+      "--available-manifests"
+    ],
+    "status": "PASS"
+  }
+]

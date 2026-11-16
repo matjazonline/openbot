@@ -1,0 +1,49 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-precleanup-diag)
+error[E0277]: `domain::entities::mcp::McpToolName` doesn't implement `std::fmt::Display`
+   --> src/adapters/mcp/mod.rs:206:34
+    |
+206 |         eprintln!("D2TIMING call {name} start");
+    |                                  ^^^^^^ `domain::entities::mcp::McpToolName` cannot be formatted with the default formatter
+    |
+help: the trait `std::fmt::Display` is not implemented for `domain::entities::mcp::McpToolName`
+   --> src/domain/entities/mcp.rs:45:1
+    |
+ 45 | pub struct McpToolName(String);
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+    = note: required for `&domain::entities::mcp::McpToolName` to implement `std::fmt::Display`
+    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `eprintln` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `domain::entities::mcp::McpToolName` doesn't implement `std::fmt::Display`
+   --> src/adapters/mcp/mod.rs:240:34
+    |
+240 |         eprintln!("D2TIMING call {name} registered {:?}", diagnostic_started.elapsed());
+    |                                  ^^^^^^ `domain::entities::mcp::McpToolName` cannot be formatted with the default formatter
+    |
+help: the trait `std::fmt::Display` is not implemented for `domain::entities::mcp::McpToolName`
+   --> src/domain/entities/mcp.rs:45:1
+    |
+ 45 | pub struct McpToolName(String);
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+    = note: required for `&domain::entities::mcp::McpToolName` to implement `std::fmt::Display`
+    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `eprintln` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: `domain::entities::mcp::McpToolName` doesn't implement `std::fmt::Display`
+   --> src/adapters/mcp/mod.rs:242:34
+    |
+242 |         eprintln!("D2TIMING call {name} response {:?}, ok={}", diagnostic_started.elapsed(), matches!(&response, Ok(Ok(_))));
+    |                                  ^^^^^^ `domain::entities::mcp::McpToolName` cannot be formatted with the default formatter
+    |
+help: the trait `std::fmt::Display` is not implemented for `domain::entities::mcp::McpToolName`
+   --> src/domain/entities/mcp.rs:45:1
+    |
+ 45 | pub struct McpToolName(String);
+    | ^^^^^^^^^^^^^^^^^^^^^^
+    = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+    = note: required for `&domain::entities::mcp::McpToolName` to implement `std::fmt::Display`
+    = note: this error originates in the macro `$crate::format_args_nl` which comes from the expansion of the macro `eprintln` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

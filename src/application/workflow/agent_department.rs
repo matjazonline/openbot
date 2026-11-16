@@ -43,13 +43,13 @@ pub struct RosterDepartment {
     pub desk: Option<RosterDesk>,
 }
 
-/// An agent member or role holder, with its own default desk.
+/// An agent member or role holder, with its direct address.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct RosterAgent {
     pub name: String,
     pub slug: String,
     pub lead: bool,
-    pub desk: Option<RosterDesk>,
+    pub address: Option<crate::application::agent::AgentAddress>,
 }
 
 impl DepartmentContext {
@@ -75,19 +75,23 @@ impl DepartmentContext {
             return;
         };
         text.push_str("\nDesks around this department:");
-        line(text, "This department's desk", roster.desk.as_ref());
+        line(
+            text,
+            "This department's desk",
+            roster.desk.as_ref().map(|value| value.address.as_str()),
+        );
         if let Some(parent) = &roster.parent {
             line(
                 text,
                 &format!("Parent department {} ({})", parent.name, parent.slug),
-                parent.desk.as_ref(),
+                parent.desk.as_ref().map(|value| value.address.as_str()),
             );
         }
         for child in &roster.children {
             line(
                 text,
                 &format!("Child department {} ({})", child.name, child.slug),
-                child.desk.as_ref(),
+                child.desk.as_ref().map(|value| value.address.as_str()),
             );
         }
         if roster.more_children {
@@ -98,7 +102,7 @@ impl DepartmentContext {
             line(
                 text,
                 &format!("Agent {} ({}{role})", agent.name, agent.slug),
-                agent.desk.as_ref(),
+                agent.address.as_ref().map(|value| value.address.as_str()),
             );
         }
         if roster.more_agents {
@@ -107,14 +111,14 @@ impl DepartmentContext {
     }
 }
 
-fn line(text: &mut String, label: &str, desk: Option<&RosterDesk>) {
+fn line(text: &mut String, label: &str, address: Option<&str>) {
     text.push_str("\n- ");
     text.push_str(label);
-    match desk {
-        Some(desk) => {
+    match address {
+        Some(address) => {
             text.push_str(": ");
-            text.push_str(&desk.address);
+            text.push_str(address);
         }
-        None => text.push_str(": no desk"),
+        None => text.push_str(": no address"),
     }
 }

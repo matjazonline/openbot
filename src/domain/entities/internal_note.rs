@@ -49,7 +49,7 @@ impl FromStr for InternalNoteProvenance {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AddInternalNote {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub thread_id: Uuid,
     pub text: String,
     pub command_id: Uuid,
@@ -75,7 +75,7 @@ impl AddInternalNote {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TombstoneInternalNote {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub thread_id: Uuid,
     pub note_id: Uuid,
     pub command_id: Uuid,
@@ -105,7 +105,7 @@ mod tests {
     fn note(text: String) -> AddInternalNote {
         AddInternalNote {
             company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             thread_id: Uuid::new_v4(),
             text,
             command_id: Uuid::new_v4(),

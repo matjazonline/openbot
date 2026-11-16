@@ -1,0 +1,12 @@
+{
+  "parent": 91243,
+  "owned_descendants": [
+    13980,
+    14054,
+    14055
+  ],
+  "reason": "Controlled correction boundary after independent R4/F1; parent paused to prevent subsequent test stages, then TERM/CONT for EXIT cleanup",
+  "source": "99ec987f83548485a18f8edc71e96192d48507b117257ae7d3b962fbf54ab820",
+  "completed": "Formatting/whitespace/static/evidence/offline/Clippy/migrations/SQLx metadata; runtime/stack/lease pending",
+  "no_test_database_created_yet": true
+}

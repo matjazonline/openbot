@@ -1,0 +1,3 @@
+waiting for server to shut down.... done
+server stopped
+Removed owned PostgreSQL fixture directory. Source, evidence and successful build caches retained.

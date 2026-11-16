@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::http::routes::knowledge::tests::multipart_tests::knowledge_upload_multipart_file_count_size_format_and_unknown_fields_are_bounded ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4689 filtered out; finished in 0.16s
+

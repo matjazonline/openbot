@@ -1,0 +1,68 @@
+2026-11-12 11:29:13.630 CET [34528] ERROR:  syntax error at end of input at character 584
+2026-11-12 11:29:13.630 CET [34528] QUERY:  NOT FOUND OR NEW.run_id IS DISTINCT FROM source.run_id OR NEW.hop IS DISTINCT FROM source.hop
+	        OR NEW.origin_department_id IS DISTINCT FROM source.origin_department_id OR NEW.reason_code IS DISTINCT FROM source.reason_code
+	        OR NEW.created_at IS DISTINCT FROM source.created_at OR NEW.deadline IS DISTINCT FROM source.deadline
+	        OR source.ack_hours IS NULL OR NEW.deadline IS DISTINCT FROM NEW.created_at+make_interval(hours=>source.ack_hours::integer)
+	        OR (NEW.hop=2 AND source.policy->>'hops'<>'2')
+	        OR NEW.role IS DISTINCT FROM CASE WHEN NEW.hop=1
+2026-11-12 11:29:13.630 CET [34528] CONTEXT:  PL/pgSQL function guard_workflow_escalation_hop() line 15 at IF
+2026-11-12 11:29:13.630 CET [34528] STATEMENT:  INSERT INTO workflow_run_escalations(company_id,case_id,hop,run_id,decision_id,origin_department_id, chosen_department_id,role,reason_code,resolution,recipient_facts,control_event_id,created_at,deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+2026-11-12 11:29:13.631 CET [34525] ERROR:  syntax error at end of input at character 584
+2026-11-12 11:29:13.631 CET [34525] QUERY:  NOT FOUND OR NEW.run_id IS DISTINCT FROM source.run_id OR NEW.hop IS DISTINCT FROM source.hop
+	        OR NEW.origin_department_id IS DISTINCT FROM source.origin_department_id OR NEW.reason_code IS DISTINCT FROM source.reason_code
+	        OR NEW.created_at IS DISTINCT FROM source.created_at OR NEW.deadline IS DISTINCT FROM source.deadline
+	        OR source.ack_hours IS NULL OR NEW.deadline IS DISTINCT FROM NEW.created_at+make_interval(hours=>source.ack_hours::integer)
+	        OR (NEW.hop=2 AND source.policy->>'hops'<>'2')
+	        OR NEW.role IS DISTINCT FROM CASE WHEN NEW.hop=1
+2026-11-12 11:29:13.631 CET [34525] CONTEXT:  PL/pgSQL function guard_workflow_escalation_hop() line 15 at IF
+2026-11-12 11:29:13.631 CET [34525] STATEMENT:  INSERT INTO workflow_run_escalations(company_id,case_id,hop,run_id,decision_id,origin_department_id, chosen_department_id,role,reason_code,resolution,recipient_facts,control_event_id,created_at,deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+2026-11-12 11:29:13.748 CET [34528] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34524] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34532] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34525] FATAL:  terminating connection due to administrator command
+
+2026-11-12 11:29:13.631 CET [34525] ERROR:  syntax error at end of input at character 584
+2026-11-12 11:29:13.631 CET [34525] QUERY:  NOT FOUND OR NEW.run_id IS DISTINCT FROM source.run_id OR NEW.hop IS DISTINCT FROM source.hop
+	        OR NEW.origin_department_id IS DISTINCT FROM source.origin_department_id OR NEW.reason_code IS DISTINCT FROM source.reason_code
+	        OR NEW.created_at IS DISTINCT FROM source.created_at OR NEW.deadline IS DISTINCT FROM source.deadline
+	        OR source.ack_hours IS NULL OR NEW.deadline IS DISTINCT FROM NEW.created_at+make_interval(hours=>source.ack_hours::integer)
+	        OR (NEW.hop=2 AND source.policy->>'hops'<>'2')
+	        OR NEW.role IS DISTINCT FROM CASE WHEN NEW.hop=1
+2026-11-12 11:29:13.631 CET [34525] CONTEXT:  PL/pgSQL function guard_workflow_escalation_hop() line 15 at IF
+2026-11-12 11:29:13.631 CET [34525] STATEMENT:  INSERT INTO workflow_run_escalations(company_id,case_id,hop,run_id,decision_id,origin_department_id, chosen_department_id,role,reason_code,resolution,recipient_facts,control_event_id,created_at,deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+2026-11-12 11:29:13.748 CET [34528] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34524] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34532] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34525] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34535] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34530] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34533] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34534] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34529] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.748 CET [34527] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:13.940 CET [83599] LOG:  checkpoint complete: wrote 2310 buffers (14.1%), wrote 1 SLRU buffers; 0 WAL file(s) added, 0 removed, 1 recycled; write=101.686 s, sync=0.032 s, total=101.719 s; sync files=1661, longest=0.001 s, average=0.001 s; distance=20899 kB, estimate=22841 kB; lsn=F/AB4D46E8, redo lsn=F/A951AEA8
+2026-11-12 11:29:13.941 CET [83599] LOG:  checkpoint starting: immediate force wait
+2026-11-12 11:29:13.943 CET [83599] LOG:  checkpoint complete: wrote 1 buffers (0.0%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.001 s, sync=0.001 s, total=0.002 s; sync files=2, longest=0.001 s, average=0.001 s; distance=32486 kB, estimate=32486 kB; lsn=F/AB4D47C0, redo lsn=F/AB4D4760
+
+2026-11-12 11:29:15.028 CET [34546] ERROR:  syntax error at end of input at character 584
+2026-11-12 11:29:15.028 CET [34546] QUERY:  NOT FOUND OR NEW.run_id IS DISTINCT FROM source.run_id OR NEW.hop IS DISTINCT FROM source.hop
+	        OR NEW.origin_department_id IS DISTINCT FROM source.origin_department_id OR NEW.reason_code IS DISTINCT FROM source.reason_code
+	        OR NEW.created_at IS DISTINCT FROM source.created_at OR NEW.deadline IS DISTINCT FROM source.deadline
+	        OR source.ack_hours IS NULL OR NEW.deadline IS DISTINCT FROM NEW.created_at+make_interval(hours=>source.ack_hours::integer)
+	        OR (NEW.hop=2 AND source.policy->>'hops'<>'2')
+	        OR NEW.role IS DISTINCT FROM CASE WHEN NEW.hop=1
+2026-11-12 11:29:15.028 CET [34546] CONTEXT:  PL/pgSQL function guard_workflow_escalation_hop() line 15 at IF
+2026-11-12 11:29:15.028 CET [34546] STATEMENT:  INSERT INTO workflow_run_escalations(company_id,case_id,hop,run_id,decision_id,origin_department_id, chosen_department_id,role,reason_code,resolution,recipient_facts,control_event_id,created_at,deadline) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+2026-11-12 11:29:15.030 CET [34544] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.030 CET [34545] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.030 CET [34546] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.030 CET [34542] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.030 CET [34547] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.132 CET [83599] LOG:  checkpoint starting: immediate force wait
+2026-11-12 11:29:15.167 CET [83599] LOG:  checkpoint complete: wrote 1983 buffers (12.1%), wrote 2 SLRU buffers; 0 WAL file(s) added, 0 removed, 2 recycled; write=0.011 s, sync=0.023 s, total=0.035 s; sync files=1362, longest=0.001 s, average=0.001 s; distance=32474 kB, estimate=32485 kB; lsn=F/AD4B14E0, redo lsn=F/AD48B1C8
+2026-11-12 11:29:15.398 CET [34543] ERROR:  division by zero
+2026-11-12 11:29:15.398 CET [34543] CONTEXT:  SQL statement "SELECT 1/0"
+	PL/pgSQL function refuse_escalation_test() line 1 at PERFORM
+2026-11-12 11:29:15.398 CET [34543] STATEMENT:  INSERT INTO workflow_escalation_cases (company_id,id,source_kind,admission_refusal_id,binding_id,binding_revision, origin_department_id,policy,reason_code,step_id,role) SELECT refusal.company_id,gen_random_uuid(),'admission',refusal.id, refusal.binding_id,refusal.binding_revision,channel.department_id,configuration.escalation, workflow_role_refusal_code(refusal.role_refusal),refusal.role_refusal->>'step', refusal.role_refusal->>'role' FROM workflow_admission_refusals AS refusal JOIN workflow_binding_revisions AS configuration ON configuration.company_id=refusal.company_id AND configuration.binding_id=refusal.binding_id AND configuration.revision=refusal.binding_revision LEFT JOIN channels AS channel ON channel.company_id=refusal.company_id AND channel.id=refusal.channel_id WHERE refusal.company_id=$1 AND refusal.id=$2 AND configuration.escalation IS NOT NULL ON CONFLICT (company_id,admission_refusal_id) WHERE admission_refusal_id IS NOT NULL DO NOTHING RETURNING id
+2026-11-12 11:29:15.426 CET [34543] FATAL:  terminating connection due to administrator command
+2026-11-12 11:29:15.426 CET [34552] FATAL:  terminating connection due to administrator command

@@ -1,0 +1,30 @@
+{
+  "baseline": "plan/02-workflow-roles/phases/p03/docs/logs/B1-R2-static-inventory1.txt",
+  "current": "plan/02-workflow-roles/phases/p04/docs/logs/B1-unit-inventory4.txt",
+  "before": 4228,
+  "after": 4249,
+  "removed": [],
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_is_original_desk_not_chosen_ancestor",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_rejects_forged_missing_and_mutated_snapshot",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_competing_allocators_commit_distinct_revisions",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_refuses_missing_extra_and_foreign_members",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_revision_exhaustion_is_a_named_refusal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_changing_zero",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers",
+    "adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree",
+    "application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds",
+    "application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration",
+    "application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops",
+    "application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_reject_partial_or_ambiguous_documents",
+    "application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_sets_are_stable_and_explicitly_empty",
+    "application::workflow::registry::decision_tests::workflow_reviewer_follow_flag_is_static_and_compiled",
+    "application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof",
+    "application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_rejects_ambiguous_members_and_implicit_fields",
+    "domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference"
+  ]
+}

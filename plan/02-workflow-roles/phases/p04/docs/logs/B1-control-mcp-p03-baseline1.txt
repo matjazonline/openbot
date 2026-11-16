@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/openbot-p04-mcp-baseline-6xwpp7ro)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 13s
+     Running unittests src/lib.rs (/Users/mac02/.codex/worktrees/2050/openbot/target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (50479928) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4227 filtered out; finished in 0.19s
+
+error: test failed, to rerun pass `--lib`

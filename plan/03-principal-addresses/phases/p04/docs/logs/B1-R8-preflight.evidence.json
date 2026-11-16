@@ -1,0 +1,99 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R8-preflight",
+  "artifact": "3adf4b435a51f0b482d3d372c43398a57cbc20c1823394f14fbfa3ab2a29ec8b",
+  "checks": [
+    {
+      "criteria": [
+        "D3-shell-syntax"
+      ],
+      "command": "bash -n scripts/test-network-isolation.sh services/memory/scripts/test-network-isolation.sh scripts/check.sh; Python compile",
+      "fixture": "Darwin author shell; Linux NOT EXERCISED",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-local-shell-checks.txt",
+          "sha256": "352ac35ba6b8241364ac7f74f0aaa268eedfd5ad61bc04bffa8602be886a94c5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "D3-existing-Darwin"
+      ],
+      "command": "scripts/test-network-isolation.sh python3 wrapped-command",
+      "fixture": "Darwin sandbox network preflight; root wrapper",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-root-darwin.txt",
+          "sha256": "a98f6bddd100909850bd339dda529bf6f8ce7f72c175949a581a6b8d8dd7ca6c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "D3-existing-Darwin"
+      ],
+      "command": "services/memory/scripts/test-network-isolation.sh python3 wrapped-command",
+      "fixture": "Darwin sandbox network preflight; memory wrapper",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-memory-darwin.txt",
+          "sha256": "15d10b4f7e9ed7312c12c46d957a20cdbb531bb3602021a2fcd83796de478019"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "R7-ten-failures"
+      ],
+      "command": "immutable R7 libtest ten exact cases --nocapture; RUST_TEST_THREADS=4",
+      "fixture": "PG51167 phase-owned pa03_p04_r8_diag; binarybc5bb926...45843b; unchangedRustbytes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-ten-failures-replay1.txt",
+          "sha256": "a9e785798cdb90fc7fc7e74b69944a917db1a12b2ad881dd424c5e2b9fb4033b"
+        },
+        {
+          "path": "logs/R8-unchanged-rust-source.json",
+          "sha256": "ab83ee1521d9ab30517516dad0b4610f63328638627d7b292f2b3f0e92449993"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "prior-full-failure"
+      ],
+      "command": "scripts/check.sh RUST_TEST_THREADS=4 (R7)",
+      "fixture": "PG51167 own check fixtures; unchangedRustbytes; main4668PASS/10FAIL/27IGNORE; parentterminatedaftermain",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R7-final-check4.txt",
+          "sha256": "03b463996e89a4c02ac0fbdab4e3ed0b13132c5a0dc1269aaa0dd2f02b0b18ac"
+        },
+        {
+          "path": "logs/R7-main-failures.txt",
+          "sha256": "03c44e91dde8341c2c51c9a624055ef2c3193035d63371de62d9cab0a6f013d3"
+        },
+        {
+          "path": "logs/R7-correction-boundary-stop.json",
+          "sha256": "b873bf2c5df0db41e3f0026eaad163bf9ae35e48e8d147183bbc753f1100b425"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "D3-Linux-real-sockets",
+        "final-full-gates"
+      ],
+      "command": "Required exact-candidate CI43833996212 plus local scripts/check.sh active38573",
+      "fixture": "CIe888c26b/source3adf; localPG51167 ownedcheckfixtures; no competingCargo",
+      "status": "NOT EXERCISED",
+      "reason": "Current jobs active; Linux unavailable on localDarwin and final full run has not completed"
+    }
+  ]
+}

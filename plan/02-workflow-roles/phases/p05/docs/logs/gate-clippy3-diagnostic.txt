@@ -1,0 +1,4 @@
+# DIAGNOSTIC ONLY: the 7 pre-plan02 rustc-1.99.1 lint-drift findings allowed by name so dependent targets are linted; not a gate substitute
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 53s
+EXIT 0

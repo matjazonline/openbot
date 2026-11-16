@@ -29,6 +29,9 @@ export function createBrowserOwner(puppeteer) {
       await record('pending', null);
       browser = await puppeteer.launch({ executablePath: process.env.DOOP_TEST_UI_CHROME, headless: true,
         userDataDir: join(runtime, 'ui-profile'),
+        // Chrome creates a private scoped directory for its singleton Unix socket. A nested
+        // invocation TMPDIR can exceed that socket's path bound; the profile stays run-owned.
+        env: { ...process.env, TMPDIR: '/tmp' },
         args: [`--ignore-certificate-errors-spki-list=${process.env.DOOP_TEST_TLS_SPKI}`] });
       pid = browser.process()?.pid;
       assert.ok(Number.isInteger(pid) && pid > 1);

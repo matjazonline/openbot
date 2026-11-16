@@ -1,0 +1,147 @@
+{
+  "old_material_artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362",
+  "new_material_artifact": "3adf4b435a51f0b482d3d372c43398a57cbc20c1823394f14fbfa3ab2a29ec8b",
+  "claim": "All changed Rust implementation/fixture bytes remain identical to reviewed R7 and its immutable binary. No Rust testcase names added/removed in R8.",
+  "files": [
+    {
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "sha256": "34a41a60bc1e14651d88986073086904f7653a5fe383a4881bf5f42a92861a21"
+    },
+    {
+      "path": "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+      "sha256": "2b29d870063bf5b4302f880b9883af8d340ea1fee29f19746fd1c2336c1c7831"
+    },
+    {
+      "path": "src/adapters/mcp/authentication_tests.rs",
+      "sha256": "55a1399629040be32bbb72aa93eff640a3d58959314f1c541704fd57cbca36cf"
+    },
+    {
+      "path": "src/adapters/mcp/cleanup_tests.rs",
+      "sha256": "bf89cec3aa9095162a5e17b3bc3893632d2d885bfacff4936d0fa5440d859213"
+    },
+    {
+      "path": "src/adapters/mcp/connection.rs",
+      "sha256": "e183fc166a7e500e19008616c35c5e872a36c4e125fe854481eadb9ac91321f1"
+    },
+    {
+      "path": "src/adapters/mcp/doop_tests.rs",
+      "sha256": "1b5c73a91df0518959fb2c0fdff1b5a1355f70189db76d147cfa431c462e4a28"
+    },
+    {
+      "path": "src/adapters/mcp/http.rs",
+      "sha256": "e1b09bc9c4c297294aaeeff5739db598ee7d6d60eeb8e489d8d1043cf8fa4e29"
+    },
+    {
+      "path": "src/adapters/mcp/mod.rs",
+      "sha256": "895ce7b711a576542a21e69d5c5baff40e4278ccc0c355586945fc13b364403e"
+    },
+    {
+      "path": "src/adapters/mcp/registration_test_support.rs",
+      "sha256": "fa821835729bfa2ae5ff8623827ac87511b527d437151c5565378cb228029569"
+    },
+    {
+      "path": "src/adapters/mcp/tests.rs",
+      "sha256": "2c4da1f838b93cca220561261e426c5a5903e1d719ec239e6246001b9f5c8eea"
+    },
+    {
+      "path": "src/adapters/persistence/legacy_runtime_schema_tests.rs",
+      "sha256": "a2334ab914afd4387ec169132d88a912f25fa3ad856101f41556ffdce14f8985"
+    },
+    {
+      "path": "src/adapters/persistence/skill_tests.rs",
+      "sha256": "706ae1093c0af8ff6fb932c934efc204acff00c5be5007745a33585ab0e71c2b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_account_hints.rs",
+      "sha256": "fffc063c2551263e4d9dc0ee47d03748110723e59058e8de416b6fcde060c6e7"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_authority.rs",
+      "sha256": "b915f81d24ffbb3230f9a36ee781240d8c1e5eb9853a2ab88274936395bb72c1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_dispatch.rs",
+      "sha256": "c159a5faf1f733f6b7f0bdf6972243527ae88918ad058e3cc7dac30e30faf045"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_receipts.rs",
+      "sha256": "f9bda383159436b44cbb85266135ffedaa9757664150921e3e15ee0c0c7470db"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/actions.rs",
+      "sha256": "6911f901fc22bcdb4eedae48960e88322f018c519f980d6c35d7fcb1ee9bdebb"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/http.rs",
+      "sha256": "407e650783626a39c5dbf2305d02d776e9d2d8fc0eaa10c6f4728a5cb233d8a4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/http_runtime.rs",
+      "sha256": "91f9476a827e572e364547c18905bab4042609bd9728a342c21493122a61dfe3"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/integration_authority.rs",
+      "sha256": "74c5ad3e6d4f6a6f63c097d92b48577cba99a856179faf21623bc2df4d947722"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+      "sha256": "06640ee10276851c61b94b66b5bbcd3f802289266da5edcc6ba526ba56c7f800"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+      "sha256": "873c56c683110520599979d880fbd03ce67c596b06f694fcdb606e269463cc35"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+      "sha256": "a69735e8d39677781f9ae724d9f2adcbfe843b28762159f34acad71078772af4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/delivery.rs",
+      "sha256": "bf51ceeb129059f153d76f07b199d489c4e9de0361709910022f745cd79be036"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+      "sha256": "7273ddecbc0b7c804f6bfdfcd7e19bf510ec03df25e93243bb66c2c4d41ba46e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/resolution.rs",
+      "sha256": "25fb7f950c7e0a821c760ea67d77eed6bb7cd4b8ef3d492fda60130588fcbba0"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mcp.rs",
+      "sha256": "6a8aee0e5fe65f9f34fb30106f8375d44c880731da308299ac1c0ba940bc77d5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "sha256": "98e8e83d5aa3df2f869810051269a10ba8603d406b8ac43d793daedaf9ad8759"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "sha256": "0feab1e0be2f965a5c7ffccb42d4d6cdd1d179acd23acdf303ceea4ff77c75b0"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+      "sha256": "f61b5472dfa94ae19bc0e8e6bbeeb9b5edc24ce1696a86bf5d133fb57fa5fbd2"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/native_mcp/live.rs",
+      "sha256": "7c17865326755d762185af0e48ae4ef739918f508ffb544fbb4510e4f2bc35b6"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/native_mcp/mod.rs",
+      "sha256": "582a426e431af4fba33739d088375698d484db34e4cd75a9965717117b23c59c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/run_provenance/mod.rs",
+      "sha256": "3b0456b70e7bbf2fbf8670dbfe4211ac420d919ff2155a48e3c9efa7bcdc98d0"
+    },
+    {
+      "path": "src/application/agent/contract_tests.rs",
+      "sha256": "708753f7d7ae6a9db6118fa859289eec514d3dba5716f10e87af3692e2aa440b"
+    },
+    {
+      "path": "src/application/agent/definition.rs",
+      "sha256": "e3bde9e064f26e181ba66f012811d47081f22651e1c577d44602b71472cfc6b1"
+    }
+  ]
+}

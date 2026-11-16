@@ -1,0 +1,382 @@
+[
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_exact_binding_revoke_and_foreign_mutation_refusal",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:198:30:",
+    "error": "index out of bounds: the len is 0 but the index is 0 note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace"
+  },
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_failed_publication_retains_original_request_and_does_not_save_editor",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:150:5:",
+    "error": "<section id=\"agent-publication-8743af16-f0a7-4c6e-a603-8353bad4aff2\" class=\"mt-6 space-y-4 rounded-box border border-base-300 p-4\" hx-sync=\"this:queue all\" hx-disabled-elt=\"#agent-publication-8743af16-f0a7-4c6e-a603-8353bad4aff2 button\">         <h3 class=\"font-semibold\">Saved dr"
+  },
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_form_preserves_stale_input_tools_and_expected_revision",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:28:5:",
+    "error": "assertion `left == right` failed   left: 0"
+  },
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:432:6:",
+    "error": "called `Option::unwrap()` on a `None` value test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_missing_skill_tool_fails_shared_preview_without_changing_active ... FAILED"
+  },
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_order_survives_classic_metadata_save_and_stale_rejection",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:340:5:",
+    "error": "assertion `left == right` failed   left: []"
+  },
+  {
+    "test": "adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel",
+    "location": "src/adapters/http/routes/ui_agents/authoring/publication_tests.rs:287:35:",
+    "error": "index out of bounds: the len is 0 but the index is 0 test adapters::http::routes::ui_agents::authoring::publication::tests::autonomous_agent_authoring_skill_revocation_form_uses_exact_assignment_and_safe_panel ... FAILED"
+  },
+  {
+    "test": "adapters::http::routes::workflows::tests::tool_tests::autonomous_agent_authoring_competing_json_draft_writes_apply_once",
+    "location": "src/adapters/http/routes/workflows/tool_tests.rs:135:5:",
+    "error": "assertion `left == right` failed   left: [500, 500]"
+  },
+  {
+    "test": "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::autonomous_agent_authoring_workflow_picker_uses_current_hint_and_keeps_model_only_steps_tool_free",
+    "location": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs:96:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... ok"
+  },
+  {
+    "test": "adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republishing_workflow",
+    "location": "src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:63:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::http::routes::workflows::ui::authoring::tests::registration_authority_tests::autonomous_agent_authoring_workflow_registration_revocation_refuses_admission_without_republish"
+  },
+  {
+    "test": "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes",
+    "location": "src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:309:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::autonomous_agent_samples_keep_old_capture_and_hash_after_draft_changes ... FAILED"
+  },
+  {
+    "test": "adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects",
+    "location": "src/adapters/http/routes/workflows/ui/authoring/tools_tests.rs:63:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent::tests::postgres_agent_persistence_works",
+    "location": "src/adapters/persistence/agent.rs:853:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent::tests::postgres_agent_persistence_works ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_final_metadata_conflict_rolls_back_skill_and_binding_changes",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_competing_draft_writers_commit_one_complete_assignment_set ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content",
+    "location": "src/adapters/persistence/agent_publication/tests/authoring.rs:117:23:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::authoring::autonomous_agent_authoring_save_competing_with_publication_never_activates_unsaved_content ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::http::vault_binding_agent_publication_refuses_an_integration_http_source",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::mcp::vault_binding_agent_publication_refuses_an_integration_mcp_source ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_replay_returns_original_after_newer_activation",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_removal_revokes_identity_and_new_identity_cannot_revive_it ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_revoke_deactivate_and_delete_preserve_frozen_result",
+    "location": "src/adapters/persistence/agent_publication/tests/publication.rs:242:5:",
+    "error": "assertion failed: matches!(AgentPersistence::delete(&f.p, f.scope.agent.as_uuid()).await,     Err(AppError::Conflict(_)))"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::publication::autonomous_agent_publication_validation_failure_preserves_active_and_history",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_actual_skill_deletion_serializes_before_capture ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") "
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_holds_draft_and_shared_text_until_commit",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::races::autonomous_agent_publication_capture_serializes_before_actual_skill_deletion ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_missing_requirement_preserves_active_without_adding_grants ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_removal_reassignment_and_explicit_revoke_preserve_incarnations ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment",
+    "location": "src/adapters/persistence/agent_publication/tests/support.rs:94:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::agent_publication::tests::skills::autonomous_agent_skills_shared_edit_does_not_change_frozen_text_or_live_assignment ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::department::tests::lead_desks::department_lead_desk_agent_to_agent_repoints_the_same_binding",
+    "location": "src/adapters/persistence/department_lead_desk_tests.rs:119:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: RowNotFound test adapters::persistence::department::tests::lead_desks::department_lead_desk_agent_to_agent_repoints_the_same_binding ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_an_agent_created_as_its_lead",
+    "location": "src/adapters/persistence/department_lead_desk_tests.rs:119:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: RowNotFound test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_an_agent_created_as_its_lead ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_person_and_agent_leads_with_one_binding",
+    "location": "src/adapters/persistence/department_lead_desk_tests.rs:119:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: RowNotFound test adapters::persistence::department::tests::lead_desks::department_lead_desk_follows_person_and_agent_leads_with_one_binding ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::department::tests::lead_desks::department_lead_desk_with_an_agent_lead_answers_on_it",
+    "location": "src/adapters/persistence/department_lead_desk_tests.rs:119:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: RowNotFound test adapters::persistence::department::tests::lead_desks::department_lead_desk_with_an_agent_lead_answers_on_it ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version",
+    "location": "src/adapters/persistence/skill_tests.rs:256:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::skill::tests::a_capability_snapshot_never_mixes_an_agent_row_with_a_different_relationship_version ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::onboarding::tests::onboarding_new_owner_with_new_key_does_not_replay_the_previous_owners_command",
+    "location": "src/adapters/persistence/onboarding/tests.rs:758:5:",
+    "error": "Completed([OnboardedAgent { agent: Agent { id: ed852073-3475-8ec7-9487-d862a9c8d3fa, draft_revision: AgentDraftRevision(1), company_id: Some(7820a47c-a68e-4700-93fe-135b4980df53), name: \"Desk\", slug: \"desk\", open_to_public: false, provider: Some(\"openai\"), model: Some(\"gpt-4o-min"
+  },
+  {
+    "test": "adapters::persistence::onboarding::tests::onboarding_second_channel_error_rolls_back_every_effect",
+    "location": "src/adapters/persistence/onboarding/tests.rs:280:10:",
+    "error": "called `Result::unwrap_err()` on an `Ok` value: [OnboardedAgent { agent: Agent { id: 3a25970d-a494-8081-90b7-638bee5ddc14, draft_revision: AgentDraftRevision(1), company_id: Some(70c460e8-b0f3-4581-8e3a-1de6d870a538), name: \"First\", slug: \"first\", open_to_public: false, provider:"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup",
+    "location": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs:48:5:",
+    "error": "Err(Database(\"error returned from database: update or delete on table \\\"agent_revisions\\\" violates foreign key constraint \\\"agent_manifest_revisions_company_id_agent_id_revision_id_fkey\\\" on table \\\"agent_manifest_revisions\\\"\")) test adapters::persistence::workflow::tests::admiss"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks",
+    "location": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs:48:5:",
+    "error": "Ok(()) test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_competing_writers_cannot_retarget_a_binding_identity",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_draft_tests.rs:82:5:",
+    "error": "assertion `left == right` failed   left: 0"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_are_independent",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_draft_tests.rs:31:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::draft_tests::autonomous_agent_storage_draft_round_trip_order_and_live_grants_a"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revision_assignments",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_revision_tests.rs:85:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::revision_tests::autonomous_agent_storage_skill_incarnations_and_sealed_revisio"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializes_before_source_delete",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs:32:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_authority_reader_serializ"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_and_cannot_revive_assignment",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs:32:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_preserves_history_"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_authority_reader",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_storage_skill_lifetime_tests.rs:32:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::skill_lifetime_tests::autonomous_agent_storage_skill_delete_serializes_before_"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_graph_tests.rs:175:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::autonomous_agent_admission_cycle_refuses_atomically_but_model_only_is_a_leaf ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_publication",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_child_selection_tests.rs:62:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::autonomous_agent_admission_descendant_keeps_the_parent_selection_after_new_pub"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_children_first_tool_child_keeps_root_selected_agent_and_workflow_after_publication_and_repin",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:70:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_children_tests.rs:70:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_r"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_configuration",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs:98:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::autonomous_agent_samples_nested_aliases_and_model_only_leaf_keep_exact_sealed_conf"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_production_effects",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_sample_closure_tests.rs:98:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::samples::bounds::autonomous_agent_samples_draft_cycle_is_refused_without_activation_or_prod"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/approval.rs:57:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::driver::e2e::autonomous_agent_e2e_approval_reconstruction_after_publication_keeps_saved_call_and_skill ... FA"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs:72:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_native_scope_selection_binding_and_content ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_origin_fixture.rs:72:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::origin_schema::autonomous_agent_storage_action_origin_populated_collector_and_company_cascade ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect",
+    "location": "src/adapters/persistence/workflow/agent_recovery_tests.rs:465:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::recovery::autonomous_agent_recovery_model_removal_preserves_unknown_effect ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists",
+    "location": "src/adapters/persistence/workflow/agent_runtime_tests.rs:426:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::workflow_agent_capability_writers_preserve_unsupplied_lists ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_authoring_mcp_tests.rs:56:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::authoring_journey::autonomous_agent_authoring_one_typed_mcp_agent_runs_in_two_workflows_and_views_retain_revisions ..."
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_draft_skill_detach_keeps_selection_until_exact_revocation",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:88:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_park_commit_ack_proves_atomic_saved_owner_or_no_operation ... ok"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_invalid_required_alias_draft_cannot_replace_active_capabilities",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:88:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_invalid_required_alias_draft_cannot_replace_active_capabilities ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_model_removal_after_admission_refuses_before_all_peers",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:88:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::live::autonomous_agent_e2e_model_removal_after_admission_refuses_before_all_peers ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:88:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::races::autonomous_agent_e2e_competing_publication_admission_and_lost_commit_replies ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/support.rs:88:14:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::e2e::revisions::autonomous_agent_e2e_mixed_tools_skills_two_workflows_and_queued_revisions ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_retargeted_alias_cannot_redirect_saved_call_and_dispatch_races_once",
+    "location": "src/adapters/persistence/workflow/autonomous_agent_e2e/mcp_effects.rs:40:10:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::e2e::autonomous_agent_e2e_retargeted_alias_cannot_redirect_saved_call_and_dispatch_races_once .."
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_protocol_new_revision_provider_and_schema_keep_prior_pairs_as_data",
+    "location": "src/adapters/persistence/workflow/agent_history_private_context_tests.rs:237:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::agent_history_protocol_new_revision_provider_and_schema_keep"
+  },
+  {
+    "test": "application::use_cases::thread::tests::a_hop_to_a_plain_channel_is_relayed",
+    "location": "src/application/use_cases/thread/tests.rs:1705:5:",
+    "error": "Refused(\"Sender unauthorized for channel\") test application::use_cases::thread::tests::a_hop_to_a_plain_channel_is_relayed ... FAILED"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::workflow_tool_revocation_tests::current_authority::autonomous_agent_authority_workflow_repoint_requires_new_binding_publication",
+    "location": "src/adapters/persistence/workflow/workflow_tool_current_authority_tests.rs:157:6:",
+    "error": "called `Result::unwrap()` on an `Err` value: Internal(\"Company agent has no direct address\") test application::workflow::compiler::compile::validation_tests::workflow_compiler_validates_literals_in_original_reference_scopes ... ok"
+  },
+  {
+    "test": "application::workflow::publication::tests::agent_tests::department::department_context_follows_the_instructions_and_precedes_skills",
+    "location": "src/application/workflow/publication/../agent_department_tests.rs:107:5:",
+    "error": "Answer using the supplied context "
+  },
+  {
+    "test": "application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks",
+    "location": "src/application/workflow/publication/../agent_department_tests.rs:209:5:",
+    "error": "assertion failed: declaration.description.contains(\"An agent's desk is the address its own replies come from\") test application::workflow::publication::tests::agent_tests::department::department_directory_tool_description_names_departments_and_desks ... FAILED"
+  }
+]

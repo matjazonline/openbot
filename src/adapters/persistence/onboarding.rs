@@ -8,7 +8,7 @@ use super::{
     agent::{AGENT_COLUMNS, AgentDb},
     channel::prepare_library_agent_on,
     company::{model_api_key_on, model_connections_on},
-    company_agent::{CompanyAgentCreation, create_company_agent_on, default_desk_key},
+    company_agent::{CompanyAgentCreation, create_company_agent_on},
     department::{create_department_with_id_on, place_in_department_on},
     workflow::provisioning::ProvisioningDeployment,
 };
@@ -104,6 +104,34 @@ impl OnboardingSession for Session {
     async fn model_connections(&mut self) -> AppResult<Vec<CompanyModelConnection>> {
         model_connections_on(&mut self.tx, self.company_id).await
     }
+    async fn completed_agents(&mut self, ids: &[Uuid]) -> AppResult<Vec<OnboardedAgent>> {
+        let agents = self.existing_agents(ids).await?;
+        let principals: Vec<(Uuid, Uuid)> = sqlx::query_as(
+            "SELECT agent_id,id FROM principals WHERE company_id=$1 AND agent_id=ANY($2) AND kind='agent'",
+        ).bind(self.company_id).bind(ids).fetch_all(&mut *self.tx).await?;
+        ids.iter()
+            .map(|id| {
+                let agent = agents
+                    .iter()
+                    .find(|agent| agent.id == *id)
+                    .cloned()
+                    .ok_or_else(|| {
+                        AppError::Internal("Prepared onboarding agent was not found.".into())
+                    })?;
+                let principal = principals
+                    .iter()
+                    .find(|row| row.0 == *id)
+                    .map(|row| row.1)
+                    .ok_or_else(|| {
+                        AppError::Internal("Onboarding agent has no principal.".into())
+                    })?;
+                Ok(OnboardedAgent {
+                    agent,
+                    principal_id: crate::entities::transport::PrincipalId::new(principal),
+                })
+            })
+            .collect()
+    }
     async fn model_api_key(&mut self, provider: &ModelProvider) -> AppResult<Option<String>> {
         model_api_key_on(&self.persistence, &mut self.tx, self.company_id, provider).await
     }
@@ -134,19 +162,7 @@ impl OnboardingSession for Session {
             self.tx.rollback().await?;
             return rejected(error);
         }
-        let agents = self.existing_agents(&command.selected_ids).await?;
-        let mut results = Vec::with_capacity(agents.len());
-        for id in command.selected_ids {
-            let agent = agents
-                .iter()
-                .find(|agent| agent.id == id)
-                .cloned()
-                .ok_or_else(|| {
-                    AppError::Internal("Prepared onboarding agent was not found.".into())
-                })?;
-            let channel = self.channel(&agent).await?;
-            results.push(OnboardedAgent { agent, channel });
-        }
+        let results = self.completed_agents(&command.selected_ids).await?;
         self.tx.commit().await?;
         Ok(OnboardingOutcome::Completed(results))
     }
@@ -243,19 +259,6 @@ impl Session {
             None,
         )
         .await
-    }
-
-    /// The agent's default desk, as its creation recorded it.
-    async fn channel(&mut self, agent: &Agent) -> AppResult<serde_json::Value> {
-        sqlx::query_scalar(
-            "SELECT result FROM workflow_provisioning_commands \
-             WHERE company_id = $1 AND command_key = $2",
-        )
-        .bind(self.company_id)
-        .bind(default_desk_key(agent.id))
-        .fetch_optional(&mut *self.tx)
-        .await?
-        .ok_or_else(|| AppError::Internal(format!("Agent '{}' has no default desk", agent.slug)))
     }
 }
 

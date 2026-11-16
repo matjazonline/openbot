@@ -2,7 +2,7 @@
 
 - Authority: `/Users/mac02/orca/workspaces/openbot/attribution-service/plan/attribution-service/COORDINATION.md`
 - Writer: `/root`, current Codex session in `/Users/mac02/orca/workspaces/openbot/attribution-service`
-- Revision: 28
+- Revision: 30
 
 ## Plan-wide instructions
 
@@ -265,3 +265,29 @@ This scope acceptance does not certify the whole repository. AS-P10-VG1 departme
 lifecycleConflict remains causally unresolved; original failed and unexercised
 root/memory/plugin/Doop gates remain explicit in p10 final evidence. No global
 green, production deployment, commit or push is implied.
+
+
+## Main publication integration — revision29
+
+User explicitly authorized "push to main" on 2026-11-16. The accepted attribution
+source was committed as e61d384e after exact comparison with55ecc5ea. Remote main
+advanced to8fdb892b; its existing principal-address/workflow changes merge cleanly
+without attribution implementation changes. Root owns final integration in the main
+workspace and preserves all incoming work. C001–C008/r1 and the prior unresolved
+verification gaps remain unchanged. P10 owns focused merged-source checks, retained
+Astra integration review, merge commit and a non-force SSH push to main. Production
+deployment remains outside this authorization.
+
+
+## Main publication acceptance — revision30
+
+Root accepts AS-P10-PUSH-R1 on merged digest3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d,
+review basee61d384e and incoming main8fdb892b. Independent B AS-P10-PUSH-R1-N1 PASS
+confirms attribution bytes, combined identity/lifecycle contracts, focused25PASS
+and actual SSO1PASS/8checks. Formatting, offline all-target compilation, fresh
+migration, service build and manifest retention pass. Initial linker disk-full
+failure and successful artifact-only retry remain recorded. No source edits were
+needed for this merge. C001–C008/r1 unchanged and satisfied for agreed scope;
+VG1 and global verification gaps remain. Owned publication PG18 is stopped and
+removed; no phase worker/check remains active. User-authorized non-force push of
+this accepted merge targets origin/main. Production deployment remains deferred.

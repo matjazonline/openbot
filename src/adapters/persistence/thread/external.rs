@@ -6,6 +6,8 @@
 //! collide -- and neither is a column on `threads` or `messages`, which is what lets one canonical
 //! thread be bound to email and several Slack conversations at once.
 
+use crate::entities::address::AddressTarget;
+use crate::entities::transport::PrincipalId;
 use uuid::Uuid;
 
 use crate::{
@@ -53,27 +55,29 @@ pub(super) async fn find_external_thread(
 pub(super) async fn canonical_email_binding(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
-    channel_id: Uuid,
+    target: AddressTarget,
 ) -> AppResult<ChannelBindingId> {
     let binding: Option<Uuid> = sqlx::query_scalar(
         r#"SELECT binding.id
            FROM channel_bindings AS binding
            WHERE binding.company_id = $1
-             AND binding.channel_id = $2
+             AND binding.channel_id IS NOT DISTINCT FROM $2
+             AND binding.principal_id IS NOT DISTINCT FROM $3
              AND binding.transport = 'email'
              AND binding.installation_id IS NULL
            ORDER BY binding.created_at, binding.id
            LIMIT 1"#,
     )
     .bind(company_id)
-    .bind(channel_id)
+    .bind(target.desk_id())
+    .bind(target.principal_id().map(PrincipalId::as_uuid))
     .fetch_optional(&mut *connection)
     .await
     .map_err(AppError::from)?;
 
     binding.map(ChannelBindingId::new).ok_or_else(|| {
         AppError::Internal(format!(
-            "Channel {channel_id} has no canonical email binding to correlate mail against"
+            "Target {target:?} has no canonical email binding to correlate mail against"
         ))
     })
 }
@@ -199,7 +203,7 @@ pub(super) async fn insert_or_verify_external_message(
 /// thread.
 pub(super) struct ExternalThreadMapping<'a> {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
     pub binding_id: ChannelBindingId,
     pub key: &'a ExternalThreadKey,
     pub thread_id: Uuid,
@@ -216,23 +220,24 @@ pub(super) async fn upsert_external_thread(
 ) -> AppResult<()> {
     let ExternalThreadMapping {
         company_id,
-        channel_id,
+        target,
         binding_id,
         key,
         thread_id,
     } = mapping;
     sqlx::query(
         r#"INSERT INTO external_threads (
-                id, company_id, channel_id, binding_id, external_thread_key, thread_id
-           ) VALUES ($1, $2, $3, $4, $5, $6)
+                id, company_id, channel_id, binding_id, external_thread_key, thread_id, principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
            ON CONFLICT (binding_id, external_thread_key) DO NOTHING"#,
     )
     .bind(Uuid::new_v4())
     .bind(company_id)
-    .bind(channel_id)
+    .bind(target.desk_id())
     .bind(binding_id.as_uuid())
     .bind(key.as_str())
     .bind(thread_id)
+    .bind(target.principal_id().map(PrincipalId::as_uuid))
     .execute(&mut *connection)
     .await
     .map_err(AppError::from)?;

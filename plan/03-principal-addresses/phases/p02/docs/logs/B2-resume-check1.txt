@@ -1,0 +1,1481 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/mod.rs:252:14
+    |
+252 |             .get_thread_by_id(thread_id)
+    |              ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+252 |             .get_thread_by_id(thread_id, /* Uuid */)
+    |                                        ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:254:37
+    |
+254 |             .filter(|thread| thread.channel_id == channel.id);
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/application/use_cases/thread/reads.rs:124:14
+    |
+124 |             .list_threads_updated_after(scope.channel_id, after, limit)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^                   ----- argument #2 of type `AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+124 |             .list_threads_updated_after(scope.channel_id, /* AddressTarget */, after, limit)
+    |                                                           ++++++++++++++++++++
+
+error[E0599]: no method named `list_threads_by_channel_id` found for struct `std::sync::Arc<(dyn application::ports::thread::ThreadPersistence + 'static)>` in the current scope
+   --> src/application/use_cases/thread/reads.rs:108:14
+    |
+106 |           let threads = self
+    |  _______________________-
+107 | |             .thread_persistence
+108 | |             .list_threads_by_channel_id(scope.channel_id, before, limit)
+    | |_____________-^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: there is a method `list_threads_by_target` with a similar name, but with different arguments
+   --> src/application/ports/thread/mod.rs:55:5
+    |
+ 55 | /     async fn list_threads_by_target(
+ 56 | |         &self,
+ 57 | |         company_id: Uuid,
+ 58 | |         target: crate::entities::address::AddressTarget,
+ 59 | |         before: Option<ThreadCursor>,
+ 60 | |         limit: usize,
+ 61 | |     ) -> AppResult<Vec<Thread>>;
+    | |________________________________^
+
+error[E0407]: method `list_threads_by_channel_id` is not a member of trait `ThreadPersistence`
+   --> src/application/use_cases/thread/test_support.rs:440:5
+    |
+440 |       async fn list_threads_by_channel_id(
+    |       ^        -------------------------- help: there is an associated function with a similar name: `list_threads_by_target`
+    |  _____|
+    | |
+441 | |         &self,
+442 | |         channel_id: Uuid,
+443 | |         before: Option<ThreadCursor>,
+...   |
+458 | |         Ok(threads)
+459 | |     }
+    | |_____^ not a member of trait `ThreadPersistence`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/thread/inbound.rs:665:9
+    |
+662 |     super::insert_thread_principals(
+    |     ------------------------------- arguments to this function are incorrect
+...
+665 |         association.channel_id,
+    |         ^^^^^^^^^^^^^^^^^^^^^^ expected `AddressTarget`, found `Uuid`
+    |
+note: function defined here
+   --> src/adapters/persistence/thread/mod.rs:253:21
+    |
+253 | pub(super) async fn insert_thread_principals(
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+256 |     target: AddressTarget,
+    |     ---------------------
+help: try wrapping the expression in `domain::entities::address::AddressTarget::Desk`
+    |
+665 |         domain::entities::address::AddressTarget::Desk(association.channel_id),
+    |         +++++++++++++++++++++++++++++++++++++++++++++++                      +
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/http/routes/authorization_test_support.rs:105:14
+    |
+105 |             .create_thread(channel, "Private thread", &[])
+    |              ^^^^^^^^^^^^^          ---------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+105 |             .create_thread(channel, /* AddressTarget */, "Private thread", &[])
+    |                                     ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/http/routes/authorization_test_support.rs:110:14
+    |
+110 |             .create_thread(foreign_channel, "Foreign private thread", &[])
+    |              ^^^^^^^^^^^^^                  ------------------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+110 |             .create_thread(foreign_channel, /* AddressTarget */, "Foreign private thread", &[])
+    |                                             ++++++++++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+  --> src/adapters/http/routes/ui_local_agents_tests.rs:89:19
+   |
+89 |     f.persistence.get_thread_by_id(id).await.unwrap().unwrap()
+   |                   ^^^^^^^^^^^^^^^^---- argument #2 of type `uuid::Uuid` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:53:14
+   |
+53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+   |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+   |
+89 |     f.persistence.get_thread_by_id(id, /* Uuid */).await.unwrap().unwrap()
+   |                                      ++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:450:14
+    |
+450 |             .get_thread_by_id(thread_id)
+    |              ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+450 |             .get_thread_by_id(thread_id, /* Uuid */)
+    |                                        ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/routing.rs:452:37
+    |
+452 |             .filter(|thread| thread.channel_id == channel.id))
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:384:18
+    |
+384 |                 .get_thread_by_id(target_thread_id)
+    |                  ^^^^^^^^^^^^^^^^------------------ argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+384 |                 .get_thread_by_id(target_thread_id, /* Uuid */)
+    |                                                   ++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/routing.rs:386:23
+    |
+386 |             && thread.channel_id == candidate.channel.id
+    |                       ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:394:18
+    |
+394 |                 .find_thread_for_message(candidate.channel.id, reply_to_id)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^                       ----------- argument #2 of type `AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+394 |                 .find_thread_for_message(candidate.channel.id, /* AddressTarget */, reply_to_id)
+    |                                                                ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/routing.rs:396:23
+    |
+396 |             && thread.channel_id == candidate.channel.id
+    |                       ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:405:59
+    |
+405 |             && let Some(thread) = self.thread_persistence.get_thread_by_id(thread_id).await?
+    |                                                           ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+405 |             && let Some(thread) = self.thread_persistence.get_thread_by_id(thread_id, /* Uuid */).await?
+    |                                                                                     ++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/routing.rs:406:23
+    |
+406 |             && thread.channel_id == candidate.channel.id
+    |                       ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:424:14
+    |
+424 |             .find_thread_by_thread_index(candidate.channel.id, &index)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                       ------ argument #2 of type `AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:92:14
+    |
+ 92 |     async fn find_thread_by_thread_index(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 95 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+424 |             .find_thread_by_thread_index(candidate.channel.id, /* AddressTarget */, &index)
+    |                                                                ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/routing.rs:426:37
+    |
+426 |             .filter(|thread| thread.channel_id == candidate.channel.id))
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/ingest/mod.rs:412:18
+    |
+412 |                 .get_thread_by_id(*thread_id)
+    |                  ^^^^^^^^^^^^^^^^------------ argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+412 |                 .get_thread_by_id(*thread_id, /* Uuid */)
+    |                                             ++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/mod.rs:421:23
+    |
+421 |             if thread.channel_id != prepared_channel.candidate.channel.id {
+    |                       ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/ingest/mod.rs:424:28
+    |
+424 |                     thread.channel_id, prepared_channel.candidate.channel.id
+    |                            ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/application/use_cases/thread/reads.rs:124:14
+    |
+124 |             .list_threads_updated_after(scope.channel_id, after, limit)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^                   ----- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+124 |             .list_threads_updated_after(scope.channel_id, /* AddressTarget */, after, limit)
+    |                                                           ++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/http/routes/ui_stream_tests.rs:337:9
+    |
+337 |         ThreadPersistence::create_thread(self.persistence.as_ref(), self.channel_id, subject, &[])
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                                             ------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+337 |         ThreadPersistence::create_thread(self.persistence.as_ref(), self.channel_id, /* AddressTarget */, subject, &[])
+    |                                                                                      ++++++++++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/mod.rs:321:18
+    |
+321 |                 .get_thread_by_id(thread_id)
+    |                  ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+321 |                 .get_thread_by_id(thread_id, /* Uuid */)
+    |                                            ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:323:31
+    |
+323 |                 .filter(|t| t.channel_id == channel_id),
+    |                               ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/mod.rs:327:26
+    |
+327 |                         .find_thread_for_message(channel_id, reply_to)
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^             -------- argument #2 of type `AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+327 |                         .find_thread_for_message(channel_id, /* AddressTarget */, reply_to)
+    |                                                              ++++++++++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/mod.rs:403:14
+    |
+403 |             .get_thread_by_id(command.thread_id)
+    |              ^^^^^^^^^^^^^^^^------------------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+403 |             .get_thread_by_id(command.thread_id, /* Uuid */)
+    |                                                ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:405:37
+    |
+405 |             .filter(|thread| thread.channel_id == channel.id)
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:407:33
+    |
+407 |         debug_assert_eq!(thread.channel_id, command.channel_id);
+    |                                 ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/use_cases/thread/mod.rs:432:14
+    |
+432 |             .get_thread_by_id(command.thread_id)
+    |              ^^^^^^^^^^^^^^^^------------------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+432 |             .get_thread_by_id(command.thread_id, /* Uuid */)
+    |                                                ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:434:37
+    |
+434 |             .filter(|thread| thread.channel_id == channel.id)
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/mod.rs:436:33
+    |
+436 |         debug_assert_eq!(thread.channel_id, command.channel_id);
+    |                                 ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+  --> src/adapters/http/pages/local_agents/mod.rs:54:55
+   |
+54 |         format!("&channel={}&conversation={}", thread.channel_id, thread.id)
+   |                                                       ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+  --> src/adapters/http/pages/local_agents/mod.rs:61:16
+   |
+61 |         thread.channel_id, thread.id))
+   |                ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/persistence/dashboard_tests.rs:149:18
+    |
+149 |     let thread = ThreadPersistence::create_thread(persistence, fixture.channel, "Dashboard", &[])
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                               ----------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+149 |     let thread = ThreadPersistence::create_thread(persistence, fixture.channel, /* AddressTarget */, "Dashboard", &[])
+    |                                                                                 ++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/persistence/delivery/tests.rs:103:18
+    |
+103 |     let thread = ThreadPersistence::create_thread(persistence, channel.id, "Delivery", &[])
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                          ---------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+103 |     let thread = ThreadPersistence::create_thread(persistence, channel.id, /* AddressTarget */, "Delivery", &[])
+    |                                                                            ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/adapters/persistence/local_agents/management/tests.rs:450:75
+    |
+450 |         json!({"company":s.f.company,"channel":view.conversation.unwrap().channel_id,
+    |                                                                           ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+  --> src/adapters/persistence/thread/test_support.rs:86:14
+   |
+86 |             .create_thread(channel.id, "Subject", &[EmailAddress::from(email)])
+   |              ^^^^^^^^^^^^^             --------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:45:14
+   |
+45 |     async fn create_thread(
+   |              ^^^^^^^^^^^^^
+...
+48 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+86 |             .create_thread(channel.id, /* AddressTarget */, "Subject", &[EmailAddress::from(email)])
+   |                                        ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/test_support.rs:104:14
+    |
+104 |             .create_thread(
+    |              ^^^^^^^^^^^^^
+105 |                 channel_id,
+106 |                 subject,
+    |                 ------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+104 |             .create_thread(
+105 |                 channel_id,
+106 ~                 /* AddressTarget */,
+107 ~                 subject,
+    |
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/application/workflow/authorization.rs:123:14
+    |
+123 |         self.get_thread_by_id(id.as_uuid()).await
+    |              ^^^^^^^^^^^^^^^^-------------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+123 |         self.get_thread_by_id(id.as_uuid(), /* Uuid */).await
+    |                                           ++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/workflow/authorization.rs:187:59
+    |
+187 |             if thread.id != thread_id.as_uuid() || thread.channel_id != channel_id.as_uuid() {
+    |                                                           ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/message_reply_tests.rs:297:10
+    |
+297 |         .create_thread(source, "Delegated", &[])
+    |          ^^^^^^^^^^^^^         ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+297 |         .create_thread(source, /* AddressTarget */, "Delegated", &[])
+    |                                ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/message_intent_tests.rs:129:14
+    |
+129 |             .create_thread(
+    |              ^^^^^^^^^^^^^
+130 |                 channel,
+131 |                 "Question",
+    |                 ---------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+129 |             .create_thread(
+130 |                 channel,
+131 ~                 /* AddressTarget */,
+132 ~                 "Question",
+    |
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+  --> src/adapters/persistence/workflow/agent_history_capacity_tests.rs:38:14
+   |
+38 |             .create_thread(
+   |              ^^^^^^^^^^^^^
+39 |                 f.s.channel,
+40 |                 "Independent",
+   |                 ------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:45:14
+   |
+45 |     async fn create_thread(
+   |              ^^^^^^^^^^^^^
+...
+48 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+38 |             .create_thread(
+39 |                 f.s.channel,
+40 ~                 /* AddressTarget */,
+41 ~                 "Independent",
+   |
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+  --> src/adapters/persistence/workflow/message_thread_tests.rs:99:10
+   |
+99 |         .create_thread(channel, "Question", &[EmailAddress::from(CUSTOMER)])
+   |          ^^^^^^^^^^^^^          ---------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:45:14
+   |
+45 |     async fn create_thread(
+   |              ^^^^^^^^^^^^^
+...
+48 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+99 |         .create_thread(channel, /* AddressTarget */, "Question", &[EmailAddress::from(CUSTOMER)])
+   |                                 ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/message_thread_tests.rs:199:18
+    |
+199 |                 .create_thread(other, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+    |                  ^^^^^^^^^^^^^        ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+199 |                 .create_thread(other, /* AddressTarget */, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+    |                                       ++++++++++++++++++++
+
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+  --> src/adapters/persistence/address_tests/rejoin.rs:83:22
+   |
+83 |         let thread = ThreadPersistence::create_thread(
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+86 |             "Existing correspondence",
+   |             ------------------------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:45:14
+   |
+45 |     async fn create_thread(
+   |              ^^^^^^^^^^^^^
+...
+48 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+83 |         let thread = ThreadPersistence::create_thread(
+84 |             &self.fixture.persistence,
+85 |             desk.id,
+86 ~             /* AddressTarget */,
+87 ~             "Existing correspondence",
+   |
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:394:18
+    |
+394 |                 .find_thread_for_message(candidate.channel.id, reply_to_id)
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^                       ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+394 |                 .find_thread_for_message(candidate.channel.id, /* AddressTarget */, reply_to_id)
+    |                                                                ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/ingest/routing.rs:424:14
+    |
+424 |             .find_thread_by_thread_index(candidate.channel.id, &index)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                       ------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:92:14
+    |
+ 92 |     async fn find_thread_by_thread_index(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 95 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+424 |             .find_thread_by_thread_index(candidate.channel.id, /* AddressTarget */, &index)
+    |                                                                ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/application/use_cases/thread/mod.rs:327:26
+    |
+327 |                         .find_thread_for_message(channel_id, reply_to)
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^             -------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+327 |                         .find_thread_for_message(channel_id, /* AddressTarget */, reply_to)
+    |                                                              ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/application/workflow/tests/authorization_cases/association.rs:102:11
+    |
+102 |     wrong.channel_id = Uuid::new_v4();
+    |           ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+  --> src/application/workflow/tests/authorization_cases/cancellation.rs:74:58
+   |
+74 |                 channel_id: RelatedChannelId::new(thread.channel_id),
+   |                                                          ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0050]: method `create_thread` has 4 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::create_thread` has 5
+   --> src/application/use_cases/thread/test_support.rs:403:9
+    |
+403 | /         &self,
+404 | |         channel_id: Uuid,
+405 | |         subject: &str,
+406 | |         participant_emails: &[EmailAddress],
+    | |___________________________________________^ expected 5 parameters, found 4
+    |
+   ::: src/application/ports/thread/mod.rs:46:9
+    |
+ 46 | /         &self,
+ 47 | |         company_id: Uuid,
+ 48 | |         target: crate::entities::address::AddressTarget,
+ 49 | |         subject: &str,
+ 50 | |         participant_emails: &[EmailAddress],
+    | |___________________________________________- trait requires 5 parameters
+
+error[E0050]: method `get_thread_by_id` has 2 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::get_thread_by_id` has 3
+   --> src/application/use_cases/thread/test_support.rs:429:31
+    |
+429 |     async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
+    |                               ^^^^^^^^^^^^^^^ expected 3 parameters, found 2
+    |
+   ::: src/application/ports/thread/mod.rs:53:31
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |                               --------------------------------- trait requires 3 parameters
+
+error[E0050]: method `list_threads_updated_after` has 4 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::list_threads_updated_after` has 5
+   --> src/application/use_cases/thread/test_support.rs:462:9
+    |
+462 | /         &self,
+463 | |         channel_id: Uuid,
+464 | |         after: Option<ThreadCursor>,
+465 | |         limit: usize,
+    | |____________________^ expected 5 parameters, found 4
+    |
+   ::: src/application/ports/thread/mod.rs:78:9
+    |
+ 78 | /         &self,
+ 79 | |         company_id: Uuid,
+ 80 | |         target: crate::entities::address::AddressTarget,
+ 81 | |         after: Option<ThreadCursor>,
+ 82 | |         limit: usize,
+    | |____________________- trait requires 5 parameters
+
+error[E0050]: method `update_thread_participants` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::update_thread_participants` has 4
+   --> src/application/use_cases/thread/test_support.rs:483:9
+    |
+483 | /         &self,
+484 | |         id: Uuid,
+485 | |         participant_emails: &[EmailAddress],
+    | |___________________________________________^ expected 4 parameters, found 3
+    |
+   ::: src/application/ports/thread/mod.rs:86:9
+    |
+ 86 | /         &self,
+ 87 | |         company_id: Uuid,
+ 88 | |         id: Uuid,
+ 89 | |         participant_emails: &[EmailAddress],
+    | |___________________________________________- trait requires 4 parameters
+
+error[E0050]: method `find_thread_for_message` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::find_thread_for_message` has 4
+   --> src/application/use_cases/thread/test_support.rs:523:9
+    |
+523 | /         &self,
+524 | |         channel_id: Uuid,
+525 | |         message_id: CanonicalMessageId,
+    | |______________________________________^ expected 4 parameters, found 3
+    |
+   ::: src/application/ports/thread/mod.rs:114:9
+    |
+114 | /         &self,
+115 | |         company_id: Uuid,
+116 | |         target: crate::entities::address::AddressTarget,
+117 | |         message_id: CanonicalMessageId,
+    | |______________________________________- trait requires 4 parameters
+
+error[E0050]: method `find_thread_by_thread_index` has 3 parameters but the declaration in trait `application::ports::thread::ThreadPersistence::find_thread_by_thread_index` has 4
+   --> src/application/use_cases/thread/test_support.rs:561:9
+    |
+561 | /         &self,
+562 | |         channel_id: Uuid,
+563 | |         thread_index: &ThreadIndex,
+    | |__________________________________^ expected 4 parameters, found 3
+    |
+   ::: src/application/ports/thread/mod.rs:93:9
+    |
+ 93 | /         &self,
+ 94 | |         company_id: Uuid,
+ 95 | |         target: crate::entities::address::AddressTarget,
+ 96 | |         thread_index: &ThreadIndex,
+    | |__________________________________- trait requires 4 parameters
+
+error[E0046]: not all trait items implemented, missing: `list_threads_by_target`
+   --> src/application/use_cases/thread/test_support.rs:382:1
+    |
+382 |   impl ThreadPersistence for InMemoryThreads {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ missing `list_threads_by_target` in implementation
+    |
+   ::: src/application/ports/thread/mod.rs:55:5
+    |
+ 55 | /     async fn list_threads_by_target(
+ 56 | |         &self,
+ 57 | |         company_id: Uuid,
+ 58 | |         target: crate::entities::address::AddressTarget,
+ 59 | |         before: Option<ThreadCursor>,
+ 60 | |         limit: usize,
+ 61 | |     ) -> AppResult<Vec<Thread>>;
+    | |________________________________- `list_threads_by_target` from trait
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+   --> src/adapters/http/pages/tests.rs:157:9
+    |
+157 |         channel_id,
+    |         ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+    |
+    = note: available fields are: `company_id`, `target`
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+   --> src/adapters/http/routes/channel.rs:891:13
+    |
+891 |             channel_id: Uuid::new_v4(),
+    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+    |
+    = note: available fields are: `company_id`, `target`
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+   --> src/adapters/http/routes/channel.rs:977:13
+    |
+977 |             channel_id: channel.id,
+    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+    |
+    = note: available fields are: `company_id`, `target`
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+    --> src/adapters/http/routes/channel.rs:1137:13
+     |
+1137 |             channel_id: channel.id,
+     |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+     |
+     = note: available fields are: `company_id`, `target`
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+  --> src/adapters/http/routes/channel_authorization_tests.rs:80:10
+   |
+80 |         .create_thread(other_channel.id, "Other channel secret", &[])
+   |          ^^^^^^^^^^^^^                   ---------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:45:14
+   |
+45 |     async fn create_thread(
+   |              ^^^^^^^^^^^^^
+...
+48 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+80 |         .create_thread(other_channel.id, /* AddressTarget */, "Other channel secret", &[])
+   |                                          ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+   --> src/adapters/http/routes/ui_local_agents_tests.rs:101:43
+    |
+101 |     let (channel, conversation) = (thread.channel_id, thread.id);
+    |                                           ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+Some errors have detailed explanations: E0061, E0308, E0599, E0609.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib) due to 31 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0061]: this function takes 5 arguments but 4 arguments were supplied
+   --> src/adapters/persistence/dashboard_tests.rs:338:18
+    |
+338 |     let thread = ThreadPersistence::create_thread(&persistence, a.channel, "Later", &[])
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                          ------- argument #3 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+338 |     let thread = ThreadPersistence::create_thread(&persistence, a.channel, /* AddressTarget */, "Later", &[])
+    |                                                                            ++++++++++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/persistence/local_agents/management/tests.rs:372:30
+    |
+372 |     let mut conversation = p.get_thread_by_id(s.conversation).await.unwrap().unwrap();
+    |                              ^^^^^^^^^^^^^^^^---------------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+372 |     let mut conversation = p.get_thread_by_id(s.conversation, /* Uuid */).await.unwrap().unwrap();
+    |                                                             ++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/thread/read_tests.rs:49:14
+   |
+49 |             .find_thread_by_thread_index(fixture.channel_id, &direct_reply)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                     ------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:92:14
+   |
+92 |     async fn find_thread_by_thread_index(
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+95 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+49 |             .find_thread_by_thread_index(fixture.channel_id, /* AddressTarget */, &direct_reply)
+   |                                                              ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/thread/read_tests.rs:69:14
+   |
+69 |             .find_thread_by_thread_index(fixture.channel_id, &third_reply)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                     ------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:92:14
+   |
+92 |     async fn find_thread_by_thread_index(
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+95 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+69 |             .find_thread_by_thread_index(fixture.channel_id, /* AddressTarget */, &third_reply)
+   |                                                              ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/thread/read_tests.rs:90:14
+   |
+90 |             .find_thread_by_thread_index(foreign_channel, &third_reply)
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^                  ------------ argument #2 of type `domain::entities::address::AddressTarget` is missing
+   |
+note: method defined here
+  --> src/application/ports/thread/mod.rs:92:14
+   |
+92 |     async fn find_thread_by_thread_index(
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+95 |         target: crate::entities::address::AddressTarget,
+   |         ------
+help: provide the argument
+   |
+90 |             .find_thread_by_thread_index(foreign_channel, /* AddressTarget */, &third_reply)
+   |                                                           ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:109:10
+    |
+109 |         .find_thread_by_thread_index(Uuid::new_v4(), &ThreadIndex::from("not-base64"))
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^                 -------------------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:92:14
+    |
+ 92 |     async fn find_thread_by_thread_index(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 95 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+109 |         .find_thread_by_thread_index(Uuid::new_v4(), /* AddressTarget */, &ThreadIndex::from("not-base64"))
+    |                                                      ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:252:10
+    |
+252 |         .list_threads_updated_after(fixture.channel_id, None, 50)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     ---- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+252 |         .list_threads_updated_after(fixture.channel_id, /* AddressTarget */, None, 50)
+    |                                                         ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:264:10
+    |
+264 |         .list_threads_updated_after(fixture.channel_id, Some(all[0].cursor()), 50)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+264 |         .list_threads_updated_after(fixture.channel_id, /* AddressTarget */, Some(all[0].cursor()), 50)
+    |                                                         ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:271:10
+    |
+271 |         .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+271 |         .list_threads_updated_after(fixture.channel_id, /* AddressTarget */, Some(all[2].cursor()), 50)
+    |                                                         ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:285:10
+    |
+285 |         .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^                     --------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:77:14
+    |
+ 77 |     async fn list_threads_updated_after(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 80 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+285 |         .list_threads_updated_after(fixture.channel_id, /* AddressTarget */, Some(all[2].cursor()), 50)
+    |                                                         ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:413:10
+    |
+413 |         .create_thread(fixture.channel_id, "Subject", std::slice::from_ref(&author))
+    |          ^^^^^^^^^^^^^                     --------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+413 |         .create_thread(fixture.channel_id, /* AddressTarget */, "Subject", std::slice::from_ref(&author))
+    |                                            ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/thread/read_tests.rs:436:10
+    |
+436 |         .update_thread_participants(
+    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+437 |             thread.id,
+438 |             &[author.clone(), EmailAddress::from("cc@partner.test")],
+    |             -------------------------------------------------------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:85:14
+    |
+ 85 |     async fn update_thread_participants(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+ 88 |         id: Uuid,
+    |         --
+help: provide the argument
+    |
+436 |         .update_thread_participants(
+437 |             thread.id,
+438 ~             /* Uuid */,
+439 ~             &[author.clone(), EmailAddress::from("cc@partner.test")],
+    |
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/thread/view_tests.rs:439:10
+    |
+439 |         .find_thread_for_message(fixture.channel_id, stored.canonical_id)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^                     ------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+439 |         .find_thread_for_message(fixture.channel_id, /* AddressTarget */, stored.canonical_id)
+    |                                                      ++++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/thread/view_tests.rs:449:10
+    |
+449 |         .find_thread_for_message(other_channel_id, stored.canonical_id)
+    |          ^^^^^^^^^^^^^^^^^^^^^^^                   ------------------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:113:14
+    |
+113 |     async fn find_thread_for_message(
+    |              ^^^^^^^^^^^^^^^^^^^^^^^
+...
+116 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+449 |         .find_thread_for_message(other_channel_id, /* AddressTarget */, stored.canonical_id)
+    |                                                    ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/channel_reply_membership_tests.rs:199:10
+    |
+199 |         .create_thread(channel, "Target", &[])
+    |          ^^^^^^^^^^^^^          -------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+199 |         .create_thread(channel, /* AddressTarget */, "Target", &[])
+    |                                 ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/channel_reply_membership_tests.rs:217:10
+    |
+217 |         .create_thread(donor.channel, "Ordinary", &[])
+    |          ^^^^^^^^^^^^^                ---------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+217 |         .create_thread(donor.channel, /* AddressTarget */, "Ordinary", &[])
+    |                                       ++++++++++++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/message_thread_tests.rs:886:10
+    |
+886 |         .create_thread(setup.channel, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+    |          ^^^^^^^^^^^^^                ----------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:45:14
+    |
+ 45 |     async fn create_thread(
+    |              ^^^^^^^^^^^^^
+...
+ 48 |         target: crate::entities::address::AddressTarget,
+    |         ------
+help: provide the argument
+    |
+886 |         .create_thread(setup.channel, /* AddressTarget */, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+    |                                       ++++++++++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/persistence/address_tests/rejoin.rs:247:10
+    |
+247 |         .get_thread_by_id(thread.id)
+    |          ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+247 |         .get_thread_by_id(thread.id, /* Uuid */)
+    |                                    ++++++++++++
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+   --> src/adapters/persistence/address_tests/rejoin.rs:292:10
+    |
+292 |         .get_thread_by_id(thread.id)
+    |          ^^^^^^^^^^^^^^^^----------- argument #2 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/ports/thread/mod.rs:53:14
+    |
+ 53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+    |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+    |
+292 |         .get_thread_by_id(thread.id, /* Uuid */)
+    |                                    ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/test_support.rs:300:34
+    |
+300 |             .map(|thread| thread.channel_id)
+    |                                  ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+   --> src/application/use_cases/thread/test_support.rs:410:13
+    |
+410 |             channel_id,
+    |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+    |
+    = note: available fields are: `company_id`, `target`
+
+error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/test_support.rs:452:37
+    |
+452 |             .filter(|thread| thread.channel_id == channel_id)
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/test_support.rs:473:37
+    |
+473 |             .filter(|thread| thread.channel_id == channel_id)
+    |                                     ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/test_support.rs:537:35
+    |
+537 |             .find(|thread| thread.channel_id == channel_id && thread_ids.contains(&thread.id))
+    |                                   ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `&&domain::entities::thread::Thread`
+   --> src/application/use_cases/thread/test_support.rs:587:65
+    |
+587 |                 .find(|thread| thread.id == thread_id && thread.channel_id == channel_id)
+    |                                                                 ^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `identity` on type `&&ThreadPrincipalIntent`
+    --> src/application/use_cases/thread/test_support.rs:1488:35
+     |
+1488 |                         && intent.identity.transport() == TransportKind::Email
+     |                                   ^^^^^^^^ unknown field
+     |
+     = note: available fields are: `reference`, `role`
+
+error[E0609]: no field `identity` on type `&ThreadPrincipalIntent`
+    --> src/application/use_cases/thread/test_support.rs:1490:57
+     |
+1490 |                 .map(|intent| EmailAddress::from(intent.identity.subject().as_str()))
+     |                                                         ^^^^^^^^ unknown field
+     |
+     = note: available fields are: `reference`, `role`
+
+error[E0061]: this method takes 2 arguments but 1 argument was supplied
+    --> src/application/use_cases/thread/test_support.rs:1497:30
+     |
+1497 | ...                   .get_thread_by_id(*thread_id)
+     |                        ^^^^^^^^^^^^^^^^------------ argument #2 of type `uuid::Uuid` is missing
+     |
+note: method defined here
+    --> src/application/ports/thread/mod.rs:53:14
+     |
+  53 |     async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
+     |              ^^^^^^^^^^^^^^^^                          --
+help: provide the argument
+     |
+1497 |                             .get_thread_by_id(*thread_id, /* Uuid */)
+     |                                                         ++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/application/use_cases/thread/test_support.rs:1515:30
+     |
+1515 | ...                   .update_thread_participants(*thread_id, &participants)
+     |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^             ------------- argument #2 of type `uuid::Uuid` is missing
+     |
+note: method defined here
+    --> src/application/ports/thread/mod.rs:85:14
+     |
+  85 |     async fn update_thread_participants(
+     |              ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+  88 |         id: Uuid,
+     |         --
+help: provide the argument
+     |
+1515 |                             .update_thread_participants(*thread_id, /* Uuid */, &participants)
+     |                                                                     +++++++++++
+
+error[E0061]: this method takes 4 arguments but 3 arguments were supplied
+    --> src/application/use_cases/thread/test_support.rs:1522:26
+     |
+1522 |                         .create_thread(association.channel_id, subject, &emails)
+     |                          ^^^^^^^^^^^^^                         ------- argument #2 of type `domain::entities::address::AddressTarget` is missing
+     |
+note: method defined here
+    --> src/application/ports/thread/mod.rs:45:14
+     |
+  45 |     async fn create_thread(
+     |              ^^^^^^^^^^^^^
+...
+  48 |         target: crate::entities::address::AddressTarget,
+     |         ------
+help: provide the argument
+     |
+1522 |                         .create_thread(association.channel_id, /* AddressTarget */, subject, &emails)
+     |                                                                ++++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+    --> src/application/use_cases/thread/tests.rs:2794:39
+     |
+2794 |     assert_eq!(result.thread.unwrap().channel_id, channel_id);
+     |                                       ^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0609]: no field `channel_id` on type `domain::entities::thread::Thread`
+    --> src/application/use_cases/thread/tests.rs:3289:32
+     |
+3289 |         result.thread.unwrap().channel_id,
+     |                                ^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `id`, `company_id`, `target`, `subject`, `participant_principal_ids` ... and 3 others
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+  --> src/application/workflow/tests/authorization_cases/mod.rs:35:9
+   |
+35 |         channel_id,
+   |         ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+   |
+   = note: available fields are: `company_id`, `target`
+
+error[E0560]: struct `domain::entities::thread::Thread` has no field named `channel_id`
+  --> src/domain/entities/thread.rs:72:13
+   |
+72 |             channel_id: Uuid::new_v4(),
+   |             ^^^^^^^^^^ `domain::entities::thread::Thread` does not have this field
+   |
+   = note: available fields are: `company_id`, `target`
+
+Some errors have detailed explanations: E0046, E0050, E0061, E0308, E0407, E0560, E0599, E0609.
+For more information about an error, try `rustc --explain E0046`.
+error: could not compile `open_bots` (lib test) due to 96 previous errors

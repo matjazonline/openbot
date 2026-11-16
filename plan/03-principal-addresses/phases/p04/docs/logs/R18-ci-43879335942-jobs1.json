@@ -1,0 +1,137 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 133340705556,
+      "run_id": 43879335942,
+      "workflow_name": "Plan03 Linux catalog correction proof",
+      "head_branch": "codex/plan03-p04-r18-e1f2be66",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43879335942",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAfC7mzFA",
+      "head_sha": "e1f2be664aba6475e322f3de62debda0df0a7f74",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/133340705556",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43879335942/job/133340705556",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-16T13:48:27Z",
+      "started_at": "2026-11-16T13:48:30Z",
+      "completed_at": "2026-11-16T13:57:07Z",
+      "name": "focused-linux",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-16T13:48:31Z",
+          "completed_at": "2026-11-16T13:48:34Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-16T13:48:34Z",
+          "completed_at": "2026-11-16T13:48:47Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-16T13:48:47Z",
+          "completed_at": "2026-11-16T13:49:01Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-16T13:49:01Z",
+          "completed_at": "2026-11-16T13:49:13Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-16T13:49:13Z",
+          "completed_at": "2026-11-16T13:49:15Z"
+        },
+        {
+          "name": "Record platform and require ordinary CI database configuration",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-16T13:49:15Z",
+          "completed_at": "2026-11-16T13:49:15Z"
+        },
+        {
+          "name": "Fetch locked dependencies and compile current tests offline",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-16T13:49:15Z",
+          "completed_at": "2026-11-16T13:54:40Z"
+        },
+        {
+          "name": "Require the complete Doop family and corrected crash and reply cases",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-16T13:54:40Z",
+          "completed_at": "2026-11-16T13:54:41Z"
+        },
+        {
+          "name": "Exercise actual Linux paths under network isolation with four competing test threads",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-16T13:54:41Z",
+          "completed_at": "2026-11-16T13:56:54Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-16T13:56:54Z",
+          "completed_at": "2026-11-16T13:57:04Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-16T13:57:04Z",
+          "completed_at": "2026-11-16T13:57:04Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-16T13:57:04Z",
+          "completed_at": "2026-11-16T13:57:04Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-16T13:57:04Z",
+          "completed_at": "2026-11-16T13:57:04Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/133340705556",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001242,
+      "runner_name": "GitHub Actions 1000001242",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

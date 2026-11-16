@@ -1,0 +1,159 @@
+
+running 142 tests
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... ok
+test adapters::persistence::notification::tests::a_failed_projection_batch_backs_off_before_it_can_be_claimed_again ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_rechecks_expiry_after_waiting_for_the_event_row ... ok
+test adapters::persistence::notification::tests::notification_census_executes_against_postgres ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_queued_behind_a_settings_edit_is_refused_with_nothing_stored ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_intent_leaves_no_thread_message_or_mapping ... ok
+test adapters::persistence::thread::inbound_tests::a_commit_that_fails_at_the_threads_writes_nothing_either ... ok
+test adapters::persistence::thread::inbound_tests::a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_binding ... ok
+test adapters::persistence::thread::inbound_tests::a_redelivery_returns_the_first_delivery_and_enqueues_nothing_further ... ok
+test adapters::persistence::thread::inbound_tests::a_repeated_key_with_changed_content_is_a_collision_rather_than_a_rewrite ... ok
+test adapters::persistence::thread::inbound_tests::a_reply_observed_before_its_root_wins_the_provider_thread_mapping ... ok
+test adapters::persistence::thread::inbound_tests::a_settings_edit_queued_behind_a_commit_applies_after_it ... ok
+test adapters::persistence::thread::inbound_tests::a_stored_event_key_reused_with_a_different_body_is_a_collision ... ok
+test adapters::persistence::thread::inbound_tests::a_crash_at_any_inbox_phase_recovers_without_a_duplicate_canonical_message ... ok
+test adapters::persistence::thread::inbound_tests::an_accepted_message_lands_with_its_mapping_thread_and_intent_at_once ... ok
+test adapters::persistence::thread::inbound_tests::an_association_through_another_channels_binding_names_the_first_bad_pair ... ok
+test adapters::persistence::thread::inbound_tests::authored_identity_cannot_belong_to_a_different_author_principal ... ok
+test adapters::persistence::thread::inbound_tests::concurrent_different_messages_sharing_a_new_thread_key_open_one_thread ... ok
+test adapters::persistence::thread::inbound_tests::inconsistent_multi_binding_message_mappings_are_a_typed_collision ... ok
+test adapters::persistence::thread::inbound_tests::canonical_rows_and_inbox_completion_commit_together ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::an_intent_records_disposition_policy_origin_and_relay_trace ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::each_association_gets_one_intent_and_redelivery_adds_none ... ok
+test adapters::persistence::thread::inbound_tests::multi_task_tests::intent_rows_cannot_reach_across_tenants ... ok
+test adapters::persistence::thread::inbound_tests::slack_participant_intents_persist_with_explicit_roles_and_no_email_projection ... ok
+test adapters::persistence::thread::inbound_tests::two_concurrent_deliveries_of_one_message_produce_one_of_everything ... ok
+test adapters::persistence::workflow::escalations::access::tests::workflow_escalation_payload_source_validates_identity_before_using_a_public_stamp ... ok
+test adapters::persistence::thread::inbound_tests::lease_loss_at_final_commit_rolls_back_every_canonical_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_deferred_deadline_and_lost_ack_are_atomic ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_first_successor_link_enforces_run_and_company_scope ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_rule_replay_ignores_new_available_predecessor ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::recovery_tests::workflow_batch_hard_transaction_timeout_releases_run_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_elapsed_budget_yields_and_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_frozen_rule_choice_and_default_survive_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_invalid_scope_lease_due_state_and_bounds_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_failures_rollback_at_each_write_boundary ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_nonpure_boundary_is_unactivated_pending ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_output_schema_failure_preserves_progress_and_settles ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_real_competitors_make_one_progression ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_records_map_rule_end_and_null_output ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_run_lock_contention_cannot_cross_deadline_or_timeout ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_sql_rejects_mutated_choice_route_successor_and_duplicate_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::workflow_batch_yield_replay_and_resume_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_activated_expired_wait_takes_final_error ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_effect_output_and_spent_pending_reconcile ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_invalid_wait_input_terminates_before_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::uncertainty_tests::workflow_action_uncertainty_pending_failures_consult_expired_action_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_io_activation_and_wrong_kind_park ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::pending_io_tests::workflow_poison_wait_deadlines_and_invalid_input_settle ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_competing_deadline_owners_create_one_terminal_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_case_failure_rolls_back_expiry_and_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_requires_actual_expiry_and_delivers_one_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_competing_decision_sweepers_commit_one_failure_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_deadline_fails_real_wait_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_authored_handler_suppresses_ladder_even_at_end ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_case_failure_rolls_back_terminal_and_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_invalid_output_enqueues_one_actual_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_case_failure_rolls_back_run_and_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_preserves_real_source_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_competing_expiry_owners_record_one_exhausted_handling_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_expiry_keeps_one_bounded_mixed_page_and_ordinary_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_origin_policy_stays_private_without_a_reply_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_notice_before_real_role_writer_commits_captured_root_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_account_update_role_writer_and_notice_all_finish ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::role_lock_tests::workflow_escalation_agent_real_role_writer_gate_contention_defers_then_admits_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::terminal_tests::workflow_escalation_agent_competing_terminal_owners_fail_original_recipient_without_recursion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_competing_actual_workers_commit_one_receipt_and_email_per_person ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_one_retired_recipient_preserves_the_capable_recipients_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_projection_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_post_projection_retirement_cancels_email_and_expedites_without_rewriting_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipt_cannot_commit_without_fenced_event_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipts_reject_forged_opt_out_and_source_rebinding ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_source_uuid_and_public_stamp_validation_agree_in_rust_and_sql ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_control_real_repair_seals_sixteen_maximum_escaped_labels ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::a_dead_workflow_delivery_notifies_its_run_actor_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_admission_replay_with_another_delivery_policy_conflicts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_claims_are_fair_across_tenants ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_competing_claimants_admit_one_run_and_fence_the_stale_worker ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_crash_after_admission_replays_its_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_ignores_bindings_activated_later_or_deactivated ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_in_app_policy_reaches_the_admitted_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_poison_batch_is_not_reclaimed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_reconfigured_binding_is_re_read_before_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_refused_run_as_is_visible_and_spares_its_sibling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rows_cannot_name_another_companys_records ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rules_admit_each_eligible_binding_independently ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_transient_failure_retries_only_the_failed_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_worker_stops_between_and_during_processing ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_does_not_change_agent_or_people_modes ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof ... ok
+test domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference ... ok
+test domain::entities::notification::tests::a_delivery_failure_emails_only_when_its_preference_is_on ... ok
+test domain::entities::notification::tests::only_the_delivery_source_and_action_parse ... ok
+test domain::entities::notification::tests::self_triggered_actions_keep_in_app_but_suppress_email ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed' (4046438) panicked at src/adapters/persistence/workflow/role_reviewer_tests.rs:142:40:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/value", span: SourceSpan { start: 310, end: 311, line: 1, column: 311 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed
+
+test result: FAILED. 141 passed; 1 failed; 0 ignored; 0 measured; 4286 filtered out; finished in 78.71s
+

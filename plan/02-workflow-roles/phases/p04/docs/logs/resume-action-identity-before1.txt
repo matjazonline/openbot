@@ -1,0 +1,17 @@
+$ /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 workflow_action_approval_digest_fk_rejects_each_mismatch --test-threads=1 --nocapture
+RUST_MIN_STACK=2097152
+
+running 1 test
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch ... 
+thread 'adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch' (153536) panicked at src/adapters/persistence/workflow/action_approval_sql_tests.rs:51:131:
+called `Result::unwrap_err()` on an `Ok` value: PgQueryResult { rows_affected: 1 }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4282 filtered out; finished in 1.26s
+

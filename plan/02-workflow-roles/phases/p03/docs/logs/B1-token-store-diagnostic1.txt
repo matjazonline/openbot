@@ -1,0 +1,16 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request' (48859491) panicked at src/adapters/persistence/workflow/harness_token_tests.rs:51:5:
+assertion failed: matches!(p.reserve_workflow_model(model.write, request.clone(),
+    Some(&notices)).await.unwrap(), WorkflowModelAdmission::Parked(_))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::workflow_harness_token_approval_never_admits_and_claim_consumes_exact_request
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4223 filtered out; finished in 0.96s
+

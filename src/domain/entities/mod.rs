@@ -1,4 +1,5 @@
 pub mod access_level;
+pub mod address;
 pub mod agent;
 pub mod agent_capability;
 pub mod attention;
@@ -38,6 +39,7 @@ pub mod unicode_sanitization;
 pub mod upload;
 pub mod user;
 pub mod value_objects;
+pub mod workflow_escalation;
 
 pub mod mcp;
 

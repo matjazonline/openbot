@@ -1,0 +1,43 @@
+
+running 25 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk' (16607579) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow action authority")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::autonomous_provisioning::autonomous_agent_provisioning_failed_final_command_rolls_back_initial_revision_then_competing_retries_publish_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_returns_direct_binding_without_a_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_command_replays_by_key_and_refuses_a_changed_request ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refuses_implicit_desk_configuration ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::assistant_channel_commands_race_to_one_assistant ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource' (16607587) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow action authority")
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_competing_builder_claimants_make_one_direct_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_competing_commands_share_one_selection ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_bootstrap_selects_once_and_replay_preserves_clear ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_picker_entries_name_departments_and_the_desk ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_lists_departments_roles_and_desks ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::knowledge_provisioning_tests::knowledge_run_level_provisioning_rechecks_pending_intent_before_any_local_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_agent_reference_keeps_its_own_published_binding ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_agents_and_models ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_lists_an_oversized_directory_within_its_bound ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_losing_an_address_race_is_a_conflict_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_refusals_commit_a_receipt_and_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_transient_fault_leaves_no_marker_receipt_or_effect ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::channel_reply_native_tests::channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource
+
+test result: FAILED. 23 passed; 2 failed; 0 ignored; 0 measured; 4571 filtered out; finished in 16.87s
+

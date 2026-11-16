@@ -19,7 +19,7 @@ pub(super) async fn lock_run_on(
     db: &mut PgConnection,
     row: &PublicationRow,
 ) -> AppResult<RunAuthority> {
-    let actor = action_authority::prelock_accounts_on(db, row.scope(), None).await?;
+    let actor = action_authority::prelock_reply_on(db, row.scope(), None).await?;
     let succeeded: Option<bool> = sqlx::query_scalar(
         "SELECT state='succeeded' AND terminal_execution_id=$3 AND parent_run_id IS NULL \
          FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE",
@@ -126,7 +126,8 @@ async fn approval_on(
     }
     for reviewer in policy.reviewers() {
         if let Err(error) =
-            channel_reply_approvals::require_clearance_on(db, row.activation(), *reviewer).await
+            channel_reply_approvals::require_principal_clearance_on(db, row.activation(), *reviewer)
+                .await
         {
             return Ok(Some(classify_refusal(error, Failure::AuthorityRevoked)?));
         }

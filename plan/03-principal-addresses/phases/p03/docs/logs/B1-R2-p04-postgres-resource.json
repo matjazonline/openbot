@@ -1,0 +1,22 @@
+{
+  "status": "prepared maintenance cluster only; application migration and p04 implementation not started",
+  "owner": "/root Plan03 integration preflight",
+  "base": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-final-pg-gle6llrk",
+  "data": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-final-pg-gle6llrk/data",
+  "port": 51167,
+  "role": "mac02",
+  "pid": 36486,
+  "setup_log": "B1-R2-p04-postgres-setup.txt",
+  "stop_command": [
+    "/opt/homebrew/opt/postgresql@18/bin/pg_ctl",
+    "-D",
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-final-pg-gle6llrk/data",
+    "-m",
+    "fast",
+    "-w",
+    "stop"
+  ],
+  "probe": "PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit|en_US.UTF-8|pg_stat_statements|top|off|0|0|100",
+  "probe_exit": 0,
+  "first_probe_failure": "PostgreSQL18 lc_collate is not a GUC; corrected read uses pg_database.datcollate. Server start succeeded."
+}

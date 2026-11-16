@@ -1,0 +1,11 @@
+
+running 6 tests
+test adapters::persistence::address_tests::direct::ingress::direct_thread_stale_slug_rolls_back_every_ingress_row ... ok
+test adapters::protocols::email::ingress::trace_tests::direct_trace_email_preserves_equal_uuid_targets_with_different_kinds ... ok
+test adapters::protocols::email::ingress::trace_tests::direct_trace_email_refuses_malformed_duplicate_folded_and_over_budget_headers ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_competing_same_conversation_and_redelivery_keep_one_target_thread ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_thread_real_ingress_and_all_viewer_projections_enforce_person_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_thread_unrelated_roots_stay_separate_and_replies_reuse_the_target ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4528 filtered out; finished in 1.11s
+

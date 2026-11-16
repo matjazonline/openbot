@@ -1,0 +1,41 @@
+
+running 12 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_expiry_keeps_one_bounded_mixed_page_and_ordinary_outcomes ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::expiry_tests::workflow_escalation_agent_competing_expiry_owners_record_one_exhausted_handling_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::workflow_escalation_agent_origin_policy_stays_private_without_a_reply_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_source_message_sql_matches_existing_typed_decoder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_company_nowait_defers_once_and_releases_its_gate ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_competing_actual_workers_commit_one_canonical_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_real_account_nowait_defers_without_an_agent_account ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::lock_tests::workflow_escalation_agent_lost_lease_rolls_back_canonical_message_intent_and_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout' (4004491) panicked at src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:179:72:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: function workflow_escalation_agent_route_matches(text) does not exist")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate' (4004526) panicked at src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:254:72:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: function workflow_escalation_agent_route_matches(text) does not exist")
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts' (4004552) panicked at src/adapters/persistence/workflow/escalation_agent_binding_tests.rs:86:10:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: function workflow_escalation_agent_route_matches(text) does not exist")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_actual_admission_selects_one_of_eight_and_ordinary_ingress_keeps_fanout
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_changed_captured_revision_exposes_no_fallback_candidate
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::workflow_escalation_agent_company_teardown_removes_private_roots_and_origin_receipts
+
+test result: FAILED. 9 passed; 3 failed; 0 ignored; 0 measured; 4409 filtered out; finished in 11.01s
+

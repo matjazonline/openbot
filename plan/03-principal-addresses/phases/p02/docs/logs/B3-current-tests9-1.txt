@@ -1,0 +1,23 @@
+
+running 8 tests
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+observed gated transaction pids=[53616] blocker=53623 elapsed_ms=549
+2026-11-15T07:19:53.159397Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T07:19:53.166183Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(583a5abc-5e54-42f6-93f2-89d83a6fb694)
+2026-11-15T07:19:53.396461Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(3edfa0d9-c5f6-46e1-aef7-c2549fca8b31)
+2026-11-15T07:19:53.430614Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(3edfa0d9-c5f6-46e1-aef7-c2549fca8b31)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... ok
+2026-11-15T07:19:54.776807Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T07:19:54.795778Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(05378ed9-e847-4f49-a4e8-93b65b4e147d)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope ... ok
+observed gated transaction pids=[53652] blocker=53660 elapsed_ms=529
+observed gated transaction pids=[53679] blocker=53691 elapsed_ms=505
+observed gated transaction pids=[53714] blocker=53721 elapsed_ms=515
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4579 filtered out; finished in 20.08s
+

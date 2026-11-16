@@ -1,0 +1,159 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0422]: cannot find struct, variant or union type `AgentPublicationDirectory` in module `crate::adapters::persistence::workflow::agent_manifest`
+   --> src/adapters/persistence/workflow/role_reviewer_tests.rs:105:65
+    |
+105 |         crate::adapters::persistence::workflow::agent_manifest::AgentPublicationDirectory {
+    |                                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/application/agent/publication.rs:39:1
+    |
+ 39 | pub struct AgentPublicationScope {
+    | -------------------------------- similarly named struct `AgentPublicationScope` defined here
+    |
+help: a struct with a similar name exists
+    |
+105 -         crate::adapters::persistence::workflow::agent_manifest::AgentPublicationDirectory {
+105 +         crate::adapters::persistence::workflow::agent_manifest::AgentPublicationScope {
+    |
+help: consider importing this struct
+    |
+  1 + use crate::adapters::persistence::workflow::agent_publication::AgentPublicationDirectory;
+    |
+help: if you import `AgentPublicationDirectory`, refer to it directly
+    |
+105 -         crate::adapters::persistence::workflow::agent_manifest::AgentPublicationDirectory {
+105 +         AgentPublicationDirectory {
+    |
+
+error[E0425]: cannot find type `PrincipalId` in module `crate::domain::entities`
+  --> src/adapters/persistence/workflow/agent_runtime_tests.rs:93:65
+   |
+93 |     customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+   |                                                                 ^^^^^^^^^^^ not found in `crate::domain::entities`
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::entities::transport::PrincipalId;
+   |
+help: if you import `PrincipalId`, refer to it directly
+   |
+93 -     customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+93 +     customize: impl FnOnce(&mut Value, PrincipalId),
+   |
+
+error[E0433]: cannot find `PrincipalId` in `entities`
+   --> src/adapters/persistence/workflow/agent_runtime_tests.rs:175:34
+    |
+175 |         crate::domain::entities::PrincipalId::new(
+    |                                  ^^^^^^^^^^^ could not find `PrincipalId` in `entities`
+    |
+help: consider importing this struct
+    |
+  3 + use crate::entities::transport::PrincipalId;
+    |
+help: if you import `PrincipalId`, refer to it directly
+    |
+175 -         crate::domain::entities::PrincipalId::new(
+175 +         PrincipalId::new(
+    |
+
+error[E0425]: cannot find type `PrincipalId` in module `crate::domain::entities`
+  --> src/adapters/persistence/workflow/agent_recovery_tests.rs:39:55
+   |
+39 | ) -> impl FnOnce(&mut Value, crate::domain::entities::PrincipalId) {
+   |                                                       ^^^^^^^^^^^ not found in `crate::domain::entities`
+   |
+help: consider importing this struct
+   |
+ 4 + use crate::entities::transport::PrincipalId;
+   |
+help: if you import `PrincipalId`, refer to it directly
+   |
+39 - ) -> impl FnOnce(&mut Value, crate::domain::entities::PrincipalId) {
+39 + ) -> impl FnOnce(&mut Value, PrincipalId) {
+   |
+
+error[E0425]: cannot find type `PrincipalId` in module `crate::domain::entities`
+  --> src/adapters/persistence/workflow/local_agent_tests.rs:59:69
+   |
+59 |         customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+   |                                                                     ^^^^^^^^^^^ not found in `crate::domain::entities`
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::entities::transport::PrincipalId;
+   |
+help: if you import `PrincipalId`, refer to it directly
+   |
+59 -         customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+59 +         customize: impl FnOnce(&mut Value, PrincipalId),
+   |
+
+error[E0425]: cannot find type `PrincipalId` in module `crate::domain::entities`
+  --> src/adapters/persistence/workflow/local_agent_tests.rs:64:69
+   |
+64 |         customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+   |                                                                     ^^^^^^^^^^^ not found in `crate::domain::entities`
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::entities::transport::PrincipalId;
+   |
+help: if you import `PrincipalId`, refer to it directly
+   |
+64 -         customize: impl FnOnce(&mut Value, crate::domain::entities::PrincipalId),
+64 +         customize: impl FnOnce(&mut Value, PrincipalId),
+   |
+
+error[E0433]: cannot find `PrincipalId` in `entities`
+   --> src/adapters/persistence/workflow/local_agent_tests.rs:113:38
+    |
+113 |             crate::domain::entities::PrincipalId::new(
+    |                                      ^^^^^^^^^^^ could not find `PrincipalId` in `entities`
+    |
+help: consider importing this struct
+    |
+  3 + use crate::entities::transport::PrincipalId;
+    |
+help: if you import `PrincipalId`, refer to it directly
+    |
+113 -             crate::domain::entities::PrincipalId::new(
+113 +             PrincipalId::new(
+    |
+
+error[E0728]: `await` is only allowed inside `async` functions and blocks
+  --> src/adapters/persistence/workflow/doop_document_tests.rs:48:95
+   |
+45 | fn params(f: &Fixture) -> Value {
+   | ------------------------------- this is not `async`
+...
+48 |         "result_destinations":[{"kind":"principal","id":f.principal(f.target.actor.user_id()).await}],
+   |                                                                                               ^^^^^ only allowed inside `async` functions and blocks
+
+error[E0728]: `await` is only allowed inside `async` functions and blocks
+  --> src/adapters/persistence/workflow/doop_document_tests.rs:49:104
+   |
+45 | fn params(f: &Fixture) -> Value {
+   | ------------------------------- this is not `async`
+...
+49 |         "action_approval":{"reviewers":[{"kind":"principal","id":f.principal(f.target.actor.user_id()).await}],
+   |                                                                                                        ^^^^^ only allowed inside `async` functions and blocks
+
+error[E0277]: `uuid::Uuid` is not a future
+   --> src/adapters/persistence/workflow/channel_reply_continuation_views_test_support.rs:255:72
+    |
+255 |         json!({"literal":[{"kind":"principal","id":s.owner_principal().await}]});
+    |                                                                        ^^^^^ `uuid::Uuid` is not a future
+    |
+    = help: the trait `futures::Future` is not implemented for `uuid::Uuid`
+    = note: uuid::Uuid must be a future or must implement `IntoFuture` to be awaited
+    = note: required for `uuid::Uuid` to implement `std::future::IntoFuture`
+help: remove the `.await`
+    |
+255 -         json!({"literal":[{"kind":"principal","id":s.owner_principal().await}]});
+255 +         json!({"literal":[{"kind":"principal","id":s.owner_principal()}]});
+    |
+
+Some errors have detailed explanations: E0277, E0422, E0425, E0433, E0728.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 10 previous errors

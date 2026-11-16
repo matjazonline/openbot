@@ -1,0 +1,23 @@
+{
+  "review": "03PA-P04-D1-R2",
+  "decision_sha256": "f0de7324072fe8dbdb761897936bbbe7b362093ba5fbba0b4f34b3ad65f0a388",
+  "source_digest_en_US_UTF8": "d36ece5064ce6cb57c89af50aa4a5231b7ac857aeda6ec7220708e8eb6e1583a",
+  "source_digest_C_UTF8": "0ea4417d9fa23af60da326f0838d95cdbe867d7f9f4c0918e805d848299d4604",
+  "source_locale_equivalence": "Reproduced both on same source; root independently confirmed, see D1-r2-snapshot-locale-disposition.json. Future root snapshots pin LC_ALL=C LANG=C.",
+  "head": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+  "coordination_revision": 23,
+  "coordination_sha256": "5e7c14b14841de80f4f4731dee22fa87cae3172e9cb22fa97a3507b2b433ae99",
+  "coordination_pin_matches_live": true,
+  "exclusions": [
+    "plan/03-principal-addresses/phases/p04/docs",
+    "plan/03-principal-addresses/phases/p03/docs",
+    "plan/03-principal-addresses/phases/p02/docs",
+    "plan/03-principal-addresses/phases/p01/docs",
+    "plan/03-principal-addresses/COORDINATION.md",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/02-workflow-roles/phases/p05/docs"
+  ],
+  "outcome": "PASS decision only",
+  "implementation_accepted": false,
+  "runtime_checks_executed": false
+}

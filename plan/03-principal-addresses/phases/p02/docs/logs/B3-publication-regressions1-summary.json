@@ -1,0 +1,26 @@
+[
+  {
+    "group": "publication",
+    "filter": "channel_reply_publication",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 13.79,
+    "log": "B3-publication-regressions1.txt"
+  },
+  {
+    "group": "internal-relay",
+    "filter": "workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin",
+    "status": "FAIL",
+    "exit": 101,
+    "seconds": 10.86,
+    "log": "B3-internal-relay-regressions1.txt"
+  },
+  {
+    "group": "external-relay",
+    "filter": "workflow_message_thread_external_reply_continues_the_source_relay_trace",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 3.05,
+    "log": "B3-external-relay-regressions1.txt"
+  }
+]

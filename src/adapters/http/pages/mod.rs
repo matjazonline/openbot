@@ -31,7 +31,7 @@ fn parse_platform_address(
     value: &str,
     app_domain_name: &str,
 ) -> Option<(crate::entities::value_objects::CompanySlug, String)> {
-    crate::adapters::protocols::email::EmailChannelSelectorParser::new(app_domain_name)
+    crate::adapters::protocols::email::EmailAddressParser::new(app_domain_name)
         .parse_platform_address(value)
 }
 
@@ -74,6 +74,7 @@ mod team_settings;
 mod thread_activity;
 mod workflow_authoring;
 mod workflow_decision;
+mod workflow_escalation;
 mod workflow_runs;
 
 pub use agent_authoring::*;
@@ -114,6 +115,7 @@ pub use team_settings::*;
 pub use thread_activity::*;
 pub use workflow_authoring::*;
 pub use workflow_decision::*;
+pub use workflow_escalation::*;
 pub use workflow_runs::*;
 
 /// Every timestamp the app stores is UTC. These helpers preserve that instant in a semantic

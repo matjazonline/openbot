@@ -10,7 +10,7 @@ use probes::{ProbeKind, install_probe, remove_probe};
 mod cancellation_tests;
 
 use super::super::super::super::control_serialization_tests::contention::{
-    try_wait_for_lock, wait_for_lock,
+    AUTHORITY_COMPANY_WAIT, LEASE_COMPANY_WAIT, try_wait_for_lock, wait_for_lock,
 };
 use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::gated_policy;
 
@@ -18,7 +18,6 @@ use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests:
 const HANG_GUARD: Duration = Duration::from_secs(10);
 
 const USAGE_WAIT: &str = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
-const RUN_WAIT: &str = "SELECT binding_id, max_context_bytes FROM workflow_runs";
 
 async fn live_deadline(observer: &mut sqlx::PgConnection, s: &Scheduled) -> bool {
     sqlx::query_scalar(
@@ -99,7 +98,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
     );
     let second_pid = tokio::select! {
         result = first.as_mut() => panic!("first claimant escaped usage wait: {result:?}"),
-        pid = try_wait_for_lock(&mut observer, first_pid, RUN_WAIT, second.as_mut()) => pid,
+        pid = try_wait_for_lock(&mut observer, first_pid, LEASE_COMPANY_WAIT, second.as_mut()) => pid,
     };
     let second_pid = match second_pid {
         Ok(pid) => pid,
@@ -124,7 +123,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
         "both genuine callers queued before expiry"
     );
     eprintln!(
-        "live DB deadline: usage waiter {first_pid} blocked by {}, run waiter {second_pid} blocked by {first_pid}",
+        "live DB deadline: usage waiter {first_pid} blocked by {}, company waiter {second_pid} blocked by {first_pid}",
         gate.pid
     );
     // Three quarters of the claimants' attempt bound: their server lock timeout is what
@@ -159,7 +158,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
     );
     assert!(
         second.unwrap().is_none(),
-        "run-lock waiter sees expired deadline"
+        "company-lock waiter sees expired deadline"
     );
     assert_quiescent(&mut observer, &[first_pid, second_pid]).await;
     drop(observer);

@@ -1,0 +1,41 @@
+{
+  "status": "FAIL",
+  "diagnostics": [
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 373,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 407,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 10,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 38,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/adapters/persistence/department.rs",
+      "line": 346,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/application/services/model_usage/mod.rs",
+      "line": 24,
+      "unchanged_context": true
+    },
+    {
+      "path": "src/domain/workflow/reply_integrity.rs",
+      "line": 29,
+      "unchanged_context": true
+    }
+  ],
+  "disposition": "seven inherited only; no correction diagnostics"
+}

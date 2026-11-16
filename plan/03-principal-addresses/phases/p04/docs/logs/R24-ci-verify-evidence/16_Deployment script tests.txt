@@ -1,0 +1,17 @@
+﻿2026-11-16T14:18:27.5604701Z ##[group]Run scripts/tests/deploy.sh
+2026-11-16T14:18:27.5605051Z [36;1mscripts/tests/deploy.sh[0m
+2026-11-16T14:18:27.5605382Z [36;1mscripts/tests/credential-key-rotation.sh[0m
+2026-11-16T14:18:27.5632485Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:18:27.5632701Z env:
+2026-11-16T14:18:27.5632870Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:18:27.5633062Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:18:27.5633456Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:18:27.5633680Z   SQLX_OFFLINE: true
+2026-11-16T14:18:27.5633855Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:18:27.5634046Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:18:27.5634216Z   CARGO_TERM_COLOR: always
+2026-11-16T14:18:27.5634396Z   CACHE_ON_FAILURE: false
+2026-11-16T14:18:27.5634564Z ##[endgroup]
+2026-11-16T14:18:27.6467085Z deployment model-stage/non-root/missing-model gate assertions passed
+2026-11-16T14:18:27.6499860Z deploy script tests passed
+2026-11-16T14:18:27.7206895Z credential key rollout script tests passed

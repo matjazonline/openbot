@@ -1,0 +1,34 @@
+{
+  "build": 96,
+  "selected": [
+    "adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_api_reads_current_authority_and_audits_exact_command_replay",
+    "adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_ui_submits_reassignment_and_acknowledgement_on_the_same_decision_surface",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "--test-threads=2",
+    "adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_api_reads_current_authority_and_audits_exact_command_replay",
+    "adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_ui_submits_reassignment_and_acknowledgement_on_the_same_decision_surface",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle"
+  ],
+  "exit": 0,
+  "seconds": 8.82,
+  "fixture": "resume8 owned databases",
+  "RUST_MIN_STACK": 2097152
+}

@@ -1,0 +1,27 @@
+[
+  {
+    "selection": "provisioning_dispatch_tests",
+    "exit": 101,
+    "log": "B1-builder-dispatch-tests2.txt"
+  },
+  {
+    "selection": "workflow_escalation_origin_",
+    "exit": 101,
+    "log": "B1-relay-origin-tests5.txt"
+  },
+  {
+    "selection": "provisioning_runtime_tests",
+    "exit": 101,
+    "log": "B1-builder-runtime-tests1.txt"
+  },
+  {
+    "selection": "application::use_cases::builtin_agent_library",
+    "exit": 101,
+    "log": "B1-builder-prompt-tests1.txt"
+  },
+  {
+    "selection": "address_tests",
+    "exit": 101,
+    "log": "B1-address-regression-tests1.txt"
+  }
+]

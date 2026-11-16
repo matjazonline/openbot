@@ -27,6 +27,7 @@ fn query(
         visible_channel_ids: &[],
         manager,
         company_items: manager,
+        direct_items: true,
         view,
         cursor: None,
         limit: 100,
@@ -57,7 +58,11 @@ async fn a_run_awaiting_reconciliation_is_unassigned_team_work() {
         let item = &items[0];
         assert_eq!(item.source_kind, AttentionSourceKind::RunReconciliation);
         assert_eq!((item.source_id, item.run_id), (f.run, Some(f.run)));
-        assert_eq!(item.channel_id, channel);
+        assert_eq!(
+            item.target
+                .and_then(crate::entities::address::AddressTarget::desk_id),
+            channel
+        );
         assert_eq!(item.responsibility, AttentionResponsibility::ChannelTeam);
         assert_eq!(item.state, "waiting");
         assert!(item.due_at.is_some(), "the run deadline is when it is due");
@@ -87,7 +92,7 @@ async fn a_run_awaiting_reconciliation_is_unassigned_team_work() {
         );
     }
 
-    let summary = p.operational_summary(f.company, &[]).await.unwrap();
+    let summary = p.operational_summary(f.company, &[], owner).await.unwrap();
     assert_eq!(summary.runs_awaiting_reconciliation, 1);
     assert_eq!(summary.open_decision_count, 0);
 }
@@ -136,6 +141,7 @@ async fn department_views_company_items_are_left_out_of_a_department_view() {
     let narrowed = p
         .list_attention(AttentionQuery {
             company_items: false,
+            direct_items: false,
             ..query(f.company, owner, AttentionView::TeamWork, true)
         })
         .await

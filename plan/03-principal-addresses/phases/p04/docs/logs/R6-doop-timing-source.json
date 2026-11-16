@@ -1,0 +1,10 @@
+{
+  "base": "3d186172a778602dd82d790eb2ef230c80cc045d",
+  "purpose": "timing-only diagnostics on R5 MCP source; authoritative worktree unchanged",
+  "changes": [
+    {
+      "path": "src/adapters/mcp/mod.rs",
+      "sha256": "9f1f67825219cb66857553b242a4207a07e3e5c7298c29421c6eddf13e957eff"
+    }
+  ]
+}

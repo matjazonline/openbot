@@ -1,0 +1,23 @@
+5179:-- Name: workflow_decision_reviewers; Type: TABLE; Schema: public; Owner: -
+5182:CREATE TABLE public.workflow_decision_reviewers (
+5191:    CONSTRAINT workflow_decision_reviewers_notice_check CHECK (((notice_delivery_id IS NULL) = notice_opted_out)),
+5192:    CONSTRAINT workflow_decision_reviewers_ordinal_check CHECK (((ordinal >= 0) AND (ordinal <= 15)))
+5705:           OR reviewer->>'kind' IS DISTINCT FROM 'user'
+7237:-- Name: workflow_decision_reviewers workflow_decision_reviewer_notice; Type: CONSTRAINT; Schema: public; Owner: -
+7240:ALTER TABLE ONLY public.workflow_decision_reviewers
+7245:-- Name: workflow_decision_reviewers workflow_decision_reviewer_ordinal; Type: CONSTRAINT; Schema: public; Owner: -
+7248:ALTER TABLE ONLY public.workflow_decision_reviewers
+7253:-- Name: workflow_decision_reviewers workflow_decision_reviewers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+7256:ALTER TABLE ONLY public.workflow_decision_reviewers
+7257:    ADD CONSTRAINT workflow_decision_reviewers_pkey PRIMARY KEY (company_id, decision_id, principal_id);
+9353:-- Name: workflow_decision_reviewers workflow_decision_reviewer_guard; Type: TRIGGER; Schema: public; Owner: -
+9356:CREATE TRIGGER workflow_decision_reviewer_guard BEFORE INSERT ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_reviewer_guard();
+9360:-- Name: workflow_decision_reviewers workflow_decision_reviewer_immutable; Type: TRIGGER; Schema: public; Owner: -
+9363:CREATE TRIGGER workflow_decision_reviewer_immutable BEFORE UPDATE ON public.workflow_decision_reviewers FOR EACH ROW EXECUTE FUNCTION public.workflow_decision_fact_immutable();
+10688:-- Name: workflow_decision_reviewers workflow_decision_reviewers_decision_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10691:ALTER TABLE ONLY public.workflow_decision_reviewers
+10692:    ADD CONSTRAINT workflow_decision_reviewers_decision_fkey FOREIGN KEY (company_id, decision_id) REFERENCES public.workflow_decisions(company_id, id) ON DELETE CASCADE;
+10696:-- Name: workflow_decision_reviewers workflow_decision_reviewers_notice_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10699:ALTER TABLE ONLY public.workflow_decision_reviewers
+10700:    ADD CONSTRAINT workflow_decision_reviewers_notice_fkey FOREIGN KEY (company_id, notice_delivery_id) REFERENCES public.message_deliveries(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+12708:            OR reviewer->>'kind' IS DISTINCT FROM 'user'

@@ -1,0 +1,160 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R9-preflight",
+  "artifact": "1d5990aa52b4c252bd8104b3a3e625fda073f77487e2f834709c474bf6b87022",
+  "checks": [
+    {
+      "criteria": [
+        "native-core",
+        "final-local-primary"
+      ],
+      "command": "scripts/check.sh primary isolated all-target gate; RUST_TEST_THREADS=4",
+      "fixture": "PG51167 ownedpa03_p04_dev_check_66037; Rust/Darwin projection unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-main-complete-before-adoption.txt",
+          "sha256": "84fd6a3538f8ffd6553cafc1fe21e087dcf17c0c1ed15607bb881bdc03a83025"
+        },
+        {
+          "path": "logs/R13-runtime-projection.json",
+          "sha256": "764dee365338f526bbc63cd41216f87db3a611e39872621d048546df9755d1c8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "stock-stack"
+      ],
+      "command": "scripts/check.sh stock-stack gate at2048KiB; RUST_TEST_THREADS=4",
+      "fixture": "same ownedPG51167 check fixtures; unchanged Rust/Darwin projection",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-stock-complete-before-adoption.txt",
+          "sha256": "883e5e44fd56e6563ae59991032931476002eeb19e815cb4f344a2db6dad01f8"
+        },
+        {
+          "path": "logs/R13-runtime-projection.json",
+          "sha256": "764dee365338f526bbc63cd41216f87db3a611e39872621d048546df9755d1c8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "D3-Linux-scope",
+        "B1-R8-F1",
+        "B1-R8-F2"
+      ],
+      "command": "CI43846081398: python3 -I scripts/tests/network-isolation-scope.py",
+      "fixture": "Ubuntu24.04 exactfd5f7f76; bothwrappers/extractedMemory; real TCP/creator/root-child fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-ci-43846081398-jobs1.json",
+          "sha256": "fb7088fcfe2c5d5a692ebfb3ca73e9d02e9ab17cc8dd2287a712aaa314afc435"
+        },
+        {
+          "path": "logs/R13-ci-source.json",
+          "sha256": "37d7e330e919fb9725c2b717e6f0e8e8f21860dd4288150bcef14aa6698abe61"
+        },
+        {
+          "path": "logs/R13-final-material-equality.json",
+          "sha256": "3793c1146568142cbece2ceafef2a9e37a98e72b8eaa27373119b62bce0a9b19"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "D3-Darwin-unchanged",
+        "shell-syntax"
+      ],
+      "command": "bash -n wrappers/helper/check.sh; generatedfixture Pythoncompile; bothDarwinwrappedcommands",
+      "fixture": "localDarwin sandbox; Linux actual proof above",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-local-focused.txt",
+          "sha256": "e1b7480c6ed5401e92c337d19e7b6aa886c8de737fc35d7e0e9ec1058c37116f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "source-projection"
+      ],
+      "command": "exact code/test/config equality tofd5f7f76; originalDarwinpreambles/branches; staged source identity",
+      "fixture": "rootHEADf059f498; three extra nonruntime learnings; exact seven exclusions",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-source.snapshot.txt",
+          "sha256": "a575dd5cbb9d5eee2dbe97ac786bfbcbeff8b8676c003e0be3b3fa027f7b4abb"
+        },
+        {
+          "path": "logs/R13-final-material-equality.json",
+          "sha256": "3793c1146568142cbece2ceafef2a9e37a98e72b8eaa27373119b62bce0a9b19"
+        },
+        {
+          "path": "logs/R13-runtime-projection.json",
+          "sha256": "764dee365338f526bbc63cd41216f87db3a611e39872621d048546df9755d1c8"
+        },
+        {
+          "path": "logs/R13-adoption-equality.json",
+          "sha256": "3375769a58766741429636cb634d125092a3b9b5d431363cb574a7e6a8348241"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "prior-main-failure-retention"
+      ],
+      "command": "prior R7 full gate before successful unchangedRust main/stock rerun",
+      "fixture": "old immutable88d4 source; no unrelatedness claim",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R7-main-failures.txt",
+          "sha256": "03c44e91dde8341c2c51c9a624055ef2c3193035d63371de62d9cab0a6f013d3"
+        },
+        {
+          "path": "logs/R7-correction-boundary-stop.json",
+          "sha256": "b873bf2c5df0db41e3f0026eaad163bf9ae35e48e8d147183bbc753f1100b425"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "prior-F2-failure-retention"
+      ],
+      "command": "R10/R11/R12 actualprivilegedcleanupdeadline attempts before inner root timer",
+      "fixture": "exact historical source candidates; superseded by actualR13 strong proof",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R10-scope-failure-annotations.json",
+          "sha256": "0f8d84282e2819ea4bbbd6da23912bfb1afb0c2094d2d617605cea2491323bea"
+        },
+        {
+          "path": "logs/R11-scope-failure-annotations.json",
+          "sha256": "9e654c8b5eefcceccaf9b3cf6abd89c13ed65fb1540623a72f7b2c0d4170bd84"
+        },
+        {
+          "path": "logs/R12-scope-failure-annotations.json",
+          "sha256": "8bbdd371501344219dc03fcea21fde79aa114f932c54f69d84e2f0b294e5ecc9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "final-lease",
+        "current-whole-CI",
+        "final-acceptance"
+      ],
+      "command": "live scripts/check.sh lease gate plus currentR13 CI/private jobs",
+      "fixture": "rootworker38573; currentR13CI43846081398/Memory43846081478",
+      "status": "NOT EXERCISED",
+      "reason": "Required final gates remain active. Source/focused review only; no phase/plan acceptance until actual results retained."
+    }
+  ]
+}

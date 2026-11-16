@@ -7,9 +7,10 @@ use crate::{
     adapters::persistence::{PostgresPersistence, account_identity::rekey_account_identity_on},
     app_error::{AppError, AppResult},
     entities::{
+        address::PersonAddress,
         notification::NotificationPreferences,
         user::User,
-        value_objects::{AvatarUrl, EmailAddress},
+        value_objects::{AvatarUrl, ChannelSlug, CompanySlug, EmailAddress},
     },
     use_cases::user::{
         AccountChange, AccountChangeKind, AccountChangePersistence, AuthAttemptKey,
@@ -188,6 +189,82 @@ impl UserPersistence for PostgresPersistence {
         transaction.commit().await.map_err(AppError::from)?;
 
         Ok(db.into())
+    }
+
+    async fn person_addresses(&self, user_id: Uuid) -> AppResult<Vec<PersonAddress>> {
+        let rows: Vec<(Uuid, String, String, String)> = sqlx::query_as(
+            "SELECT company.id, company.name, company.slug::text, address.slug::text \
+               FROM principals AS principal \
+               JOIN addresses AS address ON address.company_id = principal.company_id \
+                AND address.principal_id = principal.id \
+               JOIN companies AS company ON company.id = principal.company_id \
+              WHERE principal.user_id = $1 AND principal.kind = 'person' \
+              ORDER BY company.name, company.id",
+        )
+        .bind(user_id)
+        .fetch_all(&self.pool)
+        .await
+        .map_err(AppError::from)?;
+        Ok(rows.into_iter().map(person_address).collect())
+    }
+
+    async fn rename_person_address(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        slug: &ChannelSlug,
+    ) -> AppResult<Option<PersonAddress>> {
+        let mut transaction = self.pool.begin().await?;
+        sqlx::query("SET LOCAL lock_timeout = '5s'")
+            .execute(&mut *transaction)
+            .await?;
+        // The address trigger advances its principal's routing revision. Lock that principal
+        // before the address, matching removal and avoiding an address/principal lock cycle.
+        let principal: Option<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 \
+             AND kind = 'person' FOR UPDATE",
+        )
+        .bind(company_id)
+        .bind(user_id)
+        .fetch_optional(&mut *transaction)
+        .await?;
+        let Some(principal) = principal else {
+            transaction.commit().await?;
+            return Ok(None);
+        };
+        let row: Option<(Uuid, String, String, String)> = sqlx::query_as(
+            "UPDATE addresses AS address SET slug = $3 \
+               FROM principals AS principal, companies AS company \
+              WHERE principal.company_id = $2 AND principal.user_id = $1 \
+                AND principal.kind = 'person' \
+                AND address.company_id = principal.company_id \
+                AND address.principal_id = principal.id \
+                AND company.id = principal.company_id \
+          RETURNING company.id, company.name, company.slug::text, address.slug::text",
+        )
+        .bind(user_id)
+        .bind(company_id)
+        .bind(slug.as_str())
+        .fetch_optional(&mut *transaction)
+        .await
+        .map_err(|error| match &error {
+            sqlx::Error::Database(database) if database.code().as_deref() == Some("23505") => {
+                AppError::Conflict(format!(
+                    "Address '{slug}' is already in use in this company."
+                ))
+            }
+            _ => AppError::from(error),
+        })?;
+        if row.is_some() {
+            super::integration::email_binding::sync_principal_email_binding_on(
+                &mut transaction,
+                company_id,
+                crate::entities::transport::PrincipalId::new(principal),
+            )
+            .await?;
+        }
+        transaction.commit().await?;
+        Ok(row.map(person_address))
     }
 
     async fn notification_preferences(&self, id: Uuid) -> AppResult<NotificationPreferences> {
@@ -477,9 +554,10 @@ impl UserPersistence for PostgresPersistence {
                 "An external login requires a verified provider email claim.".into(),
             ));
         }
+        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         // The row lock from UPDATE serializes with an address change. The provider's proof
         // installs a marker only while it names the address currently stored on this row.
-        sqlx::query_as::<_, UserDb>(
+        let user = sqlx::query_as::<_, UserDb>(
             r#"UPDATE users AS account
                SET email_verified_at = CASE
                    WHEN account.email = $3::citext THEN COALESCE(account.email_verified_at, CURRENT_TIMESTAMP)
@@ -492,10 +570,20 @@ impl UserPersistence for PostgresPersistence {
         .bind(identity.provider.as_str())
         .bind(identity.subject)
         .bind(identity.email.as_str())
-        .fetch_optional(&self.pool)
+        .fetch_optional(&mut *transaction)
         .await
-        .map(|user| user.map(Into::into))
-        .map_err(AppError::from)
+        .map_err(AppError::from)?;
+        if let Some(user) = &user {
+            let companies =
+                super::workflow::prelock_account_companies_on(&mut transaction, user.id).await?;
+            Box::pin(super::workflow::refresh_account_dependents_on(
+                &mut transaction,
+                &companies,
+            ))
+            .await?;
+        }
+        transaction.commit().await.map_err(AppError::from)?;
+        Ok(user.map(Into::into))
     }
 
     async fn link_external_identity(
@@ -509,6 +597,13 @@ impl UserPersistence for PostgresPersistence {
             ));
         }
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
+        // Take the exclusive account owner before the login-method FK's key-share lock,
+        // so competing links cannot each hold a weaker account lock and then upgrade it.
+        sqlx::query("SELECT id FROM users WHERE id=$1 FOR UPDATE")
+            .bind(user_id)
+            .execute(&mut *transaction)
+            .await
+            .map_err(AppError::from)?;
         sqlx::query(
             "INSERT INTO user_login_methods (user_id, provider, provider_subject) VALUES ($1, $2, $3)",
         )
@@ -531,6 +626,13 @@ impl UserPersistence for PostgresPersistence {
                 "The verified provider email no longer matches this account.".into(),
             ));
         }
+        let companies =
+            super::workflow::prelock_account_companies_on(&mut transaction, user_id).await?;
+        Box::pin(super::workflow::refresh_account_dependents_on(
+            &mut transaction,
+            &companies,
+        ))
+        .await?;
         transaction.commit().await.map_err(AppError::from)?;
         Ok(())
     }
@@ -845,6 +947,17 @@ fn taken_address_error(err: sqlx::Error, address: Option<&str>) -> AppError {
         ));
     }
     AppError::from(err)
+}
+
+fn person_address(
+    (company_id, company_name, company_slug, slug): (Uuid, String, String, String),
+) -> PersonAddress {
+    PersonAddress {
+        company_id,
+        company_name,
+        company_slug: CompanySlug::from(company_slug),
+        slug: ChannelSlug::from(slug),
+    }
 }
 
 #[cfg(test)]

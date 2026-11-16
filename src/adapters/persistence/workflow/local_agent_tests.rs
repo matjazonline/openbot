@@ -32,10 +32,10 @@ mod corrections;
 #[path = "local_agent_mcp_tests.rs"]
 mod native_mcp;
 
-struct Setup {
-    fixture: Fixture,
-    profile: LocalAgentProfile,
-    scope: ActivationRequest,
+pub(in crate::adapters::persistence::workflow::tests) struct Setup {
+    pub(in crate::adapters::persistence::workflow::tests) fixture: Fixture,
+    pub(in crate::adapters::persistence::workflow::tests) profile: LocalAgentProfile,
+    pub(in crate::adapters::persistence::workflow::tests) scope: ActivationRequest,
     paired: Paired,
     journal_id: Uuid,
 }
@@ -54,16 +54,17 @@ enum TestAssociation {
 }
 
 impl Setup {
-    fn new() -> impl std::future::Future<Output = Self> {
+    pub(in crate::adapters::persistence::workflow::tests) fn new()
+    -> impl std::future::Future<Output = Self> {
         Self::with_inputs(|_, _| {})
     }
     fn with_inputs(
-        customize: impl FnOnce(&mut Value, Uuid),
+        customize: impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId),
     ) -> impl std::future::Future<Output = Self> {
         Self::configured(customize, TestAssociation::Company)
     }
     async fn configured(
-        customize: impl FnOnce(&mut Value, Uuid),
+        customize: impl FnOnce(&mut Value, crate::domain::entities::transport::PrincipalId),
         association: TestAssociation,
     ) -> Self {
         let local = MachineFixture::new()
@@ -89,7 +90,7 @@ impl Setup {
                 let channel:Uuid=sqlx::query_scalar("UPDATE channels SET access_mode='allowlist' WHERE id=(SELECT channel_id FROM threads WHERE id=$1) RETURNING id")
                     .bind(thread).fetch_one(&local.database.pool).await.unwrap();
                 RelatedAssociation::Thread {
-                    channel_id: crate::application::workflow::RelatedChannelId::new(channel),
+                    target: crate::entities::address::AddressTarget::Desk(channel),
                     thread_id: crate::application::workflow::RelatedThreadId::new(thread),
                 }
             }
@@ -110,7 +111,12 @@ impl Setup {
         };
         let mut inputs =
             json!({"profile_id":{"literal":profile.id},"prompt":{"literal":"bounded native task"}});
-        customize(&mut inputs, fixture.target.actor.user_id());
+        customize(
+            &mut inputs,
+            crate::domain::entities::transport::PrincipalId::new(
+                fixture.principal(fixture.target.actor.user_id()).await,
+            ),
+        );
         let version = publish_local(&fixture, inputs).await;
         let binding = bound(&fixture, version).await;
         let scope = admitted_as(&fixture, binding, association, "local-step").await;
@@ -122,7 +128,9 @@ impl Setup {
             journal_id: Uuid::new_v4(),
         }
     }
-    fn handler(&self) -> LocalAgentHandler<local_agents::PostgresLocalAgentWorkflow> {
+    pub(in crate::adapters::persistence::workflow::tests) fn handler(
+        &self,
+    ) -> LocalAgentHandler<local_agents::PostgresLocalAgentWorkflow> {
         LocalAgentHandler::new(
             local_agents::PostgresLocalAgentWorkflow::new(
                 self.fixture.persistence.clone(),
@@ -349,7 +357,9 @@ impl Setup {
         }
     }
 
-    async fn native_success(&self) -> ConnectionFence {
+    pub(in crate::adapters::persistence::workflow::tests) async fn native_success(
+        &self,
+    ) -> ConnectionFence {
         let native = self.native_started().await;
         self.native_complete(&native).await;
         native.fence

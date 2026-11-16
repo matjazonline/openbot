@@ -1,0 +1,266 @@
+{
+  "version": 1,
+  "round": "03PA-P02-B2-R2",
+  "artifact": "b02007609c01e28674ee6640fe07f6fc115e95879c5916ff01356bcaca8fa7f6",
+  "checks": [
+    {
+      "criteria": [
+        "03PA-P02-B2-R1/F1"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 direct_thread_ui_revocation_ --nocapture --test-threads=4",
+      "fixture": "owned retention schema2, localhost52471; UUID-isolated harness databases; existing16MiB libtest stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-new-tests1.txt",
+          "sha256": "4871ac80ef2f9863cbd58a878d5b44a2cf91c24ea1280a56909eee526b308d64"
+        },
+        {
+          "path": "logs/B2-R2-new-selected1.txt",
+          "sha256": "4c6cb0ef4b68ef9c2ea2441d4a2f502cb89313b8386051deab44baf4024a3991"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "03PA-P02-B2-R1/F1",
+        "B2-shared-reader-regressions"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 adapters::http::routes::ui:: application::use_cases::thread::tests:: direct_thread_real_ingress_and_all_viewer_projections_enforce_person_target --nocapture --test-threads=4",
+      "fixture": "owned retention schema2, localhost52471; UUID-isolated harness databases; existing16MiB libtest stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-affected1.txt",
+          "sha256": "243918e57c35896e6b915c38127478bc3bae74429c529f3f587e710b4aaa37a0"
+        },
+        {
+          "path": "logs/B2-R2-affected-selected1.txt",
+          "sha256": "28dbd15d148047d147aac19dbdecd5c1b23da9a991752e803ef32b04ffce92e5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-offline"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned retention schema2, localhost52471; UUID-isolated harness databases; existing16MiB libtest stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-check1.txt",
+          "sha256": "e9f518364d218f188271c2fe1380108173e37127fc07c16d23b6537347d9e251"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-build"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run --message-format=json",
+      "fixture": "owned retention schema2, localhost52471; UUID-isolated harness databases; existing16MiB libtest stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-build1-stderr.txt",
+          "sha256": "8f763989f09b988e50e919529b2778cb0ddd84992d99dbefe57725c1155fb6a5"
+        },
+        {
+          "path": "logs/B2-R2-binary1.txt",
+          "sha256": "189d7f6ffaf36364e2b0e30127b887a3dc4342732be2553f12038f7d566f806b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-SQLx"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "same successfully migrated owned schema2; .sqlx unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-sqlx-prepare1.txt",
+          "sha256": "fd60d1d9e5daf054923c7c8ba63a7f55a8f9642c7c228f0a08aac90ecbd343bd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-reachability"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "owned retention schema2, localhost52471; UUID-isolated harness databases; existing16MiB libtest stack",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-source-modules1.txt",
+          "sha256": "706a301368583a1f62404ad2e74345ca66cc4e968baabc6f3d20c0078f2d33ab"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-clippy"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "seven unchanged inherited diagnostics only, lib and lib-test; no affected correction diagnostics; not a strict clippy PASS",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B2-R2-clippy1.txt",
+          "sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014"
+        },
+        {
+          "path": "logs/B2-R2-clippy-disposition.json",
+          "sha256": "5cbbdf81b3845a08ab7d795d189b607fea4c95c26ea9a1b3882caa566609c69b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-collection"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 --list",
+      "fixture": "4570\u21924574 tests; four new enduring regressions, no removal",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-collection1.txt",
+          "sha256": "c82a70c5d2e2307f92607e83e87313e29fb77c211c44299957e836aa9640ccd7"
+        },
+        {
+          "path": "logs/B2-R2-collection-delta.json",
+          "sha256": "d39f3d937b61b7e608c05a782efb6e09e7bae58c10f4bf095325f165b3290f8c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-format1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "git diff --check",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-whitespace1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-transport-tests1.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-transport1.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-workflow-boundary-tests1.txt",
+          "sha256": "28ac24320688cdd1b685720ae2f389ef328c5441ac38e8c41077a11639833467"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-workflow-boundary1.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-integration-boundary-tests1.txt",
+          "sha256": "02c8abffb898ae2cecff770961bac39ada621b45b343b0c1029fb091ff5fa1eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-integration-boundary1.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B2-AC9-static"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "current frozen source; same real rg provider as R1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B2-R2-integration-docs1.txt",
+          "sha256": "a75f51322dfe954d187ec5cca653d5bb70f69db617566e98110ffea4a375978f"
+        }
+      ]
+    }
+  ]
+}

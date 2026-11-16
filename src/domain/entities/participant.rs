@@ -54,8 +54,50 @@ pub struct Principal {
     pub user_id: Option<Uuid>,
     pub agent_id: Option<Uuid>,
     pub display_label: String,
+    pub open_to_public: bool,
+    pub settings_revision: i64,
+    /// Lifetime personal ownership, retained through retirement; never a live authority grant.
+    pub historical_person_user_id: Option<Uuid>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
+}
+
+impl Principal {
+    /// Admission policy for a direct address. Being a thread participant never widens it.
+    pub fn direct_access(
+        &self,
+        context: PrincipalAccessContext,
+    ) -> super::channel::ParticipantAccess {
+        let trusted = context.membership.is_team();
+        let authorized = match self.kind {
+            PrincipalKind::Person => {
+                trusted && (context.membership.is_owner() || context.principal_id == Some(self.id))
+            }
+            PrincipalKind::Agent => trusted || self.open_to_public,
+            PrincipalKind::External | PrincipalKind::System => false,
+        };
+        super::channel::ParticipantAccess {
+            authorized,
+            trusted,
+        }
+    }
+
+    /// Public ingress never grants viewing. The owner retains access to archived personal mail.
+    pub fn direct_viewer_access(&self, context: PrincipalAccessContext) -> bool {
+        if !context.membership.is_team() {
+            return false;
+        }
+        match self.kind {
+            PrincipalKind::Person => {
+                context.membership.is_owner() || context.principal_id == Some(self.id)
+            }
+            PrincipalKind::Agent => true,
+            PrincipalKind::External => {
+                self.historical_person_user_id.is_some() && context.membership.is_owner()
+            }
+            PrincipalKind::System => false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -375,3 +417,7 @@ mod tests {
         assert_ne!(claim.version(), 1);
     }
 }
+
+#[cfg(test)]
+#[path = "participant/direct_tests.rs"]
+mod direct_tests;

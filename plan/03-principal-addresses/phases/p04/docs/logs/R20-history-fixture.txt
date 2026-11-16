@@ -1,0 +1,7 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::views::agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 4.24s
+

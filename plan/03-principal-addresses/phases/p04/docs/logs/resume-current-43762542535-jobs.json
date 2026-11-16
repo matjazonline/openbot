@@ -1,0 +1,191 @@
+{
+  "total_count": 3,
+  "jobs": [
+    {
+      "id": 132960322078,
+      "run_id": 43762542535,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-r5-memory-retry-7bc51d2a",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43762542535",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9Q2CHg",
+      "head_sha": "7bc51d2a6f3e4188592b5321158a9436561c4aef",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132960322078",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43762542535/job/132960322078",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-15T21:14:06Z",
+      "started_at": "2026-11-15T21:14:08Z",
+      "completed_at": null,
+      "name": "memory-integration",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T21:14:09Z",
+          "completed_at": "2026-11-15T21:14:13Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T21:14:13Z",
+          "completed_at": "2026-11-15T21:14:25Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T21:14:25Z",
+          "completed_at": "2026-11-15T21:14:36Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T21:14:36Z",
+          "completed_at": "2026-11-15T21:14:48Z"
+        },
+        {
+          "name": "Install the memory service toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T21:14:48Z",
+          "completed_at": "2026-11-15T21:14:55Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T21:14:55Z",
+          "completed_at": "2026-11-15T21:14:57Z"
+        },
+        {
+          "name": "Cache memory model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-15T21:14:57Z",
+          "completed_at": "2026-11-15T21:15:02Z"
+        },
+        {
+          "name": "Prepare and verify the pinned model (build network only)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T21:15:02Z",
+          "completed_at": "2026-11-15T21:15:04Z"
+        },
+        {
+          "name": "Live memory-service integration",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 9,
+          "started_at": "2026-11-15T21:15:04Z",
+          "completed_at": null
+        },
+        {
+          "name": "Post Cache memory model artifacts",
+          "status": "pending",
+          "conclusion": null,
+          "number": 15,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "pending",
+          "conclusion": null,
+          "number": 16,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null,
+          "number": 17,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Stop containers",
+          "status": "pending",
+          "conclusion": null,
+          "number": 18,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132960322078",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001162,
+      "runner_name": "GitHub Actions 1000001162",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 132960323246,
+      "run_id": 43762542535,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-r5-memory-retry-7bc51d2a",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43762542535",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9Q2Grg",
+      "head_sha": "7bc51d2a6f3e4188592b5321158a9436561c4aef",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132960323246",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43762542535/job/132960323246",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-15T21:14:06Z",
+      "started_at": "2026-11-15T21:14:06Z",
+      "completed_at": "2026-11-15T21:14:06Z",
+      "name": "doop-integration",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132960323246",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    },
+    {
+      "id": 132960323514,
+      "run_id": 43762542535,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-r5-memory-retry-7bc51d2a",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43762542535",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9Q2Hug",
+      "head_sha": "7bc51d2a6f3e4188592b5321158a9436561c4aef",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132960323514",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43762542535/job/132960323514",
+      "status": "completed",
+      "conclusion": "skipped",
+      "created_at": "2026-11-15T21:14:06Z",
+      "started_at": "2026-11-15T21:14:06Z",
+      "completed_at": "2026-11-15T21:14:06Z",
+      "name": "verify",
+      "steps": [],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132960323514",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": null,
+      "runner_name": null,
+      "runner_group_id": null,
+      "runner_group_name": null
+    }
+  ]
+}

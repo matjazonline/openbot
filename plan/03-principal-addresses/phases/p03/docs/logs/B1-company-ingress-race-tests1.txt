@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::thread::inbound_tests::direct_company_lifecycle::direct_competing_company_delete_waits_for_ingress_then_cascades_every_direct_effect ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4595 filtered out; finished in 1.62s
+

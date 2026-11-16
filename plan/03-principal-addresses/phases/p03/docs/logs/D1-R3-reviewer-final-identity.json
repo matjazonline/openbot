@@ -1,0 +1,12 @@
+{
+  "decision": "D1/r3 PASS (architecture only)",
+  "decision_sha256": "29d8b74a6d14d3a990a4e52ef2a0a3dfc78b30a6a216932f152a86e4ec3d0259",
+  "source_digest": "3f49dff07554a3243f36074b804b38cae6927fd6ebda1e19fb56d13175c0129d",
+  "start_final_snapshots_equal": true,
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "coordination_revision": 17,
+  "coordination_live_pin_equal": true,
+  "coordination_sha256": "6a54471819b1ae32c8cf2b815ab9b35f8652c58d8e6e789599ffe87362594455",
+  "reviewer_runtime_tests_executed": false,
+  "source_accepted": false
+}

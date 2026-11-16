@@ -29,6 +29,7 @@ mod bindings;
 mod channel_response;
 mod editor;
 mod library;
+mod reviewer_picker;
 mod sample;
 mod tools;
 mod versions;
@@ -54,7 +55,7 @@ const REVOKE_TOOL_ROUTE: &str = "/ui/workflows/tools/revoke";
 const RESPONSE_ROUTE: &str = "/ui/workflows/channels/{channel_id}/response";
 /// Every write this workspace registers; the CSRF test routes these same patterns.
 #[cfg(test)]
-const WRITE_ROUTES: [&str; 14] = [
+const WRITE_ROUTES: [&str; 16] = [
     NEW_ROUTE,
     COPY_ROUTE,
     SAVE_ROUTE,
@@ -69,11 +70,14 @@ const WRITE_ROUTES: [&str; 14] = [
     RESPONSE_ROUTE,
     agent_picker::PICKER_ROUTE,
     agent_picker::APPLY_ROUTE,
+    reviewer_picker::PICKER_ROUTE,
+    reviewer_picker::APPLY_ROUTE,
 ];
 
 pub(super) fn router() -> Router<AppState> {
     Router::new()
         .merge(agent_picker::router())
+        .merge(reviewer_picker::router())
         .route("/ui/workflows", get(workspace))
         .route(
             "/ui/workflow-bindings/{binding_id}",

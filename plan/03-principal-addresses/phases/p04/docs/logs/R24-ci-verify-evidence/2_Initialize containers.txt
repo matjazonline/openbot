@@ -1,0 +1,104 @@
+﻿2026-11-16T14:15:49.5683252Z ##[group]Checking docker version
+2026-11-16T14:15:49.5696536Z ##[command]/usr/bin/docker version --format '{{.Server.APIVersion}}'
+2026-11-16T14:15:51.7649941Z '1.48'
+2026-11-16T14:15:51.7659910Z Docker daemon API version: '1.48'
+2026-11-16T14:15:51.7660514Z ##[command]/usr/bin/docker version --format '{{.Client.APIVersion}}'
+2026-11-16T14:15:51.7791832Z '1.48'
+2026-11-16T14:15:51.7799275Z Docker client API version: '1.48'
+2026-11-16T14:15:51.7803357Z ##[endgroup]
+2026-11-16T14:15:51.7804987Z ##[group]Clean up resources from previous jobs
+2026-11-16T14:15:51.7808916Z ##[command]/usr/bin/docker ps --all --quiet --no-trunc --filter "label=4d9673"
+2026-11-16T14:15:51.7921488Z ##[command]/usr/bin/docker network prune --force --filter "label=4d9673"
+2026-11-16T14:15:51.8028453Z ##[endgroup]
+2026-11-16T14:15:51.8028709Z ##[group]Create local container network
+2026-11-16T14:15:51.8034932Z ##[command]/usr/bin/docker network create --label 4d9673 github_network_3d5cdc259d7e49d190dd9b4e9bb122d4
+2026-11-16T14:15:51.8379206Z 7c8816a04b943c8e6674b4e7cec665d27278111a12ffbb4c7a58f7c688e0d060
+2026-11-16T14:15:51.8384701Z ##[endgroup]
+2026-11-16T14:15:51.8405074Z ##[group]Starting postgres service container
+2026-11-16T14:15:51.8421311Z ##[command]/usr/bin/docker pull postgres:18.6-bookworm
+2026-11-16T14:15:52.0854442Z 18.6-bookworm: Pulling from library/postgres
+2026-11-16T14:15:52.1524342Z dd051e1b8c92: Pulling fs layer
+2026-11-16T14:15:52.1524702Z 02c52c643efd: Pulling fs layer
+2026-11-16T14:15:52.1524898Z 9bb37150231e: Pulling fs layer
+2026-11-16T14:15:52.1525088Z c655dd92eb76: Pulling fs layer
+2026-11-16T14:15:52.1525290Z 9b9b33d059d0: Pulling fs layer
+2026-11-16T14:15:52.1525507Z 45759bcf6a4b: Pulling fs layer
+2026-11-16T14:15:52.1525908Z 98765332bf2e: Pulling fs layer
+2026-11-16T14:15:52.1526461Z a8f8dff36ade: Pulling fs layer
+2026-11-16T14:15:52.1526653Z f24ab7b12bc2: Pulling fs layer
+2026-11-16T14:15:52.1526879Z c7fa8ef43f35: Pulling fs layer
+2026-11-16T14:15:52.1527063Z 6432f252ba4f: Pulling fs layer
+2026-11-16T14:15:52.1527253Z 447daba5d8af: Pulling fs layer
+2026-11-16T14:15:52.1527481Z 4c15b1dacf71: Pulling fs layer
+2026-11-16T14:15:52.1527785Z a8f8dff36ade: Waiting
+2026-11-16T14:15:52.1527980Z f24ab7b12bc2: Waiting
+2026-11-16T14:15:52.1528150Z c7fa8ef43f35: Waiting
+2026-11-16T14:15:52.1528351Z 6432f252ba4f: Waiting
+2026-11-16T14:15:52.1528560Z 447daba5d8af: Waiting
+2026-11-16T14:15:52.1528765Z 4c15b1dacf71: Waiting
+2026-11-16T14:15:52.1528948Z c655dd92eb76: Waiting
+2026-11-16T14:15:52.1529134Z 9b9b33d059d0: Waiting
+2026-11-16T14:15:52.1529296Z 45759bcf6a4b: Waiting
+2026-11-16T14:15:52.1529457Z 98765332bf2e: Waiting
+2026-11-16T14:15:52.1971752Z 02c52c643efd: Verifying Checksum
+2026-11-16T14:15:52.1972030Z 02c52c643efd: Download complete
+2026-11-16T14:15:52.2213766Z 9bb37150231e: Verifying Checksum
+2026-11-16T14:15:52.2214295Z 9bb37150231e: Download complete
+2026-11-16T14:15:52.2536094Z c655dd92eb76: Verifying Checksum
+2026-11-16T14:15:52.2536534Z c655dd92eb76: Download complete
+2026-11-16T14:15:52.3168595Z 45759bcf6a4b: Verifying Checksum
+2026-11-16T14:15:52.3168998Z 45759bcf6a4b: Download complete
+2026-11-16T14:15:52.3262736Z 9b9b33d059d0: Verifying Checksum
+2026-11-16T14:15:52.3263271Z 9b9b33d059d0: Download complete
+2026-11-16T14:15:52.3610530Z 98765332bf2e: Verifying Checksum
+2026-11-16T14:15:52.3611438Z 98765332bf2e: Download complete
+2026-11-16T14:15:52.3752238Z a8f8dff36ade: Verifying Checksum
+2026-11-16T14:15:52.3754885Z a8f8dff36ade: Download complete
+2026-11-16T14:15:52.4290710Z c7fa8ef43f35: Verifying Checksum
+2026-11-16T14:15:52.4291364Z c7fa8ef43f35: Download complete
+2026-11-16T14:15:52.4725150Z 6432f252ba4f: Verifying Checksum
+2026-11-16T14:15:52.4725511Z 6432f252ba4f: Download complete
+2026-11-16T14:15:52.4852288Z dd051e1b8c92: Verifying Checksum
+2026-11-16T14:15:52.4852660Z dd051e1b8c92: Download complete
+2026-11-16T14:15:52.5190910Z 447daba5d8af: Verifying Checksum
+2026-11-16T14:15:52.5191297Z 447daba5d8af: Download complete
+2026-11-16T14:15:52.5231932Z 4c15b1dacf71: Verifying Checksum
+2026-11-16T14:15:52.5232494Z 4c15b1dacf71: Download complete
+2026-11-16T14:15:53.1715175Z dd051e1b8c92: Pull complete
+2026-11-16T14:15:53.2110835Z 02c52c643efd: Pull complete
+2026-11-16T14:15:53.2835150Z 9bb37150231e: Pull complete
+2026-11-16T14:15:53.3026176Z c655dd92eb76: Pull complete
+2026-11-16T14:15:53.4566309Z 9b9b33d059d0: Pull complete
+2026-11-16T14:15:53.4864828Z 45759bcf6a4b: Pull complete
+2026-11-16T14:15:53.4919161Z 98765332bf2e: Pull complete
+2026-11-16T14:15:53.4956363Z a8f8dff36ade: Pull complete
+2026-11-16T14:15:53.5220636Z f24ab7b12bc2: Download complete
+2026-11-16T14:15:55.0745135Z f24ab7b12bc2: Pull complete
+2026-11-16T14:15:55.0794366Z c7fa8ef43f35: Pull complete
+2026-11-16T14:15:55.0842641Z 6432f252ba4f: Pull complete
+2026-11-16T14:15:55.0882437Z 447daba5d8af: Pull complete
+2026-11-16T14:15:55.0922693Z 4c15b1dacf71: Pull complete
+2026-11-16T14:15:55.0946957Z Digest: sha256:f1ea2a1a4fb7b68d4836be1fdcb8a6466a89b072158bf9d97663600538c294c5
+2026-11-16T14:15:55.0961243Z Status: Downloaded newer image for postgres:18.6-bookworm
+2026-11-16T14:15:55.0967933Z docker.io/library/postgres:18.6-bookworm
+2026-11-16T14:15:55.1013663Z ##[command]/usr/bin/docker create --name 3aefd031589e47de98035a26de98b9f1_postgres186bookworm_cf1b88 --label 4d9673 --network github_network_3d5cdc259d7e49d190dd9b4e9bb122d4 --network-alias postgres -p 5432:5432 --health-cmd "pg_isready -U postgres -d open_bots_test" --health-interval 5s --health-timeout 5s --health-retries 10 -e "POSTGRES_USER=postgres" -e "POSTGRES_PASSWORD=postgres" -e "POSTGRES_DB=open_bots_test" -e GITHUB_ACTIONS=true -e CI=true postgres:18.6-bookworm
+2026-11-16T14:15:55.9180650Z e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:55.9199234Z ##[command]/usr/bin/docker start e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:56.9147538Z e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:56.9162804Z ##[command]/usr/bin/docker ps --all --filter id=e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52 --filter status=running --no-trunc --format "{{.ID}} {{.Status}}"
+2026-11-16T14:15:56.9273827Z e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52 Up Less than a second (health: starting)
+2026-11-16T14:15:56.9289957Z ##[command]/usr/bin/docker port e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:56.9389904Z 5432/tcp -> 0.0.0.0:5432
+2026-11-16T14:15:56.9390231Z 5432/tcp -> [::]:5432
+2026-11-16T14:15:56.9420837Z ##[endgroup]
+2026-11-16T14:15:56.9427650Z ##[group]Waiting for all services to be ready
+2026-11-16T14:15:56.9437650Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:56.9549483Z starting
+2026-11-16T14:15:56.9561284Z postgres service is starting, waiting 2 seconds before checking again.
+2026-11-16T14:15:58.9564869Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:15:58.9677384Z starting
+2026-11-16T14:15:58.9687099Z postgres service is starting, waiting 3 seconds before checking again.
+2026-11-16T14:16:02.6023020Z ##[command]/usr/bin/docker inspect --format="{{if .Config.Healthcheck}}{{print .State.Health.Status}}{{end}}" e2f1ea9684d12887054642561b2d246fd1ce0361e655cf31687c19c3b09abe52
+2026-11-16T14:16:02.6134560Z healthy
+2026-11-16T14:16:02.6152405Z postgres service is healthy.
+2026-11-16T14:16:02.6153030Z ##[endgroup]

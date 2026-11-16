@@ -1,0 +1,9 @@
+BEGIN
+ALTER TABLE
+ALTER TABLE
+SELECT 1
+INSERT 0 1
+INSERT 0 1
+DELETE 1
+ERROR:  insert or update on table "threads" violates foreign key constraint "threads_target_principal_fk"
+DETAIL:  Key (company_id, principal_id)=(6f16cdb7-3bbb-476a-9736-b6f900963267, 0ac636d0-1338-4951-888e-a92620851fc8) is not present in table "principals".

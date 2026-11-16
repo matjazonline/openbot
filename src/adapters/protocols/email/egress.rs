@@ -32,14 +32,13 @@ use crate::{
     transport::{
         CanonicalContentV1, ContentDigest, ConversationAnchor, DeliveryEnvelope, DeliveryRecord,
         EmailDeliveryContext, EmailThreading, FailureDetail, InternalMailRelay, InternalRelayMail,
-        PartIndex, PartKey, ProviderSendOutcome, RelayDisposition, RenderedPart,
-        StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer, TransportSender,
+        InternalRelayProof, PartIndex, PartKey, ProviderSendOutcome, RelayDisposition,
+        RenderedPart, StandaloneDeliveryEnvelope, TransportPayload, TransportRenderer,
+        TransportSender,
     },
 };
 
-use super::{
-    CompanyMailTransports, EmailChannelSelectorParser, MailHeader, MailMessage, MailSendOutcome,
-};
+use super::{CompanyMailTransports, EmailAddressParser, MailHeader, MailMessage, MailSendOutcome};
 
 /// The version of the frozen email payload. Bumping it makes every already-queued part fail to
 /// decode loudly instead of being read as a shape it is not.
@@ -74,7 +73,7 @@ pub struct OutboundEmailV1 {
     pub in_reply_to: Option<MessageId>,
     pub references: Vec<MessageId>,
     /// Present only when the adapter resolved the recipient as one direct internal channel.
-    pub internal_target: Option<crate::entities::transport::ChannelSelector>,
+    pub internal_target: Option<crate::entities::transport::AddressSelector>,
     /// The chain this mail belongs to, stamped onto the wire so a recipient channel stays on it.
     pub correlation_id: CorrelationId,
     /// Loop control for mail one channel's agent sends. `None` for a platform notice, which
@@ -85,14 +84,37 @@ pub struct OutboundEmailV1 {
 /// The inter-channel hop budget this mail carries.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct OutboundRelayV1 {
-    pub source_channel_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
     /// Hops already taken. The wire header carries this plus one; ingress refuses beyond
     /// [`MAX_INGRESS_HOPS`](crate::transport::MAX_INGRESS_HOPS).
     pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
+    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
+}
+
+// Frozen payloads carry the preceding hops. Wire encoding adds at most one source target;
+// the next ingress rejects that hop if the five-hop budget is already spent.
+fn validate_relay_trace(
+    hops: u32,
+    targets: &[crate::entities::address::AddressTarget],
+) -> AppResult<()> {
+    if hops > crate::transport::MAX_INGRESS_HOPS
+        || targets.len() > crate::transport::MAX_TRACE_TARGETS
+    {
+        return Err(AppError::BadRequest(
+            "Relay trace exceeds its hop budget".into(),
+        ));
+    }
+    Ok(())
 }
 
 impl OutboundEmailV1 {
+    fn validate_trace(&self) -> AppResult<()> {
+        if let Some(relay) = &self.relay {
+            validate_relay_trace(relay.hop_count, &relay.trace_targets)?;
+        }
+        Ok(())
+    }
+
     fn into_mail_message(self) -> MailMessage {
         let headers = self.wire_headers();
         MailMessage {
@@ -131,8 +153,8 @@ impl OutboundEmailV1 {
         };
 
         headers.push(header(
-            "X-MailAgents-Channel-ID",
-            relay.source_channel_id.to_string(),
+            "X-MailAgents-Source-Target",
+            relay.source_target.to_string(),
         ));
         // The hop this mail *is*, not the hop it answers: ingress compares the received value
         // against `MAX_INGRESS_HOPS`, so incrementing here is what makes the budget finite.
@@ -142,7 +164,7 @@ impl OutboundEmailV1 {
             "X-MailAgents-Trace",
             trace
                 .iter()
-                .map(Uuid::to_string)
+                .map(ToString::to_string)
                 .collect::<Vec<_>>()
                 .join(","),
         ));
@@ -155,7 +177,7 @@ impl OutboundEmailV1 {
     /// because the relay is a transport and what a transport delivers is what it would have sent.
     /// Handing over the pre-increment values instead would make an internal hop free, and the
     /// inter-channel loop budget would never be spent.
-    fn as_relay_mail(&self) -> Option<InternalRelayMail<'_>> {
+    fn as_relay_mail(&self, proof: InternalRelayProof) -> Option<InternalRelayMail<'_>> {
         let (hop_count, _) = self.wire_relay()?;
         Some(InternalRelayMail {
             target: self.internal_target.as_ref()?,
@@ -166,10 +188,11 @@ impl OutboundEmailV1 {
             message_id: &self.message_id,
             in_reply_to: self.in_reply_to.as_ref(),
             references: &self.references,
-            source_channel_id: self.relay.as_ref()?.source_channel_id,
+            source_target: self.relay.as_ref()?.source_target,
             hop_count,
             trace: self.wire_relay()?.1,
             correlation_id: self.correlation_id,
+            proof,
         })
     }
 
@@ -178,11 +201,11 @@ impl OutboundEmailV1 {
     /// Read by the headers and by the internal relay, so a hop that leaves over SMTP and one that
     /// is ingested in process are counted identically. Two copies of this arithmetic is how an
     /// internal loop becomes cheaper than an external one.
-    fn wire_relay(&self) -> Option<(u32, Vec<Uuid>)> {
+    fn wire_relay(&self) -> Option<(u32, Vec<crate::entities::address::AddressTarget>)> {
         let relay = self.relay.as_ref()?;
-        let mut trace = relay.trace_channels.clone();
-        if !trace.contains(&relay.source_channel_id) {
-            trace.push(relay.source_channel_id);
+        let mut trace = relay.trace_targets.clone();
+        if !trace.contains(&relay.source_target) {
+            trace.push(relay.source_target);
         }
         Some((relay.hop_count + 1, trace))
     }
@@ -329,6 +352,7 @@ impl TransportRenderer for EmailRenderer {
             .map_err(|error| {
                 AppError::Internal(format!("Invalid frozen email correlation: {error}"))
             })?;
+        email.validate_trace()?;
         let provider_key = ExternalMessageKey::parse(email.message_id.as_str())
             .map_err(|error| AppError::Internal(format!("Invalid frozen email key: {error}")))?;
         let metadata = crate::entities::email_message::EmailMessageMetadata::new(email.message_id)
@@ -349,6 +373,20 @@ impl TransportRenderer for EmailRenderer {
         ExternalMessageKey::parse(format!("<{nonce}@{company}.{}>", self.app_domain_name))
             .map_err(|error| AppError::Internal(format!("Invalid application email key: {error}")))
     }
+
+    fn application_address(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity> {
+        super::EmailIdentity::parse(crate::entities::address::address_for(
+            address,
+            company,
+            &self.app_domain_name,
+        ))
+        .map(|identity| identity.qualify_default())
+        .map_err(|error| AppError::Internal(format!("Invalid application address: {error}")))
+    }
 }
 
 impl EmailRenderer {
@@ -360,6 +398,9 @@ impl EmailRenderer {
         context: &EmailDeliveryContext,
         prefix_as_reply: bool,
     ) -> AppResult<Vec<RenderedPart>> {
+        if let Some(relay) = &context.relay {
+            validate_relay_trace(relay.hop_count, &relay.trace_targets)?;
+        }
         let key = Self::part_key(delivery_key)?;
         let message_id = self.message_id_for(&key);
         let threading = self.thread_headers(&context.threading);
@@ -379,14 +420,13 @@ impl EmailRenderer {
             in_reply_to: threading.in_reply_to,
             references: threading.references,
             internal_target: internal_target(
-                EmailChannelSelectorParser::new(&self.app_domain_name)
-                    .parse(context.recipient_to.as_str()),
+                EmailAddressParser::new(&self.app_domain_name).parse(context.recipient_to.as_str()),
             ),
             correlation_id,
             relay: context.relay.as_ref().map(|relay| OutboundRelayV1 {
-                source_channel_id: relay.source_channel_id,
+                source_target: relay.source_target,
                 hop_count: relay.hop_count,
-                trace_channels: relay.trace_channels.clone(),
+                trace_targets: relay.trace_targets.clone(),
             }),
         };
 
@@ -428,8 +468,8 @@ impl EmailRenderer {
 }
 
 fn internal_target(
-    selection: Option<super::EmailChannelSelection>,
-) -> Option<crate::entities::transport::ChannelSelector> {
+    selection: Option<super::EmailAddressSelection>,
+) -> Option<crate::entities::transport::AddressSelector> {
     let selection = selection?;
     if selection.delivery().is_context_only() || selection.selectors().len() != 1 {
         return None;
@@ -485,12 +525,16 @@ impl EmailSender {
     ///
     /// A mail with no relay trace is never internal: a platform notice comes from the deployment
     /// rather than from a channel, so it has no source channel to authenticate the hop against.
+    ///
+    /// The hop names the part this call is sending, and only this call can say that: the receiving
+    /// commit proves the claim against the stored part before the message inherits anything.
     async fn relay_internally(
         &self,
         email: &OutboundEmailV1,
         delivery: &DeliveryRecord,
+        part: &RenderedPart,
     ) -> Option<ProviderSendOutcome> {
-        let mail = email.as_relay_mail()?;
+        let mail = email.as_relay_mail(InternalRelayProof::of(delivery, part))?;
         match self.internal.relay_internal(&mail).await {
             Ok(RelayDisposition::Relayed) => Some(ProviderSendOutcome::Delivered {
                 provider_key: provider_key(&email.message_id, delivery),
@@ -535,7 +579,13 @@ impl TransportSender for EmailSender {
                 };
             }
         };
-        if let Some(outcome) = self.relay_internally(&email, delivery).await {
+        if let Err(error) = email.validate_trace() {
+            return ProviderSendOutcome::Terminal {
+                class: FailureClass::InvalidPayload,
+                detail: detail(&error.to_string()),
+            };
+        }
+        if let Some(outcome) = self.relay_internally(&email, delivery, part).await {
             return outcome;
         }
         let message_id = email.message_id.clone();

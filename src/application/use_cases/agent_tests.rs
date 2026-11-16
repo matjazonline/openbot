@@ -35,6 +35,7 @@ struct MockAgentPersistence {
 impl AgentPersistence for MockAgentPersistence {
     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
         let agent = Agent {
+            open_to_public: write.open_to_public,
             native_permissions: write.native_permissions,
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
@@ -109,6 +110,7 @@ impl AgentPersistence for MockAgentPersistence {
 
         agent.name = write.name;
         agent.slug = write.slug;
+        agent.open_to_public = write.open_to_public;
         agent.provider = write.provider;
         agent.model = write.model;
         agent.system_prompt = write.system_prompt;
@@ -148,7 +150,7 @@ impl CompanyAgents for MockAgentPersistence {
         }
         Ok(CreatedAgent {
             agent: AgentPersistence::create(self, company.as_uuid(), write).await?,
-            desk_id: Uuid::new_v4(),
+            principal_id: crate::entities::transport::PrincipalId::random(),
         })
     }
 
@@ -234,6 +236,7 @@ fn fixture() -> Fixture {
             company_persistence,
             agent_persistence.clone(),
             agent_persistence.clone(),
+            crate::use_cases::agent::SpamScanning::Unavailable,
         )
         .with_company_agents(agent_persistence),
     }
@@ -250,7 +253,7 @@ fn support_agent() -> AgentWrite {
 /// 01DEP-P03-D2: creation goes through company-agent creation, which answers with the agent's
 /// default desk; without it configured, creation refuses rather than writing a bare agent.
 #[tokio::test]
-async fn agent_default_desk_creation_goes_through_company_agents() {
+async fn agent_direct_address_creation_goes_through_company_agents() {
     let fixture = fixture();
     let created = fixture
         .use_cases
@@ -259,7 +262,7 @@ async fn agent_default_desk_creation_goes_through_company_agents() {
         .expect("the agent is created");
     assert_eq!(created.agent.slug, "support-triage");
     assert_eq!(created.agent.company_id, Some(fixture.company_id));
-    assert!(!created.desk_id.is_nil());
+    assert!(!created.principal_id.as_uuid().is_nil());
 
     let unconfigured = AgentUseCases::new(
         Arc::new(company_double(Vec::new(), Vec::new())),
@@ -269,6 +272,7 @@ async fn agent_default_desk_creation_goes_through_company_agents() {
         Arc::new(MockAgentPersistence {
             agents: Mutex::new(Vec::new()),
         }),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     );
     assert!(matches!(
         unconfigured.company_agents(),
@@ -342,6 +346,7 @@ async fn company_owner_agent_crud_flow_works() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     )
     .with_company_agents(agent_persistence);
 
@@ -534,6 +539,7 @@ async fn members_read_agents_and_admins_manage_them() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     )
     .with_company_agents(agent_persistence);
 
@@ -680,6 +686,7 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
 
     // A library definition is one with no company of its own.
     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+        open_to_public: false,
         native_permissions: Default::default(),
         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
@@ -708,6 +715,7 @@ async fn a_library_pick_is_copied_into_the_company_with_a_model_it_can_run() {
         company_persistence,
         agent_persistence.clone(),
         agent_persistence.clone(),
+        crate::use_cases::agent::SpamScanning::Unavailable,
     )
     .with_company_agents(agent_persistence.clone());
 

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin' (5456086) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:45:48:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.message_trigger", message: "The workflow input schema must accept the standard message input (source_message, message, subject, sender)", field_path: "/input_schema", span: SourceSpan { start: 51, end: 52, line: 1, column: 52 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 2.12s
+

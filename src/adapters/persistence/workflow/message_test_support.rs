@@ -114,34 +114,56 @@ pub(super) enum To {
 
 /// A `message.send` step to `to`, published, bound, admitted in the run channel and claimed.
 pub(super) async fn send(to: &[To]) -> Setup {
-    Box::pin(setup_with_owner(|channel, other, user, owner| {
-        let destinations: Vec<Value> = to
-            .iter()
-            .map(|to| match to {
-                To::Channel => json!({"kind":"channel","id":other.to_string()}),
-                To::User => json!({"kind":"user","id":user.to_string()}),
-                To::Owner => json!({"kind":"user","id":owner.to_string()}),
-            })
-            .collect();
-        let _ = channel;
-        (
-            "message.send",
-            json!({"content":{"literal":{"subject":"Status","body":"The run finished."}},
+    Box::pin(setup_with_owner(
+        |MessageSetup {
+             channel,
+             other,
+             user,
+             owner,
+             ..
+         }| {
+            let destinations: Vec<Value> = to
+                .iter()
+                .map(|to| match to {
+                    To::Channel => json!({"kind":"channel","id":other.to_string()}),
+                    To::User => json!({"kind":"user","id":user.to_string()}),
+                    To::Owner => json!({"kind":"user","id":owner.to_string()}),
+                })
+                .collect();
+            let _ = channel;
+            (
+                "message.send",
+                json!({"content":{"literal":{"subject":"Status","body":"The run finished."}},
                    "destinations":{"literal":destinations}}),
-        )
-    }))
+            )
+        },
+    ))
     .await
 }
 
+pub(crate) struct MessageSetup {
+    pub(crate) channel: Uuid,
+    pub(crate) other: Uuid,
+    pub(crate) user: Uuid,
+    pub(crate) owner: Uuid,
+    pub(crate) owner_principal: Uuid,
+}
+
 pub(super) async fn setup_with_owner(
-    step: impl FnOnce(Uuid, Uuid, Uuid, Uuid) -> (&'static str, Value),
+    step: impl FnOnce(MessageSetup) -> (&'static str, Value),
 ) -> Setup {
     let fixture = Fixture::new().await;
     let channel = new_channel(&fixture, "runs").await;
     let other = new_channel(&fixture, "notices").await;
     let user = member(&fixture, "member").await;
     let owner = fixture.target.actor.user_id();
-    let (kind, with) = step(channel, other, user, owner);
+    let (kind, with) = step(MessageSetup {
+        channel,
+        other,
+        user,
+        owner,
+        owner_principal: fixture.principal(owner).await,
+    });
     let version = Box::pin(published(&fixture, kind, with)).await;
     let target = Box::pin(bound(&fixture, version)).await;
     let claim = Box::pin(claimed(&fixture, target, channel)).await;
@@ -190,6 +212,7 @@ pub(in crate::adapters::persistence::workflow::tests) async fn bound(
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

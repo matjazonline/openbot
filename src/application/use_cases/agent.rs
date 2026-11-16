@@ -39,6 +39,8 @@ pub fn agent_not_found() -> AppError {
 pub struct AgentWrite {
     pub name: String,
     pub slug: String,
+    pub open_to_public: bool,
+    pub confirm_spam_disabled: bool,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
@@ -135,15 +137,15 @@ pub struct AgentPlacement {
     pub role: Option<DepartmentRole>,
 }
 
-/// A company agent as created: the agent and its default desk.
+/// A company agent and its directly addressable principal.
 #[derive(Debug, Clone)]
 pub struct CreatedAgent {
     pub agent: Agent,
-    pub desk_id: Uuid,
+    pub principal_id: crate::entities::transport::PrincipalId,
 }
 
 /// The one way a company agent comes to exist (01DEP-P03-D1): the agent, its principal, its
-/// first published version, its default desk at its slug and its placement, in one transaction
+/// first published version, direct address/workflow and placement, in one transaction
 /// or not at all.
 #[async_trait]
 pub trait CompanyAgents: Send + Sync {
@@ -184,6 +186,17 @@ pub enum SpamScanning {
     Unavailable,
 }
 
+impl SpamScanning {
+    pub(crate) fn check_public_ingress(self, open: bool, confirmed: bool) -> AppResult<()> {
+        if open && self == Self::Unavailable && !confirmed {
+            return Err(AppError::BadRequest(
+                "Spam scanning is disabled in server configuration. Saving public mail access requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
 /// Whether one of `connections` enables `model` for `provider`, both compared canonically: the
 /// model-selection rule agent writes and assistant provisioning (p08 D2.3) share.
 pub(crate) fn model_allowed(
@@ -221,6 +234,8 @@ pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
         tool_bindings: None,
         name: definition.name.clone(),
         slug: definition.slug.clone(),
+        open_to_public: false,
+        confirm_spam_disabled: false,
         provider: definition.provider.clone(),
         model: definition.model.clone(),
         system_prompt: definition.system_prompt.clone(),
@@ -234,6 +249,7 @@ pub(super) fn library_agent_write(definition: &Agent) -> AgentWrite {
 
 #[derive(Clone)]
 pub struct AgentUseCases {
+    spam_scanning: SpamScanning,
     company_persistence: Arc<dyn CompanyPersistence>,
     agent_persistence: Arc<dyn AgentPersistence>,
     draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
@@ -253,11 +269,13 @@ impl AgentUseCases {
         company_persistence: Arc<dyn CompanyPersistence>,
         agent_persistence: Arc<dyn AgentPersistence>,
         draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
+        spam_scanning: SpamScanning,
     ) -> Self {
         Self {
             company_persistence,
             agent_persistence,
             draft_persistence,
+            spam_scanning,
             company_agents: None,
             prompt_classifier: None,
         }
@@ -373,6 +391,8 @@ impl AgentUseCases {
             managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
         write.created_by = Some(CreationProvenance::user(user_id));
         write.normalize()?;
+        self.spam_scanning
+            .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
         self.validate_model_selection(company_id, &write).await?;
         Ok((company, write))
     }
@@ -580,6 +600,8 @@ impl AgentUseCases {
         }
 
         write.normalize()?;
+        self.spam_scanning
+            .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
         self.validate_model_selection(company_id, &write).await?;
 
         info!(%agent_id, %company_id, "Updating agent");

@@ -1,0 +1,3 @@
+graft skeleton — src/application/workflow/registry/validation.rs
+
+no definitions indexed for this file

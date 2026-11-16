@@ -1,0 +1,20 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case' (6182843) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:1015:50:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42703", message: "column \"route_snapshot\" does not exist", detail: None, hint: None, position: Some(Original(1260)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_relation.c"), line: Some(3859), routine: Some("errorMissingColumn") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 20.24s
+
+EXIT 101

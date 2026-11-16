@@ -2,16 +2,19 @@
 
 Status: **accepted and integrated for the verified API-first attribution scope**.
 All ten authorized phases are implemented and sequentially accepted. Main workspace
-is the delivery and record authority. Attribution changes remain uncommitted; the
-user's pushed test-fix commit is preserved.
+is the delivery and record authority. Attribution implementation is committed as e61d384e; the user's pushed test fixes
+are preserved. Publication integration with current main is independently accepted.
 
 - Source: `55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97`.
-- HEAD: `6e55258cbbdc7633940805f366fb17fe240f02aa`.
+- Original acceptance HEAD: `6e55258cbbdc7633940805f366fb17fe240f02aa`.
+- Publication review base: `e61d384ed0d8859e04b8e5fc01b335f6c19d91c2`; clean merge of
+  origin/main `8fdb892b6e279ed0c09150e2336bbdc7462f877d` is accepted. Frozen merge
+  digest: `3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d`.
 - Root acceptance: **AS-P10-ACCEPT-R1**; independent Astra review: **AS-P10-B1-N2 PASS**.
   F1 is closed. Root/A is user-confirmed Sol 6.1/xhigh; B is retained Astra/high.
 - Workflow: `implement-astra-reviewed-2-3`. Exact snapshot exclusions remain each
   p01–p10 `docs` directory individually plus plan `COORDINATION.md`.
-- Coordination: main [COORDINATION](../../../COORDINATION.md), revision28;
+- Coordination: main [COORDINATION](../../../COORDINATION.md), revision30;
   C001–C008/r1 satisfied for the agreed scope. Canonical p06–p10 records are now main.
 
 The service has independent storage/deployment/UI, Openbot sign-in and company
@@ -41,7 +44,7 @@ Docker environment; dependent build/image/private-acceptance stages were not
 exercised. The knowledge image checker passed after correcting its fixture mount.
 No assertion was weakened or unrelated source repaired to clear these gates.
 
-No check or reviewer is active. Owned native PostgreSQL was stopped/removed;
+Original acceptance resources were cleaned up. Owned native PostgreSQL was stopped/removed;
 owned Docker PostgreSQL and anonymous volumes removed; task Colima VM stopped.
 Prepared baseline, managed-Doop and pinned-node temporary fixtures were removed.
 Source, canonical evidence, isolated author worktree, dependency/build caches and
@@ -59,5 +62,16 @@ Evidence and history:
 
 No attribution implementation work remains under the accepted scope. A follow-up
 that changes source must preserve the unresolved verification gaps and obtain
-focused verification/review for its actual changes. No commit, push or deployment
-was performed for the attribution implementation.
+focused verification/review for its actual changes. Implementation commit e61d384e is preserved in the accepted main integration.
+Independent **AS-P10-PUSH-R1-N1 PASS** and root **AS-P10-PUSH-ACCEPT-R1** accept
+merged source3688ab5d with incoming main8fdb892b. All143 service files remain
+identical to the previously accepted tree. Combined fmt, offline all-target
+compilation, fresh migration, service build,25focused root tests and actual
+SSO1test/8checks pass. The initial linker disk-full failure is retained; the
+retry uses debug0/incremental0 with unchanged code and assertions. See
+[publication evidence](logs/AS-P10-PUSH-R1.evidence.json). Whole-repository gaps
+above remain; no fresh global-green claim is made.
+
+Owned publication PostgreSQL is stopped/removed, and no check/reviewer remains
+active. User explicitly authorized the merge commit and non-force push to main.
+The delivery merge contains this handoff; production deployment remains deferred.

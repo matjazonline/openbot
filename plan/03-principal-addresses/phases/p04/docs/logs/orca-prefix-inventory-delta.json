@@ -1,0 +1,19 @@
+{
+  "baseline": "plan/03-principal-addresses/phases/p04/docs/logs/merged-binary-inventory1.txt",
+  "baseline_count": 4690,
+  "current_count": 4700,
+  "added": [
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_populated_company_cascade_removes_broker_call_run_and_thread",
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_broker_rejects_foreign_or_wrong_account_principal_and_identity_updates",
+    "adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_new_person_incarnation_gets_new_broker_without_reviving_old_invocation",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::integration_tests::native_mcp_workflow_final_credential_guard_locks_distinct_source_and_credential_owners",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_dispatch_rechecks_source_after_approval_and_reservation",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_fresh_action_and_credentials_use_original_account_prefix",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_outer_preparation_never_waits_for_broker_run",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_return_authority_rechecks_original_accounts",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_source_local_action_rejects_agent_origin_substitution",
+    "adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_workflow_actor_requester_and_revision_contention_rolls_back_and_retries"
+  ],
+  "removed": [],
+  "binary_sha256": "3bb2e2bc6db1c5d956649cd6ea04d0a31d4bcace4d6f830f467a3ae7348e97d9"
+}

@@ -48,7 +48,7 @@ fn members_only_desk(company_id: Uuid, slug: &str, member: PrincipalId) -> Chann
 }
 
 #[tokio::test]
-async fn department_desk_relay_into_a_members_only_desk_stays_trusted() {
+async fn department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants() {
     let company_id = Uuid::new_v4();
     let target = members_only_desk(company_id, "ops", PrincipalId::random());
     let member_desk = desk(company_id, "member-agent");
@@ -92,10 +92,9 @@ async fn department_desk_relay_into_a_members_only_desk_stays_trusted() {
             ),
         )
         .await;
-        assert_eq!(
-            disposition,
-            crate::transport::RelayDisposition::Relayed,
-            "a relay from {from} is admitted"
+        assert!(
+            matches!(disposition, crate::transport::RelayDisposition::Refused(_)),
+            "an unproved agent sender must not bypass the desk grant: {from}"
         );
     }
 
@@ -104,7 +103,10 @@ async fn department_desk_relay_into_a_members_only_desk_stays_trusted() {
         &thread_use_cases,
         &InternalHop {
             hop_count: 2,
-            trace_channels: vec![target_id, outside_id],
+            trace_targets: vec![
+                crate::entities::address::AddressTarget::Desk(target_id),
+                crate::entities::address::AddressTarget::Desk(outside_id),
+            ],
             ..InternalHop::new(
                 outside_id,
                 "outside-agent@acme.mailagents.com",

@@ -13,6 +13,8 @@ use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 use std::time::Duration;
 #[path = "local_agent_mcp_history_tests.rs"]
 mod history;
+#[path = "local_agent_mcp_source_tests.rs"]
+mod source_tests;
 
 async fn configure(s: &mut Setup, endpoint: &str) {
     let p = &s.fixture.persistence;

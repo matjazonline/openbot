@@ -9,7 +9,7 @@ use async_trait::async_trait;
 use sqlx::{Postgres, QueryBuilder};
 use uuid::Uuid;
 
-use super::{DeliveryDb, PART_COLUMNS, PartDb};
+use super::{DeliveryDb, PART_COLUMNS, PartDb, qualified_delivery_columns};
 use crate::{
     adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
@@ -18,7 +18,7 @@ use crate::{
         delivery::{DeliveryEntry, DeliveryFilter, DeliveryPartEntry},
         transport::{DeliveryId, DeliveryPartId},
     },
-    use_cases::delivery::{DeliveryReadScope, DeliveryReader, project_delivery},
+    use_cases::delivery::{DeliveryReadScope, DeliveryReader, DeliveryWorkspace, project_delivery},
 };
 
 /// The row plus its two joined labels, which is what a reader sees.
@@ -35,31 +35,62 @@ struct DeliveryViewDb {
 /// Both joins are inner: the composite foreign keys make a delivery whose message or binding is
 /// missing unrepresentable, so an outer join would only be describing a state the database forbids.
 ///
-/// The column list is spelled out qualified rather than derived from [`DELIVERY_COLUMNS`] by
-/// string surgery -- a `SELECT` list is what the row struct is coupled to, and reconstructing it
-/// from another string is a decoder ring the reader should not need.
-const DELIVERY_VIEW_SELECT: &str = r#"
-    SELECT delivery.id, delivery.company_id, delivery.channel_id, delivery.message_id,
-           delivery.source_binding_id, delivery.destination_binding_id,
-           delivery.external_destination, delivery.depends_on_delivery_id,
-           delivery.correlation_id, delivery.transport, delivery.purpose,
-           delivery.idempotency_key, delivery.status, delivery.attempt_count,
-           delivery.max_attempts, delivery.available_at, delivery.last_error_class,
-           delivery.last_error_detail, delivery.execution_id, delivery.owner_worker_id,
-           delivery.locked_at, delivery.lock_expires_at, delivery.delivered_at,
-           delivery.created_at, delivery.updated_at,
-           delivery.cancellation_requested_at, delivery.cancellation_reason,
-           message.subject AS subject,
+/// Reuse the queue's named projection so readers and claimants decode the same target shape.
+fn scoped_deliveries(scope: DeliveryReadScope) -> QueryBuilder<'static, Postgres> {
+    let mut query = QueryBuilder::new(format!(
+        r#"
+    SELECT {}, message.subject AS subject,
            binding.display_label AS destination_label
       FROM message_deliveries AS delivery
       JOIN messages AS message
         ON (message.company_id, message.id) = (delivery.company_id, delivery.message_id)
       JOIN channel_bindings AS binding
         ON (binding.company_id, binding.id)
-           = (delivery.company_id, delivery.destination_binding_id)"#;
+           = (delivery.company_id, delivery.destination_binding_id)
+     WHERE delivery.company_id = "#,
+        qualified_delivery_columns("delivery")
+    ));
+    query.push_bind(scope.company_id);
+    // Filter before paging; hidden personal rows must not displace readable entries.
+    query.push(
+        " AND (delivery.principal_id IS NULL OR EXISTS (\
+        SELECT 1 FROM principals AS viewer WHERE viewer.company_id=delivery.company_id \
+        AND viewer.kind='person' AND viewer.user_id=",
+    );
+    query.push_bind(scope.viewer.user_id());
+    query.push(
+        " AND principal_direct_can_view(delivery.company_id,delivery.principal_id,viewer.id)))",
+    );
+    query
+}
 
 #[async_trait]
 impl DeliveryReader for PostgresPersistence {
+    async fn workspace(
+        &self,
+        scope: DeliveryReadScope,
+        filter: &DeliveryFilter,
+        selected: Option<DeliveryId>,
+    ) -> AppResult<DeliveryWorkspace> {
+        let mut entries = self.list_company_deliveries(scope, filter).await?;
+        let selected = match selected {
+            Some(id) => self.get_delivery(scope, id).await?,
+            None => None,
+        };
+        let selected_id = selected.as_ref().map(|entry| entry.id);
+        entries.extend(selected);
+        // A selection may be outside the page. Recheck every loaded inbox together,
+        // so its later payload read cannot leave stale private rows in the sidebar.
+        let mut entries = self.project_delivery_entries(scope, entries).await?;
+        let selected = selected_id.and_then(|id| {
+            entries
+                .iter()
+                .rposition(|entry| entry.id == id)
+                .map(|index| entries.remove(index))
+        });
+        Ok(DeliveryWorkspace { entries, selected })
+    }
+
     async fn list_company_deliveries(
         &self,
         scope: DeliveryReadScope,
@@ -67,10 +98,7 @@ impl DeliveryReader for PostgresPersistence {
     ) -> AppResult<Vec<DeliveryEntry>> {
         // `QueryBuilder` rather than string interpolation: every filter value is a bind parameter,
         // which `src/adapters/persistence/AGENTS.md` requires of dynamic list filters.
-        let mut query = QueryBuilder::<Postgres>::new(format!(
-            "{DELIVERY_VIEW_SELECT} WHERE delivery.company_id = "
-        ));
-        query.push_bind(scope.company_id);
+        let mut query = scoped_deliveries(scope);
         if let Some(channel_id) = filter.channel_id {
             query
                 .push(" AND delivery.channel_id = ")
@@ -119,14 +147,15 @@ impl DeliveryReader for PostgresPersistence {
         scope: DeliveryReadScope,
         delivery_id: DeliveryId,
     ) -> AppResult<Option<DeliveryEntry>> {
-        let row = sqlx::query_as::<_, DeliveryViewDb>(&format!(
-            "{DELIVERY_VIEW_SELECT} WHERE delivery.id = $1 AND delivery.company_id = $2"
-        ))
-        .bind(delivery_id.as_uuid())
-        .bind(scope.company_id)
-        .fetch_optional(&self.pool)
-        .await
-        .map_err(AppError::from)?;
+        let mut query = scoped_deliveries(scope);
+        query
+            .push(" AND delivery.id = ")
+            .push_bind(delivery_id.as_uuid());
+        let row = query
+            .build_query_as::<DeliveryViewDb>()
+            .fetch_optional(&self.pool)
+            .await
+            .map_err(AppError::from)?;
 
         let entries = self.with_parts(row.into_iter().collect()).await?;
         Ok(self
@@ -143,25 +172,25 @@ impl PostgresPersistence {
         scope: DeliveryReadScope,
         mut entries: Vec<DeliveryEntry>,
     ) -> AppResult<Vec<DeliveryEntry>> {
-        let messages = entries
+        let deliveries = entries
             .iter()
-            .map(|entry| entry.message_id.as_uuid())
+            .map(|entry| entry.id.as_uuid())
             .collect::<Vec<_>>();
         // Parts and provider diagnostics have already loaded; this is the final authority read.
-        let levels = crate::adapters::persistence::view_visibility::message_levels_on(
+        let levels = crate::adapters::persistence::view_visibility::delivery_levels_on(
             self.pool(),
             crate::domain::workflow::CompanyId::new(scope.company_id),
             scope.viewer,
-            &messages,
+            &deliveries,
         )
         .await?;
-        for entry in &mut entries {
-            let visibility = levels
-                .get(&entry.message_id.as_uuid())
-                .copied()
-                .ok_or_else(|| AppError::NotFound("Message not found".into()))?;
-            project_delivery(entry, visibility);
-        }
+        entries.retain_mut(|entry| match levels.get(&entry.id.as_uuid()).copied() {
+            Some(visibility) => {
+                project_delivery(entry, visibility);
+                true
+            }
+            None => false,
+        });
         Ok(entries)
     }
     /// Attach every delivery's parts, in one batch read rather than one query per delivery.
@@ -217,7 +246,7 @@ fn entry(row: DeliveryViewDb, parts: Vec<DeliveryPartEntry>) -> AppResult<Delive
     Ok(DeliveryEntry {
         id: DeliveryId::new(delivery.id),
         company_id: delivery.company_id,
-        channel_id: attribution.channel_id,
+        target: attribution.target,
         message_id: attribution.message_id,
         correlation_id: CorrelationId::from(delivery.correlation_id),
         transport: delivery.transport()?,

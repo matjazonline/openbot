@@ -4,7 +4,7 @@ use std::time::Duration;
 #[tokio::test]
 async fn cloudroom_workflow_approval_parks_before_native_admission_and_grants_one_effect() {
     let s = Setup::with_inputs(|inputs, owner| {
-        inputs["approval"] = json!({"literal":{"reviewers":[{"kind":"user","id":owner}],
+        inputs["approval"] = json!({"literal":{"reviewers":[{"kind":"principal","id":owner}],
             "deadline":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()}});
     })
     .await;

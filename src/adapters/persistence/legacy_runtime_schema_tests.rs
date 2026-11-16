@@ -59,7 +59,6 @@ const RETIRED_COLUMN_NAMES: &[&str] = &[
     "response_review_email_enabled",
     "delegation_timeout_email_enabled",
     "task_failure_email_enabled",
-    "owner_agent_id",
     "response_trigger",
     "preferred_reviewer_principal_id",
     "external_response_review_override",
@@ -192,7 +191,8 @@ async fn the_legacy_runtime_tables_columns_and_functions_are_gone() {
         "SELECT table_name || '.' || column_name FROM information_schema.columns \
          WHERE table_schema = 'public' AND (column_name = ANY($1) \
             OR (table_name, column_name) IN (('message_deliveries', 'task_id'), \
-                ('task_attempts', 'result'), ('task_attempts', 'error'))) \
+                ('task_attempts', 'result'), ('task_attempts', 'error'), \
+                ('channels', 'owner_agent_id'))) \
          ORDER BY 1",
     )
     .bind(RETIRED_COLUMN_NAMES)

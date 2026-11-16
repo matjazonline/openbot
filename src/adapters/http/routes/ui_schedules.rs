@@ -368,12 +368,7 @@ async fn create_pane(
     Query(query): Query<CompanyScopedQuery>,
 ) -> AppResult<Html<String>> {
     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(CompanyAccess {
-        company,
-        membership: _,
-        ..
-    }) = company
-    else {
+    let Some(CompanyAccess { company, .. }) = company else {
         return Ok(Html(String::new()));
     };
 
@@ -402,12 +397,7 @@ async fn edit_schedule_pane(
     Query(query): Query<CompanyScopedQuery>,
 ) -> AppResult<Html<String>> {
     let (_, company) = workspace.scoped_company(Some(query.company_id)).await?;
-    let Some(CompanyAccess {
-        company,
-        membership: _,
-        ..
-    }) = company
-    else {
+    let Some(CompanyAccess { company, .. }) = company else {
         return Ok(Html(String::new()));
     };
 
@@ -676,6 +666,7 @@ mod tests {
 
     fn occurrence(status: OccurrenceStatus) -> ScheduleRun {
         ScheduleRun {
+            role_refusal: None,
             id: Uuid::new_v4(),
             scheduled_for: Utc::now(),
             manual: false,

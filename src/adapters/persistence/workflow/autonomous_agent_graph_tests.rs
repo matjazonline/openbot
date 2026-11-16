@@ -68,6 +68,7 @@ async fn publish_graph(setup: &AgentSetup, mut source: Value, params: Value) -> 
     let bindings = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

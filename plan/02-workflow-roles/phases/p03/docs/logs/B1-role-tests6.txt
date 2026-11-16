@@ -1,0 +1,115 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:101:19
+    |
+101 |         parameters["expected_bot_id"] = json!(input.bot);
+    |                   ^^^^^^^^^^^^^^^^^^^
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:102:19
+    |
+102 |         parameters["expected_workspace_id"] = json!(input.workspace);
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:103:19
+    |
+103 |         parameters["doop_origin"] = json!(origin);
+    |                   ^^^^^^^^^^^^^^^
+
+error[E0599]: no method named `clone` found for opaque type `impl futures::Future<Output = JsonValue>` in the current scope
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:114:24
+    |
+114 |             parameters.clone(),
+    |                        ^^^^^ method not found in `impl futures::Future<Output = JsonValue>`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:126:13
+    |
+126 |             parameters,
+    |             ^^^^^^^^^^ expected `Value`, found future
+    |
+note: calling an async function returns a future
+   --> src/adapters/persistence/workflow/doop_document_live_setup.rs:126:13
+    |
+126 |             parameters,
+    |             ^^^^^^^^^^
+help: consider `await`ing on the `Future`
+    |
+126 |             parameters.await,
+    |                       ++++++
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:315:15
+    |
+315 |         values["doop_origin"] = json!(origin);
+    |               ^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:316:29
+    |
+316 |         bind_params(&mut d, values).await;
+    |         -----------         ^^^^^^ expected `Value`, found future
+    |         |
+    |         arguments to this function are incorrect
+    |
+note: calling an async function returns a future
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:316:29
+    |
+316 |         bind_params(&mut d, values).await;
+    |                             ^^^^^^
+note: function defined here
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:14:10
+    |
+ 14 | async fn bind_params(d: &mut Document, values: Value) {
+    |          ^^^^^^^^^^^                   -------------
+help: consider `await`ing on the `Future`
+    |
+316 |         bind_params(&mut d, values.await).await;
+    |                                   ++++++
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:332:11
+    |
+332 |     values["result_destinations"] = json!([{"kind":"user","id":recipient}]);
+    |           ^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:333:25
+    |
+333 |     bind_params(&mut d, values).await;
+    |     -----------         ^^^^^^ expected `Value`, found future
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: calling an async function returns a future
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:333:25
+    |
+333 |     bind_params(&mut d, values).await;
+    |                         ^^^^^^
+note: function defined here
+   --> src/adapters/persistence/workflow/doop_document_result_tests.rs:14:10
+    |
+ 14 | async fn bind_params(d: &mut Document, values: Value) {
+    |          ^^^^^^^^^^^                   -------------
+help: consider `await`ing on the `Future`
+    |
+333 |     bind_params(&mut d, values.await).await;
+    |                               ++++++
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+  --> src/adapters/persistence/workflow/doop_document_sample_tests.rs:25:53
+   |
+25 |     request.params["action_approval"] = params(&d.f)["action_approval"].clone();
+   |                                                     ^^^^^^^^^^^^^^^^^^^
+
+error[E0608]: cannot index into a value of type `impl futures::Future<Output = JsonValue>`
+  --> src/adapters/persistence/workflow/doop_document_sample_tests.rs:26:57
+   |
+26 |     request.params["result_destinations"] = params(&d.f)["result_destinations"].clone();
+   |                                                         ^^^^^^^^^^^^^^^^^^^^^^^
+
+Some errors have detailed explanations: E0308, E0599, E0608.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 11 previous errors

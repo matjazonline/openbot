@@ -1,0 +1,21 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case stdout ----
+DEBUGRESULT Err(Database("error returned from database: DEBUG {\"new\": {\"step\": \"start\", \"reason\": \"workflow.activation_limit\", \"execution\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\"}, \"run\": {\"id\": \"0f3bdfd0-b779-44cf-b332-aa0fb10444cc\", \"state\": \"failed\", \"actor_id\": \"ebe350a3-6701-4520-9ac3-235ddf3b49af\", \"deadline\": \"2026-11-15T01:07:44.295297+00:00\", \"revision\": 11, \"max_steps\": 1, \"thread_id\": null, \"binding_id\": \"ce58b90f-356b-449c-83da-690e8c9150b5\", \"channel_id\": \"f9491d33-f9eb-49f2-b735-1ba02bb864cc\", \"company_id\": \"e69c2a25-443d-4bd8-b99b-2d770f4774ec\", \"created_at\": \"2026-11-14T01:07:44.295297+00:00\", \"escalation\": {\"hops\": 1, \"notify\": \"reviewer\"}, \"trigger_id\": \"3f67d7d1-8e37-48cc-9b5f-8355a94740b9\", \"version_id\": \"fc3e0ba1-2cdb-4c23-9ef9-94b1951007fa\", \"finished_at\": \"2026-11-14T01:07:44.373829+00:00\", \"workflow_id\": \"00000000-0000-0000-0000-000000000001\", \"bundle_digest\": \"\\\\x95a5d94415c3d8ee9d8536209dc6dded87732a2f9c979534bd9dc4a12f3a59fb\", \"content_exact\": false, \"content_level\": 0, \"parent_run_id\": null, \"correlation_id\": \"552f890d-32c8-4c1a-9ee4-82bace38b27b\", \"waiting_reason\": null, \"delivery_policy\": \"deliver\", \"rerun_of_run_id\": null, \"binding_revision\": 2, \"knowledge_ceiling\": 9, \"max_context_bytes\": 65536, \"parent_execution_id\": null, \"terminal_execution_id\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\", \"terminal_wakeup_sequence\": null}, \"waits\": [{\"x\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\", \"code\": \"activation_limit\", \"state\": \"failed\"}], \"events\": [{\"a\": \"ebe350a3-6701-4520-9ac3-235ddf3b49af\", \"k\": \"admitted\", \"s\": 1, \"x\": null}, {\"a\": \"ebe350a3-6701-4520-9ac3-235ddf3b49af\", \"k\": \"wait_parked\", \"s\": 2, \"x\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\"}, {\"a\": \"ebe350a3-6701-4520-9ac3-235ddf3b49af\", \"k\": \"wait_failed\", \"s\": 3, \"x\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\"}], \"execution\": {\"id\": \"c0b9ba76-08fe-4650-94a5-f99b56d5ca51\", \"step\": \"start\", \"route\": null}}"))
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case' (6100583) panicked at src/adapters/persistence/workflow/escalation_terminal_owner_tests.rs:66:5:
+debug only
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::terminal_owners::workflow_escalation_trigger_wait_failure_by_the_real_sweeper_starts_one_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4473 filtered out; finished in 1.71s
+
+EXIT 101

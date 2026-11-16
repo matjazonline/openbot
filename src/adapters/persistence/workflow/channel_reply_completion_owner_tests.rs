@@ -47,7 +47,7 @@ async fn channel_reply_completion_human_choice_parks_final_approval_before_succe
     let s = Intents::new().await;
     let mut source = source("decision.human");
     source["steps"]["start"]["with"]["reviewers"] =
-        json!({"literal":[{"kind":"user","id":s.owner().user_id()}]});
+        json!({"literal":[{"kind":"principal","id":s.owner_principal()}]});
     source["steps"]["start"]["with"]["deadline"] =
         json!({"literal":(chrono::Utc::now()+chrono::Duration::minutes(10)).to_rfc3339()});
     source["steps"]["start"]["with"]["data_schema"] = json!({"literal":true});

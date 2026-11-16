@@ -8,7 +8,7 @@ publishing them. A stale save keeps submitted fields for reconciliation with the
 Assign capabilities on the agent:
 
 - Built-ins provide message send/reply and knowledge search. Message authority still comes from
-  the workflow's actual desk and source message. Ordinary edits cannot add Builder provisioning
+  the workflow's actual desk or principal target and source message. Ordinary edits cannot add Builder provisioning
   privileges; a trusted Builder copy may retain or drop its existing provisioning bindings.
 - HTTP choices identify a company connection and approved operation.
 - MCP choices identify a company connection, operation, reviewed version and remote tool name.
@@ -51,6 +51,27 @@ cannot rewrite history. Restricted run content also hides capability provenance.
 call-origin projections show at most 50 entries per list and explicitly report truncation; revision
 history shows 20 entries per cursor page. Catalogs show 50 choices per page and retain selected
 identities outside their page.
+
+## Direct address and shared desks
+
+Creating a company agent atomically gives it a principal address at its slug, a published
+autonomous workflow and an active direct binding. A taken slug refuses the entire creation.
+Agent and desk slugs share one namespace. A rename moves the agent's canonical address; it does
+not create a forwarding alias. Creating a working agent requires an enabled model with a keyed
+company connection. Library definitions get their address and binding when copied into a company.
+
+**Allow external messages to this agent's direct address** controls `open_to_public`, initially
+false. It is independent of every shared desk the agent staffs. A private agent may answer a
+public desk, using the desk's thread, reply scope and access rules. When spam scanning is unavailable,
+opening direct access requires the explicit form confirmation. Opening access does not configure
+DNS, inbound provider routing or outbound sender-domain authorization; an already routed company
+domain requires no extra per-agent mailbox or DNS record.
+
+The agent settings show the direct address. **Create additional desk** adds a separately configured
+shared desk; it is optional. The Builder's `create_agent` provisions the same direct endpoint,
+while `create_desk_for_agent` creates a shared desk for an existing agent. Deleting an unused agent
+removes its owned direct binding and workflow. Retained direct threads, runs or other publication
+consumers refuse deletion, preserving history.
 
 ## Skill directories
 
@@ -96,8 +117,8 @@ HTTP/MCP operations), and `history`. Catalog responses contain `items` and `next
 `after` for subsequent options/connections. History uses both `before_created_at` and `before_id`.
 `GET /api/companies/{company}/agents/directory` lists scoped agent identities. Each entry carries
 `departments` (the departments the agent belongs to or holds a role in: `id`, `name`, `slug`,
-`charter`, `roles`) and `desk`, the agent's own desk as `{"id", "address"}`, or `null` once that
-desk is deleted.
+`charter`, `roles`) and `address`, the agent's direct endpoint as `{"principal_id", "address"}`, or
+`null` when no address is available.
 
 Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
 
@@ -111,6 +132,7 @@ Update an existing draft with `PUT /api/companies/{company}/agents/{agent}`:
     "model": "your-enabled-model",
     "system_prompt": "Answer support questions using the approved tools.",
     "native_permissions": "full",
+    "open_to_public": false,
     "description": "Customer support",
     "skill_ids": []
   },
@@ -133,8 +155,8 @@ preserves them; `[]` clears the draft list. Omitting `skill_ids` preserves order
 by authoring. Catalog `choice` values carry exact HTTP/MCP/workflow identifiers; use those values
 rather than fabricating operation names, review versions or workflow parameter digests.
 Create uses `POST /api/companies/{company}/agents` with flat agent metadata. It creates the agent,
-publishes its first revision and gives it its default desk at its slug: a team desk with the
-autonomous reply workflow and an active binding, all in one transaction. The company needs a model
+publishes its first revision and gives its principal the direct address at its slug, an autonomous
+reply workflow and an active direct binding, all in one transaction. No desk is created. The company needs a model
 connection first: an omitted provider and model are pinned to the default connection's first model.
 A taken address, a model the company's connections lack or an unmet publication prerequisite (such
 as a skill whose tool the draft does not bind) refuses the whole create. Optional `department_id`
@@ -145,12 +167,12 @@ The update contract requires the nested payload and expected revision.
 An `agent.run` on a desk a department owns gets that department's context as system text after
 the agent's own instructions and before its skills: the department's name and charter, a sentence
 that the agent answers as the lead when it holds the department's `lead` role, and the desks around
-it -- the department's own desk, its parent's, its child departments' and its agents' own desks,
+it: the department's own desk, its parent's, its child departments' desks and its agents' principal addresses,
 each by address (at most 20 children and 50 agents, with a note when there are more). The context
-follows the desk's ownership, not the agent's membership: a member agent's own default desk belongs
-to no department, so its runs there get none. A public department desk gets the name, charter and
+follows the desk's ownership. A principal-owned direct thread has no owning desk department, so
+it does not acquire department context from the agent's memberships. A public department desk gets the name, charter and
 lead sentence but no desks, since its conversations are with outsiders. The context only lists
-addresses; a message sent to a desk does not start that desk's work. A run that is retried reuses
+addresses; an outbound system note posted with a channel destination does not start that desk's work. A run that is retried reuses
 the context it first prepared with, even after the charter or roster changes.
 
 `POST .../{agent}/preview` previews the saved draft and returns revision/count metadata.

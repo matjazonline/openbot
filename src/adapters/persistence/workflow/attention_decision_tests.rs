@@ -34,6 +34,7 @@ async fn listed(
         visible_channel_ids: &[],
         manager,
         company_items: manager,
+        direct_items: true,
         view,
         cursor: None,
         limit: 100,
@@ -74,7 +75,7 @@ async fn attention_lists_a_decision_for_its_reviewers_and_once_in_team_work() {
             (AttentionSourceKind::Decision, view.decision.0)
         );
         assert_eq!(item.run_id, Some(f.scope.run.as_uuid()));
-        assert_eq!(item.channel_id, None);
+        assert_eq!(item.target, None);
         assert_eq!(
             item.responsibility,
             AttentionResponsibility::Principal(reviewer)
@@ -109,7 +110,7 @@ async fn attention_lists_a_decision_for_its_reviewers_and_once_in_team_work() {
     assert_eq!(team[0].source_id, view.decision.0);
     assert_eq!(team[0].responsibility_label, "2 reviewers");
     assert_eq!(team[0].responsibility, AttentionResponsibility::ChannelTeam);
-    let summary = p.operational_summary(company, &[]).await.unwrap();
+    let summary = p.operational_summary(company, &[], owner).await.unwrap();
     assert_eq!(summary.open_decision_count, 1);
     assert!(summary.oldest_open_decision_age_seconds.is_some());
 
@@ -127,7 +128,7 @@ async fn attention_lists_a_decision_for_its_reviewers_and_once_in_team_work() {
             .is_empty()
     );
     assert_eq!(
-        p.operational_summary(company, &[])
+        p.operational_summary(company, &[], owner)
             .await
             .unwrap()
             .open_decision_count,
@@ -193,7 +194,7 @@ async fn attention_lists_a_failed_run_for_its_actor_until_it_is_rerun() {
         1
     );
     assert_eq!(
-        p.operational_summary(company, &[])
+        p.operational_summary(company, &[], actor)
             .await
             .unwrap()
             .failed_run_count,
@@ -217,7 +218,7 @@ async fn attention_lists_a_failed_run_for_its_actor_until_it_is_rerun() {
         );
     }
     assert_eq!(
-        p.operational_summary(company, &[])
+        p.operational_summary(company, &[], actor)
             .await
             .unwrap()
             .failed_run_count,

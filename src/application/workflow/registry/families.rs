@@ -145,7 +145,7 @@ impl Registration<'_> {
                 self.check(InputCheck::Deadline)?;
                 self.static_roots("reviewers", STATIC_REVIEWERS)?;
                 contract(
-                    json!({"proposal":true,"reviewers":reviewers(),"deadline":text(MAX_DEADLINE),"data_schema":declaration,"feedback_required":feedback}),
+                    json!({"proposal":true,"reviewers":reviewers(),"reviewers_follow_role":{"type":"boolean"},"deadline":text(MAX_DEADLINE),"data_schema":declaration,"feedback_required":feedback}),
                     &["proposal", "reviewers", "deadline", "data_schema"],
                     output,
                 )

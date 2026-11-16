@@ -20,9 +20,14 @@ pub enum BindingOutcome {
     /// The binding started a run for the message.
     Admitted(AdmittedRun),
     /// The binding declined the message, for the stored reason.
-    Refused { reason: String },
+    Refused {
+        reason: String,
+    },
+    RoleRefused(super::department::RoleAdmissionRefusal),
     /// Admission failed, for the stored reason.
-    Failed { reason: String },
+    Failed {
+        reason: String,
+    },
 }
 
 /// The run an admission started, as it stands now.

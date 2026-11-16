@@ -10,10 +10,13 @@ use crate::application::workflow::{
 use children::ChildStart;
 use serde_json::Value;
 
+#[path = "child_completion_plan.rs"]
+mod completion_plan;
+
 /// The wait's child and, once it is terminal, its single wakeup fact, found by the sequence the
 /// child's terminal transition allocated (a primary-key lookup).
 #[derive(sqlx::FromRow)]
-struct ChildFact {
+pub(super) struct ChildFact {
     child_run_id: Uuid,
     content_level: i16,
     content_exact: bool,
@@ -23,14 +26,23 @@ struct ChildFact {
     terminal_execution_id: Option<Uuid>,
 }
 
-pub(super) async fn resume_on(
+impl ChildFact {
+    pub(super) fn terminal_state(&self) -> Option<&str> {
+        self.terminal_state.as_deref()
+    }
+}
+
+pub(super) enum ResumePurpose {
+    WithoutReplyAccounts,
+    Continue,
+}
+
+pub(super) fn fact_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
-    run: waits::WaitRun,
     wait: Uuid,
-    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
-) -> AppResult<WaitProgress> {
-    let fact = sqlx::query_as::<_, ChildFact>(
+) -> impl std::future::Future<Output = Result<ChildFact, sqlx::Error>> + '_ {
+    sqlx::query_as::<_, ChildFact>(
         "SELECT wait.child_run_id, child.content_level::smallint AS content_level, child.content_exact, wait.child_ordinal, wait.child_tool_call_id, event.terminal_state, event.terminal_execution_id \
          FROM workflow_waits AS wait \
          JOIN workflow_runs AS child ON child.company_id = wait.company_id AND child.id = wait.child_run_id \
@@ -41,9 +53,19 @@ pub(super) async fn resume_on(
     )
     .bind(scope.company.as_uuid())
     .bind(wait)
-    .fetch_one(&mut *db)
-    .await?;
-    let Some(state) = fact.terminal_state.as_deref() else {
+    .fetch_one(db)
+}
+
+pub(super) async fn resume_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    run: waits::WaitRun,
+    wait: Uuid,
+    purpose: ResumePurpose,
+    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+) -> AppResult<WaitProgress> {
+    let fact = fact_on(db, scope, wait).await?;
+    let Some(state) = fact.terminal_state() else {
         return Ok(WaitProgress::Pending);
     };
     // A workflow tool call continues its agent job instead of completing a step (07-D2 §D2.4).
@@ -55,17 +77,80 @@ pub(super) async fn resume_on(
     // An inexact child lowers its parent with its result (E3).
     super::knowledge::absorb_content_on(db, scope.company, scope.run, level, fact.content_exact)
         .await?;
-    let round = fact
-        .child_ordinal
-        .and_then(|ordinal| u32::try_from(ordinal).ok())
-        .and_then(ChildOrdinal::new)
-        .ok_or_else(invalid)?;
+    let round = round(&fact)?;
     match state {
-        "succeeded" => Box::pin(succeeded(db, scope, &run, wait, &fact, round, notices)).await,
+        "succeeded" => {
+            Box::pin(succeeded(
+                db,
+                scope,
+                &run,
+                wait,
+                &fact,
+                ChildResume {
+                    round,
+                    purpose,
+                    notices,
+                },
+            ))
+            .await
+        }
         "failed" => child_failed(db, scope, wait, CHILD_FAILED, &fact).await,
         "cancelled" => child_failed(db, scope, wait, CHILD_CANCELLED, &fact).await,
         _ => Err(invalid()),
     }
+}
+
+pub(super) enum ReplyUse {
+    None,
+    Required,
+}
+
+pub(super) async fn reply_use_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    run: &waits::WaitRun,
+    wait: Uuid,
+) -> AppResult<ReplyUse> {
+    let fact = fact_on(db, scope, wait).await?;
+    let Some(state) = fact.terminal_state() else {
+        return Ok(ReplyUse::None);
+    };
+    // A received tool result only reopens its parked agent job. Admission of
+    // another provider effect remains with the next fenced owner.
+    if fact.child_tool_call_id.is_some() || matches!(state, "failed" | "cancelled") {
+        return Ok(ReplyUse::None);
+    }
+    if state != "succeeded" {
+        return Err(invalid());
+    }
+    // Share the actual child-output/round/completion preparation; never run a second evaluator.
+    let prepared = Box::pin(completion_plan::prepare_on(
+        db,
+        scope,
+        run,
+        &fact,
+        round(&fact)?,
+        completion_plan::Read::Observe,
+    ))
+    .await?;
+    Ok(if prepared.requires_reply(run.max_steps)? {
+        ReplyUse::Required
+    } else {
+        ReplyUse::None
+    })
+}
+
+fn round(fact: &ChildFact) -> AppResult<ChildOrdinal> {
+    fact.child_ordinal
+        .and_then(|ordinal| u32::try_from(ordinal).ok())
+        .and_then(ChildOrdinal::new)
+        .ok_or_else(invalid)
+}
+
+struct ChildResume<'a> {
+    round: ChildOrdinal,
+    purpose: ResumePurpose,
+    notices: Option<&'a crate::application::workflow::decisions::DecisionNotices>,
 }
 
 async fn succeeded(
@@ -74,110 +159,35 @@ async fn succeeded(
     run: &waits::WaitRun,
     wait: Uuid,
     fact: &ChildFact,
-    round: ChildOrdinal,
-    notices: Option<&crate::application::workflow::decisions::DecisionNotices>,
+    resume: ChildResume<'_>,
 ) -> AppResult<WaitProgress> {
-    let output: Value = sqlx::query_scalar(
-        "SELECT committed_output FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3 AND completed_at IS NOT NULL",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(fact.child_run_id)
-    .bind(fact.terminal_execution_id.ok_or_else(invalid)?)
-    .fetch_optional(&mut *db)
-    .await?
-    .ok_or_else(invalid)?;
-    let binding = admission_binding::read_saved_binding(
+    // Box shared preparation and its owned binding so the stock async stack stays shallow.
+    let prepared = Box::pin(completion_plan::prepare_on(
         db,
-        scope.company,
-        WorkflowBindingId::new(run.binding_id),
-        scope.run.as_uuid(),
-    )
+        scope,
+        run,
+        fact,
+        resume.round,
+        completion_plan::Read::Lock,
+    ))
     .await?;
-    let activation = activation::activate_on(db, scope)
-        .await?
-        .ok_or_else(invalid)?;
-    let control = binding
-        .bundle()
-        .compiled()
-        .child_control(&activation.step)
-        .ok_or_else(invalid)?;
-    let child = binding
-        .bundle()
-        .children()
-        .get(&control.child_version_id)
-        .cloned()
-        .ok_or_else(invalid)?;
-    // The child validated its own output at `$end`; a mismatch here is a defect.
-    if child.compiled().validate_output(&output).is_err() {
-        return wait_commit::fail(db, scope, WaitFailureReason::InvalidOutput).await;
+    if matches!(resume.purpose, ResumePurpose::WithoutReplyAccounts)
+        && prepared.requires_reply(run.max_steps)?
+    {
+        return Err(AppError::Conflict(
+            "Workflow child purpose changed; retry".into(),
+        ));
     }
-    let Some(bindings) = control.repeat.as_ref() else {
-        return finish(
-            db,
-            scope,
-            run,
-            ChildCompletion {
-                binding: &binding,
-                notices,
-            },
-            &activation,
-            output,
-            RouteSelection::Success,
-        )
-        .await;
-    };
-    let provisional = provisional_output(output, round);
-    let context =
-        activation::round_context(db, scope, &binding, &activation, provisional.clone()).await?;
-    let rule = RepeatRule {
-        bindings,
-        max_iterations: control.max_iterations.ok_or_else(invalid)?,
-        child: &child,
-    };
-    let limits = binding.bundle().compiled().graph().context_limits();
-    match decide_round(&rule, &context.context(), limits, round) {
-        Ok(RoundDecision::Done) => {
-            finish(
-                db,
-                scope,
-                run,
-                ChildCompletion {
-                    binding: &binding,
-                    notices,
-                },
-                &activation,
-                provisional,
-                choice("done")?,
-            )
-            .await
+    let completion_plan::Prepared {
+        binding,
+        activation,
+        outcome,
+    } = *prepared;
+    match outcome {
+        completion_plan::Outcome::InvalidOutput => {
+            wait_commit::fail(db, scope, WaitFailureReason::InvalidOutput).await
         }
-        Ok(RoundDecision::Exhausted) => {
-            let exhausted = choice("exhausted")?;
-            finish(
-                db,
-                scope,
-                run,
-                ChildCompletion {
-                    binding: &binding,
-                    notices,
-                },
-                &activation,
-                provisional,
-                exhausted,
-            )
-            .await
-        }
-        Ok(RoundDecision::Next(input)) => {
-            let next = NextRound {
-                binding: &binding,
-                activation: &activation,
-                control,
-                input,
-                round,
-            };
-            Box::pin(next_round(db, scope, run, wait, next)).await
-        }
-        Err(InvalidRound) => {
+        completion_plan::Outcome::InvalidRound => {
             terminal(
                 db,
                 scope,
@@ -186,6 +196,25 @@ async fn succeeded(
                 "next round undecidable",
             )
             .await
+        }
+        completion_plan::Outcome::Finished(completion) => {
+            wait_commit::commit_wake(
+                db,
+                scope,
+                run,
+                super::batch_commit::CompletedStep {
+                    activated: &activation,
+                    graph: binding.bundle().compiled().graph(),
+                },
+                *completion,
+                None,
+                resume.notices,
+            )
+            .await
+        }
+        completion_plan::Outcome::Next(input) => {
+            let next = NextRound::new(&binding, &activation, input, resume.round)?;
+            Box::pin(next_round(db, scope, run, wait, next)).await
         }
     }
 }
@@ -196,48 +225,34 @@ fn choice(name: &str) -> AppResult<RouteSelection> {
     ))
 }
 
-struct ChildCompletion<'a> {
-    binding: &'a crate::application::workflow::binding::ConfiguredBinding,
-    notices: Option<&'a crate::application::workflow::decisions::DecisionNotices>,
-}
-
-async fn finish(
-    db: &mut PgConnection,
-    scope: ActivationRequest,
-    run: &waits::WaitRun,
-    services: ChildCompletion<'_>,
-    activation: &ActivatedExecution,
-    output: Value,
-    route: RouteSelection,
-) -> AppResult<WaitProgress> {
-    let completion = match child_completion(services.binding.bundle(), activation, output, route) {
-        Ok(completion) => completion,
-        Err(AppError::BadRequest(_)) => {
-            return wait_commit::fail(db, scope, WaitFailureReason::InvalidOutput).await;
-        }
-        Err(error) => return Err(error),
-    };
-    wait_commit::commit_wake(
-        db,
-        scope,
-        run,
-        super::batch_commit::CompletedStep {
-            activated: activation,
-            graph: services.binding.bundle().compiled().graph(),
-        },
-        completion,
-        None,
-        services.notices,
-    )
-    .await
-}
-
 struct NextRound<'a> {
     binding: &'a crate::application::workflow::binding::ConfiguredBinding,
     activation: &'a ActivatedExecution,
     control: &'a StepControl,
     input: Value,
     round: ChildOrdinal,
+}
+
+impl<'a> NextRound<'a> {
+    fn new(
+        binding: &'a crate::application::workflow::binding::ConfiguredBinding,
+        activation: &'a ActivatedExecution,
+        input: Value,
+        round: ChildOrdinal,
+    ) -> AppResult<Self> {
+        let control = binding
+            .bundle()
+            .compiled()
+            .child_control(&activation.step)
+            .ok_or_else(invalid)?;
+        Ok(Self {
+            binding,
+            activation,
+            control,
+            input,
+            round,
+        })
+    }
 }
 
 /// Settle this round's wait and start the next round's child and wait in the same transaction;
@@ -340,6 +355,10 @@ async fn terminal(
         Some(diagnostic.to_owned()),
     )
     .map_err(|_| invalid())?;
-    recovery::route_parked_failure(db, scope, &failure).await?;
+    // The child never escalates itself; the parent's propagation decides (D1.3). Unrouted, the
+    // parent is failed here, and a failed root starts the default ladder once.
+    if !recovery::route_parked_failure(db, scope, &failure).await? {
+        Box::pin(super::escalations::run_failed_on(db, scope, failure.code())).await?;
+    }
     wait_commit::saved(db, scope, CommitDisposition::Committed, true).await
 }

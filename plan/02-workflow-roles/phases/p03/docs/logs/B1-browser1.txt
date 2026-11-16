@@ -1,0 +1,34 @@
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (3102.483375ms)
+✖ reviewer roles and people update unsaved source with visible progress and stale-response protection (6770.711041ms)
+ℹ tests 2
+ℹ suites 0
+ℹ pass 1
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 10135.729916
+
+✖ failing tests:
+
+test at scripts/tests/workflow-agent-picker-browser.mjs:143:1
+✖ reviewer roles and people update unsaved source with visible progress and stale-response protection (6770.711041ms)
+  Error: expect(locator).not.toBeVisible() failed
+  
+  Locator:  locator('#workflow-reviewer-progress')
+  Expected: not visible
+  Received: visible
+  Timeout:  5000ms
+  
+  Call log:
+  [2m  - Expect "to.be.visible" with timeout 5000ms[22m
+  [2m  - waiting for locator('#workflow-reviewer-progress')[22m
+  [2m    9 × locator resolved to <span role="status" class="htmx-indicator text-sm" id="workflow-reviewer-progress">Updating reviewer selection…</span>[22m
+  [2m      - unexpected value "visible"[22m
+  
+      at Proxy.<anonymous> (/Users/mac02/dev/openbot/node_modules/playwright/lib/matchers/expect.js:221:24)
+      at TestContext.<anonymous> (file:///Users/mac02/.codex/worktrees/2050/openbot/scripts/tests/workflow-agent-picker-browser.mjs:204:67)
+      at async Test.run (node:internal/test_runner/test:1389:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:960:7) {
+    matcherResult: { message: `expect(locator).not.toBeVisible() failed\n\nLocator:  locator('#workflow-reviewer-progress')\nExpected: not visible\nReceived: visible\nTimeout:  5000ms\n\nCall log:\n\x1B[2m  - Expect "to.be.visible" with timeout 5000ms\x1B[22m\n\x1B[2m  - waiting for locator('#workflow-reviewer-progress')\x1B[22m\n\x1B[2m    9 × locator resolved to <span role="status" class="htmx-indicator text-sm" id="workflow-reviewer-progress">Updating reviewer selection…</span>\x1B[22m\n\x1B[2m      - unexpected value "visible"\x1B[22m\n`, pass: true, actual: 'visible', name: 'toBeVisible', expected: 'visible', log: [ '  - Expect "to.be.visible" with timeout 5000ms', "  - waiting for locator('#workflow-reviewer-progress')", '    9 × locator resolved to <span role="status" class="htmx-indicator text-sm" id="workflow-reviewer-progress">Updating reviewer selection…</span>', '      - unexpected value "visible"' ], timeout: 5000 }
+  }

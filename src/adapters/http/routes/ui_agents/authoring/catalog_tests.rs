@@ -102,8 +102,24 @@ async fn autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder
     )
     .await;
     let json: serde_json::Value = serde_json::from_str(&output).unwrap();
-    assert_eq!(json["items"].as_array().unwrap().len(), 3);
-    assert!(!output.contains("list_company_agents") && !output.contains("create_agent_channel"));
+    let mut names: Vec<_> = json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|item| item["name"].as_str().unwrap())
+        .collect();
+    names.sort_unstable();
+    assert_eq!(
+        names,
+        [
+            "message.reply",
+            "message.send",
+            "read_escalation",
+            "respond_to_escalation",
+            "search_knowledge"
+        ]
+    );
+    assert!(!output.contains("list_company_agents") && !output.contains("create_agent"));
     assert!(
         !output.contains("private immutable instruction marker")
             && !output.contains("authoring-secret-never-return")

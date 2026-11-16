@@ -1,0 +1,7 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_resume_first_competing_cancel_preserves_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::wait_order_tests::workflow_control_cancel_first_competing_resume_refuses_without_writes ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4351 filtered out; finished in 1.53s
+

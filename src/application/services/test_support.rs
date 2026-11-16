@@ -264,6 +264,32 @@ impl ChannelPersistence for ChannelDirectoryStub {
         Ok(Vec::new())
     }
 
+    async fn address_for_target(
+        &self,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
+    ) -> AppResult<Option<crate::entities::address::ResolvedAddress>> {
+        Ok(self
+            .list_by_company_id(company_id)
+            .await?
+            .into_iter()
+            .find(|desk| target == crate::entities::address::AddressTarget::Desk(desk.id))
+            .map(|desk| crate::entities::address::ResolvedAddress {
+                slug: desk.slug,
+                target,
+            }))
+    }
+    async fn address_targets(
+        &self,
+        company_id: Uuid,
+        slugs: &[crate::entities::value_objects::ChannelSlug],
+    ) -> AppResult<Vec<crate::entities::address::ResolvedAddress>> {
+        Ok(crate::entities::address::desk_addresses(
+            &self.list_by_company_id(company_id).await?,
+            slugs,
+        ))
+    }
+
     async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
         if let Some(message) = self.lookup_error.as_ref() {
             return Err(crate::app_error::AppError::Database(message.clone()));

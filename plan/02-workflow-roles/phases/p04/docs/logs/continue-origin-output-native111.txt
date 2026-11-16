@@ -1,0 +1,20 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention' (5012558) panicked at src/adapters/persistence/workflow/escalation_origin_retention_tests.rs:37:16:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention' (5012868) panicked at src/adapters/persistence/workflow/escalation_origin_message_tests.rs:217:89:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "invalid channel response settlement", detail: None, hint: None, position: None, where: Some("PL/pgSQL function guard_channel_reply_decision() line 30 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 4465 filtered out; finished in 14.21s
+

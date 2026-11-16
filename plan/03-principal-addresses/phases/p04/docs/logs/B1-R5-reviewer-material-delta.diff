@@ -1,0 +1,348 @@
+--- R4/.github/workflows/ci.yml
++++ R5/.github/workflows/ci.yml
+@@ -373,12 +373,26 @@
+               for chunk in iter(lambda: source.read(1024 * 1024), b""): digest.update(chunk)
+           (root / "doop-libtest-sha256.txt").write_text(digest.hexdigest() + "\n")
+           PY
++      - name: Enable OCI image export and import
++        uses: docker/setup-docker-action@v4
++        with:
++          version: v29.9.3
++          daemon-config: |
++            {"features":{"containerd-snapshotter":true}}
+       - name: Pull the pinned private PostgreSQL image
+         run: docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+       - name: Pull the pinned private object-storage image
+         run: docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+       - name: Build the private Doop deployment image
+-        run: python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"
++        run: |
++          if ! python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"; then
++            for log in build.log load.log; do
++              if test -f "$RUNNER_TEMP/doop-image/$log"; then
++                cat "$RUNNER_TEMP/doop-image/$log"
++              fi
++            done
++            exit 1
++          fi
+       - name: Require both private storage modes and both actual probe families
+         run: |
+           python3 scripts/doop-test.py acceptance --directory "$RUNNER_TEMP/doop" \
+--- R4/.trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md
++++ R5/.trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md
+@@ -0,0 +1,35 @@
++---
++title: Publish SDK cancellation ownership before cleanup can run
++author: Mac02
++date: 2026-11-15
++branch: feature/plan03_04
++id: l-057c03ea
++scope: repo
++status: active
++src: agent
++touches:
++  - ".github/workflows/ci.yml"
++  - ".github/workflows/memory-service.yml"
++  - plan/03-principal-addresses/COORDINATION.md
++  - plan/03-principal-addresses/phases/p04/docs/HANDOFF.md
++  - plan/03-principal-addresses/phases/p04/docs/REVIEW.md
++  - plan/03-principal-addresses/phases/p04/docs/TASK.md
++  - plan/03-principal-addresses/phases/p04/docs/agent-review-findings.md
++  - plan/03-principal-addresses/phases/p04/docs/agent-review-notes.md
++  - src/adapters/http/routes/agent_api_tests.rs
++  - src/adapters/http/routes/agent_api_tests/public_settings.rs
++---
++
++## Decided
++
++One per-connection cleanup gate must cover SDK queue admission and publication of the real request ID, then release before waiting for the remote response. Serializing cancellation and DELETE alone is incomplete: another SDK task can dispatch the queued call while the caller's poll is preempted before its ID reaches shared cleanup state. Preserve the single pending-ID owner, fixed cancellation message, current-source guards and existing cancellation/cleanup budgets.
++
++## Tried and ruled out
++
++The first actual competing drop/shutdown tests and 115 focused cases passed while leaving the enqueue/publication interval uncontrolled. Independent review found the missing interleaving. A synchronous per-connection pause with a held real HTTP call and actual SDK deletion entry now forces that interval; removing only the registration lock makes the real wire-order assertion fail. A plain synchronous pause parked Tokio's core and prevented SDK dispatch; block_in_place hands the core to another worker without introducing an async cancellation point in the tested handoff.
++
++## Watch out
++
++Do not hold the registration gate through await_response: cleanup must be able to cancel a pending effect. Do not infer IDs, clear uncertain transport failures as completed responses, or treat joined workers as proof a cancellation notification was sent. The installed SDK's no-options Sender.send handoff has no further suspension after enqueue; recheck cancellation safety when changing SDK/options or adding an await there. Release test pauses on failure and prove the old ordering fails the actual protocol assertion, not just a mutex check or probe timeout.
++
++In the code: src/adapters/mcp/mod.rs owns admission/publication; http.rs owns serialized cancel/delete; registration_test_support.rs is per-connection cfg(test) only. cleanup_tests.rs mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session uses real SDK/loopback credentials, negotiated version/session and exact original request ID. Plan03 p04 D2/r4 and D2-r4-old-ordering-proof.json retain the decision and counterexample; B1-R4/F1 is the independent finding.
+--- R4/src/adapters/mcp/cleanup_tests.rs
++++ R5/src/adapters/mcp/cleanup_tests.rs
+@@ -1,4 +1,5 @@
+ //! Caller abandonment and adapter shutdown compete for one real protocol cleanup.
++use super::super::registration_test_support::RegistrationProbe;
+ use super::*;
+ use crate::services::test_support::ScriptedRequest;
+ use std::sync::{Arc, Mutex};
+@@ -55,14 +56,12 @@
+     ]
+ }
+ 
+-async fn competing_cleanup(session: Option<&'static str>) {
+-    let (arrived, observed) = tokio::sync::oneshot::channel();
+-    let (release, released) = tokio::sync::oneshot::channel();
++fn cleanup_script(
++    session: Option<&'static str>,
++    response: ScriptedResponse,
++) -> Vec<ScriptedExchange> {
+     let id = Arc::new(Mutex::new(None::<Value>));
+     let captured = id.clone();
+-    let mut response = ScriptedResponse::json(json!({"jsonrpc":"2.0","id":1,
+-        "result":{"content":[],"isError":false}}));
+-    response.barrier = Some((arrived, released));
+     let mut script = handshake(session);
+     script.push(ScriptedExchange::new(
+         move |request| {
+@@ -101,8 +100,22 @@
+             accepted(),
+         ));
+     }
+-    let server = scripted_scenario(script).await;
+-    let adapter = Arc::new(adapter(&server.base_url));
++    script
++}
++
++async fn competing_cleanup(
++    session: Option<&'static str>,
++    registration: Option<(Arc<RegistrationProbe>, std::sync::mpsc::Sender<()>)>,
++) {
++    let (arrived, observed) = tokio::sync::oneshot::channel();
++    let (release, released) = tokio::sync::oneshot::channel();
++    let mut response = ScriptedResponse::json(json!({"jsonrpc":"2.0","id":1,
++        "result":{"content":[],"isError":false}}));
++    response.barrier = Some((arrived, released));
++    let server = scripted_scenario(cleanup_script(session, response)).await;
++    let mut client = adapter(&server.base_url);
++    client.registration_probe = registration.as_ref().map(|(probe, _)| probe.clone());
++    let adapter = Arc::new(client);
+     let connected = adapter
+         .connect(
+             &server.base_url.clone().try_into().unwrap(),
+@@ -116,6 +129,9 @@
+             .await
+     });
+     observed.await.unwrap();
++    if let Some((probe, _)) = &registration {
++        probe.enqueued.notified().await;
++    }
+     let start = Arc::new(tokio::sync::Barrier::new(3));
+     let drop_start = start.clone();
+     let dropped = tokio::spawn(async move {
+@@ -125,7 +141,6 @@
+             !matches!(call.await, Ok(Ok(_))),
+             "held call cannot finish successfully before abandonment"
+         );
+-        release.send(()).unwrap();
+     });
+     let stop_start = start.clone();
+     let stopping = adapter.clone();
+@@ -135,6 +150,16 @@
+     });
+     start.wait().await;
+     dropped.await.unwrap();
++    if let Some((probe, resume)) = registration {
++        probe.delete_entered.notified().await;
++        // In the old ordering, let cleanup consume the absent ID before resuming publication.
++        // This forces a real wire-order failure instead of relying on thread scheduling luck.
++        if !probe.gate_blocked.load(std::sync::atomic::Ordering::SeqCst) {
++            probe.cleanup_claimed.notified().await;
++        }
++        resume.send(()).unwrap();
++    }
++    release.send(()).unwrap();
+     shutdown.await.unwrap();
+     assert!(adapter.workers.lock().await.is_empty());
+     assert_eq!(
+@@ -145,12 +170,21 @@
+ 
+ #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+ async fn mcp_drop_and_shutdown_compete_for_one_stateless_cancellation() {
+-    Box::pin(competing_cleanup(None)).await;
++    Box::pin(competing_cleanup(None, None)).await;
+ }
+ 
+ #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+ async fn mcp_drop_and_shutdown_cancel_before_one_stateful_delete() {
+-    Box::pin(competing_cleanup(Some("cleanup-session"))).await;
++    Box::pin(competing_cleanup(Some("cleanup-session"), None)).await;
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 4)]
++async fn mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session() {
++    Box::pin(competing_cleanup(
++        Some("handoff-session"),
++        Some(RegistrationProbe::new()),
++    ))
++    .await;
+ }
+ 
+ #[tokio::test]
+--- R4/src/adapters/mcp/connection.rs
++++ R5/src/adapters/mcp/connection.rs
+@@ -57,6 +57,8 @@
+             session: Default::default(),
+             pending_call: Default::default(),
+             gate: Default::default(),
++            #[cfg(test)]
++            registration_probe: self.registration_probe.clone(),
+         };
+         let transport = StreamableHttpClientTransport::with_client(
+             http::BoundedHttp {
+--- R4/src/adapters/mcp/http.rs
++++ R5/src/adapters/mcp/http.rs
+@@ -45,6 +45,8 @@
+     pub session: Arc<std::sync::Mutex<Option<SessionIdentity>>>,
+     pub pending_call: Arc<std::sync::Mutex<Option<rmcp::model::RequestId>>>,
+     pub gate: Arc<tokio::sync::Mutex<()>>,
++    #[cfg(test)]
++    pub registration_probe: Option<Arc<super::registration_test_support::RegistrationProbe>>,
+ }
+ #[derive(Clone)]
+ pub(super) struct SessionIdentity {
+@@ -291,8 +293,16 @@
+         auth: Option<String>,
+         headers: HashMap<HeaderName, HeaderValue>,
+     ) -> Result<(), Error> {
++        #[cfg(test)]
++        if let Some(probe) = &self.cleanup.registration_probe {
++            probe.deleting(self.cleanup.gate.try_lock().is_err());
++        }
+         let _gate = self.cleanup.gate.lock().await;
+         let _ = self.cleanup.cancel_locked().await;
++        #[cfg(test)]
++        if let Some(probe) = &self.cleanup.registration_probe {
++            probe.cleanup_claimed.notify_one();
++        }
+         delete(&self.client, &uri, &session, auth, headers).await?;
+         self.cleanup
+             .session
+--- R4/src/adapters/mcp/mod.rs
++++ R5/src/adapters/mcp/mod.rs
+@@ -10,6 +10,8 @@
+ pub(crate) mod preparation_test_server;
+ #[cfg(test)]
+ pub(crate) mod preparation_tests;
++#[cfg(test)]
++mod registration_test_support;
+ mod worker;
+ use crate::{
+     app_error::{AppError, AppResult},
+@@ -39,6 +41,8 @@
+     shutdown: tokio_util::sync::CancellationToken,
+     /// One bound for acquiring both session permits.
+     permit_wait: Duration,
++    #[cfg(test)]
++    registration_probe: Option<Arc<registration_test_support::RegistrationProbe>>,
+ }
+ impl HttpMcpClient {
+     pub fn new(policy: EndpointPolicy) -> Self {
+@@ -49,6 +53,8 @@
+             workers: Default::default(),
+             shutdown: Default::default(),
+             permit_wait: Duration::from_secs(5),
++            #[cfg(test)]
++            registration_probe: None,
+         }
+     }
+ }
+@@ -199,18 +205,36 @@
+         let request = rmcp::model::CallToolRequest::new(
+             CallToolRequestParams::new(name.as_str().to_owned()).with_arguments(args),
+         );
+-        let handle = self
+-            .client
+-            .send_cancellable_request(
+-                request.into(),
+-                rmcp::service::PeerRequestOptions::no_options(),
+-            )
+-            .await
+-            .map_err(|error| errors::service(error, "MCP effect indeterminate; do not retry"))?;
+-        *self
+-            .pending_call
+-            .lock()
+-            .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
++        let handle = {
++            // SDK enqueue can dispatch on another thread before returning the real ID. Cleanup
++            // must wait for synchronous publication, then run without waiting for the response.
++            let _registration = self.cleanup.gate.lock().await;
++            if self.stop.is_cancelled()
++                || self.client.is_closed()
++                || self.client.is_transport_closed()
++            {
++                return Err(failed("MCP session unavailable"));
++            }
++            let handle = self
++                .client
++                .send_cancellable_request(
++                    request.into(),
++                    rmcp::service::PeerRequestOptions::no_options(),
++                )
++                .await
++                .map_err(|error| {
++                    errors::service(error, "MCP effect indeterminate; do not retry")
++                })?;
++            #[cfg(test)]
++            if let Some(probe) = &self.cleanup.registration_probe {
++                probe.pause();
++            }
++            *self
++                .pending_call
++                .lock()
++                .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
++            handle
++        };
+         let response = tokio::time::timeout(Duration::from_secs(30), handle.await_response()).await;
+         if matches!(
+             &response,
+--- R4/src/adapters/mcp/registration_test_support.rs
++++ R5/src/adapters/mcp/registration_test_support.rs
+@@ -0,0 +1,49 @@
++//! Per-connection, synchronous SDK handoff pause; never introduces a production await.
++use std::sync::{
++    Arc, Mutex,
++    atomic::{AtomicBool, Ordering},
++    mpsc::{Receiver, Sender},
++};
++use tokio::sync::Notify;
++
++pub(super) struct RegistrationProbe {
++    pub enqueued: Notify,
++    pub delete_entered: Notify,
++    pub cleanup_claimed: Notify,
++    pub gate_blocked: AtomicBool,
++    release: Mutex<Receiver<()>>,
++}
++
++impl RegistrationProbe {
++    pub fn new() -> (Arc<Self>, Sender<()>) {
++        let (release, receiver) = std::sync::mpsc::channel();
++        (
++            Arc::new(Self {
++                enqueued: Notify::new(),
++                delete_entered: Notify::new(),
++                cleanup_claimed: Notify::new(),
++                gate_blocked: AtomicBool::new(false),
++                release: Mutex::new(receiver),
++            }),
++            release,
++        )
++    }
++
++    pub fn pause(&self) {
++        // Let other SDK tasks use this worker's Tokio core while this poll stays synchronous.
++        tokio::task::block_in_place(|| {
++            self.enqueued.notify_one();
++            // Sender drop also releases a failed test; no blocked thread survives an assertion.
++            self.release
++                .lock()
++                .unwrap()
++                .recv_timeout(std::time::Duration::from_secs(3))
++                .expect("test must release the SDK handoff within the existing cancellation bound");
++        });
++    }
++
++    pub fn deleting(&self, blocked: bool) {
++        self.gate_blocked.store(blocked, Ordering::SeqCst);
++        self.delete_entered.notify_one();
++    }
++}

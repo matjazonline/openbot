@@ -1,0 +1,77 @@
+{
+  "commit": "60341d256bcf78db780541b236108183c672852f",
+  "parent": "46fc08d4f01f540f8735214713fb615f98414023",
+  "tree": "a3e1acdb68a6318dfbcfd37869430937853857e5",
+  "branch": "codex/plan03-p04-r9b-draft-60341d25",
+  "base_material_candidate": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "external_draft": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r9-net",
+  "overrides": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "blob": "c4bed3d56fcfd3b9ece71df0de3fd03dd0582660",
+      "sha256": "5cae73f957cf5751401def5896ec3db7353d036635f452ad8740b3bb2d6b6156"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "blob": "ca1b603750692d87cd591b04bdc8e157335cff43",
+      "sha256": "463fbcf9ceb461fe9a22ee37de46a313bc9a2bf05f84cdba4f291192f6481e62"
+    },
+    {
+      "path": "services/memory/scripts/network-isolation-linux.sh",
+      "blob": "9508b65306f48f5bb7d39d808700e232db8bf876",
+      "sha256": "7aad07f0cc1c3c1276c91082063d86d7f17ac2f5f5163e483a26e787373c4e3c"
+    },
+    {
+      "path": "scripts/tests/network-isolation-scope.py",
+      "blob": "8b4ad6fc95d376c850cdb205c7674f3bb1858179",
+      "sha256": "45c3bb902364bd3a48cd1b182025fecf9ca0e1a709d82c1674f213d25105e168"
+    }
+  ],
+  "material_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    ".trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md",
+    ".trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md",
+    "scripts/check.sh",
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh",
+    "src/adapters/http/routes/agent_api_tests.rs",
+    "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+    "src/adapters/mcp/authentication_tests.rs",
+    "src/adapters/mcp/cleanup_tests.rs",
+    "src/adapters/mcp/connection.rs",
+    "src/adapters/mcp/doop_tests.rs",
+    "src/adapters/mcp/http.rs",
+    "src/adapters/mcp/mod.rs",
+    "src/adapters/mcp/registration_test_support.rs",
+    "src/adapters/mcp/tests.rs",
+    "src/adapters/persistence/legacy_runtime_schema_tests.rs",
+    "src/adapters/persistence/skill_tests.rs",
+    "src/adapters/persistence/workflow/action_account_hints.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/action_dispatch.rs",
+    "src/adapters/persistence/workflow/action_receipts.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/http.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/local_agents/resolution.rs",
+    "src/adapters/persistence/workflow/mcp.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+    "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "src/adapters/persistence/workflow/run_provenance/mod.rs",
+    "src/application/agent/contract_tests.rs",
+    "src/application/agent/definition.rs"
+  ],
+  "claim": "R9 code unchanged; strengthen only deadline regression to await/verify actual privileged child termination. Root3adf/source still frozen for active local run."
+}

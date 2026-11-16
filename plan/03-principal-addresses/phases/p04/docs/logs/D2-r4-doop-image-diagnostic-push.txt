@@ -1,0 +1,6 @@
+remote: 
+remote: Create a pull request for 'codex/plan03-doop-image-diagnostic-2f218c86' on GitHub by visiting:        
+remote:      https://github.com/matjazonline/openbot/pull/new/codex/plan03-doop-image-diagnostic-2f218c86        
+remote: 
+To github.com:matjazonline/openbot.git
+ * [new branch]        2f218c86fe13a1de5b32d995ff7102f47e9680e9 -> codex/plan03-doop-image-diagnostic-2f218c86

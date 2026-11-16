@@ -23,7 +23,14 @@
 //! * A provider conversation mapping wins over a caller's stale create decision. A reply that
 //!   arrives before its root can therefore create the conversation and the root joins it.
 
+use crate::entities::address::AddressTarget;
+use crate::entities::transport::PrincipalId;
 use std::collections::HashMap;
+#[path = "inbound_notice.rs"]
+mod notice;
+#[path = "inbound_target.rs"]
+mod target_gate;
+pub(in crate::adapters::persistence) use notice::{AgentNoticeAuthority, commit_agent_notice_on};
 
 use async_trait::async_trait;
 use chrono::Utc;
@@ -66,7 +73,7 @@ use crate::transport::ThreadTarget;
 /// Every thread one association resolved to, once the commit has created the ones it had to.
 struct ResolvedThread {
     thread_id: Uuid,
-    channel_id: Uuid,
+    address_target: AddressTarget,
     binding_id: ChannelBindingId,
 }
 
@@ -77,6 +84,13 @@ struct StoredMessage {
 
 #[async_trait]
 impl InboundMessageCommitter for PostgresPersistence {
+    async fn authenticate_internal_relay(
+        &self,
+        mail: &crate::transport::InternalRelayMail<'_>,
+    ) -> AppResult<Option<crate::transport::AuthenticatedRelaySource>> {
+        let mut db = self.pool.acquire().await?;
+        super::relay::authenticate_on(&mut db, &super::relay::RelayClaim::from_mail(mail)).await
+    }
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
@@ -94,12 +108,59 @@ pub(super) async fn commit_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<InboundCommitOutcome> {
+    let author = match super::relay::RelayClaim::from_request(request)? {
+        Some(claim) => {
+            let source = super::relay::authenticate_on(tx, &claim)
+                .await?
+                .ok_or_else(relay_refused)?;
+            InboundAuthor::Relay(source.agent_principal)
+        }
+        None => InboundAuthor::Observed,
+    };
+    commit_as_on(tx, request, author).await
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum InboundAuthor {
+    Observed,
+    AgentNotice,
+    Relay(Option<PrincipalId>),
+}
+
+async fn commit_as_on(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    author: InboundAuthor,
+) -> AppResult<InboundCommitOutcome> {
     if request.associations.is_empty() {
         return Err(AppError::BadRequest(
             "An inbound commit must name at least one thread association".into(),
         ));
     }
-    hold_channel_settings(tx, request).await?;
+    target_gate::validate_target_alignment(request)?;
+    sqlx::query("SET LOCAL lock_timeout = '5s'")
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query("SET LOCAL statement_timeout = '15s'")
+        .execute(&mut **tx)
+        .await?;
+    // Acquire the parent key lock before target rows; later FK inserts must not invert company deletion.
+    sqlx::query("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
+        .bind(request.company_id)
+        .fetch_optional(&mut **tx)
+        .await?
+        .ok_or_else(|| AppError::NotFound("Inbound company was not found".into()))?;
+    hold_channel_settings(tx, request, author).await?;
+    if let InboundAuthor::Relay(principal) = author {
+        let claim = super::relay::RelayClaim::from_request(request)?.ok_or_else(relay_refused)?;
+        let current = super::relay::authenticate_on(tx, &claim)
+            .await?
+            .ok_or_else(relay_refused)?;
+        if current.agent_principal != principal {
+            return Err(relay_refused());
+        }
+        super::relay::validate_targets_on(tx, request, principal).await?;
+    }
     let binding_ids = verify_association_bindings(tx, request).await?;
     lock_provider_keys(tx, request, &binding_ids).await?;
 
@@ -108,14 +169,15 @@ pub(super) async fn commit_on(
     // empty conversation behind and then failed associating the message it already held.
     let existing = existing_message_mappings(tx, request, &binding_ids).await?;
     if !existing.is_empty() {
-        return recognise_redelivery(tx, request, existing).await;
+        return recognise_redelivery(tx, request, existing, author).await;
     }
 
     let threads = resolve_threads(tx, request).await?;
     bind_conversations(tx, request, &threads).await?;
 
-    let write = message_write(request, threads[0].thread_id)?;
+    let write = message_write(request, threads[0].thread_id, author)?;
     let stored = store_canonical(tx, request, &write).await?;
+    prove_internal_relay(tx, request, stored.id).await?;
 
     associate_threads(tx, request, &threads, stored.id).await?;
     map_provider_message(tx, request, &threads, &stored).await?;
@@ -143,16 +205,31 @@ pub(super) async fn commit_on(
 pub(super) async fn hold_channel_settings(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
+    author: InboundAuthor,
 ) -> AppResult<()> {
     acquire_channel_gates_on(
         tx,
         request
             .intents
             .iter()
-            .map(|intent| ChannelGateKey::new(request.company_id, intent.channel_id)),
+            .filter_map(|intent| {
+                intent
+                    .target
+                    .desk_id()
+                    .map(|id| ChannelGateKey::new(request.company_id, id))
+            })
+            .chain(
+                request
+                    .origin
+                    .relay_proof()
+                    .and(request.envelope.directives.source_target)
+                    .and_then(|target| target.desk_id())
+                    .map(|id| ChannelGateKey::new(request.company_id, id)),
+            ),
         ChannelGateAccess::Admit,
     )
     .await?;
+    target_gate::hold_principal_settings(tx, request, author).await?;
     verify_channel_settings(tx, request).await
 }
 
@@ -169,7 +246,12 @@ async fn verify_channel_settings(
     let (channels, revisions): (Vec<Uuid>, Vec<i64>) = request
         .intents
         .iter()
-        .map(|intent| (intent.channel_id, intent.settings_revision))
+        .filter_map(|intent| {
+            intent
+                .target
+                .desk_id()
+                .map(|id| (id, intent.settings_revision))
+        })
         .unzip();
     let superseded: Option<Uuid> = sqlx::query_scalar(
         "SELECT seen.channel_id FROM unnest($2::uuid[], $3::bigint[]) AS seen(channel_id, revision) \
@@ -204,6 +286,7 @@ async fn recognise_redelivery(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
     existing: Vec<(ChannelBindingId, external::ExistingExternalMessage)>,
+    author: InboundAuthor,
 ) -> AppResult<InboundCommitOutcome> {
     let message_id = existing[0].1.message_id;
     for (binding_id, mapping) in &existing[1..] {
@@ -221,7 +304,7 @@ async fn recognise_redelivery(
         AppError::Internal(format!("Stored message {message_id} belongs to no thread"))
     })?;
 
-    let write = message_write(request, first_thread)?;
+    let write = message_write(request, first_thread, author)?;
     let author = message::resolve_author(tx, request.company_id, &write.author).await?;
     let participants = message::resolve_participants(tx, request.company_id, &write).await?;
     let attachments = message::encode_attachments(&write.attachments)?;
@@ -235,6 +318,7 @@ async fn recognise_redelivery(
             &content_hash,
         )?;
     }
+    redelivered_relay_matches(tx, request, message_id).await?;
 
     let intent_ids = intents_for_message(tx, request.company_id, message_id, &thread_ids).await?;
     complete_claimed_event(tx, request).await?;
@@ -246,6 +330,92 @@ async fn recognise_redelivery(
         // A redelivery fans out nothing: the first delivery's intents are already durable.
         delivery_ids: Vec::new(),
     })
+}
+
+/// The refusal every unproved internal hop reads as, whichever check caught it.
+fn relay_refused() -> AppError {
+    AppError::Forbidden(
+        "The internal hop does not match the delivery part it claims to be, so nothing was stored"
+            .into(),
+    )
+}
+
+/// Record which delivery part an internal hop is (D4.3), proved where the claim is written.
+///
+/// The guard on `message_internal_relays` checks the claim against the stored delivery, its frozen
+/// part and the message just written: company, source channel, RFC id, recipient and body digest.
+/// The message inherits its source message's provenance from that row and from nothing else, so
+/// a claim the guard refuses aborts the whole commit and is reported as a definite refusal.
+async fn prove_internal_relay(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    message_id: CanonicalMessageId,
+) -> AppResult<()> {
+    let Some(proof) = request.origin.relay_proof() else {
+        return Ok(());
+    };
+    let Some(source_target) = request.envelope.directives.source_target else {
+        return Err(relay_refused());
+    };
+    if proof.company_id() != request.company_id {
+        return Err(relay_refused());
+    }
+    let claim = super::relay::RelayClaim::from_request(request)?.ok_or_else(relay_refused)?;
+    let source = super::relay::authenticate_on(tx, &claim)
+        .await?
+        .ok_or_else(relay_refused)?;
+    sqlx::query(
+        "INSERT INTO message_internal_relays (company_id, message_id, delivery_id, part_index, \
+         source_channel_id,source_principal_id,sender_principal_id) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+    )
+    .bind(request.company_id)
+    .bind(message_id.as_uuid())
+    .bind(proof.delivery_id().as_uuid())
+    .bind(i32::from(proof.part_index().get()))
+    .bind(source_target.desk_id())
+    .bind(source_target.principal_id().map(PrincipalId::as_uuid))
+    .bind(source.agent_principal.map(PrincipalId::as_uuid))
+    .execute(&mut **tx)
+    .await
+    .map_err(|error| {
+        match error
+            .as_database_error()
+            .and_then(|database| database.constraint())
+        {
+            Some("message_internal_relay_guard") => relay_refused(),
+            _ => AppError::from(error),
+        }
+    })?;
+    Ok(())
+}
+
+/// A repeated internal hop is the same delivery part, or it is not a redelivery at all.
+///
+/// The provider key alone would let any proof replay onto a stored hop; the stored relay row is
+/// what says which part delivered it.
+async fn redelivered_relay_matches(
+    tx: &mut Transaction<'_, Postgres>,
+    request: &InboundCommitRequest,
+    message_id: CanonicalMessageId,
+) -> AppResult<()> {
+    let Some(proof) = request.origin.relay_proof() else {
+        return Ok(());
+    };
+    let same: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT 1 FROM message_internal_relays WHERE company_id = $1 \
+           AND message_id = $2 AND delivery_id = $3 AND part_index = $4 \
+           AND source_channel_id IS NOT DISTINCT FROM $5::uuid AND source_principal_id IS NOT DISTINCT FROM $6::uuid)",
+    )
+    .bind(request.company_id)
+    .bind(message_id.as_uuid())
+    .bind(proof.delivery_id().as_uuid())
+    .bind(i32::from(proof.part_index().get()))
+    .bind(request.envelope.directives.source_target.and_then(AddressTarget::desk_id))
+    .bind(request.envelope.directives.source_target.and_then(AddressTarget::principal_id).map(PrincipalId::as_uuid))
+    .fetch_one(&mut **tx)
+    .await
+    .map_err(AppError::from)?;
+    if same { Ok(()) } else { Err(relay_refused()) }
 }
 
 /// The conversations a stored message already belongs to, in the order it joined them.
@@ -292,11 +462,7 @@ async fn verify_association_bindings(
     tx: &mut Transaction<'_, Postgres>,
     request: &InboundCommitRequest,
 ) -> AppResult<Vec<ChannelBindingId>> {
-    if let Some((binding_id, channel_id)) = first_unbound_association(tx, request).await? {
-        return Err(AppError::NotFound(format!(
-            "Active binding {binding_id} does not belong to channel {channel_id}"
-        )));
-    }
+    target_gate::verify_bindings(tx, request).await?;
     let mut bindings = Vec::with_capacity(request.associations.len());
     for association in &request.associations {
         if !bindings.contains(&association.binding_id) {
@@ -310,46 +476,6 @@ async fn verify_association_bindings(
     }
     bindings.sort_unstable();
     Ok(bindings)
-}
-
-/// The first association whose binding is not an active binding of its channel in this company,
-/// asked once for the whole list rather than once per recipient channel.
-///
-/// "First" is the request's own order, as it was when each association was its own round trip, so
-/// a commit naming several bad pairs is refused naming the same one it always was.
-async fn first_unbound_association(
-    tx: &mut Transaction<'_, Postgres>,
-    request: &InboundCommitRequest,
-) -> AppResult<Option<(ChannelBindingId, Uuid)>> {
-    let binding_ids: Vec<Uuid> = request
-        .associations
-        .iter()
-        .map(|association| association.binding_id.as_uuid())
-        .collect();
-    let channel_ids: Vec<Uuid> = request
-        .associations
-        .iter()
-        .map(|association| association.channel_id)
-        .collect();
-    let unbound: Option<(Uuid, Uuid)> = sqlx::query_as(
-        r#"SELECT association.binding_id, association.channel_id
-           FROM unnest($1::uuid[], $2::uuid[]) WITH ORDINALITY
-                AS association (binding_id, channel_id, ordinal)
-           WHERE NOT EXISTS (
-               SELECT 1 FROM channel_bindings AS binding
-               WHERE binding.id = association.binding_id AND binding.company_id = $3
-                 AND binding.channel_id = association.channel_id AND binding.status = 'active'
-           )
-           ORDER BY association.ordinal
-           LIMIT 1"#,
-    )
-    .bind(&binding_ids)
-    .bind(&channel_ids)
-    .bind(request.company_id)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-    Ok(unbound.map(|(binding_id, channel_id)| (ChannelBindingId::new(binding_id), channel_id)))
 }
 
 /// Serialize every provider mapping this transaction may read or create.
@@ -414,7 +540,8 @@ struct ThreadResolution<'a> {
 #[derive(sqlx::FromRow)]
 struct LockedThread {
     id: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
 }
 
 async fn resolve_threads(
@@ -432,7 +559,8 @@ async fn resolve_threads(
             None => match resolution.target {
                 ThreadTarget::Existing(thread_id) => thread_id,
                 ThreadTarget::Create { subject } => {
-                    open_thread(tx, request.company_id, association.channel_id, &subject).await?
+                    open_thread(tx, request.company_id, association.address_target, &subject)
+                        .await?
                 }
             },
         };
@@ -440,7 +568,7 @@ async fn resolve_threads(
         resolved_by_binding.insert(association.binding_id, thread_id);
         threads.push(ResolvedThread {
             thread_id,
-            channel_id: association.channel_id,
+            address_target: association.address_target,
             binding_id: association.binding_id,
         });
     }
@@ -492,7 +620,7 @@ async fn lock_existing_threads(
     // Publications lock this same set in UUID order. Address order remains the presentation
     // order, but cannot determine the lock order when a follow-up races a sibling reply.
     let locked: Vec<LockedThread> = sqlx::query_as(
-        "SELECT id, channel_id FROM threads WHERE company_id = $1 AND id = ANY($2) \
+        "SELECT id, channel_id, principal_id FROM threads WHERE company_id = $1 AND id = ANY($2) \
          ORDER BY id FOR UPDATE",
     )
     .bind(company_id)
@@ -504,13 +632,16 @@ async fn lock_existing_threads(
         let ThreadTarget::Existing(id) = resolution.target else {
             continue;
         };
-        if !locked
-            .iter()
-            .any(|thread| thread.id == id && thread.channel_id == resolution.association.channel_id)
-        {
+        if !locked.iter().any(|thread| {
+            thread.id == id
+                && AddressTarget::from_parts(
+                    thread.channel_id,
+                    thread.principal_id.map(PrincipalId::new),
+                ) == Some(resolution.association.address_target)
+        }) {
             return Err(AppError::Internal(format!(
-                "Thread {id} does not belong to channel {} of company {company_id}",
-                resolution.association.channel_id,
+                "Thread {id} does not belong to target {:?} of company {company_id}",
+                resolution.association.address_target,
             )));
         }
     }
@@ -520,30 +651,21 @@ async fn lock_existing_threads(
 async fn open_thread(
     tx: &mut Transaction<'_, Postgres>,
     company_id: Uuid,
-    channel_id: Uuid,
+    target: AddressTarget,
     subject: &str,
 ) -> AppResult<Uuid> {
     let id = Uuid::new_v4();
-    let created: Option<Uuid> = sqlx::query_scalar(
-        r#"INSERT INTO threads (id, company_id, channel_id, subject)
-           SELECT $1, channel.company_id, channel.id, $4
-           FROM channels AS channel
-           WHERE channel.id = $3 AND channel.company_id = $2
-           RETURNING id"#,
+    sqlx::query(
+        "INSERT INTO threads(id,company_id,channel_id,principal_id,subject) VALUES($1,$2,$3,$4,$5)",
     )
     .bind(id)
     .bind(company_id)
-    .bind(channel_id)
+    .bind(target.desk_id())
+    .bind(target.principal_id().map(PrincipalId::as_uuid))
     .bind(subject)
-    .fetch_optional(&mut **tx)
-    .await
-    .map_err(AppError::from)?;
-
-    created.ok_or_else(|| {
-        AppError::Internal(format!(
-            "Channel {channel_id} of company {company_id} was not found"
-        ))
-    })
+    .execute(&mut **tx)
+    .await?;
+    Ok(id)
 }
 
 /// Add the handles this message brings to a thread, and touch it so readers see the change.
@@ -559,7 +681,7 @@ async fn add_thread_principals(
     super::insert_thread_principals(
         tx,
         request.company_id,
-        association.channel_id,
+        association.address_target,
         thread_id,
         &association.principals,
     )
@@ -590,7 +712,7 @@ async fn bind_conversations(
             tx,
             external::ExternalThreadMapping {
                 company_id: request.company_id,
-                channel_id: thread.channel_id,
+                target: thread.address_target,
                 binding_id: thread.binding_id,
                 key: thread_key,
                 thread_id: thread.thread_id,
@@ -656,12 +778,12 @@ async fn associate_threads(
             tx,
             message::ThreadScope {
                 company_id: request.company_id,
-                channel_id: thread.channel_id,
+                target: thread.address_target,
             },
             message::AssociationWrite {
                 thread_id: thread.thread_id,
                 created_at: Utc::now(),
-                entry_kind: if request.envelope.directives.source_channel_id.is_some() {
+                entry_kind: if request.envelope.directives.source_target.is_some() {
                     crate::entities::message::ThreadEntryKind::Delegation
                 } else {
                     crate::entities::message::ThreadEntryKind::Conversation
@@ -715,37 +837,38 @@ async fn create_intents(
     threads: &[ResolvedThread],
     message_id: CanonicalMessageId,
 ) -> AppResult<Vec<Uuid>> {
-    let thread_of: HashMap<Uuid, Uuid> = threads
+    let thread_of: HashMap<AddressTarget, Uuid> = threads
         .iter()
-        .map(|thread| (thread.channel_id, thread.thread_id))
+        .map(|thread| (thread.address_target, thread.thread_id))
         .collect();
     let directives = &request.envelope.directives;
-    let trace: Vec<Uuid> = directives.trace_channels.iter().copied().collect();
+    let trace = serde_json::to_value(&directives.trace_targets)
+        .map_err(|error| AppError::Internal(format!("Cannot encode relay trace: {error}")))?;
     let policy = match request.reply_delivery {
         ReplyDelivery::Send => "deliver",
         ReplyDelivery::InAppOnly => "in_app_only",
     };
     let mut ids = Vec::with_capacity(request.intents.len());
     for intent in &request.intents {
-        let thread_id = thread_of.get(&intent.channel_id).copied().ok_or_else(|| {
+        let thread_id = thread_of.get(&intent.target).copied().ok_or_else(|| {
             AppError::Internal(format!(
-                "Admission intent channel {} has no association in this commit",
-                intent.channel_id
+                "Admission intent target {:?} has no association in this commit",
+                intent.target
             ))
         })?;
         let id: Uuid = sqlx::query_scalar(
             r#"INSERT INTO workflow_message_intents
                    (company_id, id, message_id, channel_id, thread_id, role, mentioned, admissible,
-                    origin, reply_to_message_id, responder_principal_id, hop_count, trace_channels,
-                    delivery_policy, correlation_id)
+                    origin, reply_to_message_id, responder_principal_id, hop_count, trace_targets,
+                    delivery_policy, correlation_id, principal_id)
                SELECT $1, $2, message.id, $3, $4, $5, $6, $7, $8, $9, message.author_principal_id,
-                    $10, $11, $12, $13
+                    $10, $11, $12, $13, $15
                FROM messages AS message WHERE message.company_id = $1 AND message.id = $14
                RETURNING id"#,
         )
         .bind(request.company_id)
         .bind(Uuid::new_v4())
-        .bind(intent.channel_id)
+        .bind(intent.target.desk_id())
         .bind(thread_id)
         .bind(intent.role.as_str())
         .bind(intent.mentioned)
@@ -760,6 +883,7 @@ async fn create_intents(
         .bind(policy)
         .bind(request.envelope.correlation_id.as_uuid())
         .bind(message_id.as_uuid())
+        .bind(intent.target.principal_id().map(PrincipalId::as_uuid))
         .fetch_one(&mut **tx)
         .await
         .map_err(AppError::from)?;
@@ -813,6 +937,7 @@ async fn complete_claimed_event(
 fn message_write(
     request: &InboundCommitRequest,
     primary_thread_id: Uuid,
+    source: InboundAuthor,
 ) -> AppResult<MessageWrite> {
     let envelope = &request.envelope;
     let author = envelope.author.clone();
@@ -829,9 +954,9 @@ fn message_write(
     }
 
     // A relayed message is delegated evidence: another channel talking, kept private.
-    let is_delegation = envelope.directives.source_channel_id.is_some();
+    let is_delegation = envelope.directives.source_target.is_some();
     let is_note = envelope.directives.disposition == crate::transport::MessageDisposition::FileOnly;
-    Ok(MessageWrite {
+    let mut write = MessageWrite {
         structured: None,
         id: CanonicalMessageId::random(),
         thread_id: primary_thread_id,
@@ -862,7 +987,32 @@ fn message_write(
         participants,
         correlation: correlation_of(envelope),
         created_at: Utc::now(),
-    })
+    };
+    if matches!(source, InboundAuthor::AgentNotice) {
+        if request.origin != crate::transport::InboundOrigin::Application
+            || request.reply_delivery != ReplyDelivery::InAppOnly
+            || !request.deliveries.is_empty()
+        {
+            return Err(AppError::BadRequest(
+                "A platform ingress must stay private".into(),
+            ));
+        }
+        write.author = MessageAuthorWrite::Platform;
+        write.role = MessageRole::System;
+        write.audience = crate::entities::message::MessageAudience::InternalOnly;
+        // Platform notices resolve no observed identities or member accounts.
+        write.participants.clear();
+    }
+    if let InboundAuthor::Relay(principal) = source {
+        write.author =
+            principal.map_or(MessageAuthorWrite::Platform, MessageAuthorWrite::Principal);
+        write.role = if principal.is_some() {
+            MessageRole::Agent
+        } else {
+            MessageRole::System
+        };
+    }
+    Ok(write)
 }
 
 fn correlation_of(envelope: &InboundEnvelope) -> MessageCorrelation {

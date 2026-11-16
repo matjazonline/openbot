@@ -1,0 +1,6 @@
+{
+  "RETIRED_COLUMN_NAMES": [
+    "workflow_definitions.owner_agent_id"
+  ],
+  "RETIRED_FUNCTIONS": []
+}

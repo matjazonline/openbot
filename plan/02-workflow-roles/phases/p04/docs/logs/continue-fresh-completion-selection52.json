@@ -1,0 +1,32 @@
+{
+  "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+  "inventory": 4358,
+  "groups": {
+    "continue-completion-order-after2": [
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt_paths",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_cancel_first",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_replay_contract_cannot_override_terminal",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_authority_lock_allows_runtime_fk_and_fences_owner_mutation",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_cancel_competes_with_child_creation",
+      "adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::guard_tests::workflow_control_receipt_delete_and_deferred_fault_preserve_all_writes"
+    ],
+    "continue-completion-fixture-after2": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_fenced_replay_ignores_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_finalization_replay_ignores_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_pure_replay_ignores_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completed_wait_replay_ignores_unused_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_completion_replay_company_precedes_run_during_actual_retirement",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_nonterminal_pure_replay_ignores_unused_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::workflow_reviewer_follow_uncompleted_finalization_requires_current_final_reviewers"
+    ],
+    "continue-fresh-completion-applicability-before1": [
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_expired_final_io_result_ignores_unused_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_fresh_final_io_completion_requires_current_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_invalid_io_result_retires_without_unused_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_nonterminal_io_completion_ignores_unused_retired_final_reviewers",
+      "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::fresh_hints::workflow_reviewer_follow_stale_final_io_result_ignores_unused_retired_final_reviewers"
+    ]
+  }
+}

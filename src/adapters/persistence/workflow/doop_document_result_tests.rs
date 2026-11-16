@@ -25,6 +25,7 @@ async fn bind_params(d: &mut Document, values: Value) {
     let bindings = d.engine.services().bindings();
     let configured = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Channel(d.channel),
@@ -311,7 +312,7 @@ async fn doop_result_invalid_trusted_origin_fails_before_remote_dispatch() {
         "https://doop.example.test/?public=1",
     ] {
         let mut d = Box::pin(Document::new(McpErrorPolicy::FailStep)).await;
-        let mut values = params(&d.f);
+        let mut values = params(&d.f).await;
         values["doop_origin"] = json!(origin);
         bind_params(&mut d, values).await;
         let scope = d.runtime().admit(input()).await.unwrap();
@@ -328,7 +329,7 @@ async fn doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create
     let mut d = Box::pin(Document::new(McpErrorPolicy::FailStep)).await;
     let recipient = member(&d.f, "member").await;
     super::delivery_support::verified_recipient(&d.f, recipient).await;
-    let mut values = params(&d.f);
+    let mut values = params(&d.f).await;
     values["result_destinations"] = json!([{"kind":"user","id":recipient}]);
     bind_params(&mut d, values).await;
     d.server

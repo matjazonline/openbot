@@ -1,0 +1,23 @@
+same binary copy sha256 6526fd0b…daf8; DB openbot_roles_p05_b2; Sat Nov 14 07:15:09 CET 2026
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 15 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_database_requires_authentic_complete_immutable_target_and_links ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_existing_root_failure_after_source_retention_never_restarts_the_ladder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_missing_message_seal_aborts_real_fenced_completion_and_retries_atomically ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_bounds_scanned_pages_skips_locked_prefix_and_collectors_delete_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::cleanup::workflow_escalation_origin_real_cleanup_preserves_token_during_actual_child_propagation_after_source_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_missing_child_or_rerun_seal_rolls_back_real_creation_then_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::inheritance::workflow_escalation_origin_real_child_recovery_and_authorized_rerun_keep_origin_across_source_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_native_message_keeps_origin_after_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_admission_first_preserves_its_only_root_when_source_retention_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_retention_first_closes_the_competing_actual_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::messages::workflow_escalation_origin_real_final_publication_seals_atomically_and_survives_actual_producer_retention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_actual_source_retention_closes_pending_and_claimed_private_intents_without_fanout ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_former_root_retention_keeps_the_one_root_seal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 4465 filtered out; finished in 50.65s
+
+EXIT 0

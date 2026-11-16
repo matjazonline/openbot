@@ -1,0 +1,164 @@
+
+==> Generated CSS is current
+≈ tailwindcss v4.1.12
+
+/*! 🌼 daisyUI 5.0.50 */
+Done in 513ms
+
+==> SSE navigation lifecycle
+✔ library payload carries the agent's own fields and no retired runtime fields (6.725542ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (3.481833ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (1050.499291ms)
+✔ ordinary page links release every stream before navigation (5.3055ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (6.087542ms)
+✔ anchors and non-document protocols keep streams (3.812959ms)
+✔ native filter submissions release all streams on every navigation (14.112125ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (3.430292ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1678.148916
+
+==> Deployment script tests
+deployment model-stage/non-root/missing-model gate assertions passed
+deploy script tests passed
+credential key rollout script tests passed
+
+==> Formatting
+
+==> Patch whitespace
+
+==> Transport abstraction boundary
+runtime boundary gate regression tests passed
+transport boundary check passed
+
+==> Workflow evidence validator fixtures
+............
+----------------------------------------------------------------------
+Ran 12 tests in 3.484s
+
+OK
+
+==> Retained workflow evidence
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p01/docs/logs/CL-P01-B1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p02/docs/logs/CL-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p03/docs/logs/CL-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 2, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p04/docs/logs/CL-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 10}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p05/docs/logs/CL-P05-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 11}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 11}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p06/docs/logs/CL-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.final-v2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 65}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/phases/p07/docs/logs/CL-P07-B1-R2.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 3, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.final.evidence.json: retained evidence valid {"FAIL": 6, "NOT EXERCISED": 1, "PASS": 55}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/cloudroom-local/publication/logs/CL-PUB-R1.preliminary.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 11}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archive/vault-google/integration/publication-06-07/docs/logs/VG-PUB67-RELEASE.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/integration/final/docs/logs/AH-FINAL-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 20}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/integration/publication/docs/logs/AH-PUBLISH-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 18}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-AG1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p05/docs/logs/AH-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-AG1-R3.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 0}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p06/docs/logs/AH-P06-B1-R2.evidence.json: retained evidence valid {"FAIL": 5, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/.archived/04-autonomous-agent-history/phases/p07/docs/logs/AH-P07-B1-R1.evidence.json: retained evidence valid {"FAIL": 10, "NOT EXERCISED": 1, "PASS": 24}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p01/docs/logs/01DEP-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 4}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p02/docs/logs/01DEP-P02-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B2-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p03/docs/logs/01DEP-P03-B3-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B2-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B3-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p04/docs/logs/01DEP-P04-B3-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-A1.evidence.json: retained evidence valid {"FAIL": 19, "NOT EXERCISED": 0, "PASS": 85}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R1.evidence.json: retained evidence valid {"FAIL": 7, "NOT EXERCISED": 3, "PASS": 56}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R2.evidence.json: retained evidence valid {"FAIL": 8, "NOT EXERCISED": 3, "PASS": 61}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R3.evidence.json: retained evidence valid {"FAIL": 14, "NOT EXERCISED": 0, "PASS": 75}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/01-departments/phases/p05/docs/logs/01DEP-P05-B1-R4.evidence.json: retained evidence valid {"FAIL": 19, "NOT EXERCISED": 0, "PASS": 84}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-A1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-R1-reviewer.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p01/docs/logs/02WR-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p02/docs/logs/02WR-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p02/docs/logs/B1-R1.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 3, "PASS": 28}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p02/docs/logs/CP1-final.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 4, "PASS": 26}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p02/docs/logs/CP1.evidence.json: retained evidence valid {"FAIL": 27, "NOT EXERCISED": 4, "PASS": 26}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-A1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 15}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R1-schema.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 2, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p03/docs/logs/02WR-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 14}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p04/docs/logs/02WR-P04-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 7}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p04/docs/logs/02WR-P04-B1-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 12}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p04/docs/logs/C1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p05/docs/logs/02WR-P05-R1.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 3, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p05/docs/logs/02WR-P05-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 2, "PASS": 2}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/02-workflow-roles/phases/p05/docs/logs/02WR-P05-R3.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 4}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p01/docs/logs/03PA-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 10}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p01/docs/logs/03PA-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 7}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B1-R2.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 0, "PASS": 15}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B2-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B2-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B3-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p02/docs/logs/03PA-P02-B3-R2.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p03/docs/logs/03PA-P03-B1-R1.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 12}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p03/docs/logs/03PA-P03-B1-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 0, "PASS": 13}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p04/docs/logs/B1-R1-preflight.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 2, "PASS": 25}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p04/docs/logs/B1-R3-reviewer-focused.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/phases/p04/docs/logs/orca-B1-R3-preflight.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 1, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/integration/main-20261112/docs/logs/CH-MAIN-B1-R1-focused.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/integration/main-20261112/docs/logs/CH-MAIN-B1-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/integration/main-20261112/docs/logs/CH-MAIN-B1-R3-corrections.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/integration/main-20261112/docs/logs/CH-MAIN-B1-R3-final.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 0, "PASS": 17}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG3-R3-reviewer.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B1-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B1-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 16}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R1.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 19}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-reviewer.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 19}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-reviewer.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 3}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R1.evidence.json: retained evidence valid {"FAIL": 4, "NOT EXERCISED": 2, "PASS": 19}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R2.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 12}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R3.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 2, "PASS": 5}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R4-final.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 8}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R4-lease.evidence.json: retained evidence valid {"FAIL": 0, "NOT EXERCISED": 0, "PASS": 1}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R4.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 2, "PASS": 6}
+/Users/mac02/orca/workspaces/openbot/plan03-04/plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R5-whitespace.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 3}
+98 evidence manifest(s) validated; declared results are not acceptance
+
+==> Fetch locked Rust dependencies
+
+==> Offline compilation
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2.07s
+
+==> Clippy
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4m 33s
+
+==> Migrations
+
+==> SQLx metadata matches migrated schema
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 47s
+
+==> Compile tests
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+Terminated: 15

@@ -1,0 +1,17 @@
+{
+  "uid": 1000,
+  "status": {
+    "CapEff": "0000000000000000",
+    "NoNewPrivs": "1",
+    "Seccomp": "2"
+  },
+  "parentChrootDenied": true,
+  "applicationWritable": false,
+  "sandbox": "Sandbox Status\nLayer 1 Sandbox\tNamespace\nPID namespaces\tYes\nNetwork namespaces\tYes\nSeccomp-BPF sandbox\tYes\nSeccomp-BPF sandbox supports TSYNC\tYes\nPtrace Protection with Yama LSM (Broker)\tYes\nPtrace Protection with Yama LSM (Non-broker)\tNo\n\nYou are adequately sandboxed.",
+  "resourcesAfterBrowserClose": [
+    "FSReqCallback",
+    "PipeWrap",
+    "PipeWrap",
+    "Timeout"
+  ]
+}

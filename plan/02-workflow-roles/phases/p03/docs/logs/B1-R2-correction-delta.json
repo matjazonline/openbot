@@ -1,0 +1,31 @@
+{
+  "base_artifact": "e46aef026ae60bc4156ebb3b5f8436f63972e99fca2049d5200fd09bef7d0331",
+  "artifact": "5bd5645a4256002c4202f11f1bdfdea9814c98188e1d6e2dcbd181cd503ba1db",
+  "changes": [
+    {
+      "path": "src/adapters/persistence/workflow/decision_authority_tests.rs",
+      "before_sha256": "224f6a347d4f3945d437e1b6c9b2505fc9eb3b71655356ddba3d921227bf3cb8",
+      "after_sha256": "a1fe463f66d71d7875a6af1283c065d37ef5debf0c07a320ef60c5ffd1e26729"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decision_business_member_tests.rs",
+      "before_sha256": null,
+      "after_sha256": "72ae9edb9cdc140b3ada01477c875ab4ea70b4dc0df5b68a1e44dd80f404b1ba"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+      "before_sha256": "0f43acf731ca163449dde9d5e25b72b6a32c11413a695a80a8a08aa38b0e1c67",
+      "after_sha256": "3957134cb809bb230d3598dd72eff5b689336df5c145cb80310c877d890bc76b"
+    },
+    {
+      "path": "src/application/workflow/compiler/roles.rs",
+      "before_sha256": "f8cfed02976792634ccdf325723c4f02b15c8a07949caf9d407edc3257fc178c",
+      "after_sha256": "aa8b8bc8e99333e60aa4c6da1d176699d4cfee1f275d5f451381e15992f729ec"
+    },
+    {
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "before_sha256": "924639ddd586fc74ca40d6a551999f2505c5e5c926713793057d77e0266aa018",
+      "after_sha256": "be612f3bc88b9ffbe464bcea6c5b3e27da752d98d4c203f860d0e9d63d9d5f0d"
+    }
+  ]
+}

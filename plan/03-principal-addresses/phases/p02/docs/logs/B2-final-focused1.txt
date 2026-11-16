@@ -1,0 +1,22 @@
+
+running 8 tests
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_competing_same_conversation_and_redelivery_keep_one_target_thread ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_removal_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_promotion_and_mail_finish_in_both_identity_lock_orders ... ok
+
+thread 'adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks' (14329824) panicked at src/adapters/persistence/address_tests/validation.rs:120:6:
+called `Result::unwrap()` on an `Err` value: BadRequest("Invalid participant email: invalid email address")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks ... FAILED
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_rename_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_self_mail_rekey_finishes_in_both_identity_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::status::direct_competing_binding_status_and_ingress_finish_in_both_lock_orders ... ok
+
+failures:
+
+failures:
+    adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 4560 filtered out; finished in 13.40s
+

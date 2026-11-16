@@ -143,14 +143,14 @@ pub struct AgentDirectoryEntry {
     pub active_revision: Option<AgentRevisionId>,
     /// The departments the agent is a member of or holds a role in, by slug (01DEP-P03-D10).
     pub departments: Vec<DepartmentRef>,
-    /// The agent's default desk, while it exists.
-    pub desk: Option<AgentDesk>,
+    /// The agent's directly addressable principal.
+    pub address: Option<AgentAddress>,
 }
 
-/// An agent's default desk: the one created with the agent, at its current primary address.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct AgentDesk {
-    pub id: Uuid,
+/// An agent's canonical direct address.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AgentAddress {
+    pub principal_id: crate::entities::transport::PrincipalId,
     pub address: String,
 }
 

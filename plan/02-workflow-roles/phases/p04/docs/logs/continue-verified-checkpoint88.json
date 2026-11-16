@@ -1,0 +1,39 @@
+{
+  "verified_distinct_checks": 142,
+  "old_pass": 141,
+  "corrected_source_checks": 4,
+  "unchanged_production_since": 86,
+  "changed_since_86": [
+    "src/adapters/persistence/workflow/escalation_source_guard_tests.rs"
+  ],
+  "current_build": 88,
+  "stock_stack_bytes": 2097152,
+  "test_threads": 2,
+  "failures_retained": [
+    "continue-affected-native86.txt",
+    "continue-agent-handling-native85.txt"
+  ],
+  "scope": "focused phase04 checks only; no phase acceptance or full-suite claim",
+  "static_checks": {
+    "continue-sqlx-prepare58.txt": {
+      "status": "PASS",
+      "sha256": "af00eff874d2be53cc5e1b714b2650bfa41b05baf4dcf3675b9cb77594c6d074"
+    },
+    "continue-offline-all-targets88.txt": {
+      "status": "PASS",
+      "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"
+    },
+    "continue-fmt88.txt": {
+      "status": "PASS",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "continue-whitespace88.txt": {
+      "status": "PASS",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "continue-trail-build11.txt": {
+      "status": "PASS",
+      "sha256": "6b161c5aea9426c65026ee456ebb6a1253f8ecd85da229c3075041d86e325476"
+    }
+  }
+}

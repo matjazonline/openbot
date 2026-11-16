@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::finalization_hints::workflow_reviewer_follow_cancelled_finalization_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::finalization_hints::workflow_reviewer_follow_pending_finalization_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::completion_hints::finalization_hints::workflow_reviewer_follow_pending_finalization_replans_before_new_actor_accounts ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4358 filtered out; finished in 2.21s
+

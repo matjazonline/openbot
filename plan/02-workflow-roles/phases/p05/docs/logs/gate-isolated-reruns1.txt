@@ -1,0 +1,199 @@
+=== adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript ... FAILED
+
+failures:
+
+---- adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript stdout ----
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (7154970) panicked at src/adapters/http/pages/tests.rs:4695:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.15s
+
+EXIT 101
+=== adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact ... FAILED
+
+failures:
+
+---- adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact stdout ----
+
+thread 'adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact' (7155068) panicked at src/adapters/http/routes/workflows/tests.rs:361:9:
+the engine never reached: first review
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::http::routes::workflows::tests::decision_tests::review::reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 31.81s
+
+EXIT 101
+=== adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (7156951) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.11s
+
+EXIT 101
+=== adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it ... FAILED
+
+failures:
+
+---- adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it stdout ----
+
+thread 'adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it' (7156982) panicked at src/adapters/persistence/auth_attempts.rs:697:9:
+assertion `left == right` failed
+  left: 1
+ right: 5
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::auth_attempts::tests::security_auth_limits_login_counter_is_shared_and_success_resets_it
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 2.60s
+
+EXIT 101
+=== adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest ... FAILED
+
+failures:
+
+---- adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest stdout ----
+
+thread 'adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest' (7157318) panicked at src/adapters/persistence/auth_attempts.rs:543:9:
+case alias confirmation failed: Err(BadRequest("Invalid or expired confirmation code"))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::auth_attempts::tests::security_auth_limits_unicode_registration_aliases_share_budget_and_code_digest
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 1.22s
+
+EXIT 101
+=== adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading ... FAILED
+
+failures:
+
+---- adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading stdout ----
+
+thread 'adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading' (7157958) panicked at src/adapters/persistence/database_query_health.rs:272:17:
+assertion failed: !snapshot.utility_tracking
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::database_query_health::tests::database_snapshot_executes_or_reports_that_the_library_needs_preloading
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 0.35s
+
+EXIT 101
+=== adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline' (7158156) panicked at src/adapters/persistence/workflow/provisioning_runtime_tests.rs:599:5:
+assertion `left == right` failed
+  left: String("87501891-9e99-45a1-b074-b55f35dc5c89")
+ right: String("6472d458-62b6-4106-8d8a-8757d28609d3")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 12.91s
+
+EXIT 101
+=== adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 37.16s
+
+EXIT 0
+=== adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 37.35s
+
+EXIT 0
+=== adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 49.50s
+
+EXIT 0
+=== adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 34.98s
+
+EXIT 0
+=== adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4478 filtered out; finished in 51.87s
+
+EXIT 0

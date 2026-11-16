@@ -273,6 +273,42 @@ async fn export_picker_responses(
     .unwrap()
     .0;
     browser_fixture(root, "applied.html", applied);
+    let role_form = || {
+        axum::Form(
+            serde_json::from_value(json!({"source":unsaved,"step":"start","agent":"role:lead"}))
+                .unwrap(),
+        )
+    };
+    browser_fixture(
+        root,
+        "role-selected-picker.html",
+        picker(f.ui(f.owner), Path(workflow), f.query(), role_form())
+            .await
+            .unwrap()
+            .0,
+    );
+    browser_fixture(
+        root,
+        "role-applied.html",
+        apply(f.ui(f.owner), Path(workflow), f.query(), role_form())
+            .await
+            .unwrap()
+            .0,
+    );
+    let reviewer_form = axum::Form(serde_json::from_value(json!({"source":initial})).unwrap());
+    browser_fixture(
+        root,
+        "empty-reviewer-picker.html",
+        super::super::reviewer_picker::picker(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            reviewer_form,
+        )
+        .await
+        .unwrap()
+        .0,
+    );
 }
 
 #[tokio::test]
@@ -315,6 +351,7 @@ async fn dump_autonomous_workflow_agent_picker_browser_fixtures() {
     browser_fixture(root, "theme-init.js", pages::theme_init_javascript());
     let agent = target.definition.agent_id.as_uuid();
     export_picker_responses(&f, root, workflow, &source, &unsaved, agent).await;
+    let reviewers = export_reviewer_browser(&f, root).await;
     browser_fixture(
         root,
         "metadata.json",
@@ -323,6 +360,8 @@ async fn dump_autonomous_workflow_agent_picker_browser_fixtures() {
             "source":source, "unsaved":unsaved, "other_source":other_source,
             "applied":unsaved.replacen(r#""literal": "assistant""#, r#""literal": "picked""#, 1),
             "revision":target.id.as_uuid(),
+            "role_applied":crate::application::workflow::compiler::select_role_reference(&crate::adapters::workflow_source::WorkflowSourceDecoder,&unsaved,&crate::domain::workflow::StepId::parse("start").unwrap(),crate::entities::department::DepartmentRole::Lead).unwrap(),
+            "reviewers":reviewers,
         }))
         .unwrap(),
     );
@@ -330,4 +369,132 @@ async fn dump_autonomous_workflow_agent_picker_browser_fixtures() {
     assert_eq!(stored.source, source);
     assert_eq!(stored.summary.revision, 1);
     assert!(stored.versions.is_empty());
+}
+
+async fn export_reviewer_browser(f: &Fixture, root: &std::path::Path) -> Value {
+    use crate::application::workflow::compiler::select_reviewer_references;
+    use crate::application::workflow::reviewers::ReviewerSelector;
+    use crate::entities::department::DepartmentRole;
+    let workflow = Uuid::new_v4();
+    let source = source_of("decision.human", workflow);
+    let unsaved = format!("{source}\n# browser reviewer edit\n");
+    f.draft(workflow, "Reviewer browser", &source).await;
+    let person = f
+        .engine
+        .authoring_reads()
+        .reviewer_choices(crate::domain::workflow::CompanyId::new(f.company), None)
+        .await
+        .unwrap()
+        .items[0]
+        .principal;
+    let role = ReviewerSelector::Role(DepartmentRole::Reviewer);
+    let step = crate::domain::workflow::StepId::parse("start").unwrap();
+    let decoder = crate::adapters::workflow_source::WorkflowSourceDecoder;
+    let applied = select_reviewer_references(&decoder, &unsaved, &step, &[role]).unwrap();
+    let added = select_reviewer_references(
+        &decoder,
+        &applied,
+        &step,
+        &[role, ReviewerSelector::Principal(person)],
+    )
+    .unwrap();
+    let page = super::super::workspace(
+        f.ui(f.owner),
+        Query(super::super::WorkspaceQuery {
+            company_id: Some(f.company),
+            workflow_id: Some(workflow),
+            tab: None,
+            new: None,
+            tools: None,
+        }),
+    )
+    .await
+    .unwrap()
+    .0;
+    browser_fixture(root, "reviewer-page.html", page);
+    let make_form =
+        |source: &str,
+         selection: Option<ReviewerSelector>,
+         edit: Option<super::super::reviewer_picker::ReviewerEdit>| {
+            let selection = selection.map(|selection| match selection {
+                ReviewerSelector::Role(role) => format!("role:{role}"),
+                ReviewerSelector::Principal(id) => id.as_uuid().to_string(),
+            });
+            axum::Form(
+                serde_json::from_value(
+                    json!({"source":source,"step":"start","reviewer":selection,"edit":edit}),
+                )
+                .unwrap(),
+            )
+        };
+    browser_fixture(
+        root,
+        "reviewer-initial.html",
+        super::super::reviewer_picker::picker(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            make_form(&source, None, None),
+        )
+        .await
+        .unwrap()
+        .0,
+    );
+    browser_fixture(
+        root,
+        "reviewer-selected.html",
+        super::super::reviewer_picker::picker(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            make_form(&unsaved, Some(role), None),
+        )
+        .await
+        .unwrap()
+        .0,
+    );
+    browser_fixture(
+        root,
+        "reviewer-applied.html",
+        super::super::reviewer_picker::apply(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            make_form(&unsaved, Some(role), None),
+        )
+        .await
+        .unwrap()
+        .0,
+    );
+    browser_fixture(
+        root,
+        "reviewer-person-selected.html",
+        super::super::reviewer_picker::picker(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            make_form(&applied, Some(ReviewerSelector::Principal(person)), None),
+        )
+        .await
+        .unwrap()
+        .0,
+    );
+    browser_fixture(
+        root,
+        "reviewer-added.html",
+        super::super::reviewer_picker::apply(
+            f.ui(f.owner),
+            Path(workflow),
+            f.query(),
+            make_form(
+                &applied,
+                Some(ReviewerSelector::Principal(person)),
+                Some(super::super::reviewer_picker::ReviewerEdit::Add),
+            ),
+        )
+        .await
+        .unwrap()
+        .0,
+    );
+    json!({"workflow":workflow,"source":source,"unsaved":unsaved,"applied":applied,"added":added,"person":person.as_uuid()})
 }

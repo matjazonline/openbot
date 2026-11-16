@@ -1,0 +1,22 @@
+$ cargo test --locked --offline --lib message_intent_
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.22s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 14 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_poison_batch_is_not_reclaimed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rows_cannot_name_another_companys_records ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_in_app_policy_reaches_the_admitted_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_lease_lapsing_on_the_last_attempt_fails_it_observably ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_ignores_bindings_activated_later_or_deactivated ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_competing_claimants_admit_one_run_and_fence_the_stale_worker ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_rules_admit_each_eligible_binding_independently ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_admission_replay_with_another_delivery_policy_conflicts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_reconfigured_binding_is_re_read_before_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_claims_are_fair_across_tenants ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_crash_after_admission_replays_its_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_refused_run_as_is_visible_and_spares_its_sibling ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_transient_failure_retries_only_the_failed_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::message_intent_worker_stops_between_and_during_processing ... ok
+
+test result: ok. 14 passed; 0 failed; 0 ignored; 0 measured; 4186 filtered out; finished in 7.10s
+

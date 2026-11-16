@@ -69,10 +69,10 @@ requires a published agent named `assistant`; configure it with no business tool
 appropriate model instructions and permission to process the selected mailbox text.
 The protected send example already includes `with.approval`, using the binding's
 `params.reviewers` and the run deadline. Replace the sample reviewer UUID with real
-authorized company reviewers in the saved binding parameters:
+authorized company person principals in the saved binding parameters:
 
 ```json
-{"reviewers":[{"kind":"user","id":"REVIEWER_UUID"}]}
+{"reviewers":[{"kind":"principal","id":"REVIEWER_PRINCIPAL_UUID"}]}
 ```
 
 Its sample response declares `approval: true` to simulate review, never to approve

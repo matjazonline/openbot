@@ -266,6 +266,7 @@ pub fn agent_edit_fragment(company: &Company, agent: &Agent) -> String {
     let draft = AgentDraft {
         name: &agent.name,
         slug: &agent.slug,
+        open_to_public: agent.open_to_public,
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
@@ -341,6 +342,7 @@ pub fn agent_edit_fragment_draft(
                 <input type="hidden" name="expected_revision" value="{expected_revision}">
                 <input type="hidden" name="native_permissions" value="{native_permissions}">
                 {preserved}
+                {direct_settings}
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <label class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
@@ -389,6 +391,7 @@ pub fn agent_edit_fragment_draft(
             .unwrap_or(agent.draft_revision)
             .get(),
         error = form_error_banner(error),
+        direct_settings = super::agent_settings::direct_settings_fields(draft),
         name = escape_html_attr(name),
         slug = escape_html_attr(slug),
         avatar_field =

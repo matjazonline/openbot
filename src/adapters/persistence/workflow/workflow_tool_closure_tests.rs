@@ -103,6 +103,7 @@ async fn bind_child_resource(setup: &ToolSetup, resource: RuntimeResourceId) -> 
     let service = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = service
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

@@ -278,7 +278,10 @@ pub enum AdmissionResult {
     Stale,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
+)]
+#[serde(transparent)]
 pub struct RunRevision(pub u64);
 
 /// Company-scoped authoritative run identity, logical state, and revision.

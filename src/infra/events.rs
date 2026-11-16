@@ -59,24 +59,23 @@ const RECONNECT_BACKOFF: std::time::Duration = std::time::Duration::from_secs(5)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub struct ThreadScope {
     pub thread_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub company_id: Uuid,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 pub struct AttentionScope {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub source_kind: AttentionWakeSource,
     pub source_id: Uuid,
 }
 
-/// A workflow run whose state or waiting reason changed, or that was admitted. A run without a
-/// channel is company-wide.
+/// A workflow run whose state or waiting reason changed, or that was admitted. A run without an inbox target is company-wide.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 pub struct RunScope {
     pub company_id: Uuid,
-    pub channel_id: Option<Uuid>,
+    pub target: Option<crate::entities::address::AddressTarget>,
     pub thread_id: Option<Uuid>,
     pub run_id: Uuid,
 }
@@ -152,12 +151,12 @@ impl MailboxEvent {
 
     /// True for a message committed anywhere in `channel_id`.
     pub fn is_message_in_channel(&self, channel_id: Uuid) -> bool {
-        matches!(self, MailboxEvent::MessageCommitted(scope) if scope.channel_id == channel_id)
+        matches!(self, MailboxEvent::MessageCommitted(scope) if scope.target == crate::entities::address::AddressTarget::Desk(channel_id))
     }
 
     /// True for a run's state change on any thread of `channel_id`.
     pub fn is_activity_in_channel(&self, channel_id: Uuid) -> bool {
-        matches!(self, MailboxEvent::ActivityChanged(scope) if scope.channel_id == channel_id)
+        matches!(self, MailboxEvent::ActivityChanged(scope) if scope.target == crate::entities::address::AddressTarget::Desk(channel_id))
     }
 
     pub fn attention_scope(&self, company_id: Uuid) -> Option<AttentionScope> {
@@ -316,7 +315,7 @@ mod tests {
     fn scope() -> ThreadScope {
         ThreadScope {
             thread_id: id(1),
-            channel_id: id(2),
+            target: crate::entities::address::AddressTarget::Desk(id(2)),
             company_id: id(3),
         }
     }
@@ -327,7 +326,7 @@ mod tests {
     fn parses_the_payload_the_triggers_build() {
         let payload = r#"{
             "thread_id": "0a8f5f5e-0000-4000-8000-000000000001",
-            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
+            "target": {"kind":"desk","id":"0a8f5f5e-0000-4000-8000-000000000002"},
             "company_id": "0a8f5f5e-0000-4000-8000-000000000003"
         }"#;
 
@@ -340,7 +339,7 @@ mod tests {
         // standing between a renamed source kind and a queue that silently stops updating.
         let attention_payload = r#"{
             "company_id": "0a8f5f5e-0000-4000-8000-000000000003",
-            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
+            "target": {"kind":"desk","id":"0a8f5f5e-0000-4000-8000-000000000002"},
             "source_kind": "delivery",
             "source_id": "0a8f5f5e-0000-4000-8000-000000000006"
         }"#;
@@ -348,7 +347,7 @@ mod tests {
             serde_json::from_str::<AttentionScope>(attention_payload).unwrap(),
             AttentionScope {
                 company_id: id(3),
-                channel_id: id(2),
+                target: crate::entities::address::AddressTarget::Desk(id(2)),
                 source_kind: AttentionWakeSource::Delivery,
                 source_id: id(6),
             }
@@ -419,7 +418,7 @@ mod tests {
     fn attention(source_kind: AttentionWakeSource) -> AttentionScope {
         AttentionScope {
             company_id: id(3),
-            channel_id: id(2),
+            target: crate::entities::address::AddressTarget::Desk(id(2)),
             source_kind,
             source_id: id(7),
         }
@@ -473,7 +472,7 @@ mod tests {
 
         let run = RunScope {
             company_id: id(3),
-            channel_id: None,
+            target: None,
             thread_id: None,
             run_id: id(4),
         };
@@ -483,7 +482,7 @@ mod tests {
             .unwrap();
         sqlx::query("SELECT pg_notify('workflow_run_changed', $1)")
             .bind(
-                serde_json::json!({"company_id": run.company_id, "channel_id": null,
+                serde_json::json!({"company_id": run.company_id, "target": null,
                     "thread_id": null, "run_id": run.run_id, "state": "queued",
                     "waiting_reason": null})
                 .to_string(),

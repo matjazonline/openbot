@@ -6,6 +6,8 @@ use crate::domain::workflow::{RunId, VersionId, WorkflowId};
 fn card(state: RunStateName) -> RunSummary {
     let now = chrono::Utc::now();
     RunSummary {
+        role_holders: Vec::new(),
+        role_holders_truncated: false,
         run: RunId::new(Uuid::new_v4()),
         binding: WorkflowBindingId::new(Uuid::new_v4()),
         workflow: WorkflowId::new(Uuid::new_v4()),
@@ -30,14 +32,14 @@ fn cards(state: RunStateName, count: usize) -> Vec<RunSummary> {
 fn count(state: RunStateName, channel: Option<Uuid>, runs: u64) -> BoardCount {
     BoardCount {
         state,
-        channel,
+        target: channel.map(crate::entities::address::AddressTarget::Desk),
         runs,
     }
 }
 
 #[test]
 fn the_board_has_one_column_per_state_in_order_and_empty_ones_count_nothing() {
-    let columns = assemble_columns(&[], &VisibleChannels::default(), Vec::new()).unwrap();
+    let columns = assemble_columns(&[], &VisibleInboxes::default(), Vec::new()).unwrap();
     assert_eq!(
         columns
             .iter()
@@ -55,7 +57,8 @@ fn the_board_has_one_column_per_state_in_order_and_empty_ones_count_nothing() {
 #[test]
 fn a_column_counts_only_the_channels_the_viewer_may_see() {
     let (seen, hidden) = (Uuid::new_v4(), Uuid::new_v4());
-    let visible = VisibleChannels {
+    let visible = VisibleInboxes {
+        principals: Vec::new(),
         channels: vec![seen],
         company: true,
     };
@@ -74,7 +77,8 @@ fn a_column_counts_only_the_channels_the_viewer_may_see() {
     assert_eq!(failed.cards.len(), 5);
     assert_eq!(columns[0].total, 0, "the queued runs are all hidden");
 
-    let company_hidden = VisibleChannels {
+    let company_hidden = VisibleInboxes {
+        principals: Vec::new(),
         channels: vec![seen],
         company: false,
     };
@@ -87,7 +91,8 @@ fn a_column_past_the_cap_is_cut_and_reads_more_than_it_shows() {
     let read = cards(RunStateName::Running, BOARD_COLUMN_CAP + 1);
     let first = read[0].run;
     let counts = [count(RunStateName::Running, None, 312)];
-    let visible = VisibleChannels {
+    let visible = VisibleInboxes {
+        principals: Vec::new(),
         channels: Vec::new(),
         company: true,
     };
@@ -114,7 +119,7 @@ fn a_column_past_the_cap_is_cut_and_reads_more_than_it_shows() {
 fn a_card_in_an_unknown_state_is_an_error_not_a_dropped_card() {
     let mut odd = card(RunStateName::Queued);
     odd.state = "paused".into();
-    assert!(assemble_columns(&[], &VisibleChannels::default(), vec![odd]).is_err());
+    assert!(assemble_columns(&[], &VisibleInboxes::default(), vec![odd]).is_err());
 }
 
 #[test]

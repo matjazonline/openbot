@@ -1,0 +1,15 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 8 tests
+test application::use_cases::channel::tests::address_slug_shape_matches_the_format_constraint ... ok
+test application::use_cases::channel::tests::address_slug_onboarding_names_are_unchanged_by_the_shared_helper ... ok
+test application::use_cases::channel::tests::address_slug_derivation_keeps_the_database_shape ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_an_internal_relay_to_a_person_is_refused_definitely ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_a_person_together_are_refused_whole ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_context_suffix_strips_for_a_desk_and_is_refused_for_a_person ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_is_admitted_and_a_person_is_refused_for_a_teammate ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4488 filtered out; finished in 0.02s
+
+EXIT 0

@@ -1,0 +1,1 @@
+/opt/homebrew/Caskroom/codex/0.169.0/codex-path/rg

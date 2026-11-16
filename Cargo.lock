@@ -2660,6 +2660,7 @@ dependencies = [
  "dotenvy",
  "fastembed",
  "futures",
+ "hickory-resolver",
  "hmac",
  "htmd",
  "icu_casemap",

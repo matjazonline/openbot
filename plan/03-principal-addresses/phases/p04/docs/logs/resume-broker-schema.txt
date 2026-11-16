@@ -1,0 +1,34 @@
+                             Table "public.native_mcp_brokers"
+       Column        |           Type           | Collation | Nullable |      Default      
+---------------------+--------------------------+-----------+----------+-------------------
+ company_id          | uuid                     |           | not null | 
+ id                  | uuid                     |           | not null | 
+ actor_id            | uuid                     |           | not null | 
+ actor_principal_id  | uuid                     |           | not null | 
+ agent_revision_id   | uuid                     |           | not null | 
+ agent_binding_id    | uuid                     |           | not null | 
+ contract            | jsonb                    |           | not null | 
+ workflow_id         | uuid                     |           | not null | 
+ version_id          | uuid                     |           | not null | 
+ workflow_binding_id | uuid                     |           | not null | 
+ created_at          | timestamp with time zone |           | not null | clock_timestamp()
+Indexes:
+    "native_mcp_brokers_pkey" PRIMARY KEY, btree (company_id, id)
+    "native_mcp_brokers_company_id_actor_id_actor_principal_id_a_key" UNIQUE CONSTRAINT, btree (company_id, actor_id, actor_principal_id, agent_revision_id, agent_binding_id)
+    "native_mcp_brokers_company_id_version_id_key" UNIQUE CONSTRAINT, btree (company_id, version_id)
+    "native_mcp_brokers_company_id_workflow_binding_id_key" UNIQUE CONSTRAINT, btree (company_id, workflow_binding_id)
+    "native_mcp_brokers_company_id_workflow_id_key" UNIQUE CONSTRAINT, btree (company_id, workflow_id)
+Check constraints:
+    "native_mcp_brokers_contract_check" CHECK (jsonb_typeof(contract) = 'object'::text AND octet_length(contract::text) <= 131072)
+Foreign-key constraints:
+    "native_mcp_brokers_company_id_agent_revision_id_agent_bind_fkey" FOREIGN KEY (company_id, agent_revision_id, agent_binding_id) REFERENCES agent_revision_bindings(company_id, revision_id, binding_id) DEFERRABLE INITIALLY DEFERRED
+    "native_mcp_brokers_company_id_fkey" FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+    "native_mcp_brokers_company_id_version_id_fkey" FOREIGN KEY (company_id, version_id) REFERENCES workflow_versions(company_id, id) DEFERRABLE INITIALLY DEFERRED
+    "native_mcp_brokers_company_id_workflow_binding_id_fkey" FOREIGN KEY (company_id, workflow_binding_id) REFERENCES workflow_bindings(company_id, id) DEFERRABLE INITIALLY DEFERRED
+    "native_mcp_brokers_company_id_workflow_id_fkey" FOREIGN KEY (company_id, workflow_id) REFERENCES workflow_definitions(company_id, id) DEFERRABLE INITIALLY DEFERRED
+Referenced by:
+    TABLE "native_mcp_calls" CONSTRAINT "native_mcp_calls_company_id_broker_id_fkey" FOREIGN KEY (company_id, broker_id) REFERENCES native_mcp_brokers(company_id, id) DEFERRABLE INITIALLY DEFERRED
+Triggers:
+    native_mcp_broker_actor BEFORE INSERT ON native_mcp_brokers FOR EACH ROW EXECUTE FUNCTION native_mcp_broker_actor()
+    native_mcp_broker_immutable BEFORE DELETE OR UPDATE ON native_mcp_brokers FOR EACH ROW EXECUTE FUNCTION native_mcp_broker_immutable()
+

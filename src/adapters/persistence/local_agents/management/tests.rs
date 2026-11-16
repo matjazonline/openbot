@@ -369,7 +369,11 @@ async fn dump_cloudroom_management_browser_fixtures() {
         .await
         .unwrap()
         .unwrap();
-    let mut conversation = p.get_thread_by_id(s.conversation).await.unwrap().unwrap();
+    let mut conversation = p
+        .get_thread_by_id(s.f.company, s.conversation)
+        .await
+        .unwrap()
+        .unwrap();
     conversation.subject = "Conversation <img src=x onerror=alert(1)>".into();
     let mut profile = s.profile.clone();
     profile.name = "Profile \"<img src=x onerror=alert(1)>".into();
@@ -452,7 +456,7 @@ async fn write_profile_navigation(
     }
     std::fs::write(
         root.join("profiles-navigation.json"),
-        json!({"company":s.f.company,"channel":view.conversation.unwrap().channel_id,
+        json!({"company":s.f.company,"channel":view.conversation.unwrap().target.desk_id().unwrap(),
         "conversation":view.conversation.unwrap().id,"cursor":cursor,"profile":chosen.id,"name":chosen.name})
         .to_string(),
     )

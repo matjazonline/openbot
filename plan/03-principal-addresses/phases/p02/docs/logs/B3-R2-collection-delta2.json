@@ -1,0 +1,17 @@
+{
+  "before": 4589,
+  "after": 4589,
+  "added": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::privacy::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts: test"
+  ],
+  "removed": [
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts: test"
+  ],
+  "disposition": [
+    {
+      "old": "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts: test",
+      "replacement": "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::delivery::privacy::direct_delivery_private_readers_filter_before_paging_and_recheck_actual_retirement_after_parts: test",
+      "reason": "Same new regression and assertions, private fixture/reader phases split into a sibling test module"
+    }
+  ]
+}

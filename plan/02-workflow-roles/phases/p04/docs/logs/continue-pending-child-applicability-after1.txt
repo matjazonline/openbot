@@ -1,0 +1,7 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_terminal_arrival_replans_before_new_actor_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4374 filtered out; finished in 1.53s
+

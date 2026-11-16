@@ -1,0 +1,5 @@
+holder lock      | concurrent statement                                       | outcome
+FOR KEY SHARE    | UPDATE principals SET kind='external'                      | BLOCKED
+FOR KEY SHARE    | UPDATE principals SET display_label='Q'                    | proceeded
+FOR SHARE        | UPDATE principals SET kind='external'                      | BLOCKED
+FOR SHARE        | UPDATE principals SET display_label='Q'                    | BLOCKED

@@ -1,0 +1,5 @@
+checking 500 changed files against 5 learnings and 4 skills
+
+✓ no learning bears on this change
+
+· no conflicts

@@ -1,0 +1,56 @@
+[
+  {
+    "command": [
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-1.txt"
+  },
+  {
+    "command": [
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-2.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-3.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-4.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-5.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-6.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-prefix-boundary-7.txt"
+  }
+]

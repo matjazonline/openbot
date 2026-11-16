@@ -1,0 +1,330 @@
+{
+  "version": 1,
+  "round": "02WR-P03-B1-R1",
+  "artifact": "e46aef026ae60bc4156ebb3b5f8436f63972e99fca2049d5200fd09bef7d0331",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4"
+      ],
+      "command": "RUST_MIN_STACK=2097152 native lib binary workflow_role_reviewer_ and two exact token store/runtime cases",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-token-role-tests16.txt",
+          "sha256": "27a4db423b4c2dadb6ef3b5b2f9b8c5e039749a101c60ab8a3c40b71bc00cb1b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC4",
+        "D1-F1",
+        "D1-F3"
+      ],
+      "command": "RUST_MIN_STACK=2097152 native lib binary workflow_reviewer_principal_",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-principal-tests2.txt",
+          "sha256": "b771b10d2a0fc2388e76b2e444538f1d3075c1106f74c09abb59d263c350602b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REGRESSIONS-history"
+      ],
+      "command": "RUST_MIN_STACK=2097152 native lib binary affected-interface filter union; 810collected,803PASS/3FAIL/4ignored",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-affected-regressions2.txt",
+          "sha256": "9ea6f68717ff46c9e39188e161e9c1a920149f44438d4b40966d02dd8aa973ea"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REGRESSIONS",
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "RUST_MIN_STACK=2097152 native lib binary attention_ workflow_fixtures_ workflow_role_ workflow_reviewer_principal_ assistant_channel_command_replays_by_key_and_refuses_a_changed_request;82PASS",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-focused1.txt",
+          "sha256": "adede3bdd1e78341be0c0b6b8228f5ba559c58b274ceece30eafc8ca78127cc4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REGRESSIONS"
+      ],
+      "command": "exact native lib case doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas; unchanged bounds/assertions",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doop-diagnostic1.txt",
+          "sha256": "6817ef1df5cd5e5b695dbc3938020f0c30ea625b2eb1aa08a8895bc7850dee62"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REGRESSIONS"
+      ],
+      "command": "exact native lib case doop_agent_observe_policy_keeps_error_observation_available_to_the_model; unchanged bounds/assertions",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-doop-diagnostic2.txt",
+          "sha256": "73ab47b2ad0c1f7ac6a96ecff8a4339df5ff0533af9ca96d91caed8a32bb8876"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-sqlx-prepare1.txt",
+          "sha256": "170cd8363d6a53c0ee04558a30e9e70bc7f193fbbe2813a33b66531d4a01d3f6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo fmt --check",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "git diff --check",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-whitespace1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-offline1.txt",
+          "sha256": "f2066ca264b9a8598ecd436c70919e1efe1acea4098ad2a13b5d82d67bc049ec"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-clippy1.txt",
+          "sha256": "016c75d652ccfe1f15f06b10c13a009cef7ca8a911cf4b29757099015d03fc50"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-focused-build1.txt",
+          "sha256": "e6977fc4eecd55341bcdf86413059322d24637523bcc42470032ef7030f37831"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo test --locked --offline --test source_modules;8PASS",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-static-reachability1.txt",
+          "sha256": "25c97dacf00f4b8d0cb6ce7b6bf866e97a299dff6bde0c2018f41551d9d066ef"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "INVENTORY"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list;4202\u21924224,22added,zero removed",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-before-tests.txt",
+          "sha256": "284c0cdbef1b85f7bde601818b171ea6d317cb90806702702d99322199814bb2"
+        },
+        {
+          "path": "logs/B1-static-test-inventory1.txt",
+          "sha256": "9607fa2f7eeb35de5fe25ae6df100e5cda5fca772cd7c88bbcaf69a93f955647"
+        },
+        {
+          "path": "logs/B1-discovered-test-delta.json",
+          "sha256": "6a96dc2cf364689bc361138c804886f7098173caf71ad8afd2508256cdde6a04"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "STATIC"
+      ],
+      "command": "after final local button disabling: cargo fmt --check; git diff --check; cargo test --locked --offline --lib --no-run",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-final-format2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-final-whitespace2.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-final-focused-build2.txt",
+          "sha256": "9c7f03e0578267ff6d0e19ec06fd9b6a3342750659410d86809e6b1787229a0a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "native ignored fixture exporter then CHROME_PATH native Chrome node --test scripts/tests/workflow-agent-picker-browser.mjs; computed progress/source/focus/stale/disabled Add assertions",
+      "fixture": "native production-rendered markup/scripts/HTMX/CSP; local browser server; latest compiled lib; owned fixture directory openbot-p03-picker-ready",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-browser-export3.txt",
+          "sha256": "de3ba66af3c2f1af9596fb2391782498eadf41917011c7557a0e2818d5c9427a"
+        },
+        {
+          "path": "logs/B1-browser5.txt",
+          "sha256": "4eab3bd9de3857f464e5bb1f51e647200b38944d286608c5b120d7b52bd30a61"
+        },
+        {
+          "path": "logs/B1-browser4-fixtures.tar.gz",
+          "sha256": "cd771df87a69a4e05e0d6cd3cb5f6d75729ac3990b36027e3932c9b7471be977"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "ARTIFACT"
+      ],
+      "command": "snapshot.sh with fixed five exclusions; complete205path source archive and148path p03 delta against accepted p02",
+      "fixture": "branch codex/departments-addressing-plans; HEAD/start/base103004a8ac2fd643cf14bde7e09022ae79f72053",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-snapshot.txt",
+          "sha256": "9f45b2579e27430d41f33af6043014a3da747de3d7a0dcdabaf7f2355ba7ae1d"
+        },
+        {
+          "path": "logs/B1-R1-source.tar.gz",
+          "sha256": "ebf0d49dd4b3983228421c6996f97ea79f4f7d7db3ca0447d1810c464a0a7c4b"
+        },
+        {
+          "path": "logs/B1-R1-source-bytes.json",
+          "sha256": "21c34126afa31f3d2f9e8d94510791c3acf0578977f933f0951018b938763680"
+        },
+        {
+          "path": "logs/B1-R1-p03-delta.json",
+          "sha256": "8525bcbba601d8c8a28a607c34b904372cf7c6b6c1d24bd87eb28bd6d14b5e29"
+        },
+        {
+          "path": "logs/B1-R1-p03-delta.patch",
+          "sha256": "c30052a6f1350fa0c4367f91a029b938486c61ee6fb2570f5720ca66e23033e6"
+        },
+        {
+          "path": "logs/coordination-r16.md",
+          "sha256": "8379877c9c73ecf3848de45bfca718c65de98f44a8129a59e7bef6215aa33c07"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "P05-full-suite"
+      ],
+      "command": "full repository suite",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Reserved for plan02 p05 final gate per root instructions and active I003/r1; no full-suite claim in p03."
+    },
+    {
+      "criteria": [
+        "C1-inherited-teardown"
+      ],
+      "command": "full same-run-company owner account-deletion teardown commit",
+      "fixture": "plan-owned PostgreSQL18.6 localhost60242; fresh p03_v2/test_v2; tests use scoped/owned DB fixtures",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-principal-tests1.txt",
+          "sha256": "70cbf059b9d778686e7ce9975d4feaa9c4a0217fafc23ca0e741f8b44d0db9ae"
+        },
+        {
+          "path": "logs/C1-inherited-action-fk.json",
+          "sha256": "a3306cac4107475d4ab5f55c860ee52658bc071d3ba810b6c9f2851019721ff9"
+        }
+      ],
+      "reason": "Independent C1/r1 disposition accepts bounded F3 full alternate-account races plus owner prefix rollback; inherited action-identity FK remains unresolved and reportable atp05."
+    }
+  ]
+}

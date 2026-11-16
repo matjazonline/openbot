@@ -14,6 +14,7 @@ struct AuthorityFacts {
     actor_id: Uuid,
     bundle: Vec<u8>,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
 }
 
@@ -26,7 +27,7 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
     let identity: crate::application::workflow::agent_contract::AgentSelectionIdentity =
         serde_json::from_value(prepared["selection"].clone()).map_err(|_| invalid())?;
     let facts = sqlx::query_as::<_,AuthorityFacts>(
-        "SELECT run.actor_id,stored.bundle,run.channel_id,run.thread_id FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
+        "SELECT run.actor_id,stored.bundle,run.channel_id,run.principal_id,run.thread_id FROM workflow_runs AS run JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND run.id=$2 AND octet_length(stored.bundle)<=$3"
     ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(MAX_BUNDLE_BYTES as i32)
         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let actor = WorkflowActor::authenticated(facts.actor_id).map_err(|_| invalid())?;
@@ -34,7 +35,11 @@ pub(in crate::adapters::persistence::workflow) async fn current_on(
         db,
         scope.company,
         actor,
-        binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
+        association::association_from_columns(association::AssociationColumns {
+            channel_id: facts.channel_id,
+            principal_id: facts.principal_id,
+            thread_id: facts.thread_id,
+        })?,
     )
     .await?;
     let bundle = restore_bundle(

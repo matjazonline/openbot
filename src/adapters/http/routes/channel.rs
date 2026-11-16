@@ -18,7 +18,7 @@ use uuid::Uuid;
 use crate::adapters::http::app_state::AppState;
 use crate::adapters::http::auth::AuthenticatedUser;
 use crate::adapters::http::pages;
-use crate::adapters::protocols::email::EmailChannelSelectorParser;
+use crate::adapters::protocols::email::EmailAddressParser;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::adapters::protocols::email::EmailIngressAdapter;
 use crate::adapters::protocols::email::EmailIngressTrust;
@@ -83,11 +83,11 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/companies/{company_id}/channels/{id}/threads",
-            get(list_channel_threads_page),
+            get(list_inbox_threads_page),
         )
         .route(
             "/companies/{company_id}/channels/{id}/threads/list",
-            get(list_channel_threads_fragment),
+            get(list_inbox_threads_fragment),
         )
         .route(
             "/api/companies/{company_id}/channels",
@@ -101,7 +101,7 @@ pub fn router() -> Router<AppState> {
         )
         .route(
             "/api/companies/{company_id}/channels/{id}/threads",
-            get(list_channel_threads_json),
+            get(list_inbox_threads_json),
         )
 }
 
@@ -261,7 +261,7 @@ fn parse_thread_cursor(cursor: &str) -> AppResult<ThreadCursor> {
 pub(crate) async fn load_thread_page(
     thread_use_cases: &ThreadUseCases,
     viewer: &crate::entities::user::Viewer,
-    channel: &Channel,
+    inbox: impl Into<crate::use_cases::thread::InboxReadScope>,
     query: &ThreadListQuery,
 ) -> AppResult<ThreadListResponse> {
     let limit = query.limit.unwrap_or(DEFAULT_THREAD_PAGE_SIZE);
@@ -277,7 +277,7 @@ pub(crate) async fn load_thread_page(
         .transpose()?;
 
     let mut threads = thread_use_cases
-        .list_channel_threads(viewer, channel.into(), before, limit + 1)
+        .list_inbox_threads(viewer, inbox.into(), before, limit + 1)
         .await?;
     let has_more = threads.len() > limit;
     threads.truncate(limit);
@@ -668,7 +668,7 @@ pub(crate) fn reply_headers_for_thread(
 }
 
 /// GET /companies/{company_id}/channels/{id}/threads - Paginated thread list page (Protected).
-async fn list_channel_threads_page(
+async fn list_inbox_threads_page(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
@@ -705,7 +705,7 @@ async fn list_channel_threads_page(
 }
 
 /// GET /companies/{company_id}/channels/{id}/threads/list - Next HTMX page (Protected).
-async fn list_channel_threads_fragment(
+async fn list_inbox_threads_fragment(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(config): State<Arc<AppConfig>>,
@@ -742,7 +742,7 @@ async fn list_channels_json(
 }
 
 /// JSON API: List channel threads newest-first with keyset pagination (Protected).
-async fn list_channel_threads_json(
+async fn list_inbox_threads_json(
     State(channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     viewer: crate::entities::user::Viewer,
@@ -888,7 +888,8 @@ mod tests {
     fn thread_cursor_round_trips() {
         let thread = Thread {
             id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            company_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             subject: "Subject".into(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection::default(),
@@ -974,7 +975,8 @@ mod tests {
 
         let thread = Thread {
             id: Uuid::new_v4(),
-            channel_id: channel.id,
+            company_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(channel.id),
             subject: "Question <script>".into(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection {
@@ -1134,7 +1136,8 @@ mod tests {
 
         let sample_thread = crate::entities::thread::Thread {
             id: Uuid::new_v4(),
-            channel_id: channel.id,
+            company_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(channel.id),
             subject: "Existing Thread Subject".to_string(),
             participant_principal_ids: Vec::new(),
             participant_projection: crate::entities::thread::ThreadParticipantProjection {

@@ -1,0 +1,62 @@
+[
+  {
+    "commit": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+    "path": "src/adapters/persistence/workflow/association.rs",
+    "sha256": "6ecb20b492f7f3bb216089d53619e2ff220149b2e1620818f231668d74189968"
+  },
+  {
+    "commit": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+    "path": "src/adapters/persistence/workflow/action_account_hints.rs",
+    "sha256": "f1414c24c8deef6218b754819746a80a8681afb56a6f21ab2b71279a1e435140"
+  },
+  {
+    "commit": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+    "path": "src/adapters/persistence/workflow/reviewer_accounts.rs",
+    "sha256": "f1c3f71f14f62313ba4fb280e25356f4a043ffb13612661ea46ed451523560f8"
+  },
+  {
+    "commit": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+    "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+    "sha256": "ee07780f68a99f033e433e56d691bbb5bfa96452e5c8e2e072952fb0b5ecc158"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/association.rs",
+    "sha256": "3edb3d23abc3817b18836da697cfdb995087e3fb77c1186955e5b9afaebcfbf3"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/action_authority.rs",
+    "sha256": "2c96b9998e51622d9821ea417b0ae7d5d2dab99eb770ecb5e36d91be550f6a1a"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/local_agents/protocol/bundles.rs",
+    "sha256": "45e56503f40b0b2f1eb57e73ce98ff05225aa0651da761a12a62cfb6fc71dc78"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+    "sha256": "753961fd3acea6e92f3b3f66e5366ebbe011d2a9cbb24677689c07624b1751c3"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "sha256": "59d7e5049412313e2865551c6525837f94bf88a662769d6a74d27719d6510104"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "sha256": "fc03786023d9d84f44f16b5e23d69e27793a1083d421581ef6f5ea1a41816db9"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/native_mcp/retention.rs",
+    "sha256": "f408fb18b8923d110a47c2c5910590b576bb70574638de315e3b55070353e657"
+  },
+  {
+    "commit": "d543787fd0ca82ca0976a7e0ea1d9d73f325423b",
+    "path": "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "sha256": "779f8579caf0d262b4ed38159c0abd88daacf68ca8ecc49f99253b6a3575139d"
+  }
+]

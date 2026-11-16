@@ -205,7 +205,7 @@ pub fn attention_list(list: &AttentionListView<'_>) -> String {
             .to_string()
     } else {
         departments
-            .group(&page.items, |item| item.channel_id)
+            .group(&page.items, |item| item.target.and_then(crate::entities::address::AddressTarget::desk_id))
             .into_iter()
             .map(|(heading, items)| {
                 let cards: String = items
@@ -243,6 +243,7 @@ fn attention_card(item: &AttentionItem, as_of: chrono::DateTime<chrono::Utc>) ->
     // up.
     let source = match item.source_kind {
         AttentionSourceKind::Decision => "Decision",
+        AttentionSourceKind::EscalationDecision => "Escalation decision",
         AttentionSourceKind::RunReconciliation => "Needs reconciliation",
         AttentionSourceKind::RunFailure => "Failed run",
         AttentionSourceKind::BindingRefusal => "Refused messages",
@@ -339,7 +340,7 @@ mod tests {
             source_kind,
             source_id: Uuid::new_v4(),
             company_id: Uuid::new_v4(),
-            channel_id: Some(Uuid::new_v4()),
+            target: Some(crate::entities::address::AddressTarget::Desk(Uuid::new_v4())),
             thread_id: None,
             run_id: Some(Uuid::new_v4()),
             correlation_id: None,
@@ -467,7 +468,7 @@ mod tests {
         let owned = item(AttentionSourceKind::Decision, None);
         let loose = item(AttentionSourceKind::Decision, None);
         let departments = DeskDepartments {
-            owners: [(owned.channel_id.unwrap(), sales.id)]
+            owners: [(owned.target.unwrap().desk_id().unwrap(), sales.id)]
                 .into_iter()
                 .collect(),
             departments: vec![sales.clone()],

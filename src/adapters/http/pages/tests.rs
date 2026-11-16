@@ -154,7 +154,8 @@ fn mailbox_channel(company_id: Uuid) -> Channel {
 fn mailbox_thread(channel_id: Uuid) -> Thread {
     Thread {
         id: Uuid::new_v4(),
-        channel_id,
+        company_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(channel_id),
         subject: "Question <script>".to_string(),
         participant_principal_ids: Vec::new(),
         participant_projection: crate::entities::thread::ThreadParticipantProjection {
@@ -199,8 +200,13 @@ fn mailbox_page_renders_three_columns_and_escapes_thread_subjects() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: std::slice::from_ref(&thread),
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
@@ -239,8 +245,13 @@ fn top_bar_carries_a_theme_controller_that_survives_a_reload() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -363,8 +374,13 @@ fn top_bar_shows_the_logo_and_the_signed_in_account() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -405,8 +421,13 @@ fn a_workspace_names_its_list_and_detail_columns_for_the_compact_layout() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "mailagents.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -438,7 +459,7 @@ fn a_detail_column_with_nothing_open_says_so() {
     let email = mailbox_account_email();
     let occupied = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[],
         viewer_email: &email,
@@ -461,8 +482,11 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: None,
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: None,
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -478,8 +502,13 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -497,7 +526,7 @@ fn compose_button_lives_in_the_thread_column_of_the_selected_channel() {
     // It rides along with the column, so picking a channel over htmx brings it in too.
     let column = thread_column(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         threads: &[],
         next_cursor: None,
@@ -513,14 +542,18 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
     let channel = mailbox_channel(company.id);
     let detail = empty_detail_pane("Select a thread.", FragmentSwap::Inline);
     let email = mailbox_account_email();
+    let readable = crate::use_cases::thread::ReadableInbox::from(channel.clone());
     let page = |selected| {
         mailbox_page(&MailboxPage {
             user: &mailbox_user(&email),
             company: &company,
             companies: std::slice::from_ref(&company),
             app_domain_name: "example.com",
-            channels: std::slice::from_ref(&channel),
-            selected_channel: selected,
+            inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+                channel.clone(),
+            )],
+            selected_inbox: selected,
+            direct_truncated: false,
             threads: &[],
             next_cursor: None,
             selected_thread_id: None,
@@ -535,7 +568,7 @@ fn channel_sidebar_lists_addresses_and_offers_channel_actions() {
     assert!(unselected.contains(&format!("/ui/channels?company_id={}&new=1", company.id)));
     assert!(!unselected.contains("Edit Desk"));
 
-    let selected = page(Some(&channel));
+    let selected = page(Some(&readable));
     assert!(selected.contains("Edit Desk"));
     assert!(selected.contains(&format!(
         "/ui/channels?company_id={}&channel_id={}",
@@ -576,8 +609,13 @@ fn the_rail_ends_on_the_company_it_is_scoped_to_rather_than_on_a_way_out() {
             company,
             companies: std::slice::from_ref(company),
             app_domain_name: "example.com",
-            channels: std::slice::from_ref(&channel),
-            selected_channel: Some(&channel),
+            inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+                channel.clone(),
+            )],
+            selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+                channel.clone(),
+            )),
+            direct_truncated: false,
             threads: &[],
             next_cursor: None,
             selected_thread_id: None,
@@ -760,8 +798,13 @@ fn icon_rail_lights_the_workspace_the_response_belongs_to() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -1400,6 +1443,7 @@ fn channel_settings_list_targets_the_pane_and_swaps_out_of_band() {
 
 fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
     Agent {
+        open_to_public: false,
         native_permissions: Default::default(),
         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
         id: Uuid::new_v4(),
@@ -1710,7 +1754,7 @@ fn appended_thread_page_swaps_pagination_out_of_band() {
     let fragment = thread_list_fragment(
         &ThreadColumn {
             company_id: company.id,
-            channel: &channel,
+            inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             app_domain_name: MAILBOX_APP_DOMAIN,
             threads: std::slice::from_ref(&thread),
             next_cursor: None,
@@ -1771,7 +1815,7 @@ fn message_pane_puts_the_viewers_messages_on_the_right_and_everyone_else_on_the_
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[inbound, outbound],
         viewer_email: &mailbox_account_email(),
@@ -1856,7 +1900,7 @@ fn internal_note_markup_is_unmistakable_escaped_and_hides_removed_text() {
     });
     let scope = MessageScope {
         company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
     };
 
     let active = message_bubble_chat(&note, None, scope, RunLinkAccess::Label);
@@ -1924,7 +1968,7 @@ fn message_pane_streams_new_messages_from_where_it_was_rendered() {
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[mailbox_message(thread.id, "older"), newest.clone()],
         viewer_email: &mailbox_account_email(),
@@ -1958,7 +2002,7 @@ fn message_pane_omits_the_resume_cursor_for_an_empty_thread() {
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[],
         viewer_email: &mailbox_account_email(),
@@ -1989,7 +2033,7 @@ fn thread_column_streams_touched_threads_from_where_it_was_rendered() {
 
     let html = thread_column(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         // The column is newest-first, so the resume cursor is the *first* row, not the last.
         threads: &[newest.clone(), older],
@@ -2022,7 +2066,7 @@ fn the_out_of_band_thread_list_stays_live() {
 
     let oob = thread_list_oob(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         threads: std::slice::from_ref(&thread),
         next_cursor: None,
@@ -2043,7 +2087,7 @@ fn thread_column_omits_the_resume_cursor_for_an_empty_channel() {
 
     let html = thread_column(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         threads: &[],
         next_cursor: None,
@@ -2069,7 +2113,7 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
 
     let column = thread_column(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         threads: std::slice::from_ref(&thread),
         next_cursor: None,
@@ -2081,7 +2125,7 @@ fn a_streamed_thread_row_is_identical_to_one_rendered_with_the_column() {
         column.contains(
             thread_row_fragment(
                 company.id,
-                &channel,
+                &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
                 &thread,
                 false,
                 ThreadRowMarks::default()
@@ -2102,7 +2146,7 @@ fn thread_row_marks_only_the_selected_thread() {
     assert!(
         thread_row_fragment(
             company.id,
-            &channel,
+            &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             &thread,
             true,
             ThreadRowMarks::default()
@@ -2112,7 +2156,7 @@ fn thread_row_marks_only_the_selected_thread() {
     assert!(
         !thread_row_fragment(
             company.id,
-            &channel,
+            &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             &thread,
             false,
             ThreadRowMarks::default()
@@ -2129,14 +2173,14 @@ fn a_thread_row_carries_its_own_activity_slot() {
 
     let idle = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks::default(),
     );
     let working = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks {
@@ -2173,7 +2217,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
     // changing shape that fast reads as a flicker rather than as progress.
     let queued = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks {
@@ -2188,7 +2232,7 @@ fn a_thread_row_carries_its_own_activity_slot() {
     // A thread that has stalled earns its own glyph -- quiet, unanimated, wording on hover.
     let blocked = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks {
@@ -2211,7 +2255,7 @@ fn only_streamed_rows_say_who_spoke_last() {
 
     let from_page = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks::default(),
@@ -2221,7 +2265,7 @@ fn only_streamed_rows_say_who_spoke_last() {
 
     let streamed = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks {
@@ -2233,7 +2277,7 @@ fn only_streamed_rows_say_who_spoke_last() {
 
     let from_person = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &thread,
         false,
         ThreadRowMarks {
@@ -2254,7 +2298,7 @@ fn the_open_thread_is_identifiable_from_the_pane() {
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[],
         viewer_email: &mailbox_account_email(),
@@ -2316,7 +2360,7 @@ fn the_message_pane_has_a_slot_for_the_activity_strip() {
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[],
         viewer_email: &mailbox_account_email(),
@@ -2344,7 +2388,7 @@ fn an_agent_reply_is_drawn_as_its_channel_address_and_an_inbound_message_as_its_
     let thread = mailbox_thread(mailbox_channel(company.id).id);
     let scope = MessageScope {
         company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
     };
 
     // A reply is stored with the channel's address as its sender, and that is what it shows.
@@ -2377,7 +2421,7 @@ fn a_message_from_another_channel_is_marked_and_keeps_its_own_sender() {
     let thread = mailbox_thread(mailbox_channel(company.id).id);
     let scope = MessageScope {
         company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
     };
 
     // Inbound *and* agent: only the internal delivery path writes that pair.
@@ -2436,7 +2480,7 @@ fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
     };
     let row = thread_row_fragment(
         company.id,
-        &channel,
+        &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         &delegated,
         false,
         ThreadRowMarks {
@@ -2455,7 +2499,7 @@ fn a_thread_opened_by_another_channel_is_marked_and_one_from_a_person_is_not() {
     assert!(
         !thread_row_fragment(
             company.id,
-            &channel,
+            &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             &from_person,
             false,
             ThreadRowMarks::default(),
@@ -2486,7 +2530,7 @@ fn the_column_marks_a_delegated_thread_without_being_told() {
 
     let column = thread_column(&ThreadColumn {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         app_domain_name: MAILBOX_APP_DOMAIN,
         threads: std::slice::from_ref(&delegated),
         next_cursor: None,
@@ -2514,8 +2558,13 @@ fn a_reply_in_the_open_thread_quiets_that_thread_s_activity_mark() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: std::slice::from_ref(&thread),
         next_cursor: None,
         selected_thread_id: None,
@@ -2555,7 +2604,7 @@ fn a_message_renders_for_every_transport_including_none_at_all() {
     let thread = mailbox_thread(channel.id);
     let scope = MessageScope {
         company_id: company.id,
-        channel_id: channel.id,
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
     };
 
     let email = stored_email_view(mailbox_message_draft(thread.id, "Arrived by mail."));
@@ -2619,7 +2668,7 @@ fn only_the_company_owner_is_offered_the_simulator() {
     let render = |viewer_membership| {
         message_pane(&MessagePane {
             company_id: company.id,
-            channel: &channel,
+            inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
             thread: &thread,
             messages: &[],
             viewer_email: &mailbox_account_email(),
@@ -2657,7 +2706,7 @@ fn a_thread_page_links_to_the_diagnostic_pane_rather_than_rendering_provider_key
 
     let html = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: &[message],
         viewer_email: &mailbox_account_email(),
@@ -2685,7 +2734,7 @@ fn the_diagnostic_pane_qualifies_every_provider_key_by_its_interface() {
         canonical_id: CanonicalMessageId::random(),
         company_id: Uuid::new_v4(),
         thread_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         author: AuthorView {
             principal_id: PrincipalId::random(),
             label: "Triage Agent".into(),
@@ -2721,7 +2770,7 @@ fn the_diagnostic_pane_says_when_no_transport_carried_a_message() {
         canonical_id: CanonicalMessageId::random(),
         company_id: Uuid::new_v4(),
         thread_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         author: AuthorView {
             principal_id: PrincipalId::random(),
             label: "System".into(),
@@ -2773,7 +2822,7 @@ fn an_attachment_is_offered_as_a_download_scoped_to_its_thread() {
         None,
         MessageScope {
             company_id: company.id,
-            channel_id: channel.id,
+            target: crate::entities::address::AddressTarget::Desk(channel.id),
         },
         RunLinkAccess::Label,
     );
@@ -2809,7 +2858,7 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
 
     let pane = message_pane(&MessagePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         messages: std::slice::from_ref(&message),
         viewer_email: &mailbox_account_email(),
@@ -2822,7 +2871,7 @@ fn a_streamed_bubble_is_identical_to_one_rendered_with_the_page() {
     // than of two different attachment links.
     let scope = MessageScope {
         company_id: company.id,
-        channel_id: channel.id,
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
     };
     assert!(
         pane.contains(
@@ -2848,7 +2897,7 @@ fn reply_pane_fixes_the_subject_to_the_thread_it_continues() {
 
     let html = reply_pane(&ReplyPane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         thread: &thread,
         channel_address: "inbox@acme.example.com",
         sender_email: "owner@example.com",
@@ -2881,7 +2930,7 @@ fn compose_pane_shows_the_channel_address_and_errors() {
 
     let html = compose_pane(&ComposePane {
         company_id: company.id,
-        channel: &channel,
+        inbox: &crate::use_cases::thread::ReadableInbox::from(channel.clone()),
         channel_address: "inbox@acme.example.com",
         sender_email: "owner@example.com",
         subject: "Draft subject",
@@ -3740,7 +3789,7 @@ fn queued_delivery(company_id: Uuid, channel_id: Uuid) -> DeliveryEntry {
     DeliveryEntry {
         id: DeliveryId::random(),
         company_id,
-        channel_id,
+        target: crate::entities::address::AddressTarget::Desk(channel_id),
         message_id: CanonicalMessageId::random(),
         correlation_id: CorrelationId::new(),
         transport: TransportKind::Email,
@@ -3973,8 +4022,13 @@ fn the_ui_shell_carries_the_placeholder_machinery_for_its_swap_targets() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: std::slice::from_ref(&thread),
         next_cursor: Some("next_cursor"),
         selected_thread_id: None,
@@ -4066,8 +4120,13 @@ fn every_ui_workspace_first_column_renders_a_sidebar_header() {
         company: &company,
         companies: &companies,
         app_domain_name: "example.com",
-        channels: std::slice::from_ref(&channel),
-        selected_channel: Some(&channel),
+        inboxes: &[crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )],
+        selected_inbox: Some(&crate::use_cases::thread::ReadableInbox::from(
+            channel.clone(),
+        )),
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,
@@ -4462,6 +4521,7 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
         user: &user,
         company: Some(&company),
         pane_html: &pane,
+        addresses_html: "",
     });
     assert!(with_company.contains("<title>Profile"));
     assert!(with_company.contains(r##"<a href="/ui/profile">Profile</a>"##));
@@ -4473,6 +4533,7 @@ fn the_profile_page_renders_through_the_ui_shell_with_or_without_a_company() {
         user: &user,
         company: None,
         pane_html: &pane,
+        addresses_html: "",
     });
     assert!(without_company.contains(r##"hx-put="/ui/profile""##));
     assert!(!without_company.contains("company_id="));
@@ -4505,8 +4566,9 @@ fn the_agent_library_reaches_the_account_menu_only_for_an_operator() {
         company: &company,
         companies: std::slice::from_ref(&company),
         app_domain_name: "example.com",
-        channels: &[],
-        selected_channel: None,
+        inboxes: &[],
+        selected_inbox: None,
+        direct_truncated: false,
         threads: &[],
         next_cursor: None,
         selected_thread_id: None,

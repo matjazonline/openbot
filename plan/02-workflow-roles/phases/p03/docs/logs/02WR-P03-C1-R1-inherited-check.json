@@ -1,0 +1,8 @@
+{
+  "accepted_archive_fk_identical": true,
+  "fk_sha256": "5d548fd5b5173256d43a65c920eaab6a45007d29e77cb731c350817d48d6efa0",
+  "owned_deletion_tail_identical_to_HEAD": true,
+  "tail_sha256": "53edfbcf9cff0709619ed143adbe3a27516225b9776f07d5330957cbc878bb5d",
+  "coordination_revision": 15,
+  "scope": "Read-only static independence check; no baseline behavioral reproduction"
+}

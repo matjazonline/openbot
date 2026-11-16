@@ -128,7 +128,7 @@ async fn insert_root_budget(
 pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppResult<()> {
     let bytes = store_bundle(row.binding.bundle())?;
     let digest = super::bundle_store::insert_on(db, row.company, &bytes).await?;
-    let (channel, thread) = binding_rows::association_columns(row.association);
+    let association = association::association_columns(row.association);
     let definition = row.binding.bundle().compiled().graph().definition();
     if row.parent.is_none() {
         insert_root_budget(db, row.company, row.run, &definition.limits.root_budget).await?;
@@ -143,12 +143,12 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         "INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \
          channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \
          max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \
-         delivery_policy, knowledge_ceiling, content_level, content_exact, native_mcp_call_id) \
+         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id, native_mcp_call_id) \
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \
-         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27)",
+         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28, $29)",
     ).bind(row.company.as_uuid()).bind(row.run.as_uuid())
         .bind(row.binding.id().as_uuid()).bind(revision(row.binding.revision().get())?)
-        .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(channel).bind(thread)
+        .bind(definition.workflow_id.as_uuid()).bind(definition.version_id.as_uuid()).bind(association.channel_id).bind(association.thread_id)
         .bind(row.actor_id).bind(row.trigger.as_uuid())
         .bind(row.correlation).bind(digest.as_bytes())
         .bind(row.input).bind(row.binding.params()).bind(resources)
@@ -160,7 +160,11 @@ pub(super) async fn insert_run(db: &mut PgConnection, row: &RunRow<'_>) -> AppRe
         .bind(row.parent.map(|parent| parent.execution.as_uuid()))
         .bind(row.rerun_of.map(|original| original.as_uuid()))
         .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16())
-        .bind(row.content_exact).bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid)).execute(db).await?;
+        .bind(row.content_exact)
+        .bind(row.binding.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)
+        .bind(association.principal_id)
+        .bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid))
+        .execute(db).await?;
     Ok(())
 }
 
@@ -179,12 +183,12 @@ pub(super) async fn insert_first_job(db: &mut PgConnection, job: &FirstJob<'_>) 
         "INSERT INTO workflow_executions (company_id, run_id, id, step_id, activation) VALUES ($1,$2,$3,$4,1)",
     ).bind(job.company.as_uuid()).bind(job.run.as_uuid()).bind(job.execution.as_uuid())
         .bind(job.entry.as_str()).execute(&mut *db).await?;
-    let (channel, thread) = binding_rows::association_columns(job.association);
+    let association = association::association_columns(job.association);
     sqlx::query(
-        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id) VALUES ($1,$2,$3,$4,$5,$6)",
-    ).bind(Uuid::new_v4()).bind(job.company.as_uuid()).bind(channel).bind(thread)
+        "INSERT INTO background_tasks (id, company_id, channel_id, thread_id, correlation_id, workflow_execution_id, principal_id) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+    ).bind(Uuid::new_v4()).bind(job.company.as_uuid()).bind(association.channel_id).bind(association.thread_id)
         .bind(job.correlation)
-        .bind(job.execution.as_uuid()).execute(db).await?;
+        .bind(job.execution.as_uuid()).bind(association.principal_id).execute(db).await?;
     Ok(())
 }
 
@@ -198,8 +202,8 @@ pub(super) async fn insert_admission(
     sqlx::query(
         "INSERT INTO workflow_admissions (company_id, binding_id, source_key, run_id) VALUES ($1, $2, $3, $4)",
     ).bind(company.as_uuid()).bind(binding.as_uuid())
-        .bind(source.as_str()).bind(run.as_uuid()).execute(db).await?;
-    Ok(())
+        .bind(source.as_str()).bind(run.as_uuid()).execute(&mut *db).await?;
+    super::escalation_handling::capture_root_on(db, company, source, run).await
 }
 
 pub(super) async fn insert_admitted(

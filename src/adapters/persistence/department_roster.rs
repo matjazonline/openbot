@@ -1,11 +1,10 @@
 //! Departments as an agent sees them (01-departments p03 B3): the departments an agent belongs to
-//! and its own desk, for the directories (DEP-P03-D10), and the department context of a run on a
+//! and its direct address, for the directories (DEP-P03-D10), and the department context of a run on a
 //! department-owned desk (DEP-P03-D11). Plain reads on the caller's transaction: they take no
 //! lock and decide nothing.
 //!
-//! An agent's desk is the channel its `agent:{id}` creation record names, while that channel
-//! exists; a department's desk is the channel its `department:{id}` record names, while the
-//! department still owns it. Either is addressed at its current primary slug.
+//! Agent addresses come from live principal addresses; department desks retain their explicit
+//! department provisioning record. Both render their current primary slug.
 use std::collections::HashMap;
 
 use sqlx::PgConnection;
@@ -28,36 +27,49 @@ use crate::{
 /// The most departments one agent lists, by slug.
 pub(crate) const MAX_AGENT_DEPARTMENTS: usize = 16;
 
-const AGENT_DESK: &str = "LEFT JOIN workflow_provisioning_commands AS desk_record \
-     ON desk_record.company_id = agent.company_id AND desk_record.command_key = 'agent:' || agent.id::text \
-     LEFT JOIN channels AS desk ON desk.company_id = agent.company_id \
-     AND desk.id = (desk_record.result->'channel'->>'id')::uuid \
-     LEFT JOIN channel_slugs AS desk_slug ON desk_slug.company_id = desk.company_id \
-     AND desk_slug.channel_id = desk.id AND desk_slug.is_primary";
+const AGENT_ADDRESS: &str = "LEFT JOIN principals AS agent_principal \
+     ON agent_principal.company_id=agent.company_id AND agent_principal.agent_id=agent.id AND agent_principal.kind='agent' \
+     LEFT JOIN addresses AS agent_address ON agent_address.company_id=agent_principal.company_id \
+     AND agent_address.principal_id=agent_principal.id AND agent_address.is_primary";
 
 const DEPARTMENT_DESK: &str = "LEFT JOIN workflow_provisioning_commands AS desk_record \
      ON desk_record.company_id = department.company_id \
      AND desk_record.command_key = 'department:' || department.id::text \
      LEFT JOIN channels AS desk ON desk.company_id = department.company_id \
      AND desk.id = (desk_record.result->'channel'->>'id')::uuid AND desk.department_id = department.id \
-     LEFT JOIN channel_slugs AS desk_slug ON desk_slug.company_id = desk.company_id \
+     LEFT JOIN addresses AS desk_slug ON desk_slug.company_id = desk.company_id \
      AND desk_slug.channel_id = desk.id AND desk_slug.is_primary";
 
 /// Forms desk addresses under the company's slug and the app domain, read and required only when
 /// a desk is listed.
-pub(crate) struct DeskAddresses<'a> {
+pub(crate) struct CompanyAddresses<'a> {
     company: CompanyId,
     domain: Option<&'a str>,
     company_slug: Option<CompanySlug>,
 }
 
-impl<'a> DeskAddresses<'a> {
+impl<'a> CompanyAddresses<'a> {
     pub(crate) fn new(company: CompanyId, domain: Option<&'a str>) -> Self {
         Self {
             company,
             domain,
             company_slug: None,
         }
+    }
+
+    async fn address(&mut self, db: &mut PgConnection, slug: String) -> AppResult<String> {
+        let domain = self
+            .domain
+            .ok_or_else(|| AppError::Internal("The app domain is not configured".into()))?;
+        if self.company_slug.is_none() {
+            let slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id=$1")
+                .bind(self.company.as_uuid())
+                .fetch_one(&mut *db)
+                .await?;
+            self.company_slug = Some(CompanySlug::from(slug));
+        }
+        let company = self.company_slug.as_ref().expect("loaded above");
+        Ok(Channel::address_for(&ChannelSlug::from(slug), company, domain).to_string())
     }
 
     async fn desk(
@@ -69,44 +81,46 @@ impl<'a> DeskAddresses<'a> {
         let (Some(id), Some(slug)) = (id, slug) else {
             return Ok(None);
         };
-        let domain = self
-            .domain
-            .ok_or_else(|| AppError::Internal("The app domain is not configured".into()))?;
-        if self.company_slug.is_none() {
-            let company_slug: String =
-                sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
-                    .bind(self.company.as_uuid())
-                    .fetch_one(&mut *db)
-                    .await?;
-            self.company_slug = Some(CompanySlug::from(company_slug));
-        }
-        let company_slug = self.company_slug.as_ref().expect("read above");
         Ok(Some(RosterDesk {
             id,
-            address: Channel::address_for(&ChannelSlug::new(slug), company_slug, domain)
-                .to_string(),
+            address: self.address(db, slug).await?,
+        }))
+    }
+
+    async fn agent(
+        &mut self,
+        db: &mut PgConnection,
+        principal: Option<Uuid>,
+        slug: Option<String>,
+    ) -> AppResult<Option<crate::application::agent::AgentAddress>> {
+        let (Some(principal), Some(slug)) = (principal, slug) else {
+            return Ok(None);
+        };
+        Ok(Some(crate::application::agent::AgentAddress {
+            principal_id: crate::entities::transport::PrincipalId::new(principal),
+            address: self.address(db, slug).await?,
         }))
     }
 }
 
-/// The desk addresses of `agents` that still have their default desk.
-pub(crate) async fn agent_desks_on(
+/// The canonical principal addresses of the selected company agents.
+pub(crate) async fn agent_addresses_on(
     db: &mut PgConnection,
-    addresses: &mut DeskAddresses<'_>,
+    addresses: &mut CompanyAddresses<'_>,
     agents: &[Uuid],
-) -> AppResult<HashMap<Uuid, RosterDesk>> {
+) -> AppResult<HashMap<Uuid, crate::application::agent::AgentAddress>> {
     let rows: Vec<(Uuid, Uuid, String)> = sqlx::query_as(&format!(
-        "SELECT agent.id, desk.id, desk_slug.slug::text FROM agents AS agent {AGENT_DESK} \
-         WHERE agent.company_id = $1 AND agent.id = ANY($2) AND desk.id IS NOT NULL"
+        "SELECT agent.id, agent_principal.id, agent_address.slug::text FROM agents AS agent {AGENT_ADDRESS} \
+         WHERE agent.company_id = $1 AND agent.id = ANY($2) AND agent_address.principal_id IS NOT NULL"
     ))
     .bind(addresses.company.as_uuid())
     .bind(agents)
     .fetch_all(&mut *db)
     .await?;
     let mut desks = HashMap::with_capacity(rows.len());
-    for (agent, desk, slug) in rows {
-        if let Some(desk) = addresses.desk(db, Some(desk), Some(slug)).await? {
-            desks.insert(agent, desk);
+    for (agent, principal, slug) in rows {
+        if let Some(address) = addresses.agent(db, Some(principal), Some(slug)).await? {
+            desks.insert(agent, address);
         }
     }
     Ok(desks)
@@ -192,7 +206,7 @@ struct DepartmentRow {
 
 async fn departments_on(
     db: &mut PgConnection,
-    addresses: &mut DeskAddresses<'_>,
+    addresses: &mut CompanyAddresses<'_>,
     filter: &str,
     key: Uuid,
     limit: usize,
@@ -265,7 +279,7 @@ pub(crate) async fn department_context_on(
     let roster = if owner.access_mode == "public" {
         None
     } else {
-        let mut addresses = DeskAddresses::new(company, domain);
+        let mut addresses = CompanyAddresses::new(company, domain);
         Some(roster_on(db, &mut addresses, &owner).await?)
     };
     Ok(Some(DepartmentContext {
@@ -282,7 +296,7 @@ type RosterRow = (String, String, bool, Option<Uuid>, Option<String>);
 
 async fn roster_on(
     db: &mut PgConnection,
-    addresses: &mut DeskAddresses<'_>,
+    addresses: &mut CompanyAddresses<'_>,
     owner: &OwnerRow,
 ) -> AppResult<DepartmentRoster> {
     let desk = departments_on(db, addresses, "id", owner.id, 1)
@@ -320,11 +334,11 @@ async fn roster_on(
                EXISTS (SELECT 1 FROM department_roles AS role WHERE role.company_id = $1 \
                  AND role.department_id = $2 AND role.role = 'lead' \
                  AND role.principal_id = principal.id), \
-               desk.id, desk_slug.slug::text \
+               agent_principal.id, agent_address.slug::text \
              FROM placed JOIN principals AS principal ON principal.company_id = $1 \
                AND principal.id = placed.principal_id \
              JOIN agents AS agent ON agent.company_id = $1 AND agent.id = principal.agent_id \
-             {AGENT_DESK} \
+             {AGENT_ADDRESS} \
              ORDER BY agent.slug LIMIT $3"
     ))
     .bind(addresses.company.as_uuid())
@@ -334,12 +348,12 @@ async fn roster_on(
     .await?;
     let more_agents = rows.len() > MAX_ROSTER_AGENTS;
     let mut agents = Vec::with_capacity(rows.len().min(MAX_ROSTER_AGENTS));
-    for (name, slug, lead, desk_id, desk_slug) in rows.into_iter().take(MAX_ROSTER_AGENTS) {
+    for (name, slug, lead, principal_id, address_slug) in rows.into_iter().take(MAX_ROSTER_AGENTS) {
         agents.push(RosterAgent {
             name,
             slug,
             lead,
-            desk: addresses.desk(db, desk_id, desk_slug).await?,
+            address: addresses.agent(db, principal_id, address_slug).await?,
         });
     }
     Ok(DepartmentRoster {

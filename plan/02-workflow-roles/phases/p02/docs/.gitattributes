@@ -1,0 +1,2 @@
+# Preserve immutable machine evidence exactly.
+logs/*.txt binary

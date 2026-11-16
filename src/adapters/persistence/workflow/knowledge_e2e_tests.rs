@@ -74,9 +74,9 @@ async fn knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_ge
     assert_eq!(facts["content"], 5);
     assert_eq!(facts["reply_levels"], json!([5]));
     let scope = crate::use_cases::thread::ThreadReadScope {
-        channel: crate::use_cases::thread::ChannelReadScope {
+        inbox: crate::use_cases::thread::InboxReadScope {
             company_id: j.d.fixture.target.company.as_uuid(),
-            channel_id: j.d.channel,
+            target: crate::entities::address::AddressTarget::Desk(j.d.channel),
         },
         thread_id: thread,
     };
@@ -93,7 +93,7 @@ async fn knowledge_e2e_level_five_team_reply_is_stamped_and_level_zero_viewer_ge
             Some(&lower.email),
             crate::adapters::http::pages::MessageScope {
                 company_id: j.d.fixture.target.company.as_uuid(),
-                channel_id: j.d.channel,
+                target: crate::entities::address::AddressTarget::Desk(j.d.channel),
             },
             crate::adapters::http::pages::RunLinkAccess::Label,
         );

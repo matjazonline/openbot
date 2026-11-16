@@ -217,6 +217,7 @@ async fn workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources() {
     for resource in [foreign.id, Uuid::new_v4()] {
         let configured = bindings
             .configure(ConfigureBinding {
+                escalation: None,
                 target: BindingTarget {
                     company: setup.company(),
                     actor: setup.actor(),

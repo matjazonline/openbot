@@ -1,0 +1,10 @@
+$ cargo test --locked --offline --lib memory_scope_competing_agent_delete
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.36s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 2 tests
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_company_delete_never_deadlock ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4198 filtered out; finished in 2.00s
+

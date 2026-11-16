@@ -1,0 +1,10 @@
+{
+  "source_digest_matches": true,
+  "start_final_snapshot_equal": true,
+  "decision_sha256": "25ad97ff3d207c705d44ea427cddb9a7a6d5c6077204add116f4fd1d12319d68",
+  "decision_matches": true,
+  "head": "3fceb7d3435f3b821c3b37820200e1c5400206d9",
+  "head_matches": true,
+  "coordination_live_pin_equal": true,
+  "coordination_sha256": "6c1b27b874356477091776c6a74355146ae60af9b087ac308a1593e64f66aded"
+}

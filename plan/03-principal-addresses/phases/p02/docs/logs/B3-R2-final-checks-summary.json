@@ -1,0 +1,155 @@
+[
+  {
+    "name": "sqlx",
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 28.84,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-sqlx.txt"
+  },
+  {
+    "name": "offline",
+    "command": [
+      "env",
+      "SQLX_OFFLINE=true",
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "exit": 0,
+    "seconds": 0.36,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-offline.txt"
+  },
+  {
+    "name": "clippy",
+    "command": [
+      "env",
+      "SQLX_OFFLINE=true",
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit": 101,
+    "seconds": 121.24,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-clippy.txt"
+  },
+  {
+    "name": "source-modules",
+    "command": [
+      "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/source_modules-eebb1cce2b17f9a5",
+      "--test-threads=4"
+    ],
+    "exit": 0,
+    "seconds": 7.58,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-source-modules.txt"
+  },
+  {
+    "name": "format",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 3.74,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-format.txt"
+  },
+  {
+    "name": "whitespace",
+    "command": [
+      "git",
+      "diff",
+      "HEAD",
+      "--check"
+    ],
+    "exit": 0,
+    "seconds": 0.09,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-whitespace.txt"
+  },
+  {
+    "name": "transport-fixtures",
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "seconds": 1.82,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-transport-fixtures.txt"
+  },
+  {
+    "name": "transport",
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "seconds": 6.97,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-transport.txt"
+  },
+  {
+    "name": "workflow-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "seconds": 0.14,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-workflow-fixtures.txt"
+  },
+  {
+    "name": "workflow",
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "seconds": 0.05,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-workflow.txt"
+  },
+  {
+    "name": "integration-fixtures",
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "exit": 0,
+    "seconds": 0.09,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-integration-fixtures.txt"
+  },
+  {
+    "name": "integration",
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "exit": 0,
+    "seconds": 1.81,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-integration.txt"
+  },
+  {
+    "name": "integration-docs",
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "exit": 0,
+    "seconds": 0.14,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-R2-final-integration-docs.txt"
+  }
+]

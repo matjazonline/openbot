@@ -84,7 +84,7 @@ impl CommitPlan {
             .channels
             .iter()
             .map(|channel| ThreadAssociation {
-                channel_id: channel.candidate.channel.id,
+                address_target: channel.candidate.inbox.target(),
                 binding_id: channel.candidate.binding_id,
                 target: channel.target.clone(),
                 role: channel.candidate.role,
@@ -96,11 +96,11 @@ impl CommitPlan {
             .channels
             .iter()
             .map(|channel| InboundAdmissionIntent {
-                channel_id: channel.candidate.channel.id,
+                target: channel.candidate.inbox.target(),
                 role: channel.candidate.role,
                 mentioned: channel.mentioned,
                 reply_to: channel.reply_to,
-                settings_revision: channel.candidate.channel.settings_revision,
+                settings_revision: channel.candidate.inbox.settings_revision(),
             })
             .collect();
 
@@ -176,7 +176,7 @@ const fn inbound_origin(origin: IngressOrigin) -> InboundOrigin {
     match origin {
         IngressOrigin::ExternalTransport => InboundOrigin::External,
         IngressOrigin::TrustedApplication => InboundOrigin::Application,
-        IngressOrigin::InternalChannel { .. } => InboundOrigin::Internal,
+        IngressOrigin::Internal { proof, .. } => InboundOrigin::Internal(proof),
     }
 }
 
@@ -279,7 +279,7 @@ mod tests {
                     authorized: true,
                     trusted: false,
                 },
-                channel,
+                inbox: crate::use_cases::thread::Inbox::Desk(Box::new(channel)),
             },
             target: ThreadTarget::Existing(Uuid::new_v4()),
             mentioned: false,
@@ -322,8 +322,14 @@ mod tests {
         let parent = CanonicalMessageId::new(Uuid::new_v4());
         let mut billing = prepared_channel(&company, "billing", RecipientRole::Cc);
         billing.reply_to = Some(parent);
-        billing.candidate.channel.settings_revision = 7;
-        let ids = [support.candidate.channel.id, billing.candidate.channel.id];
+        let crate::use_cases::thread::Inbox::Desk(desk) = &mut billing.candidate.inbox else {
+            unreachable!()
+        };
+        desk.settings_revision = 7;
+        let ids = [
+            support.candidate.inbox.target().desk_id().unwrap(),
+            billing.candidate.inbox.target().desk_id().unwrap(),
+        ];
         let request =
             plan_with_disposition(&company, vec![support, billing], MessageDisposition::Answer);
         assert!(request.admissible);
@@ -333,14 +339,14 @@ mod tests {
             intents,
             vec![
                 InboundAdmissionIntent {
-                    channel_id: ids[0],
+                    target: crate::entities::address::AddressTarget::Desk(ids[0]),
                     role: RecipientRole::To,
                     mentioned: true,
                     reply_to: None,
                     settings_revision: 0,
                 },
                 InboundAdmissionIntent {
-                    channel_id: ids[1],
+                    target: crate::entities::address::AddressTarget::Desk(ids[1]),
                     role: RecipientRole::Cc,
                     mentioned: false,
                     reply_to: Some(parent),

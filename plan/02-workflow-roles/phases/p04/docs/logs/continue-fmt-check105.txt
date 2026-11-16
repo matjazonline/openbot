@@ -1,0 +1,407 @@
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/http/pages/workflow_escalation.rs:96:
+         return String::new();
+     };
+     let choice = match &command.choice {
+-        crate::application::workflow::escalation::EscalationChoice::Acknowledge => "Acknowledged".into(),
+-        crate::application::workflow::escalation::EscalationChoice::Reassign { principal } => format!("Reassigned to {principal}"),
+-        crate::application::workflow::escalation::EscalationChoice::Cancel { .. } => "Run cancellation requested".into(),
++        crate::application::workflow::escalation::EscalationChoice::Acknowledge => {
++            "Acknowledged".into()
++        }
++        crate::application::workflow::escalation::EscalationChoice::Reassign { principal } => {
++            format!("Reassigned to {principal}")
++        }
++        crate::application::workflow::escalation::EscalationChoice::Cancel { .. } => {
++            "Run cancellation requested".into()
++        }
+     };
+     format!(
+         r#"<section aria-label="Command history"><h2 class="font-semibold">Command history</h2><p>{}</p><p class="text-sm">Account {} · principal {} · {}</p></section>"#,
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/http/routes/workflows/escalation_tests.rs:211:
+     assert_eq!(status, StatusCode::CONFLICT);
+     let (status, history) = answer(
+         escalations::read(s.f.state(), by(s.f.owner), Path((s.f.company, s.decision))).await,
+-    ).await;
++    )
++    .await;
+     assert_eq!(status, StatusCode::OK);
+     assert_eq!(history["command"]["actor_user"], s.f.owner.to_string());
+     assert_eq!(history["command"]["choice"]["kind"], "acknowledge");
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/attention.rs:399:
+     match item.source_kind {
+         AttentionSourceKind::Decision => Some(format!("/ui/workflow-decisions/{}", item.source_id)),
+         AttentionSourceKind::EscalationDecision => Some(format!(
+-            "/ui/workflow-decisions/escalations/{}", item.source_id
++            "/ui/workflow-decisions/escalations/{}",
++            item.source_id
+         )),
+         AttentionSourceKind::DeliveryFailure => {
+             Some(format!("/ui/deliveries?company_id={}", item.company_id))
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:1:
+ //! Open administrative decisions share the actual work feed and operational count.
+ use super::*;
+ use crate::application::attention::AttentionPersistence;
+-use crate::entities::attention::{AttentionItem, AttentionQuery, AttentionSourceKind, AttentionView};
++use crate::entities::attention::{
++    AttentionItem, AttentionQuery, AttentionSourceKind, AttentionView,
++};
+ 
+ async fn listed(
+     f: &GuardFixture,
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:9:
+     view: AttentionView,
+     channels: &[Uuid],
+ ) -> Vec<AttentionItem> {
+-    f.p().list_attention(AttentionQuery {
+-        company_id: f.scope.company.as_uuid(), principal_id: viewer,
+-        visible_channel_ids: channels, manager: false, company_items: false,
+-        view, cursor: None, limit: 100,
+-    }).await.unwrap().items.into_iter()
+-        .filter(|item| item.source_kind == AttentionSourceKind::EscalationDecision).collect()
++    f.p()
++        .list_attention(AttentionQuery {
++            company_id: f.scope.company.as_uuid(),
++            principal_id: viewer,
++            visible_channel_ids: channels,
++            manager: false,
++            company_items: false,
++            view,
++            cursor: None,
++            limit: 100,
++        })
++        .await
++        .unwrap()
++        .items
++        .into_iter()
++        .filter(|item| item.source_kind == AttentionSourceKind::EscalationDecision)
++        .collect()
+ }
+ 
+ async fn owner(f: &GuardFixture) -> PrincipalId {
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:21:
+-    PrincipalId::new(sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'")
+-        .bind(f.scope.company.as_uuid()).bind(f.people.role.admission.binding.target.actor.user_id())
+-        .fetch_one(f.p().pool()).await.unwrap())
++    PrincipalId::new(
++        sqlx::query_scalar(
++            "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
++        )
++        .bind(f.scope.company.as_uuid())
++        .bind(f.people.role.admission.binding.target.actor.user_id())
++        .fetch_one(f.p().pool())
++        .await
++        .unwrap(),
++    )
+ }
+ 
+ #[tokio::test]
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:32:
+         let mine = listed(&f, *reviewer, AttentionView::MyWork, &channels).await;
+         assert_eq!(mine.len(), 1);
+         assert_eq!(mine[0].source_id, decision.as_uuid());
+-        assert_eq!(mine[0].href.as_deref(), Some(format!("/ui/workflow-decisions/escalations/{decision}").as_str()));
++        assert_eq!(
++            mine[0].href.as_deref(),
++            Some(format!("/ui/workflow-decisions/escalations/{decision}").as_str())
++        );
+     }
+-    assert!(listed(&f, owner, AttentionView::MyWork, &channels).await.is_empty());
+-    assert_eq!(listed(&f, owner, AttentionView::TeamWork, &channels).await.len(), 1);
+-    assert!(listed(&f, owner, AttentionView::Unassigned, &channels).await.is_empty());
+-    assert!(listed(&f, owner, AttentionView::TeamWork, &[]).await.is_empty());
++    assert!(
++        listed(&f, owner, AttentionView::MyWork, &channels)
++            .await
++            .is_empty()
++    );
++    assert_eq!(
++        listed(&f, owner, AttentionView::TeamWork, &channels)
++            .await
++            .len(),
++        1
++    );
++    assert!(
++        listed(&f, owner, AttentionView::Unassigned, &channels)
++            .await
++            .is_empty()
++    );
++    assert!(
++        listed(&f, owner, AttentionView::TeamWork, &[])
++            .await
++            .is_empty()
++    );
+     let foreign = PrincipalId::new(Uuid::new_v4());
+-    assert!(listed(&f, foreign, AttentionView::TeamWork, &channels).await.is_empty());
+-    assert_eq!(f.p().operational_summary(f.scope.company.as_uuid(), &channels).await.unwrap().open_decision_count, 1);
++    assert!(
++        listed(&f, foreign, AttentionView::TeamWork, &channels)
++            .await
++            .is_empty()
++    );
++    assert_eq!(
++        f.p()
++            .operational_summary(f.scope.company.as_uuid(), &channels)
++            .await
++            .unwrap()
++            .open_decision_count,
++        1
++    );
+     let (target_user, target) = eligible_member(&f).await;
+-    f.p().submit_escalation(command(&f, decision, f.people.users[0], "feed-reassign", EscalationChoice::Reassign { principal: target }))
+-        .await.unwrap();
+-    assert!(listed(&f, f.people.principals[0], AttentionView::MyWork, &channels).await.is_empty());
++    f.p()
++        .submit_escalation(command(
++            &f,
++            decision,
++            f.people.users[0],
++            "feed-reassign",
++            EscalationChoice::Reassign { principal: target },
++        ))
++        .await
++        .unwrap();
++    assert!(
++        listed(&f, f.people.principals[0], AttentionView::MyWork, &channels)
++            .await
++            .is_empty()
++    );
+     let next = listed(&f, target, AttentionView::MyWork, &channels).await;
+     assert_eq!(next.len(), 1);
+     assert_ne!(next[0].source_id, decision.as_uuid());
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:51:
+-    f.p().submit_escalation(command(&f, EscalationDecisionId::new(next[0].source_id), target_user, "feed-ack", EscalationChoice::Acknowledge))
+-        .await.unwrap();
+-    assert!(listed(&f, target, AttentionView::MyWork, &channels).await.is_empty());
+-    assert!(listed(&f, owner, AttentionView::TeamWork, &channels).await.is_empty());
+-    assert_eq!(f.p().operational_summary(f.scope.company.as_uuid(), &channels).await.unwrap().open_decision_count, 0);
++    f.p()
++        .submit_escalation(command(
++            &f,
++            EscalationDecisionId::new(next[0].source_id),
++            target_user,
++            "feed-ack",
++            EscalationChoice::Acknowledge,
++        ))
++        .await
++        .unwrap();
++    assert!(
++        listed(&f, target, AttentionView::MyWork, &channels)
++            .await
++            .is_empty()
++    );
++    assert!(
++        listed(&f, owner, AttentionView::TeamWork, &channels)
++            .await
++            .is_empty()
++    );
++    assert_eq!(
++        f.p()
++            .operational_summary(f.scope.company.as_uuid(), &channels)
++            .await
++            .unwrap()
++            .open_decision_count,
++        0
++    );
+ }
+ 
+ #[tokio::test]
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:61:
+     let channels = [f.people.role.channel];
+     let owner_principal = owner(&f).await;
+     for user in &f.people.users {
+-        f.p().remove_member(f.scope.company.as_uuid(), *user).await.unwrap();
++        f.p()
++            .remove_member(f.scope.company.as_uuid(), *user)
++            .await
++            .unwrap();
+     }
+     for _ in 0..4 {
+-        if f.worker().drain_once().await.unwrap() == 0 { break; }
++        if f.worker().drain_once().await.unwrap() == 0 {
++            break;
++        }
+     }
+     let waiting = listed(&f, owner_principal, AttentionView::MyWork, &channels).await;
+     assert_eq!(waiting.len(), 1);
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_attention_tests.rs:73:
+     assert_eq!(team.len(), 1);
+     assert_eq!(team[0].responsibility_label, "Company owner");
+     let (other_user, other) = eligible_member(&f).await;
+-    assert!(listed(&f, other, AttentionView::MyWork, &channels).await.is_empty());
++    assert!(
++        listed(&f, other, AttentionView::MyWork, &channels)
++            .await
++            .is_empty()
++    );
+     let owner_user = f.people.role.admission.binding.target.actor.user_id();
+     assert_ne!(owner_user, other_user);
+-    f.p().submit_escalation(command(&f, EscalationDecisionId::new(waiting[0].source_id), owner_user, "owner-feed-ack", EscalationChoice::Acknowledge))
+-        .await.unwrap();
+-    assert!(listed(&f, owner_principal, AttentionView::MyWork, &channels).await.is_empty());
++    f.p()
++        .submit_escalation(command(
++            &f,
++            EscalationDecisionId::new(waiting[0].source_id),
++            owner_user,
++            "owner-feed-ack",
++            EscalationChoice::Acknowledge,
++        ))
++        .await
++        .unwrap();
++    assert!(
++        listed(&f, owner_principal, AttentionView::MyWork, &channels)
++            .await
++            .is_empty()
++    );
+     assert_eq!(f.worker().drain_once().await.unwrap(), 0);
+ }
+ 
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_command_tests.rs:1:
+ use super::*;
++#[path = "escalation_attention_tests.rs"]
++mod attention;
+ #[path = "escalation_cancellation_tests.rs"]
+ mod cancellation;
+ #[path = "escalation_history_tests.rs"]
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_command_tests.rs:5:
+ mod history;
+-#[path = "escalation_attention_tests.rs"]
+-mod attention;
+ use crate::application::workflow::escalation::{
+     EscalationChoice, EscalationDecisionId, EscalationSubmission, EscalationView, SubmitEscalation,
+     WorkflowEscalations,
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_command_tests.rs:147:
+     assert_eq!(audit.actor_principal, f.people.principals[0]);
+     assert_eq!(audit.choice, EscalationChoice::Acknowledge);
+     assert_eq!(audit.next_decision, None);
+-    assert!(crate::adapters::http::pages::workflow_escalation_page(&after)
+-        .contains(&format!("Account {actor} · principal {}", audit.actor_principal)));
++    assert!(
++        crate::adapters::http::pages::workflow_escalation_page(&after).contains(&format!(
++            "Account {actor} · principal {}",
++            audit.actor_principal
++        ))
++    );
+     assert_eq!(
+         facts(&f).await,
+         json!({"commands":1,"assignments":1,"hops":1,"notices":1,"active":0,"state":"settled","manual":0})
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_command_tests.rs:155:
+     );
+     assert_eq!(f.worker().drain_once().await.unwrap(), 0);
+-    f.p().remove_member(f.scope.company.as_uuid(), actor).await.unwrap();
+-    let history = view(&f, decision, f.people.role.admission.binding.target.actor.user_id()).await;
++    f.p()
++        .remove_member(f.scope.company.as_uuid(), actor)
++        .await
++        .unwrap();
++    let history = view(
++        &f,
++        decision,
++        f.people.role.admission.binding.target.actor.user_id(),
++    )
++    .await;
+     assert_eq!(history.command.unwrap().actor_user, actor);
+ }
+ 
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_decisions.rs:356:
+     .bind(decision.as_uuid())
+     .fetch_optional(db)
+     .await?;
+-    value.map(|value| serde_json::from_value(value).map_err(|_| invalid())).transpose()
++    value
++        .map(|value| serde_json::from_value(value).map_err(|_| invalid()))
++        .transpose()
+ }
+ 
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_history_tests.rs:2:
+ use super::*;
+ 
+ #[tokio::test]
+-async fn workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history() {
++async fn workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history()
++ {
+     let (f, decision) = Box::pin(pending(1)).await;
+     let actor = f.people.users[0];
+     let principal = f.people.principals[0];
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_history_tests.rs:9:
+     let company = f.scope.company;
+     let captured: i64 = sqlx::query_scalar(
+         "SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND principal_id=$2",
+-    ).bind(company.as_uuid()).bind(principal.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
+-    assert!(captured > 0, "exercise a principal actually sealed into the source run");
+-    f.p().submit_escalation(command(&f, decision, actor, "historical-ack", EscalationChoice::Acknowledge))
+-        .await.unwrap();
++    )
++    .bind(company.as_uuid())
++    .bind(principal.as_uuid())
++    .fetch_one(f.p().pool())
++    .await
++    .unwrap();
++    assert!(
++        captured > 0,
++        "exercise a principal actually sealed into the source run"
++    );
++    f.p()
++        .submit_escalation(command(
++            &f,
++            decision,
++            actor,
++            "historical-ack",
++            EscalationChoice::Acknowledge,
++        ))
++        .await
++        .unwrap();
+     sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+-        .bind(company.as_uuid()).bind(actor).execute(f.p().pool()).await.unwrap();
+-    let remains: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM principals WHERE company_id=$1 AND id=$2)")
+-        .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
+-    assert!(!remains, "actual raw membership retirement deleted the live principal");
++        .bind(company.as_uuid())
++        .bind(actor)
++        .execute(f.p().pool())
++        .await
++        .unwrap();
++    let remains: bool =
++        sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM principals WHERE company_id=$1 AND id=$2)")
++            .bind(company.as_uuid())
++            .bind(principal.as_uuid())
++            .fetch_one(f.p().pool())
++            .await
++            .unwrap();
++    assert!(
++        !remains,
++        "actual raw membership retirement deleted the live principal"
++    );
+     let retained: i64 = sqlx::query_scalar(
+         "SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND principal_id=$2",
+-    ).bind(company.as_uuid()).bind(principal.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
++    )
++    .bind(company.as_uuid())
++    .bind(principal.as_uuid())
++    .fetch_one(f.p().pool())
++    .await
++    .unwrap();
+     assert_eq!(retained, captured);
+     let owner = f.people.role.admission.binding.target.actor.user_id();
+     let saved = view(&f, decision, owner).await;
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_history_tests.rs:27:
+     let audit = saved.command.unwrap();
+-    assert_eq!((audit.actor_user, audit.actor_principal), (actor, principal));
++    assert_eq!(
++        (audit.actor_user, audit.actor_principal),
++        (actor, principal)
++    );
+     assert_eq!(audit.choice, EscalationChoice::Acknowledge);
+-    assert!(f.p().read_escalation(company, WorkflowActor::authenticated(actor).unwrap(), decision).await.is_err());
++    assert!(
++        f.p()
++            .read_escalation(
++                company,
++                WorkflowActor::authenticated(actor).unwrap(),
++                decision
++            )
++            .await
++            .is_err()
++    );
+ }
+ 

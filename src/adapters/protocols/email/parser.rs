@@ -57,10 +57,11 @@ pub struct ParsedEmail {
     pub prompt_text: String,
     pub is_auto_reply: bool,
     pub is_forwarded: bool,
-    pub channel_id_header: Option<Uuid>,
+    pub source_target_header: Option<crate::entities::address::AddressTarget>,
     pub thread_id_header: Option<Uuid>,
     pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
+    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
+    pub trace_invalid: bool,
     pub spf_status: AuthVerdict,
     pub dkim_status: AuthVerdict,
     pub dmarc_status: AuthVerdict,
@@ -75,10 +76,11 @@ struct ParsedHeaders {
     references: Vec<String>,
     thread_index: Option<String>,
     is_auto_reply: bool,
-    channel_id: Option<Uuid>,
+    source_target: Option<crate::entities::address::AddressTarget>,
     thread_id: Option<Uuid>,
     hop_count: u32,
-    trace_channels: Vec<Uuid>,
+    trace_targets: Vec<crate::entities::address::AddressTarget>,
+    trace_invalid: bool,
     is_context_only: bool,
     correlation_id: Option<String>,
 }
@@ -153,10 +155,11 @@ impl EmailParser {
             references,
             thread_index: raw_thread_index,
             is_auto_reply: is_auto_reply_from_headers,
-            channel_id: channel_id_header,
+            source_target: source_target_header,
             thread_id: thread_id_header,
             hop_count,
-            trace_channels,
+            trace_targets,
+            trace_invalid,
             is_context_only: is_context_from_headers,
             correlation_id: supplied_correlation_id,
         } = payload
@@ -276,10 +279,11 @@ impl EmailParser {
             prompt_text,
             is_auto_reply,
             is_forwarded,
-            channel_id_header,
+            source_target_header,
             thread_id_header,
             hop_count,
-            trace_channels,
+            trace_targets,
+            trace_invalid,
             spf_status: payload.spf,
             dkim_status: payload.dkim,
             dmarc_status: payload.dmarc,
@@ -300,10 +304,13 @@ impl EmailParser {
         let mut references = Vec::new();
         let mut thread_index: Option<String> = None;
         let mut is_auto_reply = false;
-        let mut channel_id_header = None;
+        let mut source_target_header = None;
         let mut thread_id_header = None;
         let mut hop_count = 0u32;
-        let mut trace_channels = Vec::new();
+        let mut trace_targets = Vec::new();
+        let mut trace_invalid = false;
+        let mut trace_seen = false;
+        let mut collecting_trace = false;
         let mut is_context_only = false;
         let mut correlation_id = None;
 
@@ -311,6 +318,7 @@ impl EmailParser {
         let mut collecting_thread_index = false;
         for raw_line in headers_str.split('\n') {
             if raw_line.starts_with(' ') || raw_line.starts_with('\t') {
+                trace_invalid |= collecting_trace;
                 if collecting_thread_index && let Some(value) = thread_index.as_mut() {
                     // Preserve folding whitespace for `ThreadIndex::parse`: its raw-length guard
                     // must run before RFC 2045 whitespace is removed.
@@ -320,6 +328,7 @@ impl EmailParser {
                 continue;
             }
 
+            collecting_trace = false;
             collecting_thread_index = false;
             let line = raw_line.trim();
             if line.is_empty() {
@@ -344,21 +353,31 @@ impl EmailParser {
                 // RFC 2045 whitespace removal, in that order.
                 thread_index = Some(raw_line["thread-index:".len()..].to_string());
                 collecting_thread_index = true;
-            } else if lower.starts_with("x-mailagents-channel-id:") {
-                let val = line["x-mailagents-channel-id:".len()..].trim();
-                channel_id_header = Uuid::from_str(val).ok();
+            } else if lower.starts_with("x-mailagents-source-target:") {
+                let val = line["x-mailagents-source-target:".len()..].trim();
+                source_target_header = val.parse::<crate::entities::address::AddressTarget>().ok();
             } else if lower.starts_with("x-mailagents-thread-id:") {
                 let val = line["x-mailagents-thread-id:".len()..].trim();
                 thread_id_header = Uuid::from_str(val).ok();
             } else if lower.starts_with("x-mailagents-hop-count:") {
                 let val = line["x-mailagents-hop-count:".len()..].trim();
-                hop_count = val.parse().unwrap_or(0);
+                hop_count = val.parse().unwrap_or(u32::MAX);
             } else if lower.starts_with("x-mailagents-trace:") {
                 let val = line["x-mailagents-trace:".len()..].trim();
-                trace_channels = val
+                trace_invalid |= trace_seen;
+                trace_seen = true;
+                collecting_trace = true;
+                let parsed: Result<Vec<crate::entities::address::AddressTarget>, _> = val
                     .split(',')
-                    .filter_map(|s| Uuid::from_str(s.trim()).ok())
+                    .take(crate::transport::MAX_TRACE_TARGETS + 1)
+                    .map(|token| token.trim().parse())
                     .collect();
+                match parsed {
+                    Ok(targets) if targets.len() <= crate::transport::MAX_TRACE_TARGETS => {
+                        trace_targets = targets
+                    }
+                    _ => trace_invalid = true,
+                }
             } else if lower.starts_with("auto-submitted:") {
                 let val = line["auto-submitted:".len()..].trim().to_lowercase();
                 if val != "no" {
@@ -403,10 +422,11 @@ impl EmailParser {
             references,
             thread_index,
             is_auto_reply,
-            channel_id: channel_id_header,
+            source_target: source_target_header,
             thread_id: thread_id_header,
             hop_count,
-            trace_channels,
+            trace_targets,
+            trace_invalid,
             is_context_only,
             correlation_id,
         }
@@ -466,7 +486,7 @@ Message-ID: <CAGX123@mail.gmail.com>
 In-Reply-To: <ORIGINAL456@mailagents.com>
 References: <REF1@mailagents.com> <REF2@mailagents.com>
 Auto-Submitted: auto-replied
-X-MailAgents-Channel-ID: 00000000-0000-0000-0000-000000000001
+X-MailAgents-Source-Target: desk:00000000-0000-0000-0000-000000000001
 X-MailAgents-Hop-Count: 2
 Subject: Test Email
 "#;
@@ -487,11 +507,13 @@ Subject: Test Email
         assert!(parsed.thread_index.is_none());
         assert!(parsed.is_auto_reply);
         assert_eq!(
-            parsed.channel_id,
-            Some(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
+            parsed.source_target,
+            Some(crate::entities::address::AddressTarget::Desk(
+                Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap()
+            ))
         );
         assert_eq!(parsed.hop_count, 2);
-        assert!(parsed.trace_channels.is_empty());
+        assert!(parsed.trace_targets.is_empty());
         assert!(!parsed.is_context_only);
     }
 

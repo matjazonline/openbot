@@ -1,0 +1,9 @@
+{
+  "artifact": "45d7f5be8d17a9fbad70acc3a001084498ecebd7b1d2556ac3eb5de81a69cee5",
+  "review_base": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "accepted_B2_artifact": "b02007609c01e28674ee6640fe07f6fc115e95879c5916ff01356bcaca8fa7f6",
+  "cache_baseline": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa02-b3-r1-source-kyxaug4u",
+  "archive_sha256": "1b6e41c8f441f4ff8ef4353721bb77234a4919e24c04b350930ebbfd146f8075",
+  "verified_R1_delta_paths": 186,
+  "scope": "Material project source only; unrelated user/configuration files stay unchanged outside this source-comparison cache."
+}

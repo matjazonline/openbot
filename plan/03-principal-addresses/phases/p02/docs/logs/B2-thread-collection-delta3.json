@@ -1,0 +1,15 @@
+{
+  "before": 4534,
+  "after": 4537,
+  "removed": [
+    "application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_a_person_together_are_refused_whole",
+    "application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_is_admitted_and_a_person_is_refused_for_a_teammate"
+  ],
+  "added": [
+    "adapters::persistence::address_tests::direct::ingress::direct_thread_agent_policy_and_revocation_do_not_borrow_participant_authority",
+    "adapters::persistence::address_tests::direct::ingress::direct_thread_identity_adoption_preserves_the_direct_target_and_membership_pin",
+    "adapters::persistence::address_tests::direct::ingress::direct_trace_native_shape_and_bound_match_the_typed_wire_contract",
+    "application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_a_person_together_get_one_copy_each",
+    "application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_the_senders_direct_address_are_admitted"
+  ]
+}

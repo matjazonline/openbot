@@ -1,0 +1,45 @@
+src/adapters/persistence/workflow/channel_reply_completion.rs:15:    pub channel_id: Uuid,
+src/adapters/persistence/workflow/channel_reply_completion.rs:29:    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.thread_id,context.actor_id, \
+src/adapters/persistence/workflow/channel_reply_completion.rs:79:            target: crate::entities::address::AddressTarget::Desk(root.channel_id),
+src/adapters/persistence/workflow/channel_reply_completion.rs:93:        WHERE company_id=$1 AND channel_id=$2 AND binding_id IS NOT NULL FOR SHARE",
+src/adapters/persistence/workflow/channel_reply_completion.rs:96:    .bind(root.channel_id)
+src/adapters/persistence/workflow/channel_reply_completion.rs:248:        "actor":root.actor_id,"channel":root.channel_id,"thread":root.thread_id,"output":completion.output,
+src/adapters/persistence/workflow/channel_reply_binding_tests.rs:30:        channel: RelatedChannelId::new(s.channel),
+src/adapters/persistence/workflow/channel_reply_binding_tests.rs:95:            channel: RelatedChannelId::new(s.channel),
+src/adapters/persistence/workflow/channel_reply_publish.rs:129:            channel: destination.channel_id,
+src/adapters/persistence/workflow/channel_reply_publication_integrity_tests.rs:79:            "UPDATE channel_bindings SET status='paused' WHERE company_id=$1 AND channel_id=$2",
+src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs:44:    sqlx::query("INSERT INTO channel_principal_grants(company_id,channel_id,principal_id,capability,provenance) \
+src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs:48:    sqlx::query("DELETE FROM channel_principal_grants WHERE company_id=$1 AND channel_id=$2 AND principal_id=$3")
+src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs:85:            channel: RelatedChannelId::new(s.channel),
+src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs:195:        "INSERT INTO workflow_message_intents(company_id,id,message_id,channel_id,thread_id,role,\
+src/adapters/persistence/workflow/channel_reply_binding_authority.rs:8:    pub channel: Uuid,
+src/adapters/persistence/workflow/channel_reply_binding_authority.rs:16:        WHERE company_id=$1 AND channel_id=$2 AND id=$3 AND transport=$4 FOR SHARE",
+src/adapters/persistence/workflow/channel_reply_binding_authority.rs:38:        WHERE active.company_id=$1 AND active.channel_id=$2 AND active.id=$3 AND active.transport=$4)",
+src/adapters/persistence/workflow/channel_reply_membership_tests.rs:42:    sqlx::query("INSERT INTO message_deliveries (id,company_id,channel_id,message_id,source_binding_id,destination_binding_id, \
+src/adapters/persistence/workflow/channel_reply_membership_tests.rs:45:        .bind(delivery.id.as_uuid()).bind(delivery.company_id).bind(delivery.channel_id).bind(delivery.message_id.as_uuid())
+src/adapters/persistence/workflow/channel_reply_membership_tests.rs:167:        "UPDATE channel_bindings SET status='paused' WHERE company_id=$1 AND channel_id=$2",
+src/adapters/persistence/workflow/channel_reply_membership_tests.rs:208:    rejected(sqlx::query("UPDATE thread_messages SET company_id=$3,channel_id=$4,thread_id=$5,message_id=$6 WHERE company_id=$1 AND message_id=$2")
+src/adapters/persistence/workflow/channel_reply_publication_tests.rs:76:            AND filed.thread_id=context.thread_id AND filed.channel_id=context.channel_id \
+src/adapters/persistence/workflow/channel_reply.rs:50:    channel: RelatedChannelId,
+src/adapters/persistence/workflow/channel_reply.rs:54:         WHERE company_id=$1 AND channel_id=$2",
+src/adapters/persistence/workflow/channel_reply.rs:69:    channel: RelatedChannelId,
+src/adapters/persistence/workflow/channel_reply.rs:108:        channel: RelatedChannelId,
+src/adapters/persistence/workflow/channel_reply.rs:227:    channel: RelatedChannelId,
+src/adapters/persistence/workflow/channel_reply.rs:331:        "INSERT INTO channel_reply_settings(company_id,channel_id,revision,binding_id,binding_revision,contract,approval_policy) \
+src/adapters/persistence/workflow/channel_reply.rs:332:         VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(company_id,channel_id) DO UPDATE \
+src/adapters/persistence/workflow/channel_reply_delivery.rs:17:    channel_id: Uuid,
+src/adapters/persistence/workflow/channel_reply_delivery.rs:28:        delivery.channel_id,delivery.source_binding_id,delivery.destination_binding_id \
+src/adapters/persistence/workflow/channel_reply_delivery.rs:66:            channel: link.channel_id,
+src/adapters/persistence/workflow/channel_reply_delivery_tests.rs:277:    sqlx::query("SELECT id FROM channel_bindings WHERE company_id=$1 AND channel_id=$2 FOR UPDATE")
+src/adapters/persistence/workflow/channel_reply_publish_plan.rs:18:    channel: Uuid,
+src/adapters/persistence/workflow/channel_reply_publish_plan.rs:33:        || destination.channel_id != route.channel
+src/adapters/persistence/workflow/channel_reply_publish_plan.rs:80:        && delivery.channel_id == route.channel
+src/adapters/persistence/workflow/channel_reply_publish_plan.rs:104:            channel: sender.id,
+src/adapters/persistence/workflow/channel_reply_publish_plan.rs:116:            channel: *channel,
+src/adapters/persistence/workflow/channel_reply_e2e_hitl_tests.rs:286:        "UPDATE channel_bindings SET status='paused' WHERE company_id=$1 AND channel_id=$2",
+src/adapters/persistence/workflow/channel_reply_policy_tests.rs:60:        assert!(sqlx::query("UPDATE channel_reply_settings SET revision=revision+1,approval_policy=$1 WHERE company_id=$2 AND channel_id=$3")
+src/adapters/persistence/workflow/channel_reply_views.rs:17:    channel_id: Uuid,
+src/adapters/persistence/workflow/channel_reply_views.rs:79:            channel: self.channel_id,
+src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs:183:    sqlx::query("SELECT id FROM channel_bindings WHERE company_id=$1 AND channel_id=$2 FOR UPDATE")
+src/adapters/persistence/workflow/channel_reply_views_tests.rs:340:        json!({"company_id":f.scope.company.as_uuid(),"channel_id":f.s.channel,"thread_id":f.s.thread})
+src/adapters/persistence/workflow/channel_reply_views_tests.rs:344:        json!({"company_id":f.scope.company.as_uuid(),"channel_id":f.s.channel,"thread_id":f.s.thread,

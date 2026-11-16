@@ -1,0 +1,2078 @@
+$ vitest run "--maxWorkers=2"
+
+ RUN  v5.0.3 /home/runner/work/_temp/doop-check/source/managed-source
+
+2:43:58 PM [vite] ws proxy error:
+AggregateError: 
+    at internalConnectMultiple (node:net:1135:18)
+    at afterConnectMultiple (node:net:1716:7)
+ ✓  parallel  tests/elementPanelBrowser.test.ts (56 tests) 49147ms
+   ✓ element design controls (56)
+     ✓ edits fonts and alignment through the sandbox, persists them, and supports undo and RTL 1596ms
+     ✓ opens image settings, shows upload for hover or touch, and dismisses with Escape (touch: false) 639ms
+     ✓ opens image settings, shows upload for hover or touch, and dismisses with Escape (touch: true) 2312ms
+     ✓ validates image URLs, replaces through Enter, and persists sizing with undo 2661ms
+     ✓ replaces responsive images from a local file, preserving their box and supporting undo/redo 960ms
+     ✓ replaces CSS image fills without changing their positioning or background color 683ms
+     ✓ preserves image sizing without Typed OM () 544ms
+     ✓ preserves image sizing without Typed OM (#photo { width: 50%; height: auto; }) 320ms
+     ✓ keeps flex row distribution and intrinsic sizing across repeated replacements 2036ms
+     ✓ keeps flex column distribution and intrinsic sizing across repeated replacements 1752ms
+     ✓ keeps background color and opacity editable alongside an image fill 622ms
+     ✓ keeps the old image after upload failure and allows retrying the same file 405ms
+     ✓ does not overwrite a layer changed while its image is uploading 309ms
+     ✓ edits flex direction, alignment, spacing and padding without overwriting the other axes; saves and undoes 2257ms
+     ✓ aligns children to the physical bottom right in row / rtl / horizontal-tb / nowrap 311ms
+     ✓ positions and aligns transformed layers without disturbing siblings; saves and undoes geometry 2150ms
+     ✓ preserves fill RGB/alpha independently of element opacity, clips content, and reads nonstandard weights 1069ms
+     ✓ reads stylesheet sizes and switches between flex fill, fixed, and content sizing 747ms
+     ✓ settles position and alignment before restoring stylesheet transitions 509ms
+     ✓ settles position and alignment before restoring inline transitions 541ms
+     ✓ fills the physical dimensions of a vertical-writing flex row 537ms
+     ✓ fills the physical dimensions of a vertical-writing flex column 584ms
+     ✓ fills to the parent edge with fractional borders and padding 588ms
+     ✓ scrubs negative geometry without probe animations and restores translations on cancel and undo 771ms
+     ✓ scrubs a fractional position onto whole values, zoomed in too 580ms
+     ✓ scrubs live in both directions, saves, and undoes/redoes the edit 903ms
+     ✓ covers numeric units, padding shorthand, CSS lengths, modifiers, and bounds 1728ms
+     ✓ cancels with Escape and cleans up capture when interrupted or selection changes 379ms
+     ✓ preserves typing and keyboard adjustment and leaves nonnumeric lengths alone 853ms
+     ✓ reconciles the displayed value with computed CSS after a drag finishes 325ms
+     ✓ restores original CSS units, absent properties, priorities, and shorthands on Escape without saving 542ms
+     ✓ saves a paused drag as one undo step and drops a paused cancellation 5343ms
+     ✓ keeps remote edits when a preview is cancelled 537ms
+     ✓ links dimensions for typing and dragging, persists the ratio, and restores both dimensions on cancel/undo 2280ms
+     ✓ recognizes authored aspect ratios and maintains them in Fill mode 875ms
+     ✓ keeps an existing width Fill proportional when linking 563ms
+     ✓ keeps an existing height Fill proportional when linking 641ms
+     ✓ adds up a fast run of nudges sent before any of them lands 668ms
+     ✓ undoes a nudge whose save is still pending 600ms
+     ✓ leaves a standalone canvas element in place 406ms
+     ✓ preserves stylesheet-derived image dimensions when unlinking 488ms
+     ✓ uses a loaded image natural ratio instead of its auto fallback while editing 660ms
+     ✓ requires positive dimensions before linking and supports the keyboard toggle 710ms
+     ✓ creates a token from a field with that field's value, and binds the field 764ms
+ ❯  parallel  tests/privateRendering.test.ts (18 tests | 1 failed) 23515ms
+   ✓ the actual local browser raster prepares private files under current scope before drawing 674ms
+   ✓ the real browser export fetches public bytes anonymously and admits them before drawing 2272ms
+   ✓ the current owner reads exact source image/font bytes while another account cannot 323ms
+   ✓ an authorized headless screenshot paints the private image pixels 1403ms
+   ✓ the actual opaque editor iframe loads its authorized private image 11ms
+   ✓ the actual opaque editor iframe loads its authorized private font face 4ms
+   ✓ materialization preserves the script-only sandbox and gives the frame no readable session cookie 31ms
+   ✓ the authenticated materializer binds a draft to its live parent even when the reader owns both canvases 1151ms
+   ✓ runtime snapshot and element code retain canonical private IDs without transient bytes 7ms
+   ✓ inline media and SVG failures are bounded while the actual source data remains canonical 1517ms
+   ✓ normal scoped preparation returns real costs and only accepts reduced remaining budgets 1116ms
+   ✓ source occurrences remain bounded even when a browser would coalesce repeated public requests 29ms
+   ✓ nested data documents share occurrence limits and URL-normalized data cannot hide a large raster 615ms
+   ✓ an image sink cannot bypass admission with an unknown binary format declared as plain text 87ms
+   ✓ normal editor save persists canonical private IDs after a real DOM edit 96ms
+   × real editor roundtrip retains private hashes and deeply escaped srcdoc while preserving authored data URLs 876ms
+   ✓ the real Image fill URL edit prepares a new private file before the opaque child decodes it 2228ms
+   ✓ the actual editor removes old private frame bytes when its live canvas is deleted 1120ms
+ ✓  parallel  tests/elementResizeBrowser.test.ts (39 tests) 18106ms
+   ✓ element resize handles (39)
+     ✓ commits a fast drag after a delayed begin reply (Shift: false) 384ms
+     ✓ commits a fast drag after a delayed begin reply (Shift: true) 540ms
+     ✓ drags the corner to resize, saving once and recording one undo step 326ms
+     ✓ resizes Fill children in row / horizontal-tb and restores Fill on undo 650ms
+     ✓ resizes Fill children in column / horizontal-tb and restores Fill on undo 454ms
+     ✓ resizes Fill children in row-reverse / vertical-rl and restores Fill on undo 470ms
+     ✓ resizes Fill children in column-reverse / vertical-rl and restores Fill on undo 522ms
+     ✓ resizes wrapped Fill children in a row layout 382ms
+     ✓ resizes wrapped Fill children in a column layout 353ms
+     ✓ restores inline flex priority when Shift is released 484ms
+     ✓ preserves Fill when only resizing the cross axis 312ms
+     ✓ restores Fill after releasing Shift during a cross-axis drag 398ms
+     ✓ restores Fill on Escape without saving 315ms
+     ✓ grows from the computed size, so a padded content box keeps its padding 388ms
+     ✓ keeps the aspect ratio with Shift 319ms
+     ✓ converts screen pixels at the stage zoom 350ms
+     ✓ puts the element back on Escape without saving 718ms
+     ✓ lets go of the ratio when Shift is released mid-drag 367ms
+     ✓ files each gesture on release as its own undo step 738ms
+     ✓ keeps a later panel edit when an earlier save echoes back 1031ms
+     ✓ puts the element back when the grips leave mid-drag 571ms
+     ✓ divides the drag by a scaled element's render scale, and skips a rotated one 308ms
+     ✓ removes handles after the Rotation control rotates an element 554ms
+     ✓ still resizes through positive ancestor scales and a zero individual rotation 445ms
+     ✓ offers no grips on an inline run or a locked layer 442ms
+     ✓ ⇧-click picks several elements in the frame, outlining each, and a plain click narrows back to one 963ms
+     ✓ keeps the shell's grips, ring and badge on a standalone element whose own shape is picked 463ms
+     ✓ withholds the shell's grips from a standalone element whose shape is locked 512ms
+     ✓ outlines a layer wider than its frame in full, hovered and selected, while the frame clips its content 661ms
+stderr | tests/slackAgent.test.ts > design jobs > retries failed result delivery without dispatching or spending again
+[slack] session update deferred Ev2743c13c03
+
+ ✓  parallel  tests/slackAgent.test.ts (35 tests) 4955ms
+   ✓ design jobs (22)
+     ✓ does not let one installer’s backlog starve another workspace 526ms
+ ✓  parallel  tests/layerTransfer.test.ts (32 tests) 244ms
+ ✓  parallel  tests/styleCarry.test.ts (40 tests) 129ms
+ ❯  parallel  tests/drawingBrowser.test.ts (88 tests | 1 failed) 104343ms
+   ❯ drawing on the canvas (88)
+     ✓ draws a frame with reverse drag at a panned/zoomed viewport, then adds editable shapes inside it 2658ms
+     ✓ creates standalone transparent circles, constrained rectangles and SVG paths 1481ms
+     ✓ types literal multiline text without triggering shortcuts, keeps escaped text and drops empty drafts 1751ms
+     ✓ draws smooth Bézier curves by dragging anchors, including a curved closed path 1823ms
+     ✓ drags a circle into a frame, into another frame, and back onto the canvas with undo/redo 1764ms
+     ✓ snaps the path preview and closes at the first anchor at zoom 0.5 872ms
+     ✓ snaps the path preview and closes at the first anchor at zoom 2 875ms
+     ✓ snaps the path preview and closes at the first anchor at zoom 3 920ms
+     ✓ snaps to intermediate anchors and lets Alt place a point freely 1021ms
+     ✓ edits anchors and handles, converts curves, deletes points, and undoes each change 1689ms
+     ✓ selects asymmetric handles and anchors without changing the path or saving 1431ms
+     ✓ edits transformed paths without moving their other endpoint (standalone: false) 1109ms
+     ✓ edits transformed paths without moving their other endpoint (standalone: true) 1264ms
+     ✓ resizes an edited standalone path through its shell's grips 1237ms
+     ✓ keeps a Layers pick when a save refreshes the element being text-edited 1476ms
+     ✓ snaps edited anchors, allows Alt to bypass snapping, and cancels on pointer cancellation 1193ms
+     ✓ cancels interrupted gestures and lets Space pan without drawing 975ms
+     ✓ leaves editing keys in unrelated fields alone while a vector path is unfinished 811ms
+     ✓ cancels moving an element on Escape, pointer cancellation, and page changes 1123ms
+     ✓ constrains a layer drag with Shift held before pressing (selection: none) 939ms
+     ✓ constrains a layer drag with Shift held before pressing (selection: frame) 806ms
+     ✓ constrains a layer drag with Shift held before pressing (selection: multiple) 785ms
+     ✓ keeps Shift-click frame selection without moving or prematurely selecting its layer 827ms
+     ✓ constrains a svg vertically when Shift is held before the drag 927ms
+     ✓ constrains a drawing vertically when Shift is held before the drag 762ms
+     ✓ keeps the drag selection when an earlier click has a pending timer 1718ms
+     ✓ keeps the drag selection when an earlier click has a pending reply 1897ms
+     ✓ keeps a click a click when its hit test answers after the pointer has moved on 1389ms
+     ✓ drags an HTML rectangle directly at zoom 0.5, saving once with undo/redo 1002ms
+     ✓ drags an HTML rectangle directly at zoom 1, saving once with undo/redo 1079ms
+     ✓ drags an HTML rectangle directly at zoom 2, saving once with undo/redo 1010ms
+     ✓ moves a transformed layer in screen space without changing its transform or siblings 751ms
+     ✓ cancels an HTML layer drag on escape without saving 778ms
+     ✓ cancels an HTML layer drag on pointer without saving 827ms
+     ✓ cancels an HTML layer drag on blur without saving 755ms
+     ✓ cancels an HTML layer drag on page without saving 791ms
+     ✓ cancels an HTML layer drag on remote without saving 848ms
+     ✓ drags a selected group from its child (drawing: false) and constrains movement with Shift 916ms
+     ✓ drags a selected group from its child (drawing: true) and constrains movement with Shift 900ms
+     ✓ freely drags absolutely positioned SVG, text and image layers: <svg id="rect" width="100" height="80"><rect width="100" height="80" fill="coral"/></svg> 730ms
+     ✓ freely drags absolutely positioned SVG, text and image layers: <p id="rect" style="width:100px;height:80px;margin:0"><span>Text layer</span></p> 848ms
+     ✓ freely drags absolutely positioned SVG, text and image layers: <img id="rect" width="100" height="80" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"> 796ms
+     ✓ reparents an image with a live insertion bar and growing container at zoom 0.5 1104ms
+     ✓ reparents an image with a live insertion bar and growing container at zoom 1 1318ms
+     ✓ reparents an image with a live insertion bar and growing container at zoom 2 1284ms
+     ✓ reorders DOM siblings in a block layout 1089ms
+     ✓ reorders DOM siblings in a column layout 1119ms
+     ✓ reorders DOM siblings in a row layout 1079ms
+     ✓ reorders DOM siblings in a reverse row layout 1169ms
+     ✓ reorders DOM siblings in a RTL row layout 1270ms
+     ✓ reorders DOM siblings in a grid layout 1166ms
+     ✓ reorders DOM siblings in a wrapped row layout 1317ms
+     ✓ moves an absolutely positioned image into an empty container and puts it in flow 1137ms
+     ✓ does not commit a layout drop on escape 1148ms
+     ✓ does not commit a layout drop on pointer 1209ms
+     ✓ does not commit a layout drop on blur 1080ms
+     ✓ does not commit a layout drop on remote 1391ms
+     ✓ does not commit a layout drop on locked 941ms
+     ✓ does not commit a layout drop on outside 988ms
+     ✓ does not commit a layout drop on same slot 980ms
+     ✓ uses the release position when an earlier target reply is delayed 1138ms
+     ✓ keeps a path-selected image selected when it enters a div containing plain text 1227ms
+     ✓ removes imported transform translation while retaining rotation and scale: translateX(-50%) 1217ms
+     ✓ removes imported transform translation while retaining rotation and scale: translate(-50%, 20px) rotate(20deg) scale(1.2) 1043ms
+     ✓ matches CSS order when dropping after the last visible flex item (outside) 1561ms
+     ✓ matches CSS order when dropping after the last visible flex item (already last in DOM) 1127ms
+     ✓ keeps fast layer drags and cancellation correct while doop:move-hit is delayed 1585ms
+     ✓ keeps fast layer drags and cancellation correct while doop:style-gesture is delayed 1811ms
+     ✓ keeps fast layer drags and cancellation correct while doop:move-target is delayed 1386ms
+     ✓ waits for a pending document before picking the layer to drag 2005ms
+     ✓ drops the hover outline of a layer the document no longer has, without the pointer moving 891ms
+     ✓ formats selected text from the toolbar, saves it, and supports canvas undo after editing 875ms
+     ✓ bolds a picked text layer whole from the canvas and undoes it in one step 741ms
+     ✓ leaves a layer inside a locked frame alone on a format shortcut 1028ms
+     ✓ still enters text editing on double-click and moves the whole frame from its title 898ms
+     ✓ preserves transformed shape geometry across moves: scale(2) 1448ms
+     ✓ preserves transformed shape geometry across moves: rotate(30deg) scale(1.5) 1419ms
+     ✓ measures drawing geometry consistently once the world settles at the zoom 1400ms
+     ✓ lays the drag preview out at design px while the world is zoomed 1055ms
+     ✓ keeps a peer cursor on its spot while the world switches layout zoom 1017ms
+     ✓ grabs the visibly top drawing through stacking contexts instead of reverse DOM order 818ms
+     ✓ handles a drag that ends before its iframe hit test returns (cancel: false) 1000ms
+     ✓ handles a drag that ends before its iframe hit test returns (cancel: true) 1014ms
+     ✓ does not grab a drawing behind non-drawing content 1083ms
+     × preserves canvas comments and lets comment pins interrupt drawing without creating a shape 1352ms
+     ✓ comments on a frame as a whole where the Comment tool finds no element 1304ms
+     ✓ drags a comment pin off its element onto the canvas, onto the frame, and back onto an element 2275ms
+     ✓ keeps all tools reachable on phones, clear of zoom, and accepts touch drawing 2064ms
+ ✓  parallel  tests/prototypeBrowser.test.ts (16 tests) 7019ms
+   ✓ prototype player (16)
+     ✓ navigates on click, goes back, and opens and closes an overlay 657ms
+     ✓ draws connectors and the flow start in Prototype mode only 426ms
+     ✓ keeps interactions inert in a frame the editor drives 649ms
+     ✓ review fixes (8)
+       ✓ walks repeated screens back to the start and forward again with the browser history 337ms
+       ✓ closes an overlay on Escape before the overlay screen runs its own key:Escape 446ms
+       ✓ runs only the top screen’s delays and keys while an overlay is open 1405ms
+ ✓  parallel  tests/richTextBrowser.test.ts (23 tests) 5483ms
+   ✓ rich text editing (23)
+     ✓ formats only selected text with bold and toggles it off 387ms
+     ✓ formats only selected text with italic and toggles it off 302ms
+     ✓ supports formatting shortcuts and plain-text paste without importing clipboard markup 302ms
+     ✓ saves pending typing before a scrub on selected words, so a cancel leaves nothing of the preview 715ms
+ ✓  parallel  tests/importer.test.ts (23 tests) 2260ms
+   ✓ webpage capture (18)
+     ✓ uses direct Chromium for bare domains when Context.dev is not configured 606ms
+     ✓ returns a bounded screenshot and text preview when requested 723ms
+     ✓ returns a capture error when the acquired HTML renders no visible content 723ms
+ ✓  parallel  tests/drawingMove.test.ts (24 tests) 155ms
+ ✓  parallel  tests/githubApp.test.ts (19 tests) 7383ms
+ ✓  parallel  tests/mcp-comments-write.test.ts (14 tests) 297ms
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/config.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/globals.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/featureFlagUtils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/types.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/json-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/bot-detection.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/string-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/type-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/number-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/bucketed-rate-limiter.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/user-agent-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/utils/index.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/gzip.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/logs/logs-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/logs/index.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/metrics/metrics-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/metrics/index.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/chunk-ids.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/error-properties-builder.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/parsers/base.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/parsers/safari.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/parsers/chrome.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/parsers/gecko.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/parsers/index.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/dom-exception-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/error-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/error-event-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/string-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/types.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/object-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/event-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/primitive-coercer.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/coercers/promise-rejection-event.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/exception-steps.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/logger.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/general-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/cookie-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/uuidv7.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/url-targeting-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/constants.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/element-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/autocapture-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/request-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/event-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/disposable.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/types/compression.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/types/surveys.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/setup-pnpm/node_modules/.bin/store/v11/links/@/fflate/0.4.8/3d6bb6f51514b78f73eff8bf58c4fef7e18a9483e0eef595f39f3a49c6c31e1d/node_modules/fflate/esm/browser.js"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/encode-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/simple-event-emitter.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/blocked-uas.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/device-model-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/surveys/activation.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/surveys/property-matching.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/property-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/surveys/keys.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/extension-runtime.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/surveys/events.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/promise-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/browser-common/dist/utils/elements-chain-utils.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/error-tracking/release.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to a source file outside its package: "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/core/dist/metrics/config.mjs"
+Sourcemap for "/home/runner/work/_temp/doop-check/source/managed-source/node_modules/posthog-js/dist/module.no-external.js" points to missing source files
+stderr | tests/svgImport.test.ts
+VITE_POSTHOG_KEY is unset — PostHog is disabled and no events will be sent.
+
+ ✓  parallel  tests/svgImport.test.ts (16 tests) 115ms
+ ✓  parallel  tests/frameExport.test.ts (24 tests) 311ms
+ ✓  parallel  tests/webhooks.test.ts (39 tests) 56ms
+ ✓  parallel  tests/canvasCommentsRoute.test.ts (12 tests) 10488ms
+   ✓ POST /api/canvases/:id/comments (5)
+     ✓ survives a restart and comes back in the room state 3214ms
+   ✓ retains the element placement across a server restart 3237ms
+stderr | tests/linearAgent.test.ts > delegation jobs > retries failed result delivery without dispatching or spending again
+[linear] session update deferred a94488ec-02a9-4063-84e7-289c0914708a
+
+ ✓  parallel  tests/linearAgent.test.ts (22 tests) 3478ms
+ ✓  parallel  tests/approvalAutomations.test.ts (16 tests) 3791ms
+   ✓ skips handled approval receipts without issuing duplicate inserts 310ms
+stderr | tests/layersRename.test.tsx > renaming in the Layers panel > refuses the undo when the renamed layer is gone rather than renaming its neighbour
+undo failed Error: Layer removed
+    at saveLayerName (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:181:28)
+    at apply (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:615:11)
+    at step (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:706:27)
+
+ ✓  parallel  tests/layersRename.test.tsx (25 tests) 1449ms
+ ✓  parallel  tests/guideEdits.test.ts (20 tests) 546ms
+stderr | tests/pageEdits.test.ts > keeps a duplicate retryable when its page cannot be restored on redo
+redo failed PrerequisiteFailed [Error]: Too many pages
+    at applyOrdered (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:540:13)
+    at step (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:706:21)
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/pageEdits.test.ts:363:3
+    at async file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20 {
+  remaining: { type: 'group', entries: [ [Object], [Object] ], ordered: true },
+  applied: null,
+  canvasId: undefined,
+  [cause]: Error: Too many pages
+      at /home/runner/work/_temp/doop-check/source/managed-source/tests/pageEdits.test.ts:362:38
+      at async file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20
+}
+
+ ✓  parallel  tests/pageEdits.test.ts (19 tests) 92ms
+ ✓  parallel  tests/mcp-tools.test.ts (9 tests) 242ms
+ ✓  parallel  tests/privateResourceOwnership.test.ts (11 tests) 9412ms
+   ✓ orders a competing child write and deletion through shutdown without resurrecting its frame or refs 2756ms
+   ✓ removes memory authority first, orders a competing frame write, and cascades private children before acknowledging deletion 2809ms
+ ✓  parallel  tests/ingest.test.ts (13 tests) 7520ms
+ ✓  parallel  tests/openaiAgent.test.ts (25 tests) 23ms
+ ✓  parallel  tests/pathEditing.test.ts (28 tests) 70ms
+ ✓  parallel  tests/privateMediaCache.test.ts (16 tests) 80718ms
+   ✓ actual disk, Chromium and current private cache authority (6)
+     ✓ warm image bytes never grant anonymous or foreign reads and no extra render starts 709ms
+     ✓ deleting only a frame while its real screenshot is complete denies delivery and cache resurrection 370ms
+     ✓ live unmodified held screenshot delivers exactly the actual completed render 359ms
+     ✓ multi-frame PDF loses the entire result when one selected frame alone disappears 459ms
+     ✓ normal MCP credential revoked after real render completion cannot return pixels or prime a readable result 387ms
+   ✓ actual thumbnail and context competing claimants (4)
+     ✓ two contents pending for one thumbnail deliver their own actual pixels and never mislabel persisted bytes 1108ms
+     ✓ the production thumbnail path refuses the twentieth claimant while exactly three actual renders hold its pipeline 4167ms
+     ✓ the production page owner refuses the twenty-first claimant and never exceeds four live contexts 3630ms
+     ✓ an actual context waiter expires at30s without starting a fifth render 31144ms
+   ✓ current browser and PDF credential delivery (3)
+     ✓ a revoked browser session cannot reuse warmed bytes while a second normal session still reads the same parent 482ms
+     ✓ a normal browser session revoked after actual render completion cannot receive the pending bytes 478ms
+     ✓ MCP PDF revalidates the same normal credential after actual vector-page completion 525ms
+   ✓ current workspace membership at private read boundaries (2)
+     ✓ revoked membership denies warmed image and asset paths before cache or disk reuse 483ms
+     ✓ membership revoked after real render completion denies that pending reader while its parent survives 436ms
+   ✓ the actual thumbnail queue expires after30s before using the spare fourth context 31212ms
+ ✓  parallel  tests/elementClipboard.test.ts (18 tests) 214ms
+ ✓  parallel  tests/drawing.test.ts (14 tests) 95ms
+ ✓  parallel  tests/pdfExport.test.ts (15 tests) 8017ms
+   ✓ renderFramePdfPage (1)
+     ✓ keeps a block that straddles the frame’s bottom edge, with viewport units at the frame’s size 696ms
+   ✓ GET /api/canvases/:id/export.pdf (5)
+     ✓ returns one vector page per frame, each sized to its frame, in the order listed 953ms
+     ✓ exports every visible frame on a page, in reading order, when no frames are named 560ms
+     ✓ names a single-frame PDF after the frame 354ms
+ ✓  parallel  tests/designTokenWrites.test.ts (14 tests) 51ms
+ ✓  parallel  tests/pageControlsBrowser.test.ts (3 tests) 13520ms
+   ✓ page list controls and keyboard history (3)
+     ✓ drags pages, double-clicks to rename, and restores a deleted page and frame with Cmd+Z 2905ms
+     ✓ moves a selected frame through the page picker and undoes the move 1509ms
+     ✓ claims Backspace on the canvas: deletes the selection, never leaves the page 459ms
+ ✓  parallel  tests/selectionKeys.test.ts (18 tests) 115ms
+stderr | tests/prototype.test.ts
+VITE_POSTHOG_KEY is unset — PostHog is disabled and no events will be sent.
+
+ ✓  parallel  tests/prototype.test.ts (21 tests) 27ms
+DOMException [NotSupportedError]: Failed to fetch from "about:blank#doop-export-0-end": URL scheme "about" is not supported.
+    at FetchRequestValidationUtility.validateSchema (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/utilities/FetchRequestValidationUtility.js:90:19)
+    at Fetch.send (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/Fetch.js:126:39)
+    at ResourceFetch.fetch (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/ResourceFetch.js:70:38)
+    at #loadStyleSheet (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/html-link-element/HTMLLinkElement.js:391:44)
+    at [connectedToDocument] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/html-link-element/HTMLLinkElement.js:213:41)
+    at [connectedToNode] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at [appendChild] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at [appendChild] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLParser.parseEndOfStartTag (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/html-parser/HTMLParser.js:489:53)
+    at HTMLParser.parse (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/html-parser/HTMLParser.js:213:34)
+DOMException [NotSupportedError]: Failed to fetch from "about:blank#doop-export-0-end": URL scheme "about" is not supported.
+    at FetchRequestValidationUtility.validateSchema (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/utilities/FetchRequestValidationUtility.js:90:19)
+    at Fetch.send (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/Fetch.js:126:39)
+    at ResourceFetch.fetch (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/fetch/ResourceFetch.js:70:38)
+    at #loadStyleSheet (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/html-link-element/HTMLLinkElement.js:391:44)
+    at [connectedToDocument] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/html-link-element/HTMLLinkElement.js:213:41)
+    at [connectedToNode] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/node/Node.js:801:53)
+    at [appendChild] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/node/Node.js:421:45)
+    at [appendChild] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/nodes/element/Element.js:1102:62)
+    at HTMLParser.parseEndOfStartTag (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/html-parser/HTMLParser.js:489:53)
+    at HTMLParser.parse (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/happy-dom/lib/html-parser/HTMLParser.js:213:34)
+ ✓  parallel  tests/frameRaster.test.ts (18 tests) 199ms
+ ✓  parallel  tests/access.test.ts (16 tests) 5390ms
+   ✓ canvas access model (16)
+     ✓ signs up three accounts and creates a canvas with a frame 585ms
+ ✓  parallel  tests/shareLinkRoles.test.ts (13 tests) 5363ms
+ ✓  parallel  tests/modelCatalog.test.ts (7 tests) 4600ms
+ ✓  parallel  tests/automations.test.ts (16 tests) 4865ms
+ ✓  parallel  tests/tokensPanel.test.tsx (8 tests) 656ms
+ ✓  parallel  tests/pages.test.ts (5 tests) 13704ms
+   ✓ creates, reorders and copies pages while preserving frame membership and access control 4798ms
+   ✓ duplicates a page with its frames right after the source, numbering the name when taken 4314ms
+ ✓  parallel  tests/billing.test.ts (13 tests) 9190ms
+   ✓ workspaces behind Stripe (11)
+     ✓ survives a restart with the billing state intact 4431ms
+stderr | tests/imageGen.test.ts > who pays > never bills the server when the account lookup itself fails
+[image-gen] could not read the connected model accounts Error: db down
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/imageGen.test.ts:127:41
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64
+
+ ✓  parallel  tests/imageGen.test.ts (16 tests) 208ms
+ ✓  parallel  tests/privateConsumers.test.ts (6 tests) 17795ms
+   ✓ the actual prototype component paints scoped private files with its normal cookie API 4058ms
+   ✓ the actual history component paints scoped private files with its normal cookie API 1595ms
+   ✓ the actual memory component paints scoped private files with its normal cookie API 2091ms
+   ✓ normal HTML download embeds exact authorized private bytes and observable invalidation revokes its real object URL 1405ms
+   ✓ a real foreign-parent draft cannot fall back to a successful older stored image 1688ms
+   ✓ the real drawing drag preview materializes private image and font bytes under its source frame 2403ms
+ ✓  parallel  tests/mcp-comments.test.ts (11 tests) 347ms
+ ✓  parallel  tests/privateExport.test.ts (6 tests) 14358ms
+   ✓ get_frame_screenshot returns a real image within the workflow 16 KiB inline field budget 1534ms
+   ✓ export_frame png supplies bounded media and a current-session full download 1266ms
+   ✓ export_frame jpg supplies bounded media and a current-session full download 1402ms
+   ✓ large PDF exports keep inline blobs bounded and provide an authenticated full file location 2752ms
+stderr | tests/canvasComments.test.ts > where a canvas comment leads > puts a frame the resident agent creates for a canvas comment on its page, beside the pin
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:948:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/canvasComments.test.ts > where a canvas comment leads > puts a frame the resident agent creates for a canvas comment on its page, beside the pin
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:948:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stdout | tests/canvasComments.test.ts > where a canvas comment leads > puts a frame the resident agent creates for a canvas comment on its page, beside the pin
+[doop-agent] ANTHROPIC_API_KEY not set — the free Doop Agent tier is off. Users who connect a model account of their own still get the agent; everyone else sees queued cards and @mentions go unpicked. See README → "The Doop Agent".
+
+ ✓  parallel  tests/canvasComments.test.ts (13 tests) 54ms
+ ✓  parallel  tests/designTokensHttp.test.ts (10 tests) 9839ms
+   ✓ design tokens over MCP (3)
+     ✓ survives a restart 3986ms
+ ✓  parallel  tests/privateClipboardCopies.test.ts (9 tests) 5758ms
+ ✓  parallel  tests/rulersBrowser.test.ts (8 tests) 5430ms
+   ✓ rulers and guides (8)
+     ✓ toggles the rulers with Shift+R and remembers the choice 607ms
+     ✓ snaps a moved frame onto the guide, and Alt moves it freely 464ms
+     ✓ moves a guide, undoes it, and removes it by dropping it on its ruler 373ms
+ ✓  parallel  tests/oidcAccountLinking.test.ts (6 tests) 9598ms
+   ✓ OIDC account linking against a real (faked-IdP) callback (4)
+     ✓ drops a password nobody could use yet when the IdP, not that password, verifies the address 521ms
+ ✓  parallel  tests/layersDragAcross.test.tsx (6 tests) 748ms
+stderr | tests/elementIdBackfill.test.ts > backfillElementIds > writes no comment when the frame write fails, so the selectors stay for the next boot
+[comments] element id backfill: frame f1 not written, left for the next boot: Error: db down
+    at Proxy.saveFrameNow (/home/runner/work/_temp/doop-check/source/managed-source/tests/elementIdBackfill.test.ts:34:33)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at Module.backfillElementIds (/home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:749:9)
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/elementIdBackfill.test.ts:165:20
+
+ ✓  parallel  tests/elementIdBackfill.test.ts (10 tests) 3110ms
+   ✓ backfillElementIds (5)
+     ✓ survives frame HTML nested deeper than the call stack 3056ms
+ ✓  parallel  tests/fonts.test.ts (23 tests) 52ms
+ ✓  parallel  tests/workspaces.test.ts (13 tests) 8585ms
+   ✓ workspaces (self-hosted, billing off) (13)
+     ✓ survives a restart 3659ms
+ ✓  parallel  tests/backgrounds.test.ts (17 tests) 131ms
+ ✓  parallel  tests/desktopConnect.test.ts (18 tests) 4892ms
+ ✓  parallel  tests/privateFileAccess.test.ts (42 tests) 6035ms
+ ✓  parallel  tests/commentNotifications.test.ts (14 tests) 36ms
+ ✓  parallel  tests/frameApproval.test.ts (11 tests) 9649ms
+   ✓ exposes approval to agents, filters implementation candidates, and invalidates agent edits 380ms
+   ✓ persists current approvals and stale approvals through a server restart 4246ms
+ ✓  parallel  tests/multiElementSelection.test.ts (16 tests) 82ms
+ ✓  parallel  tests/designTokens.test.ts (17 tests) 19ms
+ ✓  parallel  tests/frameReplay.test.ts (6 tests) 3822ms
+   ✓ sandboxed frame replay (6)
+     ✓ captures rendered content and mutations while preserving the sandbox and masking 330ms
+     ✓ bounds failed downloads and cancels pending retries when recording stops 2682ms
+ ✓  parallel  tests/privateCanvasCreation.test.ts (7 tests) 17412ms
+   ✓ HTTP reports uncertainty without SQL details, phantom children, or resurrection after restart 3342ms
+   ✓ failed optional welcome creation retains the account without a phantom document or demo 3419ms
+   ✓ startup binds no listener while seed is pending or failed, then seeds only committed children 5880ms
+ ✓  parallel  tests/mcpSchemas.test.ts (4 tests) 435ms
+ ✓  parallel  tests/claudeExtension.test.ts (4 tests) 10732ms
+   ✓ packages the same installed dependencies under Bun and Node 1218ms
+   ✓ runs the extracted download and forwards real Doop tools, instructions and resources 1363ms
+   ✓ completes OAuth with Doop and reuses the sign-in after restarting the extension 2519ms
+ ✓  parallel  tests/svgImportBrowser.test.ts (3 tests) 3839ms
+   ✓ importing SVG files (3)
+     ✓ reads the paint the browser computes: class rules, currentColor and inherited fills 1410ms
+     ✓ keeps the effects a style block gives shapes, text and images, as the browser computes them 965ms
+     ✓ opens the path editor on a shape inside an imported group, keeps its percentage layout and adds points on the outline 1302ms
+ ✓  parallel  tests/connectModal.test.tsx (12 tests) 512ms
+ ✓  parallel  tests/frameClipboard.test.ts (11 tests) 40ms
+ ✓  parallel  tests/frameApprovalControl.test.tsx (7 tests) 366ms
+ ✓  parallel  tests/layersStack.test.tsx (9 tests) 698ms
+ ✓  parallel  tests/privateCanvasCopies.test.ts (3 tests) 8218ms
+   ✓ copies each private asset once, rewrites HTML/CSS/SVG/srcset/reference/token/font carriers, and survives source deletion 3497ms
+ ✓  parallel  tests/frameVersions.test.ts (7 tests) 10494ms
+   ✓ frame version history (7)
+     ✓ folds a burst of tweaks into one version and opens a new one on the next redesign 398ms
+     ✓ files what a stream replaced once, not once per chunk 386ms
+     ✓ survives a restart 4562ms
+stdout | tests/residentComments.test.ts > the resident agent replying in a thread > posts the reply under the root as the agent and remembers the thread
+[doop-agent] ANTHROPIC_API_KEY not set — the free Doop Agent tier is off. Users who connect a model account of their own still get the agent; everyone else sees queued cards and @mentions go unpicked. See README → "The Doop Agent".
+
+stderr | tests/residentComments.test.ts > settling the comments a run was about > still resolves a thread the agent closed itself during the run
+[resident] could not reply in thread OG_qPJZu: thread resolved, or its frame is gone
+
+ ✓  parallel  tests/residentComments.test.ts (13 tests) 47ms
+ ✓  parallel  tests/oidcConfig.test.ts (32 tests) 162ms
+ ✓  parallel  tests/chatCompletionsAgent.test.ts (13 tests) 90ms
+ ✓  parallel  tests/admin.test.ts (17 tests) 17638ms
+   ✓ admin surface (17)
+     ✓ refuses to hand the role to an unverified claim on the address in production 4321ms
+     ✓ lets unverified accounts in when verification is optional, but still will not promote them 4501ms
+     ✓ promotes accounts that already existed when ADMIN_EMAILS gained them 4040ms
+ ✓  parallel  tests/contextDev.test.ts (11 tests) 41ms
+stdout | tests/liveActivityDelivery.test.ts > delivers updates once, then sends a terminal event and removes the token
+[live-activities] update push for a -> 200 (working)
+
+stdout | tests/liveActivityDelivery.test.ts > delivers updates once, then sends a terminal event and removes the token
+[live-activities] end push for a -> 200 (finished)
+
+stdout | tests/liveActivityDelivery.test.ts > ends revoked subscriptions without leaking private content
+[live-activities] end push for a -> 200 (finished)
+
+stdout | tests/liveActivityDelivery.test.ts > retains tokens after transient delivery failures and removes invalid ones
+[live-activities] update push for a -> 503 (working)
+
+stdout | tests/liveActivityDelivery.test.ts > retains tokens after transient delivery failures and removes invalid ones
+[live-activities] update push for a -> 410 (working)
+
+stdout | tests/liveActivityDelivery.test.ts > starts an activity on registered devices for a task on any canvas the user belongs to, once
+[live-activities] start push for canvas other -> 200 (working)
+
+stdout | tests/liveActivityDelivery.test.ts > does not start activities for canvases the user cannot access, and drops dead start tokens
+[live-activities] start push for canvas other -> 410 (working)
+
+ ✓  parallel  tests/liveActivityDelivery.test.ts (8 tests) 2962ms
+ ✓  parallel  tests/githubRecon.test.ts (22 tests) 17ms
+ ✓  parallel  tests/geminiCloudWorker.test.ts (7 tests) 479ms
+ ✓  parallel  tests/github.test.ts (15 tests) 4780ms
+ ✓  parallel  tests/frameLabelStackingBrowser.test.ts (5 tests) 1714ms
+ ✓  parallel  tests/guestCanvas.test.ts (7 tests) 5164ms
+ ✓  parallel  tests/frameResizeBrowser.test.ts (7 tests) 2791ms
+   ✓ frame resize handles (7)
+     ✓ moves the near edge from a north-west grip and keeps the far corner still 361ms
+ ✓  parallel  tests/privateRenderIdentity.test.ts (6 tests) 1628ms
+   ✓ live stored private render identities (4)
+     ✓ renders an independent pinned reference after its original source frame is gone 664ms
+ ✓  parallel  tests/svgPath.test.ts (25 tests) 39ms
+ ✓  parallel  tests/storePages.test.ts (6 tests) 22ms
+stderr | tests/promptComposer.test.tsx > the Agents tab composer > still reports a send that failed while another tab was open
+Error: upload failed
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/promptComposer.test.tsx:177:32
+    at Proxy.act (/home/runner/work/_temp/doop-check/source/managed-source/node_modules/react/cjs/react.development.js:2512:16)
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/promptComposer.test.tsx:177:11
+    at async file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20
+
+stderr | tests/promptComposer.test.tsx > the Agents tab composer > flies the camera to the first new frame on this canvas only
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+
+stderr | tests/promptComposer.test.tsx > the Agents tab composer > flies the camera to the first new frame after a send
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: An update to PromptBar inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act
+    at PromptBar (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PromptBar.tsx:189:22)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at TabsContent (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:153:13)
+    at PanelTabPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:240:26)
+    at div
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Tabs (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tabs/dist/index.mjs:27:7)
+    at PanelTabsRoot (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:155:26)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at ActivityPanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ActivityPanel.tsx:58:26)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+
+ ✓  parallel  tests/promptComposer.test.tsx (9 tests) 434ms
+ ✓  parallel  tests/elementIds.test.ts (15 tests) 5756ms
+   ✓ stampElementId (14)
+     ✓ does not throw on an escape past Unicode or on deeply nested markup 5707ms
+ ✓  parallel  tests/localClaudeConnection.test.tsx (7 tests) 390ms
+ ✓  parallel  tests/confirmDialogs.test.tsx (4 tests) 336ms
+stderr | tests/inspectorScrub.test.tsx > lets undo wait for a slow scrub save, so the inverse write never lands first
+Warning: You called act(async () => ...) without await. This could lead to unexpected testing behaviour, interleaving multiple act calls and mixing their scopes. You should - await act(async () => ...);
+
+ ✓  parallel  tests/inspectorScrub.test.tsx (7 tests) 326ms
+ ✓  parallel  tests/fontLibrary.test.ts (9 tests) 5026ms
+ ✓  parallel  tests/privateReferences.test.ts (34 tests) 168ms
+ ✓  parallel  tests/inspiration.test.ts (10 tests) 67ms
+ ✓  parallel  tests/avatar.test.ts (4 tests) 4922ms
+   ✓ stores a photo and shows it on every face 422ms
+ ✓  parallel  tests/thumbs.test.ts (8 tests) 26ms
+ ✓  parallel  tests/layerLock.test.ts (11 tests) 31ms
+ ✓  parallel  tests/guides.test.ts (4 tests) 10577ms
+   ✓ stores guides per page, broadcasts them live, gates them by access and survives a restart 4641ms
+   ✓ refuses a page copy whose guides would pass the canvas limit 1454ms
+ ✓  parallel  tests/commentMove.test.ts (9 tests) 11ms
+ ✓  parallel  tests/privateTokenReferences.test.ts (14 tests) 50571ms
+   ✓ HTTP refuses an unused or used foreign token before any state change (used: false) 3131ms
+   ✓ HTTP refuses an unused or used foreign token before any state change (used: true) 3523ms
+   ✓ HTTP refuses an unused or used missing token before any state change (used: false) 3317ms
+   ✓ HTTP refuses an unused or used missing token before any state change (used: true) 2874ms
+   ✓ MCP refuses an unused or used foreign token before any state change (used: false) 2895ms
+   ✓ MCP refuses an unused or used foreign token before any state change (used: true) 3348ms
+   ✓ MCP refuses an unused or used missing token before any state change (used: false) 3233ms
+   ✓ MCP refuses an unused or used missing token before any state change (used: true) 3561ms
+   ✓ HTTP rejects a base/foreign edit before rename, aliases, theme declarations or restyling 3296ms
+   ✓ HTTP rejects a theme/foreign edit before rename, aliases, theme declarations or restyling 3475ms
+   ✓ HTTP rejects a base/missing edit before rename, aliases, theme declarations or restyling 3210ms
+   ✓ HTTP rejects a theme/missing edit before rename, aliases, theme declarations or restyling 3449ms
+   ✓ MCP preserves valid-item batch semantics, same-parent CSS and literal strings while rejecting foreign theme values 3161ms
+   ✓ MCP refuses a foreign value edit before its rename or theme can affect the document 3621ms
+ ✓  parallel  tests/privateExportOperation.test.ts (6 tests) 127ms
+ ✓  parallel  tests/previews.test.ts (12 tests) 21ms
+ ✓  parallel  tests/chatgptProviderSwitch.test.tsx (7 tests) 395ms
+stderr | tests/selection.test.ts > review follow-ups > a failing member of a group does not stop the others, and the survivors stay redoable
+undo failed for 1 frame(s) Error: boom
+    at Object.<anonymous> (/home/runner/work/_temp/doop-check/source/managed-source/tests/selection.test.ts:152:29)
+    at Object.Mock [as updateFrame] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/spy.DgMTfhrK.js:323:40)
+    at apply (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:635:17)
+    at /home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:514:67
+    at Array.map (<anonymous>)
+    at settle (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:514:52)
+    at apply (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:579:26)
+    at step (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/history.ts:706:27)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/selection.test.ts:155:5
+
+ ✓  parallel  tests/selection.test.ts (10 tests) 32ms
+ ✓  parallel  tests/publicUrl.test.ts (22 tests) 183ms
+ ✓  parallel  tests/privateMediaValidation.test.ts (8 tests) 3286ms
+   ✓ woff directory cost is reserved before its real decompressor is allowed to run 549ms
+   ✓ woff2 directory cost is reserved before its real decompressor is allowed to run 488ms
+   ✓ the actual decoder worker validates a real PNG and private WOFF2 before browser use 510ms
+   ✓ a compressed-small 100M-pixel PNG is rejected before any forbidden raw decoder allocation 402ms
+   ✓ individually valid compressed images cannot exceed the shared intrinsic decoded aggregate 593ms
+   ✓ actual animated GIF admission charges both frames without multiplying stacked height twice 366ms
+   ✓ SVG file policy rejects hidden network and dynamic URL carriers while allowing local fragments 371ms
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stdout | tests/runnerQueue.test.ts
+[doop-agent] ANTHROPIC_API_KEY not set — the free Doop Agent tier is off. Users who connect a model account of their own still get the agent; everyone else sees queued cards and @mentions go unpicked. See README → "The Doop Agent".
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/runnerQueue.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ✓  parallel  tests/runnerQueue.test.ts (9 tests) 60ms
+ ✓  parallel  tests/claudeInstall.test.tsx (9 tests) 88ms
+ ✓  parallel  tests/agentRunners.test.ts (9 tests) 24ms
+ ✓  parallel  tests/liveActivities.test.ts (10 tests) 4861ms
+ ✓  parallel  tests/mcpReadOnlyFeedback.test.ts (8 tests) 191ms
+ ✓  parallel  tests/localAgentRuns.test.ts (7 tests) 24ms
+stderr | tests/imagePaste.test.ts > files pasted together > keeps the frames that landed when a sibling request fails
+1 of 2 frame(s) failed Error: offline
+    at Object.<anonymous> (/home/runner/work/_temp/doop-check/source/managed-source/tests/imagePaste.test.ts:118:13)
+    at Object.Mock [as createFrame] (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/spy.DgMTfhrK.js:323:40)
+    at /home/runner/work/_temp/doop-check/source/managed-source/src/lib/frameClipboard.ts:103:68
+    at Array.map (<anonymous>)
+    at settleFrames (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/frameClipboard.ts:103:53)
+    at importIncoming (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/frameClipboard.ts:429:24)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at pasteFilesCentered (/home/runner/work/_temp/doop-check/source/managed-source/src/lib/frameClipboard.ts:443:18)
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/imagePaste.test.ts:120:5
+    at async file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20
+
+stderr | tests/imagePaste.test.ts > files pasted together > still lands the vector when a bitmap’s upload fails, and reports that failure when nothing lands
+1 of 2 file(s) failed Error: Image is larger than 5 MB
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/imagePaste.test.ts:128:43
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:1628:35
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:26
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3321:20
+    at new Promise (<anonymous>)
+    at runWithCancel (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3316:10)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3301:20
+    at new Promise (<anonymous>)
+    at runWithTimeout (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3259:10)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:3882:64
+
+stderr | tests/imagePaste.test.ts > files pasted together > still lands the vector when a bitmap’s upload fails, and reports that failure when nothing lands
+1 of 1 file(s) failed Error: Image is larger than 5 MB
+    at /home/runner/work/_temp/doop-check/source/managed-source/tests/imagePaste.test.ts:133:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+    at async file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/vitest/dist/chunks/run.BTlFXlnv.js:2783:20
+
+ ✓  parallel  tests/imagePaste.test.ts (7 tests) 92ms
+ ✓  parallel  tests/fitSelectionBrowser.test.ts (4 tests) 13421ms
+   ✓ zoom to selection with the panels open (4)
+     ✓ keeps the fitted frame clear of the side panels and centred between them 575ms
+     ✓ fits a linked frame beside the Inspector the link opens 1341ms
+     ✓ docked: the stage fills the gap between the columns and fits there 1327ms
+     ✓ docked: fits a linked frame inside the stage the Inspector narrows 1356ms
+ ✓  parallel  tests/deleteSelection.test.ts (10 tests) 37ms
+ ✓  parallel  tests/localAgentRouting.test.ts (9 tests) 23ms
+ ✓  parallel  tests/resourceCopyBounds.test.ts (4 tests) 34ms
+ ✓  parallel  tests/modelPickerRunners.test.tsx (5 tests) 290ms
+ ✓  parallel  tests/slackIntegration.test.ts (7 tests) 4938ms
+ ✓  parallel  tests/appleSignIn.test.ts (8 tests) 5783ms
+ ✓  parallel  tests/privatePdfRendering.test.ts (2 tests) 20408ms
+   ✓ renders real private images and an embedded font on both PDF pages through disk storage 7372ms
+   ✓ renders real private images and an embedded font on both PDF pages through bucket storage 13034ms
+ ✓  parallel  tests/webFonts.test.ts (13 tests) 16ms
+ ✓  parallel  tests/framePlacement.test.ts (8 tests) 11ms
+stderr | tests/repoCards.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/repoCards.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1361:43
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stdout | tests/repoCards.test.ts
+[doop-agent] ANTHROPIC_API_KEY not set — the free Doop Agent tier is off. Users who connect a model account of their own still get the agent; everyone else sees queued cards and @mentions go unpicked. See README → "The Doop Agent".
+
+stderr | tests/repoCards.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/repoCards.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ✓  parallel  tests/repoCards.test.ts (5 tests) 28ms
+ ✓  parallel  tests/cssPrune.test.ts (11 tests) 250ms
+ ✓  parallel  tests/canvasEvents.test.ts (6 tests) 22ms
+ ✓  parallel  tests/privateIdleRevocation.test.ts (3 tests) 5118ms
+   ✓ closes an idle removed workspace member before any edit while authorized rooms remain usable 343ms
+ ✓  parallel  tests/privateMcpReaders.test.ts (4 tests) 110ms
+ ✓  parallel  tests/companyPolicy.test.ts (16 tests) 16ms
+ ✓  parallel  tests/keyRotation.test.tsx (3 tests) 344ms
+ ✓  parallel  tests/prototypeMcp.test.ts (3 tests) 99ms
+ ✓  parallel  tests/secretBox.test.ts (8 tests) 3791ms
+ ✓  parallel  tests/linearMcp.test.ts (3 tests) 4122ms
+ ✓  parallel  tests/anthropicAccount.test.ts (2 tests) 5140ms
+   ✓ switches accounts on and off and marks one connection as the default 308ms
+ ✓  parallel  tests/privateMediaStorage.test.ts (9 tests) 10040ms
+ ✓  parallel  tests/fontFrameWrites.test.ts (6 tests) 56ms
+ ✓  parallel  tests/community.test.ts (4 tests) 8217ms
+   ✓ keeps a listing across a restart 4018ms
+ ✓  parallel  tests/switchSelect.test.tsx (6 tests) 275ms
+stdout | tests/stopCard.test.ts > a run whose card is stopped > aborts the model turn in flight and does not complete the card
+[resident] run start canvas=canvas-stop agent=Doop model=Test on=ann feedback=0 comments=0 cards=1
+
+stdout | tests/stopCard.test.ts > a run whose card is stopped > stays stopped when Retry lands before the stopped run has let go
+[resident] run start canvas=canvas-stop agent=Doop model=Test on=ann feedback=0 comments=0 cards=1
+
+stdout | tests/stopCard.test.ts > a run whose card is stopped > stays stopped when Retry lands before the stopped run has let go
+[resident] run start canvas=canvas-stop agent=Doop model=Test on=ann feedback=0 comments=0 cards=1
+
+ ✓  parallel  tests/stopCard.test.ts (5 tests) 459ms
+   ✓ a run whose card is stopped (2)
+     ✓ aborts the model turn in flight and does not complete the card 339ms
+ ✓  parallel  tests/layersEye.test.tsx (4 tests) 249ms
+ ✓  parallel  tests/providerKeyAccounts.test.ts (3 tests) 4670ms
+ ✓  parallel  tests/taskFrames.test.ts (8 tests) 42ms
+ ✓  parallel  tests/frameRasterZoom.test.ts (8 tests) 2252ms
+   ✓ layout zoom (3)
+     ✓ rounds a density-path zoom up to a whole number, so design sizes scale exactly 444ms
+   ✓ settled canvas zoom (5)
+     ✓ leaves a 100vh column and its bottom-anchored footer where they were (density) 383ms
+     ✓ leaves a 100vh column and its bottom-anchored footer where they were (counter) 349ms
+ ✓  parallel  tests/agentFeedback.test.ts (5 tests) 3363ms
+ ✓  parallel  tests/residentQueue.test.ts (9 tests) 15ms
+ ✓  parallel  tests/geminiCloudMcp.test.ts (1 test) 188ms
+ ✓  parallel  tests/codexInstall.test.tsx (6 tests) 180ms
+ ✓  parallel  tests/privateNetworkLifetime.test.ts (3 tests) 214ms
+ ✓  parallel  tests/desktopAuth.test.ts (11 tests) 13ms
+ ✓  parallel  tests/comments.test.ts (7 tests) 7ms
+ ✓  parallel  tests/websiteAccess.test.ts (12 tests) 12ms
+ ✓  parallel  tests/commentReplies.test.ts (8 tests) 100ms
+ ✓  parallel  tests/chatgptModelCatalog.test.ts (3 tests) 74ms
+ ✓  parallel  tests/mcpCanvasIdentity.test.ts (4 tests) 4955ms
+ ✓  parallel  tests/elementLink.test.tsx (6 tests) 207ms
+ ✓  parallel  tests/frameResize.test.ts (12 tests) 15ms
+stderr | tests/linearKeyRotation.test.tsx
+VITE_POSTHOG_KEY is unset — PostHog is disabled and no events will be sent.
+
+ ✓  parallel  tests/layersKeys.test.tsx (4 tests) 271ms
+ ✓  parallel  tests/layersMove.test.ts (14 tests) 38ms
+ ✓  parallel  tests/linearKeyRotation.test.tsx (5 tests) 246ms
+ ✓  parallel  tests/agentRunner.test.ts (10 tests) 11ms
+ ✓  parallel  tests/browserDetection.test.ts (12 tests) 1775ms
+   ✓ browser detection (12)
+     ✓ finds Chrome using the PROGRAMFILES directory 1500ms
+ ✓  parallel  tests/rosterPanel.test.tsx (2 tests) 122ms
+ ✓  parallel  tests/linearIntegration.test.ts (6 tests) 4940ms
+ ✓  parallel  tests/authFormBrowser.test.ts (3 tests) 3927ms
+   ✓ sign-up form error handling (3)
+     ✓ says the app could not be reached when the platform answers instead of it 1656ms
+     ✓ offers sign-in when the account already exists 1109ms
+     ✓ shows what the API said for every other failure 982ms
+ ✓  parallel  tests/chatgptConnection.test.tsx (26 tests) 792ms
+ ✓  parallel  tests/companyManaged.test.ts (3 tests) 13969ms
+   ✓ revokes owner read/list/copy/room access and preserves removal across restart 4158ms
+ ✓  parallel  tests/canvasRole.test.ts (20 tests) 11ms
+ ✓  parallel  tests/follow.test.ts (10 tests) 19ms
+ ✓  parallel  tests/privateReplay.test.ts (2 tests) 665ms
+   ✓ real rrweb omits initial private content and later mutations across both privacy transitions 342ms
+ ✓  parallel  tests/anthropicTurn.test.ts (2 tests) 58ms
+ ✓  parallel  tests/layersSelection.test.ts (8 tests) 11ms
+ ✓  parallel  tests/elementContextMenu.test.tsx (2 tests) 311ms
+ ✓  parallel  tests/iosSelection.test.ts (7 tests) 49ms
+ ✓  parallel  tests/supportChat.test.ts (7 tests) 538ms
+ ✓  parallel  tests/agentKeys.test.ts (7 tests) 4926ms
+ ✓  parallel  tests/chromeCapture.test.ts (5 tests) 44ms
+ ✓  parallel  tests/reasoningEffort.test.ts (3 tests) 7058ms
+   ✓ reports a server default outside the four, which the pickers then show as its own item 3465ms
+ ✓  parallel  tests/frameConcurrentSave.test.ts (12 tests) 3784ms
+ ✓  parallel  tests/i18n.test.ts (6 tests) 153ms
+ ✓  parallel  tests/webhookRoutes.test.ts (5 tests) 89ms
+ ✓  parallel  tests/snapGuides.test.ts (11 tests) 9ms
+ ✓  parallel  tests/cssValues.test.ts (13 tests) 10ms
+ ✓  parallel  tests/stepSlider.test.tsx (6 tests) 76ms
+ ✓  parallel  tests/tools.test.ts (10 tests) 8ms
+ ✓  parallel  tests/storageBucketBounds.test.ts (7 tests) 224ms
+ ✓  parallel  tests/claudeConnection.test.ts (28 tests) 56ms
+stderr | tests/cardPrompt.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/cardPrompt.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at Module.onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at /home/runner/work/_temp/doop-check/source/managed-source/server/actions.ts:1249:41
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stdout | tests/cardPrompt.test.ts
+[doop-agent] ANTHROPIC_API_KEY not set — the free Doop Agent tier is off. Users who connect a model account of their own still get the agent; everyone else sees queued cards and @mentions go unpicked. See README → "The Doop Agent".
+
+stderr | tests/cardPrompt.test.ts
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the default connection TypeError: Cannot read properties of undefined (reading 'select')
+    at getStoredDefault (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:18:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:55:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+stderr | tests/cardPrompt.test.ts
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+[doop-agent] could not read the connected model accounts TypeError: Cannot read properties of undefined (reading 'select')
+    at getLocalAgentPreference (/home/runner/work/_temp/doop-check/source/managed-source/server/localAgentPreferences.ts:7:26)
+    at readConnections (/home/runner/work/_temp/doop-check/source/managed-source/server/agentDefaults.ts:52:5)
+    at pickModel (/home/runner/work/_temp/doop-check/source/managed-source/server/agentModel.ts:317:29)
+    at runAgent (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:387:23)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:123:29)
+    at onFeedback (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:105:3)
+    at sweep (/home/runner/work/_temp/doop-check/source/managed-source/server/resident.ts:134:34)
+    at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+
+ ✓  parallel  tests/cardPrompt.test.ts (6 tests) 21ms
+ ✓  parallel  tests/anthropicRouting.test.ts (4 tests) 11ms
+ ✓  parallel  tests/mcpPdfExport.test.ts (3 tests) 769ms
+   ✓ export_frame format pdf (3)
+     ✓ returns one multi-page PDF as an embedded resource, pages in the order given 707ms
+ ✓  parallel  tests/homePromptVisibility.test.tsx (3 tests) 203ms
+ ✓  parallel  tests/env.test.ts (8 tests) 16ms
+ ✓  parallel  tests/frameRasterBrowser.test.ts (7 tests) 618ms
+stdout | tests/canvasCreationVisibility.test.ts > one initial canvas publication boundary > seed waits for a durable parent before creating either child
+⟡ seeded demo canvas 8ms_aofEHP
+
+ ✓  parallel  tests/canvasCreationVisibility.test.ts (4 tests) 30ms
+ ✓  parallel  tests/elementResize.test.ts (9 tests) 8ms
+ ✓  parallel  tests/materializationJob.test.ts (3 tests) 159ms
+ ✓  parallel  tests/frameExportModal.test.tsx (3 tests) 300ms
+ ✓  parallel  tests/defaultRouting.test.ts (5 tests) 11ms
+ ✓  parallel  tests/privatePreparation.test.ts (4 tests) 62ms
+ ✓  parallel  tests/localAgentMcp.test.ts (1 test) 107ms
+ ✓  parallel  tests/privateStorageWrapper.test.ts (3 tests) 18ms
+ ✓  parallel  tests/privateMaterializationDrain.test.ts (1 test) 34699ms
+   ✓ real held disk reads retain all four materializer slots after the default thirty-second caller deadline 34698ms
+ ✓  parallel  tests/userEventsHttp.test.ts (3 tests) 4017ms
+ ✓  parallel  tests/privateMcpMedia.test.ts (5 tests) 1710ms
+   ✓ small png output preserves the actual full bytes 407ms
+   ✓ small jpeg output preserves the actual full bytes 402ms
+   ✓ a dense real PNG becomes a nonblank bounded JPEG with truthful aspect and dimensions 526ms
+   ✓ a compressed 100M-pixel source cannot enter the preview decoder despite its small encoding 367ms
+ ✓  parallel  tests/interactionsPanelBrowser.test.ts (1 test) 1914ms
+   ✓ interactions panel (1)
+     ✓ adds, edits, undoes and removes an interaction 300ms
+ ✓  parallel  tests/frameVisibilityBrowser.test.ts (1 test) 764ms
+ ✓  parallel  tests/rosterRouting.test.ts (4 tests) 15ms
+ ✓  parallel  tests/webCapture.test.ts (5 tests) 55ms
+ ✓  parallel  tests/frameRuntimeBody.test.ts (2 tests) 509ms
+ ✓  parallel  tests/agentToolParity.test.ts (3 tests) 121ms
+ ✓  parallel  tests/oidc.test.ts (4 tests) 16077ms
+   ✓ boot-time refusal on partial OIDC config (1)
+     ✓ exits rather than boot when only some of the three required vars are set 6986ms
+ ✓  parallel  tests/mcpScreenshotCache.test.ts (2 tests) 1191ms
+   ✓ primes the image cache so the preview card’s load is a free cached serve 574ms
+   ✓ never files a screenshot under an edit that landed while it rendered 615ms
+ ✓  parallel  tests/firstCanvasLanding.test.ts (7 tests) 4973ms
+ ✓  parallel  tests/panelIconTab.test.tsx (4 tests) 103ms
+ ✓  parallel  tests/privateMaterializationCosts.test.ts (4 tests) 14ms
+ ✓  parallel  tests/textSelectionBrowser.test.ts (3 tests) 925ms
+   ✓ text selection while editing (3)
+     ✓ replaces an existing selection with the next drag 332ms
+ ✓  parallel  tests/theme.test.tsx (5 tests) 44ms
+ ✓  parallel  tests/residentTokenWork.test.ts (6 tests) 15ms
+stderr | tests/pagePanel.test.tsx > shows the active page and its colour, and follows the page in view
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipPortal (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:222:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+
+stderr | tests/pagePanel.test.tsx > shows the active page and its colour, and follows the page in view
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > shows the active page and its colour, and follows the page in view
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > paints the page from a typed hex, clears it from an empty field, and undoes
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipPortal (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:222:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+
+stderr | tests/pagePanel.test.tsx > paints the page from a typed hex, clears it from an empty field, and undoes
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > paints the page from a typed hex, clears it from an empty field, and undoes
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > paints the page from a typed hex, clears it from an empty field, and undoes
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > closes from its header
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at button
+    at Button (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/button.tsx:71:67)
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-slot/dist/index.mjs:10:11
+    at file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-primitive/dist/index.mjs:31:13
+    at PopperAnchor (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:50:13)
+    at TooltipTrigger (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:171:13)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Presence (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-presence/dist/index.mjs:21:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipPortal (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:222:11)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at Popper (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/node_modules/@radix-ui/react-popper/dist/index.mjs:32:11)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+Warning: The current testing environment is not configured to support act(...)
+    at Tooltip (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:77:5)
+    at Tooltip (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:28:20)
+    at PanelClose (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:266:23)
+    at header
+    at PanelHeader (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:131:24)
+    at div
+    at Panel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/panel.tsx:49:18)
+    at PagePanel (/home/runner/work/_temp/doop-check/source/managed-source/src/components/PagePanel.tsx:26:22)
+    at Provider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-context/dist/index.mjs:38:15)
+    at TooltipProvider (file:///home/runner/work/_temp/doop-check/source/managed-source/node_modules/@radix-ui/react-tooltip/dist/index.mjs:32:5)
+    at TooltipProvider (/home/runner/work/_temp/doop-check/source/managed-source/src/components/ui/tooltip.tsx:16:28)
+
+stderr | tests/pagePanel.test.tsx > closes from its header
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/pagePanel.test.tsx > closes from its header
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+ ✓  parallel  tests/pagePanel.test.tsx (3 tests) 116ms
+ ✓  parallel  tests/elementCommentPositionBrowser.test.ts (1 test) 1618ms
+ ✓  parallel  tests/localAgentPreferences.test.ts (4 tests) 97ms
+ ✓  parallel  tests/storage.test.ts (13 tests) 85ms
+ ✓  parallel  tests/frameStack.test.ts (8 tests) 7ms
+ ✓  parallel  tests/hideUi.test.ts (5 tests) 9ms
+stderr | tests/pdfImport.test.ts > importPdf > makes one frame per page at the page’s CSS size
+warning: dropping unclosed device
+
+ ✓  parallel  tests/pdfImport.test.ts (5 tests) 307ms
+ ✓  parallel  tests/duplicatePersistence.test.ts (1 test) 9427ms
+   ✓ persists a complete canvas duplicate across a server restart 9425ms
+ ✓  parallel  tests/accountDeletion.test.ts (2 tests) 10ms
+ ✓  parallel  tests/frameLocalEdits.test.ts (1 test) 2451ms
+   ✓ local frame edits (1)
+     ✓ does not replay locally saved HTML, but still renders undo 839ms
+ ✓  parallel  tests/modelTurnRetry.test.ts (5 tests) 44ms
+ ✓  parallel  tests/fontLibraryRace.test.ts (2 tests) 532ms
+   ✓ addFont (2)
+     ✓ keeps one entry per face when the same face is uploaded concurrently 523ms
+ ✓  parallel  tests/layerDrop.test.ts (3 tests) 19ms
+ ✓  parallel  tests/layersHide.test.ts (7 tests) 31ms
+ ✓  parallel  tests/rate-limit-wiring.test.ts (1 test) 1626ms
+   ✓ configurable tool rate limits (1)
+     ✓ applies a lowered MCP_UPLOADS_PER_MIN to upload_asset 1624ms
+ ✓  parallel  tests/canvasRevisionPersistence.test.ts (1 test) 4936ms
+ ✓  parallel  tests/frameHtml.test.ts (3 tests) 4501ms
+ ✓  parallel  tests/frameStackStore.test.ts (5 tests) 17ms
+ ✓  parallel  tests/frameVersionBursts.test.ts (3 tests) 45ms
+stderr | tests/valueScrub.test.tsx > useValueScrub > scrubs a fractional start onto whole values
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > scrubs a fractional start onto whole values
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > snaps to tens with Shift and tenths with Alt
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > snaps to tens with Shift and tenths with Alt
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > adds up fractional pointer moves instead of rounding each away
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > adds up fractional pointer moves instead of rounding each away
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > leaves a whole start alone until the pointer moves
+Warning: The current testing environment is not configured to support act(...)
+
+stderr | tests/valueScrub.test.tsx > useValueScrub > leaves a whole start alone until the pointer moves
+Warning: The current testing environment is not configured to support act(...)
+
+ ✓  parallel  tests/valueScrub.test.tsx (4 tests) 41ms
+ ✓  parallel  tests/frameRenameBrowser.test.ts (1 test) 326ms
+ ✓  parallel  tests/frameHidden.test.ts (4 tests) 3627ms
+ ✓  parallel  tests/privatePdfBudget.test.ts (2 tests) 11ms
+ ✓  parallel  tests/linear.test.ts (10 tests) 44ms
+ ✓  parallel  tests/codexConnection.test.ts (18 tests) 12ms
+ ✓  parallel  tests/mcpTokens.test.ts (2 tests) 2337ms
+ ✓  parallel  tests/rulers.test.ts (9 tests) 9ms
+ ✓  parallel  tests/frameStackActions.test.ts (3 tests) 10ms
+ ✓  parallel  tests/commentsPanel.test.tsx (2 tests) 76ms
+ ✓  parallel  tests/exportModal.test.tsx (1 test) 208ms
+ ✓  parallel  tests/frameLockActivity.test.ts (3 tests) 15ms
+ ✓  parallel  tests/frameActorClientId.test.ts (1 test) 3539ms
+ ✓  parallel  tests/localAgentEffort.test.ts (2 tests) 3555ms
+ ✓  parallel  tests/commentHandBack.test.ts (1 test) 2663ms
+ ✓  parallel  tests/syncMigrations.test.ts (1 test) 2580ms
+   ✓ upgrades an existing OSS database without the deferred Figma migration 2578ms
+ ✓  parallel  tests/privateMcpLifetime.test.ts (1 test) 30426ms
+   ✓ the actual default 30s preview deadline retains all four slots until begun current-reader leaves settle 30424ms
+ ✓  parallel  tests/canvasShares.test.ts (4 tests) 7ms
+ ✓  parallel  tests/workspaceCache.test.ts (3 tests) 7ms
+ ✓  parallel  tests/panelWidths.test.ts (5 tests) 6ms
+ ✓  parallel  tests/componentLayerLint.test.ts (20 tests) 803ms
+   ✓ component-layer lint rule (20)
+     ✓ reports raw button 751ms
+ ✓  parallel  tests/frameLock.test.ts (2 tests) 8597ms
+   ✓ keeps the lock across a server restart 4372ms
+ ✓  parallel  tests/notificationPrefs.test.ts (3 tests) 77ms
+ ✓  parallel  tests/shell.test.ts (15 tests) 8ms
+ ✓  parallel  tests/spaceScroll.test.ts (3 tests) 18ms
+ ✓  parallel  tests/webpageImport.test.ts (2 tests) 11ms
+ ✓  parallel  tests/geminiCloudImport.test.ts (2 tests) 8946ms
+stderr | tests/accountMenu.test.tsx
+VITE_POSTHOG_KEY is unset — PostHog is disabled and no events will be sent.
+
+ ✓  parallel  tests/avatarFace.test.tsx (2 tests) 57ms
+ ✓  parallel  tests/accountMenu.test.tsx (2 tests) 185ms
+ ✓  parallel  tests/frameSnapshot.test.ts (4 tests) 12ms
+ ✓  parallel  tests/translateGuard.test.ts (4 tests) 10ms
+ ✓  parallel  tests/presentShortcut.test.ts (2 tests) 6ms
+ ✓  parallel  tests/chatgptTokenRefresh.test.ts (1 test) 18ms
+ ✓  parallel  tests/composerPlacement.test.ts (4 tests) 6ms
+ ✓  parallel  tests/locate.test.ts (2 tests) 7ms
+ ✓  parallel  tests/userEventsObservers.test.ts (3 tests) 8ms
+ ✓  parallel  tests/viewFit.test.ts (4 tests) 5ms
+ ✓  parallel  tests/canvasClipboard.test.ts (3 tests) 169ms
+ ✓  parallel  tests/agentFeedbackHttp.test.ts (1 test) 4509ms
+ ✓  parallel  tests/panelLayout.test.ts (4 tests) 25ms
+ ✓  parallel  tests/website.test.ts (2 tests) 8ms
+ ✓  parallel  tests/claudeModels.test.ts (22 tests) 12ms
+ ✓  parallel  tests/localFonts.test.ts (3 tests) 11ms
+ ✓  parallel  tests/desktopLinks.test.ts (1 test) 67ms
+ ✓  parallel  tests/guardedBatch.test.ts (2 tests) 5ms
+ ✓  parallel  tests/authError.test.ts (6 tests) 7ms
+ ✓  parallel  tests/localAgentSelection.test.ts (2 tests) 9ms
+ ✓  parallel  tests/identity.test.ts (1 test) 9ms
+ ✓  parallel  tests/pageBackground.test.ts (3 tests) 7ms
+ ✓  parallel  tests/viewMenu.test.ts (4 tests) 7ms
+ ✓  parallel  tests/pageSelection.test.ts (2 tests) 9ms
+ ✓  parallel  tests/localClaudeBrowser.test.tsx (1 test) 44ms
+ ✓  parallel  tests/homePrompt.test.ts (3 tests) 5ms
+ ✓  parallel  tests/escapedHtml.test.ts (4 tests) 10ms
+ ✓  parallel  tests/geminiCloudAllowance.test.ts (1 test) 10ms
+ ✓  parallel  tests/legacyPagesMigration.test.ts (1 test) 3348ms
+   ✓ persists legacy membership before reordering, including after reopening the database 3346ms
+ ✓  parallel  tests/privateMediaLimits.test.ts (2 tests) 6ms
+ ✓  parallel  tests/signupLanding.test.ts (3 tests) 6ms
+ ✓  parallel  tests/cn.test.ts (3 tests) 11ms
+ ✓  parallel  tests/privateStorageLifecycle.test.ts (1 test) 279ms
+ ✓  parallel  tests/signupRestrictions.test.ts (2 tests) 3975ms
+ ✓  clipboard  tests/elementContextMenuBrowser.test.ts (16 tests) 16737ms
+   ✓ frame and element context menus (16)
+     ✓ renames a frame from the Layers panel without losing editor focus 1419ms
+     ✓ renames a image from the Layers panel without losing editor focus 906ms
+     ✓ renames nested layer #photo and restores its name after reload 1614ms
+     ✓ renames nested layer #text and restores its name after reload 1564ms
+     ✓ renames nested layer #box and restores its name after reload 1616ms
+     ✓ opens the frame menu only from its title, and targets the clicked element 956ms
+     ✓ shares hide, unlock, and link actions with the layer panel 1032ms
+     ✓ does not open the frame or background menu in empty frame space 603ms
+     ✓ resolves elements at canvas zoom and treats SVG artwork as a layer 673ms
+     ✓ keeps rename undo and redo in sync with an actively edited text layer 1164ms
+     ✓ opens the element menu during inline text editing and preserves the final text 735ms
+     ✓ ignores a delayed hit from a dismissed menu when another element is right-clicked 733ms
+     ✓ keeps group actions on titles but restricts a surface action to its element 801ms
+     ✓ waits for the matching iframe document before using a position-based selector 944ms
+     ✓ disables a menu when a collaborator changes its document after it opens 667ms
+     ✓ copies table rows and cells through the Layers menu 1177ms
+ ✓  clipboard  tests/canvasClipboardBrowser.test.ts (17 tests) 14764ms
+   ✓ canvas clipboard shortcuts (17)
+     ✓ copies a whole element after a screenshot and pastes its children as one undo step 1481ms
+     ✓ pastes a newer external image instead of stale copied elements 1038ms
+     ✓ does not paste an old element when external text replaced the clipboard 792ms
+     ✓ copies and pastes immediately after leaving text editing with Escape 1334ms
+     ✓ keeps focus in another field when a remote lock ends text editing 835ms
+     ✓ keeps multiple copied elements together and selects the pasted set 784ms
+     ✓ copies through the element menu and pastes with the keyboard 992ms
+     ✓ copies a frame through its menu and pastes with the keyboard 868ms
+     ✓ replaces an element copy with an entire frame copied through the keyboard 762ms
+     ✓ preserves the previous copy when the element menu copy is denied 869ms
+     ✓ preserves the previous copy when the frame menu copy is denied 758ms
+     ✓ leaves native text copy and paste alone while an element is selected 671ms
+     ✓ copies selected paragraph text instead of the selected canvas element 674ms
+     ✓ duplicates the picked element when the key arrives as uppercase D 615ms
+     ✓ respects view protection when pasting 736ms
+     ✓ respects frame protection when pasting 717ms
+     ✓ respects element protection when pasting 716ms
+ ✓  clipboard  tests/pageCanvasBrowser.test.ts (11 tests) 8334ms
+   ✓ page camera and snapping (11)
+     ✓ centers the linked frame on a different page instead of fitting its distant siblings 989ms
+     ✓ selects a linked element after its frame mounts on the first page 1141ms
+     ✓ selects a linked element after its frame mounts on the second page 936ms
+     ✓ stamps an element that has no id yet when its link is copied 928ms
+     ✓ falls back to the frame when no element carries the linked id 405ms
+     ✓ opens the frame alone when the element parameter is not an id 428ms
+     ✓ opens links to script-created elements on the first page 1100ms
+     ✓ opens links to script-created elements on the second page 866ms
+     ✓ falls back to frame details when a script removes an element from the saved HTML 404ms
+     ✓ follows another element link and browser history within the same mounted canvas 455ms
+     ✓ does not snap a drag to the invisible frame on another page 520ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL   parallel  tests/drawingBrowser.test.ts > drawing on the canvas > preserves canvas comments and lets comment pins interrupt drawing without creating a shape
+AssertionError: expected '' to be 'Reply text' // Object.is equality
+
+- Expected
++ Received
+
+- Reply text
+
+ ❯ tests/drawingBrowser.test.ts:1796:55
+    1794|     await page.click(reply)
+    1795|     await page.keyboard.type('Reply text')
+    1796|     expect(await page.$eval(reply, (el) => el.value)).toBe('Reply text…
+       |                                                       ^
+    1797|     expect(await page.$eval(reply, (el) => getComputedStyle(el).cursor…
+    1798|     expect(saved).toHaveLength(0)
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL   parallel  tests/privateRendering.test.ts > real editor roundtrip retains private hashes and deeply escaped srcdoc while preserving authored data URLs
+AssertionError: expected [ 255, 255, 255 ] to deeply equal [ 13, 165, 67 ]
+
+- Expected
++ Received
+
+  [
+-   13,
+-   165,
+-   67,
++   255,
++   255,
++   255,
+  ]
+
+ ❯ tests/privateRendering.test.ts:623:50
+    621|     .toBuffer({ resolveWithObject: true })
+    622|   const at = (8 * painted.info.width + 8) * painted.info.channels
+    623|   expect([...painted.data.subarray(at, at + 3)]).toEqual(color)
+       |                                                  ^
+    624|   await root.waitForFunction(() => document.querySelectorAll('iframe')…
+    625|   const nestedElement = await root.$('iframe')
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+ Test Files  2 failed | 301 passed (303)
+      Tests  2 failed | 2726 passed (2728)
+   Start at  14:43:51
+   Duration  682.03s (tests 84%, import 13%, environment 2%, transform 1%)
+
+close timed out after 10000ms
+Tests closed successfully but something prevents 2 Vite servers from exiting
+You can try to identify the cause by enabling "hanging-process" reporter. See https://vitest.dev/guide/reporters.html#hanging-process-reporter
+error: script "test" exited with code 1

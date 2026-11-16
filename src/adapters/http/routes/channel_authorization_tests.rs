@@ -77,13 +77,23 @@ async fn simulation_and_application_thread_reads_hide_other_channels_and_tenants
     .unwrap();
     let other_thread = f
         .persistence
-        .create_thread(other_channel.id, "Other channel secret", &[])
+        .create_thread(
+            f.company.id,
+            crate::entities::address::AddressTarget::Desk(other_channel.id),
+            "Other channel secret",
+            &[],
+        )
         .await
         .unwrap();
     let viewer = Fixture::viewer(&f.owner);
     assert!(
         f.threads
-            .readable_thread(&viewer, f.company.id, f.channel, f.thread)
+            .readable_thread(
+                &viewer,
+                f.company.id,
+                crate::entities::address::AddressTarget::Desk(f.channel),
+                f.thread
+            )
             .await
             .unwrap()
             .is_some()
@@ -92,7 +102,12 @@ async fn simulation_and_application_thread_reads_hide_other_channels_and_tenants
     for id in [Uuid::new_v4(), f.foreign_thread, other_thread.id] {
         assert!(
             f.threads
-                .readable_thread(&viewer, f.company.id, f.channel, id)
+                .readable_thread(
+                    &viewer,
+                    f.company.id,
+                    crate::entities::address::AddressTarget::Desk(f.channel),
+                    id
+                )
                 .await
                 .unwrap()
                 .is_none()

@@ -1,5 +1,61 @@
 //! Fresh native workflow, binding, and responder in the existing provisioning transaction.
 use super::*;
+use crate::entities::address::AddressTarget;
+use crate::entities::transport::PrincipalId;
+
+pub(super) enum WorkflowTarget {
+    NewDesk(Uuid),
+    ExistingDesk(Uuid),
+    Agent { agent: Uuid, principal: PrincipalId },
+}
+
+impl WorkflowTarget {
+    fn association(&self) -> RelatedAssociation {
+        match *self {
+            Self::NewDesk(id) | Self::ExistingDesk(id) => {
+                RelatedAssociation::Channel(RelatedChannelId::new(id))
+            }
+            Self::Agent { principal, .. } => RelatedAssociation::Principal(principal),
+        }
+    }
+
+    fn selection(&self) -> Option<AddressTarget> {
+        match *self {
+            Self::NewDesk(id) => Some(AddressTarget::Desk(id)),
+            Self::ExistingDesk(_) => None,
+            Self::Agent { principal, .. } => Some(AddressTarget::Principal(principal)),
+        }
+    }
+
+    fn owner(&self) -> Option<Uuid> {
+        match *self {
+            Self::Agent { agent, .. } => Some(agent),
+            Self::NewDesk(_) | Self::ExistingDesk(_) => None,
+        }
+    }
+}
+
+pub(super) struct WorkflowProvisioning<'a> {
+    pub company: CompanyId,
+    pub requester: WorkflowActor,
+    pub agent_slug: &'a str,
+    pub reply_mode: ReplyMode,
+    pub steps: &'a [CustomStep],
+    pub key: &'a ProvisioningKey,
+}
+
+impl Provisioning {
+    pub(super) fn workflow<'a>(&'a self, agent_slug: &'a str) -> WorkflowProvisioning<'a> {
+        WorkflowProvisioning {
+            company: self.company,
+            requester: self.requester,
+            agent_slug,
+            reply_mode: self.reply_mode,
+            steps: &self.steps,
+            key: &self.key,
+        }
+    }
+}
 
 pub(crate) struct ProvisionedAssistant {
     pub(super) agent_id: Uuid,
@@ -26,7 +82,7 @@ impl ProvisionedAssistant {
     }
 }
 
-pub(super) struct NativeWorkflow {
+pub(crate) struct NativeWorkflow {
     pub workflow: WorkflowId,
     pub version: VersionId,
     pub binding: WorkflowBindingId,
@@ -68,7 +124,7 @@ pub(super) async fn provision_on(
         .fetch_one(&mut **tx)
         .await?;
     insert_channel_row_on(tx, company.as_uuid(), channel_id, &channel).await?;
-    insert_channel_slugs(
+    insert_desk_addresses(
         tx,
         company.as_uuid(),
         channel_id,
@@ -78,13 +134,17 @@ pub(super) async fn provision_on(
     .await?;
     write_channel_email_binding(tx, company.as_uuid(), channel_id, &channel).await?;
 
-    let native =
-        match provision_workflow_on(tx, templates, provisioning, &agent_slug, channel_id, true)
-            .await?
-        {
-            Ok(created) => created,
-            Err(refusal) => return Ok(Err(refusal)),
-        };
+    let native = match provision_workflow_on(
+        tx,
+        templates,
+        provisioning.workflow(&agent_slug),
+        WorkflowTarget::NewDesk(channel_id),
+    )
+    .await?
+    {
+        Ok(created) => created,
+        Err(refusal) => return Ok(Err(refusal)),
+    };
 
     Ok(Ok(ProvisionedAssistant {
         agent_id,
@@ -104,16 +164,13 @@ pub(super) async fn provision_on(
     }))
 }
 
-/// The reply-mode workflow on `agent_slug`, published, and its active binding on `channel_id`;
-/// with `select`, also the channel's first reply settings selecting it. A department desk that
-/// already has reply settings selects it itself (01DEP-P03-D9).
+/// Publish the reply workflow and its typed binding. Existing department desks select their
+/// replacement separately; new desks and agent principals bootstrap their first responder here.
 pub(super) async fn provision_workflow_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
-    provisioning: &Provisioning,
-    agent_slug: &str,
-    channel_id: Uuid,
-    select: bool,
+    provisioning: WorkflowProvisioning<'_>,
+    target: WorkflowTarget,
 ) -> AppResult<Provisioned<NativeWorkflow>> {
     let company = provisioning.company;
     let requester = provisioning.requester;
@@ -134,10 +191,12 @@ pub(super) async fn provision_workflow_on(
     let source = provisioning
         .reply_mode
         .agent_workflow()
-        .with_steps(provisioning.steps.clone())
+        .with_steps(provisioning.steps.to_vec())
         .compose(&decoder, AGENT_BASE_SOURCE)
         .and_then(|source| decoder.encode(&source))
-        .and_then(|source| retarget_agent(&decoder, &source, REPLY_AGENT_STEP, agent_slug))
+        .and_then(|source| {
+            retarget_agent(&decoder, &source, REPLY_AGENT_STEP, provisioning.agent_slug)
+        })
         .and_then(|source| rebase_workflow_id(&decoder, &source, workflow));
     let source = match source {
         Ok(source) => source,
@@ -148,7 +207,7 @@ pub(super) async fn provision_workflow_on(
         }
     };
     let draft = CompanyWorkflowDraft::from_template(company, workflow, template, source);
-    super::definitions::insert_draft_on(tx, &draft, requester, "copied").await?;
+    super::definitions::insert_draft_on(tx, &draft, requester, "copied", target.owner()).await?;
     let bundle = match compiled(tx, templates, &decoder, &draft, version).await? {
         Ok(bundle) => Arc::new(bundle),
         Err(refusal) => return Ok(Err(refusal)),
@@ -170,7 +229,7 @@ pub(super) async fn provision_workflow_on(
     .map_err(lifecycle_error)?;
     let bundle = super::definitions::publish_on(tx, &publication).await?;
 
-    let binding = provision_binding_on(tx, provisioning, channel_id, bundle, select).await?;
+    let binding = provision_binding_on(tx, &provisioning, target, bundle).await?;
     Ok(Ok(NativeWorkflow {
         workflow,
         version,
@@ -180,10 +239,9 @@ pub(super) async fn provision_workflow_on(
 
 async fn provision_binding_on(
     tx: &mut Transaction<'_, Postgres>,
-    provisioning: &Provisioning,
-    channel_id: Uuid,
+    provisioning: &WorkflowProvisioning<'_>,
+    target: WorkflowTarget,
     bundle: Arc<PublishedBundle>,
-    select: bool,
 ) -> AppResult<WorkflowBindingId> {
     let company = provisioning.company;
     let requester = provisioning.requester;
@@ -192,7 +250,17 @@ async fn provision_binding_on(
     let binding = WorkflowBindingId::new(key.id("binding"));
     let params = match provisioning.reply_mode {
         ReplyMode::Autonomous => json!({}),
-        ReplyMode::Reviewed => json!({"reviewer": requester.user_id().to_string()}),
+        ReplyMode::Reviewed => {
+            let principal: Uuid = sqlx::query_scalar(
+                "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+            )
+            .bind(company.as_uuid())
+            .bind(requester.user_id())
+            .fetch_optional(&mut **tx)
+            .await?
+            .ok_or_else(missing)?;
+            json!({"reviewer": principal.to_string()})
+        }
     };
     let changes = provisioned_binding(
         BindingTarget {
@@ -200,7 +268,7 @@ async fn provision_binding_on(
             actor: requester,
             binding,
         },
-        RelatedAssociation::Channel(RelatedChannelId::new(channel_id)),
+        target.association(),
         params,
         MessageTrigger::Direct,
         bundle,
@@ -210,15 +278,43 @@ async fn provision_binding_on(
         super::bindings::save_binding_on(tx, change).await?;
     }
 
-    if select {
-        super::channel_reply::bootstrap_native_on(
-            tx,
-            company,
-            RelatedChannelId::new(channel_id),
-            requester,
-            binding,
-        )
-        .await?;
+    if let Some(selected) = target.selection() {
+        super::channel_reply::bootstrap_native_on(tx, company, selected, requester, binding)
+            .await?;
     }
     Ok(binding)
+}
+
+pub(crate) struct AgentWorkflowOwner<'a> {
+    pub agent: Uuid,
+    pub principal: PrincipalId,
+    pub slug: &'a str,
+}
+
+/// Provision the agent's owned autonomous workflow without creating a shared intake desk.
+pub(crate) async fn provision_agent_workflow_on(
+    tx: &mut Transaction<'_, Postgres>,
+    templates: &ProvisioningDeployment,
+    company: CompanyId,
+    actor: WorkflowActor,
+    owner: AgentWorkflowOwner<'_>,
+) -> AppResult<Provisioned<NativeWorkflow>> {
+    let key = ProvisioningKey::agent(owner.agent);
+    provision_workflow_on(
+        tx,
+        templates,
+        WorkflowProvisioning {
+            company,
+            requester: actor,
+            agent_slug: owner.slug,
+            reply_mode: ReplyMode::Autonomous,
+            steps: &[],
+            key: &key,
+        },
+        WorkflowTarget::Agent {
+            agent: owner.agent,
+            principal: owner.principal,
+        },
+    )
+    .await
 }

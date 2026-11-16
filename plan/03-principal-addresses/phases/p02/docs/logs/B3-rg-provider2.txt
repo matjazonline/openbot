@@ -1,0 +1,1 @@
+/opt/homebrew/Caskroom/codex/0.169.0/codex-path/rg: Mach-O 64-bit executable arm64

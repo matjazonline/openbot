@@ -1,0 +1,15 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 9 tests
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::persistence::legacy_runtime_schema_tests::the_legacy_runtime_tables_columns_and_functions_are_gone ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+test adapters::persistence::legacy_runtime_schema_tests::no_catalog_object_names_the_legacy_runtime ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4694 filtered out; finished in 9.39s
+

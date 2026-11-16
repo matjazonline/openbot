@@ -433,7 +433,7 @@ impl QualifiedIdentity {
 
 /// Transport-neutral intent to address a business channel.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub enum ChannelSelector {
+pub enum AddressSelector {
     CurrentCompany(ChannelSlug),
     Qualified {
         company: CompanySlug,
@@ -443,30 +443,30 @@ pub enum ChannelSelector {
 
 /// A selector text that names no channel, or names one in a shape this platform cannot address.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-pub enum InvalidChannelSelector {
+pub enum InvalidAddressSelector {
     #[error("a channel selector cannot be empty")]
     Empty,
     #[error("a channel selector is 'channel' or 'company/channel', not '{0}'")]
     Shape(String),
 }
 
-impl ChannelSelector {
+impl AddressSelector {
     /// Read a selector as an agent or an operator writes it: `support`, or `acme/support`.
     ///
     /// This is the whole grammar. It deliberately does not accept an address: an address is one
     /// transport's way of reaching a channel, and parsing one here is how the routing key came to
     /// be an email string. A caller holding an address resolves it through that transport's
     /// adapter instead.
-    pub fn parse(value: &str) -> Result<Self, InvalidChannelSelector> {
+    pub fn parse(value: &str) -> Result<Self, InvalidAddressSelector> {
         let value = value.trim();
         if value.is_empty() {
-            return Err(InvalidChannelSelector::Empty);
+            return Err(InvalidAddressSelector::Empty);
         }
         let mut parts = value.split('/');
         let first = parts.next().unwrap_or_default().trim();
         let second = parts.next().map(str::trim);
         if parts.next().is_some() || first.is_empty() || second.is_some_and(str::is_empty) {
-            return Err(InvalidChannelSelector::Shape(value.to_string()));
+            return Err(InvalidAddressSelector::Shape(value.to_string()));
         }
         Ok(match second {
             Some(channel) => Self::Qualified {
@@ -491,7 +491,7 @@ impl ChannelSelector {
     }
 }
 
-impl fmt::Display for ChannelSelector {
+impl fmt::Display for AddressSelector {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::CurrentCompany(channel) => write!(formatter, "{channel}"),
@@ -571,14 +571,14 @@ mod tests {
     #[test]
     fn a_channel_selector_reads_a_channel_or_a_company_and_channel_and_nothing_else() {
         assert_eq!(
-            ChannelSelector::parse("  Support "),
-            Ok(ChannelSelector::CurrentCompany(ChannelSlug::from(
+            AddressSelector::parse("  Support "),
+            Ok(AddressSelector::CurrentCompany(ChannelSlug::from(
                 "support"
             )))
         );
         assert_eq!(
-            ChannelSelector::parse("Acme/Support"),
-            Ok(ChannelSelector::Qualified {
+            AddressSelector::parse("Acme/Support"),
+            Ok(AddressSelector::Qualified {
                 company: CompanySlug::from("acme"),
                 channel: ChannelSlug::from("support"),
             })
@@ -586,7 +586,7 @@ mod tests {
 
         for rejected in ["", "   ", "/", "support/", "/support", "a/b/c"] {
             assert!(
-                ChannelSelector::parse(rejected).is_err(),
+                AddressSelector::parse(rejected).is_err(),
                 "expected {rejected:?} to be refused"
             );
         }
@@ -597,14 +597,14 @@ mod tests {
     #[test]
     fn a_selector_round_trips_through_its_displayed_form() {
         for selector in [
-            ChannelSelector::CurrentCompany(ChannelSlug::from("support")),
-            ChannelSelector::Qualified {
+            AddressSelector::CurrentCompany(ChannelSlug::from("support")),
+            AddressSelector::Qualified {
                 company: CompanySlug::from("acme"),
                 channel: ChannelSlug::from("support"),
             },
         ] {
             assert_eq!(
-                ChannelSelector::parse(&selector.to_string()),
+                AddressSelector::parse(&selector.to_string()),
                 Ok(selector.clone())
             );
         }
@@ -684,7 +684,7 @@ mod tests {
             IdentityNamespace::parse("installation-a").unwrap(),
             IdentitySubject::parse("U123").unwrap(),
         ));
-        assert_round_trip(ChannelSelector::Qualified {
+        assert_round_trip(AddressSelector::Qualified {
             company: CompanySlug::new("acme"),
             channel: ChannelSlug::new("support"),
         });

@@ -96,7 +96,7 @@ pub fn channel_response_settings(view: &ChannelResponseSettingsView<'_>) -> Stri
         <label class="form-control">Final result mapping (JSON)<textarea class="textarea w-full" name="contract" rows="4" maxlength="16384" aria-describedby="channel-response-help">{contract}</textarea></label>
         <p id="channel-response-help" class="text-xs opacity-70">Use format_version 1 with subject and body. Each selects a literal or a ref such as /input/body from the final result. Required string fields only; mapping is checked when saved.</p>
         <label class="form-control">Final response approval policy (optional JSON)<textarea class="textarea w-full" name="approval_policy" rows="2" maxlength="16384" aria-describedby="channel-response-review-help">{policy}</textarea></label>
-        <p id="channel-response-review-help" class="text-xs opacity-70">Leave blank for no final review. Otherwise name static user reviewers and review_timeout_seconds (1–86400). Review requests stay private.</p>
+        <p id="channel-response-review-help" class="text-xs opacity-70">Leave blank for no final review. Otherwise name static person-principal reviewers and review_timeout_seconds (1–86400). Review requests stay private.</p>
         <button type="submit" class="btn btn-primary btn-sm">Save response settings</button>
         </form></section>"##,
         company = view.company,

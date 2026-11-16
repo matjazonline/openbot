@@ -28,7 +28,8 @@ async fn desk_row(f: &Departments, desk: Uuid) -> (String, String, Option<Uuid>,
     sqlx::query_as(
         "SELECT slug.slug::text, channel.name, channel.department_id, channel.members_only \
            FROM channels AS channel \
-           JOIN channel_slugs AS slug ON slug.channel_id = channel.id AND slug.is_primary \
+           JOIN addresses AS slug ON slug.company_id = channel.company_id \
+            AND slug.channel_id = channel.id AND slug.is_primary \
           WHERE channel.company_id = $1 AND channel.id = $2",
     )
     .bind(f.company)
@@ -95,35 +96,36 @@ async fn selected(f: &Departments, desk: Uuid) -> Option<(Option<Uuid>, Option<i
     .unwrap()
 }
 
-/// An agent's own default desk as it stands: desk, binding, the binding's state and the desk's
-/// selection. Department-desk provisioning and re-leading never change it (plan 03 focused
-/// checks; 01DEP-P03-B2-F2).
-async fn own_desk(
-    f: &Departments,
-    principal: PrincipalId,
-) -> (Uuid, Uuid, Bound, Option<(Option<Uuid>, Option<i64>)>) {
-    let agent: Uuid = sqlx::query_scalar("SELECT agent_id FROM principals WHERE id = $1")
-        .bind(principal.as_uuid())
-        .fetch_one(f.pool())
-        .await
-        .unwrap();
-    let record: serde_json::Value = sqlx::query_scalar(
-        "SELECT result FROM workflow_provisioning_commands \
-         WHERE company_id = $1 AND command_key = $2",
+/// The lead's direct inbox stays independent of its department's shared desk.
+#[derive(Debug, PartialEq)]
+struct OwnInbox {
+    target: crate::entities::address::AddressTarget,
+    binding: Uuid,
+    configuration: Bound,
+    selected: Option<(Option<Uuid>, Option<i64>)>,
+    address: String,
+}
+
+async fn own_inbox(f: &Departments, principal: PrincipalId) -> OwnInbox {
+    let selected:Option<(Option<Uuid>,Option<i64>)>=sqlx::query_as(
+        "SELECT binding_id,binding_revision FROM channel_reply_settings WHERE company_id=$1 AND principal_id=$2",
+    ).bind(f.company).bind(principal.as_uuid()).fetch_optional(f.pool()).await.unwrap();
+    let binding = selected.unwrap().0.unwrap();
+    let address: String = sqlx::query_scalar(
+        "SELECT slug::text FROM addresses WHERE company_id=$1 AND principal_id=$2 AND is_primary",
     )
     .bind(f.company)
-    .bind(format!("agent:{agent}"))
+    .bind(principal.as_uuid())
     .fetch_one(f.pool())
     .await
     .unwrap();
-    let desk = uuid(&record["channel"]["id"]).unwrap();
-    let binding = uuid(&record["binding_id"]).unwrap();
-    (
-        desk,
+    OwnInbox {
+        target: crate::entities::address::AddressTarget::Principal(principal),
         binding,
-        bound(f, binding).await,
-        selected(f, desk).await,
-    )
+        configuration: bound(f, binding).await,
+        selected,
+        address,
+    }
 }
 
 async fn desk_bindings(f: &Departments, desk: Uuid) -> i64 {
@@ -166,14 +168,14 @@ async fn department_lead_desk_with_an_agent_lead_answers_on_it() {
     let Some(f) = Departments::new().await else {
         return;
     };
-    let own = own_desk(&f, f.agent_principal).await;
+    let own = own_inbox(&f, f.agent_principal).await;
     let department = create_led(&f, "Ops Room", Some(f.agent_principal))
         .await
         .unwrap();
     assert_eq!(
-        own_desk(&f, f.agent_principal).await,
+        own_inbox(&f, f.agent_principal).await,
         own,
-        "the lead's own desk is untouched"
+        "the lead's direct inbox is untouched"
     );
     let record = record(&f, department.id).await;
     let desk = uuid(&record["channel"]["id"]).unwrap();
@@ -274,6 +276,42 @@ async fn department_lead_desk_taken_address_refuses_the_department() {
     }
 }
 
+/// Plan 03 p01: a department's own desk shares the namespace with people, so it cannot take a
+/// person's address either, and the refused creation leaves nothing behind.
+#[tokio::test]
+async fn address_namespace_a_department_desk_cannot_take_a_persons_address() {
+    let Some(f) = Departments::new().await else {
+        return;
+    };
+    // The fixture writes its principals directly, so give its member person the address that
+    // joining would have given them.
+    let person = "dept-person";
+    sqlx::query(
+        "INSERT INTO addresses (company_id, slug, target_kind, principal_id, is_primary) \
+         VALUES ($1, $2, 'principal', $3, true)",
+    )
+    .bind(f.company)
+    .bind(person)
+    .bind(f.member_principal.as_uuid())
+    .execute(f.pool())
+    .await
+    .unwrap();
+    let departments = || async {
+        sqlx::query_scalar::<_, i64>("SELECT count(*) FROM departments WHERE company_id = $1")
+            .bind(f.company)
+            .fetch_one(f.pool())
+            .await
+            .unwrap()
+    };
+    let before = departments().await;
+    let refused = create_led(&f, person, None).await;
+    assert!(
+        matches!(&refused, Err(AppError::Conflict(message)) if message.contains(&format!("'{person}'"))),
+        "{refused:?}"
+    );
+    assert_eq!(departments().await, before);
+}
+
 /// 03B.2: renaming the department keeps its desk, and the desk still follows the lead; once the
 /// desk is detached, a lead change touches no desk.
 #[tokio::test]
@@ -358,14 +396,14 @@ async fn department_lead_desk_agent_to_agent_repoints_the_same_binding() {
     let desk = uuid(&record["channel"]["id"]).unwrap();
     let binding = uuid(&record["binding_id"]).unwrap();
     let own = (
-        own_desk(&f, f.agent_principal).await,
-        own_desk(&f, closer).await,
+        own_inbox(&f, f.agent_principal).await,
+        own_inbox(&f, closer).await,
     );
     lead(&f, f.admin, department.id, closer).await.unwrap();
     assert_eq!(
         (
-            own_desk(&f, f.agent_principal).await,
-            own_desk(&f, closer).await
+            own_inbox(&f, f.agent_principal).await,
+            own_inbox(&f, closer).await
         ),
         own,
         "neither lead's own desk changes"
@@ -394,7 +432,7 @@ async fn department_lead_desk_follows_person_and_agent_leads_with_one_binding() 
     let Some(f) = Departments::new().await else {
         return;
     };
-    let own = own_desk(&f, f.agent_principal).await;
+    let own = own_inbox(&f, f.agent_principal).await;
     let department = create_led(&f, "Field", Some(f.agent_principal))
         .await
         .unwrap();
@@ -418,7 +456,7 @@ async fn department_lead_desk_follows_person_and_agent_leads_with_one_binding() 
     );
     assert_eq!(desk_bindings(&f, desk).await, 1);
     assert_eq!(
-        own_desk(&f, f.agent_principal).await,
+        own_inbox(&f, f.agent_principal).await,
         own,
         "pausing and resuming leave its own desk"
     );
@@ -561,11 +599,19 @@ async fn department_lead_desk_refuses_lead_changes_it_cannot_follow() {
     assert_eq!(bound(&f, binding).await.agent.as_deref(), Some("closer"));
 
     // An approval policy on the desk's replies.
+    let owner_principal: Uuid = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company)
+    .bind(f.owner)
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
     sqlx::query("UPDATE channel_reply_settings SET approval_policy = $3, revision = revision + 1 WHERE company_id = $1 AND channel_id = $2")
         .bind(f.company)
         .bind(desk)
         .bind(serde_json::to_value(
-            crate::application::workflow::channel_reply::ReplyApprovalPolicy::new(vec![f.owner], 3600).unwrap(),
+            crate::application::workflow::channel_reply::ReplyApprovalPolicy::new(vec![owner_principal], 3600).unwrap(),
         ).unwrap())
         .execute(f.pool())
         .await
@@ -646,17 +692,24 @@ async fn department_lead_desk_follows_an_agent_created_as_its_lead() {
     .fetch_one(f.pool())
     .await
     .unwrap();
-    let (desk, own_binding, own, own_selected) = own_desk(&f, PrincipalId::new(grower)).await;
-    assert_ne!(own_binding, binding, "its own desk keeps its own binding");
+    let own = own_inbox(&f, PrincipalId::new(grower)).await;
+    assert_ne!(
+        own.binding, binding,
+        "its direct inbox keeps its own binding"
+    );
     assert_eq!(
-        (own.active, own.agent.as_deref(), own_selected),
+        (
+            own.configuration.active,
+            own.configuration.agent.as_deref(),
+            own.selected
+        ),
         (
             true,
             Some("grower"),
-            Some((Some(own_binding), Some(own.configuration)))
+            Some((Some(own.binding), Some(own.configuration.configuration)))
         )
     );
-    assert_eq!(desk_row(&f, desk).await.0, "grower");
+    assert_eq!(own.address, "grower");
 }
 
 /// Decision 9: a department whose agent-led desk is still its own is not deleted; detached, it is.
@@ -796,6 +849,7 @@ async fn department_lead_desk_leaves_a_users_own_responder_alone() {
     };
     let configured = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Channel(RelatedChannelId::new(desk)),
@@ -817,7 +871,7 @@ async fn department_lead_desk_leaves_a_users_own_responder_alone() {
     let settings = p
         .channel_reply_settings(
             CompanyId::new(f.company),
-            RelatedChannelId::new(desk),
+            crate::entities::address::AddressTarget::Desk((RelatedChannelId::new(desk)).as_uuid()),
             owner,
         )
         .await
@@ -825,7 +879,7 @@ async fn department_lead_desk_leaves_a_users_own_responder_alone() {
         .unwrap();
     p.configure_channel_reply(ConfigureChannelReply {
         company: CompanyId::new(f.company),
-        channel: RelatedChannelId::new(desk),
+        target: crate::entities::address::AddressTarget::Desk(desk),
         actor: owner,
         expected: Some(settings.revision),
         responder: Some(ConfigureResponder {

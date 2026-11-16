@@ -68,10 +68,15 @@ pub fn agent_action_target(
                 crate::entities::agent_capability::AgentBuiltinTool::MessageSend
                 | crate::entities::agent_capability::AgentBuiltinTool::MessageReply => "messaging",
                 crate::entities::agent_capability::AgentBuiltinTool::ListCompanyAgents
-                | crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel => {
+                | crate::entities::agent_capability::AgentBuiltinTool::CreateAgent
+                | crate::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent => {
                     "provisioning"
                 }
                 crate::entities::agent_capability::AgentBuiltinTool::SearchKnowledge => "knowledge",
+                crate::entities::agent_capability::AgentBuiltinTool::ReadEscalation
+                | crate::entities::agent_capability::AgentBuiltinTool::RespondToEscalation => {
+                    "escalation"
+                }
                 crate::entities::agent_capability::AgentBuiltinTool::SearchMemory
                 | crate::entities::agent_capability::AgentBuiltinTool::MemoryTimeline
                 | crate::entities::agent_capability::AgentBuiltinTool::MemoryDetails

@@ -1,0 +1,38 @@
+{
+  "reason": "Current full attempt has known failures and required production MCP correction; rerun complete gate after correction",
+  "artifact": "3afe41d0dd998fb1209be1ed1e017ce940c06d6dc9b2185079d5496445e652df",
+  "script_pid": 47951,
+  "stopped_owned_descendants": [
+    74874,
+    74849,
+    47951
+  ],
+  "observed_test_lines": 2490,
+  "observed_failures": [
+    "test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... FAILED",
+    "test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... FAILED",
+    "test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED",
+    "test adapters::persistence::legacy_runtime_schema_tests::no_catalog_object_names_the_legacy_runtime ... FAILED",
+    "test adapters::persistence::legacy_runtime_schema_tests::the_legacy_runtime_tables_columns_and_functions_are_gone ... FAILED",
+    "test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... FAILED",
+    "test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses ... FAILED",
+    "test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... FAILED",
+    "test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... FAILED"
+  ],
+  "active_disposable_databases": [
+    "open_bots_own_099a6e7201e1490b841988f001ba26f6",
+    "open_bots_own_13d3c9b921b74cd081fc1f8177bf6732",
+    "open_bots_own_1eb3702c3ecd44a4900e45e505605499",
+    "open_bots_own_2429493213f34157a984fa6a6c8e5c83",
+    "open_bots_own_54d4b98f86f8412880a6269301480bca",
+    "open_bots_own_6ff92d84cba1404b83bda8bd150a5802",
+    "open_bots_own_ac9871d625374dbd9695bf405ee27979",
+    "open_bots_own_b00cd01f5be14b6fb9b035e722b681b2",
+    "open_bots_own_c59c6769d2c54453a74595c35366c272",
+    "open_bots_own_da9c7b43c856463a92ef3b2c32a179b0",
+    "open_bots_own_e3125b0c84e144e19b78c8e85c62f354",
+    "open_bots_own_fbbe2bd5aa7e4edfb176e17ca1b63807",
+    "open_bots_own_fe67460a0ed142a0bb619727b877ce40"
+  ],
+  "other_clusters": "untouched"
+}

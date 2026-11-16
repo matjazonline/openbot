@@ -254,6 +254,7 @@ pub struct BindingFormView<'a> {
     pub mcp: &'a [ChoiceOption],
     pub typesafe: &'a [ChoiceOption],
     pub message_trigger: &'a str,
+    pub escalation: Option<crate::application::workflow::binding::EscalationPolicy>,
     pub run_as: Option<Uuid>,
     /// Only the company owner may name somebody else.
     pub owner: bool,
@@ -299,6 +300,7 @@ pub fn workflow_binding_form(form: &BindingFormView<'_>) -> String {
                 {params}
                 {resources}
                 <div class="grid gap-3 sm:grid-cols-2">{trigger}{run_as}</div>
+                {escalation}
                 {cut}
                 <div class="flex items-center gap-3 border-t border-base-300 pt-3">
                     <button type="submit" class="btn btn-primary btn-sm">Save binding</button>
@@ -312,6 +314,7 @@ pub fn workflow_binding_form(form: &BindingFormView<'_>) -> String {
         params = params_fields(form),
         resources = resource_fields(form),
         trigger = trigger_field(form),
+        escalation = escalation_field(form.escalation),
         run_as = run_as_field(form),
         cut = if form.options_truncated {
             r#"<p class="text-xs text-error">Some lists are cut at 200 entries.</p>"#
@@ -575,6 +578,34 @@ fn resource_fields(form: &BindingFormView<'_>) -> String {
         .collect();
     format!(
         r#"<fieldset class="space-y-1"><legend class="text-sm font-semibold">Resources</legend><div class="grid gap-3 sm:grid-cols-2">{fields}</div></fieldset>"#
+    )
+}
+
+fn escalation_field(
+    policy: Option<crate::application::workflow::binding::EscalationPolicy>,
+) -> String {
+    let selected = policy
+        .map(|policy| format!("{}:{}", policy.notify, policy.hops.get()))
+        .unwrap_or_default();
+    let options: String = [
+        ("", "Disabled"),
+        ("lead:1", "Lead, one hop"),
+        ("lead:2", "Lead, then parent lead"),
+        ("reviewer:1", "Reviewers, one hop"),
+        ("reviewer:2", "Reviewers, then parent lead"),
+    ]
+    .into_iter()
+    .map(|(value, label)| {
+        format!(
+            r#"<option value="{value}"{}>{label}</option>"#,
+            if value == selected { " selected" } else { "" }
+        )
+    })
+    .collect();
+    labelled(
+        "Escalation",
+        "Available on a department-owned desk.",
+        &format!(r#"<select class="select w-full" name="escalation">{options}</select>"#),
     )
 }
 

@@ -20,6 +20,9 @@ pub struct ProfilePage<'a> {
     /// has anywhere to put them.
     pub company: Option<&'a Company>,
     pub pane_html: &'a str,
+    /// The account's own addresses, a fragment of its own beside the pane so the pane's other
+    /// forms re-render without it -- see [`profile_addresses`].
+    pub addresses_html: &'a str,
 }
 
 /// What the identity form was last submitted with, so a rejected save comes back filled in.
@@ -43,6 +46,7 @@ pub enum ProfileForm {
     Identity,
     Password,
     Notifications,
+    Address,
 }
 
 /// How a submit went, attached to the form that made it.
@@ -99,9 +103,11 @@ pub fn profile_page(page: &ProfilePage<'_>) -> String {
         r##"
         <main class="min-w-0 flex-1 overflow-y-auto bg-base-100">
             {pane_html}
+            {addresses_html}
         </main>
         "##,
         pane_html = page.pane_html,
+        addresses_html = page.addresses_html,
     );
 
     ui_shell(&UiShell {
@@ -150,6 +156,72 @@ pub fn profile_pane(pane: &ProfilePane<'_>) -> String {
         login_methods = login_methods_section(pane),
         notifications = notification_preferences_section(pane),
         password = password_section(pane.user, pane.pending, pane.methods, &pane.outcome),
+    )
+}
+
+/// The account's own address in each company it belongs to, editable one company at a time.
+pub struct ProfileAddresses<'a> {
+    pub addresses: &'a [crate::entities::address::PersonAddress],
+    pub app_domain_name: &'a str,
+    /// The company whose address was just submitted, and how that went.
+    pub submitted: Option<(uuid::Uuid, ProfileOutcome<'a>)>,
+}
+
+/// The addresses section, swapped as one fragment by its own form.
+pub fn profile_addresses(section: &ProfileAddresses<'_>) -> String {
+    let rows = if section.addresses.is_empty() {
+        "<p class=\"text-sm opacity-70\">You do not belong to a company yet.</p>".to_owned()
+    } else {
+        section
+            .addresses
+            .iter()
+            .map(|address| profile_address_form(address, section))
+            .collect::<String>()
+    };
+    format!(
+        r##"<section id="profile-addresses" class="mx-auto max-w-3xl px-6 pb-10 lg:px-10">
+            <div class="rounded-box border border-base-300 p-5">
+                <h2 class="text-lg font-semibold">Your addresses</h2>
+                <p class="mb-4 text-sm opacity-70">Your address in each company you belong to. It cannot be one a desk, person or agent there already uses.</p>
+                {rows}
+            </div>
+        </section>"##
+    )
+}
+
+fn profile_address_form(
+    address: &crate::entities::address::PersonAddress,
+    section: &ProfileAddresses<'_>,
+) -> String {
+    let banner = match &section.submitted {
+        Some((company, outcome)) if *company == address.company_id => {
+            outcome.banner(ProfileForm::Address)
+        }
+        _ => String::new(),
+    };
+    let field = format!("address-{}", address.company_id);
+    format!(
+        r##"<form class="mb-4" hx-put="/ui/profile/addresses/{company_id}" hx-target="#profile-addresses" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type='submit']">
+                <label class="mb-1 block text-sm font-medium" for="{field}">{company_name}</label>
+                {banner}
+                <div class="join w-full">
+                    <input id="{field}" name="slug" class="input join-item w-full" value="{slug}" required autocomplete="off">
+                    <span class="join-item flex items-center border border-base-300 px-3 font-mono text-xs opacity-70">@{domain}</span>
+                </div>
+                <button type="submit" class="btn btn-primary btn-sm mt-3">
+                    <span class="loading loading-spinner loading-sm hidden [.htmx-request_&]:inline-block"></span>
+                    <span class="[.htmx-request_&]:hidden">Save address</span>
+                    <span class="hidden [.htmx-request_&]:inline">Saving...</span>
+                </button>
+            </form>"##,
+        company_id = address.company_id,
+        company_name = escape_html_text(&address.company_name),
+        slug = escape_html_attr(&address.slug),
+        domain = escape_html_text(&format!(
+            "{}.{}",
+            address.company_slug, section.app_domain_name
+        )),
     )
 }
 

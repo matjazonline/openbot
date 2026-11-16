@@ -1,0 +1,19 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers' (2244706) panicked at src/adapters/persistence/workflow/reviewer_wait_hint_tests.rs:196:60:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_pending_child_resume_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4373 filtered out; finished in 1.58s
+

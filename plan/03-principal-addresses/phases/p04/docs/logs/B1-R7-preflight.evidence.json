@@ -1,0 +1,148 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R7-preflight",
+  "artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362",
+  "checks": [
+    {
+      "criteria": [
+        "FC2"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib autonomous_agent_contract_ -- --nocapture",
+      "fixture": "Current source / real bounded decoder, canonical digest and schema/secret rejection;9 assertions cases, no DB stand-in",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R6-definition-contract-focused.txt",
+          "sha256": "86c748d84738d43f45c487d0ee7c3f69ac4cd2308774ce83fa8d74636781f146"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2"
+      ],
+      "command": "scripts/test-network-isolation.sh pa03-p04-reader-corrected-libtest autonomous_agent_resolution_ autonomous_agent_native_definition_ autonomous_agent_views_ doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas --nocapture",
+      "fixture": "Exact bc5bb926 binary; owned PG51167/diag plus own UUID DBs;4 parallel threads;20 exercised cases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-reader-doop-focused1.txt",
+          "sha256": "cff4956cf2ca097a782ff33cabd354842f577969ba88708a1d4942b1dcc8302e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh pa03-p04-reader-corrected-libtest <33 exact names retained in summary> --exact --nocapture",
+      "fixture": "Same current binary/process;33 original R5 failures,4 parallel threads; all guards/deadlines retained",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-original33-replay.txt",
+          "sha256": "d56793c5ba6ba84c9d6ff9c3c6d86220acaa9eb1e86341a15f39d673584bc017"
+        },
+        {
+          "path": "logs/R7-original33-replay-summary.json",
+          "sha256": "309e7b5e3cea7661c64eb6a98baed88cf4d8c277c14842fcdc9afe6322bfbf30"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Current source; exit0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Current source/all target offline compilation; owned external cache; exit0",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-clippy-check.txt",
+          "sha256": "74bb8f9ed7a17b21e98dd5b86f3c30314f21608b6cd1fb1461e726a4c687830e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "pa03-p04-reader-corrected-libtest --list; compare D2-r4 inventory",
+      "fixture": "4704\u21924705; exactly1 new canonical decoder test;0 removed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-inventory.txt",
+          "sha256": "7a394b4f267ecfdf1f996b57e0c23bfb2446da7465c3f0aee91971977e6af4ac"
+        },
+        {
+          "path": "logs/R7-inventory-delta.json",
+          "sha256": "2884e49663786725270b6d80ac1345ff28545fcf150111f6a908455c86b13357"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "trail check; trail build",
+      "fixture": "Current source/learnings; no conflicts; graph refreshed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-trail-check.txt",
+          "sha256": "9d81c8f454f500bdd5d2fc6324ef19bfc104d14c93dd3baa1cd510ddc04d9042"
+        },
+        {
+          "path": "logs/R7-trail-build.txt",
+          "sha256": "506f7bb47e649fceff06019bf76372f3f1d13cf9bd2335d10815895fb6019bea"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "git push <exact material candidate957de863> to temporary CI branch; compare all material blobs",
+      "fixture": "Alternate index only;39 changed blobs byte-identical to current files, all others HEAD; actual root HEAD/index unchanged. This proves source identity/push, not workflow success",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R7-ci-source.json",
+          "sha256": "84848041e9db300c36200a0cf5570f3bc4569e0fe272d9f40a14a0fe0bd14291"
+        },
+        {
+          "path": "logs/R7-ci-push.txt",
+          "sha256": "d1de08df9c230f37b18ccc9817fd899de02eba43d5b9aaf7e17b845ce700510c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "scripts/check.sh; complete required CI/private Doop/memory/browser gates; final independent acceptance",
+      "fixture": "Corrected final current artifact: local full gate not yet restarted; CI43772170617/Memory43772170696 running",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Only focused correction checks pass. Earlier full R5 failed33 cases; all33 now pass focused, but the required complete final gate and CI/private acceptance remain pending."
+    }
+  ]
+}

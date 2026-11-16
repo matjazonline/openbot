@@ -1,0 +1,133 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 19s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 47 tests
+test adapters::http::app_error_impl::role_tests::workflow_role_http_refusal_is_a_bounded_named_bad_request ... ok
+test adapters::http::pages::workflow_runs::provenance::role_tests::workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_preserves_unsaved_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_missing_holder_refuses_before_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_company_teardown_releases_the_complete_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_malformed_frozen_role_requirements_fail_closed ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_every_domain_kind ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_rows_and_future_resolution_revision_are_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_captures_exact_principal_revision_and_canonical_membership ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_missing_holder_has_no_run_or_partial_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::workflow_role_admission_sealed_set_rejects_late_people_and_extra_requirements ... ok
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor ... ok
+test application::workflow::compiler::role_selection_tests::workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_model_and_people_requirements_coexist_on_one_step_without_selector_confusion ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_has_requirements_without_agent_capture_and_restores_exactly ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_mixed_steps_keep_only_the_pinned_agent ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_sample_and_help_explain_the_same_requirement ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind ... ok
+test application::workflow::roles::tests::workflow_role_admission_input_preparation_uses_the_frozen_requirement_and_sample_refuses_contextless_execution ... ok
+test application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents ... ok
+test application::workflow::roles::tests::workflow_role_resolve_missing_depth_and_cycle_are_bounded ... ok
+test application::workflow::roles::tests::workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through ... ok
+test application::workflow::roles::tests::workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_sql_capture_refuses_foreign_principals_and_unselected_revisions ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_message_refusal_is_definite_named_visible_and_admits_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::workflow_role_admission_two_desks_execute_frozen_holders_and_revisions_then_new_messages_resolve_again ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::model_only::workflow_role_admission_model_only_classification_and_decision_execute_without_tools_or_history ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::children::workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection ... ok
+
+failures:
+
+---- adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane stdout ----
+
+thread 'adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane' (48815014) panicked at src/adapters/http/routes/workflows/ui/authoring/bindings_tests.rs:812:5:
+<section id="workflow-pane" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100">
+            <div class="border-b border-base-300 px-4 pt-4 sm:px-6">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h2 class="min-w-0 truncate text-xl font-bold">Role workflow</h2>
+                    <a class="btn btn-ghost btn-xs ml-auto" href="/ui/workflow-runs?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;view=board&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a">Runs board</a>
+                </div>
+                <p class="mt-1 text-xs opacity-60">Draft revision 1 · 1 published version</p>
+                <nav role="tablist" class="tabs tabs-border mt-3" aria-label="Workflow views"><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=editor"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;tab=editor"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=editor">Editor</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=sample"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;tab=sample"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=sample">Sample</a><a role="tab" class="tab" aria-selected="false"
+                href="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=versions"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;tab=versions"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=versions">Versions and usage</a><a role="tab" class="tab tab-active" aria-selected="true"
+                href="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=bindings"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;tab=bindings"
+                hx-target="#workflow-pane" hx-swap="outerHTML" hx-sync="#workflow-pane:replace"
+                hx-push-url="/ui/workflows?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;workflow_id=f9b3e1c8-ae82-4708-8f8f-be18e5b9759a&amp;tab=bindings">Bindings</a></nav>
+            </div>
+            <div class="flex-1 overflow-y-auto px-4 py-4 sm:px-6"><div class="space-y-6">
+            <section class="space-y-2"><h3 class="font-semibold">Bindings</h3><ul class="divide-y divide-base-300"><li class="py-3" id="binding-103ae037-3d0a-8d22-9f53-22060ce1deac">
+            <div class="flex flex-wrap items-center gap-2"><span class="font-semibold">Company-wide (manual starts and schedules)</span><span class="badge badge-sm badge-ghost">paused: admits nothing</span><span class="ml-auto flex gap-1"><button type="button" class="btn btn-xs btn-primary"
+                hx-post="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a/bindings/103ae037-3d0a-8d22-9f53-22060ce1deac/activate?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600"
+                hx-vals='{"expected_state_revision": "1"}'
+                hx-target="#workflow-pane" hx-swap="outerHTML">Activate</button>
+            <button type="button" class="btn btn-ghost btn-xs"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a/bindings/form?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;binding_id=103ae037-3d0a-8d22-9f53-22060ce1deac"
+                hx-target="#binding-form" hx-swap="outerHTML">Configure</button></span></div>
+            <p class="text-xs opacity-70">Runs version bbdb3233 (newest, draft revision 1) · No message trigger · as c70eedf03eb2437da1b2686247f328d9 (owner)</p>
+            
+            <p class="font-mono text-[11px] opacity-60">binding 103ae037 · state revision 1 · <a class="link" href="/ui/workflow-runs?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600&amp;binding_id=103ae037-3d0a-8d22-9f53-22060ce1deac">runs</a></p><div role="alert" class="alert alert-error mt-2 text-sm">Not activated: binding.role_needs_department: step start requires a department-owned desk</div>
+        </li></ul></section>
+            <section id="binding-form" class="space-y-3 rounded-box border border-base-300 p-4">
+            <h3 class="font-semibold">New binding</h3>
+            
+            <form hx-post="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a/bindings?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600" hx-target="#workflow-pane" hx-swap="outerHTML"
+                hx-disabled-elt="find button[type='submit']" class="space-y-4">
+                <input type="hidden" name="form_key" value="f1da8d4c-0c41-44f0-b023-7d92c7a6c7d1">
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Association</span></div><select class="select w-full" name="association"><option value="company" selected>Company-wide (manual starts and schedules)</option></select><div class="label"><span class="text-xs">A desk binding can answer that desk&#39;s messages; thread bindings are made through the API.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Published version</span></div><select class="select w-full" name="version_id"
+                hx-get="/ui/workflows/f9b3e1c8-ae82-4708-8f8f-be18e5b9759a/bindings/form?company_id=21fd990c-ee82-4bd7-bc8c-e3e3bf381600" hx-include="closest form"
+                hx-target="#binding-form" hx-swap="outerHTML" hx-trigger="change"><option value="bbdb3233-80a6-8280-9605-5c41dbec0a01" selected>version bbdb3233 (newest, draft revision 1)</option></select><div class="label"><span class="text-xs">Changing it reloads the parameters and resources this version declares.</span></div></label></div>
+                <fieldset class="space-y-1"><legend class="text-sm font-semibold">Parameters</legend><input type="hidden" name="params_mode" value="json"><label class="form-control w-full"><div class="label"><span class="text-xs">Parameters (JSON object)</span></div><textarea class="textarea w-full font-mono text-xs" rows="6" name="params_json">
+{}</textarea><div class="label"><span class="text-xs">Typed as one JSON object: the version&#39;s parameter schema has no fields this form can show, or the stored parameters hold something the fields cannot carry exactly. The binding command validates the object against the schema.</span></div></label></fieldset>
+                
+                <div class="grid gap-3 sm:grid-cols-2"><label class="form-control w-full"><div class="label"><span class="text-xs">Message trigger</span></div><select class="select w-full" name="message_trigger"><option value="" selected>No message trigger: messages never start it</option><option value="direct">Addressed in To, or mentioned</option><option value="any">Addressed in To or Cc, or mentioned</option><option value="mentioned">Mentioned by name, alias, address or handle</option><option value="mentioned_or_reply">Mentioned, or a direct reply to a message a run published</option></select><div class="label"><span class="text-xs">Desk bindings only; a company-wide binding takes none.</span></div></label><label class="form-control w-full"><div class="label"><span class="text-xs">Runs as</span></div><select class="select w-full" name="run_as"><option value="0a7c430c-8f11-423a-aa93-0f24b4345804">3030f6dcd18b4d0daee09b03c1c85588 (admin)</option><option value="671e2b47-61f9-416a-91b4-8eb84d5cb598" selected>c70eedf03eb2437da1b2686247f328d9 (owner)</option></select><div class="label"><span class="text-xs">An owner or admin who can see the desk; automatic runs use their authority.</span></div></label></div>
+                
+                <div class="flex items-center gap-3 border-t border-base-300 pt-3">
+                    <button type="submit" class="btn btn-primary btn-sm">Save binding</button>
+                    <p class="text-xs opacity-70">A saved binding stays paused until you activate it; activation checks readiness again.</p>
+                </div>
+            </form>
+        </section>
+        </div></div>
+        </section>
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture' (48815020) panicked at src/adapters/persistence/workflow/tests.rs:270:14:
+called `Result::unwrap()` on an `Err` value: Application(Conflict("Workflow lifecycle revision or command conflict"))
+
+
+failures:
+    adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture
+
+test result: FAILED. 45 passed; 2 failed; 0 ignored; 0 measured; 4175 filtered out; finished in 19.49s
+
+error: test failed, to rerun pass `--lib`

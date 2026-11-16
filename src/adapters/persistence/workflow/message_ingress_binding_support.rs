@@ -43,6 +43,7 @@ impl Deployment {
             .services()
             .bindings()
             .configure(ConfigureBinding {
+                escalation: None,
                 target,
                 expected: None,
                 association: RelatedAssociation::Channel(RelatedChannelId::new(self.channel)),

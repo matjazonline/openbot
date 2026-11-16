@@ -1,0 +1,221 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 133372898022,
+      "run_id": 43888465965,
+      "workflow_name": "Memory service",
+      "head_branch": "codex/plan03-p04-r20-0d3e4a43",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43888465965",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAfDaTq5g",
+      "head_sha": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/133372898022",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43888465965/job/133372898022",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-16T14:41:58Z",
+      "started_at": "2026-11-16T14:42:01Z",
+      "completed_at": null,
+      "name": "verify",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-16T14:42:02Z",
+          "completed_at": "2026-11-16T14:42:05Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-16T14:42:05Z",
+          "completed_at": "2026-11-16T14:42:20Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-16T14:42:20Z",
+          "completed_at": "2026-11-16T14:42:38Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@1.95.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-16T14:42:38Z",
+          "completed_at": "2026-11-16T14:42:47Z"
+        },
+        {
+          "name": "Install sqlx-cli 0.8.6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-16T14:42:47Z",
+          "completed_at": "2026-11-16T14:43:39Z"
+        },
+        {
+          "name": "Fetch locked dependencies (before network isolation)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-16T14:43:39Z",
+          "completed_at": "2026-11-16T14:43:40Z"
+        },
+        {
+          "name": "Cache model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-16T14:43:40Z",
+          "completed_at": "2026-11-16T14:43:46Z"
+        },
+        {
+          "name": "Prepare and verify the pinned model (build network only)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-16T14:43:46Z",
+          "completed_at": "2026-11-16T14:43:47Z"
+        },
+        {
+          "name": "Extracted-copy full gate",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 9,
+          "started_at": "2026-11-16T14:43:47Z",
+          "completed_at": null
+        },
+        {
+          "name": "Install the PostgreSQL 18 client",
+          "status": "pending",
+          "conclusion": null,
+          "number": 10,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Backup and restore check",
+          "status": "pending",
+          "conclusion": null,
+          "number": 11,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Standalone journey",
+          "status": "pending",
+          "conclusion": null,
+          "number": 12,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Cache model artifacts",
+          "status": "pending",
+          "conclusion": null,
+          "number": 22,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null,
+          "number": 23,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Stop containers",
+          "status": "pending",
+          "conclusion": null,
+          "number": 24,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/133372898022",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001249,
+      "runner_name": "GitHub Actions 1000001249",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 133372898445,
+      "run_id": 43888465965,
+      "workflow_name": "Memory service",
+      "head_branch": "codex/plan03-p04-r20-0d3e4a43",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43888465965",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAfDaTsjQ",
+      "head_sha": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/133372898445",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43888465965/job/133372898445",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-16T14:41:58Z",
+      "started_at": "2026-11-16T14:42:00Z",
+      "completed_at": null,
+      "name": "image",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-16T14:42:01Z",
+          "completed_at": "2026-11-16T14:42:03Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-16T14:42:03Z",
+          "completed_at": "2026-11-16T14:42:15Z"
+        },
+        {
+          "name": "Build the service image from its own directory",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 3,
+          "started_at": "2026-11-16T14:42:15Z",
+          "completed_at": null
+        },
+        {
+          "name": "Non-root, network-denied, read-only startup",
+          "status": "pending",
+          "conclusion": null,
+          "number": 4,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null,
+          "number": 8,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/133372898445",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001250,
+      "runner_name": "GitHub Actions 1000001250",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

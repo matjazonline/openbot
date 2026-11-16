@@ -1,0 +1,24 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0432]: unresolved import `super::company_agent::default_desk_key`
+  --> src/adapters/persistence/onboarding.rs:11:68
+   |
+11 |     company_agent::{CompanyAgentCreation, create_company_agent_on, default_desk_key},
+   |                                                                    ^^^^^^^^^^^^^^^^ no `default_desk_key` in `adapters::persistence::company_agent`
+
+error[E0425]: cannot find function `default_desk_key` in module `crate::adapters::persistence::company_agent`
+   --> src/adapters/http/routes/onboarding.rs:292:50
+    |
+292 |     crate::adapters::persistence::company_agent::default_desk_key(agent.id)
+    |                                                  ^^^^^^^^^^^^^^^^ not found in `crate::adapters::persistence::company_agent`
+
+error[E0609]: no field `desk` on type `CreatedCompanyAgent`
+   --> src/adapters/persistence/workflow/provisioning_builder.rs:108:17
+    |
+108 |         created.desk
+    |                 ^^^^ unknown field
+    |
+    = note: available fields are: `principal`, `workflow`
+
+Some errors have detailed explanations: E0425, E0432, E0609.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 3 previous errors

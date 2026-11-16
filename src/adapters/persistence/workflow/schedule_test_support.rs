@@ -100,6 +100,7 @@ pub(crate) async fn bind(
     };
     let state = bindings
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association,

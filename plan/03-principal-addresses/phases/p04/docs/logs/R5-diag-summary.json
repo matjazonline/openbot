@@ -1,0 +1,32 @@
+[
+  {
+    "test": "channel_reply_publication_email_and_in_app_commit_exact_content_and_replay",
+    "exit": 0,
+    "seconds": 4.22,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/R5-diag-1.txt"
+  },
+  {
+    "test": "message_reply_to_a_channel_post_matches_only_an_in_app_answer",
+    "exit": 101,
+    "seconds": 2.95,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/R5-diag-2.txt"
+  },
+  {
+    "test": "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas",
+    "exit": 101,
+    "seconds": 79.87,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/R5-diag-3.txt"
+  },
+  {
+    "test": "cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry",
+    "exit": 0,
+    "seconds": 33.78,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/R5-diag-4.txt"
+  },
+  {
+    "test": "workflow_action_approval_race_message_lost_ack_resolves_park",
+    "exit": 0,
+    "seconds": 7.92,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/R5-diag-5.txt"
+  }
+]

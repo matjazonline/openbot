@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::agent::tests::postgres_agent_persistence_works ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4692 filtered out; finished in 3.33s
+

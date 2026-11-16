@@ -1,0 +1,22 @@
+.........
+======================================================================
+ERROR: test_command_stderr_is_preserved_and_failure_annotations_are_bounded (__main__.DoopRunnerTests) (status=0)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/check-runner.py", line 161, in test_command_stderr_is_preserved_and_failure_annotations_are_bounded
+    module.run(sys.executable, str(script), str(status), stdout=output, timeout=10)
+NameError: name 'sys' is not defined
+
+======================================================================
+ERROR: test_command_stderr_is_preserved_and_failure_annotations_are_bounded (__main__.DoopRunnerTests) (status=7)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/plan03-04/scripts/tests/check-runner.py", line 158, in test_command_stderr_is_preserved_and_failure_annotations_are_bounded
+    module.run(sys.executable, str(script), str(status), stdout=output, timeout=10)
+NameError: name 'sys' is not defined
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.072s
+
+FAILED (errors=2)
+memory image passed: non-root, offline/read-only model, RSS budget, database refusal

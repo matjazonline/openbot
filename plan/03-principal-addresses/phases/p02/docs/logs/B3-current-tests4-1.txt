@@ -1,0 +1,21 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_association_codec_preserves_every_scope_and_refuses_invalid_null_shapes ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::sample_tests::sample_direct_workflow_tool_child_and_message_have_zero_production_effects ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope' (15537124) panicked at src/adapters/persistence/workflow/direct_workflow_read_tests.rs:92:86:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"workflow_runs\" violates check constraint \"workflow_run_terminal_execution_shape\"", detail: Some("Failing row contains (null, 9, 0, f, 3776f2c1-fa79-4228-b0a6-432af407bcd8, d45eff1b-9d64-4373-8e4f-a15e3d061353, 40331df1-0c9c-48b5-994c-9c5f0a0b31b8, 1, 00000000-0000-0000-0000-000000000001, b91693d3-c592-45af-a46c-19294cd828ba, null, 0365c075-b176-43c1-b26a-c251d8fa5b5d, null, 22b7b3fe-7e4c-4a77-b13c-0626540196ac, 408a98af-b54a-4005-9bb4-a35894a91073, 8c13a9a0-24b3-4dc0-a0c6-01bdcb55df66, \\xf77d6bb80c803c26ecfc0c529e42606c05a91953a0d7b4c31e8b1d6795871b..., {\"value\": 1}, {}, {}, 100, 65536, 2026-11-16 06:26:11.500692+00, 2026-11-15 06:26:11.500692+00, failed, null, null, null, null, null, 4, null, deliver, 2026-11-15 06:26:11.552185+00)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_runs"), column: None, data_type: None, constraint: Some("workflow_run_terminal_execution_shape"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope
+
+test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 4575 filtered out; finished in 5.04s
+

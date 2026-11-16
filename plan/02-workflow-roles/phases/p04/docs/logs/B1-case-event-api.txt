@@ -1,0 +1,3 @@
+graft skeleton — src/adapters/persistence/notification/events.rs
+
+no definitions indexed for this file

@@ -1,0 +1,40 @@
+
+running 6 tests
+
+thread 'adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically' (18983949) panicked at src/adapters/persistence/skill_tests.rs:210:10:
+called `Result::unwrap()` on an `Err` value: Internal("Company agent has no direct address")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... FAILED
+
+thread 'adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk' (18983948) panicked at src/adapters/http/routes/agent_api_tests/public_settings.rs:100:5:
+assertion failed: matches!(result, Err(AppError::BadRequest(ref reason)) if
+    reason.contains("confirm_spam_disabled"))
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... FAILED
+
+thread 'adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model' (18983947) panicked at src/adapters/http/routes/agent_api_tests.rs:222:5:
+assertion `left == right` failed
+  left: 0
+ right: 1
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses has been running for over 60 seconds
+PHASE scenario=prior_bounds phase=competitor_started elapsed_ms=35 owner=false attempt=128 lease_remaining_ms=0 run_remaining_ms=86215769 db_now=2026-11-15 19:00:45.363942+00
+PHASE scenario=prior_bounds phase=claimed_129 elapsed_ms=57 owner=true attempt=129 lease_remaining_ms=2990 run_remaining_ms=86215748 db_now=2026-11-15 19:00:45.385251+00
+PHASE scenario=prior_bounds phase=claimed_snapshot elapsed_ms=155 owner=true attempt=129 lease_remaining_ms=2903 run_remaining_ms=86215650 db_now=2026-11-15 19:00:45.483802+00
+PHASE scenario=prior_bounds phase=consumed_129 elapsed_ms=194 owner=true attempt=129 lease_remaining_ms=2864 run_remaining_ms=86215611 db_now=2026-11-15 19:00:45.522476+00
+PHASE scenario=prior_bounds phase=consumed_snapshot elapsed_ms=287 owner=true attempt=129 lease_remaining_ms=2771 run_remaining_ms=86215518 db_now=2026-11-15 19:00:45.615499+00
+PHASE scenario=prior_bounds phase=parked elapsed_ms=480 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86215325 db_now=2026-11-15 19:00:45.808372+00
+PHASE scenario=prior_bounds phase=pre_settlement_snapshot elapsed_ms=662 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86215142 db_now=2026-11-15 19:00:45.991188+00
+TIMELINE prior_bounds verifier_entered_ms=33 verifier_ready_ms=35 release_ms=664 verifier_returned_ms=664 settle_entered_ms=664 settle_returned_ms=681 command_ended_ms=681 result=Ok(Blocked { reason: BoundExceeded })
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses ... ok
+
+failures:
+
+failures:
+    adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model
+    adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk
+    adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically
+
+test result: FAILED. 3 passed; 3 failed; 0 ignored; 0 measured; 4694 filtered out; finished in 195.25s
+

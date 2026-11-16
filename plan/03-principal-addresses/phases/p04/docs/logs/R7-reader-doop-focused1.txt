@@ -1,0 +1,26 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 20 tests
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_requires_current_secret_and_enabled_connection ... ok
+test adapters::persistence::agent_publication::tests::http::autonomous_agent_resolution_http_alias_captures_exact_connection_and_approval ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_authoring_separates_active_and_draft_and_omits_credentials_and_active_prompt ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_reapproval_requires_fresh_concrete_binding ... ok
+test adapters::persistence::agent_publication::tests::authoring_views::autonomous_agent_views_history_pages_timestamp_ties_without_payloads_or_foreign_rows ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_retired_operation_and_removed_grant_are_not_discovery ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_schema_drift_refuses_without_replacing_active_revision ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_mcp_without_workflow_freezes_remote_name_policy_and_alias ... ok
+test adapters::persistence::workflow::tests::admission_tests::storage_tests::autonomous_agent_storage_tests::view_tests::autonomous_agent_views_bound_agent_and_workflow_dependencies_with_explicit_truncation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::tool_children::autonomous_agent_views_child_call_and_dependency_versions_use_root_manifest ... ok
+test application::agent::resolution_tests::autonomous_agent_native_definition_needs_no_hosted_model_connection ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_alias_collision_and_reserved_spoofing_are_refused ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_needs_no_workflow_slot_channel_or_run ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_requires_exact_binding_identity_source_and_order ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_same_alias_on_different_agents_is_independent ... ok
+test application::agent::resolution_tests::autonomous_agent_resolution_validates_schema_and_explicit_available_model ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_action_call_origin_survives_current_revocation ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_views::autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_version ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+
+test result: ok. 20 passed; 0 failed; 0 ignored; 0 measured; 4685 filtered out; finished in 59.62s
+

@@ -2,11 +2,13 @@
 //!
 //! One transaction, in this order, so a failure anywhere leaves the channel exactly as it was:
 //!
-//! 1. the channel's gate, exclusively ([`crate::adapters::persistence::channel_gate`]), so no
+//! 1. the company and applicable desk ownership locks, serializing current reviewer refresh;
+//! 2. the channel's gate, exclusively ([`crate::adapters::persistence::channel_gate`]), so no
 //!    inbound commit admits a message against settings this edit is replacing;
-//! 2. the channel row, re-checked against the tenant;
-//! 3. the channel settings, slugs, email binding and allowlist grants, moving the settings
-//!    revision on so a message routed against the old ones is refused at its commit.
+//! 3. the channel row, re-checked against the tenant;
+//! 4. the channel settings, slugs, email binding and allowlist grants, moving the settings
+//!    revision on so a message routed against the old ones is refused at its commit;
+//! 5. current followed reviewer assignments, preserving the proposal and original context.
 //!
 //! The whole operation runs under an explicit time budget, so an edit that cannot take its locks
 //! is refused with nothing changed rather than left waiting.
@@ -106,11 +108,10 @@ pub(crate) async fn update_channel_on(
 ) -> AppResult<()> {
     bound_statements_on(tx, budget).await?;
     let company = CompanyId::new(request.company_id);
-    // Changing who owns the desk takes the company write lock, the department and the
-    // principals its grants will name before the gate, as department writes do (DEP-P02-D3).
-    if let Some(edit) = request.write.ownership {
-        prelock_ownership_on(tx, company, Some(request.channel_id), &edit).await?;
-    }
+    // A generic allowlist save also changes reviewer visibility. Reuse the ownership prefix
+    // before the gate even when this form leaves department/members-only settings untouched.
+    let ownership = request.write.ownership.unwrap_or_default();
+    prelock_ownership_on(tx, company, Some(request.channel_id), &ownership).await?;
     acquire_channel_gate_on(
         tx,
         ChannelGateKey::new(request.company_id, request.channel_id),
@@ -122,7 +123,7 @@ pub(crate) async fn update_channel_on(
     if request.write.ownership.is_some() {
         sync_desk_grants_on(tx, company, request.channel_id).await?;
     }
-    Ok(())
+    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
 
 /// Bound every statement and lock wait in this transaction.

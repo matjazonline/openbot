@@ -1,0 +1,32 @@
+Replaying ten exact failed cases in one parallel binary invocation, threads4
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 10 tests
+native_coherence state=23514 schema=public table=workflow_action_evidence constraint=workflow_action_evidence_check message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_evidence_check"
+native_diagnostic rollback_quiescent owner=54852 observer=54850 database=open_bots_own_deaf853d48604c9abbfb442a7dc3ea2c
+test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok
+native_coherence state=23514 schema=public table=workflow_action_evidence constraint=workflow_action_evidence_check message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_evidence_check"
+native_diagnostic rollback_quiescent owner=54954 observer=54956 database=open_bots_own_cd7b64f477c843dc81243301f689371c
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call ... ok
+native_coherence positive shape=observed_equals_verified source=registered time_order=true presence=true grant_scope=true absent=0 substituted=false selected_flush=true all_flush=true ordinary_commit=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal ... ok
+native_coherence positive shape=verified_equals_created source=registered time_order=true presence=true grant_scope=true absent=0 substituted=true selected_flush=true all_flush=true ordinary_commit=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses has been running for over 60 seconds
+PHASE scenario=prior_bounds phase=competitor_started elapsed_ms=26 owner=false attempt=128 lease_remaining_ms=0 run_remaining_ms=86277434 db_now=2026-11-16 08:40:05.192616+00
+PHASE scenario=prior_bounds phase=claimed_129 elapsed_ms=43 owner=true attempt=129 lease_remaining_ms=2992 run_remaining_ms=86277418 db_now=2026-11-16 08:40:05.209376+00
+PHASE scenario=prior_bounds phase=claimed_snapshot elapsed_ms=113 owner=true attempt=129 lease_remaining_ms=2931 run_remaining_ms=86277347 db_now=2026-11-16 08:40:05.279643+00
+PHASE scenario=prior_bounds phase=consumed_129 elapsed_ms=149 owner=true attempt=129 lease_remaining_ms=2896 run_remaining_ms=86277312 db_now=2026-11-16 08:40:05.314955+00
+PHASE scenario=prior_bounds phase=consumed_snapshot elapsed_ms=217 owner=true attempt=129 lease_remaining_ms=2828 run_remaining_ms=86277244 db_now=2026-11-16 08:40:05.383125+00
+PHASE scenario=prior_bounds phase=parked elapsed_ms=356 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86277104 db_now=2026-11-16 08:40:05.523378+00
+PHASE scenario=prior_bounds phase=pre_settlement_snapshot elapsed_ms=480 owner=false attempt=129 lease_remaining_ms=0 run_remaining_ms=86276980 db_now=2026-11-16 08:40:05.646784+00
+TIMELINE prior_bounds verifier_entered_ms=24 verifier_ready_ms=26 release_ms=481 verifier_returned_ms=481 settle_entered_ms=482 settle_returned_ms=493 command_ended_ms=493 result=Ok(Blocked { reason: BoundExceeded })
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses ... ok
+
+test result: ok. 10 passed; 0 failed; 0 ignored; 0 measured; 4695 filtered out; finished in 130.17s
+

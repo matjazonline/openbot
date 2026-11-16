@@ -1,0 +1,254 @@
+{
+ "version": 1,
+ "round": "02WR-P04-B1-R2",
+ "artifact": "e9ce4b95a6bb2afc0670cd305c2a39397967b5a97db404f68d7a9ae0502b2b03",
+ "checks": [
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "sqlx migrate run on fresh openbot_roles_p04_resume21 and openbot_roles_p04_resume21_test (after the run-source validator fix)",
+   "fixture": "owned disposable PostgreSQL 127.0.0.1:52471, fresh init schema; isolated own_database per workflow fixture",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-migrations21.txt",
+     "sha256": "f588f998d2cdb8cea0c90e8443fa2e3230e9991baa4842f2f4edb495fe335fc5"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "cargo test --locked --offline --lib --no-run --jobs 4 --config profile.test.package.open_bots.debug=0 (build fmt149, after rustfmt of correction tests)",
+   "fixture": "SQLX_OFFLINE=true CARGO_INCREMENTAL=0",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-build-fmt149.txt",
+     "sha256": "82ed515a21bb421fbb9a8210c81b5a3e7d431ba93887f7e5a51bfb970efed413"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "cargo fmt --all -- --check; git diff HEAD --check; trailing-whitespace grep over untracked src/migrations/docs",
+   "fixture": "worktree at digest e9ce4b95",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-R2-snapshot149.txt",
+     "sha256": "6dfb7215bd3634284668022056d2b50dae89eae2a34b26e8e1453227197217b6"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F1",
+    "D1.3",
+    "AC1",
+    "AC2"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> terminal_owners:: (real sweeper activation-limit wait failure; unrouted child failure escalates once at root parent; authored parent route consumes child failure; validator matrix of (audit,reason) pairs) RUST_MIN_STACK=2097152",
+   "fixture": "resume21 fresh DBs",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-fmt149.txt",
+     "sha256": "9c0f730db9a2d9507ffc393c0d306ce8b75b3536508b6d9e25675e1979fb3b53"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F3a",
+    "C1"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> --exact follow_tests::bounds::workflow_reviewer_follow_park_at_the_256_bound_refuses_the_next_without_a_partial_park (in the 249-name exact run)",
+   "fixture": "resume21 fresh DBs",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-p04-added149.txt",
+     "sha256": "9660c569ef53cefdd27a11d2f45cb24e30eb0574a25df071188c4069f253304e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F3b",
+    "D4.3",
+    "D4"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> relays::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case and relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin",
+   "fixture": "resume21 fresh DBs; real DeliveryWorker + EmailRenderer + EmailSender(RecordingTransport)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-fmt149.txt",
+     "sha256": "9c0f730db9a2d9507ffc393c0d306ce8b75b3536508b6d9e25675e1979fb3b53"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F7"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> channel_reply_publication_internal_source_never_falls_back_to_email; message_reply_to_a_channel_post_matches_only_an_in_app_answer",
+   "fixture": "resume21 fresh DBs",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-fmt149.txt",
+     "sha256": "9c0f730db9a2d9507ffc393c0d306ce8b75b3536508b6d9e25675e1979fb3b53"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F4",
+    "AC4"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> workflow_escalation_mutation_routes_treat_a_foreign_tenant_decision_as_absent",
+   "fixture": "resume21 fresh DBs",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-fmt149.txt",
+     "sha256": "9c0f730db9a2d9507ffc393c0d306ce8b75b3536508b6d9e25675e1979fb3b53"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "AC1",
+    "AC2",
+    "AC3",
+    "AC4",
+    "AC5",
+    "AC6",
+    "AC7",
+    "D1",
+    "D2",
+    "D3",
+    "D4",
+    "C1",
+    "C2",
+    "F1",
+    "F3",
+    "F4",
+    "F7"
+   ],
+   "command": "open_bots-<build fmt149, target/debug/deps/open_bots-81c16b063ee66a24> --exact <all 249 p04-added tests listed in logs/B1-R2-p04-added-names.txt> (248 PASS, 1 ignored browser journey run separately)",
+   "fixture": "resume21 fresh DBs",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-p04-added149.txt",
+     "sha256": "9660c569ef53cefdd27a11d2f45cb24e30eb0574a25df071188c4069f253304e"
+    },
+    {
+     "path": "logs/B1-R2-p04-added-names.txt",
+     "sha256": "3f23c9b9e94347eb0d8ae142304e6de58d0fb06f5fc05c203610bd832bdd301b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "F2",
+    "AC4"
+   ],
+   "command": "ignored workflow_escalation_browser_actual_submissions with OPENBOT_ESCALATION_BROWSER_FIXTURE + Playwright system Chrome driver (logs/continue-browser150-drive.js): DOM-select hostile-labelled owner -> Reassign -> View current assignment -> Acknowledge; fixture asserts exactly 1 reassign + 1 ack command",
+   "fixture": "build fmt149 binary on digest e9ce4b95; isolated fixture server",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-browser-native150.txt",
+     "sha256": "76db9e620b9d4080e7ec7319709360840a4d39ad70e9d223604c577da8c64905"
+    },
+    {
+     "path": "logs/continue-browser150-final.json",
+     "sha256": "3664f9da050a23a099ee3543b07001a601d71397c43173e59cb29babbbc871e7"
+    },
+    {
+     "path": "logs/continue-browser150-drive.js",
+     "sha256": "9a6e0a267b94a2d5d8de24bad0d9f698b7f82ff561435e572b0ff8dfbd30c55c"
+    },
+    {
+     "path": "logs/continue-browser150-before.png",
+     "sha256": "9fe852346945867c29f57bf5ed23720eb2c27b9bfc07b09cdf54a38d04ff5c38"
+    },
+    {
+     "path": "logs/continue-browser150-current.png",
+     "sha256": "3808e9cba10a28056ccd4fba953bfba34e0c0b49db644e5a6769692b6b2753a0"
+    },
+    {
+     "path": "logs/continue-browser150-acknowledged.png",
+     "sha256": "0e42c59596ebf4d64bcb25dd61df7bf72596337e751dba3e04bfbbebb90436f1"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "inventory delta vs p03 baseline phases/p03/docs/logs/B1-R2-static-inventory1.txt (4228 -> 4477, 0 removed, 249 added)",
+   "fixture": "build fmt149 --list",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-test-inventory149.json",
+     "sha256": "f2c6435fb8e69af06586b798b60028d128e19b199703b2e91a24c180f343169f"
+    },
+    {
+     "path": "logs/continue-static-inventory149.txt",
+     "sha256": "0257fc8abb7e5baca1c63795afca41e5dc8e36751e3d537ca89486cd0b671d6e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "cargo test --locked --offline --test source_modules",
+   "fixture": "SQLX_OFFLINE=true",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-source-modules149.txt",
+     "sha256": "0f34a9c1095aaf89dc042526194461c5a9c0e36b125caba22ede578e5ce12e13"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "REGRESSION"
+   ],
+   "command": "open_bots-<build146> adapters::persistence::workflow:: adapters::http::routes::workflows:: adapters::persistence::thread:: adapters::protocols::email:: adapters::persistence::delivery:: application::workflow:: application::use_cases::thread:: application::services::delivery_worker application::services::notification_worker (2830 tests) -- 2811 pass, 10 fail: 6 cloudroom e2e ERR_DLOPEN_FAILED (installed node ABI 137 vs native module 147, environment), 2 pre-existing p03 failures (reviewer_comments_revises_reads_next_draft_and_accepts_exact_artifact, reviewed_assistants_park_their_answer_until_the_run_deadline; reported by B at R1, untouched by p04), 2 doop document agent timeouts under parallel load which pass in isolation (logs/continue-doop148.txt)",
+   "fixture": "resume21 fresh DBs; build146 differs from fmt149 only by rustfmt of test files",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/continue-broad147.txt",
+     "sha256": "ec6c7f75489f9537728ac94781a5b6f21b82f0c159461a7ccf4ae74b1af0e03b"
+    },
+    {
+     "path": "logs/continue-doop148.txt",
+     "sha256": "62150315e69e3b85dd96248d8fcccb3afce2b6c936e77a496c7c38b81172ad8c"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "STATIC"
+   ],
+   "command": "clippy, full database suite, SQLx prepare, network isolation, stack/lease budgets",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "plan02 p05 final gate (I003/r1)"
+  }
+ ]
+}

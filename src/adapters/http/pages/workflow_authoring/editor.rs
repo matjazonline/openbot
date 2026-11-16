@@ -217,6 +217,7 @@ pub fn workflow_editor(view: &EditorView<'_>) -> String {
             String::new()
         } else {
             super::agent_picker::workflow_agent_picker_loader(company_id, workflow)
+                + &super::reviewer_picker::workflow_reviewer_picker_loader(company_id, workflow)
         },
         preview = view.preview_html.unwrap_or_default(),
         catalogue = catalogue_disclosure(company_id),

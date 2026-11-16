@@ -1,0 +1,20 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk' (3226171) panicked at src/adapters/persistence/workflow/escalation_agent_tests.rs:120:5:
+assertion `left == right` failed: agent routing must create a private canonical notice, with no SMTP or direct run
+  left: Object {"cases": Number(1), "deliveries": Number(0), "hops": Number(1), "intents": Number(0), "messages": Number(0), "person_notifications": Number(0), "runs": Number(0)}
+ right: Object {"cases": Number(1), "deliveries": Number(0), "hops": Number(1), "intents": Number(1), "messages": Number(1), "person_notifications": Number(0), "runs": Number(0)}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4404 filtered out; finished in 1.77s
+

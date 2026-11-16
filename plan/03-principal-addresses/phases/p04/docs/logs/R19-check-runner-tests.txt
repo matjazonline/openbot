@@ -1,0 +1,6 @@
+.........
+----------------------------------------------------------------------
+Ran 9 tests in 0.075s
+
+OK
+memory image passed: non-root, offline/read-only model, RSS budget, database refusal

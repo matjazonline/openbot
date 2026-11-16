@@ -34,6 +34,7 @@ impl SampleHistoryStore {
         frame: &Frame,
         activation: &ActivatedExecution,
     ) -> AppResult<Option<Capture>> {
+        super::super::roles::refuse_unresolved_sample_role(bundle, &activation.step)?;
         let kind = bundle.compiled().graph().definition().steps[&activation.step]
             .step_type
             .as_str();

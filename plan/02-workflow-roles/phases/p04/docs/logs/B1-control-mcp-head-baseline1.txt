@@ -1,0 +1,9 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/openbot-p04-mcp-baseline-6xwpp7ro)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 11s
+     Running unittests src/lib.rs (/Users/mac02/.codex/worktrees/2050/openbot/target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4167 filtered out; finished in 0.03s
+

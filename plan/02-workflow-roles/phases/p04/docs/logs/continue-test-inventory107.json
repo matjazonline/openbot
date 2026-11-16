@@ -1,0 +1,10 @@
+{
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_database_requires_authentic_complete_immutable_target_and_links",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_existing_root_failure_after_source_retention_never_restarts_the_ladder",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::guards::workflow_escalation_origin_missing_message_seal_aborts_real_fenced_completion_and_retries_atomically",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_admission_first_preserves_its_only_root_when_source_retention_retries",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::races::workflow_escalation_origin_retention_first_closes_the_competing_actual_admission"
+  ],
+  "removed": []
+}

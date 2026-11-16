@@ -1,0 +1,31 @@
+
+running 8 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target' (4318078) panicked at src/adapters/persistence/workflow/escalation_command_tests.rs:152:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"principals\" violates foreign key constraint \"workflow_run_role_bindings_company_id_principal_id_fkey\" on table \"workflow_run_role_bindings\"", detail: Some("Key (company_id, id)=(c7850689-1f3e-4d97-bc2d-d659688577fc, d95da753-e592-4603-ac17-cb31150e1cf7) is still referenced from table \"workflow_run_role_bindings\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_run_role_bindings"), column: None, data_type: None, constraint: Some("workflow_run_role_bindings_company_id_principal_id_fkey"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle' (4318269) panicked at src/adapters/persistence/workflow/escalation_command_tests.rs:52:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle
+
+test result: FAILED. 6 passed; 2 failed; 0 ignored; 0 measured; 4433 filtered out; finished in 7.02s
+

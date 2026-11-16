@@ -1,0 +1,268 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R10-preflight2",
+  "artifact": "6207f5af68cebf9244db06ad05be67ab8459e18d07de0c672fd6f0229057f88f",
+  "checks": [
+    {
+      "criteria": [
+        "native-core",
+        "final-local-primary"
+      ],
+      "command": "scripts/check.sh primary isolated all-target gate; RUST_TEST_THREADS=4",
+      "fixture": "Historical full local gates, reused only for byte-identical production Rust/Cargo/migrations/Darwin scope; changed test-only Rust separately proved by R15 focused cases; focused stack environment unrecorded.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-main-complete-before-adoption.txt",
+          "sha256": "84fd6a3538f8ffd6553cafc1fe21e087dcf17c0c1ed15607bb881bdc03a83025"
+        },
+        {
+          "path": "logs/R13-runtime-projection.json",
+          "sha256": "764dee365338f526bbc63cd41216f87db3a611e39872621d048546df9755d1c8"
+        },
+        {
+          "path": "logs/R15-check-projection.json",
+          "sha256": "f3ad93e55d715a14a4aacebfaba4bd3156d1bb107a4dfc70bb27775ef94c8e9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "stock-stack"
+      ],
+      "command": "scripts/check.sh stock-stack gate at2048KiB; RUST_TEST_THREADS=4",
+      "fixture": "Historical full local gates, reused only for byte-identical production Rust/Cargo/migrations/Darwin scope; changed test-only Rust separately proved by R15 focused cases; focused stack environment unrecorded.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-stock-complete-before-adoption.txt",
+          "sha256": "883e5e44fd56e6563ae59991032931476002eeb19e815cb4f344a2db6dad01f8"
+        },
+        {
+          "path": "logs/R13-runtime-projection.json",
+          "sha256": "764dee365338f526bbc63cd41216f87db3a611e39872621d048546df9755d1c8"
+        },
+        {
+          "path": "logs/R15-check-projection.json",
+          "sha256": "f3ad93e55d715a14a4aacebfaba4bd3156d1bb107a4dfc70bb27775ef94c8e9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "prior-main-failure-retention"
+      ],
+      "command": "prior R7 full gate before successful unchangedRust main/stock rerun",
+      "fixture": "old immutable88d4 source; no unrelatedness claim",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R7-main-failures.txt",
+          "sha256": "03c44e91dde8341c2c51c9a624055ef2c3193035d63371de62d9cab0a6f013d3"
+        },
+        {
+          "path": "logs/R7-correction-boundary-stop.json",
+          "sha256": "b873bf2c5df0db41e3f0026eaad163bf9ae35e48e8d147183bbc753f1100b425"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "prior-F2-failure-retention"
+      ],
+      "command": "R10/R11/R12 actualprivilegedcleanupdeadline attempts before inner root timer",
+      "fixture": "exact historical source candidates; superseded by actualR13 strong proof",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R10-scope-failure-annotations.json",
+          "sha256": "0f8d84282e2819ea4bbbd6da23912bfb1afb0c2094d2d617605cea2491323bea"
+        },
+        {
+          "path": "logs/R11-scope-failure-annotations.json",
+          "sha256": "9e654c8b5eefcceccaf9b3cf6abd89c13ed65fb1540623a72f7b2c0d4170bd84"
+        },
+        {
+          "path": "logs/R12-scope-failure-annotations.json",
+          "sha256": "8bbdd371501344219dc03fcea21fde79aa114f932c54f69d84e2f0b294e5ecc9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "local-lease",
+        "historical-local-gates"
+      ],
+      "command": "scripts/check.sh completed native gates; focused JS repair after browser installation",
+      "fixture": "Historical full native/main/stock/139-case lease gates PASS; full script exit1 at missing browser; R14 installs browser and reruns exact JS gate8PASS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-complete-local-check-failure.txt",
+          "sha256": "2d9ce11e8d42861a3ca815313c1cbf7ca8ef35ed717f1a259f8dde62f04ba412"
+        },
+        {
+          "path": "logs/R14-js-focused2.txt",
+          "sha256": "4b951c7b1be6be94895ee8a4e12af5491b938a3ab1756756d0556b1919c0c672"
+        },
+        {
+          "path": "logs/R15-check-projection.json",
+          "sha256": "f3ad93e55d715a14a4aacebfaba4bd3156d1bb107a4dfc70bb27775ef94c8e9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-R9-F1",
+        "D3-r2",
+        "B1-R8-F1",
+        "B1-R8-F2"
+      ],
+      "command": "CI43863539878: reproduce old helper counterexample, then real Linux scope suite",
+      "fixture": "Exactd68c7353, helper/test unchanged from8cd82c30; real postmutation/error/timeout/collision/privileged cleanup; candidate-only workflow commands retained",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R15-ci-43863539878-jobs1.json",
+          "sha256": "764a233213b816934ddf02dc556b38f6f786c049f05adfa171e891e003a133a8"
+        },
+        {
+          "path": "logs/D3-r2-ci-focused-workflow.yml",
+          "sha256": "aa037fe59f3791773cd0bf8bebca77f53ac2cde849a477efdd0fed4c3bad6708"
+        },
+        {
+          "path": "logs/D3-r2-counterexample.py",
+          "sha256": "dce59a3a927341c30936463dfaaa1de93adbfbb0c4372524d5fb086fae2b4c8e"
+        },
+        {
+          "path": "logs/D3-r2-old-helper.sh",
+          "sha256": "c7a4d682a2e05a0bb29db642890c24702ee5c725ba1667fc90c927976b804407"
+        },
+        {
+          "path": "logs/R15-ci-source.json",
+          "sha256": "28a246a5b62bdbbb8da7ada5e4045690235bacbf61b7c18f4388dd0bffcd143a"
+        },
+        {
+          "path": "logs/R15-candidate-equality.json",
+          "sha256": "d2246e74a7deda95ebd0f774816b26b7e2b151d71cf99e3dcc64b720bb6a2242"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "current-fixtures",
+        "Doop-progress"
+      ],
+      "command": "Exact current libtest: six original CI failures, TEST_DATABASE_URL unset; test-threads2",
+      "fixture": "owned pa03_p04_test/PG51167 plus per-case UUID databases; original assertions unchanged, no raised limit",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R15-ci-environment-focused.txt",
+          "sha256": "7dddc67516ddfc4531c6bd415193ad188b762daf2aaa8ce9b0c6269d80c0dd1d"
+        },
+        {
+          "path": "logs/R15-focused-identity.json",
+          "sha256": "c639583c3697788127447898518deda6bb657b25800352db741aa8f0e8041048"
+        },
+        {
+          "path": "logs/R15-focused-inventory.txt",
+          "sha256": "0b0ad9117c493e7fe1956ab8d5cde13e21607768b137998d5b5495cdb2bf007b"
+        },
+        {
+          "path": "logs/R15-stack-evidence-clarification.txt",
+          "sha256": "eff89437a9fba7094dcf44aaa5012e9d6ab0fd92893a07bc8f24b88d68b87427"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "missing-test-env-counterfactual"
+      ],
+      "command": "Original reader-corrected executable: unavailable_composer test, TEST_DATABASE_URL unset",
+      "fixture": "Historical original fixture reproduces NotPresent and exit101; expected negative-control failure",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R15-baseline-missing-test-url.txt",
+          "sha256": "b110e010ea13a5a7d63e3ed142b7ff0d72a92ea173dc8b471a4cb6d8a934c3c7"
+        },
+        {
+          "path": "logs/R15-focused-identity.json",
+          "sha256": "c639583c3697788127447898518deda6bb657b25800352db741aa8f0e8041048"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "historical-CI-failures"
+      ],
+      "command": "CI43846081398 database-backed isolated all-target gate",
+      "fixture": "Exactfd5f7f76;4672PASS/6FAIL/27IGNORE; four fixture config failures corrected and allsix pass currentfocus; no unrelatedness claim",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/CI-R13-general-database.txt",
+          "sha256": "86b32c35374dadb59a66f941fc587fb367841f93adf30584098fcc38303b6e8d"
+        },
+        {
+          "path": "logs/CI-R13-general-download-identity.json",
+          "sha256": "989a6a277562fc3f28495a48017594864fbbddddcaf8b6ee3e60a66b133678a3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline-compile",
+        "format",
+        "source-identity"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run --message-format=json; cargo fmt --all -- --check; candidate blob equality",
+      "fixture": "Current frozen root6207f5af/HEADf059f498; compile1m57s; all50material files matchd68c7353",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R15-build-stderr.txt",
+          "sha256": "91b9f6b77dbd907120a3ff7f0056c6d733f66716fca1e34979dac70dbea31bef"
+        },
+        {
+          "path": "logs/R15-fmt.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/R15-source.snapshot.txt",
+          "sha256": "555df556a2e82efbf87bde28f5c11c45d546acee7d1006b4e8901c2f57094220"
+        },
+        {
+          "path": "logs/R15-candidate-equality.json",
+          "sha256": "d2246e74a7deda95ebd0f774816b26b7e2b151d71cf99e3dcc64b720bb6a2242"
+        },
+        {
+          "path": "logs/R15-check-projection.json",
+          "sha256": "f3ad93e55d715a14a4aacebfaba4bd3156d1bb107a4dfc70bb27775ef94c8e9b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "current-CI-private",
+        "current-whole-CI",
+        "final-acceptance"
+      ],
+      "command": "Required full CI43863539586 andMemory43863539608",
+      "fixture": "Exactcurrentd68c7353; original workflows unchanged",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/R15-ci-43863539586-jobs1.json",
+          "sha256": "c89aa9bdcffe427e3173a631bdfbe914dc5cdd564b780007536bb9855471c4a5"
+        },
+        {
+          "path": "logs/R15-ci-43863539608-jobs1.json",
+          "sha256": "e65197ee04aefa6299a78d7a8cce6d0c4c2b73bf50ad4e3e3da6d073be01d2f4"
+        }
+      ],
+      "reason": "Required current full jobs still active; no final phase/plan acceptance. Unchanged previous8cd82c30 Doop/memory jobs pass, retained separately."
+    }
+  ]
+}

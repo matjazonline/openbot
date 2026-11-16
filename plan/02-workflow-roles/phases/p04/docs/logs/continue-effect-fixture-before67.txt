@@ -1,0 +1,46 @@
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_receipt_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_error_route_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_fresh_final_message_receipt_requires_current_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_message_receipt_ignores_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_pending_message_effect_ignores_unused_retired_final_reviewers ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_receipt_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_receipt_ignores_unused_retired_final_reviewers' (2679941) panicked at src/adapters/persistence/workflow/reviewer_effect_hint_tests.rs:52:16:
+the real message step must prepare before testing its receipt wait: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_error_route_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_error_route_ignores_unused_retired_final_reviewers' (2679940) panicked at src/adapters/persistence/workflow/reviewer_effect_hint_tests.rs:52:16:
+the real message step must prepare before testing its receipt wait: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_fresh_final_message_receipt_requires_current_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_fresh_final_message_receipt_requires_current_final_reviewers' (2680232) panicked at src/adapters/persistence/workflow/reviewer_effect_hint_tests.rs:52:16:
+the real message step must prepare before testing its receipt wait: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_message_receipt_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_message_receipt_ignores_unused_retired_final_reviewers' (2680255) panicked at src/adapters/persistence/workflow/reviewer_effect_hint_tests.rs:52:16:
+the real message step must prepare before testing its receipt wait: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_pending_message_effect_ignores_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_pending_message_effect_ignores_unused_retired_final_reviewers' (2680361) panicked at src/adapters/persistence/workflow/reviewer_effect_hint_tests.rs:52:16:
+the real message step must prepare before testing its receipt wait: NotFound("Workflow resource")
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_error_route_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_receipt_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_fresh_final_message_receipt_requires_current_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_message_receipt_ignores_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_pending_message_effect_ignores_unused_retired_final_reviewers
+
+test result: FAILED. 0 passed; 5 failed; 0 ignored; 0 measured; 4385 filtered out; finished in 3.54s
+

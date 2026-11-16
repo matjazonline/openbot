@@ -1,0 +1,213 @@
+src/adapters/persistence/department.rs:142-158
+142: async fn begin_department_write(
+143:     persistence: &PostgresPersistence,
+144:     scope: DepartmentScope,
+145: ) -> AppResult<Transaction<'_, Postgres>> {
+146:     let mut tx = begin_bounded(persistence).await?;
+147:     let company = AgentCompanyScope {
+148:         company: scope.company,
+149:         actor: scope.actor,
+150:     };
+151:     lock_company_on(&mut tx, company)
+152:         .await
+153:         .map_err(|error| match error {
+154:             AppError::NotFound(_) => company_not_found(),
+155:             other => other,
+156:         })?;
+157:     Ok(tx)
+158: }
+
+src/adapters/persistence/agent_publication/mod.rs:50-61
+50: pub(in crate::adapters::persistence) async fn lock_company_on(
+51:     tx: &mut Transaction<'_, Postgres>,
+52:     scope: AgentCompanyScope,
+53: ) -> AppResult<()> {
+54:     sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE")
+55:         .bind(scope.actor.user_id())
+56:         .fetch_optional(&mut **tx)
+57:         .await?
+58:         .ok_or_else(missing)?;
+59:     super::workflow::authority::authorize_company(tx, scope.company, scope.actor).await?;
+60:     Ok(())
+61: }
+
+src/adapters/persistence/workflow/authority.rs:45-65
+45: pub(crate) async fn authorize_company(
+46:     db: &mut PgConnection,
+47:     company: CompanyId,
+48:     actor: WorkflowActor,
+49: ) -> AppResult<crate::entities::access_level::LevelActor> {
+50:     use crate::adapters::persistence::participant::{membership_from_db, reader_level};
+51:     use crate::entities::access_level::LevelActor;
+52:     let owner: Uuid =
+53:         sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+54:             .bind(company.as_uuid())
+55:             .fetch_optional(&mut *db)
+56:             .await?
+57:             .ok_or_else(missing)?;
+58:     #[derive(sqlx::FromRow)]
+59:     struct MemberAuthority {
+60:         role: String,
+61:         access_level: i16,
+62:     }
+63:     let facts=sqlx::query_as::<_,MemberAuthority>(
+64:         "SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
+65:          JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
+
+src/adapters/persistence/department_desks.rs:230-274
+230: async fn rederive_on(
+231:     tx: &mut Transaction<'_, Postgres>,
+232:     company: CompanyId,
+233:     desks: &[Uuid],
+234: ) -> AppResult<()> {
+235:     if desks.is_empty() {
+236:         return Ok(());
+237:     }
+238:     let owned: Vec<(Uuid, Uuid)> = sqlx::query_as(
+239:         "SELECT channel.id, channel.department_id FROM channels AS channel \
+240:           WHERE channel.company_id = $1 AND channel.id = ANY($2) \
+241:             AND channel.members_only AND channel.department_id IS NOT NULL",
+242:     )
+243:     .bind(company.as_uuid())
+244:     .bind(desks)
+245:     .fetch_all(&mut **tx)
+246:     .await?;
+247:     let eligible = eligible_on(tx, company, &owned).await?;
+248:     let current = lock_principals_on(tx, company, &eligible).await?;
+249:     acquire_channel_gates_on(
+250:         tx,
+251:         desks
+252:             .iter()
+253:             .map(|desk| ChannelGateKey::new(company.as_uuid(), *desk)),
+254:         ChannelGateAccess::ChangeSettings,
+255:     )
+256:     .await?;
+257:     // A desk deleted since it was read is skipped: deleting a desk takes no company lock.
+258:     let locked: Vec<Uuid> = sqlx::query_scalar(
+259:         "SELECT channel.id FROM channels AS channel \
+260:           WHERE channel.company_id = $1 AND channel.id = ANY($2) \
+261:           ORDER BY channel.id FOR UPDATE",
+262:     )
+263:     .bind(company.as_uuid())
+264:     .bind(desks)
+265:     .fetch_all(&mut **tx)
+266:     .await?;
+267:     if locked.is_empty() {
+268:         return Ok(());
+269:     }
+270:     let provenance = GrantProvenance::DepartmentMembership.as_str();
+271:     sqlx::query(
+272:         "DELETE FROM channel_principal_grants AS derived \
+273:           WHERE derived.company_id = $1 AND derived.channel_id = ANY($2) \
+274:             AND derived.provenance = $3",
+
+src/adapters/persistence/channel_gate.rs:45-86
+45:     }
+46: }
+47: 
+48: /// How a transaction takes the gate, which is also why.
+49: #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+50: pub(crate) enum ChannelGateAccess {
+51:     /// Admitting a message through the channel's current settings. Any number may hold it at once.
+52:     Admit,
+53:     /// Changing those settings. Waits for every admission in flight, and holds new ones back
+54:     /// until it commits.
+55:     ChangeSettings,
+56: }
+57: 
+58: /// Take the gate for every key, in `(company_id, channel_id)` order.
+59: ///
+60: /// A multi-channel writer must pass all of its keys in one call: taking them one at a time in the
+61: /// order it happens to meet them is how two such writers deadlock each other.
+62: pub(crate) async fn acquire_channel_gates_on(
+63:     conn: &mut PgConnection,
+64:     keys: impl IntoIterator<Item = ChannelGateKey>,
+65:     access: ChannelGateAccess,
+66: ) -> AppResult<()> {
+67:     let mut keys: Vec<ChannelGateKey> = keys.into_iter().collect();
+68:     keys.sort_unstable();
+69:     keys.dedup();
+70:     let function = match access {
+71:         ChannelGateAccess::Admit => "pg_advisory_xact_lock_shared",
+72:         ChannelGateAccess::ChangeSettings => "pg_advisory_xact_lock",
+73:     };
+74:     let statement = format!(
+75:         "SELECT {function}(hashtextextended('channel-gate:' || $1::text || ':' || $2::text, 0))"
+76:     );
+77:     for key in keys {
+78:         sqlx::query(&statement)
+79:             .bind(key.company_id)
+80:             .bind(key.channel_id)
+81:             .execute(&mut *conn)
+82:             .await
+83:             .map_err(AppError::from)?;
+84:     }
+85:     Ok(())
+86: }
+
+src/adapters/persistence/thread/inbound.rs:93-157
+93: pub(super) async fn commit_on(
+94:     tx: &mut Transaction<'_, Postgres>,
+95:     request: &InboundCommitRequest,
+96: ) -> AppResult<InboundCommitOutcome> {
+97:     if request.associations.is_empty() {
+98:         return Err(AppError::BadRequest(
+99:             "An inbound commit must name at least one thread association".into(),
+100:         ));
+101:     }
+102:     hold_channel_settings(tx, request).await?;
+103:     let binding_ids = verify_association_bindings(tx, request).await?;
+104:     lock_provider_keys(tx, request, &binding_ids).await?;
+105: 
+106:     // Asked first, and under every relevant lock. A redelivery must open no thread: the old path
+107:     // created the thread before it knew whether the message was new, so a provider retry left an
+108:     // empty conversation behind and then failed associating the message it already held.
+109:     let existing = existing_message_mappings(tx, request, &binding_ids).await?;
+110:     if !existing.is_empty() {
+111:         return recognise_redelivery(tx, request, existing).await;
+112:     }
+113: 
+114:     let threads = resolve_threads(tx, request).await?;
+115:     bind_conversations(tx, request, &threads).await?;
+116: 
+117:     let write = message_write(request, threads[0].thread_id)?;
+118:     let stored = store_canonical(tx, request, &write).await?;
+119: 
+120:     associate_threads(tx, request, &threads, stored.id).await?;
+121:     map_provider_message(tx, request, &threads, &stored).await?;
+122:     // After the associations, whose rows the intents' foreign key names, and before the fan-out:
+123:     // keeping the statement order of the whole commit fixed is what stops two concurrent inbound
+124:     // commits on one thread taking their locks in opposite orders.
+125:     let intent_ids = create_intents(tx, request, &threads, stored.id).await?;
+126:     let delivery_ids = create_deliveries(tx, request).await?;
+127:     complete_claimed_event(tx, request).await?;
+128: 
+129:     Ok(InboundCommitOutcome {
+130:         disposition: CommitDisposition::Created,
+131:         message_id: stored.id,
+132:         thread_ids: threads.iter().map(|thread| thread.thread_id).collect(),
+133:         intent_ids,
+134:         delivery_ids,
+135:     })
+136: }
+137: 
+138: /// Take the gate of every channel this commit admits into, then check the settings it was routed
+139: /// under still stand. No settings edit can land on those channels for the rest of the commit.
+140: ///
+141: /// The gates come before every row lock the commit takes, all of them in one ordered call, so
+142: /// channel settings writers and this commit lock in one order.
+143: pub(super) async fn hold_channel_settings(
+144:     tx: &mut Transaction<'_, Postgres>,
+145:     request: &InboundCommitRequest,
+146: ) -> AppResult<()> {
+147:     acquire_channel_gates_on(
+148:         tx,
+149:         request
+150:             .intents
+151:             .iter()
+152:             .map(|intent| ChannelGateKey::new(request.company_id, intent.channel_id)),
+153:         ChannelGateAccess::Admit,
+154:     )
+155:     .await?;
+156:     verify_channel_settings(tx, request).await
+157: }

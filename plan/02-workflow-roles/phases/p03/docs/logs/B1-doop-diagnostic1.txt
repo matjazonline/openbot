@@ -1,0 +1,6 @@
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4223 filtered out; finished in 51.42s
+

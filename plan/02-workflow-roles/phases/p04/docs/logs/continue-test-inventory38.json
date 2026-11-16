@@ -1,0 +1,17 @@
+{
+  "total": 4338,
+  "baseline_build31": 4328,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_reservation_does_not_lock_unused_reviewer",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_settlement_does_not_lock_unused_reviewer",
+    "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_fresh_final_vote_requires_current_reply_policy_accounts",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_fresh_nonterminal_vote_ignores_unused_retired_reply_policy_accounts",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_company_precedes_run_during_actual_retirement",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_reservation_and_replay_ignore_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_claim_ignores_unused_retired_final_reviewers",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_lease_renewal_ignores_unused_retired_final_reviewers"
+  ],
+  "removed": []
+}

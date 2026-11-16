@@ -1,0 +1,59 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R14-reviewer",
+  "artifact": "4d45c5c294aeb056ba4ce419fc21702dc168336f06f3af788610583a9771c36f",
+  "checks": [
+    {
+      "criteria": [
+        "runner-diagnostics",
+        "browser-options-protocol"
+      ],
+      "command": "python3 scripts/tests/check-runner.py; node --test scripts/tests/doop-probe.mjs",
+      "fixture": "Isolated local Python10/Node26protocol26, no actual browser/database/image",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R14-reviewer-runner.txt",
+          "sha256": "52b63e4b04bc5e40c55c3201e1e7f113b187422a867174c7f5ad01d854a479f1"
+        },
+        {
+          "path": "logs/B1-R14-reviewer-doop-probe.txt",
+          "sha256": "8508c1b1f05ac97c0f3e70b5eae59235918d3ce86dcca9f0e28a5bc9627cf2f9"
+        },
+        {
+          "path": "logs/B1-R14-reviewer-identity.json",
+          "sha256": "db0b9d206766cf042f8bf49d7ead29ad97e179dda0accb0e8d323e0bf9d7991c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "new-ipc-probe-bounded-lifetime",
+        "R14-F1"
+      ],
+      "command": "python3 plan/03-principal-addresses/phases/p04/docs/logs/B1-R14-ipc-owner-probe.py",
+      "fixture": "ExactIPCscript/controlledPuppeteer; harness exit0 confirms invariant counterexamples, no native Chrome; all children/tempfiles cleaned",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R14-ipc-owner-probe.py",
+          "sha256": "f0653c3f82c77507aefad7a5257c5aa3f5bdcd80a13ad5939b58257ba96f87ba"
+        },
+        {
+          "path": "logs/B1-R14-ipc-owner-probe.txt",
+          "sha256": "883cda5566685eab17dc4cb42377f23d3281b2b10b5be0353d93700c0b4e5fb8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "actual-four-profile-private-proof",
+        "final-acceptance"
+      ],
+      "command": "Actual CI/native and current private gate review",
+      "fixture": "Execution/final mapping pending",
+      "status": "NOT EXERCISED",
+      "reason": "Required actual evidence still running and R14/F1 correction needed."
+    }
+  ]
+}

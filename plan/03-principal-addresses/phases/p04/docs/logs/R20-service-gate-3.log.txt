@@ -1,0 +1,3 @@
+$ oxlint --type-aware --deny-warnings . && eslint . --max-warnings 0
+Found 0 warnings and 0 errors.
+Finished in 4.7s on 807 files with 97 rules using 4 threads.

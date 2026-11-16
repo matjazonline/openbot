@@ -1,0 +1,58 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0382]: use of moved value: `outcome`
+   --> src/application/workflow/message_admission.rs:255:33
+    |
+251 |                 Attempt::Outcome(outcome) => {
+    |                                  ------- move occurs because `outcome` has type `message_admission::BindingOutcome`, which does not implement the `Copy` trait
+252 |                     if !self.record(&intent, &binding, outcome).await? {
+    |                                                        ------- value moved here
+...
+255 |                     if matches!(outcome, BindingOutcome::Admitted(_)) {
+    |                                 ^^^^^^^ value used here after move
+    |
+note: consider changing this parameter type in method `record` to borrow instead if owning the value isn't necessary
+   --> src/application/workflow/message_admission.rs:413:18
+    |
+409 |     async fn record(
+    |              ------ in this method
+...
+413 |         outcome: BindingOutcome,
+    |                  ^^^^^^^^^^^^^^ this parameter takes ownership of the value
+help: consider cloning the value if the performance cost is acceptable
+    |
+252 |                     if !self.record(&intent, &binding, outcome.clone()).await? {
+    |                                                               ++++++++
+
+error[E0063]: missing field `role_refusal` in initializer of `ScheduleRun`
+   --> src/adapters/http/routes/ui_schedules.rs:678:9
+    |
+678 |         ScheduleRun {
+    |         ^^^^^^^^^^^ missing `role_refusal`
+
+For more information about this error, try `rustc --explain E0382`.
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0004]: non-exhaustive patterns: `&message_outcome::BindingOutcome::RoleRefused(_)` not covered
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1465:15
+     |
+1465 |         match &outcome.outcome {
+     |               ^^^^^^^^^^^^^^^^ pattern `&message_outcome::BindingOutcome::RoleRefused(_)` not covered
+     |
+note: `message_outcome::BindingOutcome` defined here
+    --> src/domain/entities/message_outcome.rs:19:10
+     |
+  19 | pub enum BindingOutcome {
+     |          ^^^^^^^^^^^^^^
+...
+  26 |     RoleRefused(super::department::RoleAdmissionRefusal),
+     |     ----------- not covered
+     = note: the matched value is of type `&message_outcome::BindingOutcome`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+     |
+1481 ~             BindingOutcome::Failed { .. } => panic!("no admission failed"),
+1482 ~             &message_outcome::BindingOutcome::RoleRefused(_) => todo!(),
+     |
+
+Some errors have detailed explanations: E0004, E0063, E0382.
+For more information about an error, try `rustc --explain E0004`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

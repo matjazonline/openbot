@@ -1,0 +1,44 @@
+[
+  {
+    "test": "adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard ... ok"
+    ]
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses ... ok"
+    ]
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order ... ok"
+    ]
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call ... ok"
+    ]
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock ... ok"
+    ]
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal",
+    "R7": "FAIL; live buffer pending",
+    "prior_R5_lines": [
+      "test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal ... ok"
+    ]
+  }
+]

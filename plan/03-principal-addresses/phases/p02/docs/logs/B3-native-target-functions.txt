@@ -1,0 +1,224 @@
+internal_notes_are_immutable L822-834
+828: WHERE company_id = OLD.company_id AND channel_id IS NOT DISTINCT FROM OLD.channel_id AND principal_id IS NOT DISTINCT FROM OLD.principal_id AND id = OLD.thread_id
+
+notification_from_delivery L841-871
+849: IF COALESCE(NEW.channel_id, OLD.channel_id) IS NULL THEN
+
+valid_creation_provenance L878-990
+893: channel_id uuid NOT NULL,
+894: principal_id uuid NOT NULL,
+989: AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view')))))
+
+notification_recheck_channel_access L997-1014
+1004: (row_data->>'channel_id')::UUID,
+
+notification_recheck_membership L1021-1046
+1035: notification.recipient_principal_id IS NULL
+1038: notification.channel_id, notification.principal_id,
+1039: notification.recipient_principal_id
+1042: notification.company_id,notification.source_id,notification.recipient_principal_id))
+
+notify_attention_changed L1092-1114
+1099: channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
+1106: 'channel_id', channel,
+
+notify_internal_note_change L1139-1166
+1150: note_channel := NEW.channel_id;
+1151: note_principal := NEW.principal_id;
+1154: SELECT thread_id, channel_id, company_id, principal_id
+
+notify_thread_activity L1173-1189
+1181: 'target', CASE WHEN NEW.channel_id IS NOT NULL
+1182: THEN json_build_object('kind','desk','id',NEW.channel_id)
+1183: ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
+
+notify_thread_message L1196-1212
+1204: 'target', CASE WHEN NEW.channel_id IS NOT NULL
+1205: THEN json_build_object('kind','desk','id',NEW.channel_id)
+1206: ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
+
+preserve_workflow_run_association L1496-1507
+1500: IF (NEW.company_id, NEW.id, NEW.channel_id, NEW.thread_id) IS DISTINCT FROM
+1501: (OLD.company_id, OLD.id, OLD.channel_id, OLD.thread_id) THEN
+
+require_immutable_schedule_channel L1581-1591
+1585: IF NEW.channel_id IS DISTINCT FROM OLD.channel_id THEN
+
+require_schedule_occurrence_scope L1701-1752
+1709: SELECT schedule.company_id, schedule.channel_id, schedule.binding_id
+1715: OR (NEW.channel_id IS NOT NULL AND NEW.channel_id <> owner_channel)
+1721: NEW.channel_id := owner_channel;
+1724: IF (NEW.company_id, NEW.channel_id, NEW.binding_id, NEW.schedule_id,
+1727: (OLD.company_id, OLD.channel_id, OLD.binding_id, OLD.schedule_id,
+1745: AND run.trigger_id = NEW.id AND run.channel_id = NEW.channel_id AND run.thread_id IS NULL
+
+validate_workflow_job_association L1851-1889
+1867: SELECT run.channel_id, run.thread_id INTO run_channel, run_thread
+1883: IF NEW.channel_id IS DISTINCT FROM run_channel OR NEW.thread_id IS DISTINCT FROM run_thread THEN
+
+withdraw_unauthorized_notifications L1917-1934
+1924: AND notification.channel_id = changed_channel
+1927: notification.recipient_principal_id IS NULL
+1930: notification.channel_id,
+1931: notification.recipient_principal_id
+
+workflow_decision_reviewer_guard L3099-3126
+3105: snapshot_user := workflow_decision_person_snapshot(NEW.company_id, NEW.principal_id);
+3108: WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id;
+3118: AND delivery.purpose='notification' AND delivery.company_id=NEW.company_id AND delivery.channel_id IS NULL
+3122: || ':principal:' || NEW.principal_id || ':')) THEN
+
+notify_workflow_run_changed L9382-9399
+9390: 'channel_id', NEW.channel_id,
+
+guard_channel_reply_settings L12895-12920
+12898: IF EXISTS (SELECT 1 FROM public.channels WHERE company_id=OLD.company_id AND id=OLD.channel_id)
+12905: IF TG_OP='UPDATE' AND ((NEW.company_id,NEW.channel_id) IS DISTINCT FROM (OLD.company_id,OLD.channel_id)
+12914: AND binding.channel_id=NEW.channel_id AND binding.thread_id IS NULL AND binding.active
+
+capture_channel_reply_context L12930-12952
+12935: WHERE channel.company_id=NEW.company_id AND channel.id=NEW.channel_id FOR SHARE;
+12938: (company_id,intent_id,message_id,channel_id,thread_id,responder_principal_id,
+12940: SELECT NEW.company_id,NEW.id,NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.responder_principal_id,
+12945: AND binding.id=settings.binding_id AND binding.channel_id=settings.channel_id
+12948: WHERE settings.company_id=NEW.company_id AND settings.channel_id=NEW.channel_id
+
+guard_channel_reply_context L12956-12992
+12976: AND settings.channel_id=intent.channel_id
+12980: AND (intent.message_id,intent.channel_id,intent.thread_id,intent.delivery_policy)
+12981: =(NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.delivery_policy)
+12982: AND intent.responder_principal_id IS NOT DISTINCT FROM NEW.responder_principal_id
+
+guard_channel_reply_run L13010-13047
+13036: AND (run.binding_id,run.binding_revision,run.channel_id,run.thread_id,run.trigger_id,run.actor_id,run.delivery_policy)
+13037: =(context.binding_id,context.binding_revision,context.channel_id,context.thread_id,
+
+require_channel_reply_proposal_links L13343-13386
+13362: AND NEW.integrity_document->>'channel'=context.channel_id::text
+13370: AND NEW.route_snapshot->'targets'->0->>'channel'=context.channel_id::text)
+13372: AND NEW.route_snapshot->'targets'->0->'sender'->>'id'=context.channel_id::text
+13373: AND EXISTS(SELECT 1 FROM public.addresses AS alias WHERE alias.company_id=context.company_id AND alias.channel_id=context.channel_id AND alias.is_primary
+
+channel_reply_publication_matches L13429-13465
+13444: AND filed.channel_id=context.channel_id AND filed.thread_id=context.thread_id
+13456: AND delivery.message_id=message.id AND delivery.channel_id=context.channel_id
+
+notify_channel_response_run L14159-14179
+14164: SELECT run.company_id,run.id,run.channel_id,run.thread_id,run.state,run.waiting_reason
+14172: 'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id,
+14176: 'company_id',related.company_id,'channel_id',related.channel_id,'thread_id',related.thread_id)::text);
+
+guard_agent_history_session L14300-14331
+14305: IF OLD.live_creator_principal_id IS NOT NULL AND NEW.live_creator_principal_id IS NULL
+14306: AND (to_jsonb(NEW)-'live_creator_principal_id') IS NOT DISTINCT FROM
+14307: (to_jsonb(OLD)-'live_creator_principal_id')
+14309: WHERE creator.company_id=OLD.company_id AND creator.id=OLD.live_creator_principal_id)
+14321: AND creator.id=NEW.creator_principal_id AND creator.id=NEW.live_creator_principal_id
+14325: AND NEW.channel_id IS NOT DISTINCT FROM run.channel_id
+
+guard_workflow_agent_session L14335-14375
+14354: AND session.channel_id IS NOT DISTINCT FROM run.channel_id
+14366: AND intent.id=run.trigger_id AND intent.channel_id=run.channel_id AND intent.thread_id=run.thread_id
+
+agent_history_conversation_unused L14501-14512
+14509: OR (conversation.scope_kind='thread' AND run.channel_id=conversation.channel_id AND run.thread_id=conversation.thread_id)
+
+guard_agent_history_exchange_insert L14615-14679
+14671: AND conversation.channel_id=run.channel_id AND conversation.thread_id=run.thread_id
+
+department_principal_demoted L15684-15703
+15688: WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
+15690: WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id;
+15696: WHERE derived.company_id = NEW.company_id AND derived.principal_id = NEW.id
+15698: RETURNING derived.channel_id
+15701: WHERE channel.company_id = NEW.company_id AND channel.id IN (SELECT channel_id FROM removed);
+
+guard_workflow_role_context L16157-16183
+16174: LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+
+workflow_follow_reviewer_eligible L16427-16442
+16433: LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+16435: AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND member.role IN ('owner','admin'))
+16436: OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+16438: AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
+16441: AND thread.channel_id=run.channel_id AND thread.id=run.thread_id)))
+
+guard_workflow_reviewer_receipt L16770-16809
+16774: SELECT company_id,id,decision_id,principal_id,assignment_revision,event_id,source_kind,action_kind INTO source
+16780: AND reviewer.decision_id=NEW.decision_id AND reviewer.principal_id=source.principal_id AND reviewer.notice_event_id=NEW.event_id) INTO is_current;
+16781: SELECT public.workflow_follow_reviewer_eligible(NEW.company_id,decision.run_id,source.principal_id) INTO eligible
+16785: AND event.status IN ('processing','projected') AND event.actor_principal_id IS NULL)
+16787: SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND kind='person' AND user_id=viewer)))
+16797: AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+
+guard_workflow_escalation_case L17053-17115
+17080: LEFT JOIN public.channels AS channel ON channel.company_id=refusal.company_id AND channel.id=refusal.channel_id
+
+workflow_escalation_person_eligible L17524-17540
+17528: JOIN public.principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id
+17536: AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),principal.id)
+
+guard_escalation_notification L17542-17576
+17546: IF (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id)
+17547: IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id)
+17548: OR (NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+17549: NEW.recipient_principal_id IS NULL AND NOT EXISTS (SELECT 1 FROM public.principals
+17550: WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id))) THEN
+17557: SELECT notice.principal_id,notice.principal_kind,notice.event_id,COALESCE(run.channel_id,refusal.channel_id) AS channel_id
+17564: OR source.channel_id IS DISTINCT FROM NEW.channel_id OR NEW.action_kind<>'escalation_review' OR NEW.source_generation<>1
+17565: OR (NEW.recipient_principal_id IS NOT NULL AND source.principal_id IS DISTINCT FROM NEW.recipient_principal_id)
+17566: OR (NEW.state='active' AND (NEW.recipient_principal_id IS NULL
+17571: AND id=source.principal_id AND kind='person' AND user_id=NEW.recipient_user_id))) THEN
+
+guard_workflow_escalation_person_receipt L17592-17637
+17596: SELECT company_id,id,case_id,decision_id,principal_id,principal_kind,principal_label,event_id,source_kind,action_kind,source_generation,created_at
+17598: SELECT id,company_id,recipient_user_id,recipient_principal_id,event_id,source_kind,source_id,action_kind,source_generation,channel_id,
+17601: SELECT actor_principal_id INTO actor FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status IN ('processing','projected');
+17610: OR projected.recipient_principal_id IS DISTINCT FROM source.principal_id OR projected.state<>'active'
+17611: OR NOT EXISTS (SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND user_id=projected.recipient_user_id)
+17619: IF NEW.outcome='email_queued' AND (actor IS NOT DISTINCT FROM source.principal_id
+17623: AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+17628: ELSIF NEW.outcome='opted_out' AND (projected.email_delivery_id IS NOT NULL OR actor IS NOT DISTINCT FROM source.principal_id
+17632: ELSIF NEW.outcome='self_suppressed' AND (projected.email_delivery_id IS NOT NULL OR actor IS DISTINCT FROM source.principal_id) THEN
+
+workflow_escalation_agent_route L17690-17710
+17702: JOIN public.workflow_bindings AS binding ON binding.company_id=desk.company_id AND binding.channel_id=desk.id
+17707: JOIN public.channel_bindings AS endpoint ON endpoint.company_id=desk.company_id AND endpoint.channel_id=desk.id
+
+workflow_escalation_agent_eligible L17712-17729
+17716: CROSS JOIN LATERAL public.workflow_escalation_agent_route(notice.company_id,notice.principal_id) AS route
+17725: AND public.notification_principal_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),actor.id)
+
+guard_workflow_escalation_agent_receipt L17765-17786
+17774: JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+17777: AND intent.channel_id=NEW.desk_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
+
+guard_workflow_escalation_handling_root L18096-18123
+18117: AND run.channel_id=intent.channel_id AND run.thread_id=intent.thread_id AND intent.message_id=NEW.message_id
+
+guard_message_internal_relay L18303-18331
+18317: AND delivery.transport='email' AND delivery.channel_id=NEW.source_channel_id AND delivery.message_id IS NOT NULL
+18319: AND part.payload->'body'->'relay'->>'source_channel_id'=NEW.source_channel_id::text
+
+advance_principal_address_revision L18610-18633
+18614: IF (NEW.company_id, NEW.slug, NEW.principal_id, NEW.channel_id, NEW.is_primary)
+18615: IS NOT DISTINCT FROM (OLD.company_id, OLD.slug, OLD.principal_id, OLD.channel_id, OLD.is_primary) THEN
+18619: targets := ARRAY[OLD.principal_id, NEW.principal_id];
+18621: tenants := ARRAY[NEW.company_id]; targets := ARRAY[NEW.principal_id];
+18622: ELSE tenants := ARRAY[OLD.company_id]; targets := ARRAY[OLD.principal_id]; END IF;
+
+guard_principal_transport_binding L18645-18664
+18647: IF TG_OP = 'UPDATE' AND (OLD.principal_id IS NOT NULL OR NEW.principal_id IS NOT NULL)
+18648: AND (NEW.company_id, NEW.channel_id, NEW.principal_id, NEW.transport, NEW.namespace, NEW.installation_id)
+18650: (OLD.company_id, OLD.channel_id, OLD.principal_id, OLD.transport, OLD.namespace, OLD.installation_id) THEN
+18654: IF NEW.principal_id IS NULL THEN RETURN NEW; END IF;
+18656: AND principal.id = NEW.principal_id AND principal.kind IN ('person', 'agent')) THEN
+
+guard_direct_message_notification L18859-18889
+18863: NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id,NEW.principal_id)
+18866: OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id,OLD.principal_id) THEN
+18871: AND NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+18872: NEW.recipient_principal_id IS NULL AND OLD.recipient_principal_id IS NOT NULL AND NOT EXISTS (
+18873: SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id)) THEN
+18879: JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+18881: AND NEW.channel_id IS NULL AND NEW.principal_id=target.id AND NEW.recipient_principal_id=target.id

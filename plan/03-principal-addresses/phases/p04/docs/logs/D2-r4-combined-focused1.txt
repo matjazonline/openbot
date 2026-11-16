@@ -1,0 +1,132 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 00s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 117 tests
+test adapters::mcp::doop_tests::doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing ... ok
+test adapters::mcp::doop_tests::doop_contract_profile_secret_echo_is_redacted_in_both_result_representations ... ok
+test adapters::mcp::doop_tests::doop_contract_actual_results_preserve_structure_images_resources_and_error_status ... ok
+test adapters::mcp::http::body_lifetime_tests::integration_gateway_native_mcp_sse_body_owns_completion_after_client_release ... ok
+test adapters::mcp::policy::tests::memory_integration_company_connections_cannot_reach_the_memory_service_origin ... ok
+test adapters::mcp::policy::tests::policy_exceptions_are_exact_and_operator_owned ... ok
+test adapters::mcp::policy::tests::workflow_http_connector_uses_pinned_addresses_without_resolving_hostname_again ... ok
+test adapters::mcp::policy::tests::workflow_http_resolved_dns_rejects_any_prohibited_answer_and_rebinding ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_abandonment_and_shutdown_join_initialization ... ok
+test adapters::mcp::doop_tests::doop_private_export_actual_results_survive_guarded_transport_without_fetching_urls ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_competing_admission_cancel_releases_only_its_claim ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_http_error_preserves_the_openbot_session ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_is_typed_through_actual_initialization_discovery_and_call ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_preparation_cancelled_before_admission_sends_no_credential ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_prepared_initialization_preserves_typed_failure_and_cleanup ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session ... ok
+test adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried ... ok
+test adapters::mcp::doop_tests::doop_catalog_real_minimal_operations_and_identity_results_pass_workflow_contracts ... ok
+test adapters::mcp::tests::mcp_busy_endpoint_waiters_leave_global_capacity_and_shutdown_promptly ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+test adapters::mcp::tests::mcp_discovery_rejects_duplicates_external_schemas_secret_echoes_and_oversized_data ... ok
+test adapters::mcp::doop_tests::doop_contract_actual_catalog_compiles_with_existing_limits_and_fixed_workspace_arguments ... ok
+test adapters::mcp::tests::mcp_initializes_discovers_and_explicitly_calls_json_and_sse_then_shuts_down ... ok
+test adapters::mcp::tests::mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links ... ok
+test adapters::mcp::tests::mcp_repeated_pagination_cursor_fails_without_calling_a_tool ... ok
+test adapters::mcp::tests::mcp_shutdown_joins_an_abandoned_session_and_closes_admission ... ok
+test adapters::mcp::tests::mcp_endpoint_permit_wait_expires_without_consuming_global_capacity ... ok
+test adapters::persistence::legacy_runtime_schema_tests::the_legacy_runtime_tables_columns_and_functions_are_gone ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization ... ok
+test adapters::persistence::legacy_runtime_schema_tests::no_catalog_object_names_the_legacy_runtime ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... ok
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_populated_company_cascade_removes_broker_call_run_and_thread ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_auth_and_admission_refuse_busy_owners_without_writes ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_foreign_conversation_refuses_before_session_publication ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::direct_tests::native_mcp_direct_principal_source_preserves_target_and_immutable_witness ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_authenticates_before_body_and_refuses_foreign_or_stale_connections ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::http_tests::native_mcp_http_bounds_untrusted_input_then_publishes_one_visible_no_store_run ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_broker_rejects_foreign_or_wrong_account_principal_and_identity_updates ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::identity_tests::native_mcp_new_person_incarnation_gets_new_broker_without_reviving_old_invocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_competing_machine_capacity_refuses_the_ninth_and_releases_only_finished_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::cloudroom_native_company_mcp_real_cli_plugin_pg_approval_worker_and_gateway ... ignored, requires the owned patched Cloudroom checkout, Node24 and local scripted native CLI fixture
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_real_operation_expiration_never_waits_for_broker_and_competing_sweeps_finish_once ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::integration_tests::native_mcp_integration_owned_consent_approval_credential_and_revocation_reach_real_gateway ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_ingress_auth_and_admission_never_wait_for_current_source_owners ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_real_claim_and_preparation_preserve_exact_contract_and_stop_after_grant_revocation ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_poison_retirement_keeps_a_durable_delay_after_rollback ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_cancel_by_invocation_invalidates_then_run_first_sweep_closes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::limits_tests::native_mcp_operation_capacity_includes_resolved_calls_but_never_blocks_existing_identity_replay ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+late native approval: Ok(DecisionSubmission { disposition: Applied, revision: 2, successor: None }); state=cancelled
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::lifecycle_tests::native_mcp_stop_and_archive_commit_without_broker_owner_then_revoke_old_calls_but_allow_new_explicit_input ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_is_absent_from_all_public_authoring_reads_but_run_history_is_visible ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_company_cascade_removes_real_broker_call_and_run_with_deferred_provenance ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_approval_after_committed_stop_never_reaches_the_gateway ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::live_tests::native_mcp_added_grant_and_machine_owner_locks_never_wait_behind_a_competitor ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::retention_tests::native_mcp_retention_competitors_keep_identity_and_later_status_after_collecting_original_payload ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_http_api_key_policy_denies_mcp_consent_before_any_remote_session ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::private_tests::native_mcp_private_broker_refuses_public_save_archive_and_publication_without_mutation ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_parent_cancel_ends_real_broker_lease_and_preparation_before_any_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::history::native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine_revoke_and_original_actor_removal ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_outer_preparation_never_waits_for_broker_run ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_source_local_action_rejects_agent_origin_substitution ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::integration_tests::native_mcp_workflow_final_credential_guard_locks_distinct_source_and_credential_owners ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_recovery_mcp_cancellation_closes_session_and_preserves_one_possible_effect ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_binding_rejects_foreign_and_wrong_kind_resources ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_return_authority_rechecks_original_accounts ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_operation_cas_cascades_and_tenant_constraints ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_workflow_actor_requester_and_revision_contention_rolls_back_and_retries ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_tests::reconciliation_tests::native_mcp_actual_unknown_all_historical_proofs_survive_original_actor_machine_and_grant_revocation_without_effect_retry ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_mcp_portability::integration_portability_bearer_google_and_strict_oauth_use_real_native_mcp_without_workflow_branches ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_stale_worker_during_eager_open_retries_then_calls_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_permit_timeout_retires_safely_then_retries_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::snapshot_tests::workflow_mcp_new_model_ids_keep_read_snapshot_after_peer_changes ... ok
+test adapters::persistence::workflow::tests::mcp_tests::reconciliation_tests::workflow_mcp_verified_not_applied_retries_lazily_and_checks_live_drift ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_fresh_action_and_credentials_use_original_account_prefix ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::projection_tests::vault_workflow_mcp_native_valid_oversized_projection_is_terminal_before_credentials ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_dispatch_rechecks_source_after_approval_and_reservation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_post_entry_failures_and_session_expiry_park_without_reinitialize ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_revocation_and_rotation_racing_dispatch_never_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_another_administrator_cannot_discover_the_owners_account ... ok
+test adapters::persistence::workflow::tests::mcp_tests::catalog_tests::workflow_mcp_registration_competes_with_grant_removal_refresh_and_delete ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_browser_expiring_during_catalog_prevents_configuration_save ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_competing_catalog_refreshes_commit_one_current_revision ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_credential_in_catalog_is_rejected_before_any_business_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_generation_change_during_catalog_closes_and_rebuilds_before_entry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_configuration_discovers_without_a_business_invocation ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_owner_disconnect_during_catalog_prevents_configuration_save ... ok
+test application::local_agents::mcp::tests::native_mcp_maximum_result_fits_the_complete_response_with_maximum_origin_ids ... ok
+test application::workflow::mcp::tests::workflow_mcp_discovery_must_offer_exactly_the_frozen_schemas ... ok
+test application::workflow::mcp::tests::workflow_mcp_error_envelope_classification ... ok
+test application::workflow::mcp::tests::workflow_mcp_operation_requires_grant_review_and_reconcile_recovery ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_private_session_uses_native_receipt_and_redacts_active_credential ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_competitors_restart_and_direct_tool_share_one_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_uncertain_tool_call_never_reopens_or_replays ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_tool_error_commits_receipt_and_takes_final_error ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_unavailable_before_marker_retries_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_drift_and_missing_tool_fail_before_any_marker ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_json_and_sse_run_end_to_end_with_typed_refs ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_output_violation_and_oversize_stay_unknown_without_second_call ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_resource_links_stay_inert_and_echoed_secrets_are_redacted ... ok
+test adapters::persistence::workflow::tests::mcp_tests::workflow_mcp_refusals_and_protection_are_terminal_without_network ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::preparation_authority_tests::vault_workflow_mcp_actual_authority_is_rechecked_after_each_preparation_wait ... ok
+
+test result: ok. 116 passed; 0 failed; 1 ignored; 0 measured; 4587 filtered out; finished in 121.81s
+

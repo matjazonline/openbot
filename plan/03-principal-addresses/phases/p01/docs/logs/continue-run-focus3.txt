@@ -1,0 +1,9 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 2 tests
+test adapters::resend_api::inbound::tests::address_external_ingress_resend_names_a_person_the_way_it_names_a_desk ... ok
+test adapters::smtp::server::tests::address_external_ingress_smtp_does_not_confirm_a_members_address ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4497 filtered out; finished in 1.00s
+
+EXIT 0

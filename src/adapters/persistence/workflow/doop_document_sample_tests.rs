@@ -17,13 +17,13 @@ fn capture(d: &Document) -> crate::adapters::persistence::workflow::SampleCaptur
     }
 }
 
-fn request(d: &Document) -> SampleRequest {
+async fn request(d: &Document) -> SampleRequest {
     let mut request: SampleRequest = serde_json::from_str(include_str!(
         "../../../../integrations/doop/create-document.sample.json"
     ))
     .unwrap();
-    request.params["action_approval"] = params(&d.f)["action_approval"].clone();
-    request.params["result_destinations"] = params(&d.f)["result_destinations"].clone();
+    request.params["action_approval"] = params(&d.f).await["action_approval"].clone();
+    request.params["result_destinations"] = params(&d.f).await["result_destinations"].clone();
     for script in &mut request.scripts {
         script.workflow_id = d.f.target.workflow;
     }
@@ -34,7 +34,7 @@ fn request(d: &Document) -> SampleRequest {
 async fn doop_sample_shipped_document_runs_without_model_or_mcp_transport_and_requires_approval() {
     let d = Box::pin(Document::new(McpErrorPolicy::FailStep)).await;
     let capture = capture(&d);
-    let request = request(&d);
+    let request = request(&d).await;
     for approval in [false, true] {
         let mut request = request.clone();
         request
@@ -138,7 +138,11 @@ async fn doop_result_sample_one_under_step_budget_stops_before_final_success() {
         .await
         .unwrap();
     let prepared = capture
-        .capture(d.f.target, DraftRevision::new(2).unwrap(), request(&d))
+        .capture(
+            d.f.target,
+            DraftRevision::new(2).unwrap(),
+            request(&d).await,
+        )
         .await
         .unwrap();
     let report = crate::application::workflow::sample::execute(prepared).unwrap();

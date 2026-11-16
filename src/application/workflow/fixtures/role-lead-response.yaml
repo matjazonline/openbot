@@ -1,0 +1,54 @@
+# A reusable department response. Admission resolves and freezes the nearest lead agent.
+format_version: 1
+workflow_id: 00000000-0000-0000-0000-000000000002
+input_schema:
+  type: object
+  properties:
+    message: {type: string}
+    source_message: {type: string, maxLength: 128}
+    subject: {type: string, maxLength: 998}
+    sender: {type: string, maxLength: 320}
+  required: [message, source_message]
+  additionalProperties: false
+parameter_schema: {type: object, additionalProperties: false}
+output_schema:
+  type: object
+  properties: {body: {type: string, maxLength: 16384}}
+  required: [body]
+  additionalProperties: false
+resources: []
+entry: context
+steps:
+  context:
+    type: context.history
+    with:
+      max_tokens: {literal: 8000}
+    routes: {success: draft}
+  draft:
+    type: agent.run
+    with:
+      role: {literal: lead}
+      context:
+        object:
+          untrusted_message: {ref: /input/message}
+          untrusted_subject: {default: {ref: /input/subject, value: {literal: ""}}}
+          untrusted_history: {ref: /steps/context/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: reply}
+  reply:
+    type: data.map
+    with:
+      value: {ref: /steps/draft/output}
+      output_schema:
+        literal:
+          type: object
+          properties: {body: {type: string, maxLength: 16384}}
+          required: [body]
+          additionalProperties: false
+    routes: {success: $end}
+limits: {max_steps: 10, max_context_bytes: 65536}

@@ -1,0 +1,30 @@
+
+running 25 tests
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_ui_submits_reassignment_and_acknowledgement_on_the_same_decision_surface ... ok
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_api_reads_current_authority_and_audits_exact_command_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_database_refuses_an_unassigned_current_member_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal ... ok
+test application::workflow::escalation::tools::tests::workflow_escalation_tools_bound_revisions_and_reject_conditional_choice_forgery ... ok
+test application::workflow::escalation::tools::tests::workflow_escalation_tools_trust_only_exact_company_local_snapshots ... ok
+test application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified ... ok
+test application::workflow::exactness::tests::memory_access_level_human_decision_choice_is_exact_and_free_text_is_not ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::agent_history_contract_preparation_retains_original_json_and_one_untrusted_prompt ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_declares_provider_safe_names_and_delimits_context ... ok
+test application::workflow::publication::tests::agent_tests::workflow_agent_preparation_refuses_unsupported_or_colliding_bindings ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::native::doop_agent_current_preparation_reaches_ready_before_model_io ... ok
+
+test result: ok. 25 passed; 0 failed; 0 ignored; 0 measured; 4428 filtered out; finished in 18.87s
+

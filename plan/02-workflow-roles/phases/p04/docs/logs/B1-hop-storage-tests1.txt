@@ -1,0 +1,56 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0365]: `HopRecipients` is private, and cannot be re-exported
+ --> src/adapters/persistence/workflow/escalations.rs:9:34
+  |
+9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+  |                                  ^^^^^^^^^^^^^ re-export of private `HopRecipients`
+  |
+  = note: consider declaring type or module `HopRecipients` with `pub`
+
+error[E0364]: `facts_on` is private, and cannot be re-exported
+ --> src/adapters/persistence/workflow/escalations.rs:9:49
+  |
+9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+  |                                                 ^^^^^^^^
+  |
+note: consider marking `facts_on` as `pub` in the imported module
+ --> src/adapters/persistence/workflow/escalations.rs:9:49
+  |
+9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+  |                                                 ^^^^^^^^
+
+error[E0603]: function import `facts_on` is private
+  --> src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs:36:70
+   |
+36 |     let facts = crate::adapters::persistence::workflow::escalations::facts_on(
+   |                                                                      ^^^^^^^^ private function import
+   |
+note: the function import `facts_on` is defined here...
+  --> src/adapters/persistence/workflow/escalations.rs:9:49
+   |
+ 9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+   |                                                 ^^^^^^^^
+note: ...and refers to the function `facts_on` which is defined here
+  --> src/adapters/persistence/workflow/escalation_recipient_facts.rs:37:1
+   |
+37 | / pub(super) async fn facts_on(
+38 | |     db: &mut PgConnection,
+39 | |     company: CompanyId,
+40 | |     selection: &NotificationRecipients,
+...  |
+86 | |     })
+87 | | }
+   | |_^
+
+warning: unused import: `HopRecipients`
+ --> src/adapters/persistence/workflow/escalations.rs:9:34
+  |
+9 | pub(super) use recipient_facts::{HopRecipients, facts_on};
+  |                                  ^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+Some errors have detailed explanations: E0364, E0365, E0603.
+For more information about an error, try `rustc --explain E0364`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 3 previous errors; 1 warning emitted

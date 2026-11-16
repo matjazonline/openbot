@@ -1,0 +1,7 @@
+
+running 2 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::workflow_run_triggers_notify_a_threads_run_on_both_channels ... ok
+test adapters::persistence::workflow::tests::admission_tests::workflow_run_triggers_notify_a_threadless_run_on_insert_and_state_changes_only ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4580 filtered out; finished in 1.70s
+

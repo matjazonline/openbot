@@ -1,6 +1,6 @@
 //! "Create assistant channel" (p08 D2.4): an owner or admin gives an existing agent a team
 //! channel bound to a reply-mode workflow, through the same provisioning as the Agent Builder's
-//! `create_agent_channel` tool. The caller is the requester and the binding's run-as.
+//! `create_agent` tool. The caller is the requester and the binding's run-as.
 use std::sync::Arc;
 
 use axum::{

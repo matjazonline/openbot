@@ -1,0 +1,10 @@
+{
+  "before": 4521,
+  "after": 4524,
+  "removed": [],
+  "added": [
+    "adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places",
+    "adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority",
+    "adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider"
+  ]
+}

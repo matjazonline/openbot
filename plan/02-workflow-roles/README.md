@@ -4,10 +4,10 @@
 > when needed. Do not add data backfills, dual reads/writes, legacy decoders, compatibility shims,
 > or staged rollouts for existing data.
 
-Status: proposed, 2026-11-09. Second of four organization plans; depends on
-[01-departments](../01-departments/README.md) being implemented. Followed by
-[03-principal-addresses](../03-principal-addresses/README.md) and
-[04-root-unit](../04-root-unit/README.md).
+Status: proposed, 2026-11-09. Second of nine organization plans; depends on
+[01-departments](../01-departments/README.md) being implemented. Next is
+[03-principal-addresses](../03-principal-addresses/README.md); the full sequence is listed in
+[01-departments](../01-departments/README.md).
 
 ## Intended behavior
 

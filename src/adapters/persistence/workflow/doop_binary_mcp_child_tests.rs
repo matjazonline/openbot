@@ -77,6 +77,7 @@ async fn bind_parent(setup: &ToolSetup, connection: Uuid) -> BindingTarget {
     let service = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let state = service
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

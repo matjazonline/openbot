@@ -2,7 +2,7 @@
 use super::*;
 use crate::application::agent::*;
 use crate::application::workflow::compiler::{
-    AgentReferenceStep, agent_reference_steps, select_agent_reference,
+    AgentReferenceStep, agent_reference_steps, select_agent_reference, select_role_reference,
 };
 use crate::domain::workflow::StepId;
 use crate::entities::agent_capability::AgentId;
@@ -34,11 +34,21 @@ impl PickerForm {
     fn agent(&self) -> AppResult<Option<AgentId>> {
         self.agent
             .as_deref()
-            .filter(|value| !value.is_empty())
+            .filter(|value| !value.is_empty() && !value.starts_with("role:"))
             .map(|value| {
                 Uuid::parse_str(value)
                     .map(AgentId::new)
                     .map_err(|_| AppError::BadRequest("Invalid agent selection".into()))
+            })
+            .transpose()
+    }
+    fn role(&self) -> AppResult<Option<crate::entities::department::DepartmentRole>> {
+        self.agent
+            .as_deref()
+            .and_then(|value| value.strip_prefix("role:"))
+            .map(|role| {
+                role.parse()
+                    .map_err(|_| AppError::BadRequest("Invalid department role selection".into()))
             })
             .transpose()
     }
@@ -63,7 +73,7 @@ fn step_id(value: Option<&str>) -> AppResult<Option<StepId>> {
         .transpose()
 }
 
-async fn scope(ui: &Ui, company: Uuid, workflow: Uuid) -> AppResult<AgentCompanyScope> {
+pub(super) async fn scope(ui: &Ui, company: Uuid, workflow: Uuid) -> AppResult<AgentCompanyScope> {
     ui.company(company).await?;
     if ui.detail(company, workflow).await?.summary.archived {
         return Err(AppError::BadRequest(
@@ -116,6 +126,9 @@ async fn selected_agent(
     form: &PickerForm,
     step: Option<&AgentReferenceStep>,
 ) -> AppResult<Option<AgentAuthoringState>> {
+    if form.role()?.is_some() {
+        return Ok(None);
+    }
     let reads = ui.engine.agent_authoring_reads();
     let id = if let Some(id) = form.agent()? {
         Some(id)
@@ -186,6 +199,11 @@ pub(super) async fn picker(
                 next_step: steps.next.as_ref(),
                 agents: &directory,
                 selected_agent: selected.as_ref(),
+                selected_role: if form.agent.as_deref().is_some_and(|value| !value.is_empty()) {
+                    form.role()?
+                } else {
+                    steps.selected.as_ref().and_then(|step| step.role)
+                },
             })
         }
     };
@@ -206,21 +224,26 @@ pub(super) async fn apply(
     let step = form
         .step()?
         .ok_or_else(|| AppError::BadRequest("Select a model step".into()))?;
-    let agent = form
-        .agent()?
-        .ok_or_else(|| AppError::BadRequest("Select an agent".into()))?;
-    let state = ui
-        .engine
-        .agent_authoring_reads()
-        .authoring_state(AgentPublicationScope {
-            company: scope.company,
-            actor: scope.actor,
-            agent,
-        })
-        .await?;
-    let key = AgentKey::parse(&state.agent.slug)
-        .ok_or_else(|| AppError::Internal("Invalid stored agent key".into()))?;
-    let html = match select_agent_reference(&WorkflowSourceDecoder, &form.source, &step, &key) {
+    let source = if let Some(role) = form.role()? {
+        select_role_reference(&WorkflowSourceDecoder, &form.source, &step, role)
+    } else {
+        let agent = form
+            .agent()?
+            .ok_or_else(|| AppError::BadRequest("Select an agent or role".into()))?;
+        let state = ui
+            .engine
+            .agent_authoring_reads()
+            .authoring_state(AgentPublicationScope {
+                company: scope.company,
+                actor: scope.actor,
+                agent,
+            })
+            .await?;
+        let key = AgentKey::parse(&state.agent.slug)
+            .ok_or_else(|| AppError::Internal("Invalid stored agent key".into()))?;
+        select_agent_reference(&WorkflowSourceDecoder, &form.source, &step, &key)
+    };
+    let html = match source {
         Ok(source) => pages::workflow_agent_reference_applied(&source),
         Err(diagnostic) => pages::error_alert(&diagnostic.message),
     };

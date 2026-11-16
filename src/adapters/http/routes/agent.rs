@@ -80,6 +80,10 @@ pub struct AgentForm {
     pub form_mode: Option<String>,
     pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
     pub tool_assignments: Option<String>,
+    #[serde(default)]
+    pub open_to_public: bool,
+    #[serde(default)]
+    pub confirm_spam_disabled: bool,
 }
 
 impl AgentForm {
@@ -195,6 +199,10 @@ pub struct AgentJsonPayload {
     #[serde(default)]
     pub skill_ids: Option<Vec<Uuid>>,
     pub avatar_url: Option<String>,
+    #[serde(default)]
+    pub open_to_public: bool,
+    #[serde(default)]
+    pub confirm_spam_disabled: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -364,6 +372,8 @@ async fn create_agent_handler(
                     tool_bindings: None,
                     name: form.name.clone(),
                     slug: form.slug(),
+                    open_to_public: form.open_to_public,
+                    confirm_spam_disabled: form.confirm_spam_disabled,
                     provider: form.provider.clone(),
                     model: form.model.clone(),
                     system_prompt: form.system_prompt.clone(),
@@ -625,6 +635,8 @@ async fn create_agent_json(
                 tool_bindings: None,
                 name: payload.name.clone(),
                 slug: payload.slug.clone(),
+                open_to_public: payload.open_to_public,
+                confirm_spam_disabled: payload.confirm_spam_disabled,
                 provider: payload.provider.clone(),
                 model: payload.model.clone(),
                 system_prompt: payload.system_prompt.clone(),
@@ -714,6 +726,8 @@ pub(super) async fn update_agent_json(
                     tool_bindings: None,
                     name: payload.name.clone(),
                     slug: payload.slug.clone(),
+                    open_to_public: payload.open_to_public,
+                    confirm_spam_disabled: payload.confirm_spam_disabled,
                     provider: payload.provider.clone(),
                     model: payload.model.clone(),
                     system_prompt: payload.system_prompt.clone(),
@@ -927,6 +941,7 @@ mod tests {
         };
 
         let agent = Agent {
+            open_to_public: false,
             native_permissions: Default::default(),
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),

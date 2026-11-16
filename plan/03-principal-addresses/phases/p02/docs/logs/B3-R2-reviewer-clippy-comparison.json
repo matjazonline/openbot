@@ -1,0 +1,34 @@
+{
+  "baseline_head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "matching_error_and_source_locations": [
+    [
+      "error: this pattern is unneeded as the `..` pattern can match that element",
+      "src/adapters/http/routes/ui_schedules.rs:373:9"
+    ],
+    [
+      "error: this pattern is unneeded as the `..` pattern can match that element",
+      "src/adapters/http/routes/ui_schedules.rs:407:9"
+    ],
+    [
+      "error: the `Err`-variant returned from this function is very large",
+      "src/adapters/http/routes/knowledge/upload.rs:10:6"
+    ],
+    [
+      "error: the `Err`-variant returned from this function is very large",
+      "src/adapters/http/routes/knowledge/upload.rs:38:56"
+    ],
+    [
+      "error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`",
+      "src/adapters/persistence/department.rs:346:5"
+    ],
+    [
+      "error: expression can be simplified using `Option::unwrap_or()`",
+      "src/application/services/model_usage/mod.rs:24:33"
+    ],
+    [
+      "error: using `chunks_exact` with a constant chunk size",
+      "src/domain/workflow/reply_integrity.rs:29:47"
+    ]
+  ],
+  "count": 7
+}

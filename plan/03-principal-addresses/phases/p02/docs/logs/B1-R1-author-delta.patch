@@ -1,0 +1,2138 @@
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -957,6 +957,14 @@
+     user_id uuid,
+     agent_id uuid,
+     display_label text NOT NULL,
++    open_to_public boolean NOT NULL DEFAULT false,
++    settings_revision bigint NOT NULL DEFAULT 1 CHECK (settings_revision > 0),
++    historical_person_user_id uuid,
++    CONSTRAINT principals_public_agent_check CHECK (NOT open_to_public OR kind = 'agent'),
++    CONSTRAINT principals_historical_person_check CHECK (
++        (kind <> 'person' OR (historical_person_user_id IS NOT NULL AND historical_person_user_id = user_id))
++        AND (historical_person_user_id IS NULL OR kind IN ('person', 'external'))
++    ),
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     updated_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     CONSTRAINT principals_display_label_check CHECK (((btrim(display_label) <> ''::text) AND (octet_length(display_label) <= 255))),
+@@ -18432,3 +18440,118 @@
+ END $$;
+ CREATE CONSTRAINT TRIGGER workflow_escalation_command_complete AFTER INSERT OR UPDATE ON public.workflow_escalation_decisions
+     DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_escalation_command();
++
++
++-- Personal ownership is an account identity, never a reusable email address.
++-- The historical UUID survives account deletion and conveys no current authority.
++CREATE UNIQUE INDEX principals_historical_person_user_key
++    ON public.principals(company_id, historical_person_user_id)
++    WHERE historical_person_user_id IS NOT NULL;
++
++CREATE FUNCTION public.guard_principal_direct_settings() RETURNS trigger LANGUAGE plpgsql AS $$
++BEGIN
++    IF TG_OP = 'INSERT' THEN
++        IF NEW.historical_person_user_id IS NOT NULL THEN
++            RAISE EXCEPTION 'personal ownership is assigned by the principal guard'
++                USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
++        END IF;
++        IF NEW.kind = 'person' THEN NEW.historical_person_user_id := NEW.user_id; END IF;
++        NEW.settings_revision := 1;
++        RETURN NEW;
++    END IF;
++    IF NEW.historical_person_user_id IS DISTINCT FROM OLD.historical_person_user_id THEN
++        RAISE EXCEPTION 'historical personal ownership is immutable'
++            USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
++    END IF;
++    IF OLD.historical_person_user_id IS NOT NULL THEN
++        IF NEW.kind NOT IN ('person', 'external')
++            OR (NEW.kind = 'person' AND NEW.user_id IS DISTINCT FROM OLD.historical_person_user_id) THEN
++            RAISE EXCEPTION 'a personal principal cannot be assigned to another account'
++                USING ERRCODE = '23514', CONSTRAINT = 'principals_historical_person_owner';
++        END IF;
++    ELSIF NEW.kind = 'person' THEN
++        NEW.historical_person_user_id := NEW.user_id;
++    END IF;
++    IF OLD.kind = 'agent' AND NEW.kind <> 'agent' THEN NEW.open_to_public := false; END IF;
++    IF NEW.settings_revision NOT IN (OLD.settings_revision, OLD.settings_revision + 1) THEN
++        RAISE EXCEPTION 'invalid principal settings revision'
++            USING ERRCODE = '23514', CONSTRAINT = 'principals_settings_revision';
++    END IF;
++    IF (NEW.kind, NEW.user_id, NEW.agent_id, NEW.open_to_public)
++        IS DISTINCT FROM (OLD.kind, OLD.user_id, OLD.agent_id, OLD.open_to_public) THEN
++        NEW.settings_revision := OLD.settings_revision + 1;
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER principals_direct_settings BEFORE INSERT OR UPDATE ON public.principals
++    FOR EACH ROW EXECUTE FUNCTION public.guard_principal_direct_settings();
++
++-- Mirror Principal's direct policy. Callers still enforce content level and live authority.
++CREATE FUNCTION public.principal_direct_can_view(tenant uuid, target uuid, viewer uuid)
++RETURNS boolean LANGUAGE sql STABLE AS $$
++    SELECT COALESCE((
++        SELECT CASE recipient.kind
++            WHEN 'agent' THEN true
++            WHEN 'person' THEN actor.id = recipient.id OR actor.user_id = company.user_id
++            WHEN 'external' THEN recipient.historical_person_user_id IS NOT NULL
++                AND actor.user_id = company.user_id
++            ELSE false END
++        FROM public.principals AS recipient
++        JOIN public.companies AS company ON company.id = recipient.company_id
++        JOIN public.principals AS actor ON actor.company_id = recipient.company_id AND actor.id = viewer
++        WHERE recipient.company_id = tenant AND recipient.id = target
++            AND (actor.kind = 'agent' OR (actor.kind = 'person' AND (
++                actor.user_id = company.user_id OR EXISTS (
++                    SELECT 1 FROM public.company_members AS membership
++                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))))
++    ), false)
++$$;
++
++CREATE FUNCTION public.principal_direct_can_participate(tenant uuid, target uuid, writer uuid)
++RETURNS boolean LANGUAGE sql STABLE AS $$
++    SELECT COALESCE((
++        SELECT CASE recipient.kind
++            WHEN 'agent' THEN recipient.open_to_public OR team.allowed
++            WHEN 'person' THEN team.allowed
++                AND (actor.id = recipient.id OR actor.user_id = company.user_id)
++            ELSE false END
++        FROM public.principals AS recipient
++        JOIN public.companies AS company ON company.id = recipient.company_id
++        LEFT JOIN public.principals AS actor ON actor.company_id = recipient.company_id AND actor.id = writer
++        CROSS JOIN LATERAL (
++            SELECT COALESCE(actor.kind = 'agent' OR (actor.kind = 'person' AND (
++                actor.user_id = company.user_id OR EXISTS (
++                    SELECT 1 FROM public.company_members AS membership
++                    WHERE membership.company_id = tenant AND membership.user_id = actor.user_id))), false) AS allowed
++        ) AS team
++        WHERE recipient.company_id = tenant AND recipient.id = target
++    ), false)
++$$;
++
++
++CREATE FUNCTION public.advance_principal_address_revision() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE tenants uuid[]; targets uuid[]; owned record;
++BEGIN
++    IF TG_OP = 'UPDATE' THEN
++        IF (NEW.company_id, NEW.slug, NEW.principal_id, NEW.channel_id, NEW.is_primary)
++            IS NOT DISTINCT FROM (OLD.company_id, OLD.slug, OLD.principal_id, OLD.channel_id, OLD.is_primary) THEN
++            RETURN NEW;
++        END IF;
++        tenants := ARRAY[OLD.company_id, NEW.company_id];
++        targets := ARRAY[OLD.principal_id, NEW.principal_id];
++    ELSIF TG_OP = 'INSERT' THEN
++        tenants := ARRAY[NEW.company_id]; targets := ARRAY[NEW.principal_id];
++    ELSE tenants := ARRAY[OLD.company_id]; targets := ARRAY[OLD.principal_id]; END IF;
++    FOR owned IN
++        SELECT principal.company_id, principal.id FROM public.principals AS principal
++        WHERE EXISTS (SELECT 1 FROM unnest(tenants, targets) AS affected(company_id, id)
++            WHERE affected.company_id = principal.company_id AND affected.id = principal.id)
++        ORDER BY principal.company_id, principal.id FOR UPDATE OF principal
++    LOOP
++        UPDATE public.principals SET settings_revision = settings_revision + 1,
++            updated_at = CURRENT_TIMESTAMP WHERE company_id = owned.company_id AND id = owned.id;
++    END LOOP;
++    RETURN COALESCE(NEW, OLD);
++END $$;
++CREATE TRIGGER addresses_principal_revision AFTER INSERT OR UPDATE OR DELETE ON public.addresses
++    FOR EACH ROW EXECUTE FUNCTION public.advance_principal_address_revision();
+--- a/src/adapters/http/pages/agent_settings.rs
++++ b/src/adapters/http/pages/agent_settings.rs
+@@ -83,6 +83,8 @@
+     pub advanced: bool,
+     pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
+     pub tool_assignments: Option<&'a str>,
++    pub open_to_public: bool,
++    pub confirm_spam_disabled: bool,
+ }
+ 
+ /// The settings pane for an agent that already exists.
+@@ -703,6 +705,7 @@
+                         </label>
+                     </div>
+                     {avatar_field}
++                    {direct_settings}
+                     <div class="form-control w-full">
+                         <div class="label justify-between">
+                             <span class="text-xs opacity-70">System Prompt</span>
+@@ -734,11 +737,38 @@
+         capabilities = capability_picker(fields),
+         prompt_textarea =
+             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
++        direct_settings = match fields.scope {
++            AgentFormScope::Company(_) => direct_settings_fields(draft),
++            AgentFormScope::Library => String::new(),
++        },
+         name = escape_html_text(draft.name),
+         slug = escape_html_text(draft.slug),
+         description_help = description_help,
+         description = escape_html_text(draft.description),
+         avatar_field = agent_avatar_field(&id_prefix, draft),
++    )
++}
++
++pub(super) fn direct_settings_fields(draft: &AgentDraft<'_>) -> String {
++    let public = if draft.open_to_public { " checked" } else { "" };
++    let confirmed = if draft.confirm_spam_disabled {
++        " checked"
++    } else {
++        ""
++    };
++    format!(
++        r#"<fieldset class="space-y-2">
++            <legend class="text-sm font-medium">Direct address</legend>
++            <label class="flex items-center gap-2">
++                <input type="checkbox" name="open_to_public" value="true" class="checkbox checkbox-sm"{public}>
++                <span>Allow external messages to this agent's direct address</span>
++            </label>
++            <p class="text-xs opacity-70">This setting is independent of any desk the agent staffs.</p>
++            <label class="flex items-center gap-2">
++                <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{confirmed}>
++                <span class="text-xs">If spam scanning is unavailable, I accept external mail without scanning.</span>
++            </label>
++        </fieldset>"#,
+     )
+ }
+ 
+@@ -980,6 +1010,8 @@
+     AgentDraft {
+         name: &agent.name,
+         slug: &agent.slug,
++        open_to_public: agent.open_to_public,
++        confirm_spam_disabled: false,
+         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+         description: agent.description.as_deref().unwrap_or(""),
+         provider: agent.provider.as_deref().unwrap_or(""),
+--- a/src/adapters/http/pages/agents.rs
++++ b/src/adapters/http/pages/agents.rs
+@@ -265,6 +265,7 @@
+     let draft = AgentDraft {
+         name: &agent.name,
+         slug: &agent.slug,
++        open_to_public: agent.open_to_public,
+         provider: agent.provider.as_deref().unwrap_or(""),
+         model: agent.model.as_deref().unwrap_or(""),
+         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+@@ -338,6 +339,7 @@
+                   hx-params="not avatar_file" class="space-y-4">
+                 <input type="hidden" name="expected_revision" value="{expected_revision}">
+                 {preserved}
++                {direct_settings}
+                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div>
+                         <label class="block text-xs font-medium text-base-content/80 mb-1">Agent Name</label>
+@@ -385,6 +387,7 @@
+             .unwrap_or(agent.draft_revision)
+             .get(),
+         error = form_error_banner(error),
++        direct_settings = super::agent_settings::direct_settings_fields(draft),
+         name = escape_html_attr(name),
+         slug = escape_html_attr(slug),
+         avatar_field =
+--- a/src/adapters/http/pages/tests.rs
++++ b/src/adapters/http/pages/tests.rs
+@@ -1395,6 +1395,7 @@
+ 
+ fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {
+     Agent {
++        open_to_public: false,
+         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+         id: Uuid::new_v4(),
+         company_id: Some(company_id),
+--- a/src/adapters/http/routes/agent.rs
++++ b/src/adapters/http/routes/agent.rs
+@@ -79,6 +79,10 @@
+     pub form_mode: Option<String>,
+     pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
+     pub tool_assignments: Option<String>,
++    #[serde(default)]
++    pub open_to_public: bool,
++    #[serde(default)]
++    pub confirm_spam_disabled: bool,
+ }
+ 
+ impl AgentForm {
+@@ -193,6 +197,10 @@
+     #[serde(default)]
+     pub skill_ids: Option<Vec<Uuid>>,
+     pub avatar_url: Option<String>,
++    #[serde(default)]
++    pub open_to_public: bool,
++    #[serde(default)]
++    pub confirm_spam_disabled: bool,
+ }
+ 
+ #[derive(Debug, Deserialize)]
+@@ -362,6 +370,8 @@
+                     tool_bindings: None,
+                     name: form.name.clone(),
+                     slug: form.slug(),
++                    open_to_public: form.open_to_public,
++                    confirm_spam_disabled: form.confirm_spam_disabled,
+                     provider: form.provider.clone(),
+                     model: form.model.clone(),
+                     system_prompt: form.system_prompt.clone(),
+@@ -622,6 +632,8 @@
+                 tool_bindings: None,
+                 name: payload.name.clone(),
+                 slug: payload.slug.clone(),
++                open_to_public: payload.open_to_public,
++                confirm_spam_disabled: payload.confirm_spam_disabled,
+                 provider: payload.provider.clone(),
+                 model: payload.model.clone(),
+                 system_prompt: payload.system_prompt.clone(),
+@@ -710,6 +722,8 @@
+                     tool_bindings: None,
+                     name: payload.name.clone(),
+                     slug: payload.slug.clone(),
++                    open_to_public: payload.open_to_public,
++                    confirm_spam_disabled: payload.confirm_spam_disabled,
+                     provider: payload.provider.clone(),
+                     model: payload.model.clone(),
+                     system_prompt: payload.system_prompt.clone(),
+@@ -919,6 +933,7 @@
+         };
+ 
+         let agent = Agent {
++            open_to_public: false,
+             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+             id: Uuid::new_v4(),
+             company_id: Some(company.id),
+--- a/src/adapters/http/routes/agent_api_tests.rs
++++ b/src/adapters/http/routes/agent_api_tests.rs
+@@ -5,6 +5,9 @@
+     user::UserPersistence,
+ };
+ use serde_json::{Value, json};
++
++#[path = "agent_api_tests/public_settings.rs"]
++mod public_settings;
+ 
+ async fn response_json(response: impl IntoResponse) -> Value {
+     let response = response.into_response();
+@@ -67,6 +70,7 @@
+                 persistence.clone(),
+                 persistence.clone(),
+                 persistence.clone(),
++                crate::use_cases::agent::SpamScanning::Unavailable,
+             )
+             .with_company_agents(
+                 crate::adapters::persistence::test_support::company_agents(persistence.as_ref()),
+--- a/src/adapters/http/routes/agent_api_tests/public_settings.rs
++++ b/src/adapters/http/routes/agent_api_tests/public_settings.rs
+@@ -0,0 +1,271 @@
++use super::*;
++use axum::{body::Body, extract::FromRequest, http::Request};
++
++#[tokio::test]
++async fn direct_public_settings_json_round_trips_and_preserves_desk_policy() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let created = f.create(json!({"name":"Private", "slug":"private"})).await;
++    let id: Uuid = serde_json::from_value(created["agent"]["id"].clone()).unwrap();
++    assert_eq!(created["agent"]["open_to_public"], false);
++    let before: Vec<(Uuid, String, i64)> = sqlx::query_as(
++        "SELECT id, access_mode, settings_revision FROM channels WHERE company_id=$1 ORDER BY id",
++    )
++    .bind(f.company)
++    .fetch_all(f.persistence.pool())
++    .await
++    .unwrap();
++
++    let error = f
++        .update(id, json!({"open_to_public":true}))
++        .await
++        .unwrap_err();
++    assert!(
++        matches!(error, AppError::BadRequest(ref reason) if reason.contains("confirm_spam_disabled"))
++    );
++    let unchanged = f
++        .agents
++        .get_company_agent(f.user, f.company, id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(!unchanged.open_to_public);
++    assert_eq!(
++        serde_json::to_value(unchanged.draft_revision).unwrap(),
++        created["agent"]["draft_revision"]
++    );
++
++    let opened = f
++        .update(
++            id,
++            json!({"open_to_public":true,"confirm_spam_disabled":true}),
++        )
++        .await
++        .unwrap();
++    assert_eq!(opened["agent"]["open_to_public"], true);
++    let stored = f
++        .agents
++        .get_company_agent(f.user, f.company, id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(stored.open_to_public);
++    let open_revision: i64 = sqlx::query_scalar(
++        "SELECT settings_revision FROM principals WHERE company_id=$1 AND agent_id=$2",
++    )
++    .bind(f.company)
++    .bind(id)
++    .fetch_one(f.persistence.pool())
++    .await
++    .unwrap();
++    let closed = f.update(id, json!({"open_to_public":false})).await.unwrap();
++    assert_eq!(closed["agent"]["open_to_public"], false);
++    let closed_revision: i64 = sqlx::query_scalar(
++        "SELECT settings_revision FROM principals WHERE company_id=$1 AND agent_id=$2",
++    )
++    .bind(f.company)
++    .bind(id)
++    .fetch_one(f.persistence.pool())
++    .await
++    .unwrap();
++    assert_eq!(closed_revision, open_revision + 1);
++    let after: Vec<(Uuid, String, i64)> = sqlx::query_as(
++        "SELECT id, access_mode, settings_revision FROM channels WHERE company_id=$1 ORDER BY id",
++    )
++    .bind(f.company)
++    .fetch_all(f.persistence.pool())
++    .await
++    .unwrap();
++    assert_eq!(
++        after, before,
++        "opening/revoking direct mail does not open or reconfigure a desk"
++    );
++    f.cleanup().await;
++}
++
++#[tokio::test]
++async fn direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let result = create_agent_json(
++        State(f.agents.clone()),
++        State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
++        AuthenticatedUser { id: f.user },
++        Path(f.company),
++        Json(json!({"name":"Public", "slug":"public", "open_to_public":true})),
++    )
++    .await;
++    assert!(
++        matches!(result, Err(AppError::BadRequest(ref reason)) if reason.contains("confirm_spam_disabled"))
++    );
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM agents WHERE company_id=$1")
++        .bind(f.company)
++        .fetch_one(f.persistence.pool())
++        .await
++        .unwrap();
++    assert_eq!(count, 0);
++    let count: i64 = sqlx::query_scalar("SELECT count(*) FROM channels WHERE company_id=$1")
++        .bind(f.company)
++        .fetch_one(f.persistence.pool())
++        .await
++        .unwrap();
++    assert_eq!(count, 0);
++    let saved = f
++        .create(
++            json!({"name":"Public", "slug":"public", "open_to_public":true,
++        "confirm_spam_disabled":true}),
++        )
++        .await;
++    assert_eq!(saved["agent"]["open_to_public"], true);
++    f.cleanup().await;
++}
++
++#[tokio::test]
++async fn direct_public_settings_scanning_available_does_not_require_acknowledgement() {
++    let Some(mut f) = Fixture::new().await else {
++        return;
++    };
++    f.agents = Arc::new(
++        AgentUseCases::new(
++            f.persistence.clone(),
++            f.persistence.clone(),
++            f.persistence.clone(),
++            crate::use_cases::agent::SpamScanning::Available,
++        )
++        .with_company_agents(crate::adapters::persistence::test_support::company_agents(
++            &f.persistence,
++        )),
++    );
++    let saved = f
++        .create(json!({"name":"Scanned", "slug":"scanned", "open_to_public":true}))
++        .await;
++    assert_eq!(saved["agent"]["open_to_public"], true);
++    f.cleanup().await;
++}
++
++async fn submit_form(f: &Fixture, id: Uuid, public: bool) {
++    let stored = f
++        .agents
++        .get_company_agent(f.user, f.company, id)
++        .await
++        .unwrap()
++        .unwrap();
++    let fields = if public {
++        "&open_to_public=true&confirm_spam_disabled=true"
++    } else {
++        ""
++    };
++    let request = Request::builder()
++        .method("PUT")
++        .header("content-type", "application/x-www-form-urlencoded")
++        .body(Body::from(format!(
++            "name=Form&slug=form&expected_revision={}{fields}",
++            stored.draft_revision.get()
++        )))
++        .unwrap();
++    let Form(form) = Form::<AgentForm>::from_request(request, &()).await.unwrap();
++    let Html(html) = update_agent_handler(
++        State(Arc::new(CompanyUseCases::new(f.persistence.clone()))),
++        State(f.agents.clone()),
++        State(f.skills.clone()),
++        AuthenticatedUser { id: f.user },
++        Path((f.company, id)),
++        Form(form),
++    )
++    .await
++    .unwrap();
++    assert!(!html.contains("Update failed:"), "{html}");
++}
++
++#[tokio::test]
++async fn direct_public_settings_form_saves_and_renders_the_current_principal_flag() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let created = f.create(json!({"name":"Form", "slug":"form"})).await;
++    let id: Uuid = serde_json::from_value(created["agent"]["id"].clone()).unwrap();
++    for public in [true, false] {
++        submit_form(&f, id, public).await;
++        let stored = f
++            .agents
++            .get_company_agent(f.user, f.company, id)
++            .await
++            .unwrap()
++            .unwrap();
++        assert_eq!(stored.open_to_public, public);
++        let Html(form) = edit_agent_form(
++            State(Arc::new(CompanyUseCases::new(f.persistence.clone()))),
++            State(f.agents.clone()),
++            AuthenticatedUser { id: f.user },
++            Path((f.company, id)),
++        )
++        .await
++        .unwrap();
++        assert!(form.contains("Allow external messages to this agent's direct address"));
++        let checkbox = form
++            .split("name=\"open_to_public\"")
++            .nth(1)
++            .unwrap()
++            .split('>')
++            .next()
++            .unwrap();
++        assert_eq!(checkbox.contains(" checked"), public);
++    }
++    f.cleanup().await;
++}
++
++async fn fixed_revision_write(
++    f: &Fixture,
++    id: Uuid,
++    expected: crate::entities::agent_capability::AgentDraftRevision,
++    public: bool,
++) -> AppResult<Value> {
++    let result = update_agent_json(
++        State(f.agents.clone()),State(f.skills.clone()),
++        State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
++        AuthenticatedUser{id:f.user},Path((f.company,id)),
++        Json(serde_json::from_value(json!({"expected_revision":expected,
++            "agent":{"name":"Contended","slug":"contended","open_to_public":public,"confirm_spam_disabled":true}})).unwrap()),
++    ).await?;
++    Ok(response_json(result).await)
++}
++
++#[tokio::test]
++async fn direct_public_settings_competing_draft_writers_change_policy_once() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let saved = f
++        .create(json!({"name":"Contended","slug":"contended"}))
++        .await;
++    let id: Uuid = serde_json::from_value(saved["agent"]["id"].clone()).unwrap();
++    let current = f
++        .agents
++        .get_company_agent(f.user, f.company, id)
++        .await
++        .unwrap()
++        .unwrap();
++    let (opened, closed) = tokio::join!(
++        fixed_revision_write(&f, id, current.draft_revision, true),
++        fixed_revision_write(&f, id, current.draft_revision, false),
++    );
++    let expected_public = match (opened, closed) {
++        (Ok(_), Err(AppError::Conflict(_))) => true,
++        (Err(AppError::Conflict(_)), Ok(_)) => false,
++        other => panic!("one fenced policy writer must win: {other:?}"),
++    };
++    let stored = f
++        .agents
++        .get_company_agent(f.user, f.company, id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(stored.open_to_public, expected_public);
++    assert_eq!(
++        stored.draft_revision.get(),
++        current.draft_revision.get() + 1
++    );
++    f.cleanup().await;
++}
+--- a/src/adapters/http/routes/agent_library.rs
++++ b/src/adapters/http/routes/agent_library.rs
+@@ -93,6 +93,8 @@
+         tool_bindings: None,
+         name: payload.name,
+         slug: payload.slug,
++        open_to_public: payload.open_to_public,
++        confirm_spam_disabled: payload.confirm_spam_disabled,
+         provider: payload.provider,
+         model: payload.model,
+         system_prompt: payload.system_prompt,
+--- a/src/adapters/http/routes/authorization_test_support.rs
++++ b/src/adapters/http/routes/authorization_test_support.rs
+@@ -116,7 +116,13 @@
+         Some(Self {
+             companies: Arc::new(CompanyUseCases::new(p.clone())),
+             agents: Arc::new(
+-                AgentUseCases::new(p.clone(), p.clone(), p.clone()).with_company_agents(
++                AgentUseCases::new(
++                    p.clone(),
++                    p.clone(),
++                    p.clone(),
++                    crate::use_cases::agent::SpamScanning::Unavailable,
++                )
++                .with_company_agents(
+                     crate::adapters::persistence::test_support::company_agents(p.as_ref()),
+                 ),
+             ),
+--- a/src/adapters/http/routes/onboarding.rs
++++ b/src/adapters/http/routes/onboarding.rs
+@@ -366,6 +366,7 @@
+ 
+     fn library_agent(name: &str, slug: &str) -> Agent {
+         Agent {
++            open_to_public: false,
+             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+             id: Uuid::new_v4(),
+             company_id: None,
+--- a/src/adapters/http/routes/ui_agents.rs
++++ b/src/adapters/http/routes/ui_agents.rs
+@@ -666,6 +666,8 @@
+         let stored = pages::AgentDraft {
+             name: &agent.name,
+             slug: &agent.slug,
++            open_to_public: agent.open_to_public,
++            confirm_spam_disabled: false,
+             system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+             description: agent.description.as_deref().unwrap_or(""),
+             provider: agent.provider.as_deref().unwrap_or(""),
+@@ -796,6 +798,8 @@
+             tool_bindings: None,
+             name: self.form.name.clone(),
+             slug: self.slug.clone(),
++            open_to_public: self.form.open_to_public,
++            confirm_spam_disabled: self.form.confirm_spam_disabled,
+             provider: self.form.provider.clone(),
+             model: self.form.model.clone(),
+             system_prompt: self.form.system_prompt.clone(),
+@@ -823,6 +827,8 @@
+         pages::AgentDraft {
+             name: &self.form.name,
+             slug: &self.slug,
++            open_to_public: self.form.open_to_public,
++            confirm_spam_disabled: self.form.confirm_spam_disabled,
+             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
+             description: self.form.description.as_deref().unwrap_or(""),
+             provider: self.form.provider.as_deref().unwrap_or(""),
+--- a/src/adapters/http/routes/workflows/tool_tests.rs
++++ b/src/adapters/http/routes/workflows/tool_tests.rs
+@@ -92,6 +92,7 @@
+         shared.clone(),
+         shared.clone(),
+         shared.clone(),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     ));
+     let skills = Arc::new(SkillUseCases::new(
+         shared.clone(),
+--- a/src/adapters/http/routes/workflows/ui/authoring/tests.rs
++++ b/src/adapters/http/routes/workflows/ui/authoring/tests.rs
+@@ -63,6 +63,7 @@
+                 shared.clone(),
+                 shared.clone(),
+                 shared.clone(),
++                crate::use_cases::agent::SpamScanning::Unavailable,
+             )),
+             departments: reads.0,
+             attention: reads.1,
+--- a/src/adapters/http/routes/workflows/ui/runs/runs_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/runs_tests.rs
+@@ -346,6 +346,7 @@
+             shared.clone(),
+             shared.clone(),
+             shared.clone(),
++            crate::use_cases::agent::SpamScanning::Unavailable,
+         )),
+         departments: reads.0,
+         attention: reads.1,
+--- a/src/adapters/persistence/address_tests.rs
++++ b/src/adapters/persistence/address_tests.rs
+@@ -754,9 +754,9 @@
+     let Some(f) = Fixture::new().await else {
+         return;
+     };
+-    // The guard's key-share lock on the principal is what a slug-only rename must never take:
+-    // a rename holding the address row while waiting on the principal would deadlock against a
+-    // removal holding the principal while deleting that row.
++    // Keep the kind guard narrow. Slug-only writes advance the routing revision through a
++    // separate trigger; their production writer locks the principal before the address, matching
++    // removal. Re-running the kind guard after locking only the address would invert that order.
+     let definition: String = sqlx::query_scalar(
+         "SELECT pg_get_triggerdef(oid) FROM pg_trigger \
+          WHERE tgrelid = 'public.addresses'::regclass AND tgname = 'guard_address_principal'",
+@@ -797,3 +797,5 @@
+         .unwrap()
+     }
+ }
++
++mod direct;
+--- a/src/adapters/persistence/address_tests/direct.rs
++++ b/src/adapters/persistence/address_tests/direct.rs
+@@ -0,0 +1,360 @@
++use super::*;
++use crate::{
++    application::ports::participant::PrincipalAccessPersistence,
++    entities::{
++        company_member::CompanyMembership,
++        participant::{Principal, PrincipalAccessContext, PrincipalGrantAuthority, PrincipalKind},
++        transport::PrincipalId,
++    },
++    use_cases::agent::{AgentPersistence, AgentWrite},
++};
++
++async fn principal(f: &Fixture, id: Uuid) -> Principal {
++    f.persistence
++        .principal_by_id(f.company.id, PrincipalId::new(id))
++        .await
++        .unwrap()
++        .unwrap()
++}
++
++async fn agent_principal(f: &Fixture) -> Uuid {
++    let agent = AgentPersistence::create(
++        &f.persistence,
++        f.company.id,
++        AgentWrite {
++            name: "Direct agent".into(),
++            slug: "direct-agent".into(),
++            ..AgentWrite::default()
++        },
++    )
++    .await
++    .unwrap();
++    sqlx::query_scalar("SELECT id FROM principals WHERE company_id = $1 AND agent_id = $2")
++        .bind(f.company.id)
++        .bind(agent.id)
++        .fetch_one(f.pool())
++        .await
++        .unwrap()
++}
++
++#[tokio::test]
++async fn direct_thread_policy_sql_matches_domain_for_live_and_archived_targets() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let (member, name) = account(&f.persistence, "direct_member").await;
++    let person = f.join(member, &name).await;
++    let (teammate, name) = account(&f.persistence, "direct_teammate").await;
++    f.join(teammate, &name).await;
++    let (admin, name) = account(&f.persistence, "direct_admin").await;
++    f.join(admin, &name).await;
++    sqlx::query("UPDATE company_members SET role = 'admin' WHERE company_id = $1 AND user_id = $2")
++        .bind(f.company.id)
++        .bind(admin)
++        .execute(f.pool())
++        .await
++        .unwrap();
++    let agent = agent_principal(&f).await;
++    let mut viewers = Vec::new();
++    for user in [f.owner, member, teammate, admin] {
++        viewers.push(
++            f.persistence
++                .access_context_for_user(f.company.id, user)
++                .await
++                .unwrap()
++                .unwrap(),
++        );
++    }
++    viewers.push(PrincipalAccessContext {
++        principal_id: None,
++        membership: CompanyMembership::None,
++        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
++        grant_authority: PrincipalGrantAuthority::Available,
++    });
++    for (target, public, retired) in [
++        (person, false, false),
++        (agent, false, false),
++        (agent, true, false),
++        (person, false, true),
++    ] {
++        if retired {
++            f.persistence
++                .remove_member(f.company.id, member)
++                .await
++                .unwrap();
++        } else if target == agent {
++            sqlx::query(
++                "UPDATE principals SET open_to_public = $3 WHERE company_id = $1 AND id = $2",
++            )
++            .bind(f.company.id)
++            .bind(agent)
++            .bind(public)
++            .execute(f.pool())
++            .await
++            .unwrap();
++        }
++        let target = principal(&f, target).await;
++        for viewer in &viewers {
++            // Retirement also removes the source's live membership. Rehydrate that context rather
++            // than accidentally asserting authority from the saved pre-removal actor.
++            let current = if retired && viewer.principal_id == Some(target.id) {
++                PrincipalAccessContext::external(target.id)
++            } else {
++                *viewer
++            };
++            let (can_view, can_write): (bool, bool) = sqlx::query_as(
++                "SELECT principal_direct_can_view($1,$2,$3), principal_direct_can_participate($1,$2,$3)",
++            ).bind(f.company.id).bind(target.id.as_uuid())
++                .bind(current.principal_id.map(PrincipalId::as_uuid))
++                .fetch_one(f.pool()).await.unwrap();
++            assert_eq!(
++                can_view,
++                target.direct_viewer_access(current),
++                "target {target:?}, actor {current:?}"
++            );
++            assert_eq!(
++                can_write,
++                target.direct_access(current).authorized,
++                "target {target:?}, actor {current:?}"
++            );
++        }
++    }
++}
++
++#[tokio::test]
++async fn direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let (user, name) = account(&f.persistence, "direct_owner").await;
++    let email = email_of(f.pool(), user).await;
++    let original = f.join(user, &name).await;
++    let stored = principal(&f, original).await;
++    assert_eq!(stored.historical_person_user_id, Some(user));
++    f.persistence
++        .remove_member(f.company.id, user)
++        .await
++        .unwrap();
++    let archived = principal(&f, original).await;
++    assert_eq!(archived.kind, PrincipalKind::External);
++    assert_eq!(archived.user_id, None);
++    assert_eq!(archived.historical_person_user_id, Some(user));
++    for forged in [None, Some(Uuid::new_v4())] {
++        let mut transaction = f.pool().begin().await.unwrap();
++        let error = sqlx::query(
++            "UPDATE principals SET historical_person_user_id=$3 WHERE company_id=$1 AND id=$2",
++        )
++        .bind(f.company.id)
++        .bind(original)
++        .bind(forged)
++        .execute(&mut *transaction)
++        .await
++        .unwrap_err();
++        assert_eq!(
++            refused_by(error),
++            ("23514".into(), "principals_historical_person_owner".into())
++        );
++        transaction.rollback().await.unwrap();
++    }
++    assert_eq!(
++        f.join(user, &name).await,
++        original,
++        "same account restores its own principal"
++    );
++
++    HostAccountDeletion::delete_user_account(&f.persistence, user)
++        .await
++        .unwrap();
++    let replacement_name = format!("replacement_{}", Uuid::new_v4().simple());
++    f.persistence
++        .create_user(&replacement_name, &email, "hash")
++        .await
++        .unwrap();
++    let replacement = f.persistence.get_by_email(&email).await.unwrap().unwrap();
++    let new_principal = f.join(replacement.id, &replacement_name).await;
++    assert_ne!(
++        new_principal, original,
++        "reused email does not transfer personal targets"
++    );
++    assert_eq!(
++        principal(&f, original).await.historical_person_user_id,
++        Some(user)
++    );
++    assert_eq!(
++        principal(&f, new_principal).await.historical_person_user_id,
++        Some(replacement.id)
++    );
++    let mut transaction = f.pool().begin().await.unwrap();
++    let error = sqlx::query(
++        "UPDATE principals SET kind='person', user_id=$3 WHERE company_id=$1 AND id=$2",
++    )
++    .bind(f.company.id)
++    .bind(original)
++    .bind(replacement.id)
++    .execute(&mut *transaction)
++    .await
++    .unwrap_err();
++    assert_eq!(
++        refused_by(error),
++        ("23514".into(), "principals_historical_person_owner".into())
++    );
++    transaction.rollback().await.unwrap();
++}
++
++#[tokio::test]
++async fn direct_public_settings_principal_round_trip_revision_and_kind_constraint() {
++    let Some(f) = Fixture::new().await else {
++        return;
++    };
++    let id = agent_principal(&f).await;
++    let initial = principal(&f, id).await;
++    assert!(!initial.open_to_public);
++    sqlx::query("UPDATE principals SET open_to_public = true WHERE company_id=$1 AND id=$2")
++        .bind(f.company.id)
++        .bind(id)
++        .execute(f.pool())
++        .await
++        .unwrap();
++    let opened = principal(&f, id).await;
++    assert!(opened.open_to_public);
++    assert_eq!(opened.settings_revision, initial.settings_revision + 1);
++    sqlx::query("UPDATE principals SET open_to_public = true WHERE company_id=$1 AND id=$2")
++        .bind(f.company.id)
++        .bind(id)
++        .execute(f.pool())
++        .await
++        .unwrap();
++    assert_eq!(
++        principal(&f, id).await.settings_revision,
++        opened.settings_revision
++    );
++    sqlx::query("UPDATE principals SET open_to_public = false WHERE company_id=$1 AND id=$2")
++        .bind(f.company.id)
++        .bind(id)
++        .execute(f.pool())
++        .await
++        .unwrap();
++    assert!(!principal(&f, id).await.open_to_public);
++    let owner = f.principal_of(f.owner).await;
++    let error =
++        sqlx::query("UPDATE principals SET open_to_public=true WHERE company_id=$1 AND id=$2")
++            .bind(f.company.id)
++            .bind(owner)
++            .execute(f.pool())
++            .await
++            .unwrap_err();
++    assert_eq!(
++        refused_by(error),
++        ("23514".into(), "principals_public_agent_check".into())
++    );
++    assert!(
++        f.persistence
++            .principal_by_id(Uuid::new_v4(), PrincipalId::new(id))
++            .await
++            .unwrap()
++            .is_none()
++    );
++    let before = principal(&f, owner).await.settings_revision;
++    f.persistence
++        .rename_person_address(f.owner, f.company.id, &ChannelSlug::from("new-owner"))
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(principal(&f, owner).await.settings_revision, before + 1);
++}
++
++async fn lock_rejoin_prefix(
++    transaction: &mut sqlx::Transaction<'_, sqlx::Postgres>,
++    company: Uuid,
++    user: Uuid,
++) {
++    sqlx::query("SET LOCAL lock_timeout='5s'")
++        .execute(&mut **transaction)
++        .await
++        .unwrap();
++    sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
++        .bind(user)
++        .execute(&mut **transaction)
++        .await
++        .unwrap();
++    sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
++        .bind(company)
++        .execute(&mut **transaction)
++        .await
++        .unwrap();
++}
++
++#[tokio::test]
++async fn direct_competing_personal_rejoin_claimants_restore_one_lifetime_target() {
++    let Some(f) = Fixture::isolated().await else {
++        return;
++    };
++    let (user, name) = account(&f.persistence, "rejoin").await;
++    let email = email_of(f.pool(), user).await;
++    let original = f.join(user, &name).await;
++    f.persistence
++        .remove_member(f.company.id, user)
++        .await
++        .unwrap();
++    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',1)")
++        .bind(Uuid::new_v4()).bind(f.company.id).bind(user).execute(f.pool()).await.unwrap();
++    let mut first = f.pool().begin().await.unwrap();
++    lock_rejoin_prefix(&mut first, f.company.id, user).await;
++    let one = create_person_principal_on(&mut first, f.company.id, user, &name, &email)
++        .await
++        .unwrap();
++    let pool = f.pool().clone();
++    let company = f.company.id;
++    let second = tokio::spawn(async move {
++        let mut transaction = pool.begin().await.unwrap();
++        lock_rejoin_prefix(&mut transaction, company, user).await;
++        let id = create_person_principal_on(&mut transaction, company, user, &name, &email)
++            .await
++            .unwrap();
++        transaction.commit().await.unwrap();
++        id
++    });
++    wait_until_a_backend_is_blocked(f.pool()).await;
++    assert!(
++        !second.is_finished(),
++        "the competing production resolver must wait for ownership"
++    );
++    first.commit().await.unwrap();
++    let two = second.await.unwrap();
++    assert_eq!(one.as_uuid(), original);
++    assert_eq!(two, one);
++    assert_eq!(f.addresses_of(original).await.len(), 1);
++    let count: i64 = sqlx::query_scalar(
++        "SELECT count(*) FROM principals WHERE company_id=$1 AND historical_person_user_id=$2",
++    )
++    .bind(f.company.id)
++    .bind(user)
++    .fetch_one(f.pool())
++    .await
++    .unwrap();
++    assert_eq!(count, 1);
++}
++
++#[tokio::test]
++async fn direct_thread_native_owner_shape_rejects_null_person_and_historical_system() {
++    // Trigger changes affect the entire table, so this test owns its migrated database.
++    let Some(f) = Fixture::isolated().await else {
++        return;
++    };
++    let (user, _) = account(&f.persistence, "native_owner").await;
++    for (kind, live, historical) in [("person", Some(user), None), ("system", None, Some(user))] {
++        let mut transaction = f.pool().begin().await.unwrap();
++        sqlx::query("ALTER TABLE principals DISABLE TRIGGER principals_direct_settings")
++            .execute(&mut *transaction)
++            .await
++            .unwrap();
++        let error = sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,historical_person_user_id,display_label) VALUES($1,$2,$3,$4,$5,'invalid')")
++            .bind(Uuid::new_v4()).bind(f.company.id).bind(kind).bind(live).bind(historical)
++            .execute(&mut *transaction).await.unwrap_err();
++        assert_eq!(
++            refused_by(error),
++            ("23514".into(), "principals_historical_person_check".into())
++        );
++        transaction.rollback().await.unwrap();
++    }
++}
+--- a/src/adapters/persistence/agent.rs
++++ b/src/adapters/persistence/agent.rs
+@@ -20,7 +20,10 @@
+ 
+ pub(crate) const AGENT_COLUMNS: &str = "\
+     agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \
+-    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision";
++    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, \
++    COALESCE((SELECT principal.open_to_public FROM principals AS principal \
++      WHERE principal.company_id = agent.company_id AND principal.agent_id = agent.id \
++        AND principal.kind = 'agent'), false) AS open_to_public";
+ 
+ #[derive(sqlx::FromRow, Debug, Serialize)]
+ pub struct AgentDb {
+@@ -36,6 +39,7 @@
+     pub created_by: serde_json::Value,
+     pub created_at: DateTime<Utc>,
+     pub draft_revision: i64,
++    pub open_to_public: bool,
+ }
+ 
+ #[derive(sqlx::FromRow)]
+@@ -57,6 +61,7 @@
+                 })
+                 .ok_or_else(|| AppError::Internal("Invalid agents.draft_revision".into()))?,
+             company_id: db.company_id,
++            open_to_public: db.open_to_public,
+             name: db.name,
+             slug: db.slug,
+             provider: db.provider,
+@@ -96,6 +101,11 @@
+     write: &AgentWrite,
+ ) -> AppResult<()> {
+     let created_by = validated_created_by(write)?;
++    if company_id.is_none() && write.open_to_public {
++        return Err(AppError::BadRequest(
++            "Library agents have no direct address to open.".into(),
++        ));
++    }
+     sqlx::query(
+         r#"INSERT INTO agents
+            (id, company_id, name, slug, provider, model, system_prompt, description,
+@@ -273,6 +283,36 @@
+     db.try_into()
+ }
+ 
++pub(super) async fn write_direct_settings_on(
++    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
++    company_id: Option<Uuid>,
++    id: Uuid,
++    write: &AgentWrite,
++) -> AppResult<()> {
++    let Some(company) = company_id else {
++        return if write.open_to_public {
++            Err(AppError::BadRequest(
++                "Library agents have no direct address to open.".into(),
++            ))
++        } else {
++            Ok(())
++        };
++    };
++    let updated: Option<Uuid> = sqlx::query_scalar(
++        "UPDATE principals AS principal SET open_to_public = $3, display_label = $4, \
++           settings_revision = principal.settings_revision + CASE WHEN agent.slug::text <> $5 THEN 1 ELSE 0 END, \
++           updated_at = CURRENT_TIMESTAMP \
++         FROM agents AS agent WHERE principal.company_id = $1 AND principal.agent_id = $2 \
++           AND principal.kind = 'agent' AND agent.company_id = principal.company_id \
++           AND agent.id = principal.agent_id RETURNING principal.id",
++    )
++    .bind(company).bind(id).bind(write.open_to_public).bind(&write.name).bind(&write.slug)
++    .fetch_optional(&mut **tx).await?;
++    updated
++        .ok_or_else(|| AppError::NotFound("Agent principal not found in this company.".into()))?;
++    Ok(())
++}
++
+ pub(in crate::adapters::persistence) async fn update_agent_on(
+     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+     company_id: Option<Uuid>,
+@@ -280,6 +320,7 @@
+     write: &AgentWrite,
+ ) -> AppResult<AgentDb> {
+     validated_created_by(write)?;
++    write_direct_settings_on(tx, company_id, id, write).await?;
+     replace_agent_capabilities_on(tx, company_id, id, write).await?;
+     sqlx::query_as::<_, AgentDb>(&format!(
+         r#"UPDATE agents AS agent
+@@ -329,6 +370,7 @@
+             &write.name,
+         )
+         .await?;
++        write_direct_settings_on(&mut transaction, Some(company_id), id, &write).await?;
+         let db = sqlx::query_as::<_, AgentDb>(&format!(
+             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE id = $1"
+         ))
+@@ -594,6 +636,7 @@
+     fn malformed_provenance_is_a_conversion_error_not_a_panic() {
+         let db = AgentDb {
+             draft_revision: 1,
++            open_to_public: false,
+             id: Uuid::new_v4(),
+             company_id: None,
+             name: "Broken".into(),
+--- a/src/adapters/persistence/company_agent.rs
++++ b/src/adapters/persistence/company_agent.rs
+@@ -83,6 +83,7 @@
+     resolve_model_on(tx, company, &mut write).await?;
+     insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
+     let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
++    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, &write).await?;
+     publish_initial_on(
+         tx,
+         AgentPublicationScope {
+--- a/src/adapters/persistence/department_desks_tests.rs
++++ b/src/adapters/persistence/department_desks_tests.rs
+@@ -554,7 +554,7 @@
+ 
+ /// DEP-P02-D2 (G1-F2): every save applies the members-only rule to the desk's ownership.
+ #[tokio::test]
+-async fn department_desk_members_only_form_saves_keep_allowlist_and_refuse_public() {
++async fn department_desk_public_selection_clears_members_only_and_keeps_ownership() {
+     let Some(f) = Departments::new().await else {
+         return;
+     };
+@@ -565,8 +565,6 @@
+         (saved.access_mode, saved.members_only),
+         (ChannelAccessMode::Allowlist, true)
+     );
+-    let public = save(&f, &saved, None, Some(vec!["@public"])).await;
+-    assert!(matches!(public, Err(AppError::BadRequest(_))), "{public:?}");
+     let unowned = save(
+         &f,
+         &saved,
+@@ -586,6 +584,13 @@
+         Some(hr.id),
+         "nothing changed"
+     );
++    let public = save(&f, &saved, None, Some(vec!["@public"])).await.unwrap();
++    assert_eq!(
++        (public.access_mode, public.members_only),
++        (ChannelAccessMode::Public, false)
++    );
++    assert_eq!(public.department_id, Some(hr.id));
++    assert_eq!(reload(&f, people.id).await, public);
+ }
+ 
+ /// DEP-P02-D5: a teammate removed from the company loses their derived grants with their
+@@ -810,3 +815,43 @@
+     );
+     assert!(f.roles(unit.id).await.is_empty());
+ }
++
++#[tokio::test]
++async fn department_desk_raw_public_with_members_only_is_refused() {
++    let Some(f) = Departments::new().await else {
++        return;
++    };
++    let hr = f.create("HR", None).await;
++    let people = desk(&f, "raw-private", owned(hr.id, true)).await;
++    let result = ChannelPersistence::update(
++        &f.persistence,
++        crate::application::ports::channel::ChannelUpdate {
++            company_id: f.company,
++            channel_id: people.id,
++            write: ChannelWrite {
++                participant_emails: Some(vec!["@public".into()]),
++                ..desk_write(people.slug.as_str(), owned(hr.id, true))
++            },
++        },
++    )
++    .await;
++    assert!(matches!(result, Err(AppError::BadRequest(_))), "{result:?}");
++    let error =
++        sqlx::query("UPDATE channels SET access_mode='public' WHERE company_id=$1 AND id=$2")
++            .bind(f.company)
++            .bind(people.id)
++            .execute(f.persistence.pool())
++            .await
++            .unwrap_err();
++    assert_eq!(
++        error.as_database_error().unwrap().constraint(),
++        Some("channels_members_only_allowlist")
++    );
++    let stored = reload(&f, people.id).await;
++    assert_eq!(
++        (stored.access_mode, stored.members_only),
++        (ChannelAccessMode::Allowlist, true)
++    );
++    assert_eq!(stored.settings_revision, people.settings_revision);
++    assert_eq!(stored.department_id, Some(hr.id));
++}
+--- a/src/adapters/persistence/onboarding/tests.rs
++++ b/src/adapters/persistence/onboarding/tests.rs
+@@ -211,6 +211,7 @@
+             persistence.clone(),
+             persistence.clone(),
+             persistence.clone(),
++            crate::use_cases::agent::SpamScanning::Unavailable,
+         )
+         .with_prompt_classifier(classifier),
+     );
+@@ -700,6 +701,7 @@
+         f.persistence.clone(),
+         f.persistence.clone(),
+         f.persistence.clone(),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     );
+     let error = agents
+         .create_agent_from_library(f.owner, f.company, library, None)
+--- a/src/adapters/persistence/participant.rs
++++ b/src/adapters/persistence/participant.rs
+@@ -30,6 +30,8 @@
+ use crate::use_cases::participant::IdentityDirectory;
+ use crate::use_cases::participant::IdentityResolution;
+ 
++mod person;
++
+ #[derive(sqlx::FromRow)]
+ struct PrincipalDb {
+     id: Uuid,
+@@ -38,6 +40,9 @@
+     user_id: Option<Uuid>,
+     agent_id: Option<Uuid>,
+     display_label: String,
++    open_to_public: bool,
++    settings_revision: i64,
++    historical_person_user_id: Option<Uuid>,
+     created_at: DateTime<Utc>,
+     updated_at: DateTime<Utc>,
+ }
+@@ -55,6 +60,9 @@
+             user_id: row.user_id,
+             agent_id: row.agent_id,
+             display_label: row.display_label,
++            open_to_public: row.open_to_public,
++            settings_revision: row.settings_revision,
++            historical_person_user_id: row.historical_person_user_id,
+             created_at: row.created_at,
+             updated_at: row.updated_at,
+         })
+@@ -138,7 +146,8 @@
+ }
+ 
+ const PRINCIPAL_SELECT: &str = r#"
+-    SELECT id, company_id, kind, user_id, agent_id, display_label, created_at, updated_at
++    SELECT id, company_id, kind, user_id, agent_id, display_label, created_at, updated_at,
++           open_to_public, settings_revision, historical_person_user_id
+     FROM principals
+ "#;
+ 
+@@ -338,67 +347,8 @@
+     let qualified = account_email_identity(email)?;
+     lock_identity_key(connection, company_id, &qualified).await?;
+ 
+-    let existing: Option<(Uuid, String, Option<Uuid>)> = sqlx::query_as(
+-        r#"SELECT principal.id, principal.kind, principal.user_id
+-           FROM participant_identities AS identity
+-           JOIN principals AS principal
+-             ON (principal.company_id, principal.id) =
+-                (identity.company_id, identity.principal_id)
+-           WHERE identity.company_id = $1 AND identity.transport = 'email'
+-             AND identity.namespace = $2 AND identity.subject = $3
+-           FOR UPDATE OF principal, identity"#,
+-    )
+-    .bind(company_id)
+-    .bind(qualified.namespace().as_str())
+-    .bind(qualified.subject().as_str())
+-    .fetch_optional(&mut *connection)
+-    .await
+-    .map_err(AppError::from)?;
+-
+-    let principal_id = match existing {
+-        Some((id, kind, _)) if kind == "external" => {
+-            sqlx::query(
+-                r#"UPDATE principals
+-                   SET kind = 'person', user_id = $3, display_label = $4,
+-                       updated_at = CURRENT_TIMESTAMP
+-                   WHERE company_id = $1 AND id = $2"#,
+-            )
+-            .bind(company_id)
+-            .bind(id)
+-            .bind(user_id)
+-            .bind(display_label)
+-            .execute(&mut *connection)
+-            .await
+-            .map_err(AppError::from)?;
+-            PrincipalId::new(id)
+-        }
+-        Some((id, kind, Some(existing_user_id)))
+-            if kind == "person" && existing_user_id == user_id =>
+-        {
+-            PrincipalId::new(id)
+-        }
+-        Some((_, kind, existing_user_id)) => {
+-            return Err(AppError::Conflict(format!(
+-                "Email identity is already attached to a {kind} principal ({existing_user_id:?})."
+-            )));
+-        }
+-        None => {
+-            let id = PrincipalId::random();
+-            sqlx::query(
+-                r#"INSERT INTO principals
+-                       (id, company_id, kind, user_id, display_label)
+-                   VALUES ($1, $2, 'person', $3, $4)"#,
+-            )
+-            .bind(id.as_uuid())
+-            .bind(company_id)
+-            .bind(user_id)
+-            .bind(display_label)
+-            .execute(&mut *connection)
+-            .await
+-            .map_err(AppError::from)?;
+-            id
+-        }
+-    };
++    let principal_id =
++        person::resolve_on(connection, company_id, user_id, display_label, &qualified).await?;
+ 
+     upsert_account_identity_on(
+         connection,
+@@ -586,6 +536,22 @@
+ 
+ #[async_trait]
+ impl PrincipalAccessPersistence for PostgresPersistence {
++    async fn principal_by_id(
++        &self,
++        company_id: Uuid,
++        principal_id: PrincipalId,
++    ) -> AppResult<Option<Principal>> {
++        sqlx::query_as::<_, PrincipalDb>(&format!(
++            "{PRINCIPAL_SELECT} WHERE company_id = $1 AND id = $2"
++        ))
++        .bind(company_id)
++        .bind(principal_id.as_uuid())
++        .fetch_optional(&self.pool)
++        .await?
++        .map(Principal::try_from)
++        .transpose()
++    }
++
+     async fn access_context_for_identity(
+         &self,
+         company_id: Uuid,
+--- a/src/adapters/persistence/participant/person.rs
++++ b/src/adapters/persistence/participant/person.rs
+@@ -0,0 +1,110 @@
++//! Personal targets follow an account for their lifetime, rather than the email it currently owns.
++use sqlx::PgConnection;
++use uuid::Uuid;
++
++use crate::{
++    app_error::{AppError, AppResult},
++    entities::transport::{PrincipalId, QualifiedIdentity},
++};
++
++#[derive(sqlx::FromRow)]
++struct Holder {
++    id: Uuid,
++    kind: String,
++    user_id: Option<Uuid>,
++    historical_person_user_id: Option<Uuid>,
++}
++
++async fn holder_on(
++    db: &mut PgConnection,
++    company: Uuid,
++    identity: &QualifiedIdentity,
++) -> AppResult<Option<Holder>> {
++    Ok(sqlx::query_as(
++        "SELECT principal.id, principal.kind, principal.user_id, principal.historical_person_user_id \
++         FROM participant_identities AS identity \
++         JOIN principals AS principal ON principal.company_id = identity.company_id \
++           AND principal.id = identity.principal_id \
++         WHERE identity.company_id = $1 AND identity.transport = $2 \
++           AND identity.namespace = $3 AND identity.subject = $4",
++    )
++    .bind(company)
++    .bind(identity.transport().as_str())
++    .bind(identity.namespace().as_str())
++    .bind(identity.subject().as_str())
++    .fetch_optional(db)
++    .await?)
++}
++
++/// Caller holds the identity advisory key and its existing account/company ownership prefix.
++pub(super) async fn resolve_on(
++    db: &mut PgConnection,
++    company: Uuid,
++    user: Uuid,
++    label: &str,
++    identity: &QualifiedIdentity,
++) -> AppResult<PrincipalId> {
++    let lifetime: Option<Uuid> = sqlx::query_scalar(
++        "SELECT id FROM principals WHERE company_id = $1 AND historical_person_user_id = $2",
++    )
++    .bind(company)
++    .bind(user)
++    .fetch_optional(&mut *db)
++    .await?;
++    let holder = holder_on(db, company, identity).await?;
++    let ids: Vec<Uuid> = lifetime
++        .into_iter()
++        .chain(holder.as_ref().map(|row| row.id))
++        .collect();
++    sqlx::query_scalar::<_, Uuid>(
++        "SELECT id FROM principals WHERE company_id = $1 AND id = ANY($2) ORDER BY id FOR UPDATE",
++    )
++    .bind(company)
++    .bind(ids)
++    .fetch_all(&mut *db)
++    .await?;
++
++    // Re-read after the complete sorted lock set: a concurrent removal may have demoted it.
++    let holder = holder_on(db, company, identity).await?;
++    if let Some(row) = &holder
++        && row.kind != "external"
++        && !(row.kind == "person" && row.user_id == Some(user))
++    {
++        return Err(AppError::Conflict(format!(
++            "Email identity is already attached to a {} principal.",
++            row.kind,
++        )));
++    }
++    let reusable = holder.filter(|row| {
++        row.historical_person_user_id
++            .is_none_or(|owner| owner == user)
++    });
++    let id = lifetime.or(reusable.map(|row| row.id));
++    let id = match id {
++        Some(id) => {
++            sqlx::query_scalar(
++                "UPDATE principals SET kind = 'person', user_id = $3, display_label = $4, \
++                   updated_at = CURRENT_TIMESTAMP WHERE company_id = $1 AND id = $2 RETURNING id",
++            )
++            .bind(company)
++            .bind(id)
++            .bind(user)
++            .bind(label)
++            .fetch_one(&mut *db)
++            .await?
++        }
++        None => {
++            sqlx::query_scalar(
++                "INSERT INTO principals (id, company_id, kind, user_id, display_label) \
++                 VALUES ($1, $2, 'person', $3, $4) RETURNING id",
++            )
++            .bind(Uuid::new_v4())
++            .bind(company)
++            .bind(user)
++            .bind(label)
++            .fetch_one(&mut *db)
++            .await?
++        }
++    };
++    Ok(PrincipalId::new(id))
++}
+--- a/src/adapters/persistence/user.rs
++++ b/src/adapters/persistence/user.rs
+@@ -214,8 +214,24 @@
+         company_id: Uuid,
+         slug: &ChannelSlug,
+     ) -> AppResult<Option<PersonAddress>> {
+-        // One statement that locks only the address row: a concurrent removal from the company
+-        // deletes the row first or waits for this update, and either way no lock cycle forms.
++        let mut transaction = self.pool.begin().await?;
++        sqlx::query("SET LOCAL lock_timeout = '5s'")
++            .execute(&mut *transaction)
++            .await?;
++        // The address trigger advances its principal's routing revision. Lock that principal
++        // before the address, matching removal and avoiding an address/principal lock cycle.
++        let principal: Option<Uuid> = sqlx::query_scalar(
++            "SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 \
++             AND kind = 'person' FOR UPDATE",
++        )
++        .bind(company_id)
++        .bind(user_id)
++        .fetch_optional(&mut *transaction)
++        .await?;
++        if principal.is_none() {
++            transaction.commit().await?;
++            return Ok(None);
++        }
+         let row: Option<(Uuid, String, String, String)> = sqlx::query_as(
+             "UPDATE addresses AS address SET slug = $3 \
+                FROM principals AS principal, companies AS company \
+@@ -229,7 +245,7 @@
+         .bind(user_id)
+         .bind(company_id)
+         .bind(slug.as_str())
+-        .fetch_optional(&self.pool)
++        .fetch_optional(&mut *transaction)
+         .await
+         .map_err(|error| match &error {
+             sqlx::Error::Database(database) if database.code().as_deref() == Some("23505") => {
+@@ -239,6 +255,7 @@
+             }
+             _ => AppError::from(error),
+         })?;
++        transaction.commit().await?;
+         Ok(row.map(person_address))
+     }
+ 
+--- a/src/application/ports/participant.rs
++++ b/src/application/ports/participant.rs
+@@ -22,6 +22,13 @@
+ /// The actor facts channel policy needs, looked up by whichever handle the caller arrived with.
+ #[async_trait]
+ pub trait PrincipalAccessPersistence: Send + Sync {
++    /// Tenant-scoped target lookup. A missing principal never borrows another company's policy.
++    async fn principal_by_id(
++        &self,
++        company_id: Uuid,
++        principal_id: crate::entities::transport::PrincipalId,
++    ) -> AppResult<Option<crate::entities::participant::Principal>>;
++
+     /// For an inbound message: who this transport handle is to the company.
+     async fn access_context_for_identity(
+         &self,
+--- a/src/application/use_cases/agent.rs
++++ b/src/application/use_cases/agent.rs
+@@ -39,6 +39,8 @@
+ pub struct AgentWrite {
+     pub name: String,
+     pub slug: String,
++    pub open_to_public: bool,
++    pub confirm_spam_disabled: bool,
+     pub provider: Option<String>,
+     pub model: Option<String>,
+     pub system_prompt: Option<String>,
+@@ -181,6 +183,17 @@
+ pub enum SpamScanning {
+     Available,
+     Unavailable,
++}
++
++impl SpamScanning {
++    pub(crate) fn check_public_ingress(self, open: bool, confirmed: bool) -> AppResult<()> {
++        if open && self == Self::Unavailable && !confirmed {
++            return Err(AppError::BadRequest(
++                "Spam scanning is disabled in server configuration. Saving public mail access requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
++            ));
++        }
++        Ok(())
++    }
+ }
+ 
+ /// Whether one of `connections` enables `model` for `provider`, both compared canonically: the
+@@ -220,6 +233,8 @@
+         tool_bindings: None,
+         name: definition.name.clone(),
+         slug: definition.slug.clone(),
++        open_to_public: false,
++        confirm_spam_disabled: false,
+         provider: definition.provider.clone(),
+         model: definition.model.clone(),
+         system_prompt: definition.system_prompt.clone(),
+@@ -232,6 +247,7 @@
+ 
+ #[derive(Clone)]
+ pub struct AgentUseCases {
++    spam_scanning: SpamScanning,
+     company_persistence: Arc<dyn CompanyPersistence>,
+     agent_persistence: Arc<dyn AgentPersistence>,
+     draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
+@@ -251,11 +267,13 @@
+         company_persistence: Arc<dyn CompanyPersistence>,
+         agent_persistence: Arc<dyn AgentPersistence>,
+         draft_persistence: Arc<dyn crate::application::agent::AgentDraftPersistence>,
++        spam_scanning: SpamScanning,
+     ) -> Self {
+         Self {
+             company_persistence,
+             agent_persistence,
+             draft_persistence,
++            spam_scanning,
+             company_agents: None,
+             prompt_classifier: None,
+         }
+@@ -371,6 +389,8 @@
+             managed_company(self.company_persistence.as_ref(), user_id, company_id).await?;
+         write.created_by = Some(CreationProvenance::user(user_id));
+         write.normalize()?;
++        self.spam_scanning
++            .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
+         self.validate_model_selection(company_id, &write).await?;
+         Ok((company, write))
+     }
+@@ -578,6 +598,8 @@
+         }
+ 
+         write.normalize()?;
++        self.spam_scanning
++            .check_public_ingress(write.open_to_public, write.confirm_spam_disabled)?;
+         self.validate_model_selection(company_id, &write).await?;
+ 
+         info!(%agent_id, %company_id, "Updating agent");
+--- a/src/application/use_cases/agent_tests.rs
++++ b/src/application/use_cases/agent_tests.rs
+@@ -35,6 +35,7 @@
+ impl AgentPersistence for MockAgentPersistence {
+     async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {
+         let agent = Agent {
++            open_to_public: write.open_to_public,
+             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+             id: Uuid::new_v4(),
+             company_id: Some(company_id),
+@@ -108,6 +109,7 @@
+ 
+         agent.name = write.name;
+         agent.slug = write.slug;
++        agent.open_to_public = write.open_to_public;
+         agent.provider = write.provider;
+         agent.model = write.model;
+         agent.system_prompt = write.system_prompt;
+@@ -232,6 +234,7 @@
+             company_persistence,
+             agent_persistence.clone(),
+             agent_persistence.clone(),
++            crate::use_cases::agent::SpamScanning::Unavailable,
+         )
+         .with_company_agents(agent_persistence),
+     }
+@@ -267,6 +270,7 @@
+         Arc::new(MockAgentPersistence {
+             agents: Mutex::new(Vec::new()),
+         }),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     );
+     assert!(matches!(
+         unconfigured.company_agents(),
+@@ -340,6 +344,7 @@
+         company_persistence,
+         agent_persistence.clone(),
+         agent_persistence.clone(),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     )
+     .with_company_agents(agent_persistence);
+ 
+@@ -532,6 +537,7 @@
+         company_persistence,
+         agent_persistence.clone(),
+         agent_persistence.clone(),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     )
+     .with_company_agents(agent_persistence);
+ 
+@@ -678,6 +684,7 @@
+ 
+     // A library definition is one with no company of its own.
+     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
++        open_to_public: false,
+         draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
+         id: Uuid::new_v4(),
+         company_id: None,
+@@ -705,6 +712,7 @@
+         company_persistence,
+         agent_persistence.clone(),
+         agent_persistence.clone(),
++        crate::use_cases::agent::SpamScanning::Unavailable,
+     )
+     .with_company_agents(agent_persistence.clone());
+ 
+--- a/src/application/use_cases/channel.rs
++++ b/src/application/use_cases/channel.rs
+@@ -53,6 +53,11 @@
+             });
+         }
+ 
++        if self.is_public() {
++            // Selecting public intake also clears a department's narrower members-only setting.
++            self.ownership.get_or_insert_default().members_only = Some(false);
++        }
++
+         Ok(())
+     }
+ 
+@@ -95,12 +100,7 @@
+     spam_scanning: SpamScanning,
+     confirmed: bool,
+ ) -> AppResult<()> {
+-    if write.is_public() && spam_scanning == SpamScanning::Unavailable && !confirmed {
+-        return Err(AppError::BadRequest(
+-            "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
+-        ));
+-    }
+-    Ok(())
++    spam_scanning.check_public_ingress(write.is_public(), confirmed)
+ }
+ 
+ /// A channel belonging to another company is reported exactly like a missing one, so an id probe
+@@ -1575,3 +1575,7 @@
+         assert_eq!(slugify("Ünïcode"), "n-code");
+     }
+ }
++
++#[cfg(test)]
++#[path = "channel/public_settings_tests.rs"]
++mod public_settings_tests;
+--- a/src/application/use_cases/channel/public_settings_tests.rs
++++ b/src/application/use_cases/channel/public_settings_tests.rs
+@@ -0,0 +1,53 @@
++use super::*;
++
++#[test]
++fn public_desk_private_agent_public_selection_clears_only_the_members_only_flag() {
++    let department = crate::entities::department::DepartmentId::new(Uuid::new_v4());
++    let mut write = ChannelWrite {
++        name: "Public intake".into(),
++        slug: "intake".into(),
++        participant_emails: Some(vec![" @PUBLIC ".into()]),
++        ownership: Some(crate::application::ports::channel::ChannelOwnershipWrite {
++            department_id: Some(Some(department)),
++            members_only: Some(true),
++        }),
++        ..ChannelWrite::default()
++    };
++    write.normalize().unwrap();
++    let ownership = write.ownership.unwrap();
++    assert_eq!(ownership.department_id, Some(Some(department)));
++    assert_eq!(ownership.members_only, Some(false));
++    assert!(write.is_public());
++}
++
++#[test]
++fn public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting() {
++    let mut write = ChannelWrite {
++        name: "Public intake".into(),
++        slug: "intake".into(),
++        participant_emails: Some(vec!["@public".into()]),
++        ..ChannelWrite::default()
++    };
++    write.normalize().unwrap();
++    let ownership = write.ownership.unwrap();
++    assert_eq!(
++        ownership.department_id, None,
++        "keep the existing department"
++    );
++    assert_eq!(ownership.members_only, Some(false));
++}
++
++#[test]
++fn public_desk_private_agent_private_selection_preserves_members_only() {
++    let mut write = ChannelWrite {
++        name: "Private intake".into(),
++        slug: "intake".into(),
++        ownership: Some(crate::application::ports::channel::ChannelOwnershipWrite {
++            department_id: None,
++            members_only: Some(true),
++        }),
++        ..ChannelWrite::default()
++    };
++    write.normalize().unwrap();
++    assert_eq!(write.ownership.unwrap().members_only, Some(true));
++}
+--- a/src/application/use_cases/participant/test_support.rs
++++ b/src/application/use_cases/participant/test_support.rs
+@@ -271,6 +271,9 @@
+             },
+             user_id: None,
+             agent_id: None,
++            open_to_public: false,
++            settings_revision: 1,
++            historical_person_user_id: None,
+             display_label: identity
+                 .display_label
+                 .clone()
+@@ -307,6 +310,26 @@
+ 
+ #[async_trait]
+ impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
++    async fn principal_by_id(
++        &self,
++        company: Uuid,
++        principal: PrincipalId,
++    ) -> AppResult<Option<Principal>> {
++        let found = self
++            .state
++            .lock()
++            .unwrap()
++            .identities
++            .iter()
++            .find(|((scope, _), identity)| *scope == company && identity.principal_id == principal)
++            .map(|((_, qualified), identity)| (qualified.clone(), identity.clone()));
++        let Some((qualified, identity)) = found else {
++            return Ok(None);
++        };
++        let membership = self.membership_for_subject(company, &qualified).await?;
++        Ok(Some(self.principal_from(&identity, membership)))
++    }
++
+     async fn access_context_for_identity(
+         &self,
+         company_id: Uuid,
+@@ -393,6 +416,14 @@
+ 
+ #[async_trait]
+ impl PrincipalAccessPersistence for FailingParticipantDirectory {
++    async fn principal_by_id(
++        &self,
++        _company: Uuid,
++        _principal: PrincipalId,
++    ) -> AppResult<Option<Principal>> {
++        Err(outage())
++    }
++
+     async fn access_context_for_identity(
+         &self,
+         _company_id: Uuid,
+--- a/src/application/workflow/templates/test_support.rs
++++ b/src/application/workflow/templates/test_support.rs
+@@ -32,6 +32,16 @@
+ }
+ #[async_trait]
+ impl PrincipalAccessPersistence for Store {
++    async fn principal_by_id(
++        &self,
++        _company: Uuid,
++        _principal: crate::entities::transport::PrincipalId,
++    ) -> AppResult<Option<crate::entities::participant::Principal>> {
++        Err(AppError::Internal(
++            "principal target lookup is outside this workflow fixture".into(),
++        ))
++    }
++
+     async fn access_context_for_identity(
+         &self,
+         _: Uuid,
+--- a/src/application/workflow/tests.rs
++++ b/src/application/workflow/tests.rs
+@@ -528,6 +528,16 @@
+ 
+ #[async_trait]
+ impl PrincipalAccessPersistence for MemoryStore {
++    async fn principal_by_id(
++        &self,
++        _company: Uuid,
++        _principal: crate::entities::transport::PrincipalId,
++    ) -> AppResult<Option<crate::entities::participant::Principal>> {
++        Err(AppError::Internal(
++            "principal target lookup is outside this workflow fixture".into(),
++        ))
++    }
++
+     async fn access_context_for_identity(
+         &self,
+         _company_id: Uuid,
+--- a/src/domain/entities/address.rs
++++ b/src/domain/entities/address.rs
+@@ -1,5 +1,6 @@
+ //! A company's one address namespace: every local part names exactly one desk or one principal.
+ 
++use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
+ use crate::entities::{
+@@ -8,11 +9,28 @@
+ };
+ 
+ /// What a slug in a company's address namespace names.
+-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
++#[serde(tag = "kind", content = "id", rename_all = "snake_case")]
+ pub enum AddressTarget {
+     Desk(Uuid),
+-    /// A person or an agent. Nothing is delivered to one yet; routing refuses it as undeliverable.
++    /// A person's or agent's direct inbox, independent of desks they may staff.
+     Principal(PrincipalId),
++}
++
++impl AddressTarget {
++    pub const fn desk_id(self) -> Option<Uuid> {
++        match self {
++            Self::Desk(id) => Some(id),
++            Self::Principal(_) => None,
++        }
++    }
++
++    pub const fn principal_id(self) -> Option<PrincipalId> {
++        match self {
++            Self::Principal(id) => Some(id),
++            Self::Desk(_) => None,
++        }
++    }
+ }
+ 
+ /// One addressed slug and what the namespace answered for it.
+--- a/src/domain/entities/agent.rs
++++ b/src/domain/entities/agent.rs
+@@ -14,6 +14,8 @@
+     pub company_id: Option<Uuid>,
+     pub name: String,
+     pub slug: String,
++    /// Admission to the principal address, independent of any desk this agent staffs.
++    pub open_to_public: bool,
+     pub provider: Option<String>,
+     pub model: Option<String>,
+     pub system_prompt: Option<String>,
+--- a/src/domain/entities/participant.rs
++++ b/src/domain/entities/participant.rs
+@@ -54,8 +54,50 @@
+     pub user_id: Option<Uuid>,
+     pub agent_id: Option<Uuid>,
+     pub display_label: String,
++    pub open_to_public: bool,
++    pub settings_revision: i64,
++    /// Lifetime personal ownership, retained through retirement; never a live authority grant.
++    pub historical_person_user_id: Option<Uuid>,
+     pub created_at: DateTime<Utc>,
+     pub updated_at: DateTime<Utc>,
++}
++
++impl Principal {
++    /// Admission policy for a direct address. Being a thread participant never widens it.
++    pub fn direct_access(
++        &self,
++        context: PrincipalAccessContext,
++    ) -> super::channel::ParticipantAccess {
++        let trusted = context.membership.is_team();
++        let authorized = match self.kind {
++            PrincipalKind::Person => {
++                trusted && (context.membership.is_owner() || context.principal_id == Some(self.id))
++            }
++            PrincipalKind::Agent => trusted || self.open_to_public,
++            PrincipalKind::External | PrincipalKind::System => false,
++        };
++        super::channel::ParticipantAccess {
++            authorized,
++            trusted,
++        }
++    }
++
++    /// Public ingress never grants viewing. The owner retains access to archived personal mail.
++    pub fn direct_viewer_access(&self, context: PrincipalAccessContext) -> bool {
++        if !context.membership.is_team() {
++            return false;
++        }
++        match self.kind {
++            PrincipalKind::Person => {
++                context.membership.is_owner() || context.principal_id == Some(self.id)
++            }
++            PrincipalKind::Agent => true,
++            PrincipalKind::External => {
++                self.historical_person_user_id.is_some() && context.membership.is_owner()
++            }
++            PrincipalKind::System => false,
++        }
++    }
+ }
+ 
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+@@ -375,3 +417,7 @@
+         assert_ne!(claim.version(), 1);
+     }
+ }
++
++#[cfg(test)]
++#[path = "participant/direct_tests.rs"]
++mod direct_tests;
+--- a/src/domain/entities/participant/direct_tests.rs
++++ b/src/domain/entities/participant/direct_tests.rs
+@@ -0,0 +1,77 @@
++use super::*;
++
++fn principal(kind: PrincipalKind) -> Principal {
++    Principal {
++        id: PrincipalId::random(),
++        company_id: Uuid::new_v4(),
++        kind,
++        user_id: None,
++        agent_id: None,
++        display_label: "Direct recipient".into(),
++        open_to_public: false,
++        settings_revision: 1,
++        historical_person_user_id: None,
++        created_at: Utc::now(),
++        updated_at: Utc::now(),
++    }
++}
++
++fn context(membership: CompanyMembership, principal_id: PrincipalId) -> PrincipalAccessContext {
++    PrincipalAccessContext {
++        principal_id: Some(principal_id),
++        membership,
++        access_level: crate::entities::access_level::AccessLevel::PUBLIC,
++        grant_authority: PrincipalGrantAuthority::Available,
++    }
++}
++
++#[test]
++fn direct_thread_person_is_private_to_self_and_owner() {
++    let person = principal(PrincipalKind::Person);
++    let other = PrincipalId::random();
++    for (membership, id, allowed) in [
++        (CompanyMembership::Owner, other, true),
++        (CompanyMembership::Member, person.id, true),
++        (CompanyMembership::Admin, other, false),
++        (CompanyMembership::Member, other, false),
++        (CompanyMembership::None, other, false),
++        (CompanyMembership::None, person.id, false),
++    ] {
++        let context = context(membership, id);
++        assert_eq!(person.direct_access(context).authorized, allowed);
++        assert_eq!(person.direct_viewer_access(context), allowed);
++    }
++}
++
++#[test]
++fn direct_thread_public_agent_admits_mail_without_granting_reads() {
++    let mut agent = principal(PrincipalKind::Agent);
++    let outsider = context(CompanyMembership::None, PrincipalId::random());
++    let teammate = context(CompanyMembership::Member, PrincipalId::random());
++    assert!(!agent.direct_access(outsider).authorized);
++    assert!(agent.direct_access(teammate).authorized);
++    assert!(agent.direct_access(teammate).trusted);
++    assert!(agent.direct_viewer_access(teammate));
++    agent.open_to_public = true;
++    assert!(agent.direct_access(outsider).authorized);
++    assert!(!agent.direct_access(outsider).trusted);
++    assert!(!agent.direct_viewer_access(outsider));
++}
++
++#[test]
++fn direct_thread_retired_person_keeps_only_owner_history_access() {
++    let mut archived = principal(PrincipalKind::External);
++    let owner = context(CompanyMembership::Owner, PrincipalId::random());
++    let former = context(CompanyMembership::None, archived.id);
++    assert!(!archived.direct_viewer_access(owner));
++    archived.historical_person_user_id = Some(Uuid::new_v4());
++    assert!(archived.direct_viewer_access(owner));
++    assert!(!archived.direct_access(owner).authorized);
++    assert!(!archived.direct_viewer_access(former));
++    assert!(!archived.direct_viewer_access(context(CompanyMembership::Member, archived.id)));
++    for kind in [PrincipalKind::External, PrincipalKind::System] {
++        let mut invalid_public = principal(kind);
++        invalid_public.open_to_public = true;
++        assert!(!invalid_public.direct_access(owner).authorized);
++    }
++}
+--- a/src/infra/setup/accounts.rs
++++ b/src/infra/setup/accounts.rs
+@@ -29,13 +29,14 @@
+ fn agents(
+     p: &Arc<crate::adapters::persistence::PostgresPersistence>,
+     workflow: &crate::infra::workflow::WorkflowServices,
++    spam_scanning: crate::use_cases::agent::SpamScanning,
+ ) -> anyhow::Result<Arc<AgentUseCases>> {
+     let classifier: Arc<dyn TextClassifier> =
+         Arc::new(crate::adapters::harness::rig::RigTextClassifier::new(
+             crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
+         ));
+     Ok(Arc::new(
+-        AgentUseCases::new(p.clone(), p.clone(), p.clone())
++        AgentUseCases::new(p.clone(), p.clone(), p.clone(), spam_scanning)
+             .with_company_agents(workflow.company_agents())
+             .with_prompt_classifier(classifier),
+     ))
+@@ -59,7 +60,7 @@
+             allow_unverified_without_smtp: allow_unverified_email_without_smtp_from_env(),
+         },
+     ));
+-    let agent = agents(p, workflow)?;
++    let agent = agents(p, workflow, f.config.spam_scanning())?;
+     Ok(UseCases {
+         user,
+         company: Arc::new(CompanyUseCases::new(p.clone())),

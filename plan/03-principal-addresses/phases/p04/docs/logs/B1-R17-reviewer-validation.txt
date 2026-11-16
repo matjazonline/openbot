@@ -1,0 +1,3 @@
+plan/03-principal-addresses/phases/p04/docs/logs/B1-R17-final-core.evidence.json: retained evidence valid {"FAIL": 3, "NOT EXERCISED": 1, "PASS": 6}
+plan/03-principal-addresses/phases/p04/docs/logs/B1-R17-reviewer.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 5}
+2 evidence manifest(s) validated; declared results are not acceptance

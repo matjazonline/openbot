@@ -1,0 +1,19 @@
+src/adapters/persistence/workflow/decision_lifecycle_tests.rs:20:            json!({"literal":[{"kind":"user","id":Uuid::new_v4()}]});
+src/adapters/persistence/workflow/decision_tests.rs:35:        source["steps"]["start"]["with"]["reviewers"] = json!({"literal":users.iter().map(|id| json!({"kind":"user","id":id})).collect::<Vec<_>>()});
+src/adapters/persistence/workflow/action_approval_message_tests.rs:60:                "destinations":{"literal":[{"kind":"user","id":user}]},
+src/adapters/persistence/workflow/action_approval_message_tests.rs:61:                "approval":{"literal":{"reviewers":[{"kind":"user","id":owner}],
+src/adapters/persistence/workflow/action_approval_mcp_tests.rs:32:        "reviewers":[{"kind":"user","id":fixture.target.actor.user_id()}],
+src/adapters/persistence/workflow/action_approval_http_tests.rs:77:    let mut reviewers = vec![json!({"kind":"user","id":fixture.target.actor.user_id()})];
+src/adapters/persistence/workflow/action_approval_http_tests.rs:80:        reviewers.push(json!({"kind":"user","id":id}));
+src/application/workflow/registry/contract_tests.rs:52:        ("memory.save", "scope", json!({"kind":"user"})),
+src/application/workflow/registry/contract_tests.rs:56:            json!([{"kind":"user","id":"00000000-0000-0000-0000-000000000006","extra":1}]),
+src/application/workflow/registry/message_tests.rs:76:    let duplicate = json!({"literal":[{"kind":"user","id":"00000000-0000-0000-0000-000000000001"},
+src/application/workflow/registry/message_tests.rs:77:                                       {"kind":"user","id":"00000000-0000-0000-0000-000000000001"}]});
+src/application/workflow/registry/examples.rs:109:            json!({"proposal":{"summary":"review"},"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}],"deadline":deadline,"data_schema":schema,"feedback_required":["revise"]})
+src/application/workflow/registry/decision_tests.rs:6:    let reviewer = json!({"kind":"user","id":"00000000-0000-0000-0000-000000000006"});
+src/application/workflow/registry/decision_tests.rs:59:    let params = json!({"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}]});
+src/application/workflow/registry/decision_tests.rs:72:    let reviewer = json!({"kind":"user","id":"00000000-0000-0000-0000-000000000006"});
+src/application/workflow/registry/decision_tests.rs:78:        json!([{"kind":"user","id":"not-a-uuid"}]),
+src/application/workflow/registry/decision_tests.rs:81:                .map(|id| json!({"kind":"user","id":uuid::Uuid::from_u128(id)}))
+src/application/workflow/registry/decision_tests.rs:94:        |v| v["steps"]["start"]["with"]["reviewers"] = json!({"literal":(1..=16).map(|id| json!({"kind":"user","id":uuid::Uuid::from_u128(id)})).collect::<Vec<_>>()}),
+src/application/workflow/registry/tests.rs:164:            "reviewers":[{"kind":"user","id":Uuid::new_v4()}],

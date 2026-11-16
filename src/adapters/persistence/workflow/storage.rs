@@ -25,6 +25,58 @@ fn sweep_limit(limit: u16) -> AppResult<i64> {
 }
 #[async_trait]
 impl WorkflowStorageMaintenance for PostgresPersistence {
+    async fn sweep_notification_origins(
+        &self,
+        after: Option<NotificationOriginCursor>,
+        limit: u16,
+    ) -> AppResult<NotificationOriginSweep> {
+        #[derive(sqlx::FromRow)]
+        struct ScannedOrigin {
+            company_id: Uuid,
+            origin_id: Uuid,
+            deleted: bool,
+        }
+        let limit = sweep_limit(limit)?;
+        let mut tx = begin(&self.pool).await?;
+        // Bound discovery before reference checks and locking. Advancing over the
+        // whole scanned page also makes progress when every row is retained or busy.
+        let mut query = sqlx::QueryBuilder::<Postgres>::new(
+            "WITH page AS MATERIALIZED (SELECT company_id,id FROM workflow_notification_origins WHERE notice_id IS NULL",
+        );
+        if let Some(after) = after {
+            query
+                .push(" AND (company_id,id)>(")
+                .push_bind(after.company.as_uuid())
+                .push(",")
+                .push_bind(after.origin)
+                .push(")");
+        }
+        query.push(" ORDER BY company_id,id LIMIT ").push_bind(limit).push(") , \
+            locked AS MATERIALIZED (SELECT origin.company_id,origin.id FROM workflow_notification_origins AS origin \
+                JOIN page ON page.company_id=origin.company_id AND page.id=origin.id \
+                ORDER BY origin.company_id,origin.id FOR UPDATE OF origin SKIP LOCKED), \
+            removed AS (DELETE FROM workflow_notification_origins AS origin USING locked \
+                WHERE origin.company_id=locked.company_id AND origin.id=locked.id AND origin.notice_id IS NULL \
+                  AND NOT EXISTS(SELECT 1 FROM workflow_escalation_notice_targets AS target WHERE target.company_id=origin.company_id AND target.notice_id=origin.id) \
+                  AND NOT EXISTS(SELECT 1 FROM workflow_message_notification_origins AS message WHERE message.company_id=origin.company_id AND message.origin_id=origin.id) \
+                  AND NOT EXISTS(SELECT 1 FROM workflow_run_notification_origins AS run WHERE run.company_id=origin.company_id AND run.origin_id=origin.id) \
+                RETURNING origin.company_id,origin.id) \
+            SELECT page.company_id,page.id AS origin_id,removed.id IS NOT NULL AS deleted \
+            FROM page LEFT JOIN removed ON removed.company_id=page.company_id AND removed.id=page.id \
+            ORDER BY page.company_id,page.id");
+        let scanned: Vec<ScannedOrigin> = query.build_query_as().fetch_all(&mut *tx).await?;
+        let next = scanned
+            .last()
+            .filter(|_| scanned.len() == limit as usize)
+            .map(|last| NotificationOriginCursor {
+                company: CompanyId::new(last.company_id),
+                origin: last.origin_id,
+            });
+        let deleted = scanned.iter().filter(|origin| origin.deleted).count() as u64;
+        tx.commit().await?;
+        Ok(NotificationOriginSweep { deleted, next })
+    }
+
     async fn history_page(&self, after: Option<HistoryCandidate>) -> AppResult<HistoryPage> {
         super::agent_history_retention::page(&self.pool, after).await
     }

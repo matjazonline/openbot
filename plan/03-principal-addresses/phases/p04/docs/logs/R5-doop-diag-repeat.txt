@@ -1,0 +1,17 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas has been running for over 60 seconds
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (19881450) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:
+document timed out: Some(("waiting", Some("reconciliation"), ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas", "get_canvas", "create_frame"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 95.20s
+

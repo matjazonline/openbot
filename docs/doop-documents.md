@@ -46,7 +46,7 @@ Configure and activate the binding with these trusted parameters:
   "doop_origin": "https://doop.example.com",
   "result_destinations": [{"kind": "user", "id": "a current company recipient UUID"}],
   "action_approval": {
-    "reviewers": [{"kind": "user", "id": "a current company reviewer UUID"}],
+    "reviewers": [{"kind": "principal", "id": "a current company person principal UUID"}],
     "deadline": "an ISO8601 UTC deadline for this short-lived binding"
   }
 }

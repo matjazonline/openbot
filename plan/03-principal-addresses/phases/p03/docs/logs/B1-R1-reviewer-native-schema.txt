@@ -1,0 +1,22 @@
+agent_history_conversations|agent_history_conversations_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_history_sessions|agent_history_sessions_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+agent_publication_requests|agent_publication_requests_company_id_agent_id_fkey|t|t|FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+agent_revisions|agent_revisions_company_id_agent_id_fkey|t|t|FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED
+background_tasks|background_tasks_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+channel_reply_contexts|channel_reply_contexts_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+channel_reply_settings|channel_reply_settings_target_principal_fk|f|f|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+external_threads|external_threads_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+internal_notes|internal_notes_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+message_deliveries|message_deliveries_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+notifications|notifications_target_principal_fk|f|f|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+thread_messages|thread_messages_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+thread_principals|thread_principals_target_principal_fk|t|t|FOREIGN KEY (company_id, target_principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+threads|threads_company_fk|f|f|FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE
+threads|threads_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_admission_refusals|workflow_admission_refusals_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_bindings|workflow_bindings_target_principal_fk|f|f|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+workflow_definitions|workflow_definitions_owner_agent_fk|f|f|FOREIGN KEY (company_id, owner_agent_id) REFERENCES agents(company_id, id) ON DELETE CASCADE
+workflow_history_members|workflow_history_members_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_message_destinations|workflow_message_destinations_target_principal_fk|t|t|FOREIGN KEY (company_id, target_principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_message_intents|workflow_message_intents_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED
+workflow_runs|workflow_runs_target_principal_fk|t|t|FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED

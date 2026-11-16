@@ -1,0 +1,58 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 31s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 21 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::workflow_role_admission_schedule_refusal_keeps_typed_step_role_and_does_not_retry ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_does_not_change_agent_or_people_modes ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window' (50425207) panicked at src/adapters/persistence/workflow/escalation_control_tests.rs:64:9:
+assertion `left == right` failed
+  left: Object {"hop": Number(0), "hours": Null, "state": String("pending")}
+ right: Object {"hop": Number(1), "hours": Number(1), "state": String("owner_waiting")}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation' (50425208) panicked at src/adapters/persistence/workflow/escalation_control_tests.rs:124:5:
+assertion `left == right` failed
+  left: 0
+ right: 2
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect' (50425299) panicked at src/adapters/persistence/workflow/escalation_control_tests.rs:170:10:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: syntax error at end of input")
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect
+
+test result: FAILED. 18 passed; 3 failed; 0 ignored; 0 measured; 4251 filtered out; finished in 9.99s
+
+error: test failed, to rerun pass `--lib`

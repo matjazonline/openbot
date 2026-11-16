@@ -12,8 +12,11 @@ fn message_link(
     label: &str,
 ) -> String {
     format!(
-        r#"<a class="link" href="/ui/message?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}&amp;message_id={message}">{label}</a>"#,
-        channel = outcome.channel,
+        r#"<a class="link" href="/ui/message?company_id={company}&amp;{inbox}&amp;thread_id={thread}&amp;message_id={message}">{label}</a>"#,
+        inbox = match outcome.target {
+            crate::entities::address::AddressTarget::Desk(id) => format!("channel_id={id}"),
+            crate::entities::address::AddressTarget::Principal(id) => format!("principal_id={id}"),
+        },
         thread = outcome.thread,
         message = message.as_uuid(),
         label = escape_html_text(label)

@@ -1,0 +1,16 @@
+
+running 2 tests
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits' (48659898) panicked at src/adapters/persistence/workflow/role_reviewer_tests.rs:103:10:
+called `Option::unwrap()` on a `None` value
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_missing_holder_refuses_before_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4204 filtered out; finished in 1.80s
+

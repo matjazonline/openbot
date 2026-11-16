@@ -1,0 +1,27 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0432]: unresolved import `crate::application::workflow::admission`
+ --> src/adapters/persistence/workflow/role_runtime_tests.rs:5:35
+  |
+5 | use crate::application::workflow::admission::{AdmissionResult, AdmitWorkflowRequest};
+  |                                   ^^^^^^^^^ could not find `admission` in `workflow`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/role_runtime_tests.rs:106:15
+    |
+106 |         slug: channel.slug,
+    |               ^^^^^^^^^^^^ expected `String`, found `ChannelSlug`
+    |
+help: try using a conversion method
+    |
+106 |         slug: channel.slug.to_string(),
+    |                           ++++++++++++
+
+error[E0599]: no method named `version` found for struct `std::sync::Arc<application::workflow::binding::ConfiguredBinding>` in the current scope
+   --> src/adapters/persistence/workflow/role_runtime_tests.rs:198:45
+    |
+198 |             version: previous.configuration.version(),
+    |                                             ^^^^^^^ method not found in `std::sync::Arc<application::workflow::binding::ConfiguredBinding>`
+
+Some errors have detailed explanations: E0308, E0432, E0599.
+For more information about an error, try `rustc --explain E0308`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

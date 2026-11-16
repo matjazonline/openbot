@@ -1,0 +1,34 @@
+✔ document fresh readback accepts the actual expected replacement and parent identities (0.802375ms)
+✔ document fresh readback rejects a stale saved pre-edit snapshot (0.389ms)
+✔ document fresh readback rejects a partial replacement retaining old text (0.082667ms)
+✔ document fresh readback rejects a foreign frame identity (0.301917ms)
+✔ document fresh readback rejects a foreign canvas identity (0.103458ms)
+✔ document fresh readback rejects a foreign workspace identity (0.098ms)
+✔ document fresh readback rejects a frame missing from its parent (3.387625ms)
+✔ document fresh readback rejects a missing HTML observation (0.1075ms)
+✔ competing browser launches create one process with the existing profile and sandbox (31.709041ms)
+✔ failed browser shutdown retains its created receipt for authoritative recovery (10.533375ms)
+✔ browser with no positive process identity cannot claim confirmed removal (6.282ms)
+✔ lifecycle helper rejects an old executable that exits successfully without its exact marker (140.631375ms)
+✔ shared native launcher refuses oversized stdin before starting any executable (0.239958ms)
+✔ e2e helper rejects an old executable with zero selected document workflow tests (69.447209ms)
+✔ native helper diagnostics redact retired and replacement keys (70.023125ms)
+✔ compatibility report accepts the controlled positive (69.451708ms)
+✔ compatibility report rejects list_canvases-error (54.704541ms)
+✔ compatibility report rejects get_frame-error (56.39025ms)
+✔ compatibility report rejects get_canvas-error (58.242958ms)
+✔ compatibility report rejects wrong-workspace (58.550875ms)
+✔ compatibility report rejects unpersisted-edit (58.477084ms)
+✔ compatibility report rejects wrong-frame (54.960917ms)
+✔ compatibility report rejects wrong-canvas (57.143583ms)
+✔ compatibility report rejects helper-zero-matches (135.896084ms)
+✔ compatibility report rejects helper-nonzero (133.868875ms)
+✔ compatibility report rejects helper-unavailable (60.939584ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1195.862792

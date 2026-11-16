@@ -252,7 +252,7 @@ pub(super) async fn child_review(
     let mut child: Value =
         serde_json::from_str(&registry::example("decision.human").unwrap().source).unwrap();
     child["steps"]["start"]["with"]["reviewers"] =
-        json!({"literal":[{"kind":"user","id":s.owner().user_id()}]});
+        json!({"literal":[{"kind":"principal","id":s.owner_principal()}]});
     child["steps"]["start"]["with"]["deadline"] = json!({"literal":deadline.to_rfc3339()});
     let version = Box::pin(s.fixture.publish_workflow(workflow, child)).await;
     let (workflow, version) = match depth {

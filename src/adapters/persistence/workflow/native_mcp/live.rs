@@ -17,12 +17,9 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ActionRequest,
 ) -> AppResult<()> {
-    match Box::pin(authorize_inner(tx, request)).await {
-        Err(AppError::DatabaseTimeout(_)) => Err(AppError::ServiceUnavailable(
-            "Native MCP authority is busy; no new dispatch was authorized".into(),
-        )),
-        result => result,
-    }
+    Box::pin(authorize_inner(tx, request))
+        .await
+        .map_err(super::busy)
 }
 
 async fn authorize_inner(
@@ -54,13 +51,6 @@ async fn authorize_inner(
     )?;
     provenance::restore_on(tx, request, actor, &bundle).await?;
     eligible(tx, request).await?;
-    // Every added owner acquisition, including nested source helpers, uses NOWAIT.
-    sqlx::query_scalar::<_, Uuid>("SELECT id FROM users WHERE id=$1 FOR SHARE NOWAIT")
-        .bind(actor.user_id())
-        .fetch_optional(&mut **tx)
-        .await?
-        .ok_or_else(missing)?;
-    authority::authorize_company_with_locks(tx, company, actor, RowLocks::NoWait).await?;
     let source=sqlx::query_as::<_,Origin>("SELECT call.operation_id,call.machine_id,call.session_id,call.actor_id,operation.origin
         FROM native_mcp_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id
         WHERE call.company_id=$1 AND call.id=$2 AND call.run_id=$3 AND call.retired_at IS NULL")
@@ -68,6 +58,18 @@ async fn authorize_inner(
     if source.actor_id != actor.user_id() {
         return Err(missing());
     }
+    let origin = crate::domain::local_agents::OperationOrigin::try_from(source.origin.as_str())
+        .map_err(|_| invalid())?;
+    // Box the shared native/workflow authority seam to keep the poll frame bounded.
+    Box::pin(super::super::local_agents::authorize_native_source_on(
+        tx,
+        company,
+        OperationId::new(source.operation_id).map_err(|_| invalid())?,
+        actor,
+        origin,
+        RowLocks::NoWait,
+    ))
+    .await?;
     let session = crate::adapters::persistence::local_agents::shared::session_on(
         tx,
         company,
@@ -132,21 +134,11 @@ async fn source_on(
             .await?;
         }
         SessionAssociation::Conversation { conversation_id } => {
-            let channel: Uuid =
-                sqlx::query_scalar("SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2")
-                    .bind(company.as_uuid())
-                    .bind(conversation_id)
-                    .fetch_optional(&mut **tx)
-                    .await?
-                    .ok_or_else(missing)?;
-            association::authorize_association_with_locks(
+            association::authorize_thread_with_locks(
                 tx,
                 company,
                 actor,
-                RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(channel),
-                    thread_id: RelatedThreadId::new(conversation_id),
-                },
+                conversation_id,
                 RowLocks::NoWait,
             )
             .await?;

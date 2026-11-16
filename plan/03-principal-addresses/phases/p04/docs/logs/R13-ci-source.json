@@ -1,0 +1,77 @@
+{
+  "commit": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "parent": "f1e8e081dcdaad893532642345a547c18690e3da",
+  "tree": "5387542683c0abc3334ffd71db4060883f0d832a",
+  "branch": "codex/plan03-p04-r13-fd5f7f76",
+  "base_material_candidate": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "external_draft": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r9-net",
+  "overrides": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "blob": "c4bed3d56fcfd3b9ece71df0de3fd03dd0582660",
+      "sha256": "5cae73f957cf5751401def5896ec3db7353d036635f452ad8740b3bb2d6b6156"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "blob": "ca1b603750692d87cd591b04bdc8e157335cff43",
+      "sha256": "463fbcf9ceb461fe9a22ee37de46a313bc9a2bf05f84cdba4f291192f6481e62"
+    },
+    {
+      "path": "services/memory/scripts/network-isolation-linux.sh",
+      "blob": "4000972995ee75368ce25645700b3ce3be95a84b",
+      "sha256": "c7a4d682a2e05a0bb29db642890c24702ee5c725ba1667fc90c927976b804407"
+    },
+    {
+      "path": "scripts/tests/network-isolation-scope.py",
+      "blob": "161853647d5318afb4a7929633f58e9c83dfb704",
+      "sha256": "ecbfddba4b0fef95f57c0dd98019f42ce24d21c2387005c3d4a93e9478a96865"
+    }
+  ],
+  "material_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    ".trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md",
+    ".trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md",
+    "scripts/check.sh",
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh",
+    "src/adapters/http/routes/agent_api_tests.rs",
+    "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+    "src/adapters/mcp/authentication_tests.rs",
+    "src/adapters/mcp/cleanup_tests.rs",
+    "src/adapters/mcp/connection.rs",
+    "src/adapters/mcp/doop_tests.rs",
+    "src/adapters/mcp/http.rs",
+    "src/adapters/mcp/mod.rs",
+    "src/adapters/mcp/registration_test_support.rs",
+    "src/adapters/mcp/tests.rs",
+    "src/adapters/persistence/legacy_runtime_schema_tests.rs",
+    "src/adapters/persistence/skill_tests.rs",
+    "src/adapters/persistence/workflow/action_account_hints.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/action_dispatch.rs",
+    "src/adapters/persistence/workflow/action_receipts.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/http.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/local_agents/resolution.rs",
+    "src/adapters/persistence/workflow/mcp.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+    "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "src/adapters/persistence/workflow/run_provenance/mod.rs",
+    "src/application/agent/contract_tests.rs",
+    "src/application/agent/definition.rs"
+  ],
+  "claim": "Native operation timer now executes within sudo at3s+1s, outer5s+1s unchanged. Real-sudo topology fixture retained; actual privileged child/no-late-effect assertion. No root coordinator/auth policy change. Root9938 unchanged for Darwin stock/lease."
+}

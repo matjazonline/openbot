@@ -1,6 +1,10 @@
 //! Actual reservation/claim competitors queued in both shared-usage lock orders.
-use super::super::super::control_serialization_tests::contention::try_wait_for_lock;
+use super::super::super::control_serialization_tests::contention::{
+    LEASE_COMPANY_WAIT, try_wait_for_lock,
+};
 use super::*;
+use crate::application::app_error::AppResult;
+use std::{future::Future, pin::Pin};
 
 #[derive(Clone, Copy, Debug)]
 enum UsageOrder {
@@ -61,6 +65,123 @@ enum Contest {
     Void,
 }
 
+#[derive(Clone, Copy, Debug)]
+enum Contender {
+    Debit,
+    First,
+    Second,
+}
+impl Contender {
+    fn index(self) -> usize {
+        match self {
+            Self::Debit => 0,
+            Self::First => 1,
+            Self::Second => 2,
+        }
+    }
+}
+
+#[derive(Default)]
+struct EarlyResults {
+    debit: Option<AppResult<BudgetReservationResult>>,
+    first: Option<AppResult<Option<ClaimedWorkflow>>>,
+    second: Option<AppResult<Option<ClaimedWorkflow>>>,
+}
+
+enum EarlyResult {
+    Debit(Box<AppResult<BudgetReservationResult>>),
+    First(Box<AppResult<Option<ClaimedWorkflow>>>),
+    Second(Box<AppResult<Option<ClaimedWorkflow>>>),
+}
+impl EarlyResult {
+    fn contender(&self) -> Contender {
+        match self {
+            Self::Debit(_) => Contender::Debit,
+            Self::First(_) => Contender::First,
+            Self::Second(_) => Contender::Second,
+        }
+    }
+    fn into_results(self) -> EarlyResults {
+        match self {
+            Self::Debit(output) => EarlyResults {
+                debit: Some(*output),
+                ..Default::default()
+            },
+            Self::First(output) => EarlyResults {
+                first: Some(*output),
+                ..Default::default()
+            },
+            Self::Second(output) => EarlyResults {
+                second: Some(*output),
+                ..Default::default()
+            },
+        }
+    }
+}
+
+async fn observe_waits<D, F, S>(
+    observer: &mut sqlx::PgConnection,
+    gate_pid: i32,
+    order: UsageOrder,
+    mut debit: Pin<&mut D>,
+    mut first: Pin<&mut F>,
+    mut second: Pin<&mut S>,
+) -> Option<EarlyResult>
+where
+    D: Future<Output = AppResult<BudgetReservationResult>>,
+    F: Future<Output = AppResult<Option<ClaimedWorkflow>>>,
+    S: Future<Output = AppResult<Option<ClaimedWorkflow>>>,
+{
+    let claim_statement = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
+    let debit_statement = "INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)";
+    // The first owner reaches usage while holding company. The other two queue at the
+    // company prefix in the requested order, before they can take any run/root rows.
+    let queue_tail_pid =
+        match order {
+            UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
+                let debit_pid =
+                    match try_wait_for_lock(observer, gate_pid, debit_statement, debit.as_mut())
+                        .await
+                    {
+                        Ok(pid) => pid,
+                        Err(output) => return Some(EarlyResult::Debit(Box::new(output))),
+                    };
+                match try_wait_for_lock(observer, debit_pid, LEASE_COMPANY_WAIT, first.as_mut())
+                    .await
+                {
+                    Ok(pid) => pid,
+                    Err(output) => return Some(EarlyResult::First(Box::new(output))),
+                }
+            }
+            UsageOrder::ClaimFirst => {
+                let claim_pid =
+                    match try_wait_for_lock(observer, gate_pid, claim_statement, first.as_mut())
+                        .await
+                    {
+                        Ok(pid) => pid,
+                        Err(output) => return Some(EarlyResult::First(Box::new(output))),
+                    };
+                match try_wait_for_lock(observer, claim_pid, LEASE_COMPANY_WAIT, debit.as_mut())
+                    .await
+                {
+                    Ok(pid) => pid,
+                    Err(output) => return Some(EarlyResult::Debit(Box::new(output))),
+                }
+            }
+        };
+    match try_wait_for_lock(
+        observer,
+        queue_tail_pid,
+        LEASE_COMPANY_WAIT,
+        second.as_mut(),
+    )
+    .await
+    {
+        Ok(_) => None,
+        Err(output) => Some(EarlyResult::Second(Box::new(output))),
+    }
+}
+
 async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Contest {
     let f = &race.fixture;
     let before = all_tables(f).await;
@@ -89,73 +210,24 @@ async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Con
         .persistence()
         .claim_io(race.request.fence.scope, workers[1], policy());
     tokio::pin!(debit, first, second);
-    let claim_statement = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
-    let debit_statement = "INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)";
-    let (mut early_debit, mut early_first, mut early_second) = (None, None, None);
-    let early: Option<&str> = 'observe: {
-        let first_pid = match order {
-            UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
-                let debit_pid = match try_wait_for_lock(
-                    &mut observer,
-                    gate_pid,
-                    debit_statement,
-                    debit.as_mut(),
-                )
-                .await
-                {
-                    Ok(pid) => pid,
-                    Err(output) => {
-                        early_debit = Some(output);
-                        break 'observe Some("debit");
-                    }
-                };
-                match try_wait_for_lock(&mut observer, debit_pid, claim_statement, first.as_mut())
-                    .await
-                {
-                    Ok(pid) => pid,
-                    Err(output) => {
-                        early_first = Some(output);
-                        break 'observe Some("first");
-                    }
-                }
-            }
-            UsageOrder::ClaimFirst => {
-                let pid = match try_wait_for_lock(
-                    &mut observer,
-                    gate_pid,
-                    claim_statement,
-                    first.as_mut(),
-                )
-                .await
-                {
-                    Ok(pid) => pid,
-                    Err(output) => {
-                        early_first = Some(output);
-                        break 'observe Some("first");
-                    }
-                };
-                if let Err(output) =
-                    try_wait_for_lock(&mut observer, pid, debit_statement, debit.as_mut()).await
-                {
-                    early_debit = Some(output);
-                    break 'observe Some("debit");
-                }
-                pid
-            }
-        };
-        if let Err(output) = try_wait_for_lock(
-            &mut observer,
-            first_pid,
-            "SELECT binding_id, max_context_bytes FROM workflow_runs",
-            second.as_mut(),
-        )
-        .await
-        {
-            early_second = Some(output);
-            break 'observe Some("second");
-        }
-        None
-    };
+    // Box the observation phase: all three real database futures stay in their owner frame.
+    let observation = Box::pin(observe_waits(
+        &mut observer,
+        gate_pid,
+        order,
+        debit.as_mut(),
+        first.as_mut(),
+        second.as_mut(),
+    ))
+    .await;
+    let early = observation.as_ref().map(EarlyResult::contender);
+    let EarlyResults {
+        debit: early_debit,
+        first: early_first,
+        second: early_second,
+    } = observation
+        .map(EarlyResult::into_results)
+        .unwrap_or_default();
     drop(observer);
     gate.rollback().await.unwrap();
     let (debit, first, second) = tokio::join!(
@@ -184,13 +256,10 @@ async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Con
         matches!(second, Err(AppError::DatabaseTimeout(_))),
     ];
     if let Some(racer) = early {
-        let index = ["debit", "first", "second"]
-            .iter()
-            .position(|name| *name == racer)
-            .unwrap();
+        let index = racer.index();
         assert!(
             not_applied[index],
-            "{racer} completed before its observed lock wait: debit={debit:?} first={first:?} second={second:?}"
+            "{racer:?} completed before its observed lock wait: debit={debit:?} first={first:?} second={second:?}"
         );
     }
     if not_applied.iter().any(|timed_out| *timed_out) {

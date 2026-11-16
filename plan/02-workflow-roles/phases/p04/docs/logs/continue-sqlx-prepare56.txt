@@ -1,0 +1,49 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0425]: cannot find type `SourceKey` in this scope
+  --> src/adapters/persistence/workflow/escalation_handling.rs:31:14
+   |
+31 |     source: &SourceKey,
+   |              ^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::adapters::persistence::workflow::admission_binding::SourceKey;
+   |
+
+error[E0433]: cannot find type `SourceKey` in this scope
+  --> src/adapters/persistence/workflow/escalation_handling.rs:34:25
+   |
+34 |     let Some(message) = SourceKey::message(source.as_str()) else {
+   |                         ^^^^^^^^^ use of undeclared type `SourceKey`
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::adapters::persistence::workflow::admission_binding::SourceKey;
+   |
+
+error[E0425]: cannot find type `ActivationRequest` in this scope
+  --> src/adapters/persistence/workflow/escalation_handling.rs:90:12
+   |
+90 |     scope: ActivationRequest,
+   |            ^^^^^^^^^^^^^^^^^ not found in this scope
+   |
+help: consider importing this struct
+   |
+ 3 + use crate::application::workflow::activation::ActivationRequest;
+   |
+
+error[E0433]: cannot find type `SourceKey` in this scope
+  --> src/adapters/persistence/workflow/escalations.rs:47:55
+   |
+47 |     if let Some(message) = source.as_deref().and_then(SourceKey::message)
+   |                                                       ^^^^^^^^^ use of undeclared type `SourceKey`
+   |
+help: consider importing this struct
+   |
+ 2 + use crate::adapters::persistence::workflow::admission_binding::SourceKey;
+   |
+
+Some errors have detailed explanations: E0425, E0433.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib) due to 4 previous errors
+error: `cargo check` failed with status: exit status: 101

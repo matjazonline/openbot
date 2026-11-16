@@ -1,0 +1,402 @@
+{
+  "fixture": "open_bots_own_4a252b765fd848bcb4f5f2d7a30c0858",
+  "states": [
+    {
+      "runs": null,
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": null
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "running",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "draft",
+          "output": null,
+          "target": null,
+          "response": "automatic"
+        },
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        }
+      ]
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "running",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "draft",
+          "output": null,
+          "target": null,
+          "response": "automatic"
+        },
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        }
+      ]
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "running",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        },
+        {
+          "step": "draft",
+          "output": null,
+          "target": null,
+          "response": "automatic"
+        }
+      ]
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "running",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        },
+        {
+          "step": "reply",
+          "output": null,
+          "target": null,
+          "response": "automatic"
+        },
+        {
+          "step": "draft",
+          "output": {
+            "body": "A direct production reply"
+          },
+          "target": "reply",
+          "response": "automatic"
+        }
+      ]
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "running",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": null,
+      "proposals": null,
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        },
+        {
+          "step": "reply",
+          "output": null,
+          "target": null,
+          "response": "automatic"
+        },
+        {
+          "step": "draft",
+          "output": {
+            "body": "A direct production reply"
+          },
+          "target": "reply",
+          "response": "automatic"
+        }
+      ]
+    },
+    {
+      "runs": [
+        {
+          "id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "state": "succeeded",
+          "target": "427e157e-07a6-4908-b844-07df5d4e55ac",
+          "binding": "32e8c34f-8f90-8ca5-8afd-9aac6f508a12",
+          "revision": 1
+        }
+      ],
+      "decisions": [
+        {
+          "state": "claimed",
+          "run_id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "attempts": 1,
+          "integrity": "67ed090a2e2486b340b81a7d0fad0a9f6c7130c3ae4272e77ca015f4786b273d",
+          "intent_id": "3ff67ff2-2c28-4017-84da-0bed18f2b573",
+          "worker_id": "6d226667-bea4-4d13-a72e-1037ebfd4be3",
+          "company_id": "9c4e6009-317e-426d-ab6f-e3109525c86b",
+          "created_at": "2026-11-15T12:21:18.718414+01:00",
+          "generation": "b1509ab8-303a-4cbf-ad25-ce28e4df1ffb",
+          "message_id": null,
+          "updated_at": "2026-11-15T12:21:19.645407+01:00",
+          "delivery_id": null,
+          "disposition": "automatic",
+          "proposal_id": "e71ae7df-a9ba-4f30-b444-6789b94a445d",
+          "available_at": "2026-11-15T12:21:18.718414+01:00",
+          "execution_id": "4b8590cf-4a9a-4af3-98c7-83fbd8effad4",
+          "diagnostic_code": null,
+          "last_claimed_at": "2026-11-15T12:21:19.645392+01:00",
+          "lease_expires_at": "2026-11-15T12:21:49.645406+01:00"
+        }
+      ],
+      "proposals": [
+        {
+          "id": "e71ae7df-a9ba-4f30-b444-6789b94a445d",
+          "job_id": "467316c4-7983-4e0b-906e-b8c0da64d8de",
+          "run_id": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+          "content": {
+            "body": "A direct production reply",
+            "subject": "Response"
+          },
+          "integrity": "67ed090a2e2486b340b81a7d0fad0a9f6c7130c3ae4272e77ca015f4786b273d",
+          "intent_id": "3ff67ff2-2c28-4017-84da-0bed18f2b573",
+          "company_id": "9c4e6009-317e-426d-ab6f-e3109525c86b",
+          "created_at": "2026-11-15T12:21:18.703174+01:00",
+          "owner_kind": "pure",
+          "recipients": [
+            {
+              "id": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+              "kind": "reply",
+              "address": "workflow@example.test"
+            }
+          ],
+          "execution_id": "4b8590cf-4a9a-4af3-98c7-83fbd8effad4",
+          "owner_expiry": null,
+          "owner_worker": null,
+          "invocation_id": "5f2298f9-ef8b-4875-b2bf-335b29274791",
+          "owner_attempt": null,
+          "route_snapshot": {
+            "author": {
+              "kind": "agent",
+              "principal": "427e157e-07a6-4908-b844-07df5d4e55ac"
+            },
+            "targets": [
+              {
+                "kind": "reply_email",
+                "relay": {
+                  "hop_count": 0,
+                  "trace_targets": []
+                },
+                "sender": {
+                  "name": "Assistant",
+                  "slug": "assistant",
+                  "target": {
+                    "id": "427e157e-07a6-4908-b844-07df5d4e55ac",
+                    "kind": "principal"
+                  }
+                },
+                "source": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+                "thread": "d45f7bbf-5867-41b5-87a3-27ed3b250fb1",
+                "recipient": "workflow@example.test",
+                "references": [],
+                "in_reply_to": "<f4d2ce33-3ceb-4e8c-89e2-7ad3754dbf9f@sender.test>"
+              }
+            ],
+            "company_slug": "workflow-tests",
+            "correlation_id": "f94afb14-4b84-49cf-96c7-6a9fed20d53a",
+            "delivery_policy": "deliver"
+          },
+          "source_wait_id": null,
+          "approval_policy": null,
+          "argument_digest": "d75865d391ac1ec7b22260eb477270179055d4611752c724a6d086258cee4c61",
+          "business_output": {
+            "body": "A direct production reply"
+          },
+          "completion_route": "success",
+          "operation_digest": "51571d00ca5aa8848211f021de13cf7a86c99ba68e63e586216ef9485fea4c43",
+          "owner_generation": null,
+          "approval_deadline": null,
+          "continuation_count": 0,
+          "integrity_document": {
+            "run": "27b57ac2-b3ee-42d2-a97d-ad686cc77e1d",
+            "actor": "ce04142d-397e-4837-8ad5-5038aa25b98b",
+            "intent": "3ff67ff2-2c28-4017-84da-0bed18f2b573",
+            "output": {
+              "body": "A direct production reply"
+            },
+            "source": {
+              "id": "3ff67ff2-2c28-4017-84da-0bed18f2b573",
+              "role": "to",
+              "origin": "external",
+              "hop_count": 0,
+              "mentioned": false,
+              "thread_id": "d45f7bbf-5867-41b5-87a3-27ed3b250fb1",
+              "admissible": true,
+              "channel_id": null,
+              "company_id": "9c4e6009-317e-426d-ab6f-e3109525c86b",
+              "created_at": "2026-11-15T11:21:13.594318+00:00",
+              "message_id": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+              "principal_id": "427e157e-07a6-4908-b844-07df5d4e55ac",
+              "trace_targets": [],
+              "correlation_id": "f94afb14-4b84-49cf-96c7-6a9fed20d53a",
+              "delivery_policy": "deliver",
+              "reply_to_message_id": null,
+              "responder_principal_id": "1f142287-d56d-4dd1-ba87-3e1d186baf19"
+            },
+            "target": {
+              "id": "427e157e-07a6-4908-b844-07df5d4e55ac",
+              "kind": "principal"
+            },
+            "thread": "d45f7bbf-5867-41b5-87a3-27ed3b250fb1",
+            "company": "9c4e6009-317e-426d-ab6f-e3109525c86b",
+            "content": {
+              "body": "A direct production reply",
+              "subject": "Response"
+            },
+            "proposal": "e71ae7df-a9ba-4f30-b444-6789b94a445d",
+            "execution": "4b8590cf-4a9a-4af3-98c7-83fbd8effad4",
+            "recipients": [
+              {
+                "id": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+                "kind": "reply",
+                "address": "workflow@example.test"
+              }
+            ],
+            "route_snapshot": {
+              "author": {
+                "kind": "agent",
+                "principal": "427e157e-07a6-4908-b844-07df5d4e55ac"
+              },
+              "targets": [
+                {
+                  "kind": "reply_email",
+                  "relay": {
+                    "hop_count": 0,
+                    "trace_targets": []
+                  },
+                  "sender": {
+                    "name": "Assistant",
+                    "slug": "assistant",
+                    "target": {
+                      "id": "427e157e-07a6-4908-b844-07df5d4e55ac",
+                      "kind": "principal"
+                    }
+                  },
+                  "source": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+                  "thread": "d45f7bbf-5867-41b5-87a3-27ed3b250fb1",
+                  "recipient": "workflow@example.test",
+                  "references": [],
+                  "in_reply_to": "<f4d2ce33-3ceb-4e8c-89e2-7ad3754dbf9f@sender.test>"
+                }
+              ],
+              "company_slug": "workflow-tests",
+              "correlation_id": "f94afb14-4b84-49cf-96c7-6a9fed20d53a",
+              "delivery_policy": "deliver"
+            },
+            "source_message": "2cd0af53-3e46-4418-8928-cc5413eeeb77",
+            "approval_policy": null,
+            "approval_deadline": null
+          },
+          "approval_decision_id": null
+        }
+      ],
+      "deliveries": null,
+      "executions": [
+        {
+          "step": "context",
+          "output": {
+            "items": [],
+            "omitted": 1,
+            "token_count": 0
+          },
+          "target": "draft",
+          "response": "automatic"
+        },
+        {
+          "step": "draft",
+          "output": {
+            "body": "A direct production reply"
+          },
+          "target": "reply",
+          "response": "automatic"
+        },
+        {
+          "step": "reply",
+          "output": {
+            "body": "A direct production reply"
+          },
+          "target": "$end",
+          "response": "automatic"
+        }
+      ]
+    }
+  ]
+}

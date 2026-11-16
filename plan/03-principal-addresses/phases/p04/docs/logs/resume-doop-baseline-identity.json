@@ -1,0 +1,75 @@
+{
+  "baseline": "2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee",
+  "files": [
+    {
+      "path": "scripts/doop-test.py",
+      "sha256": "87db0bfb43eabcf50b6b5320b5ed75223492a2fb516c7777e8de0d89a10dc457"
+    },
+    {
+      "path": "scripts/doop-test/acceptance.py",
+      "sha256": "692be1a4260e9adf283edcf15ef6ab96cc8def1159737ea66ae5c01914eaec0d"
+    },
+    {
+      "path": "scripts/doop-test/browser-export.mjs",
+      "sha256": "c3d1bb00cfcbbd583c4686f9dfa7eec2370f4db8c8012f62c20ced9382685245"
+    },
+    {
+      "path": "scripts/doop-test/browser-owner.mjs",
+      "sha256": "5e5c42b217ac3532f7689ae830c54c0544dc0aa9bbe29a6a0fe654cd4ffe7784"
+    },
+    {
+      "path": "scripts/doop-test/e2e-probe.mjs",
+      "sha256": "0e1d923c801307a2192baf848baf27047a9303e5f70f4c3d6bbba86d9c6a1332"
+    },
+    {
+      "path": "scripts/doop-test/image_service.py",
+      "sha256": "88bcf05c5656f3c49cbd8df02038c7488db813c80a30271fd404a859ee43842c"
+    },
+    {
+      "path": "scripts/doop-test/ingress.py",
+      "sha256": "ccceab5c951d72aff706d4e7b8dd934f359718c833037eb197426c78c98cfdf4"
+    },
+    {
+      "path": "scripts/doop-test/lifecycle-probe.mjs",
+      "sha256": "c6fbacfe2c088927998ee588c67df66ade493f137c32f21d412482d908174107"
+    },
+    {
+      "path": "scripts/doop-test/loopback.mjs",
+      "sha256": "9e5bb2cb0d71cad02e6c3c53eb1cbabde7f07e7a47e0f1e5a2fdc9bda6b6377c"
+    },
+    {
+      "path": "scripts/doop-test/openbot-helper.mjs",
+      "sha256": "0a1c60d74ed85f27f3a7e05b53bfa922ed16652102aeb42b37c57c9fce47372d"
+    },
+    {
+      "path": "scripts/doop-test/ownership.py",
+      "sha256": "3ab17b7826ca0ac60fa273af767da746b2d7f4bf8c1188cd1d411266fb8ee7f7"
+    },
+    {
+      "path": "scripts/doop-test/private-browser.mjs",
+      "sha256": "1c1b8c280eb553bd9ee58502125894f72e05aff8135b48d6318873bd15988090"
+    },
+    {
+      "path": "scripts/doop-test/private-probe.mjs",
+      "sha256": "88f53ce466613c4a23d52e2b18c99287c5a7861fe15039335d46bfb71ce3399b"
+    },
+    {
+      "path": "scripts/doop-test/private_deployment.py",
+      "sha256": "94d2c5644540fa46d5019c259ee2953af1495b57ceae7bfea5ece6daa8b02478"
+    },
+    {
+      "path": "scripts/doop-test/probe.mjs",
+      "sha256": "e4ef8e00d26cd6674b5fa7b88274f5560ae0eb9e3c5207995472d4ffcd9fe45b"
+    },
+    {
+      "path": "scripts/doop-test/restore.py",
+      "sha256": "6152c421745ddccdfa03e53f93867749c0b3bc01e3936f9fe41c042eedfe4ca1"
+    },
+    {
+      "path": "scripts/tests/doop-test.py",
+      "sha256": "6b87c4292045d60bbd1890347c13adaa58b1b74df4c89ebf58ffecf98fc12c0f"
+    }
+  ],
+  "failure": "Python3.13 strict TLS validation: Missing Authority Key Identifier",
+  "disposition": "All runner, helper, test and static fixture inputs unchanged from main; no TLS relaxation or source edits"
+}

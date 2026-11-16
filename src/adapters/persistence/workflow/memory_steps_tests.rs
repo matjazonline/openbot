@@ -38,25 +38,36 @@ fn source() -> Value {
     source
 }
 
-struct Memory {
-    persistence: PostgresPersistence,
+pub(in crate::adapters::persistence::workflow::tests) struct Memory {
+    pub(in crate::adapters::persistence::workflow::tests) persistence: PostgresPersistence,
     fake: ContractFake,
-    client: Arc<MemoryServiceHttp>,
+    pub(in crate::adapters::persistence::workflow::tests) client: Arc<MemoryServiceHttp>,
 }
 
-async fn memory(f: &AdmissionFixture, scope: ActivationRequest) -> Memory {
+fn memory(
+    f: &AdmissionFixture,
+    scope: ActivationRequest,
+) -> impl std::future::Future<Output = Memory> + '_ {
+    memory_for(f.persistence(), scope.company, f.binding.target.actor)
+}
+
+pub(in crate::adapters::persistence::workflow::tests) async fn memory_for(
+    p: &PostgresPersistence,
+    company: CompanyId,
+    actor: WorkflowActor,
+) -> Memory {
     let persistence = PostgresPersistence::with_credential_cipher(
-        f.persistence().pool().clone(),
+        p.pool().clone(),
         CredentialCipher::for_test_with_keys(&[(1, [7_u8; 32])], 1),
     );
     let fake = ContractFake::start(ADMIN).await;
     persistence
-        .enable_memory(scope.company, f.binding.target.actor, 0, PROVISIONER)
+        .enable_memory(company, actor, 0, PROVISIONER)
         .await
         .unwrap();
     assert_eq!(
         persistence
-            .ensure_namespace(scope.company, NamespaceOwner::Company)
+            .ensure_namespace(company, NamespaceOwner::Company)
             .await
             .unwrap(),
         NamespaceReadiness::NotReady
@@ -64,21 +75,21 @@ async fn memory(f: &AdmissionFixture, scope: ActivationRequest) -> Memory {
     let namespace: Uuid = sqlx::query_scalar(
         "SELECT id FROM memory_namespaces WHERE company_id=$1 AND scope_kind='company'",
     )
-    .bind(scope.company.as_uuid())
+    .bind(company.as_uuid())
     .fetch_one(persistence.pool())
     .await
     .unwrap();
-    let token = fake.client_token(scope.company.as_uuid(), namespace);
+    let token = fake.client_token(company.as_uuid(), namespace);
     let envelope = persistence
         .credential_cipher()
         .unwrap()
         .seal_envelope(
-            &CredentialContext::memory_client_credential(scope.company.as_uuid(), namespace),
+            &CredentialContext::memory_client_credential(company.as_uuid(), namespace),
             &SecretString::from(token),
         )
         .unwrap();
     sqlx::query("UPDATE memory_namespaces SET state='ready',credential_id=gen_random_uuid(),credential_envelope=$3 WHERE company_id=$1 AND id=$2")
-        .bind(scope.company.as_uuid()).bind(namespace).bind(envelope).execute(persistence.pool()).await.unwrap();
+        .bind(company.as_uuid()).bind(namespace).bind(envelope).execute(persistence.pool()).await.unwrap();
     let client = Arc::new(
         MemoryServiceHttp::new(&MemoryServiceConfig {
             base_url: fake.base_url.clone(),

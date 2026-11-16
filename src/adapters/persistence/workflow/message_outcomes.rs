@@ -17,7 +17,7 @@ use crate::{
 /// intent per channel and an intent one outcome per binding.
 pub(crate) const MESSAGE_OUTCOMES_SQL: &str = r#"
 SELECT intent.message_id, outcome.binding_id, version.title AS workflow_title, outcome.outcome,
-       outcome.reason, outcome.run_id, run.state, run.waiting_reason
+       outcome.reason, outcome.run_id, run.state, run.waiting_reason, outcome.role_refusal
   FROM workflow_message_intents AS intent
   JOIN workflow_message_intent_bindings AS outcome
     ON (outcome.company_id, outcome.intent_id) = (intent.company_id, intent.id)
@@ -69,6 +69,7 @@ struct OutcomeRow {
     run_id: Option<Uuid>,
     state: Option<String>,
     waiting_reason: Option<String>,
+    role_refusal: Option<serde_json::Value>,
 }
 
 #[derive(sqlx::FromRow)]
@@ -144,7 +145,18 @@ impl MessageOutcomeReader for PostgresPersistence {
                         project_outcome(&mut run, visibility);
                         run
                     }),
-                    ("refused", None, Some(reason)) => BindingOutcome::Refused { reason },
+                    ("refused", None, Some(reason)) => {
+                        if let Some(value) = row.role_refusal {
+                            let refusal: crate::entities::department::RoleAdmissionRefusal =
+                                serde_json::from_value(value).map_err(|_| invalid())?;
+                            if refusal.kind.code() != reason {
+                                return Err(invalid());
+                            }
+                            BindingOutcome::RoleRefused(refusal)
+                        } else {
+                            BindingOutcome::Refused { reason }
+                        }
+                    }
                     ("failed", None, Some(reason)) => BindingOutcome::Failed { reason },
                     _ => return Err(invalid()),
                 };

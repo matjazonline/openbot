@@ -360,3 +360,109 @@ byte-equal pin, SHA30df3e15. [Final identity](logs/AS-P10-B1-R2-reviewer-final-i
 All whole-batch source coverage from N1 plus R2 corrections reused unchanged.
 No reviewer process remains. Root owns final transfer identity check and resource
 cleanup; source acceptance is invalidated by substantive edits.
+
+## AS-P10-PUSH-R1-N1 — current-main integration review — PENDING
+
+Reviewer /root/attribution_reviewer, retained independent B requested Astra/high;
+actual model/effort/context telemetry unavailable. Main workspace now authoritative:
+/Users/mac02/orca/workspaces/openbot/attribution-service. User explicitly authorized
+push to main; no deployment. Root authors merge/publication. No reviewer source
+edits, agents, Cargo jobs, author-database access or independent fullsuite.
+
+HEAD/accepted parent e61d384ed0d8859e04b8e5fc01b335f6c19d91c2; incoming
+8fdb892b6e279ed0c09150e2336bbdc7462f877d; common base6e55258c. Active conflict-free
+merge, source digest3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d.
+Exact11exclusions unchanged: p01–p10/docs individually plus COORDINATION.md.
+Independent start snapshot matches. Main coordination r29 byte-equal immutable
+PUSH-R1pin; C001–C008/r1 unchanged. Earlier VG1 and failed/unexercised global gates
+retain their status. Original numbered requirements and previous affected-scope
+acceptance remain the review boundary; no re-review of unrelated upstream features.
+
+Independent both-parent inventory:8overlapping paths, with reconciliation/contracts
+visibility prerequisite identical in both branches and no new delta there;7shared
+files receive incoming changes.157accepted service/direct attribution paths checked
+byte-identical. [Inventory](logs/AS-P10-PUSH-R1-reviewer-inventory.json).
+Merged migration bytes equal the complete incoming migration plus the byte-identical
+accepted6,684-byte attribution suffix over common base. Thus no attribution FK,
+version/outbox trigger or identity constraint is lost or accidentally modified.
+[Migration audit](logs/AS-P10-PUSH-R1-reviewer-migration.json).
+
+Read actual shared-file diffs and traced affected producer/consumer paths with
+Trail. New dev-only hickory dependency already exists in lock; no package versions
+change. Persistence module only adds address tests. Foundation creates/reuses one
+spam scanner; accepted SessionAuthority setup and attribution worker construction
+remain intact. Startup note lists retain attribution and add incoming plans.
+
+Incoming principal/address schema and user/company membership/deletion owners
+were followed for integration effects. Attribution still reads current company
+membership plus live grant/session/account revision and company lifecycle; new
+principal kinds/address settings do not become authorization inputs. Its lock order
+remains account→session→company→member. Incoming membership and account teardown
+use account→company→membership ordering; stronger company lock does not bypass
+existing checks. Actual account deletion still executes DELETE companies/users
+in its transaction, preserving atomic terminal attribution lifecycle/outbox and
+FK grant removal. New workflow dependent refreshes stay in that transaction.
+
+Read owning tests completely: attribution lifecycle test invokes actual direct
+company deletion and delete_user_account, verifies injected rollback, terminal
+state, exact one deletion notification and rejection of revival. Role HTTP test
+uses actual company membership use cases for downgrade/removal and verifies the
+same grant immediately loses access. Thus planned attribution_ filter exercises
+changed producer paths, not only raw SQL substitutes. SSO browser remains required
+for the actual login/session consumer. No integration source defect found so far.
+
+Root reports fmt/offlineall-targetcheck/freshPG18migration complete; testbuild and
+actualSSO evidence pending. Final decision requires immutable focused manifest,
+actual output inspection, unchanged end digest/parents and r29 recheck.
+
+### AS-P10-PUSH-R1-N1 final decision — PASS
+
+**PASS** for the reviewed publication integration on exact source
+`3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d`.
+Accepted parent/HEAD `e61d384ed0d8859e04b8e5fc01b335f6c19d91c2`; incoming/MERGE_HEAD
+`8fdb892b6e279ed0c09150e2336bbdc7462f877d`. No integration finding. Root may
+complete the user-authorized merge/publication after its final identity check.
+No production deployment or whole-repository green acceptance is implied.
+
+The source review above covers the complete integration delta touching accepted
+attribution contracts; unchanged accepted service/fulltopology evidence is reused.
+Independently compared all143tracked service files to the accepted isolated tree;
+all match. Independently verified the actual rebuilt service binary SHA69301c17
+against retained build/identity metadata. Earlier157direct-owned-path comparison
+and exact migration union proof remain valid. No project source edits occurred.
+
+Actual focused evidence inspected:
+- fmt and offline all-target compilation PASS; fresh PG18 migration PASS, with
+  ON_ERROR_STOP and one transaction. The merged migration also executes through
+  actual runtime fixture creation in the following tests.
+- First test-harness compilation FAIL before tests: linker write() errno28.
+  Retained log and cleanup571files/8.5GiB inspected. Retry used debug-symbols0
+  and incremental0 to reduce disposable build files; unoptimized test profile
+  remains, source/assertions and debug assertions unchanged. No runtime/application
+  bound was raised and no test was skipped to obtain a pass.
+- Retry actual attribution_ filter:25PASS/0FAIL/1ignored,74.29s. All12ordinary
+  attribution tests are present and pass, including real membership downgrade/
+  removal, owning company/account deletion with rollback, competing code redemption,
+  lifecycle outbox claimants/recovery and authorization/version guards. Other
+  name-matched legacy tests are not counted as new attribution implementation tests.
+- Ignored actual SSO invoked separately:1PASS,6.54s; new password login, existing
+  login, independent secure cookies, current company access, local logout, session
+  rotation, upstream revocation and recovery all exercised. Rebuilt byte-identical
+  standalone service and pinned browser tooling used; no simulated authority
+  substituted for the real Openbot login/session consumer.
+
+Manifest independently validates8PASS/1FAIL/1NOTEXERCISED;
+[validation](logs/AS-P10-PUSH-R1-reviewer-validation.txt). The FAIL is retained
+initial resource-limited harness build; whole-repository suite on this publication
+merge is explicitly NOT EXERCISED. Previous full-gate failures, unexercised service
+stages and AS-P10-VG1 retain their exact status. This review does not diagnose or
+reclassify VG1, certify unrelated incoming functionality, or claim a new fullsuite.
+Focused checks cover the traced affected identity/lifecycle/build consumers.
+
+Final reviewer recomputation matches the start source digest with the same exact
+11exclusions; both parents unchanged. Main coordination29 remains byte-equal
+PUSH-R1pin, C001–C008/r1 unchanged.
+[End snapshot](logs/AS-P10-PUSH-R1-reviewer-end.snapshot.txt).
+Only review records/logs written; no agents, Cargo/database jobs, fixture changes
+or root-owned resource operations. No reviewer process remains. Root owns final
+merge commit, non-force publication identity and owned fixture cleanup.

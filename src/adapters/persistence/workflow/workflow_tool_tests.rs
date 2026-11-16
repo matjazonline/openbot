@@ -60,7 +60,10 @@ async fn workflow_tool_resumes_the_pending_call_after_a_child_human_decision() {
     .await
     .unwrap();
     assert_eq!(input, json!({"question": "Refund order 42?"}));
-    assert_eq!(params, json!({"reviewer": setup.reviewer.to_string()}));
+    assert_eq!(
+        params,
+        json!({"reviewer": setup.fixture.principal(setup.reviewer).await.to_string()})
+    );
     assert_eq!(version, setup.child.as_uuid());
     assert!(inherited);
     let wait: (Uuid, Option<Uuid>, Option<i32>) = sqlx::query_as(

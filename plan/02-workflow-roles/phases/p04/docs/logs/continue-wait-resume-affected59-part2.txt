@@ -1,0 +1,135 @@
+
+running 74 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_rejected_approval_keeps_its_slot_reservation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_reserves_128th_slot_once_under_competing_finalizers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_rejects_unprivileged_reviewers_and_invalid_sql_shape ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::policy_tests::channel_reply_completion_policy_settings_freeze_duration_for_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::approval::channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_cannot_be_an_agent_or_ad_hoc_tool ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_commits_wait_and_delivery_together ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_competing_publishers_create_one_occurrence ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_in_app_acceptance_keeps_the_human_wait_open ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::channel_reply_hitl_prompt_uuid_case_and_nanosecond_deadline_keep_the_same_witness ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::child::channel_reply_hitl_resume_child_question_returns_to_parent_without_suppression ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_lost_commit_ack_replays_human_wait_before_transport_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::commit::channel_reply_hitl_prompt_deferred_commit_cannot_outlive_its_real_claim ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_canonical_content_and_delivery_membership_are_frozen ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_failed_atomic_write_leaves_no_prompt_or_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_ownership_cannot_be_edited_or_removed ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::integrity::channel_reply_hitl_prompt_true_company_teardown_removes_its_owned_question_and_unknown_delivery ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_safe_retry_keeps_message_wait_deadline_and_continuation_budget ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_unknown_send_stays_unknown_after_a_human_response ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_prompt_provider_entry_rechecks_deadline_after_competing_parent_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_late_response_races_timeout_and_stops_unsent_work_before_wake ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_authorized_entry_retains_accepted_truth_after_demotion ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_recorded_in_time_survives_delayed_wakeup ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_clearance_revoked_before_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_committed_demotion_wins_while_entry_is_blocked ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_retired_frozen_address_is_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_safe_retry_rechecks_without_changing_the_human_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_thread_audience_change_is_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_verification_revoked_before_entry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_before_ack_and_reconstruction_consumes_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_competing_humans_have_one_winner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_ingress_consumes_before_ordinary_admission ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_repeated_questions_have_distinct_waits_and_no_reply_keeps_prompts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_two_live_runs_in_one_thread_stay_independent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::resume::channel_reply_hitl_resume_wrong_respondent_and_prompt_do_not_consume_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary::doop_binary_child_actual_completion_provider_checkpoint_and_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::history_cascade::agent_history_recovery_parent_cancel_private_child_and_other_root_admission_do_not_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::knowledge_run_level_workflow_tool_child_and_saved_result_replay_taint_parent_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::doop_binary_mcp::doop_binary_mcp_child_actual_action_completion_error_and_parent_replay ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::memory_access_level_workflow_tool_child_exactness_reaches_the_calling_run ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_output_outside_the_pinned_schema_fails_the_parent_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_child_failure_limit_and_result_bound_are_typed_errors ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_dispatch_starts_one_child_per_call_and_one_resumer_continues ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_parent_cancel_cascades_and_a_restarted_worker_resumes_the_call ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_resumes_the_pending_call_after_a_child_human_decision ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_admission_preserves_control_capacity ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_deadline_rejects_elapsed_and_above_maximum ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_output_and_catalog_decode_at_their_limits ... ok
+test application::local_agents::contract_tests::cloudroom_bounds_prompt_counts_utf8_bytes_and_redacts_debug ... ok
+test application::local_agents::contract_tests::cloudroom_contract_aligned_leap_seconds_are_not_representable_operation_deadlines ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_refuses_unsupported_model_reasoning ... ok
+test application::local_agents::contract_tests::cloudroom_contract_catalog_success_requires_catalog_evidence ... ok
+test application::local_agents::contract_tests::cloudroom_contract_commands_are_closed_and_controls_are_explicit ... ok
+test application::local_agents::contract_tests::cloudroom_contract_deadline_precision_is_frozen_before_hashing ... ok
+test application::local_agents::contract_tests::cloudroom_contract_effect_success_requires_its_thread_and_a_turn ... ok
+test application::local_agents::contract_tests::cloudroom_contract_identities_validate_on_decode ... ok
+test application::local_agents::contract_tests::cloudroom_contract_machine_capabilities_reference_an_installation_scoped_snapshot ... ok
+test application::local_agents::contract_tests::cloudroom_contract_operations_freeze_digest_and_separate_dispatch_outcomes ... ok
+test application::local_agents::contract_tests::cloudroom_contract_reasoning_is_frozen_into_the_create_digest ... ok
+test application::local_agents::lifecycle::tests::cloudroom_lifecycle_retention_shutdown_cancels_the_actual_pending_port_future ... ok
+test application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text ... FAILED
+test application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority ... FAILED
+test application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_enforces_review_and_duration_bounds ... ok
+test application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_materializes_relative_to_each_response_and_caps_run ... ok
+test application::workflow::channel_reply::approval::tests::channel_reply_completion_policy_roundtrips_only_static_user_reviewers ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_tool_tests::workflow_tool_typed_errors_reach_the_model_without_fabricated_success ... ok
+
+failures:
+
+---- application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text stdout ----
+
+thread 'application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text' (2206422) panicked at src/application/local_agents/wire_tests.rs:85:5:
+Node wire proof failed: node:internal/modules/package_json_reader:343
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/integrations/cloudroom-plugin/src/protocol.ts
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:343:9)
+    at packageResolve (node:internal/modules/esm/resolve:751:25)
+    at moduleResolve (node:internal/modules/esm/resolve:840:18)
+    at defaultResolve (node:internal/modules/esm/resolve:973:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v26.13.1
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority stdout ----
+
+thread 'application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority' (2206444) panicked at src/application/local_agents/wire_tests.rs:85:5:
+Node wire proof failed: node:internal/modules/package_json_reader:343
+  throw new ERR_MODULE_NOT_FOUND(packageName, fileURLToPath(base), null);
+        ^
+
+Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'zod' imported from /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/integrations/cloudroom-plugin/src/protocol.ts
+    at Object.getPackageJSONURL (node:internal/modules/package_json_reader:343:9)
+    at packageResolve (node:internal/modules/esm/resolve:751:25)
+    at moduleResolve (node:internal/modules/esm/resolve:840:18)
+    at defaultResolve (node:internal/modules/esm/resolve:973:11)
+    at #cachedDefaultResolve (node:internal/modules/esm/loader:708:20)
+    at #resolveAndMaybeBlockOnLoaderThread (node:internal/modules/esm/loader:728:38)
+    at ModuleLoader.resolveSync (node:internal/modules/esm/loader:766:56)
+    at #resolve (node:internal/modules/esm/loader:690:17)
+    at ModuleLoader.getOrCreateModuleJob (node:internal/modules/esm/loader:610:35)
+    at ModuleJob.syncLink (node:internal/modules/esm/module_job:277:33) {
+  code: 'ERR_MODULE_NOT_FOUND'
+}
+
+Node.js v26.13.1
+
+
+
+failures:
+    application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text
+    application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority
+
+test result: FAILED. 72 passed; 2 failed; 0 ignored; 0 measured; 4297 filtered out; finished in 45.87s
+

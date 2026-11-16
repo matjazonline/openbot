@@ -230,7 +230,7 @@ fn channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approv
     assert!(PreparedSample::new(automatic(), req, vec![]).is_err());
     let mut definition = source("message.ask");
     definition["steps"]["start"]["with"]["approval"] = json!({"literal":{
-        "reviewers":[{"kind":"user","id":Uuid::from_u128(6)}],"deadline":"2030-01-01T00:00:00Z"}});
+        "reviewers":[{"kind":"principal","id":Uuid::from_u128(6)}],"deadline":"2030-01-01T00:00:00Z"}});
     let report = execute(
         build(&definition, DependencySnapshots::default(), vec![]),
         request(vec![]),

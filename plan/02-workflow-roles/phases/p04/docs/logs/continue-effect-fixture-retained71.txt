@@ -1,0 +1,26 @@
+
+running 21 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ignored, needs the live memory service: scripts/memory-integration.sh
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_output_never_precedes_its_committed_observation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_lower_destination ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_disable_and_run_cancel_overlapping_in_id_order_never_deadlock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_interrupted_save_without_an_intent_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_competing_disable_and_run_cancel_settle_every_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancel_during_an_in_flight_delivery_loses_its_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_save_and_load_steps_round_trip_through_the_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_steps_fail_terminally_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_operations_settled_save_intents_outlive_every_run_that_can_replay_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_terminal_intent_wakes_and_fails_the_parked_save ... ok
+test adapters::persistence::workflow::tests::message_tests::agent_tests::workflow_agent_message_tool_parks_on_delivery_and_continues_with_its_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_error_route_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_failed_message_receipt_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_final_receipt_arrival_replans_before_new_actor_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_fresh_final_message_receipt_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_message_receipt_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_nonfinal_receipt_arrival_commits_with_actor_account_locked ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::effect_hints::workflow_reviewer_follow_pending_message_effect_ignores_unused_retired_final_reviewers ... ok
+
+test result: ok. 20 passed; 0 failed; 1 ignored; 0 measured; 4383 filtered out; finished in 19.70s
+

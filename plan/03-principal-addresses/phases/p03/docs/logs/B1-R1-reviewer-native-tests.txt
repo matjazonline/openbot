@@ -1,0 +1,12 @@
+
+running 7 tests
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_result_cannot_reference_another_agent_or_company ... ok
+test adapters::persistence::agent_publication::tests::native::autonomous_agent_publication_native_request_result_is_immutable_and_company_owned ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_retained_principal_delete_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_insert_cannot_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_admission_first_serializes_delete_before_agent_principal_and_desk_cleanup ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_delete_first_serializes_admission_before_channel_and_agent_locks ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::race_tests::workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4597 filtered out; finished in 2.92s
+

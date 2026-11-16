@@ -1,0 +1,26 @@
+
+> bb-plugin-openbot-local@0.2.0 test:guards
+> node --test compatibility/check-source.test.mjs scripts/install-local.test.mjs
+
+✔ bundled public SDK declarations match the pinned source and all approved patches (5.274833ms)
+✔ multiple source patches validate all inputs before mutation and accept partial preparation (1122.494333ms)
+✔ source verification rejects changed tracked GUI source before any build, from any cwd (287.304417ms)
+✔ prepared source accepts only the exact approved patch and rejects tampering (1357.358792ms)
+✔ cohesive source patch adds absent inputs and refuses partial or unsafe preparation (1305.663125ms)
+✔ pinned compatibility extension retains 75 percent source capacity headroom (0.497125ms)
+✔ options require separate absolute directories and distinct unprivileged ports (2.707208ms)
+✔ preflight reports every missing or mismatched prerequisite together (0.122541ms)
+✔ the plugin directory must be absent or empty because Cloudroom runs it in place (1.482584ms)
+✔ the archive must match its own integrity file and any trusted copy (2.038542ms)
+✔ Cloudroom CLI calls address only the installed profile (0.278083ms)
+✔ readiness follows the wrapper status lines (119.553917ms)
+✔ shell quoting keeps printed commands copyable (0.248875ms)
+✔ the command line refuses bad options before running anything (99.705584ms)
+ℹ tests 14
+ℹ suites 0
+ℹ pass 14
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4133.405167

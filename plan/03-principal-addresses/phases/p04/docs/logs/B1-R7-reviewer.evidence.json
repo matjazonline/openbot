@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R7-reviewer",
+  "artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "source owned pa03-p04-env.sh; override TEST_DATABASE_URL=postgres://mac02@127.0.0.1:51167/pa03_p04_b_r5_20261115_test; RUST_MIN_STACK=16777216 RUST_TEST_THREADS=4 PYTHONDONTWRITEBYTECODE=1 scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-reader-corrected-libtest autonomous_agent_contract_ autonomous_agent_resolution_ autonomous_agent_native_definition_ autonomous_agent_views_ doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas --nocapture",
+      "fixture": "Independent B: SHA256 bc5bb926eea3b4a8caa2bbcccd0d0aaffcc5dca0e73eaceb120587995b45843b; private B DB and fixtures own UUID databases; real decoder/schema/hash and workflow/Doop paths; network guard confirmed;4threads;29PASS/0FAIL/0IGNORE,72.53s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R7-reviewer-focused1.txt",
+          "sha256": "8a553a7dbb422704d8506b078d725a5c40e97ab63c013e6fef3e48fa3b8894e2"
+        },
+        {
+          "path": "logs/B1-R7-reviewer-source-equality.json",
+          "sha256": "c756c325807cfe15ca78b72fb2606832340164bed3ffaf6049d2d7c8ede30ef8"
+        },
+        {
+          "path": "logs/B1-R7-reviewer-return-identity.json",
+          "sha256": "8d120c04d220f4300380828e01601841327f724d332d6a6ff313a30d4d7b1b8a"
+        },
+        {
+          "path": "logs/B1-R7-reviewer-return.snapshot.txt",
+          "sha256": "5533e9e884fe49bf4b7d4765cbecd7e3c5c93b46f2dd1cf4de4839033e8a5882"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "Complete current-source full local/CI/private integration gates and final independent acceptance",
+      "fixture": "Outside this focused review; author preflight2 explicitly retains pending full gates",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Focused proof and source identity do not substitute for full repository and CI/private acceptance."
+    }
+  ]
+}

@@ -87,6 +87,8 @@ pub struct AgentDraft<'a> {
     pub advanced: bool,
     pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
     pub tool_assignments: Option<&'a str>,
+    pub open_to_public: bool,
+    pub confirm_spam_disabled: bool,
 }
 
 /// The settings pane for an agent that already exists.
@@ -365,14 +367,14 @@ fn agent_placement_card(
     company_id: Uuid,
     entry: &crate::application::agent::AgentDirectoryEntry,
 ) -> String {
-    let desk = match &entry.desk {
-        Some(desk) => format!(
-            r#"<p class="text-sm">Mail to <code id="agent-default-desk" class="font-mono">{address}</code> reaches this agent's own desk, created with the agent.</p>
-            <a class="btn btn-ghost btn-sm" href="/ui/channels?company_id={company_id}&amp;channel_id={id}">Open desk settings</a>"#,
-            address = escape_html_text(&desk.address),
-            id = desk.id,
+    let desk = match &entry.address {
+        Some(address) => format!(
+            r#"<p class="text-sm">Mail to <code id="agent-direct-address" class="font-mono">{address}</code> reaches this agent's direct inbox.</p>
+            <a class="btn btn-ghost btn-sm" href="/ui?company_id={company_id}&amp;principal_id={id}">Open direct inbox</a>"#,
+            address = escape_html_text(&address.address),
+            id = address.principal_id,
         ),
-        None => r#"<p id="agent-default-desk" class="text-sm opacity-70">This agent's own desk was deleted. Create an additional desk below to give it an address again.</p>"#.to_string(),
+        None => r#"<p id="agent-direct-address" class="text-sm opacity-70">This agent's direct address is unavailable.</p>"#.to_string(),
     };
     let departments = if entry.departments.is_empty() {
         r#"<p class="text-sm opacity-70">Not in any department.</p>"#.to_string()
@@ -449,7 +451,7 @@ pub fn assistant_channel_card(
                 <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
                     <div>
                         <h3 class="font-semibold">Additional assistant desk</h3>
-                        <p class="text-sm opacity-70">The agent already has its own desk. Create another team desk (never public) that this agent answers, at a different address. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
+                        <p class="text-sm opacity-70">The agent has its own direct address. Create another team desk (never public) that this agent answers, at a different address. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
                     </div>
                     {banner}
                     <form hx-post="/ui/agents/{agent_id}/assistant-channel?company_id={company_id}"
@@ -708,6 +710,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         </label>
                     </div>
                     {avatar_field}
+                    {direct_settings}
                     <div class="form-control w-full">
                         <div class="label justify-between">
                             <span class="text-xs opacity-70">System Prompt</span>
@@ -741,11 +744,38 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         native_permissions_field = native_permissions_field(draft.native_permissions),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
+        direct_settings = match fields.scope {
+            AgentFormScope::Company(_) => direct_settings_fields(draft),
+            AgentFormScope::Library => String::new(),
+        },
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
         description_help = description_help,
         description = escape_html_text(draft.description),
         avatar_field = agent_avatar_field(&id_prefix, draft),
+    )
+}
+
+pub(super) fn direct_settings_fields(draft: &AgentDraft<'_>) -> String {
+    let public = if draft.open_to_public { " checked" } else { "" };
+    let confirmed = if draft.confirm_spam_disabled {
+        " checked"
+    } else {
+        ""
+    };
+    format!(
+        r#"<fieldset class="space-y-2">
+            <legend class="text-sm font-medium">Direct address</legend>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="open_to_public" value="true" class="checkbox checkbox-sm"{public}>
+                <span>Allow external messages to this agent's direct address</span>
+            </label>
+            <p class="text-xs opacity-70">This setting is independent of any desk the agent staffs.</p>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{confirmed}>
+                <span class="text-xs">If spam scanning is unavailable, I accept external mail without scanning.</span>
+            </label>
+        </fieldset>"#,
     )
 }
 
@@ -842,7 +872,7 @@ fn company_model_selection(fields: &AgentFields<'_>, id_prefix: &str) -> String 
     let (blank_choice, help) = match fields.agent_id {
         None => (
             "Company default",
-            "Leave both blank to use the company's default model for the new agent's desk. Creating an agent requires a model connection with an API key.",
+            "Leave both blank to use the company's default model for the new agent's direct workflow. Creating an agent requires a model connection with an API key.",
         ),
         Some(_) => (
             "No hosted model",
@@ -1016,6 +1046,8 @@ fn stored_draft(agent: &Agent) -> AgentDraft<'_> {
     AgentDraft {
         name: &agent.name,
         slug: &agent.slug,
+        open_to_public: agent.open_to_public,
+        confirm_spam_disabled: false,
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
         native_permissions: agent.native_permissions,
         description: agent.description.as_deref().unwrap_or(""),

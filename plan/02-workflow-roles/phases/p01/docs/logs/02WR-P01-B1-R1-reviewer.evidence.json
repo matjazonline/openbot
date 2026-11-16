@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "round": "02WR-P01-B1-R1-reviewer",
+  "artifact": "91741e066ae90284ca17ba5163cbc89561eef3ac1fb728daec3645392d1f473d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "TEST_DATABASE_URL=<owned localhost60242/openbot_roles_p01_test> SQLX_OFFLINE=true cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Owned PG18.6 localhost60242, openbot_roles_p01_test; production BindingFixture/OwnDatabase isolated databases, no HTTP calls.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-reviewer-role-tests.txt",
+          "sha256": "07cc1cc0b37243ca0af2058c2aa0da19cf7458b9c3e37da9ef0db41ba12a3acf"
+        }
+      ]
+    }
+  ]
+}

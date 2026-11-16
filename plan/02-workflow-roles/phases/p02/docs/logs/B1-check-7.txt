@@ -1,0 +1,25 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0616]: field `message` of struct `WorkflowGuardViolation` is private
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:114:77
+    |
+114 |         matches!(error, AppError::WorkflowGuard(ref violation) if violation.message.contains("role members must exactly match")),
+    |                                                                             ^^^^^^^ private field
+    |
+help: a method `message` also exists, call it with parentheses
+    |
+114 |         matches!(error, AppError::WorkflowGuard(ref violation) if violation.message().contains("role members must exactly match")),
+    |                                                                                    ++
+
+error[E0616]: field `message` of struct `WorkflowGuardViolation` is private
+   --> src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:129:77
+    |
+129 | ...   matches!(error, AppError::WorkflowGuard(ref violation) if violation.message.contains("exactly cover frozen workflow requireme...
+    |                                                                           ^^^^^^^ private field
+    |
+help: a method `message` also exists, call it with parentheses
+    |
+129 |         matches!(error, AppError::WorkflowGuard(ref violation) if violation.message().contains("exactly cover frozen workflow requirements")),
+    |                                                                                    ++
+
+For more information about this error, try `rustc --explain E0616`.
+error: could not compile `open_bots` (lib test) due to 2 previous errors

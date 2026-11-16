@@ -1,0 +1,9 @@
+
+running 4 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_authored_pure_error_route_keeps_the_ladder_suppressed ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_case_failure_rolls_back_terminal_and_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_trigger_pure_invalid_output_enqueues_one_actual_case ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4424 filtered out; finished in 3.22s
+

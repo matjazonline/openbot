@@ -1,0 +1,207 @@
+{
+ "version": 1,
+ "round": "03PA-P01-B1-R1",
+ "artifact": "888f0a805e0a1fa00b37892acf298493f573eca5897be111ba3fb9d7e255416c",
+ "checks": [
+  {
+   "criteria": [
+    "D1.6 address_namespace_"
+   ],
+   "command": "open_bots lib (ns4) address_namespace_ -- 8 PASS",
+   "fixture": "fresh openbot_pa_p01_b1a migrated by test support",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-ns4.txt",
+     "sha256": "24430691882b77f1a9aa14fec79547a49f42d728780bc0ad8a1bab0a9dc88735"
+    },
+    {
+     "path": "logs/continue-build-ns4.txt",
+     "sha256": "1ce31ec97decadb635c131c4ee2e8753e38bc694c5290a77d5d045e323ae3416"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 address_slug_",
+    "D1.6 address_resolution_"
+   ],
+   "command": "open_bots lib (res2) address_slug_ address_resolution_ -- 8 PASS (before the relay Box change)",
+   "fixture": "in-memory doubles; openbot_pa_p01_b1a",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-res2.txt",
+     "sha256": "b84be5ed38303bbbea89c1c4352f32054590478903074c88df4ec721eb94e59b"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 regressions",
+    "D1.6 address_*"
+   ],
+   "command": "open_bots lib (focus1) address_ channel smtp resend_api sendgrid egress use_cases::thread simulation ui_profile participant company_invite integration::tests user -- 794 PASS, 1 FAIL (new SMTP test: its fixture desk was disabled; fixed, see focus3), 3 ignored",
+   "fixture": "fresh openbot_pa_p01_b1b",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/continue-run-focus1.txt",
+     "sha256": "63a4282652c7fba7c663debaa174c3b8e7897568803fd599fdaeb7a878e16a21"
+    },
+    {
+     "path": "logs/continue-build-focus1.txt",
+     "sha256": "82ed515a21bb421fbb9a8210c81b5a3e7d431ba93887f7e5a51bfb970efed413"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 regressions"
+   ],
+   "command": "open_bots lib (focus2) department provisioning onboarding escalation_agent escalation_origin channel_reply agent_api company_agent -- 532 PASS, 1 ignored",
+   "fixture": "openbot_pa_p01_b1b",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-focus2.txt",
+     "sha256": "48c6d682b0d1fb5a6d01e021786544ec6b5c74c63421199cceeba605ad109550"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 address_external_ingress_"
+   ],
+   "command": "open_bots lib (focus3) address_external_ingress_ -- 2 PASS (SMTP enumeration with the fixture desk enabled; Resend routing)",
+   "fixture": "own_database (SMTP); scripted Resend API",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-focus3.txt",
+     "sha256": "31e99fa5beeb543417eecf3f7a132d38ecf9c585d036bdc4eb9b1e074bb20901"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 address_resolution_ relay",
+    "D1.4 F2"
+   ],
+   "command": "open_bots lib (relay1) address_resolution_ relay -- 20 PASS, after boxing InternalDestination::Desk",
+   "fixture": "in-memory doubles; openbot_pa_p01_b1b",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-relay1.txt",
+     "sha256": "91cb8ec0668dac83e66d22ee43319bce99f7d3420175edb3c44d360db0737ccc"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 address_external_ingress_ SendGrid signed webhook"
+   ],
+   "command": "route-level signed SendGrid webhook test",
+   "fixture": "none",
+   "status": "NOT EXERCISED",
+   "reason": "no harness drives sendgrid_inbound_webhook; covered only by composition (decode to RawInboundPayload unit test, the same accept/preflight path as the SMTP and resolution tests, unchanged handle_bounce_dispatch); a verification gap"
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "cargo clippy --all-targets -D warnings with only the 5 pre-plan02 lint names allowed (diagnostic): first run FAIL on clippy::large_enum_variant in the new relay enum",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/B1-clippy1-diagnostic.txt",
+     "sha256": "7ca7f1adc308c363f02cdfa1b054f46520a23ce88da23c33f805214ad2f81031"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "the same diagnostic clippy after boxing the variant",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-clippy2-diagnostic.txt",
+     "sha256": "0c6da8c9b963389f50c67ecd710861e210c92c84e628ec182d4a8c5263946c8e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "fresh sqlx migrate run; SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets (.sqlx unchanged)",
+   "fixture": "fresh openbot_pa_p01_sqlx",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-migrations1.txt",
+     "sha256": "f9cb56963f302bca679bab7d6034e76987ee29194b8a87d09f85023e87d3ad09"
+    },
+    {
+     "path": "logs/B1-sqlx-prepare1.txt",
+     "sha256": "31a8c5943425acfa32806adff0042ff0e78ae5b39cd17c68f1d39f69ee8ad9cd"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "cargo fmt --check, git diff HEAD --check, transport boundary scripts with rg on PATH, CI extra boundary scripts",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-boundaries2.txt",
+     "sha256": "f42693c530316c32e16bb5253c93384da0af345e1e74f3256f8a89babda1c11e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "tests/source_modules.rs (Rust source module reachability) -- 8 PASS",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-source-modules1.txt",
+     "sha256": "d27038ca56eb651614a9e0ce0ac9e89ee71f4373c0ac473c78171396cb15bdaf"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "D1.6 gates"
+   ],
+   "command": "discovered test names before (4493) and after (4512): 19 added, 0 removed",
+   "fixture": "cargo test --all-targets -- --list",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/B1-tests-before.txt",
+     "sha256": "4346eab20a050cc477f0e3c23f219e99ea5b83e8473bbb8a40cc08fb3e66291c"
+    },
+    {
+     "path": "logs/B1-tests-after.txt",
+     "sha256": "49cc05525123fa8f177ddca1ac81edc0f53432e528efebf912affde71ea4e1ce"
+    },
+    {
+     "path": "logs/B1-tests-delta.txt",
+     "sha256": "1c62011a3d3a9a2cb9192af213930a98afbe5eb360d4e3f7e663efba18124d9d"
+    }
+   ]
+  }
+ ]
+}

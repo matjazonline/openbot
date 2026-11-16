@@ -96,7 +96,7 @@ fn autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority
     for alias in [
         "message.send",
         "message.unknown",
-        "create_agent_channel",
+        "create_agent",
         "list_company_agents",
         "search_knowledge",
     ] {
@@ -109,7 +109,7 @@ fn autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority
         };
         assert!(binding.validate().is_err(), "{alias}");
     }
-    AgentToolBinding::builtin(AgentBuiltinTool::CreateAgentChannel)
+    AgentToolBinding::builtin(AgentBuiltinTool::CreateAgent)
         .validate()
         .unwrap();
 }
@@ -139,16 +139,42 @@ fn autonomous_agent_contract_skills_require_local_aliases_without_granting_tools
 #[test]
 fn autonomous_agent_contract_definition_decoding_is_bounded_and_rejects_extra_secrets() {
     assert!(ResolvedAgentDefinition::decode(&vec![b' '; MAX_AGENT_DEFINITION_BYTES + 1]).is_err());
+    assert!(
+        ResolvedAgentDefinition::decode_and_hash(&vec![b' '; MAX_AGENT_DEFINITION_BYTES + 1])
+            .is_err()
+    );
     let value = definition();
     let mut json = serde_json::to_value(&value).unwrap();
     json["model"]["api_key"] = json!("must-never-be-captured");
     assert!(ResolvedAgentDefinition::decode(&serde_json::to_vec(&json).unwrap()).is_err());
+    assert!(ResolvedAgentDefinition::decode_and_hash(&serde_json::to_vec(&json).unwrap()).is_err());
     let mut value = value;
     value.instructions = "x".repeat(MAX_AGENT_TEXT_BYTES + 1);
     assert!(value.canonical_content().is_err());
     value.instructions.clear();
     value.model.as_mut().unwrap().max_output_tokens = 0;
     assert!(value.validate().is_err());
+}
+
+#[test]
+fn autonomous_agent_contract_decoded_hash_preserves_canonical_proof_and_schema_validation() {
+    use sha2::{Digest, Sha256};
+    let value = definition();
+    let pretty = serde_json::to_vec_pretty(&value).unwrap();
+    let (decoded, digest) = ResolvedAgentDefinition::decode_and_hash(&pretty).unwrap();
+    assert_eq!(digest, value.content_hash().unwrap());
+    assert_eq!(
+        decoded.canonical_content().unwrap(),
+        value.canonical_content().unwrap()
+    );
+    assert_ne!(digest.as_slice(), Sha256::digest(&pretty).as_slice());
+
+    let mut invalid = serde_json::to_value(&value).unwrap();
+    invalid["tools"][0]["input_schema"] = json!({"type":"not-a-schema-type"});
+    assert!(
+        ResolvedAgentDefinition::decode_and_hash(&serde_json::to_vec(&invalid).unwrap()).is_err()
+    );
+    assert!(ResolvedAgentDefinition::decode_and_hash(b"not JSON").is_err());
 }
 
 #[test]
@@ -194,6 +220,8 @@ fn autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts(
 #[test]
 fn autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content() {
     let mut manifest = DependencyManifest {
+        role_context_department_id: None,
+        roles: vec![],
         company_id: CompanyId::new(Uuid::new_v4()),
         root_run_id: RunId::new(Uuid::new_v4()),
         agents: (0..2)
@@ -209,6 +237,12 @@ fn autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_conte
     assert_eq!(digest, manifest.content_hash().unwrap());
     let restored = DependencyManifest::decode(&manifest.canonical_content().unwrap()).unwrap();
     assert_eq!(restored.content_hash().unwrap(), digest);
+    let mut missing_context = serde_json::to_value(&manifest).unwrap();
+    missing_context
+        .as_object_mut()
+        .unwrap()
+        .remove("role_context_department_id");
+    assert!(DependencyManifest::decode(&serde_json::to_vec(&missing_context).unwrap()).is_err());
     manifest.agents.push(manifest.agents[0].clone());
     assert!(manifest.validate().is_err());
     manifest.agents = (0..257)

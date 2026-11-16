@@ -1,0 +1,15 @@
+base:   e5a13246f054325ac97ad5c2355de3b927ac1002
+digest: 2345b4d4ec0ed95bacd4da34c9deafc24b732b02be6cd3d316e8d35e7942c26f
+files:
+  migrations/20260817000000_init_schema.sql
+  src/adapters/http/pages/agent_settings.rs
+  src/adapters/persistence/local_agents/management/native_mcp_direct_tests.rs
+  src/adapters/persistence/local_agents/management/native_mcp_identity_tests.rs
+  src/adapters/persistence/local_agents/management/native_mcp_live_tests.rs
+  src/adapters/persistence/local_agents/management/native_mcp_tests.rs
+  src/adapters/persistence/local_agents/management/native_tests.rs
+  src/adapters/persistence/workflow/native_mcp/mod.rs
+  src/adapters/persistence/workflow/native_mcp/provenance.rs
+  src/adapters/persistence/workflow/native_mcp/registry.rs
+  src/application/workflow/native_mcp.rs
+  src/application/workflow/native_mcp/tests.rs

@@ -1,0 +1,12 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_run_company_owner_lock_prefix_precedes_publication_company_gate ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4217 filtered out; finished in 3.55s
+

@@ -60,3 +60,9 @@ gap and other failed/unexercised repository checks in root's final report. It is
 not evidence of an identified attribution-source defect and is outside the
 contract surface certified by the scoped PASS; whole-repository success is not
 accepted. Exact evidence/limitations are in N2's final assessment.
+
+## AS-P10-PUSH-R1 final disposition
+
+No new integration finding. AS-P10-PUSH-R1-N1 PASS on3688ab5d for publication
+integration with accepted attribution implementation preserved. F1 remains closed;
+AS-P10-VG1 and earlier failed/unexercised whole-repository checks remain unchanged.

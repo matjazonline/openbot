@@ -4,6 +4,8 @@ use thiserror::Error;
 /// out a successful one. See `services::dashboard_snapshot`.
 #[derive(Error, Debug, Clone)]
 pub enum AppError {
+    #[error("{0}")]
+    WorkflowRole(crate::entities::department::RoleAdmissionRefusal),
     #[error("The triggering message exceeds this audience's access level")]
     KnowledgeTrigger {
         content: crate::entities::access_level::AccessLevel,

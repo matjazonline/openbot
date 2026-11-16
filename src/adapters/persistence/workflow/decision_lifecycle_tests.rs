@@ -17,7 +17,7 @@ async fn workflow_decision_past_deadline_never_parks_and_unavailable_never_route
     assert_eq!(past.counts().await["waits"], 0);
     let unavailable = Box::pin(DecisionFixture::configured(1, |source| {
         source["steps"]["start"]["with"]["reviewers"] =
-            json!({"literal":[{"kind":"user","id":Uuid::new_v4()}]});
+            json!({"literal":[{"kind":"principal","id":Uuid::new_v4()}]});
         source["steps"]["start"]["routes"]["error"] = json!("finish");
     }))
     .await;

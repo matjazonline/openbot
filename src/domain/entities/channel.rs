@@ -251,7 +251,7 @@ impl Channel {
         company_slug: &CompanySlug,
         app_domain_name: &str,
     ) -> EmailAddress {
-        EmailAddress::new(format!("{channel_slug}@{company_slug}.{app_domain_name}"))
+        crate::entities::address::address_for(channel_slug, company_slug, app_domain_name)
     }
 }
 

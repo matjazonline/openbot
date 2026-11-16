@@ -1,0 +1,12 @@
+{
+  "material_files": 56,
+  "mismatches": [],
+  "focused_workflow_delta": [
+    ".github/workflows/agent-history.yml",
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    ".github/workflows/plan03-private-proof.yml"
+  ],
+  "native_delta_from_R18": [],
+  "HEAD": "584d7d69c02569c6a1410b1b75a4d0ce2b3d3287"
+}

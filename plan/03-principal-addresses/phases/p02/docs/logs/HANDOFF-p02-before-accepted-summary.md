@@ -1,0 +1,57 @@
+# 03PA-P02 continuation — B3 R2 awaiting independent review, no phase/plan acceptance
+
+## Authority and original scope
+
+Root/A `/root` is user-confirmed Sol6.1/xhigh. Independent B `/root/p02_reviewer` is Astra/high, no inherited history, now running the combined B3 R2 correction recheck after R1 changes required. Workflow: `.agents/skills/implement-astra-reviewed-2-3`. Preserve these roles; no new author or substitute review. Context/compaction controls are unavailable; host defaults and durable checkpoints apply.
+
+- Worktree: `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`.
+- Branch: `room/check-last-handoff-md-under-plan-02-work-qc8d`.
+- Phase start/review base/HEAD: `830561e2a7a4fb859f389fbaf6995a756badb561`.
+- Authoritative coordination: this worktree's `plan/03-principal-addresses/COORDINATION.md`, root sole writer, revision15, rechecked before webhook continuation. Applicable I001–I004/r1, C001–C007/r1 and revision10 notes remain acknowledged; no new notice requirement.
+- Exact snapshot exclusions, unchanged: `plan/03-principal-addresses/phases/p02/docs`, `plan/03-principal-addresses/phases/p01/docs`, `plan/03-principal-addresses/COORDINATION.md`, `plan/02-workflow-roles/COORDINATION.md`, `plan/02-workflow-roles/phases/p05/docs`. GNU coreutils PATH is required by snapshot.sh.
+- TASK owns original requirements, criterion mapping, contract impact, full history and execution evidence. B owns REVIEW/agent-review-notes/agent-review-findings. Prior long handoff is retained at logs/HANDOFF-before-B3-webhook-continuation.md.
+
+## Accepted prerequisites
+
+- p01 accepted 03PA-P01-B1-R2, digest `dc9329df080197b948e37372460f55476974a800811cb217182826193400ca23`; uncommitted source preserved.
+- D1/r3 architecture PASS03PA-P02-D1-R3/N1; logs/D1-r3.md SHA256 `167adf1a44f4a6de9bc0fe119ff341692cb1bed2722929e047b3731d0a273db0`. AC1–AC12 bind all implementation. User grouping: like desk mail, reply/conversation correlation, unrelated roots separate.
+- B1 accepted 03PA-P02-B1-R2/N1, digest `30f6b67395ab9b9ec3235a5ca1d80bc78e2b596cebd8fc3ea19bec49a5edc7bb`.
+- D2/r2 architecture PASS03PA-P02-D2-R2/N1; logs/D2-r2.md SHA256 `1a19b9a8d5a17325ff4a41ac06082d8b8519417ec55ddf3d47e4e1a314f7fde2`. Exact company_members.id notification source pin and generated member-recipient key; timestamps/current membership alone are insufficient.
+- B2 milestone accepted 03PA-P02-B2-R2/N1 at `b02007609c01e28674ee6640fe07f6fc115e95879c5916ff01356bcaca8fa7f6`. Revocation finding F1 resolved by actual audit and HTML races. Author/new4/affected94 plus independent10 PASS; inherited clippy/CSP/CSS gaps remain. Accepted source cache is logs/B3-accepted-B2-source.tar/.json; sparse omissions mean HEAD, not deletion.
+
+## Latest implementation and exact proof
+
+B3 is not reviewed/accepted. Typed workflow associations, binding/admission/role contexts, final replies/transport/history/native wakes and private readers are implemented in progress under D1. Principal-source relay is explicitly refused until p03 C006 establishes own-agent sender authority. Production agent address registration/automatic-desk removal/notice adapter switch remain p03; B3 agent address fixtures explicitly register stand-ins.
+
+- Build3 PASS at `6f4ee9ce820af1b5249f03b5849850ddb6fb7272206bd51bc87ecbc10d381a86`,4578 tests. Actual direct ingress→run/job/history pins and pure final reply→competing claim/publication→one message/delivery/replay PASS. Role5, relay16 (original internal relay fixture fixed) and infra event6 PASS.
+- Broad history run148 PASS/5 FAIL/1 ignored. Four failures individually PASS on the same binary; the remaining knowledge/history case PASS on build4 with safe failure diagnostics only. All original failures retained; no full aggregate green or unrelated-failure claim.
+- Build4 PASS at `3f43593a438952bc037e47bfe65468a62805bc03b6091b4e3baed1ef45a25b19`,4582 tests (+4/no removal). New current-public-policy admission and zero/one/multiple/concurrent roster tests PASS. Attention26, run counts11, native wake2 and knowledge/history1 PASS. Sole new private reader fixture failed a native terminal-execution constraint; fixed by pinning its actual execution, without weakening any privacy assertion.
+- Build6 PASS at `9abd119296a06a6e049f6e7a996691ebffd8e9f75d92ccea37d3202290d0a995`,4583 (+one/no removal). Corrected private reader test PASS1.23s: owner/self/admin counters, attention+summary, department exclusion and actual removal/archive authority. New scripted production public-desk/private-agent runtime/final reply/delivery test PASS3.26s, including independent private/direct/restricted-desk policy.
+- Build7 PASS at `9e23385f78a6888958b06cf490f7617b7c308100871007126fc828dc8cd4c46f`,4584 (+one/no removal). Locked offline all-target check13 PASS1m55s. Actual TCP SMTP + real SPF/DMARC through local DNS + production ingress/runtime/final reply/delivery PASS3.58s (`B3-smtp-native2.txt`). It refuses private direct mail, forged Authentication-Results via actual failed DNS auth, and score99 mail; reopening direct admits a new source. External scanner score is an explicit service stand-in, DNS verifier is real. A mistyped executable path failed before execution in smtp-native1 and is retained.
+- Native attention PREPARE PASS validates15-parameter SQL shape only. Formatting through14 PASS. Current B3 SQLx regeneration/static/reachability/clippy/whole affected gate and independent review remain outstanding.
+
+## Current frozen correction recheck (B3 R2)
+
+R1 independent whole B3 review was CHANGES REQUIRED, N1/F1 HIGH direct-delivery decoder/global claim rollback and F2 LOW missing direct native wakes. B reviewed186 paths, independently18 PASS and retained actual public persistence/queue/trigger counterexamples. Frozen R1's wider gate finished2266 PASS/7 inherited ignores/0 FAIL,1602.75s. R1 immutable evidence validates; it is not implementation acceptance. R1 comparison cache/archive reconstructed from acceptedB2+R1 patch with all186 hashes verified (logs/B3-R1-material-source.json/.tar.gz).
+
+**Source frozen for combined F1/F2 correction recheck**, artifact `1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa`, start/review-base/HEAD830561e2, same five exclusions. Snapshot matches build4. Exact17-path/1098-line R1→R2 correction at logs/B3-R2-delta.json/.patch. Live/pinned coordination15 unchanged, all I001–I004/C001–C007/r1 and revision10 acknowledged. Root owns TASK/HANDOFF; B owns review/notes/findings. No source edits until B finishes.
+
+Corrections: exact AddressTarget through delivery decoder/queue/domain/read presentation, shared named columns; canonical malformed shapes still refuse and targetless standalone preserved. Native principal policy filters before paging; final SQL rechecks exact target/live membership/classification after parts. Full workspace rechecks sidebar+selection together; pane loads channel context first and renders synchronously. Native attention supports either valid target and suppresses no-op status writes. No changed architecture/auth/concurrency decision or compatibility path.
+
+Current actual proof: build4 PASS1m19s;4589 collected (+one/no removals vs R1, interim newly introduced test move explicitly mapped). **235 focused PASS66.92s/no ignores**, including actual producer→global mixed direct/desk/standalone queue→EmailSender/DeliveryWorker→recording provider→terminal fenced delivery/provider keys and native direct/desk/standalone/no-op wake controls. Private reader case passes owner/self/admin/real owned foreign tenant, pre-pagination exclusion and actual member removal during blocked parts read, with owner archive retained. Personal canonical delivery rows use the shared persistence fixture, not a personal HTTP publisher. Verification stamp/provider recording/agent-address registration stand-ins are explicit; production agent registration stays p03/C006.
+
+Current offline all-target/source-module8/format/whitespace/all boundary+fixture/docs checks PASS. SQLx prepare PASS on unchanged production SQL; no metadata diff; runtime6 schema SHA384 matches current init migration. Trail refreshed. Clippy has exactly seven **confirmed pre-existing** diagnostics: reproduced with same locked/offline all-target command at detached immutable HEAD in owned cache worktree, comparison2 metadata retained. No lint suppression or green clippy claim. Immutable logs/03PA-P02-B3-R2.evidence.json validates16 declaredPASS/1 declaredFAIL. All earlier failed setup/exploratory runs retained.
+
+**No active root compiler/test/graph process.** Compiler cache available to B. Runtime6/gate4 are current; older schemas obsolete. On continuation root independently recomputed the exact frozen digest and reconciled coordination revision15. The combined R2 recheck assignment has now been sent by followup_task to existing independent B `/root/p02_reviewer`, including original criteria, exact exclusions/digest, delta/baseline/evidence paths and resource ownership. Findings remain OPEN until B resolves them. Root must check explicit matching PASS, saved notes/dispositions, manifest validity, snapshot and coordination before p02 acceptance. Root is doing read-only p03 contract tracing while source stays frozen. Then publish phase acceptance/producer identity and start p03 agent defaults/own-agent relay/notices under its own architecture gate and phase-local records. No main push before whole plan03 integration/full gate. Plans04/05 unstarted.
+
+## Resources and retained authorization
+
+- Owned compiler cache: `/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target`, serialized author/reviewer use.
+- PostgreSQL127.0.0.1:52471; current root DB `pa02_codex_b3_runtime6_20261115`, fresh R2 migration2 PASS/current schema. Root prefix pa02_codex_, reviewer pa02_review_; OwnDatabase UUID fixtures clean up via handles. Earlier B2/B3 owned DBs/evidence remain. Never reset/kill other sessions' resources; other host cargo jobs exist.
+- Preserve unrelated user/tool `.claude/`, `.mcp.json`, AGENTS.md and `.trail/` changes. No blanket stage/commit of them.
+- User authorized: finish/review/full-gate all plan03, integrate current main and push normally to main; then complete plan04-root-unit/review/full gate and push main; then execute plan05-scopes. Do not re-ask. No force push/deployment. No plan03 push yet, no plan04/05 implementation yet. Re-fetch main at p04 and preserve its concurrent Cloudroom/native MCP/plan08 changes.
+- Plan04 must preserve the exact membership-instance receipt pin and recipient-key semantics, with real pending/projected/removal/rejoin/race tests.
+
+## Root p02 acceptance / p03 handoff
+
+Root accepts complete p02 in phase at artifact `1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa`, base/HEAD830561e2, after `03PA-P02-B3-R2/N1` explicit PASS, saved F1/F2 RESOLVED, independently matching snapshot and validated evidence. Coordination16 publishes the accepted C007 producer. Current235 author and19 independent focused PASS; unchanged broader2266 PASS/7 inherited ignores retained. Seven baseline clippy diagnostics remain failed; no full-plan verification claim. Source comparison export is `logs/p02-accepted-source.json`/`.tar.gz` with per-path/archive hashes. p03 starts architecture investigation; p04 full integration gate and main publication remain pending. Unrelated changes and prior authorizations preserved.

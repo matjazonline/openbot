@@ -1,0 +1,809 @@
+{
+  "total_count": 3,
+  "jobs": [
+    {
+      "id": 132926694005,
+      "run_id": 43751642401,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-cleanup-65d722f1",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43751642401",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe8wxidQ",
+      "head_sha": "65d722f1a5a3c5584b3b84ce901e6ab77635e633",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132926694005",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43751642401/job/132926694005",
+      "status": "in_progress",
+      "conclusion": null,
+      "created_at": "2026-11-15T19:18:06Z",
+      "started_at": "2026-11-15T19:18:08Z",
+      "completed_at": null,
+      "name": "verify",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T19:18:09Z",
+          "completed_at": "2026-11-15T19:18:10Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T19:18:10Z",
+          "completed_at": "2026-11-15T19:18:22Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T19:18:22Z",
+          "completed_at": "2026-11-15T19:18:30Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T19:18:30Z",
+          "completed_at": "2026-11-15T19:18:40Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T19:18:40Z",
+          "completed_at": "2026-11-15T19:18:42Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T19:18:42Z",
+          "completed_at": "2026-11-15T19:18:47Z"
+        },
+        {
+          "name": "Install boundary test tool",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-15T19:18:47Z",
+          "completed_at": "2026-11-15T19:18:58Z"
+        },
+        {
+          "name": "Install frontend dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T19:18:58Z",
+          "completed_at": "2026-11-15T19:18:59Z"
+        },
+        {
+          "name": "Verify local-agent plugin and build counted test peers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-15T19:18:59Z",
+          "completed_at": "2026-11-15T19:19:33Z"
+        },
+        {
+          "name": "Reproducible local-agent package and locked runtime installation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-15T19:19:33Z",
+          "completed_at": "2026-11-15T19:19:37Z"
+        },
+        {
+          "name": "Generated CSS is current",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-15T19:19:37Z",
+          "completed_at": "2026-11-15T19:19:38Z"
+        },
+        {
+          "name": "Install browser for protocol tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-15T19:19:38Z",
+          "completed_at": "2026-11-15T19:19:52Z"
+        },
+        {
+          "name": "Run counts browser protocol",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-15T19:19:52Z",
+          "completed_at": "2026-11-15T19:19:55Z"
+        },
+        {
+          "name": "SSE navigation lifecycle",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 14,
+          "started_at": "2026-11-15T19:19:55Z",
+          "completed_at": "2026-11-15T19:20:42Z"
+        },
+        {
+          "name": "Deployment script tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-15T19:20:42Z",
+          "completed_at": "2026-11-15T19:20:42Z"
+        },
+        {
+          "name": "Knowledge artifact preparation tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-15T19:20:42Z",
+          "completed_at": "2026-11-15T19:20:42Z"
+        },
+        {
+          "name": "Disposable Doop test runner boundaries",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-15T19:20:42Z",
+          "completed_at": "2026-11-15T19:20:49Z"
+        },
+        {
+          "name": "Knowledge model production image and early memory budget",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-15T19:20:49Z",
+          "completed_at": "2026-11-15T19:35:58Z"
+        },
+        {
+          "name": "Formatting",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-15T19:35:58Z",
+          "completed_at": "2026-11-15T19:36:05Z"
+        },
+        {
+          "name": "Patch whitespace",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 20,
+          "started_at": "2026-11-15T19:36:05Z",
+          "completed_at": "2026-11-15T19:36:06Z"
+        },
+        {
+          "name": "Transport boundary self-tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 21,
+          "started_at": "2026-11-15T19:36:06Z",
+          "completed_at": "2026-11-15T19:36:08Z"
+        },
+        {
+          "name": "Transport abstraction boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-11-15T19:36:08Z",
+          "completed_at": "2026-11-15T19:36:12Z"
+        },
+        {
+          "name": "Workflow sample boundary self-tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-11-15T19:36:12Z",
+          "completed_at": "2026-11-15T19:36:13Z"
+        },
+        {
+          "name": "Workflow sample boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-11-15T19:36:13Z",
+          "completed_at": "2026-11-15T19:36:13Z"
+        },
+        {
+          "name": "Integration boundary self-tests",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-11-15T19:36:13Z",
+          "completed_at": "2026-11-15T19:36:13Z"
+        },
+        {
+          "name": "Integration boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 26,
+          "started_at": "2026-11-15T19:36:13Z",
+          "completed_at": "2026-11-15T19:36:15Z"
+        },
+        {
+          "name": "Integration documentation boundary",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 27,
+          "started_at": "2026-11-15T19:36:15Z",
+          "completed_at": "2026-11-15T19:36:15Z"
+        },
+        {
+          "name": "Fetch locked Rust dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 28,
+          "started_at": "2026-11-15T19:36:15Z",
+          "completed_at": "2026-11-15T19:36:19Z"
+        },
+        {
+          "name": "Workflow evidence retention",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-11-15T19:36:19Z",
+          "completed_at": "2026-11-15T19:36:41Z"
+        },
+        {
+          "name": "Offline compilation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-11-15T19:36:41Z",
+          "completed_at": "2026-11-15T19:41:17Z"
+        },
+        {
+          "name": "Clippy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-11-15T19:41:17Z",
+          "completed_at": "2026-11-15T19:44:10Z"
+        },
+        {
+          "name": "Install SQLx CLI",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 32,
+          "started_at": "2026-11-15T19:44:10Z",
+          "completed_at": "2026-11-15T19:45:11Z"
+        },
+        {
+          "name": "Enable pg_stat_statements in CI PostgreSQL",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 33,
+          "started_at": "2026-11-15T19:45:11Z",
+          "completed_at": "2026-11-15T19:45:13Z"
+        },
+        {
+          "name": "Migrations",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 34,
+          "started_at": "2026-11-15T19:45:13Z",
+          "completed_at": "2026-11-15T19:45:14Z"
+        },
+        {
+          "name": "Query statistics activation",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 35,
+          "started_at": "2026-11-15T19:45:14Z",
+          "completed_at": "2026-11-15T19:45:14Z"
+        },
+        {
+          "name": "SQLx metadata matches migrated schema",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 36,
+          "started_at": "2026-11-15T19:45:14Z",
+          "completed_at": "2026-11-15T19:48:05Z"
+        },
+        {
+          "name": "Compile tests before denying network access",
+          "status": "in_progress",
+          "conclusion": null,
+          "number": 37,
+          "started_at": "2026-11-15T19:48:05Z",
+          "completed_at": null
+        },
+        {
+          "name": "Integration conformance families are registered",
+          "status": "pending",
+          "conclusion": null,
+          "number": 38,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Vault authoring browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 39,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Rust source module reachability",
+          "status": "pending",
+          "conclusion": null,
+          "number": 40,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "HTML rendering and team autocomplete browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 41,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Knowledge library native form browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 42,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Memory settings capture forms browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 43,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Agent authoring browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 44,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Local agent management browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 45,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Skill directory import browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 46,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Workflow agent selection browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 47,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Session revocation browser protocol",
+          "status": "pending",
+          "conclusion": null,
+          "number": 48,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Database-backed test suite (isolated network)",
+          "status": "pending",
+          "conclusion": null,
+          "number": 49,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Decision browser forms",
+          "status": "pending",
+          "conclusion": null,
+          "number": 50,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Stack budget",
+          "status": "pending",
+          "conclusion": null,
+          "number": 51,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Lease budget",
+          "status": "pending",
+          "conclusion": null,
+          "number": 52,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "pending",
+          "conclusion": null,
+          "number": 101,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "pending",
+          "conclusion": null,
+          "number": 102,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "pending",
+          "conclusion": null,
+          "number": 103,
+          "started_at": null,
+          "completed_at": null
+        },
+        {
+          "name": "Stop containers",
+          "status": "pending",
+          "conclusion": null,
+          "number": 104,
+          "started_at": null,
+          "completed_at": null
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132926694005",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001144,
+      "runner_name": "GitHub Actions 1000001144",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 132926694171,
+      "run_id": 43751642401,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-cleanup-65d722f1",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43751642401",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe8wxjGw",
+      "head_sha": "65d722f1a5a3c5584b3b84ce901e6ab77635e633",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132926694171",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43751642401/job/132926694171",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-15T19:18:06Z",
+      "started_at": "2026-11-15T19:18:08Z",
+      "completed_at": "2026-11-15T19:27:49Z",
+      "name": "memory-integration",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T19:18:09Z",
+          "completed_at": "2026-11-15T19:18:11Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T19:18:11Z",
+          "completed_at": "2026-11-15T19:18:28Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T19:18:28Z",
+          "completed_at": "2026-11-15T19:18:38Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T19:18:38Z",
+          "completed_at": "2026-11-15T19:18:49Z"
+        },
+        {
+          "name": "Install the memory service toolchain",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T19:18:49Z",
+          "completed_at": "2026-11-15T19:18:57Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T19:18:57Z",
+          "completed_at": "2026-11-15T19:18:58Z"
+        },
+        {
+          "name": "Cache memory model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-15T19:18:58Z",
+          "completed_at": "2026-11-15T19:19:02Z"
+        },
+        {
+          "name": "Prepare and verify the pinned model (build network only)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T19:19:02Z",
+          "completed_at": "2026-11-15T19:19:03Z"
+        },
+        {
+          "name": "Live memory-service integration",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-15T19:19:03Z",
+          "completed_at": "2026-11-15T19:27:27Z"
+        },
+        {
+          "name": "Post Cache memory model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-15T19:27:27Z",
+          "completed_at": "2026-11-15T19:27:27Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 16,
+          "started_at": "2026-11-15T19:27:27Z",
+          "completed_at": "2026-11-15T19:27:46Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 17,
+          "started_at": "2026-11-15T19:27:46Z",
+          "completed_at": "2026-11-15T19:27:46Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 18,
+          "started_at": "2026-11-15T19:27:46Z",
+          "completed_at": "2026-11-15T19:27:46Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 19,
+          "started_at": "2026-11-15T19:27:46Z",
+          "completed_at": "2026-11-15T19:27:47Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132926694171",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001145,
+      "runner_name": "GitHub Actions 1000001145",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 132926694196,
+      "run_id": 43751642401,
+      "workflow_name": "CI",
+      "head_branch": "codex/plan03-p04-cleanup-65d722f1",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43751642401",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe8wxjNA",
+      "head_sha": "65d722f1a5a3c5584b3b84ce901e6ab77635e633",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132926694196",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43751642401/job/132926694196",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-11-15T19:18:06Z",
+      "started_at": "2026-11-15T19:18:09Z",
+      "completed_at": "2026-11-15T19:34:25Z",
+      "name": "doop-integration",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T19:18:10Z",
+          "completed_at": "2026-11-15T19:18:12Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T19:18:12Z",
+          "completed_at": "2026-11-15T19:18:26Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T19:18:26Z",
+          "completed_at": "2026-11-15T19:18:37Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@stable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T19:18:37Z",
+          "completed_at": "2026-11-15T19:18:49Z"
+        },
+        {
+          "name": "Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T19:18:49Z",
+          "completed_at": "2026-11-15T19:18:50Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T19:18:50Z",
+          "completed_at": "2026-11-15T19:18:55Z"
+        },
+        {
+          "name": "Require the ordinary sandboxed system browser",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-15T19:18:55Z",
+          "completed_at": "2026-11-15T19:18:58Z"
+        },
+        {
+          "name": "Prepare the pinned managed Doop source and dependencies",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T19:18:58Z",
+          "completed_at": "2026-11-15T19:19:09Z"
+        },
+        {
+          "name": "Complete separate Doop service gate without inherited credentials",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-15T19:19:09Z",
+          "completed_at": "2026-11-15T19:27:35Z"
+        },
+        {
+          "name": "Compile and retain the exact Openbot helper executable",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-15T19:27:35Z",
+          "completed_at": "2026-11-15T19:34:04Z"
+        },
+        {
+          "name": "Pull the pinned private PostgreSQL image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-15T19:34:04Z",
+          "completed_at": "2026-11-15T19:34:09Z"
+        },
+        {
+          "name": "Pull the pinned private object-storage image",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-15T19:34:09Z",
+          "completed_at": "2026-11-15T19:34:09Z"
+        },
+        {
+          "name": "Build the private Doop deployment image",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 13,
+          "started_at": "2026-11-15T19:34:09Z",
+          "completed_at": "2026-11-15T19:34:13Z"
+        },
+        {
+          "name": "Require both private storage modes and both actual probe families",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 14,
+          "started_at": "2026-11-15T19:34:13Z",
+          "completed_at": "2026-11-15T19:34:13Z"
+        },
+        {
+          "name": "Retain sanitized source image helper and acceptance evidence",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 15,
+          "started_at": "2026-11-15T19:34:13Z",
+          "completed_at": "2026-11-15T19:34:15Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 27,
+          "started_at": "2026-11-15T19:34:15Z",
+          "completed_at": "2026-11-15T19:34:15Z"
+        },
+        {
+          "name": "Post Run Swatinem/rust-cache@v2",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 28,
+          "started_at": "2026-11-15T19:34:15Z",
+          "completed_at": "2026-11-15T19:34:15Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 29,
+          "started_at": "2026-11-15T19:34:15Z",
+          "completed_at": "2026-11-15T19:34:15Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 30,
+          "started_at": "2026-11-15T19:34:15Z",
+          "completed_at": "2026-11-15T19:34:19Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 31,
+          "started_at": "2026-11-15T19:34:19Z",
+          "completed_at": "2026-11-15T19:34:19Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132926694196",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001146,
+      "runner_name": "GitHub Actions 1000001146",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

@@ -1,0 +1,18 @@
+
+running 4 tests
+test application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants ... ok
+
+thread 'adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_publication_restores_every_owned_resource' (16644106) panicked at src/adapters/persistence/agent_direct_lifecycle_tests.rs:143:10:
+called `Result::unwrap_err()` on an `Ok` value: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_publication_restores_every_owned_resource ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::guard_tests::native_claims::workflow_escalation_agent_native_receipt_rejects_forged_fence_route_and_principal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... ok
+
+failures:
+
+failures:
+    adapters::persistence::department::tests::agent_desks::direct_lifecycle::agent_address_delete_retained_external_publication_restores_every_owned_resource
+
+test result: FAILED. 3 passed; 1 failed; 0 ignored; 0 measured; 4597 filtered out; finished in 17.96s
+

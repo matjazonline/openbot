@@ -1,0 +1,14 @@
+
+running 9 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_cancelled_child_result_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_child_failure_error_route_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_failed_child_result_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_fresh_final_child_result_requires_current_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_nonfinal_child_arrival_commits_without_unused_actor_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_nonfinal_child_result_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_repeat_done_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_repeat_exhausted_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::terminal_hints::workflow_reviewer_follow_repeat_next_round_ignores_unused_retired_final_reviewers ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4376 filtered out; finished in 6.14s
+

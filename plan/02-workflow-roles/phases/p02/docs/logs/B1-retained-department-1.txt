@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 57.35s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict' (48388054) panicked at src/adapters/persistence/workflow/role_snapshot_sql_tests.rs:247:55:
+called `Result::unwrap()` on an `Err` value: Conflict("This channel has retained conversations or workflow configuration and cannot be deleted")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sql_tests::workflow_role_admission_retained_department_refuses_delete_with_a_history_conflict
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4199 filtered out; finished in 1.57s
+
+error: test failed, to rerun pass `--lib`

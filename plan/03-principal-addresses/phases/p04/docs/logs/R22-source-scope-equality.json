@@ -1,0 +1,15 @@
+{
+  "artifact": "dc5b28cd2cee6eb9281ef6ed583d20682bfc9ecacd0afe597e4aa4a83f726c14",
+  "head": "584d7d69c02569c6a1410b1b75a4d0ce2b3d3287",
+  "compared_material_commit": "222b9aea996151748f7ba6d5a0c0ead7a913df0a",
+  "focused_private_commit": "76925ef6836250171f556892ba449e9575dc4308",
+  "changed_since_R21": [
+    ".github/workflows/ci.yml",
+    ".trail/learnings/2026-11-16-keep-browser-temporary-path-fixes-inside-mac02.md",
+    "scripts/check-doop.py",
+    "scripts/doop-test/browser-ipc-check.mjs",
+    "scripts/tests/check-runner.py"
+  ],
+  "identical_runtime_files": 2488,
+  "claim": "BrowserOwner/private/e2e/image/acceptance/supervisor/nativeRust/Cargo/migrations/.sqlx/Memory bytes identical. Only extra standalonepreflight registration/program removed, fakecallcount restored, retrospectivelearning added. R21wholecandidate differs; reuse onlyexactprivateconsumerprojection if proof completes, notdeletedpreflightfailurepaths."
+}

@@ -140,6 +140,7 @@ impl Frames {
 /// A deployment with no spam scanning, which is all these streams need.
 pub(in crate::adapters::http::routes) fn test_config() -> Arc<AppConfig> {
     Arc::new(AppConfig {
+        escalation_ack_hours: Default::default(),
         knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
         knowledge_search_limit:
             crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -249,11 +250,24 @@ struct Harness {
     company_id: Uuid,
     channel_id: Uuid,
     owner: Viewer,
+    _database: Option<crate::adapters::persistence::test_support::OwnDatabase>,
 }
 
 impl Harness {
     async fn new() -> Option<Self> {
-        let persistence = Arc::new(PostgresPersistence::new(test_pool().await?));
+        Self::on(test_pool().await?, None).await
+    }
+
+    async fn isolated() -> Option<Self> {
+        let database = crate::adapters::persistence::test_support::own_database().await?;
+        Self::on(database.pool.clone(), Some(database)).await
+    }
+
+    async fn on(
+        pool: sqlx::PgPool,
+        database: Option<crate::adapters::persistence::test_support::OwnDatabase>,
+    ) -> Option<Self> {
+        let persistence = Arc::new(PostgresPersistence::new(pool));
         let suffix = Uuid::new_v4().simple().to_string();
         let email = format!("activity-stream-{suffix}@example.com");
         persistence
@@ -296,6 +310,7 @@ impl Harness {
                 .expect("one renderer registers"),
         );
         Some(Self {
+            _database: database,
             channels: Arc::new(ChannelUseCases::new(
                 persistence.clone(),
                 persistence.clone(),
@@ -333,10 +348,16 @@ impl Harness {
     }
 
     async fn thread(&self, subject: &str) -> Uuid {
-        ThreadPersistence::create_thread(self.persistence.as_ref(), self.channel_id, subject, &[])
-            .await
-            .unwrap()
-            .id
+        ThreadPersistence::create_thread(
+            self.persistence.as_ref(),
+            self.company_id,
+            crate::entities::address::AddressTarget::Desk(self.channel_id),
+            subject,
+            &[],
+        )
+        .await
+        .unwrap()
+        .id
     }
 
     /// Set what a thread's newest run is doing; `None` is a thread with no run, or a finished one.
@@ -355,7 +376,7 @@ impl Harness {
         self.events
             .publish(MailboxEvent::ActivityChanged(ThreadScope {
                 thread_id,
-                channel_id: self.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(self.channel_id),
                 company_id: self.company_id,
             }));
     }
@@ -376,7 +397,10 @@ impl Harness {
                 HeaderMap::new(),
                 Query(ChannelStreamQuery {
                     company_id: self.company_id,
-                    channel_id: self.channel_id,
+                    inbox: crate::adapters::http::routes::ui::InboxSelection {
+                        channel_id: Some(self.channel_id),
+                        principal_id: None,
+                    },
                     after: None,
                 }),
             )
@@ -397,7 +421,10 @@ impl Harness {
                 HeaderMap::new(),
                 Query(ThreadStreamQuery {
                     company_id: self.company_id,
-                    channel_id: self.channel_id,
+                    inbox: crate::adapters::http::routes::ui::InboxSelection {
+                        channel_id: Some(self.channel_id),
+                        principal_id: None,
+                    },
                     thread_id,
                     after: None,
                 }),
@@ -526,7 +553,7 @@ async fn the_open_thread_streams_its_activity_strip() {
         .events
         .publish(MailboxEvent::AttentionChanged(AttentionScope {
             company_id: harness.company_id,
-            channel_id: harness.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(harness.channel_id),
             source_kind: AttentionWakeSource::Delivery,
             source_id: Uuid::new_v4(),
         }));
@@ -543,3 +570,6 @@ mod message_source_tests;
 
 #[path = "ui_knowledge_view_tests.rs"]
 mod knowledge_views;
+
+#[path = "ui_direct_tests.rs"]
+mod direct_tests;

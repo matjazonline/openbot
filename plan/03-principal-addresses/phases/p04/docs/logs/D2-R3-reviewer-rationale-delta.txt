@@ -1,0 +1,36 @@
+diff --git a/plan/03-principal-addresses/phases/p04/docs/logs/D2-r2.md b/plan/03-principal-addresses/phases/p04/docs/logs/D2-r3.md
+index 8354a6fc..0ad6b1eb 100644
+--- a/plan/03-principal-addresses/phases/p04/docs/logs/D2-r2.md
++++ b/plan/03-principal-addresses/phases/p04/docs/logs/D2-r3.md
+@@ -1,4 +1,4 @@
+-# 03PA-P04 D2/r2 — Deliver pending MCP cancellation outside a stopped SDK queue
++# 03PA-P04 D2/r3 — Deliver pending MCP cancellation outside a stopped SDK queue
+ 
+ No backward compatibility. No database, public API, timeout increase, new provider or dependency.
+ This corrects an exposed lifecycle dependency of the integrated native MCP path; it does not change
+@@ -15,12 +15,19 @@ the prefix code. It is within FC2's native effect/lease-loss cancellation interf
+ edit unrelated service sources. Existing workflow MCP cancellation tests require this notification.
+ 
+ Session.call stores the real SDK RequestHandle id. rmcp1.8.0 send_request_with_option reserves it
+-before enqueueing the request. Session.close calls cancel_pending, but client.notify_cancelled only
+-queues a notification: it does not await the HTTP send. Session.close immediately cancels the same
+-Control.stop token that drives the SDK service/transport. HttpMcpClient.shutdown can cancel that
+-parent first as well. Thus the queued cleanup notification can be discarded before HTTP dispatch,
+-even though BoundedHttp explicitly exempts this cleanup notification from live authority checks.
+-The final joined SDK worker proves no work remains; it does not prove the cancellation was sent.
++before sending the peer request. Its notify_cancelled/send_notification DOES await responder →
++WorkerTransport::send → HTTP post completion (service.rs:590–599,1131–1151;
++transport/worker.rs:189–208; streamable_http_client.rs:811–815). The r2 statement that this was only
++an enqueue was incorrect; D2-R2/F1 identified that rationale error.
++
++The demonstrated failure instead involves HttpMcpClient.shutdown canceling its parent token before
++or concurrently with abandoned-session cleanup. Control.stop is a child of that token and is also
++the SDK service/transport token. worker::run then exits to Session.close, but cancel_pending cannot
++send through that already-stopped SDK. BoundedHttp's exemption for a fixed cancellation notification
++cannot reopen the stopped peer/service. The direct existing HTTP cleanup capability remains usable
++after Control.stop, just as fallback session DELETE already is. The joined SDK worker proves no work
++remains; it does not prove the missing notification was delivered. This evidence correction changes
++no r2 protocol choice, ownership, budget, authority exception or required test.
+ The installed SDK also calls BoundedHttp.delete_session when its transport stops
+ (streamable_http_client.rs:832–845), independently of Session.close, under its existing5second
+ cleanup bound. Therefore direct cancellation and SDK deletion must share the same cleanup owner;

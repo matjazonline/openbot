@@ -1,0 +1,15 @@
+{
+  "digest": "4c0a3396c2af07a24a9a9dc19894f032cb3ebb13839ffad17ca8bcb216192ba4",
+  "head": "2bbe2649024aa6a4617b74b0c0c7868b14590b5f",
+  "excludes": [
+    "plan/02-workflow-roles/phases/p01/docs",
+    "plan/02-workflow-roles/phases/p02/docs",
+    "plan/02-workflow-roles/phases/p03/docs",
+    "plan/02-workflow-roles/phases/p04/docs",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/03-principal-addresses/COORDINATION.md"
+  ],
+  "coordination_revision": 37,
+  "decision_sha256": "7240993d7cf2aeddd4de19a11337269fefc39c6f2d2e746b3e20ff2de637a042",
+  "coordination_sha256": "02330f8392710ad45fed74eff1b647eea9bbe88dd1f4a848934189e6b9c83386"
+}

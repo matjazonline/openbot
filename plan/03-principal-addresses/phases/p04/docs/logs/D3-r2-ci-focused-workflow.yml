@@ -1,0 +1,14 @@
+name: Plan03 Linux isolation proof
+on: [push]
+permissions:
+  contents: read
+jobs:
+  focused-proof:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reproduce the previous post-mutation ownership defect
+        run: python3 -I plan/03-principal-addresses/phases/p04/docs/logs/D3-r2-counterexample.py
+      - name: Exercise current real Linux isolation and ownership paths
+        run: python3 -I scripts/tests/network-isolation-scope.py

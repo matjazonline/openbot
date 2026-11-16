@@ -1,7 +1,7 @@
 //! Shared canonical message planning; provider sends belong to the delivery worker.
 use super::*;
 use crate::application::ports::thread::{
-    MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, qualified_email_identity,
+    MessageCorrelation, MessageParticipantWrite, qualified_email_identity,
 };
 use crate::application::transport::{
     DeliveryComposer, DeliveryContext, DeliveryPurpose, DeliveryRequest, EmailDeliveryContext,
@@ -9,9 +9,7 @@ use crate::application::transport::{
 };
 use crate::domain::workflow::ActionInvocationId;
 use crate::entities::channel::Channel;
-use crate::entities::message::{
-    MessageDirection, MessageParticipantKind, MessageRole, ThreadEntryKind,
-};
+use crate::entities::message::{MessageDirection, MessageParticipantKind, ThreadEntryKind};
 
 #[derive(Debug, Clone, Copy)]
 pub struct MessagePublicationIdentity {
@@ -64,8 +62,8 @@ impl MessagePlanner {
                 RouteTarget::ReplyInternal {
                     source,
                     thread,
-                    channel,
-                } => plan_internal_reply(*source, *thread, *channel, content, routes),
+                    target,
+                } => plan_internal_reply(*source, *thread, *target, content, routes),
                 RouteTarget::User { .. } | RouteTarget::ReplyEmail { .. }
                     if routes.delivery_policy
                         == crate::application::workflow::DeliveryPolicy::InAppOnly =>
@@ -109,7 +107,7 @@ impl MessagePlanner {
             .composer
             .compose(DeliveryRequest {
                 company_id: identity.company.as_uuid(),
-                channel_id: email.sender.id,
+                target: email.sender.target,
                 message_id,
                 correlation_id: routes.correlation_id,
                 purpose: email.purpose,
@@ -131,7 +129,7 @@ impl MessagePlanner {
             kind,
             destination_id,
             new_thread: email.new_thread,
-            channel_id: email.sender.id,
+            target: email.sender.target,
             thread_id: email.thread_id,
             message,
             delivery: Some(composed.delivery),
@@ -144,7 +142,7 @@ impl MessagePlanner {
 
 /// The email-specific facts of one destination, decided without I/O.
 struct EmailPlan {
-    sender: ChannelRoute,
+    sender: MessageSender,
     recipient: EmailAddress,
     threading: EmailThreading,
     relay: EmailRelayTrace,
@@ -184,11 +182,11 @@ impl EmailPlan {
             id: message_id,
             ..MessageWrite::internal(
                 self.thread_id,
-                MessageAuthorWrite::Platform,
+                routes.author.message_author(),
                 content.subject().to_string(),
                 content.body_text().to_string(),
                 MessageDirection::Outbound,
-                MessageRole::System,
+                routes.author.role(),
                 routes.correlation_id,
             )
         }
@@ -223,15 +221,15 @@ impl EmailPlan {
                     threading: EmailThreading::Standalone,
                     // The scheduled-delivery precedent: the sending channel starts the chain.
                     relay: EmailRelayTrace {
-                        source_channel_id: sender.id,
+                        source_target: sender.target,
                         hop_count: 0,
-                        trace_channels: vec![sender.id],
+                        trace_targets: vec![sender.target],
                     },
                     purpose: DeliveryPurpose::WorkflowSend,
                     thread_id,
                     new_thread: Some(NewThread {
                         id: thread_id,
-                        channel_id: sender.id,
+                        target: sender.target,
                         subject: content.subject().to_string(),
                     }),
                     principal: Some(*principal),
@@ -239,7 +237,7 @@ impl EmailPlan {
                         user: *user,
                         principal: *principal,
                         email: email.clone(),
-                        sender: sender.id,
+                        sender: sender.target,
                     },
                 })
             }
@@ -261,11 +259,11 @@ impl EmailPlan {
                 // A reply continues the trace the source arrived with; with none recorded it
                 // starts one, as direct mail does.
                 relay: EmailRelayTrace {
-                    source_channel_id: sender.id,
+                    source_target: sender.target,
                     hop_count: relay.as_ref().map_or(0, |relay| relay.hop_count),
-                    trace_channels: relay
+                    trace_targets: relay
                         .as_ref()
-                        .map(|relay| relay.trace_channels.clone())
+                        .map(|relay| relay.trace_targets.clone())
                         .unwrap_or_default(),
                 },
                 purpose: DeliveryPurpose::WorkflowReply,
@@ -275,7 +273,7 @@ impl EmailPlan {
                 check: RouteCheck::Source {
                     source: *source,
                     thread: *thread,
-                    channel: sender.id,
+                    target: sender.target,
                 },
             }),
             RouteTarget::Channel { .. } | RouteTarget::ReplyInternal { .. } => {
@@ -295,11 +293,11 @@ fn plan_channel(
     let thread_id = Uuid::new_v4();
     let message = MessageWrite::internal(
         thread_id,
-        MessageAuthorWrite::Platform,
+        routes.author.message_author(),
         content.subject().to_string(),
         content.body_text().to_string(),
         MessageDirection::Outbound,
-        MessageRole::System,
+        routes.author.role(),
         routes.correlation_id,
     )
     // It opens its own thread, so a conversation entry answers no earlier turn.
@@ -309,10 +307,10 @@ fn plan_channel(
         destination_id,
         new_thread: Some(NewThread {
             id: thread_id,
-            channel_id: channel,
+            target: crate::entities::address::AddressTarget::Desk(channel),
             subject: content.subject().to_string(),
         }),
-        channel_id: channel,
+        target: crate::entities::address::AddressTarget::Desk(channel),
         thread_id,
         message,
         delivery: None,
@@ -335,11 +333,11 @@ fn plan_in_app(
     let email = EmailPlan::of(target, content)?;
     let message = MessageWrite::internal(
         email.thread_id,
-        MessageAuthorWrite::Platform,
+        routes.author.message_author(),
         content.subject().to_string(),
         content.body_text().to_string(),
         MessageDirection::Outbound,
-        MessageRole::System,
+        routes.author.role(),
         routes.correlation_id,
     )
     .with_entry_kind(ThreadEntryKind::Conversation);
@@ -347,7 +345,7 @@ fn plan_in_app(
         kind,
         destination_id,
         new_thread: email.new_thread,
-        channel_id: email.sender.id,
+        target: email.sender.target,
         thread_id: email.thread_id,
         message,
         delivery: None,
@@ -360,18 +358,18 @@ fn plan_in_app(
 fn plan_internal_reply(
     source: CanonicalMessageId,
     thread: Uuid,
-    channel: Uuid,
+    target: crate::entities::address::AddressTarget,
     content: &CanonicalContent,
     routes: &MessageRoutes,
 ) -> PlannedDestination {
     // A note: it neither answers a customer turn nor carries email headers.
     let message = MessageWrite::internal(
         thread,
-        MessageAuthorWrite::Platform,
+        routes.author.message_author(),
         content.subject().to_string(),
         content.body_text().to_string(),
         MessageDirection::Outbound,
-        MessageRole::System,
+        routes.author.role(),
         routes.correlation_id,
     )
     .with_entry_kind(ThreadEntryKind::Note);
@@ -379,7 +377,7 @@ fn plan_internal_reply(
         kind: DestinationKind::Reply,
         destination_id: source.as_uuid(),
         new_thread: None,
-        channel_id: channel,
+        target,
         thread_id: thread,
         message,
         delivery: None,
@@ -388,7 +386,7 @@ fn plan_internal_reply(
         check: RouteCheck::Source {
             source,
             thread,
-            channel,
+            target,
         },
     }
 }

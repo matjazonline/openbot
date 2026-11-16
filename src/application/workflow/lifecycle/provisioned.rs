@@ -51,6 +51,7 @@ pub fn provisioned_binding(
     }
     let configuration = Arc::new(ConfiguredBinding::new(
         BindingConfiguration {
+            escalation: None,
             id: target.binding,
             revision: BindingRevision::new(1).expect("first configuration"),
             company_id: target.company,
@@ -111,6 +112,7 @@ pub fn provisioned_reconfiguration(
             resources: old.resources().clone(),
             run_as: actor,
             message_trigger: old.message_trigger(),
+            escalation: old.escalation(),
         },
         bundle,
     )?);

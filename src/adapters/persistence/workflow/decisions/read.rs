@@ -42,7 +42,7 @@ pub(super) async fn read_on(
 ) -> AppResult<DecisionView> {
     let Locked {
         scope, reviewer, ..
-    } = lock_decision(tx, company, actor, decision).await?;
+    } = lock_decision(tx, company, actor, decision, DecisionPurpose::Read).await?;
     let row: ViewRow = sqlx::query_as(READ_SQL)
         .bind(company.as_uuid())
         .bind(decision.0)
@@ -54,8 +54,14 @@ pub(super) async fn read_on(
          JOIN workflow_run_budgets AS budget ON (budget.company_id,budget.run_id)=(run.company_id,run.id) \
          WHERE run.company_id=$1 AND run.id=$2")
         .bind(company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
-    let reviewers: Vec<Uuid> = sqlx::query_scalar("SELECT user_id FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
+    let reviewers: Vec<Uuid> = sqlx::query_scalar("SELECT principal_id FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
         .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
+    let reviewer_labels: Vec<(Uuid, String)> = sqlx::query_as("SELECT reviewer.principal_id,reviewer.reviewer_label FROM workflow_decision_reviewers AS reviewer WHERE reviewer.company_id=$1 AND reviewer.decision_id=$2 ORDER BY reviewer.ordinal")
+        .bind(company.as_uuid()).bind(decision.0).fetch_all(&mut **tx).await?;
+    let reviewer_labels = reviewer_labels
+        .into_iter()
+        .map(|(principal, label)| DecisionReviewer { principal, label })
+        .collect();
     let comments = comments(tx, company, decision).await?;
     let subject = subject(&row.subject_kind)?;
     let step = StepId::parse(&row.step_id).map_err(|_| invalid())?;
@@ -83,7 +89,8 @@ pub(super) async fn read_on(
                 inspect_run: reviewer.privileged,
             },
             reviewers,
-            actor: actor.user_id(),
+            reviewer_labels,
+            actor: reviewer.principal,
             step,
             choices,
             proposal,
@@ -99,6 +106,7 @@ struct DecisionReadParts {
     subject: DecisionSubject,
     context: DecisionContext,
     reviewers: Vec<Uuid>,
+    reviewer_labels: Vec<DecisionReviewer>,
     actor: Uuid,
     step: StepId,
     choices: Vec<String>,
@@ -164,6 +172,7 @@ fn assemble(
         deadline: row.deadline,
         state: row.state,
         reviewers: parts.reviewers,
+        reviewer_labels: parts.reviewer_labels,
         choices: parts.choices,
         submission,
         comments: parts.comments,

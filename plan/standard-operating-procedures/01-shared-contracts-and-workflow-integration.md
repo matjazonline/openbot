@@ -39,8 +39,11 @@ introductions still describe early compiler phases; use the current source and
 2. Include SOP sections in compiler validation, compiled identity, immutable publication storage,
    diffs, authoring help, and sample inputs. Reject unknown fields and unsupported policy values.
    Guidance edits require republishing; runtime never dereferences a mutable SOP document.
-3. Define role keys as domain newtypes. A role describes responsibility and maps to an existing
-   company user/group reviewer or the selected saved agent. It does not grant membership, tools,
+3. Use the workflow roles plan's `DepartmentRole` (`lead`, `reviewer`;
+   `src/domain/entities/department.rs`) as the role key; do not define a second one. A role is
+   resolved through the desk's department, as `plan/02-workflow-roles` does for workflow steps and
+   reviewers. A role describes responsibility and maps to an existing company user/group reviewer
+   or the selected saved agent. It does not grant membership, tools,
    skills, model access, or coordinator authority. A coordinator must be a currently authorized
    human. Group membership and authority are rechecked when a person acts.
 4. Freeze concrete run responsibility bindings at admission using the existing binding/readiness

@@ -169,7 +169,7 @@ pub struct MessageAuditView {
     pub canonical_id: CanonicalMessageId,
     pub company_id: Uuid,
     pub thread_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: super::address::AddressTarget,
     pub author: AuthorView,
     pub direction: MessageDirection,
     pub role: MessageRole,

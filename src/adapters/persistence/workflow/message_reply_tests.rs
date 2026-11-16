@@ -33,6 +33,8 @@ enum Ask {
     Member,
     /// A `message.reply` to a customer's message: its author answers, in the customer thread.
     Customer,
+    /// A reply to a specific incoming message, including a desk's observed email address.
+    Reply(CanonicalMessageId),
     /// A `channel` post: a member answers in-app.
     Channel,
 }
@@ -78,11 +80,13 @@ async fn asked(s: &Intents, then: Then, park: bool) -> Asked {
     asked_via(s, Ask::Member, then, park).await
 }
 
-/// Publish, bind and admit a run asking through `ask`, and drive its question to completion.
-async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
-    let p = s.p();
-    let workflow = WorkflowId::new(Uuid::new_v4());
-    let (start, association) = match ask {
+/// Select the message operation and the association that owns its source.
+async fn question_start(
+    s: &Intents,
+    ask: Ask,
+    workflow: WorkflowId,
+) -> (Value, RelatedAssociation) {
+    match ask {
         Ask::Member => {
             let user = member(&s.fixture, "member").await;
             (
@@ -92,14 +96,17 @@ async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
                 RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
             )
         }
-        Ask::Customer => {
-            let source = s.message().await;
+        Ask::Customer | Ask::Reply(_) => {
+            let source = match ask {
+                Ask::Reply(source) => source,
+                _ => s.message().await,
+            };
             (
                 json!({"type":"message.reply","with":{
                     "content":{"literal":{"body":"Shall we proceed?"}},
                     "source_message":{"literal":source.as_uuid().to_string()}}}),
                 RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(s.channel),
+                    target: crate::entities::address::AddressTarget::Desk(s.channel),
                     thread_id: RelatedThreadId::new(s.thread),
                 },
             )
@@ -117,7 +124,14 @@ async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
                 RelatedAssociation::Channel(RelatedChannelId::new(s.channel)),
             )
         }
-    };
+    }
+}
+
+/// Publish, bind and admit a run asking through `ask`, and drive its question to completion.
+async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
+    let p = s.p();
+    let workflow = WorkflowId::new(Uuid::new_v4());
+    let (start, association) = Box::pin(question_start(s, ask, workflow)).await;
     let version = VersionId::new(Uuid::new_v4());
     let definitions = DefinitionService::new(
         Preflight,
@@ -145,7 +159,7 @@ async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
         .await
         .unwrap()
         .unwrap();
-    let kind = if ask == Ask::Customer {
+    let kind = if matches!(ask, Ask::Customer | Ask::Reply(_)) {
         "message.reply"
     } else {
         "message.send"
@@ -238,24 +252,27 @@ async fn reply(s: &Intents, asked: &Asked, by: By, role: &str) -> Uuid {
 /// A reply into the question's thread that reached ingress by `origin`, as its intent.
 async fn reply_from(s: &Intents, asked: &Asked, by: By, role: &str, origin: &str) -> Uuid {
     let n = s.messages.fetch_add(1, Ordering::SeqCst);
-    let message = s
-        .p()
-        .create_message(&inbound(
-            asked.thread,
-            &format!("<reply-{n}@partner.test>"),
-            &[],
-            "Yes, go ahead.",
-        ))
-        .await
-        .unwrap()
-        .canonical_id;
+    let message = if origin == "internal" {
+        Box::pin(relayed_reply(s, asked, n)).await
+    } else {
+        s.p()
+            .create_message(&inbound(
+                asked.thread,
+                &format!("<reply-{n}@partner.test>"),
+                &[],
+                "Yes, go ahead.",
+            ))
+            .await
+            .unwrap()
+            .canonical_id
+    };
     let id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, thread_id, \
            role, mentioned, admissible, origin, reply_to_message_id, responder_principal_id, \
-           hop_count, trace_channels, delivery_policy, correlation_id) \
+           hop_count, trace_targets, delivery_policy, correlation_id) \
          SELECT $1, $2, message.id, $3, $4, $5, false, true, $9, $6, \
-           COALESCE($7, message.author_principal_id), 0, '{}', 'deliver', $2 \
+           COALESCE($7, message.author_principal_id), 0, '[]', 'deliver', $2 \
          FROM messages AS message WHERE message.company_id = $1 AND message.id = $8",
     )
     .bind(s.fixture.target.company.as_uuid())
@@ -275,6 +292,109 @@ async fn reply_from(s: &Intents, asked: &Asked, by: By, role: &str, origin: &str
     .await
     .unwrap();
     id
+}
+
+/// The observed sender on another desk's incoming email is the destination of a real
+/// workflow reply. Its canonical publication supplies the relay's sealed producer and part.
+async fn relay_source(s: &Intents, asked: &Asked, n: usize) -> CanonicalMessageId {
+    use crate::application::ports::channel::ChannelPersistence;
+    use crate::application::ports::thread::{MessageAuthorWrite, MessageParticipantWrite};
+    use crate::application::use_cases::company::CompanyPersistence;
+    // The shared message fixture keeps desks disabled. A genuine internal sender must be live.
+    sqlx::query("UPDATE channels SET enabled=true WHERE company_id=$1 AND id=$2")
+        .bind(s.fixture.target.company.as_uuid())
+        .bind(s.channel)
+        .execute(s.pool())
+        .await
+        .unwrap();
+    let channel = ChannelPersistence::get_by_id(s.p(), asked.channel)
+        .await
+        .unwrap()
+        .unwrap();
+    let company = CompanyPersistence::get_by_id(s.p(), channel.company_id)
+        .await
+        .unwrap()
+        .unwrap();
+    let address =
+        crate::entities::channel::Channel::address_for(&channel.slug, &company.slug, "agents.test");
+    let identity =
+        crate::application::ports::thread::qualified_email_identity(address.as_str()).unwrap();
+    let mut incoming = inbound(
+        s.thread,
+        &format!("<relay-source-{n}@partner.test>"),
+        &[],
+        "A desk request",
+    );
+    incoming.author = MessageAuthorWrite::Observed(
+        crate::application::ports::participant::IdentityObservation {
+            identity: identity.clone(),
+            display_label: None,
+            claim_metadata: crate::entities::participant::IdentityClaimMetadata::observation(),
+            provenance: crate::entities::participant::IdentityProvenance::TransportIngress,
+        },
+    );
+    incoming.participants[0] = MessageParticipantWrite::new(
+        crate::entities::message::MessageParticipantKind::Sender,
+        identity,
+    );
+    s.p().create_message(&incoming).await.unwrap().canonical_id
+}
+
+/// Reconstruct the exact internal copy of a real workflow reply, leaving the native relay
+/// guard enabled. A human message or an unsealed fixture delivery cannot provide this proof.
+async fn relayed_reply(s: &Intents, asked: &Asked, n: usize) -> CanonicalMessageId {
+    use crate::application::ports::thread::{
+        MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
+        qualified_email_identity,
+    };
+    use crate::entities::email_message::EmailMessageMetadata;
+    use crate::entities::message::{MessageDirection, MessageParticipantKind, MessageRole};
+    let source = Box::pin(relay_source(s, asked, n)).await;
+    let producer = Box::pin(asked_via(s, Ask::Reply(source), Then::AwaitOther, true)).await;
+    let delivery = delivery(s.pool(), producer.run, 0).await;
+    let payload: Value = sqlx::query_scalar(
+        "SELECT part.payload->'body' FROM message_delivery_parts AS part WHERE part.company_id=$1 AND part.delivery_id=$2 AND part.part_index=0",
+    ).bind(s.fixture.target.company.as_uuid()).bind(delivery).fetch_one(s.pool()).await.unwrap();
+    let email: crate::adapters::protocols::email::OutboundEmailV1 =
+        serde_json::from_value(payload).unwrap();
+    let message = MessageWrite::internal(
+        asked.thread,
+        MessageAuthorWrite::Platform,
+        email.subject,
+        email.body_text.clone(),
+        MessageDirection::Inbound,
+        MessageRole::System,
+        email.correlation_id,
+    )
+    .with_participants(vec![
+        MessageParticipantWrite::new(
+            MessageParticipantKind::Sender,
+            qualified_email_identity(email.from.as_str()).unwrap(),
+        ),
+        MessageParticipantWrite::new(
+            MessageParticipantKind::To,
+            qualified_email_identity(email.recipients_to[0].as_str()).unwrap(),
+        ),
+    ])
+    .with_correlation(MessageCorrelation::Email(
+        EmailMessageMetadata::new(email.message_id)
+            .in_reply_to(email.in_reply_to)
+            .references(email.references)
+            .raw_bodies(Some(email.body_text), None),
+    ));
+    let message = s.p().create_message(&message).await.unwrap().canonical_id;
+    sqlx::query(
+        "INSERT INTO message_internal_relays(company_id,message_id,delivery_id,part_index,source_channel_id) \
+         VALUES($1,$2,$3,0,$4)",
+    )
+    .bind(s.fixture.target.company.as_uuid())
+    .bind(message.as_uuid())
+    .bind(delivery)
+    .bind(s.channel)
+    .execute(s.pool())
+    .await
+    .unwrap();
+    message
 }
 
 /// A member's principal: a party to the company who is not whom a question addressed.

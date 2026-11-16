@@ -70,7 +70,7 @@ async fn workflow_agent_run_protected_tool_waits_for_approval_and_dispatches_onc
 async fn workflow_agent_run_token_pause_resumes_with_the_saved_request() {
     let setup = Box::pin(agent_setup_source("http://127.0.0.1:1", None, false, |source, actor| {
         source["limits"]["root_budget"] = json!({"activations":10,"model_calls":10,"repetitions":10,
-            "tokens":{"max_tokens":100,"reviewers":[{"kind":"user","id":actor}]}});
+            "tokens":{"max_tokens":100,"reviewers":[{"kind":"principal","id":actor}]}});
     }))
     .await;
     let llm = scripted_llm(vec![LlmTurn::text("\"after approval\"")]).await;

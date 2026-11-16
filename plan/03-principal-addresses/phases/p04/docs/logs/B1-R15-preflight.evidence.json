@@ -1,0 +1,67 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R15-preflight",
+  "artifact": "dc5b28cd2cee6eb9281ef6ed583d20682bfc9ecacd0afe597e4aa4a83f726c14",
+  "checks": [
+    {
+      "criteria": [
+        "R14-F1-removal",
+        "browser-env-protocol",
+        "runner-failure-contract"
+      ],
+      "command": "Node24 node --test scripts/tests/doop-probe.mjs; PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py; scope-byte-equality; gitdiffHEAD--check",
+      "fixture": "Existing26Node+10Pythoncases, no skipped/removedcases; removednewunprotectedpreflight insteadofnewcleanupabstraction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R22-doop-probe.txt",
+          "sha256": "9ac3495e6cc47cf940d50a677fad8d57df86af78ccf5ed5e694cb9ff89f21a5c"
+        },
+        {
+          "path": "logs/R22-check-runner.txt",
+          "sha256": "210291689cf9c05b65fdc4be1664c228e107c93d620e03c4dec3742aadee11ce"
+        },
+        {
+          "path": "logs/R22-source.snapshot.txt",
+          "sha256": "90fc65029fcf2eafe8317a4eafc101d36a041c81a256837b3027550b7b2d8169"
+        },
+        {
+          "path": "logs/R22-source-scope-equality.json",
+          "sha256": "a3be62133a26def56acbade56f0aa5f450d547b40dc529769dec7e5160a8efe4"
+        },
+        {
+          "path": "logs/R22-coordination56.md",
+          "sha256": "743524b77d7338b2fb7d8876333b4d539e6d8abaf9d459c1184d24bf4e9c3e7b"
+        },
+        {
+          "path": "logs/D4-r2.md",
+          "sha256": "71d0945cd27c4662893afd6bcb9609174a2ed64b8de51976f71b5fb5463bf5d5"
+        },
+        {
+          "path": "logs/B1-R14-ipc-owner-probe.txt",
+          "sha256": "883cda5566685eab17dc4cb42377f23d3281b2b10b5be0353d93700c0b4e5fb8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "required-native-fullgate",
+        "corrected-four-profile-private-proof"
+      ],
+      "command": "ActualgeneralR19CI43883869265 + actualR21focusedprivate43893046978",
+      "fixture": "Unchangednative/runtimeprojection, candidateincludesnowremovedindependentpreflight; no wholecandidateidentityclaim",
+      "status": "NOT EXERCISED",
+      "reason": "Currentactualgates stillrunning; no acceptance.",
+      "files": [
+        {
+          "path": "logs/R22-poll-151712-43883869265.json",
+          "sha256": "46e67969cdf1b4283bb3266a4eda885c7db7fefe7f1e8ae1bfbc583c5e709c19"
+        },
+        {
+          "path": "logs/R22-poll-151712-43893046978.json",
+          "sha256": "1af154c36478a5c8fb3614c24e549017aab8b270cb4f3dbd050a7997815e01c9"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 6 tests
+test adapters::mcp::tests::authentication::mcp_authentication_preparation_cancelled_before_admission_sends_no_credential ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4698 filtered out; finished in 0.05s
+

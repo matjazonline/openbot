@@ -1,0 +1,197 @@
+
+running 150 tests
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_foreign_ids_cannot_read_or_mutate_resources ... ok
+test adapters::http::routes::local_agents::tests::cloudroom_management_http_auth_csrf_typed_requests_and_frozen_session_roundtrip ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_foreign_selection_and_form_mutations_cannot_cross_company ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_later_profile_page_and_selection_keep_authorized_start_conversation ... ok
+test adapters::http::routes::local_agents::tests::ui::cloudroom_management_ui_native_forms_parse_save_start_and_render_original_session ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_operation_deadline_round_trip_preserves_digest ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_company_profiles_sessions_operations_are_scoped_and_frozen ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_fences_competing_connections_and_preserves_uncertainty ... ok
+test adapters::persistence::local_agents::machine_tests::cloudroom_revocation_repair_is_new_and_installation_reservation_survives_company_deletion ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_machine_reference_constraints_reject_foreign_rows ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_session_operation_constraints_reject_foreign_rows ... ok
+test adapters::persistence::local_agents::machine_tests::constraint_tests::cloudroom_company_workflow_session_constraint_rejects_existing_foreign_run ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_competing_starts_freeze_one_session_and_replay_before_profile_edits ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_connection_diagnostics_are_fenced_and_do_not_claim_provider_execution ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_controls_keep_disabled_headroom_and_stable_request_actor ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_private_and_foreign_session_reads_and_every_control_fail_closed ... ok
+test adapters::persistence::local_agents::management::tests::cloudroom_management_profile_pages_are_complete_without_cross_company_rows ... ok
+test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ignored, explicit browser fixture output
+test adapters::persistence::local_agents::management::tests::cloudroom_management_recent_output_is_bounded_and_usage_remains_unavailable ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_company_live_issuer_revocation_and_management_scope ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_budget_cardinality_is_bounded_under_competing_new_keys ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_cancel_and_consume_are_linearized ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_code_limit_cancel_and_competing_attempt_budget ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_competing_claimants_and_lost_response_recover_only_winner ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_expiry_uses_database_time_after_waiting_for_locks ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_secret_encodings_entropy_and_debug_redaction ... ok
+test adapters::persistence::local_agents::pairing_tests::cloudroom_pairing_reused_claim_or_credential_never_reserves_another_installation ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_capacity_sql_matches_command_kind_and_terminal_evidence_matrix ... ok
+test adapters::persistence::local_agents::protocol::capacity_tests::cloudroom_commands_uncertain_native_work_keeps_capacity_until_known_terminal_evidence ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_capacity_keeps_eight_control_slots ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_expiration_sweeps_leave_no_poison_batch ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_competing_logical_invocations_reuse_frozen_operation ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_readiness_stays_open_for_new_delivery_but_not_replacement ... ok
+test adapters::persistence::local_agents::protocol::command_tests::cloudroom_commands_withdrawal_refuses_untouched_but_reconciles_possible_delivery ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_accepted_controls_still_bound_the_outstanding_queue ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_create_binds_once_and_logical_replay_survives_native_mapping ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_foreign_session_and_observation_are_missing_to_an_authorized_manager ... ok
+test adapters::persistence::local_agents::protocol::command_tests::failures::cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_false_refusal ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_ack_replay_uses_current_fence_and_same_payload ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_lost_journal_or_cursor_cannot_release_recovery_barrier ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::cloudroom_observations_matching_turn_result_is_durable_and_human_turn_cannot_replace_it ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_competing_sequence_claims_commit_only_one_content ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_lease_expiry_is_rechecked_after_an_actual_row_lock_wait ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_one_native_turn_cannot_settle_two_operations ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_thread_stop_is_separate_and_allowed_after_disable ... ok
+test adapters::persistence::local_agents::protocol::operation_record_tests::cloudroom_commands_persisted_command_session_binding_is_checked_beyond_its_digest ... ok
+test adapters::persistence::local_agents::protocol::observation_tests::failures::cloudroom_observations_late_result_is_audit_without_successful_wait ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_explicit_uncertainty_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_commands_expired_uncertain_work_reconciles_before_new_effects ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_explicit_uncertainty ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_preserves_expired_uncertainty ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_every_preflight_refusal_rejects_after_possible_submission ... ok
+test adapters::persistence::local_agents::protocol::recovery_tests::cloudroom_observations_preflight_refusals_before_intent_are_definitive ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_queued_thread_maps_once_without_completing_native_work ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_requires_intent_and_preserves_known_turn_and_foreign_binding ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_lifecycle_mapping_retirement_is_bounded_read_only_and_current_installation_fenced ... ok
+test adapters::persistence::local_agents::protocol::submission_tests::cloudroom_submission_missing_and_late_identity_preserve_uncertainty_and_capacity ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_management_durable_status_distinguishes_queue_permission_uncertainty_gaps_and_native_success ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_competing_collectors_remove_only_bounded_old_summaries_and_keep_unknown_work ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_new_manual_requests_require_current_timestamp_and_replay_current_identity ... ok
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_saved_old_manual_replay_survives_age_then_collected_id_cannot_create_again ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::e2e::memory_e2e_thread_readers_6_8_9_load_only_levels_0_to_6_from_the_real_service ... ignored, needs the live memory service: scripts/memory-integration.sh
+test adapters::persistence::local_agents::retention_tests::cloudroom_retention_unknown_native_work_survives_and_compacted_receipt_replays_under_current_fence ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_output_never_precedes_its_committed_observation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_competing_recall_and_save_freeze_preserve_the_watermark ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_access_level_load_reads_at_the_thread_audience_and_refuses_a_lower_destination ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_disable_and_run_cancel_overlapping_in_id_order_never_deadlock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_interrupted_save_without_an_intent_retries ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_competing_disable_and_run_cancel_settle_every_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancel_during_an_in_flight_delivery_loses_its_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_save_and_load_steps_round_trip_through_the_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_steps_fail_terminally_once_memory_is_disabled ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_operations_settled_save_intents_outlive_every_run_that_can_replay_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_terminal_intent_wakes_and_fails_the_parked_save ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::memory_access_level_event_wake_lowers_exactness ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_publication_native_output_is_data_and_direct_followup_cannot_reopen_workflow ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_approval_parks_before_native_admission_and_grants_one_effect ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_machine_withdrawal_refuses_parked_output_and_live_delivery ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_private_run_output_and_every_direct_control_require_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_competing_claims_park_one_operation_and_fresh_claim_consumes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_offline_operation_expires_at_frozen_deadline_without_native_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::cloudroom_workflow_result_bounds_utf8_and_classifies_native_uncertainty ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_other_profile_and_other_original_association ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_continuation_refuses_withdrawn_original_private_access ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_explicit_continuation_keeps_frozen_selection_and_approval_after_profile_edit ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::continuation::cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_reconciles_attempted_work ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_actual_fair_poll_worker_discovers_native_result_and_completes_once ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_first_uncertain_disposition_survives_late_success_before_and_after_wake ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::corrections::cloudroom_workflow_competing_expiry_keeps_eight_attempted_native_effects_until_positive_evidence ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_claude_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_codex_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::native::cloudroom_e2e_native_opencode_packaged_plugin_pairing_workflow_ui_restart_followup_stop ... ignored, explicitly authorized disposable native provider acceptance
+test adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_result_commit_ack_resolves_authorized_saved_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_cancelled_workflow_needs_guarded_old_physical_proof_without_a_success_receipt ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::resolution::cloudroom_workflow_lost_park_commit_ack_proves_atomic_saved_owner_or_no_operation ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_prepared_and_queued_continuation_preserves_old_original_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::cloudroom_retention_two_terminal_roots_with_reciprocal_native_sessions_eventually_retire ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_approval_resumes_exact_saved_output ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_commit_failure_and_lost_ack_preserve_atomic_decision ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_automatic_and_suppressed_are_atomic ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_competing_finalizers_create_one_obligation ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_contract_edits_cannot_replace_approved_content ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_missing_notice_configuration_cannot_commit_success ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_invalid_projection_fails_or_uses_original_error_route ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_policy_change_after_approval_fails_saved_step ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::channel_reply_completion_rejection_uses_failure_without_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_child_terminal_parks_only_the_owned_parent ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_exhausted_saved_child_result_never_reconciles_original_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_fenced_approval_resumes_before_worker_handler ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_human_choice_parks_final_approval_before_success ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::owner_tests::channel_reply_completion_timer_keeps_source_wait_and_final_approval_distinct ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_approved_job_cannot_claim_a_handler_with_sql ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_opposite_reviewers_have_one_formal_winner ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_private_result_cannot_cross_public_reply_clearance ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_release_revocation_and_finalization_do_not_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_review_timeout_never_publishes_unapproved_output ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_revoked_send_role_still_permits_suppression ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::slot_tests::channel_reply_completion_full_execution_rejects_final_without_another_slot ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences' (2204416) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:127:9:
+build the counted Node e2e peer before Rust tests
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry' (2204456) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:127:9:
+build the counted Node e2e peer before Rust tests
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches' (2204470) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:127:9:
+build the counted Node e2e peer before Rust tests
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once' (2204503) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:127:9:
+build the counted Node e2e peer before Rust tests
+
+---- adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer' (2204536) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:127:9:
+build the counted Node e2e peer before Rust tests
+
+---- adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once' (2204740) panicked at src/adapters/persistence/workflow/local_agent_retention_peer_tests.rs:39:9:
+build the plugin test entries before the combined lifecycle test
+
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once
+    adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer
+    adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once
+
+test result: FAILED. 139 passed; 6 failed; 5 ignored; 0 measured; 4221 filtered out; finished in 112.83s
+

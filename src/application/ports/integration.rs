@@ -2,6 +2,7 @@
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         creation::CreationProvenance,
         transport::{
             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
@@ -17,11 +18,11 @@ use uuid::Uuid;
 /// it, so an operational view cannot ask the database for an unbounded scan.
 pub const MAX_BINDING_AUDIT_EVENTS: i64 = 200;
 
-/// Everything creating one protocol interface onto a channel sets.
+/// Everything creating one protocol interface onto an addressable target sets.
 #[derive(Debug, Clone)]
 pub struct BindingWrite {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
     pub installation_id: Option<InstallationId>,
     pub transport: TransportKind,
     pub namespace: EndpointNamespace,
@@ -37,6 +38,15 @@ impl BindingWrite {
     /// The coherence rule the database also states as a `CHECK`, checked here so the caller gets a
     /// sentence instead of a constraint name.
     pub fn validate(&self) -> AppResult<()> {
+        if matches!(self.target, AddressTarget::Principal(_))
+            && (self.transport != TransportKind::Email
+                || self.access_policy != BindingAccessPolicy::TargetAcl)
+        {
+            return Err(AppError::BadRequest(
+                "A principal address requires email transport and the target's access policy."
+                    .into(),
+            ));
+        }
         if self.transport.requires_installation() != self.installation_id.is_some() {
             return Err(AppError::BadRequest(format!(
                 "A {} binding {} name an installation.",
@@ -108,12 +118,12 @@ pub trait ChannelBindingPersistence: Send + Sync {
     /// Create the binding and its `linked` audit record in one transaction.
     async fn create_binding(&self, write: BindingWrite) -> AppResult<ChannelBinding>;
 
-    /// The interfaces this channel is currently carrying traffic on. Bindings whose installation
+    /// The interfaces this target is currently carrying traffic on. Bindings whose installation
     /// is no longer usable are excluded here rather than being rewritten row by row.
-    async fn active_bindings_for_channel(
+    async fn active_bindings_for_target(
         &self,
         company_id: Uuid,
-        channel_id: Uuid,
+        target: AddressTarget,
     ) -> AppResult<Vec<ChannelBinding>>;
 
     /// The one active binding that owns this endpoint, for routing an inbound event.

@@ -1,0 +1,28 @@
+{
+  "stage": "coverage gate",
+  "decision": "C2/r1",
+  "artifact": "bde774d4d637e671804ffa5ace3a4331178be0d07861c52cc3a05b0db87ddbf7",
+  "coordination_revision": 32,
+  "files": [
+    {
+      "path": "C2-r1.md",
+      "sha256": "a915ae14f5f79fd4c7d8bc88297e3e2b279a776663c59ea72369d969600310b1"
+    },
+    {
+      "path": "C2-r1-coordination.md",
+      "sha256": "474d9e2ff0697e576147c3807c4541666862e191f9a959f9a3b1778786ada8a2"
+    },
+    {
+      "path": "C2-r1-snapshot.txt",
+      "sha256": "d4aae534da85be5830cc43485ce410a7879f590bbf6c856340e6eebb797af2c5"
+    },
+    {
+      "path": "resume-account-visibility-native1.txt",
+      "sha256": "ed313408106a72f2a73fcc4fdbbe8ee474cdccf4551e9c258efa78c9d5364081"
+    },
+    {
+      "path": "resume-account-visibility-before1.txt",
+      "sha256": "613ca7b91050d559044a238d4016a43b15b8f5844e0372540c7bd1ea7f7c7bdd"
+    }
+  ]
+}

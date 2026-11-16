@@ -1,0 +1,25 @@
+
+running 11 tests
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::jev_hints::workflow_reviewer_follow_reply_jev_authorization_and_admission_ignore_unused_retired_final_reviewers' (1932882) panicked at src/adapters/persistence/workflow/reviewer_jev_hint_tests.rs:84:54:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::jev_hints::workflow_reviewer_follow_reply_jev_authorization_and_admission_ignore_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_guard_failure_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_fresh_final_vote_requires_current_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::terminal_hints::workflow_reviewer_follow_reply_expiry_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_fresh_nonterminal_vote_ignores_unused_retired_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_history_and_replays_do_not_require_unused_retired_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_ordinary_effect_hints_ignore_unused_retired_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_company_precedes_run_during_actual_retirement ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_budget_reservation_and_replay_ignore_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_claim_ignores_unused_retired_final_reviewers ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_reply_lease_renewal_ignores_unused_retired_final_reviewers ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::jev_hints::workflow_reviewer_follow_reply_jev_authorization_and_admission_ignore_unused_retired_final_reviewers
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 4330 filtered out; finished in 7.75s
+

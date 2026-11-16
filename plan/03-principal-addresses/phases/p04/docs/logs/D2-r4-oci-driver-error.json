@@ -1,0 +1,46 @@
+{
+  "id": "0010f9c2-f7c6-4749-bd4f-5c6ccdf83742",
+  "ok": true,
+  "result": {
+    "screenshotStatus": {
+      "state": "skipped",
+      "reason": "no_screenshot_flag"
+    },
+    "snapshot": {
+      "elementCount": 149,
+      "focusedElementId": 1,
+      "window": {
+        "isMinimized": false,
+        "isOffscreen": false,
+        "screenIndex": 0,
+        "x": 10,
+        "width": 1200,
+        "height": 949,
+        "id": 96,
+        "platform": {
+          "layer": 0
+        },
+        "title": "Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8 - Google Chrome",
+        "y": 33
+      },
+      "id": "3FB721CE-9727-43BD-9A98-FD410868DE24",
+      "app": {
+        "name": "Google Chrome",
+        "bundleId": "com.google.Chrome",
+        "pid": 1450
+      },
+      "coordinateSpace": "window",
+      "truncation": {
+        "truncated": false,
+        "maxDepthReached": false,
+        "maxNodes": 1200,
+        "maxDepth": 64
+      },
+      "treeText": "App=com.google.Chrome (pid 1450)\nWindow: \"Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8 - Google Chrome\", App: Google Chrome.\n\n5 of 149 elements match \"ERROR\"; showing them with their ancestors.\n0 standard window Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8 - Google Chrome\n\t1 container Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8 - Google Chrome\n\t\t1090 scroll area\n\t\t\t1091 HTML content Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8\n\t\t\t\t1138 container\n\t\t\t\t\t1163 container Check run summary\n\t\t\t\t\t\t1164 container Annotations\n\t\t\t\t\t\t\t1167 text 1 error and 1 warning\n\t\t\t\t\t\t1168 container\n\t\t\t\t\t\t\t1169 container\n\t\t\t\t\t\t\t\t1178 button Explain error\n\t\t\t\t\t\t\t1181 container\n\t\t\t\t\t\t\t\t1186 container\n\t\t\t\t\t\t\t\t\t1187 disclosure triangle (expanded) Build the actual private image and retain build errors 5s\n\t\t\t\t\t\t\t\t\t1196 text ERROR: failed to build: OCI exporter is not supported for the docker driver.\n\t\t\t\t\t\t\t\t\t1208 text Error:\n\nThe focused UI element is 1 container Diagnose inherited private image build with unchanged Doop inputs · matjazonline/openbot@2f218c8 - Google Chrome."
+    },
+    "screenshot": null
+  },
+  "_meta": {
+    "runtimeId": "58f1681e-c072-4c58-8131-7c951f7b3376"
+  }
+}

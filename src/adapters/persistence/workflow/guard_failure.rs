@@ -1,6 +1,6 @@
 //! Fails a run whose worker write a workflow guard refused twice (fix-app 03 batch 1, G1 r3).
-//! The run lock comes first, as for every run transition; every later read therefore sees what
-//! the previous lock holder committed, so a competing settlement is observed, never overwritten.
+//! Account hints for reply effects precede company serialization, then the run lock. Later
+//! reads observe the prior owner's commit, so a competing settlement is never overwritten.
 use super::*;
 use crate::application::workflow::guard::{
     GuardFailure, GuardFailureOutcome, GuardSite, WorkflowGuardFailure,
@@ -52,7 +52,16 @@ async fn fail_on(db: &mut PgConnection, failure: &GuardFailure) -> AppResult<Gua
     let (company, run) = (scope.company.as_uuid(), scope.run.as_uuid());
     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','1000ms',true)")
         .execute(&mut *db).await?;
-    channel_reply_completion::prelock_on(db, scope).await?;
+    // Guard retirement only enqueues durable events. Company precedes run even for reply-owned
+    // work; historical final-policy accounts are not authority for this terminal write.
+    let company_exists: Option<Uuid> =
+        sqlx::query_scalar("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
+            .bind(company)
+            .fetch_optional(&mut *db)
+            .await?;
+    if company_exists.is_none() {
+        return Ok(GuardFailureOutcome::Inactive);
+    }
     let owner = sqlx::query_as::<_, RunRow>("SELECT state, deadline <= clock_timestamp() AS expired, actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
         .bind(company).bind(run).fetch_optional(&mut *db).await?;
     let Some(owner) = owner else {
@@ -102,6 +111,7 @@ async fn fail_on(db: &mut PgConnection, failure: &GuardFailure) -> AppResult<Gua
     // A guard failure ends the run early, like cancellation: its live children share its
     // deadline only at expiry, so they are cancelled now rather than left running.
     controls::cancel_children_on(db, scope.company, &children, owner.actor_id).await?;
+    Box::pin(escalations::run_failed_on(db, scope, &code)).await?;
     Ok(GuardFailureOutcome::Failed)
 }
 

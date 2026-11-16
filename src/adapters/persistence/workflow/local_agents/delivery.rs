@@ -1,5 +1,31 @@
 use super::*;
 
+/// Native entry points establish the exact source-account prefix before company
+/// ownership. Later session checks revalidate the same immutable parked operation.
+pub(in crate::adapters::persistence) async fn authorize_native_source_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    operation: OperationId,
+    actor: WorkflowActor,
+    origin: OperationOrigin,
+    locks: super::super::row_locks::RowLocks,
+) -> AppResult<()> {
+    match origin {
+        OperationOrigin::Workflow => {
+            authorize_operation_with_locks_on(tx, company, operation, actor, locks).await?;
+        }
+        OperationOrigin::Direct => {
+            sqlx::query_scalar::<_, Uuid>(&locks.sql("SELECT id FROM users WHERE id=$1 FOR SHARE"))
+                .bind(actor.user_id())
+                .fetch_optional(&mut **tx)
+                .await?
+                .ok_or_else(missing)?;
+            authority::authorize_company_with_locks(tx, company, actor, locks).await?;
+        }
+    }
+    Ok(())
+}
+
 /// A parked call authorizes only its saved operation. This check precedes machine and
 /// operation locks; reconciliation after any attempted delivery retains protocol semantics.
 pub(in crate::adapters::persistence) async fn authorize_operation_with_locks_on(
@@ -101,7 +127,7 @@ struct ParkedCall {
     argument_digest: String,
 }
 
-pub(super) async fn parked_subject_on(
+pub(in crate::adapters::persistence::workflow) async fn parked_subject_on(
     db: &mut PgConnection,
     company: CompanyId,
     operation: OperationId,

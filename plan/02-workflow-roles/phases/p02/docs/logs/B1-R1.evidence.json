@@ -1,0 +1,855 @@
+{
+  "version": 1,
+  "round": "02WR-P02-B1-R1",
+  "artifact": "be7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4.intent",
+        "AC5",
+        "AC6.storage",
+        "AC6.model"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib workflow_role_",
+      "fixture": "34 tests; indexed fresh migrations; production scripted Deployment, typed refusals, exact SQL guards/FKs, competing writers; libtest stock2MiB",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-role-stock-2.txt",
+          "sha256": "b7a7cf07416ff14e13de43432f5aad44424c73135dba454cac22703e642ddb0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.views",
+        "AC6.filters"
+      ],
+      "command": "cargo test --locked --offline --lib run_board_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-board-correlation-1.txt",
+          "sha256": "00b440157067e1377d58fc8633a9f5e4de7b6ff1ad5c2062b39a2334b7c8b526"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.child",
+        "AC6.views",
+        "AC6.filters"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib workflow_role_admission_pinned_child",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-role-child-final-1.txt",
+          "sha256": "8106a6f71fbe471014d2db80ff1801e1606aa036e5ad4957cf5c74a04b8f5541"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.filters"
+      ],
+      "command": "cargo test --locked --offline --lib run_list_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-list-final-1.txt",
+          "sha256": "9eac48e44701f491eacd85338a03d42dd7577fa0f76a2fe4b583e6cc4a5f7d52"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib memory_capture_agent_delete",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-01.txt",
+          "sha256": "4a4d060124ff215b65f235773a9b7e94d34f4488fd0ded45f96ae84ea7480bf0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib memory_scope_competing_agent_delete",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-02.txt",
+          "sha256": "34b59abc8ad5a659143266693561c52d85bea8edafdc2bf14e25563b961aa98c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib agent_retire_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-03.txt",
+          "sha256": "89ff78100d6a13ac281e86885e383069f48dcb7ff549d3344fad7113e79ec3eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib autonomous_agent_admission_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-05.txt",
+          "sha256": "00c64459eb8d04a4b7e3c3319386ae250ebc78c64fc29855aa4046f6fbb59568"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.inherited"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_agent_run_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-06.txt",
+          "sha256": "d286f09bcf7cb45188d6176b68ac75bd1adebef97b17948b309366acb4611b9e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.history"
+      ],
+      "command": "cargo test --locked --offline --lib agent_history_identity_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-07.txt",
+          "sha256": "86c3f893c442129658d763f6ddcbd1494d41115163a17024f257408a41238c0c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.views"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_view_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-09.txt",
+          "sha256": "5b9e446ca4db59f6fbbe91b8f4e6c255a662da1ce8eb88f27dfcf34b38d99c8f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4.schedule"
+      ],
+      "command": "cargo test --locked --offline --lib schedule_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-10.txt",
+          "sha256": "84133914bae1eeac88ed79248d8e97b1bcadc22ef12e0e11921db5bd693ac8fa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4.intent"
+      ],
+      "command": "cargo test --locked --offline --lib message_intent_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-11.txt",
+          "sha256": "d06adfda5e6ae57a7394e092f6bff31a4d41a0e510f005cf5ddbed35a2f7c3ae"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.views"
+      ],
+      "command": "cargo test --locked --offline --lib autonomous_agent_views_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-14.txt",
+          "sha256": "568f23548ff14a90d4150b768151942a37c7fe0c380ace608ae4a19e3fb65fd4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.manifest"
+      ],
+      "command": "cargo test --locked --offline --lib autonomous_agent_contract_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-15.txt",
+          "sha256": "65bcd70080cee477a9dc659462aaf8cafa820b8ee103a8ccd153dc96ed7cbd0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5.inherited",
+        "AC6.history"
+      ],
+      "command": "cargo test --locked --offline --lib department_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-21.txt",
+          "sha256": "5ecc103fb41e20659660ccf81ca1e3660a999e8946740119c3639e5ef9717e96"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.knowledge"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_search_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-regression-23.txt",
+          "sha256": "c6378a93e3c18fdff019219b35d199bdfd0280c748f3021e98f06f1a8fc87a22"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.memory"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_search::memory_tools::",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-memory-tools-actual-1.txt",
+          "sha256": "a10365971e6ecf525cc7f67ca4253de9ab48e2ef28a0730c172ce8011f6d8ae5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6.performance"
+      ],
+      "command": "python3 scripts/tests/run-list-query-plan.py owned_indexed_database --shapes logs/B1-query-shapes-3.json",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-query-plans-4.txt",
+          "sha256": "d65c9bfb498dd41d1a539414edd8a014c606c57d3136593f8c1ca52683553575"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SCHEMA"
+      ],
+      "command": "cargo sqlx migrate run (fresh owned openbot_roles_p02_indexed)",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-migrations-3.txt",
+          "sha256": "c4c3e0ce3e1ce1b1bbe4cc75d54a8c689f570bd81741fa2175dc2056f83e8c28"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "SQLX"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare-4.txt",
+          "sha256": "e9c0f79cac0ca7ef4086022c681eb797c4bf070b2e61cea44a7f23740486eb0e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-clippy-3.txt",
+          "sha256": "bb69b267dee806f1b7494ea54e4b1360f4f4c87697d4e28c49c415193ac1dad4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "STATIC"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-check-12.txt",
+          "sha256": "12f8976cae65ed1add856299349d19e316217373c79e39fcf7584ba6c1849f89"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "REACHABILITY"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-reachability-1.txt",
+          "sha256": "d4b7aedb2f74b9a6c00be2a9d10bc36081cce2346e66f1539c2f1bb820bbc038"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FMT"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-fmt-2.txt",
+          "sha256": "5fcb04dce61431e03194e48dc201c4f32c352e4a96d055e73ed0191c5364579a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "WHITESPACE"
+      ],
+      "command": "git diff --check",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-whitespace-2.txt",
+          "sha256": "3d4d50cd32af92c6d4df37c1df74a96622fca8cfb5643a155c91f034a42f2068"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-1.txt",
+          "sha256": "b985c1df2de06b7a1e724a6adaa09ed847c615ef224379ba43b88a8f19c69604"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-2.txt",
+          "sha256": "d0c0ea8ceed2a687b93211cb0cdde6a1278f24ab98abdb5358b837f438c5025e"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-3.txt",
+          "sha256": "478ac7344f2e7a4d754c83cb48b3c6610c2434b05daa31390e11869e0723bed5"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --tests",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-5.txt",
+          "sha256": "76151bc77b724d96dce26092a3cb17f58f1acd731bc51569549fd60304caacf3"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --tests",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-7.txt",
+          "sha256": "2850fa74c843384537ed068d82f809547275edbe014c2d48f50853ca0bcce85b"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-check-8.txt",
+          "sha256": "aa272673d29f1293aae323e238ae556619045c09949954030a86157f6db3fa50"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-1.txt",
+          "sha256": "2c633d6e417b57190d35b00d4a219d38f1e28c8a3ba992d47c2f36bec3234e5c"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-2.txt",
+          "sha256": "b78908ce395c113bf12e55cca13bcba983e3df8a90977e5d8ef55f4adee60736"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-3.txt",
+          "sha256": "ffc95fc285523c3c8cd0a56dc7d757ce2328f30df53e4db7c5ebd5522f2fb4de"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-4.txt",
+          "sha256": "0cf7ba0e1dc56d6026a1013a77e9966dabd1db850b11dd166d01598dccbcbcb1"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-7.txt",
+          "sha256": "4b4f3228bd68be75e2e959db5eb9950c4cef333642ed51cf02d244361953f61a"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-8.txt",
+          "sha256": "d5bfa1dd70d649d1823e460040251d7f11b93cf117f858a9d2565ef50b2e0489"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-role-tests-9.txt",
+          "sha256": "30f9f7a4d1836de7234fc5ec5bc18def3005f54bd59848f6a2498cdfe45bb745"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib department_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-04.txt",
+          "sha256": "50f68c68e718c85ab1e46fa313be1ec3f68fc1dba332ae7a8f3b1dae908bda03"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib run_board_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-12.txt",
+          "sha256": "dfcf03232b8c82c7c86de55e18605c5bdcacfaf673ebfe9cc5aee2d6b3474fce"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib department_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-16.txt",
+          "sha256": "b7b1844be61dbc8971ce7a61fc2b92bade3845a9045768a83b4b0e3033b1492f"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib run_board_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-17.txt",
+          "sha256": "3090e4bf2af8977002a5f39fda7517187035927b553c75ed311fd5204cee194a"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_search_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-18.txt",
+          "sha256": "96d5e0cc7db781b8edb6c61514098538b22381b03c4c1202acb87c80f4f07078"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib memory_tool_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-19.txt",
+          "sha256": "48466ee1edd51c7ccbccbc4ca51a8433ef2f770d120ab63de6d6bd9fb30e69f1"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-20.txt",
+          "sha256": "51cbbfaea17e440167184064a2d04370ea694541b7a74a5ea8508f183a870280"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-regression-25.txt",
+          "sha256": "cc8b96c23c21273921f9375ab8e4ba1aebe7487c9d1bc0a3a59430ad3d126ba7"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_role_admission_retained_department",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-retained-department-1.txt",
+          "sha256": "a74f9a345ab039adc400974bd63640a7d4f5b08f3533e90bb8f389d849989d8d"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare-1.txt",
+          "sha256": "6e27ffca82eb0d7e6e23a1646296fe97f5154c4367ba9062bf58000317a585e1"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "python3 scripts/tests/run-list-query-plan.py \"$DATABASE_URL\" --shapes plan/02-workflow-roles/phases/p02/docs/logs/B1-query-shapes.json",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-query-plans-1.txt",
+          "sha256": "8ccd3604e0bf2c56bcd4a4be37c04793442b4f9a743f5a1f68286ad0eb727f46"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "python3 scripts/tests/run-list-query-plan.py \"$DATABASE_URL\" --shapes plan/02-workflow-roles/phases/p02/docs/logs/B1-query-shapes.json",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-query-plans-2.txt",
+          "sha256": "0cc5601ed72ee773f771674e863900a7308abdb2db5c1f0684eb838165c6de8a"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "psql \"$DATABASE_URL\" -X -q -v ON_ERROR_STOP=1",
+      "fixture": "Fixed million-row TEMP-table probe supplied on stdin, 30s fixture timeout; TASK retains input design and successor exact probe2 SQL",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-query-probe-1.txt",
+          "sha256": "782b2ef42c44a5dd22332a5b3706728bc8bfa7ceb666bef1c3a9c169a3150c8f"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "HISTORICAL_CORRECTION"
+      ],
+      "command": "cargo test --locked --offline --lib dump_run_list_query_shapes -- --ignored",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-query-shapes-2.txt",
+          "sha256": "9bab2b77c30d6b108d71a733f049c5c76c2e2b6e13a7bc50aa1b706bc62cde2a"
+        }
+      ],
+      "reason": "Corrected by the later focused evidence; not a current PASS"
+    },
+    {
+      "criteria": [
+        "AC6.knowledge"
+      ],
+      "command": "cargo test --locked --offline --lib knowledge_checkpoint",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-regression-08.txt",
+          "sha256": "20b4a05277d800ed6a464b13e73881247bc80d985bff98fd6222b5e660da074d"
+        }
+      ],
+      "reason": "Collected zero tests; replaced by actual knowledge_search_ and memory_tools module checks"
+    },
+    {
+      "criteria": [
+        "AC6.memory"
+      ],
+      "command": "cargo test --locked --offline --lib memory_tool_",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-regression-24.txt",
+          "sha256": "48638eef374fa6e793bd7b1e735a68fd70fd53d83ac640710c94fe42033a9900"
+        }
+      ],
+      "reason": "Collected zero tests; replaced by actual knowledge_search::memory_tools:: (27 passing tests)"
+    },
+    {
+      "criteria": [
+        "AC4.delivery",
+        "02WR-C003/r2"
+      ],
+      "command": "RUST_MIN_STACK=2097152 cargo test --locked --offline --lib workflow_role_",
+      "fixture": "Production scripted Deployment ingest is accepted; named intent refusal settles once, message remains queryable, no run or provider call; unchanged relay transport contract",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-role-stock-2.txt",
+          "sha256": "b7a7cf07416ff14e13de43432f5aad44424c73135dba454cac22703e642ddb0b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FINAL_FULL_SUITE"
+      ],
+      "command": "scripts/check.sh and all repository/CI gates",
+      "fixture": "owned PostgreSQL18.6 cluster localhost60242; isolated per-test fixtures",
+      "status": "NOT EXERCISED",
+      "reason": "Required at plan02 p05 after all phases; current p02 checkpoint does not claim full verification"
+    },
+    {
+      "criteria": [
+        "DOCS",
+        "02WR-C003/r2"
+      ],
+      "command": "git diff --check",
+      "fixture": "Deliverable documentation updated to the explicitly selected asynchronous refusal semantics",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-doc-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    }
+  ]
+}

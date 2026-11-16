@@ -369,6 +369,27 @@ async fn wait_for_member_lock(pool: &sqlx::PgPool, minimum: i64) {
         }
     }).await.expect("real competing member locks");
 }
+
+async fn wait_for_company_lock(pool: &sqlx::PgPool) {
+    tokio::time::timeout(std::time::Duration::from_secs(2), async {
+        loop {
+            let waiting: bool = sqlx::query_scalar(
+                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() \
+                 AND pid<>pg_backend_pid() AND wait_event_type='Lock' \
+                 AND query LIKE '%SELECT user_id FROM companies%')",
+            )
+            .fetch_one(pool)
+            .await
+            .unwrap();
+            if waiting {
+                break;
+            }
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .expect("release waits behind the real company-owning role writer");
+}
 #[tokio::test]
 async fn autonomous_agent_samples_release_rechecks_admin_after_competing_role_revocation() {
     use crate::application::workflow::sample_capture::SampleDefinitionCapture;
@@ -416,11 +437,16 @@ async fn autonomous_agent_samples_release_rechecks_admin_after_competing_role_re
         let capture = capture.clone();
         tokio::spawn(async move { capture.authorize_release(target).await })
     };
-    wait_for_member_lock(f.persistence.pool(), 2).await;
+    // Demotion owns company before reaching the held member. Release now waits
+    // at that company prefix and must read membership after demotion commits.
+    wait_for_company_lock(f.persistence.pool()).await;
     locker.commit().await.unwrap();
-    demote.await.unwrap();
+    assert_eq!(
+        demote.await.unwrap().role,
+        crate::entities::company_member::CompanyAccessRole::Member
+    );
     assert!(
-        release.await.unwrap().is_err(),
+        matches!(release.await.unwrap(), Err(AppError::NotFound(_))),
         "stale admin snapshot cannot release its result"
     );
     assert_eq!(

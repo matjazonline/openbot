@@ -26,10 +26,19 @@ pub async fn verify_email_authentication(
     raw_mime: &[u8],
     mail_from: Option<&str>,
     client_ip: IpAddr,
+    resolver: Option<&mail_auth::MessageAuthenticator>,
 ) -> AuthResults {
     let mut results = AuthResults::default();
-    let Ok(resolver) = mail_auth::MessageAuthenticator::new_quad9() else {
-        return results;
+    let default_resolver;
+    let resolver = match resolver {
+        Some(resolver) => resolver,
+        None => {
+            default_resolver = match mail_auth::MessageAuthenticator::new_quad9() {
+                Ok(resolver) => resolver,
+                Err(_) => return results,
+            };
+            &default_resolver
+        }
     };
 
     let mut spf_output = None;

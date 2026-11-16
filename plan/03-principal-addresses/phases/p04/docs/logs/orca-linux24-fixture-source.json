@@ -1,0 +1,21 @@
+{
+  "commit": "f85034920575c29f1c71755ab8fd22e264212ea1",
+  "parent": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "tree": "29039d055f1a6df806eeef9943b2ed9273b6cdf2",
+  "branch": "codex/plan03-p04-linux24-f8503492",
+  "source_artifact": "def5d4442135f1787b4ea963b6fd4157b44f4e0858fdecb48f6040acf426eea4",
+  "only_changes": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "change": "runner ubuntu-latest -> ubuntu-24.04 only"
+    },
+    {
+      "path": ".github/workflows/memory-service.yml",
+      "change": "runner ubuntu-latest -> ubuntu-24.04 only"
+    }
+  ],
+  "commands_and_assertions": "unchanged",
+  "all_other_tracked_blobs": "identical to parent",
+  "main_workflows": "unchanged; ubuntu-latest failure remains retained",
+  "method": "external alternate index; actual HEAD/index/worktree unchanged"
+}

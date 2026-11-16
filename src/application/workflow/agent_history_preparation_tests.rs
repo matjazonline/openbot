@@ -18,7 +18,7 @@ fn agent_history_contract_preparation_retains_original_json_and_one_untrusted_pr
         .unwrap();
         assert_eq!(prepared.logical_input().value(), &context);
         let spec = prepared.spec(fence()).unwrap();
-        assert_eq!(spec.prepared["version"], 6);
+        assert_eq!(spec.prepared["version"], 7);
         assert_eq!(spec.prepared["mcp_error_policy"], "observe");
         assert_eq!(spec.prepared["context"], context);
         assert!(spec.prepared.get("prompt").is_none());

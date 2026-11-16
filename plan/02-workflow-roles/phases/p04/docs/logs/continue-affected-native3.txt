@@ -1,0 +1,263 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24', 'workflow_message_', 'workflow_action_approval_', 'workflow_reviewer_follow_', 'workflow_role_reviewer_', 'workflow_reviewer_principal_', '::account_identity::tests::', '::user::tests::security_email_identity_', '::user::tests::a_confirmed_code_', '::user::tests::a_wrong_or_expired_code', '::user::tests::each_kind_', '::user::tests::an_address_taken_', '::notification::', 'workflow_escalation_person_', 'channel_reply_hitl_prompt_release_retired_frozen_address_is_refused', '::company_invite::', '--nocapture', '--test-threads=2']
+
+running 236 tests
+test adapters::http::routes::company_invite::authorization_tests::invite_pages_and_fragments_hide_foreign_companies_and_propagate_failures ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_json_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_invite_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_browser_form_accepts_integer_strings_and_rejects_extra_fields ... ok
+test adapters::http::routes::company_invite::levels::tests::access_level_json_is_numeric_bounded_and_rejects_role_injection ... ok
+test adapters::http::routes::company_invite::tests::company_invites_page_renders_html_components ... ok
+test adapters::http::routes::user::tests::security_email_identity_bypassed_form_and_json_disclose_unverified_status ... ok
+test adapters::http::routes::user::tests::security_email_identity_form_and_json_share_default_no_smtp_denial ... ok
+test adapters::http::routes::user::tests::security_email_identity_google_requires_explicit_true_claim ... ok
+test adapters::http::routes::company_invite::levels::route_tests::access_level_legacy_html_member_route_enforces_actor_scope_and_caps ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_preserves_unsaved_source ... ok
+test adapters::persistence::account_identity::tests::account_email_change_adopts_an_allowlisted_outsider_address ... ok
+test adapters::persistence::account_identity::tests::account_email_change_bypass_moves_trust_in_every_company ... ok
+test adapters::persistence::account_identity::tests::account_email_change_confirmed_moves_trust_in_every_company ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::reviewer_picker_tests::workflow_role_reviewer_picker_refuses_foreign_people_desks_and_actors ... ok
+test adapters::persistence::account_identity::tests::account_email_change_old_address_is_adopted_by_its_next_owner ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_inbound_observation ... ok
+test adapters::persistence::account_identity::tests::account_email_change_races_invite_acceptance ... ok
+test adapters::persistence::account_identity::tests::account_email_change_with_an_unparseable_old_address_and_no_company_succeeds ... ok
+test adapters::persistence::account_identity::tests::account_email_change_refuses_an_address_another_person_holds ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_invite_copies_new_grants_and_never_restores_existing_grants ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_joint_readers_external_observed_and_former_members_are_public ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_sql_domain_owner_and_defaults_are_enforced ... ok
+test adapters::persistence::company_invite::access_level_tests::access_level_native_writers_apply_caps_scope_and_owner_only_role_powers ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_acceptance_and_own_invite_assignment_do_not_deadlock_or_restore_levels ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_assignment_committed_first_finishes_before_later_demotion ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_demotion_committed_first_refuses_a_waiting_assignment ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_busy_authority_returns_a_bounded_conflict_without_a_write ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_edit_of_an_invite_accepted_after_the_read_is_refused ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_refuses_the_owner_address_and_malformed_ones ... ok
+test adapters::persistence::company_invite::owner_tests::company_invite_update_matches_only_a_pending_invite_of_its_company ... ok
+test adapters::persistence::company_invite::access_level_tests::races::access_level_owner_loss_is_rechecked_after_a_waiting_invite_write ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_accepting_an_invite_to_own_company_stays_owner ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_column_cannot_change_alone ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_deleted_by_hand ... ok
+test adapters::persistence::company_invite::owner_tests::company_owner_row_cannot_be_demoted_by_hand ... ok
+test adapters::persistence::company_invite::tests::postgres_company_invite_and_member_persistence_works ... ok
+test adapters::persistence::company_invite::tests::removing_a_member_demotes_their_principal_and_spares_the_owner ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_concurrent_address_change_defeats_stale_invite_acceptance ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_accept_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::company_invite::tests::security_email_identity_invite_decline_requires_current_account_even_for_terminal_result ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_name_representation_never_blocks_valid_long_names ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_rejects_corrupt_actual_source_and_rolls_back ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_requires_material_clear_only_in_its_creation_transaction ... ok
+test adapters::persistence::notification::tests::notification_census_executes_against_postgres ... ok
+test adapters::persistence::notification::tests::a_failed_projection_batch_backs_off_before_it_can_be_claimed_again ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::user::tests::a_confirmed_code_moves_the_address_and_cannot_be_spent_twice ... ok
+test adapters::persistence::user::tests::a_wrong_or_expired_code_changes_nothing ... ok
+test adapters::persistence::user::tests::an_address_taken_since_the_code_was_mailed_refuses_the_confirmation ... ok
+test adapters::persistence::user::tests::each_kind_gets_one_request_and_a_second_ask_replaces_it ... ok
+test adapters::persistence::user::tests::security_email_identity_bypassed_address_claim_is_atomic_under_contention ... ok
+test adapters::persistence::user::tests::security_email_identity_competing_claimants_verify_only_the_winner ... ok
+test adapters::persistence::user::tests::security_email_identity_display_save_cannot_restore_address_confirmed_after_read ... ok
+test adapters::persistence::user::tests::security_email_identity_link_proof_is_atomic_and_idempotent ... ok
+test adapters::persistence::user::tests::security_email_identity_proof_round_trips_and_stays_with_current_address ... ok
+test adapters::persistence::user::tests::security_email_identity_registration_code_installs_proof_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::authority_tests::business_member_tests::workflow_reviewer_principal_visible_ordinary_member_parks_and_submits_business_decision ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::principal_tests::workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_is_original_desk_not_chosen_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_rejects_forged_missing_and_mutated_snapshot ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::child_tests::workflow_role_reviewer_pinned_child_reused_step_reads_its_admission_capture ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_competing_actual_workers_commit_one_receipt_and_email_per_person ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_one_retired_recipient_preserves_the_capable_recipients_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_projection_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_post_projection_retirement_cancels_email_and_expedites_without_rewriting_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipt_cannot_commit_without_fenced_event_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipts_reject_forged_opt_out_and_source_rebinding ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_source_uuid_and_public_stamp_validation_agree_in_rust_and_sql ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_competing_provider_links_have_one_current_proof_and_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_provider_link_refresh_failure_rolls_back_method_proof_and_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_channel_allowlist_edit_refreshes_and_repairs_without_changing_context ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_actual_desk_ownership_writer_refreshes_derived_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_competing_channel_writers_commit_matching_visibility_and_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::workflow_reviewer_follow_refresh_failure_rolls_back_channel_settings_grants_and_assignments ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_empty_case_is_atomic_and_repair_never_restarts_it ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_empty_case_sql_rejects_false_source_fields_and_repaired_reviewers ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_account_retirement_clears_all_roles_and_preserves_snapshot_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_competing_allocators_commit_distinct_revisions ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_revision_exhaustion_is_a_named_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_refuses_missing_extra_and_foreign_members ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_changing_zero ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_missing_holder_refuses_before_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_agent ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_counter_and_history_cannot_be_forged ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_failure_retry_after_continuation_uses_failure_allowance ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_continuation_ceiling_refuses_without_resetting_failures ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_expiry_and_rejection_preserve_first_decision ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_multiple_effects_resume_without_failure_debit_or_old_approval_reuse ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_old_comment_cannot_attach_to_later_wait ... ok
+observed gated transaction pids=[78520] blocker=78587 elapsed_ms=40
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_orphan_wait_and_foreign_audit_are_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_audit_kind_binding_preserves_ordinary_uniqueness ... ok
+observed resolution pids=[78566] blocker=78520 elapsed_ms=1966
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_identical_operation_new_call_id_reuses_one_receipt ... ok
+observed gated transaction pids=[78776] blocker=78853 elapsed_ms=40
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_operator_retry_preserves_nonzero_continuation_witness ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_replay_preserves_result_after_later_successor ... ok
+observed resolution pids=[78831] blocker=78776 elapsed_ms=1967
+observed gated transaction pids=[79041] blocker=79109 elapsed_ms=39
+test adapters::persistence::workflow::tests::http_tests::approval_tests::review_tests::workflow_action_approval_same_arguments_different_target_or_operation_need_new_approval ... ok
+observed resolution pids=[79088] blocker=79041 elapsed_ms=1970
+test adapters::persistence::workflow::tests::http_tests::approval_tests::role_tests::workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_deferred_identity_rejects_mismatches_and_orphans_at_commit ... ok
+observed gated transaction pids=[79304] blocker=79388 elapsed_ms=40
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_cannot_authorize_changed_arguments ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_digest_fk_rejects_each_mismatch ... ok
+observed resolution pids=[79373] blocker=79304 elapsed_ms=1967
+test adapters::persistence::workflow::tests::http_tests::approval_tests::resolution_tests::workflow_action_approval_race_lost_commit_ack_resolves_exact_park ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_invalid_choice_data_and_digest_leave_open ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_unprovable_notice_key_fails_without_park ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_admin_demotion_refuses_park_and_submission ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_reopen_checks_transaction_choice_and_accounting ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_competing_reviewers_settle_once ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_expiry_fails_without_dispatch ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_dispatch_claims_next_attempt_and_dispatches_once ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_last_failure_attempt_can_park_and_resume ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_park_with_sixteen_approvers_commits_within_bound ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reject_registered_operation_has_http_failure ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_reopen_without_submission_is_rejected ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::workflow_action_approval_submit_competes_with_expiry ... ok
+test adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_mcp_never_opens_before_approval_then_calls_once ... ok
+test adapters::persistence::workflow::tests::mcp_tests::approval_tests::workflow_action_approval_not_applied_proof_never_grants_second_entry ... ok
+observed gated transaction pids=[80519] blocker=80542 elapsed_ms=125
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_message_then_effect_wait_preserves_both_histories ... ok
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revocation_after_a_marker_stays_retryable ... ok
+observed resolution pids=[80474] blocker=80519 elapsed_ms=1958
+observed gated transaction pids=[80808] blocker=80834 elapsed_ms=131
+test adapters::persistence::workflow::tests::message_tests::authority_tests::workflow_message_publish_revoked_authority_is_terminal_rejected_before_any_marker ... ok
+observed resolution pids=[80734] blocker=80808 elapsed_ms=1950
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_duplicate_callback_adds_no_event ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_reaper_locks_parents_and_marks_started_requests_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_race_paused_producer_then_consumer_sees_both_events ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_history_and_replays_do_not_require_unused_retired_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_final_publication_rechecks_approved_reviewer_privilege ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_retirement_first_publication_refuses_without_deadlock ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_principal_run_company_owner_lock_prefix_precedes_publication_company_gate ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::release::channel_reply_hitl_prompt_release_retired_frozen_address_is_refused ... ok
+observed gated transaction pids=[81801] blocker=81826 elapsed_ms=142
+observed resolution pids=[81758] blocker=81801 elapsed_ms=1940
+observed gated transaction pids=[82094] blocker=82116 elapsed_ms=134
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_delayed_commit_past_fence_expiry_or_deadline_rolls_back ... ok
+observed two settlements pids=[82228, 82227] blocker=82267 elapsed_ms=2
+observed resolution pids=[82038] blocker=82094 elapsed_ms=1945
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_competing_settlements_reopen_once ... ok
+observed settlement and consumer pids=[82336, 82334] blocker=82370 elapsed_ms=2
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_and_consumer_compete_for_one_action ... ok
+observed gated transaction pids=[82377] blocker=82399 elapsed_ms=142
+observed settlement, consumer and begin_part pids=[82425, 82423, 82422] blocker=82436 elapsed_ms=2
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_consumer_and_begin_part_compete ... ok
+observed settlement and cancellation pids=[82454, 82453] blocker=82472 elapsed_ms=2
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes ... ok
+test adapters::persistence::workflow::tests::message_tests::race_tests::workflow_message_race_ambiguous_publication_commit_resolves_three_ways ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_model_tool_delivery_reopen_never_reopens_the_job ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_finality_breach_then_every_destination_final_vetoes_the_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_wrong_association_actor_is_refused ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_live_run_resumes_after_every_destination ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::veto_tests::workflow_message_reconcile_sql_reopen_refuses_expired_non_final_and_foreign_evidence ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_applied_on_a_terminal_run_records_truth_only ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_conflicted_execution_reopens_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_expired_proof_before_begin_part_returns_to_unknown ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_finality_breach_vetoes_resume_and_reopen ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_reopens_only_the_subject ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_stale_snapshot_is_refused_without_a_grant ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_not_applied_exhausted_or_ended_never_resends ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_reconcile_unknown_and_refusals_change_nothing ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_sql_evidence_attribution_shape_rejects_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::workflow_message_unknown_note_through_the_production_composition ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_model_tool_failed_delivery_continues_the_agent_job ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_publish_competing_dispatchers_publish_once ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_control_retry_replays_the_failed_receipt ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_existing_marker_is_never_republished ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_admission_admits_128_and_refuses_129 ... ok
+test adapters::persistence::workflow::tests::message_tests::recovery_tests::workflow_message_recovery_rolled_back_publication_retries_and_publishes_once ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_publish_step_at_the_limit_is_a_terminal_action_limit ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_admission_backstop_serializes_competing_writers ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_destination_links_reject_foreign_rows ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_delivery_provenance_rejects_unproven_exits ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_effect_wait_must_match_its_run_and_action ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_fence_capture_and_close_identity_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_park_requires_the_effect_parked_close_cause ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_step_execution_keeps_one_effect_wait ... ok
+test adapters::persistence::workflow::tests::message_tests::sql_tests::workflow_message_sql_receipt_and_state_guards_reject_forgeries ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_stores_anchored_rendered_headers_without_rederiving_them ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_answers_its_own_source ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::correlation_tests::workflow_message_invalid_frozen_correlation_creates_no_message_or_delivery ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_external_reply_continues_the_source_relay_trace ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_in_app_reply_stays_in_the_source_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_inbound_reply_resolves_each_recipients_copy ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_internal_reply_note_leaves_guards_unchanged ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_send_never_joins_the_customer_thread ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_user_send_opens_a_thread_the_member_takes_part_in ... ok
+test adapters::persistence::workflow::tests::message_tests::thread_tests::workflow_message_thread_reply_refuses_sources_it_cannot_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_publish_in_app_channel_commits_receipt_atomically ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_model_tool_deliveries_park_and_continue_sequentially ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_failed_delivery_takes_final_error_and_never_resends ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_poison_backs_off_and_stalls_at_five ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_receipt_unknown_is_uncertain_until_the_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_cancel_supersedes_unsent_and_records_late_truth ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_deadline_supersedes_unsent_deliveries ... ok
+test application::use_cases::company_invite::tests::company_invites_crud_and_accept_flow ... ok
+test application::use_cases::company_invite::tests::members_may_list_the_team_and_everyone_else_is_told_nothing ... ok
+test application::use_cases::company_invite::tests::the_owner_removes_a_member ... ok
+test application::use_cases::user::tests::security_email_identity_application_rejects_unverified_oauth_claims ... ok
+test application::use_cases::user::tests::security_email_identity_bypass_address_change_clears_old_proof ... ok
+test application::use_cases::user::tests::security_email_identity_default_no_smtp_refuses_registration_and_address_change ... ok
+test application::use_cases::user::tests::security_email_identity_no_smtp_registration_has_no_proof ... ok
+test application::use_cases::user::tests::security_email_identity_stale_profile_read_preserves_concurrent_confirmation ... ok
+test application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_reject_partial_or_ambiguous_documents ... ok
+test application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_sets_are_stable_and_explicitly_empty ... ok
+test application::workflow::registry::decision_tests::workflow_reviewer_follow_flag_is_static_and_compiled ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_rejects_ambiguous_members_and_implicit_fields ... ok
+test application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases ... ok
+test domain::entities::company_invite::tests::access_level_invite_payload_requires_current_fields ... ok
+test domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference ... ok
+test domain::entities::notification::tests::a_delivery_failure_emails_only_when_its_preference_is_on ... ok
+test domain::entities::notification::tests::only_the_delivery_source_and_action_parse ... ok
+test domain::entities::notification::tests::self_triggered_actions_keep_in_app_but_suppress_email ... ok
+test adapters::persistence::workflow::tests::message_tests::workflow_message_wait_user_email_parks_then_resumes_on_accepted_receipt ... ok
+
+test result: ok. 236 passed; 0 failed; 0 ignored; 0 measured; 4081 filtered out; finished in 152.78s
+

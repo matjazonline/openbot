@@ -1,0 +1,34 @@
+
+running 29 tests
+test adapters::persistence::notification::tests::notification_census_executes_against_postgres ... ok
+test adapters::persistence::notification::tests::a_failed_projection_batch_backs_off_before_it_can_be_claimed_again ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_competing_actual_workers_commit_one_receipt_and_email_per_person ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_one_retired_recipient_preserves_the_capable_recipients_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_lost_lease_during_receipt_rolls_back_every_projection_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_post_projection_retirement_cancels_email_and_expedites_without_rewriting_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipt_cannot_commit_without_fenced_event_completion ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipts_reject_forged_opt_out_and_source_rebinding ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_source_uuid_and_public_stamp_validation_agree_in_rust_and_sql ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof ... ok
+test domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference ... ok
+test domain::entities::notification::tests::a_delivery_failure_emails_only_when_its_preference_is_on ... ok
+test domain::entities::notification::tests::only_the_delivery_source_and_action_parse ... ok
+test domain::entities::notification::tests::self_triggered_actions_keep_in_app_but_suppress_email ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::a_dead_workflow_delivery_notifies_its_run_actor_once ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 4381 filtered out; finished in 17.99s
+

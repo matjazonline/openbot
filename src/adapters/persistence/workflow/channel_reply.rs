@@ -47,14 +47,15 @@ impl SettingsRow {
 pub(super) async fn settings_on(
     db: &mut PgConnection,
     company: CompanyId,
-    channel: RelatedChannelId,
+    target: AddressTarget,
 ) -> AppResult<Option<ChannelReplySettings>> {
     sqlx::query_as::<_, SettingsRow>(
         "SELECT revision,binding_id,binding_revision,contract,approval_policy FROM channel_reply_settings \
-         WHERE company_id=$1 AND channel_id=$2",
+         WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2::uuid AND principal_id IS NOT DISTINCT FROM $3::uuid",
     )
     .bind(company.as_uuid())
-    .bind(channel.as_uuid())
+    .bind(target.desk_id())
+    .bind(target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(db)
     .await?
     .map(SettingsRow::settings)
@@ -66,12 +67,12 @@ pub(super) async fn settings_on(
 pub(super) async fn bootstrap_native_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
-    channel: RelatedChannelId,
+    target: AddressTarget,
     actor: WorkflowActor,
     binding: WorkflowBindingId,
 ) -> AppResult<()> {
-    authorize_settings(tx, company, channel, actor).await?;
-    if settings_on(tx, company, channel).await?.is_some() {
+    authorize_settings(tx, company, target, actor).await?;
+    if settings_on(tx, company, target).await?.is_some() {
         return Err(conflict());
     }
     let binding_state = binding_rows::read_binding(tx, company, binding)
@@ -82,7 +83,7 @@ pub(super) async fn bootstrap_native_on(
     }
     let request = ConfigureChannelReply {
         company,
-        channel,
+        target,
         actor,
         expected: None,
         responder: Some(ConfigureResponder {
@@ -105,12 +106,12 @@ impl ChannelReplies for PostgresPersistence {
     async fn channel_reply_settings(
         &self,
         company: CompanyId,
-        channel: RelatedChannelId,
+        target: AddressTarget,
         actor: WorkflowActor,
     ) -> AppResult<Option<ChannelReplySettings>> {
         let mut tx = self.pool.begin().await?;
-        authorize_settings(&mut tx, company, channel, actor).await?;
-        let settings = settings_on(&mut tx, company, channel).await?;
+        authorize_settings(&mut tx, company, target, actor).await?;
+        let settings = settings_on(&mut tx, company, target).await?;
         tx.commit().await?;
         Ok(settings)
     }
@@ -134,15 +135,36 @@ pub(super) async fn configure_reply_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ConfigureChannelReply,
 ) -> AppResult<ChannelReplySettings> {
-    lock_settings_accounts(tx, request).await?;
-    authorize_settings(tx, request.company, request.channel, request.actor).await?;
-    sqlx::query("SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR UPDATE")
+    let approval_accounts = lock_settings_accounts(tx, request).await?;
+    authorize_settings(tx, request.company, request.target, request.actor).await?;
+    let reviewer_ids = request
+        .approval_policy
+        .as_ref()
+        .map_or(&[][..], |policy| policy.reviewers());
+    if super::approval_accounts::resolve_on(tx, request.company, reviewer_ids).await?
+        != approval_accounts
+    {
+        return Err(missing());
+    }
+    let query = match request.target {
+        AddressTarget::Desk(_) => {
+            "SELECT id FROM channels WHERE company_id=$1 AND id=$2 FOR UPDATE"
+        }
+        AddressTarget::Principal(_) => {
+            "SELECT id FROM principals WHERE company_id=$1 AND id=$2 AND kind='agent' FOR UPDATE"
+        }
+    };
+    let id = match request.target {
+        AddressTarget::Desk(id) => id,
+        AddressTarget::Principal(id) => id.as_uuid(),
+    };
+    sqlx::query(query)
         .bind(request.company.as_uuid())
-        .bind(request.channel.as_uuid())
+        .bind(id)
         .fetch_optional(&mut **tx)
         .await?
         .ok_or_else(missing)?;
-    let current = settings_on(tx, request.company, request.channel).await?;
+    let current = settings_on(tx, request.company, request.target).await?;
     if current.as_ref().map(|value| value.revision) != request.expected {
         return Err(conflict());
     }
@@ -159,7 +181,7 @@ pub(super) async fn configure_reply_on(
         approval_policy: request.approval_policy.clone(),
     };
     write_settings(tx, request, &state).await?;
-    tracing::info!(company=%request.company.as_uuid(),channel=%request.channel.as_uuid(),
+    tracing::info!(company=%request.company.as_uuid(),target=%request.target,
         revision=next,"Channel responder configured");
     Ok(state)
 }
@@ -183,11 +205,15 @@ pub(super) fn native_contract() -> ChannelReplyContract {
 async fn lock_settings_accounts(
     db: &mut PgConnection,
     request: &ConfigureChannelReply,
-) -> AppResult<()> {
+) -> AppResult<Vec<super::approval_accounts::PrincipalAccount>> {
     let mut accounts = vec![request.actor.user_id()];
-    if let Some(policy) = &request.approval_policy {
-        accounts.extend_from_slice(policy.reviewers());
-    }
+    let reviewer_ids = request
+        .approval_policy
+        .as_ref()
+        .map_or(&[][..], |policy| policy.reviewers());
+    let approval_accounts =
+        super::approval_accounts::resolve_on(db, request.company, reviewer_ids).await?;
+    accounts.extend(approval_accounts.iter().map(|mapping| mapping.user_id));
     if let Some(responder) = &request.responder {
         let run_as: Option<Uuid> = sqlx::query_scalar("SELECT revision.run_as_user_id FROM workflow_bindings AS binding \
             JOIN workflow_binding_revisions AS revision ON revision.company_id=binding.company_id AND revision.binding_id=binding.id \
@@ -197,17 +223,21 @@ async fn lock_settings_accounts(
     }
     accounts.sort_unstable();
     accounts.dedup();
-    sqlx::query("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
-        .bind(accounts)
-        .execute(db)
-        .await?;
-    Ok(())
+    let locked: Vec<Uuid> =
+        sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+            .bind(&accounts)
+            .fetch_all(db)
+            .await?;
+    if locked != accounts {
+        return Err(missing());
+    }
+    Ok(approval_accounts)
 }
 
 async fn authorize_settings(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
-    channel: RelatedChannelId,
+    target: AddressTarget,
     actor: WorkflowActor,
 ) -> AppResult<()> {
     sqlx::query("SET LOCAL lock_timeout = '5s'")
@@ -217,8 +247,7 @@ async fn authorize_settings(
         .execute(&mut **tx)
         .await?;
     authority::authorize_company(tx, company, actor).await?;
-    association::authorize_association(tx, company, actor, RelatedAssociation::Channel(channel))
-        .await
+    association::authorize_association(tx, company, actor, RelatedAssociation::inbox(target)).await
 }
 
 async fn validate_reviewers(
@@ -228,8 +257,16 @@ async fn validate_reviewers(
     let Some(policy) = &request.approval_policy else {
         return Ok(());
     };
-    for user in policy.reviewers() {
-        let actor = WorkflowActor::authenticated(*user)?;
+    for principal in policy.reviewers() {
+        let user: Uuid = sqlx::query_scalar(
+            "SELECT user_id FROM principals WHERE company_id=$1 AND id=$2 AND kind='person'",
+        )
+        .bind(request.company.as_uuid())
+        .bind(principal)
+        .fetch_optional(&mut **db)
+        .await?
+        .ok_or_else(missing)?;
+        let actor = WorkflowActor::authenticated(user)?;
         let reviewer = authority::authorize_reviewer_on(db, request.company, actor).await?;
         if !reviewer.privileged {
             return Err(AppError::BadRequest(
@@ -240,7 +277,7 @@ async fn validate_reviewers(
             db,
             request.company,
             actor,
-            RelatedAssociation::Channel(request.channel),
+            RelatedAssociation::inbox(request.target),
         )
         .await?;
     }
@@ -259,7 +296,7 @@ async fn selected_on(
         .ok_or_else(missing)?;
     if !state.active
         || state.revision != selection.expected_binding_revision
-        || state.association != RelatedAssociation::Channel(request.channel)
+        || state.association != RelatedAssociation::inbox(request.target)
         || state.configuration.message_trigger().is_none()
     {
         return Err(conflict());
@@ -270,7 +307,7 @@ async fn selected_on(
         tx,
         request.company,
         configuration.run_as(),
-        RelatedAssociation::Channel(request.channel),
+        RelatedAssociation::inbox(request.target),
     )
     .await?;
     bindings::verify_selection(tx, configuration).await?;
@@ -302,17 +339,39 @@ async fn write_settings(
         .map(|value| serde_json::to_value(&value.contract))
         .transpose()
         .map_err(|_| invalid())?;
-    sqlx::query(
-        "INSERT INTO channel_reply_settings(company_id,channel_id,revision,binding_id,binding_revision,contract,approval_policy) \
-         VALUES($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(company_id,channel_id) DO UPDATE \
+    let conflict = match request.target {
+        AddressTarget::Desk(_) => "company_id,channel_id",
+        AddressTarget::Principal(_) => "company_id,principal_id",
+    };
+    let query = format!(
+        "INSERT INTO channel_reply_settings(company_id,channel_id,revision,binding_id,binding_revision,contract,approval_policy,principal_id) \
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT({conflict}) DO UPDATE \
          SET revision=EXCLUDED.revision,binding_id=EXCLUDED.binding_id,\
-         binding_revision=EXCLUDED.binding_revision,contract=EXCLUDED.contract,approval_policy=EXCLUDED.approval_policy")
-        .bind(request.company.as_uuid()).bind(request.channel.as_uuid())
+         binding_revision=EXCLUDED.binding_revision,contract=EXCLUDED.contract,approval_policy=EXCLUDED.approval_policy"
+    );
+    sqlx::query(&query)
+        .bind(request.company.as_uuid())
+        .bind(request.target.desk_id())
         .bind(revision(state.revision.get())?)
         .bind(selection.map(|value| value.binding.as_uuid()))
-        .bind(selection.map(|value| revision(value.configuration_revision.get())).transpose()?)
-        .bind(contract).bind(state.approval_policy.as_ref().map(serde_json::to_value).transpose().map_err(|_|invalid())?)
-        .execute(&mut **tx).await.map_err(write_error)?;
+        .bind(
+            selection
+                .map(|value| revision(value.configuration_revision.get()))
+                .transpose()?,
+        )
+        .bind(contract)
+        .bind(
+            state
+                .approval_policy
+                .as_ref()
+                .map(serde_json::to_value)
+                .transpose()
+                .map_err(|_| invalid())?,
+        )
+        .bind(request.target.principal_id().map(|id| id.as_uuid()))
+        .execute(&mut **tx)
+        .await
+        .map_err(write_error)?;
     Ok(())
 }
 

@@ -1,0 +1,41 @@
+$ cargo test --locked --offline --lib run_board_
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0277]: a value of type `i64` cannot be made by summing an iterator over elements of type `u64`
+   --> src/adapters/persistence/workflow/role_child_runtime_tests.rs:188:53
+    |
+188 |         counts.iter().map(|count| count.runs).sum::<i64>(),
+    |                                               ---   ^^^ value of type `i64` cannot be made by summing a `std::iter::Iterator<Item=u64>`
+    |                                               |
+    |                                               required by a bound introduced by this call
+    |
+    = help: the trait `Sum<u64>` is not implemented for `i64`
+help: the following other types implement trait `Sum<A>`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/accum.rs:48:8
+    |
+    = note: `i64` implements `Sum`
+   ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/accum.rs:70:8
+    |
+    = note: `i64` implements `Sum<&i64>`
+   ::: /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/accum.rs:204:0
+    |
+    = note: in this macro invocation
+note: the method call chain might not have had the expected associated types
+   --> src/adapters/persistence/workflow/role_child_runtime_tests.rs:188:23
+    |
+182 |       let counts = d
+    |  __________________-
+183 | |         .p()
+184 | |         .run_board_counts(binding.company, &scope, cutoff)
+185 | |         .await
+    | |______________- this expression has type `Result<Vec<BoardCount>, AppError>`
+...
+188 |           counts.iter().map(|count| count.runs).sum::<i64>(),
+    |                  ------ ^^^^^^^^^^^^^^^^^^^^^^^ `Iterator::Item` changed to `u64` here
+    |                  |
+    |                  `Iterator::Item` is `&BoardCount` here
+note: required by a bound in `std::iter::Iterator::sum`
+   --> /rustc/59807616e1fa2540724bfbac14d7976d7e4a3860/library/core/src/iter/traits/iterator.rs:3653:4
+    = note: this error originates in the macro `integer_sum_product` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+For more information about this error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

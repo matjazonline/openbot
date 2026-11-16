@@ -1,0 +1,8 @@
+{
+  "commit": "1e58fa362e7fd98b5f0772c74bcde6004988934e",
+  "parent": "d68c7353dce5957a9a64eb33f8faf2d22edc5863",
+  "tree": "8ba5f4488947587a661084f7ccc2f0df5aac63cf",
+  "branch": "codex/plan03-p04-r16-1e58fa36",
+  "only_changed_path": ".github/workflows/plan03-p04-doop-proof.yml",
+  "claim": "Only supplementary validation workflow differs from exact current candidate d68c7353. No runtime/test/config source change; original CI/Memory/private workflows preserved. Root HEAD/index unchanged."
+}

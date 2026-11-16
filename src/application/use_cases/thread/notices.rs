@@ -62,14 +62,40 @@ pub struct BounceSuggestion {
     pub suggestions: Vec<ChannelSlug>,
 }
 
-/// One channel the bouncing sender could have written to instead.
+/// One address the sender is currently authorized to write to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ChannelDirectoryEntry {
+pub struct AddressDirectoryEntry {
+    pub target: crate::entities::address::AddressTarget,
     pub address: EmailAddress,
     pub name: String,
     pub description: Option<String>,
     /// The department that owns the desk; entries arrive grouped by it, root first.
     pub department: Option<String>,
+}
+
+/// Why a principal's address could not take this message.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum PrincipalRefusal {
+    /// A context suffix such as `+quiet` was put on a principal's address; it means "do not run
+    /// the desk's agent" and has no meaning for a person or an agent.
+    ContextSuffix,
+}
+
+impl PrincipalRefusal {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::ContextSuffix => {
+                "A context suffix is not accepted on a person's or an agent's address"
+            }
+        }
+    }
+}
+
+/// One person's or agent's address a team sender wrote to, and why it could not take the message.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct PrincipalBounce {
+    pub slug: ChannelSlug,
+    pub refusal: PrincipalRefusal,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +114,10 @@ pub struct BounceInfo {
     /// before this field existed still re-hydrate.
     #[serde(default)]
     pub disabled_slugs: Vec<ChannelSlug>,
+    /// People's and agents' addresses this message named, listed only for a team sender; anyone
+    /// else's are reported as [`Self::invalid_slugs`], so a stranger cannot tell a member's
+    /// address from one that does not exist.
+    pub principals: Vec<PrincipalBounce>,
     pub suggestions: Vec<BounceSuggestion>,
     /// The channels this sender may write to, listed only when they are on the company's team.
     ///
@@ -95,7 +125,7 @@ pub struct BounceInfo {
     /// channel directory from the bounce it earns. Defaulted on deserialize for the same reason as
     /// `disabled_slugs`.
     #[serde(default)]
-    pub available_channels: Vec<ChannelDirectoryEntry>,
+    pub available_channels: Vec<AddressDirectoryEntry>,
     pub original_subject: String,
 }
 
@@ -135,7 +165,15 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
         ));
     }
 
-    push_channel_directory(&mut body, &bounce.available_channels);
+    for principal in &bounce.principals {
+        body.push_str(&format!(
+            "  - Person or agent: '{}@{domain_part}'\n    {}.\n\n",
+            principal.slug,
+            principal.refusal.as_str()
+        ));
+    }
+
+    push_address_directory(&mut body, &bounce.available_channels);
 
     body.push_str("Please check the desk address and try sending your email again.\n");
     body
@@ -146,18 +184,28 @@ pub fn format_bounce_email_body(bounce: &BounceInfo, app_domain: &str) -> String
 ///
 /// Nothing at all is rendered for an empty list, so a stranger's bounce is byte-for-byte what it
 /// was before this section existed.
-fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) {
+fn push_address_directory(body: &mut String, entries: &[AddressDirectoryEntry]) {
     if entries.is_empty() {
         return;
     }
 
-    body.push_str("Desks you can write to:\n");
+    let desks: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry.target.desk_id().is_some())
+        .collect();
+    let principals: Vec<_> = entries
+        .iter()
+        .filter(|entry| entry.target.principal_id().is_some())
+        .collect();
+    if !desks.is_empty() {
+        body.push_str("Desks you can write to:\n");
+    }
     // Under department headings once any desk has a department (01-departments 04C.3); the
     // entries already arrive in that order, root departments first and "No department" last.
-    let headed = entries.iter().any(|entry| entry.department.is_some());
+    let headed = desks.iter().any(|entry| entry.department.is_some());
     let indent = if headed { "  " } else { "" };
     let mut heading: Option<Option<&str>> = None;
-    for entry in entries {
+    for entry in desks {
         let department = entry.department.as_deref();
         if headed && heading != Some(department) {
             body.push_str(&format!("  {}:\n", department.unwrap_or("No department")));
@@ -173,12 +221,21 @@ fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) 
             body.push_str(&format!("{indent}      {description}\n"));
         }
     }
+    if !principals.is_empty() {
+        body.push_str("People and agents:\n");
+        for entry in &principals {
+            body.push_str(&format!("  - {} — {}\n", entry.address, entry.name));
+        }
+        if principals.len() == 201 {
+            body.push_str("  More addresses may be available.\n");
+        }
+    }
     body.push('\n');
 }
 
 /// The reply `_help@{company}.{app_domain}` sends back.
 ///
-/// `entries` is whatever [`ThreadUseCases::writable_channel_directory`] allowed this sender, so the
+/// `entries` is whatever [`ThreadUseCases::writable_address_directory`] allowed this sender, so the
 /// team-only rule is decided there rather than restated here; an empty list still gets the syntax
 /// section, which discloses nothing about the company.
 ///
@@ -186,13 +243,14 @@ fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) 
 /// `parse_recipient_address_pipeline`, the separators in `strip_context_suffix_from_slug`, and the
 /// bracket forms in `EmailParser::check_body_context_trigger`.
 pub fn format_help_email_body(
-    entries: &[ChannelDirectoryEntry],
+    entries: &[AddressDirectoryEntry],
     company_slug: &CompanySlug,
     app_domain: &str,
 ) -> String {
     let domain_part = format!("{company_slug}.{app_domain}");
     let example = entries
-        .first()
+        .iter()
+        .find(|entry| entry.target.desk_id().is_some())
         .map(|entry| {
             entry
                 .address
@@ -204,7 +262,7 @@ pub fn format_help_email_body(
         .unwrap_or_else(|| "support".to_string());
 
     let mut body = String::from("Mail Agents Help\n\n");
-    push_channel_directory(&mut body, entries);
+    push_address_directory(&mut body, entries);
     if entries.is_empty() {
         body.push_str(
             "You are not currently a participant of any desk in this company, so there is \
@@ -234,6 +292,17 @@ pub fn format_help_email_body(
 
 /// The one sentence that says why a bounce happened, for both bounce renderers.
 pub fn bounce_cause(bounce: &BounceInfo) -> &'static str {
+    if let Some(principal) = bounce.principals.first() {
+        return if bounce.invalid_slugs.is_empty() && bounce.disabled_slugs.is_empty() {
+            match principal.refusal {
+                PrincipalRefusal::ContextSuffix => {
+                    "a context suffix is not accepted on a person's or an agent's address"
+                }
+            }
+        } else {
+            "one or more addresses could not be delivered to"
+        };
+    }
     match (
         !bounce.invalid_slugs.is_empty(),
         !bounce.disabled_slugs.is_empty(),

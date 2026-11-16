@@ -1,0 +1,9 @@
+{
+  "run": 43846081398,
+  "job": 133226472130,
+  "candidate": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "archive_sha256": "a12573f50b1330e640ea6726afad602c723e8728ff36d6f36db3694ce3748150",
+  "entry": "verify/50_Database-backed test suite (isolated network).txt",
+  "entry_sha256": "86b32c35374dadb59a66f941fc587fb367841f93adf30584098fcc38303b6e8d",
+  "acquisition": "Authenticated GitHub browser job Download log archive; candidate identity checked in full job log; only database step retained in repo"
+}

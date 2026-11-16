@@ -1,0 +1,490 @@
+--- before/src/adapters/persistence/account_identity.rs
++++ after/src/adapters/persistence/account_identity.rs
+@@ -130,7 +130,7 @@
+ /// The identity and its messages move in one statement: `messages_authored_identity_author_fk`
+ /// requires a message's author to hold its authored identity, and it is checked at the end of the
+ /// statement, so two separate updates would each violate it.
+-async fn detach_old_address(
++pub(super) async fn detach_old_address(
+     connection: &mut sqlx::PgConnection,
+     company_id: Uuid,
+     person: PrincipalId,
+@@ -180,7 +180,7 @@
+ }
+ 
+ /// Make the new address the person's account identity, adopting what an outsider held with it.
+-async fn adopt_new_address(
++pub(super) async fn adopt_new_address(
+     connection: &mut sqlx::PgConnection,
+     company_id: Uuid,
+     person: PrincipalId,
+--- before/src/adapters/persistence/participant.rs
++++ after/src/adapters/persistence/participant.rs
+@@ -345,12 +345,11 @@
+     email: &str,
+ ) -> AppResult<PrincipalId> {
+     let qualified = account_email_identity(email)?;
+-    lock_identity_key(connection, company_id, &qualified).await?;
+ 
+     let principal_id =
+         person::resolve_on(connection, company_id, user_id, display_label, &qualified).await?;
+ 
+-    upsert_account_identity_on(
++    super::account_identity::adopt_new_address(
+         connection,
+         company_id,
+         principal_id,
+--- before/src/adapters/persistence/participant/person.rs
++++ after/src/adapters/persistence/participant/person.rs
+@@ -2,6 +2,7 @@
+ use sqlx::PgConnection;
+ use uuid::Uuid;
+ 
++use super::{account_email_identity, lock_identity_key};
+ use crate::{
+     app_error::{AppError, AppResult},
+     entities::transport::{PrincipalId, QualifiedIdentity},
+@@ -36,7 +37,50 @@
+     .await?)
+ }
+ 
+-/// Caller holds the identity advisory key and its existing account/company ownership prefix.
++async fn lifetime_on(db: &mut PgConnection, company: Uuid, user: Uuid) -> AppResult<Option<Uuid>> {
++    Ok(sqlx::query_scalar(
++        "SELECT id FROM principals WHERE company_id = $1 AND historical_person_user_id = $2",
++    )
++    .bind(company)
++    .bind(user)
++    .fetch_optional(db)
++    .await?)
++}
++
++/// An absent account may have changed email without visiting its retired personal principal.
++/// Acquire every old/current key before any principal lock, just as account rekey does.
++async fn lock_restoration_identities_on(
++    db: &mut PgConnection,
++    company: Uuid,
++    lifetime: Option<Uuid>,
++    identity: &QualifiedIdentity,
++) -> AppResult<Vec<QualifiedIdentity>> {
++    let subjects: Vec<String> = sqlx::query_scalar(
++        "SELECT subject FROM participant_identities WHERE company_id = $1 AND principal_id = $2 \
++         AND transport = $3 AND namespace = $4 AND subject <> $5 \
++         AND status = 'verified' AND provenance = 'account' ORDER BY subject",
++    )
++    .bind(company)
++    .bind(lifetime)
++    .bind(identity.transport().as_str())
++    .bind(identity.namespace().as_str())
++    .bind(identity.subject().as_str())
++    .fetch_all(&mut *db)
++    .await?;
++    let obsolete: Vec<QualifiedIdentity> = subjects
++        .iter()
++        .map(|subject| account_email_identity(subject))
++        .collect::<AppResult<_>>()?;
++    let mut keys: Vec<&QualifiedIdentity> = obsolete.iter().chain([identity]).collect();
++    keys.sort_by(|left, right| left.subject().as_str().cmp(right.subject().as_str()));
++    for key in keys {
++        lock_identity_key(db, company, key).await?;
++    }
++    Ok(obsolete)
++}
++
++/// Caller holds the existing account/company ownership prefix; this takes all identity keys
++/// before the complete sorted principal lock set.
+ pub(super) async fn resolve_on(
+     db: &mut PgConnection,
+     company: Uuid,
+@@ -44,13 +88,8 @@
+     label: &str,
+     identity: &QualifiedIdentity,
+ ) -> AppResult<PrincipalId> {
+-    let lifetime: Option<Uuid> = sqlx::query_scalar(
+-        "SELECT id FROM principals WHERE company_id = $1 AND historical_person_user_id = $2",
+-    )
+-    .bind(company)
+-    .bind(user)
+-    .fetch_optional(&mut *db)
+-    .await?;
++    let lifetime = lifetime_on(db, company, user).await?;
++    let obsolete = lock_restoration_identities_on(db, company, lifetime, identity).await?;
+     let holder = holder_on(db, company, identity).await?;
+     let ids: Vec<Uuid> = lifetime
+         .into_iter()
+@@ -63,6 +102,18 @@
+     .bind(ids)
+     .fetch_all(&mut *db)
+     .await?;
++
++    if let Some(lifetime) = lifetime {
++        for old in obsolete {
++            super::super::account_identity::detach_old_address(
++                db,
++                company,
++                PrincipalId::new(lifetime),
++                &old,
++            )
++            .await?;
++        }
++    }
+ 
+     // Re-read after the complete sorted lock set: a concurrent removal may have demoted it.
+     let holder = holder_on(db, company, identity).await?;
+--- before/src/adapters/persistence/address_tests/direct.rs
++++ after/src/adapters/persistence/address_tests/direct.rs
+@@ -1,4 +1,6 @@
+ use super::*;
++#[path = "rejoin.rs"]
++mod rejoin;
+ use crate::{
+     application::ports::participant::PrincipalAccessPersistence,
+     entities::{
+@@ -290,12 +292,17 @@
+         return;
+     };
+     let (user, name) = account(&f.persistence, "rejoin").await;
+-    let email = email_of(f.pool(), user).await;
++    let old_email = email_of(f.pool(), user).await;
+     let original = f.join(user, &name).await;
+     f.persistence
+         .remove_member(f.company.id, user)
+         .await
+         .unwrap();
++    let email = EmailAddress::from(format!(
++        "rejoin-new-{}@example.test",
++        Uuid::new_v4().simple()
++    ));
++    rejoin::change_email(&f, user, &email).await;
+     sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',1)")
+         .bind(Uuid::new_v4()).bind(f.company.id).bind(user).execute(f.pool()).await.unwrap();
+     let mut first = f.pool().begin().await.unwrap();
+@@ -333,6 +340,17 @@
+     .await
+     .unwrap();
+     assert_eq!(count, 1);
++    let old_identity = EmailIdentity::parse(EmailAddress::from(old_email))
++        .unwrap()
++        .qualify_default();
++    assert_eq!(
++        f.persistence
++            .access_context_for_identity(f.company.id, &old_identity)
++            .await
++            .unwrap()
++            .membership,
++        CompanyMembership::None,
++    );
+ }
+ 
+ #[tokio::test]
+--- before/src/adapters/persistence/address_tests/rejoin.rs
++++ after/src/adapters/persistence/address_tests/rejoin.rs
+@@ -0,0 +1,308 @@
++//! Restoring a personal target preserves history without reviving old transport authority.
++use super::*;
++use crate::{
++    application::ports::thread::ThreadPersistence,
++    entities::{access_level::AccessLevel, company_member::CompanyAccessRole, thread::Thread},
++    use_cases::company_invite::CreateCompanyInvite,
++    use_cases::user::{
++        AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange,
++        auth_attempt_key,
++    },
++};
++
++struct RejoinCase {
++    fixture: Fixture,
++    user: Uuid,
++    old_email: EmailAddress,
++    email: EmailAddress,
++    original: PrincipalId,
++}
++
++struct OutsiderPlaces {
++    desk: Uuid,
++    thread: Thread,
++    outsider: PrincipalId,
++}
++
++impl RejoinCase {
++    async fn new() -> Option<Self> {
++        let fixture = Fixture::new().await?;
++        let (user, _) = account(&fixture.persistence, "changed_rejoin").await;
++        let old_email = EmailAddress::from(email_of(fixture.pool(), user).await);
++        sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id = $1")
++            .bind(user)
++            .execute(fixture.pool())
++            .await
++            .unwrap();
++        accept_invite(&fixture, user, &old_email).await;
++        let original = PrincipalId::new(fixture.principal_of(user).await);
++        fixture
++            .persistence
++            .remove_member(fixture.company.id, user)
++            .await
++            .unwrap();
++        let email = EmailAddress::from(format!("changed-{}@example.test", Uuid::new_v4().simple()));
++        change_email(&fixture, user, &email).await;
++        Some(Self {
++            fixture,
++            user,
++            old_email,
++            email,
++            original,
++        })
++    }
++
++    async fn restore(&self) {
++        accept_invite(&self.fixture, self.user, &self.email).await;
++        assert_eq!(
++            self.fixture.principal_of(self.user).await,
++            self.original.as_uuid()
++        );
++        assert_eq!(
++            self.fixture
++                .addresses_of(self.original.as_uuid())
++                .await
++                .len(),
++            1
++        );
++    }
++
++    async fn outsider_places(&self) -> OutsiderPlaces {
++        let desk = ChannelPersistence::create(
++            &self.fixture.persistence,
++            self.fixture.company.id,
++            ChannelWrite {
++                name: "Current email grant".into(),
++                slug: "current-email".into(),
++                participant_emails: Some(vec![self.email.to_string()]),
++                ..ChannelWrite::default()
++            },
++        )
++        .await
++        .unwrap();
++        let thread = ThreadPersistence::create_thread(
++            &self.fixture.persistence,
++            desk.id,
++            "Existing correspondence",
++            std::slice::from_ref(&self.email),
++        )
++        .await
++        .unwrap();
++        let outsider = identity_context(&self.fixture, &self.email)
++            .await
++            .principal_id
++            .unwrap();
++        assert_ne!(outsider, self.original);
++        OutsiderPlaces {
++            desk: desk.id,
++            thread,
++            outsider,
++        }
++    }
++}
++
++pub(super) async fn change_email(fixture: &Fixture, user: Uuid, email: &EmailAddress) {
++    fixture
++        .persistence
++        .save_pending_account_change(PendingAccountChange {
++            user_id: user,
++            change: AccountChange::Email(email),
++            confirmation_code_hash: "confirmed-rejoin-change",
++            expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
++        })
++        .await
++        .unwrap();
++    let attempt = auth_attempt_key(
++        "rejoin-regression",
++        "account-change-code:v1",
++        &[user.as_bytes()],
++    );
++    let changed = fixture
++        .persistence
++        .confirm_pending_account_change(
++            user,
++            AccountChangeKind::Email,
++            "confirmed-rejoin-change",
++            &attempt,
++        )
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(changed.email, email.as_str());
++    assert!(changed.email_verified_at.is_some());
++}
++
++async fn accept_invite(f: &Fixture, user: Uuid, email: &EmailAddress) {
++    let invite = f
++        .persistence
++        .create_invite(CreateCompanyInvite {
++            actor_id: f.owner,
++            company_id: f.company.id,
++            email: email.clone(),
++            role: CompanyAccessRole::Member,
++            access_level: AccessLevel::try_from(1_i16).unwrap(),
++        })
++        .await
++        .unwrap();
++    assert!(
++        f.persistence
++            .accept_pending_invite(invite.id, user, email)
++            .await
++            .unwrap()
++            .is_some()
++    );
++}
++
++async fn identity_context(f: &Fixture, email: &EmailAddress) -> PrincipalAccessContext {
++    let identity = EmailIdentity::parse(email.clone())
++        .unwrap()
++        .qualify_default();
++    f.persistence
++        .access_context_for_identity(f.company.id, &identity)
++        .await
++        .unwrap()
++}
++
++#[tokio::test]
++async fn direct_thread_changed_email_rejoin_does_not_revive_old_email_authority() {
++    let Some(case) = RejoinCase::new().await else {
++        return;
++    };
++    assert!(
++        !identity_context(&case.fixture, &case.old_email)
++            .await
++            .membership
++            .is_team()
++    );
++    case.restore().await;
++    let obsolete = identity_context(&case.fixture, &case.old_email).await;
++    assert_eq!(obsolete.membership, CompanyMembership::None);
++    assert_ne!(obsolete.principal_id, Some(case.original));
++    let current = identity_context(&case.fixture, &case.email).await;
++    assert_eq!(current.membership, CompanyMembership::Member);
++    assert_eq!(current.principal_id, Some(case.original));
++
++    // A new account can verify the former mailbox, but cannot acquire the old personal target.
++    let name = format!("replacement_{}", Uuid::new_v4().simple());
++    case.fixture
++        .persistence
++        .create_user(&name, &case.old_email, "hash")
++        .await
++        .unwrap();
++    let replacement = case
++        .fixture
++        .persistence
++        .get_by_email(&case.old_email)
++        .await
++        .unwrap()
++        .unwrap();
++    sqlx::query("UPDATE users SET email_verified_at = CURRENT_TIMESTAMP WHERE id=$1")
++        .bind(replacement.id)
++        .execute(case.fixture.pool())
++        .await
++        .unwrap();
++    accept_invite(&case.fixture, replacement.id, &case.old_email).await;
++    assert_ne!(
++        case.fixture.principal_of(replacement.id).await,
++        case.original.as_uuid()
++    );
++    assert_eq!(
++        case.fixture.principal_of(case.user).await,
++        case.original.as_uuid()
++    );
++}
++
++#[tokio::test]
++async fn direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places() {
++    let Some(case) = RejoinCase::new().await else {
++        return;
++    };
++    let OutsiderPlaces {
++        desk,
++        thread,
++        outsider,
++    } = case.outsider_places().await;
++    case.restore().await;
++    let viewer = case
++        .fixture
++        .persistence
++        .access_context_for_user(case.fixture.company.id, case.user)
++        .await
++        .unwrap()
++        .unwrap();
++    let desk = ChannelPersistence::get_by_id(&case.fixture.persistence, desk)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(desk.viewer_access(viewer));
++    assert_eq!(desk.principal_grants.len(), 2);
++    assert!(
++        desk.principal_grants
++            .iter()
++            .all(|grant| grant.principal_id == case.original)
++    );
++    let thread = case
++        .fixture
++        .persistence
++        .get_thread_by_id(thread.id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(thread.contains_principal(case.original));
++    assert!(!thread.contains_principal(outsider));
++    assert_eq!(
++        identity_context(&case.fixture, &case.email)
++            .await
++            .principal_id,
++        Some(case.original)
++    );
++}
++
++#[tokio::test]
++async fn direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider() {
++    let Some(case) = RejoinCase::new().await else {
++        return;
++    };
++    let OutsiderPlaces {
++        desk,
++        thread,
++        outsider,
++    } = case.outsider_places().await;
++    let alias = EmailAddress::from(format!("alias-{}@example.test", Uuid::new_v4().simple()));
++    sqlx::query(
++        "INSERT INTO participant_identities(id, company_id, principal_id, transport, namespace, subject, status, claim_metadata, provenance) \
++         SELECT $1, company_id, principal_id, transport, namespace, $4, 'observed', claim_metadata, 'transport_ingress' \
++         FROM participant_identities WHERE company_id=$2 AND principal_id=$3 LIMIT 1",
++    ).bind(Uuid::new_v4()).bind(case.fixture.company.id).bind(outsider.as_uuid()).bind(alias.as_str())
++        .execute(case.fixture.pool()).await.unwrap();
++    case.restore().await;
++    let desk = ChannelPersistence::get_by_id(&case.fixture.persistence, desk)
++        .await
++        .unwrap()
++        .unwrap();
++    assert_eq!(desk.principal_grants.len(), 2);
++    assert!(
++        desk.principal_grants
++            .iter()
++            .all(|grant| grant.principal_id == outsider)
++    );
++    let thread = case
++        .fixture
++        .persistence
++        .get_thread_by_id(thread.id)
++        .await
++        .unwrap()
++        .unwrap();
++    assert!(thread.contains_principal(outsider));
++    assert!(!thread.contains_principal(case.original));
++    assert_eq!(
++        identity_context(&case.fixture, &alias).await.principal_id,
++        Some(outsider)
++    );
++    assert_eq!(
++        identity_context(&case.fixture, &case.email)
++            .await
++            .principal_id,
++        Some(case.original)
++    );
++}

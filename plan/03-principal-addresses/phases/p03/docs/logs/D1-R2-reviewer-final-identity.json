@@ -1,0 +1,7 @@
+{
+  "source_digest": "1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa",
+  "start_equals_final": true,
+  "decision_sha256": "dc3a26cd5572086749483223267eb1c73f6f77380a8fca981b2dadb91a74d144",
+  "coordination_live_equals_pin": true,
+  "coordination_sha256": "b7ccaebbe43c5b2a2156069127afaf54628ffab9231a0f23758b80c272cc3a81"
+}

@@ -1,0 +1,5 @@
+$ /opt/homebrew/opt/postgresql@18/bin/createdb -h 127.0.0.1 -p 60242 -U mac02 openbot_roles_p02_final
+exit=0
+$ cargo sqlx migrate run
+Applied 20260817000000/migrate init schema (503.980875ms)
+exit=0

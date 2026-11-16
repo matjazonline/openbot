@@ -1,0 +1,21 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case stdout ----
+CYCLE {"finals":[{"delivery":null,"diagnostic":null,"disposition":"automatic","run":"b904a864-b54b-4f27-bece-ed3b8bd320b9","state":"published"}],"intents":[{"hop":0,"origin":"application","outcome":"admitted","policy":"in_app_only"},{"hop":1,"origin":"internal","outcome":"admitted","policy":"deliver"},{"hop":0,"origin":"external","outcome":null,"policy":"in_app_only"}],"refused":null,"relays":[{"channel":"b88cc5b2-0b04-4093-a788-0774d0636016","hop":1,"origin":"fdee238a-314e-4690-9b50-be7c19076686"}],"runs":[{"binding":"c51e76a1-9d2d-4098-9b73-c10b5dff4c9b","origin":null,"state":"failed"},{"binding":"cd9d0f4d-5be7-8741-b0fa-83d0594947e6","origin":"fdee238a-314e-4690-9b50-be7c19076686","state":"succeeded"},{"binding":"3aff65fc-da18-409d-a39e-ade738315c91","origin":"fdee238a-314e-4690-9b50-be7c19076686","state":"succeeded"},{"binding":"cd9d0f4d-5be7-8741-b0fa-83d0594947e6","origin":"fdee238a-314e-4690-9b50-be7c19076686","state":"succeeded"}]} rerun=RunId(dc873510-8c50-4809-a570-06dfa7f4eb8e) origin=fdee238a-314e-4690-9b50-be7c19076686
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case' (6197535) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:1055:5:
+observe only
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_relay_cycle_ends_at_the_hop_budget_without_a_case
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4475 filtered out; finished in 20.11s
+
+EXIT 101

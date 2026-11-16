@@ -1,0 +1,65 @@
+[
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "typecheck"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-1.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "build"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-2.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "test"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-3.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "test:guards"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-4.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "package"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-5.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "check:css"
+    ],
+    "exit": 0,
+    "log": "resume-plugin-gate-6.txt"
+  }
+]

@@ -1,0 +1,28 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 11 tests
+test adapters::persistence::legacy_runtime_schema_tests::the_legacy_runtime_tables_columns_and_functions_are_gone ... ok
+test adapters::persistence::skill::tests::capability_selection_is_scoped_and_updates_atomically ... ok
+test adapters::persistence::legacy_runtime_schema_tests::no_catalog_object_names_the_legacy_runtime ... ok
+
+thread 'adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model' (19073294) panicked at src/adapters/http/routes/agent_api_tests.rs:261:5:
+assertion `left == right` failed
+  left: ["list_company_agents", "create_agent", "create_desk_for_agent"]
+ right: ["list_company_agents", "create_agent"]
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... FAILED
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag ... ok
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once ... ok
+test adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy ... ok
+test adapters::http::routes::agent::api_tests::agent_default_desk_json_create_places_the_agent ... ok
+
+failures:
+
+failures:
+    adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model
+
+test result: FAILED. 10 passed; 1 failed; 0 ignored; 0 measured; 4691 filtered out; finished in 1.34s
+

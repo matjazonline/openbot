@@ -434,6 +434,6 @@ async fn doop_agent_current_preparation_reaches_ready_before_model_io() {
             .expect_ready();
     assert_eq!(
         launch.prepared.spec(claim.fence).unwrap().prepared["version"],
-        6
+        7
     );
 }

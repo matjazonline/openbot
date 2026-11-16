@@ -1,0 +1,3 @@
+FREEZE ACCEPTED; first_role=None
+COMPILE ACCEPTED; roles=[]
+prepare refused: Diagnostic { code: "registry.reviewers", message: "Choose person principals; department roles must be literal in this step's source", field_path: "/steps/start/with/reviewers", span: SourceSpan { start: 333, end: 334, line: 1, column: 334 }, instance_path: None, schema_path: None }

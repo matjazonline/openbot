@@ -55,6 +55,7 @@ pub(crate) async fn rekey_account_identity_on(
     old_email: &str,
     new_email: &str,
 ) -> AppResult<()> {
+    let companies = super::workflow::prelock_account_companies_on(connection, user_id).await?;
     let persons: Vec<PersonPrincipal> = sqlx::query_as(
         r#"SELECT company_id, id FROM principals
            WHERE user_id = $1 AND kind = 'person'
@@ -73,7 +74,8 @@ pub(crate) async fn rekey_account_identity_on(
     let old = account_email_identity(old_email).ok();
     let new = account_email_identity(new_email)?;
     if old.as_ref() == Some(&new) {
-        return Ok(());
+        // A confirmed same-address change can install previously missing proof.
+        return super::workflow::refresh_account_dependents_on(connection, &companies).await;
     }
     let username: String = sqlx::query_scalar("SELECT username::text FROM users WHERE id = $1")
         .bind(user_id)
@@ -96,7 +98,7 @@ pub(crate) async fn rekey_account_identity_on(
         }
         adopt_new_address(connection, person.company_id, principal, &new, &username).await?;
     }
-    Ok(())
+    super::workflow::refresh_account_dependents_on(connection, &companies).await
 }
 
 async fn identity_holder(
@@ -128,7 +130,7 @@ async fn identity_holder(
 /// The identity and its messages move in one statement: `messages_authored_identity_author_fk`
 /// requires a message's author to hold its authored identity, and it is checked at the end of the
 /// statement, so two separate updates would each violate it.
-async fn detach_old_address(
+pub(super) async fn detach_old_address(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     person: PrincipalId,
@@ -178,7 +180,7 @@ async fn detach_old_address(
 }
 
 /// Make the new address the person's account identity, adopting what an outsider held with it.
-async fn adopt_new_address(
+pub(super) async fn adopt_new_address(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     person: PrincipalId,
@@ -254,11 +256,11 @@ async fn adopt_outsider_places(
         .map_err(AppError::from)?;
     sqlx::query(
         r#"INSERT INTO thread_principals
-               (company_id, channel_id, thread_id, principal_id, role, created_at)
-           SELECT company_id, channel_id, thread_id, $3, role, created_at
+               (company_id, channel_id, thread_id, principal_id, role, created_at, target_principal_id)
+           SELECT company_id, channel_id, thread_id, $3, role, created_at, target_principal_id
            FROM thread_principals
            WHERE company_id = $1 AND principal_id = $2
-           ON CONFLICT (company_id, channel_id, thread_id, principal_id, role) DO NOTHING"#,
+           ON CONFLICT (company_id, thread_id, principal_id, role) DO NOTHING"#,
     )
     .bind(company_id)
     .bind(outsider)

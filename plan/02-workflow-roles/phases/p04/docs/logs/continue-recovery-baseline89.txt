@@ -1,0 +1,29 @@
+
+running 4 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_actual_terminal_attempt_creates_one_case_and_notice ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_authored_handlers_do_not_start_an_automatic_ladder ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_case_failure_rolls_back_actual_attempt_retirement ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_retry_and_unknown_effect_do_not_claim_terminal_failure ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_actual_terminal_attempt_creates_one_case_and_notice stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_actual_terminal_attempt_creates_one_case_and_notice' (4121287) panicked at src/adapters/persistence/workflow/escalation_recovery_tests.rs:71:5:
+assertion `left == right` failed
+  left: Number(0)
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_case_failure_rolls_back_actual_attempt_retirement stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_case_failure_rolls_back_actual_attempt_retirement' (4121338) panicked at src/adapters/persistence/workflow/escalation_recovery_tests.rs:118:10:
+called `Result::unwrap_err()` on an `Ok` value: true
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_actual_terminal_attempt_creates_one_case_and_notice
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::recovery_triggers::workflow_escalation_recovery_case_failure_rolls_back_actual_attempt_retirement
+
+test result: FAILED. 2 passed; 2 failed; 0 ignored; 0 measured; 4428 filtered out; finished in 5.22s
+

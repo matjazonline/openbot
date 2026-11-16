@@ -2,8 +2,52 @@ use super::tests::*;
 use super::*;
 
 #[test]
+fn workflow_reviewer_follow_flag_is_static_and_compiled() {
+    let unchanged = example("decision.human").unwrap();
+    let default = compile_example(&unchanged).unwrap();
+    assert!(
+        !default.graph().definition().steps[&step()]
+            .inputs
+            .contains_key("reviewers_follow_role")
+    );
+    for follow in [false, true] {
+        let mut source = example("decision.human").unwrap();
+        changed(&mut source, |value| {
+            value["steps"]["start"]["with"]["reviewers_follow_role"] = json!({"literal":follow});
+        });
+        let compiled = compile_example(&source).unwrap();
+        assert_eq!(
+            compiled.graph().definition().steps[&step()].inputs["reviewers_follow_role"],
+            crate::domain::workflow::Binding::Literal(json!(follow))
+        );
+    }
+    for binding in [
+        json!({"literal":"true"}),
+        json!({"literal":1}),
+        json!({"ref":"/input/follow"}),
+    ] {
+        let mut source = example("decision.human").unwrap();
+        changed(&mut source, |value| {
+            value["input_schema"] =
+                json!({"type":"object","properties":{"follow":{"type":"boolean"}}});
+            value["steps"]["start"]["with"]["reviewers_follow_role"] = binding;
+        });
+        let error = compile_example(&source).err().unwrap();
+        assert_eq!(
+            error.field_path.as_ref(),
+            "/steps/start/with/reviewers_follow_role"
+        );
+    }
+    let mut protected = example("http.request").unwrap();
+    changed(&mut protected, |value| {
+        value["steps"]["start"]["with"]["reviewers_follow_role"] = json!({"literal":true});
+    });
+    assert!(compile_example(&protected).is_err());
+}
+
+#[test]
 fn workflow_registry_action_approval_reviewers_are_static_and_bounded() {
-    let reviewer = json!({"kind":"user","id":"00000000-0000-0000-0000-000000000006"});
+    let reviewer = json!({"kind":"principal","id":"00000000-0000-0000-0000-000000000006"});
     for kind in [
         "http.request",
         "tool.call",
@@ -18,11 +62,7 @@ fn workflow_registry_action_approval_reviewers_are_static_and_bounded() {
             }});
         });
         compile_example(&valid).unwrap();
-        for reviewers in [
-            json!([]),
-            json!([reviewer.clone(), reviewer.clone()]),
-            json!([{"kind":"group","id":"hidden"}]),
-        ] {
+        for reviewers in [json!([]), json!([{"kind":"group","id":"hidden"}])] {
             let mut invalid = example(kind).unwrap();
             changed(&mut invalid, |v| {
                 v["steps"]["start"]["with"]["approval"] = json!({"literal":{
@@ -56,7 +96,8 @@ fn workflow_registry_action_approval_allows_dynamic_deadline_but_validates_it() 
         }});
     });
     let compiled = compile_example(&example).unwrap();
-    let params = json!({"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}]});
+    let params =
+        json!({"reviewers":[{"kind":"principal","id":"00000000-0000-0000-0000-000000000006"}]});
     for (deadline, valid) in [("2099-01-01T00:00:00Z", true), ("tomorrow", false)] {
         let input = json!({"deadline":deadline});
         let outputs = BTreeMap::new();
@@ -69,16 +110,15 @@ fn workflow_registry_action_approval_allows_dynamic_deadline_but_validates_it() 
 
 #[test]
 fn workflow_registry_decision_reviewers_static_nested_and_bounded() {
-    let reviewer = json!({"kind":"user","id":"00000000-0000-0000-0000-000000000006"});
+    let reviewer = json!({"kind":"principal","id":"00000000-0000-0000-0000-000000000006"});
     for invalid in [
         json!([]),
-        json!([reviewer.clone(), reviewer.clone()]),
         json!([{"kind":"group","id":"00000000-0000-0000-0000-000000000006"}]),
         json!([{"kind":"external","email":"user@example.test"}]),
-        json!([{"kind":"user","id":"not-a-uuid"}]),
+        json!([{"kind":"principal","id":"not-a-uuid"}]),
         json!(
             (1..=17)
-                .map(|id| json!({"kind":"user","id":uuid::Uuid::from_u128(id)}))
+                .map(|id| json!({"kind":"principal","id":uuid::Uuid::from_u128(id)}))
                 .collect::<Vec<_>>()
         ),
     ] {
@@ -91,12 +131,12 @@ fn workflow_registry_decision_reviewers_static_nested_and_bounded() {
     let mut sixteen = example("decision.human").unwrap();
     changed(
         &mut sixteen,
-        |v| v["steps"]["start"]["with"]["reviewers"] = json!({"literal":(1..=16).map(|id| json!({"kind":"user","id":uuid::Uuid::from_u128(id)})).collect::<Vec<_>>()}),
+        |v| v["steps"]["start"]["with"]["reviewers"] = json!({"literal":(1..=16).map(|id| json!({"kind":"principal","id":uuid::Uuid::from_u128(id)})).collect::<Vec<_>>()}),
     );
     compile_example(&sixteen).unwrap();
     for binding in [
         json!({"ref":"/input/reviewers"}),
-        json!({"array":[{"object":{"kind":{"literal":"user"},"id":{"ref":"/input/id"}}}]}),
+        json!({"array":[{"object":{"kind":{"literal":"principal"},"id":{"ref":"/input/id"}}}]}),
         json!({"default":{"ref":"/input/reviewers","value":{"literal":[reviewer.clone()]}}}),
     ] {
         let mut example = example("decision.human").unwrap();

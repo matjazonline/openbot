@@ -6,12 +6,24 @@ use crate::application::workflow::native_mcp::{NativeBrokerIdentity, PreparedNat
 use crate::domain::local_agents::{
     InstallationId, MachineId, NativeHarnessSelection, NativeMcpCallId, OperationId, SessionId,
 };
+use crate::entities::transport::PrincipalId;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
 
+mod accounts;
 mod live;
+pub(super) use accounts::{NativeAccounts, current_on as account_hints_on};
 mod maintenance;
 pub(super) use live::authorize_on as live_on;
+
+pub(super) fn busy(error: AppError) -> AppError {
+    match error {
+        AppError::DatabaseTimeout(_) => AppError::ServiceUnavailable(
+            "Native MCP authority is busy; no new dispatch was authorized".into(),
+        ),
+        error => error,
+    }
+}
 mod provenance;
 pub(in crate::adapters::persistence) use maintenance::sweep;
 mod reads;
@@ -35,28 +47,22 @@ pub(in crate::adapters::persistence) async fn source_facts_on(
     let actor_level = super::knowledge::actor_level_on(db, company, Some(actor.user_id())).await?;
     match source {
         SessionAssociation::Conversation { conversation_id } => {
-            let channel: Uuid =
-                sqlx::query_scalar("SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2")
-                    .bind(company.as_uuid())
-                    .bind(conversation_id)
-                    .fetch_optional(db)
-                    .await?
-                    .ok_or_else(missing)?;
-            Ok((
-                RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(channel),
-                    thread_id: RelatedThreadId::new(*conversation_id),
-                },
-                actor_level,
-            ))
+            let columns = sqlx::query_as::<_, association::AssociationColumns>(
+                "SELECT channel_id,principal_id,id AS thread_id FROM threads WHERE company_id=$1 AND id=$2",
+            ).bind(company.as_uuid()).bind(conversation_id).fetch_optional(db).await?.ok_or_else(missing)?;
+            Ok((association::association_from_columns(columns)?, actor_level))
         }
         SessionAssociation::Workflow { run_id } => {
-            let (channel,thread,ceiling):(Option<Uuid>,Option<Uuid>,i16) = sqlx::query_as("SELECT channel_id,thread_id,knowledge_ceiling::smallint FROM workflow_runs WHERE company_id=$1 AND id=$2")
+            let (channel,principal,thread,ceiling):(Option<Uuid>,Option<Uuid>,Option<Uuid>,i16) = sqlx::query_as("SELECT channel_id,principal_id,thread_id,knowledge_ceiling::smallint FROM workflow_runs WHERE company_id=$1 AND id=$2")
                 .bind(company.as_uuid()).bind(run_id).fetch_optional(db).await?.ok_or_else(missing)?;
             let level = crate::entities::access_level::AccessLevel::try_from(ceiling)
                 .map_err(|_| invalid())?;
             Ok((
-                binding_rows::association_from_columns(channel, thread)?,
+                association::association_from_columns(association::AssociationColumns {
+                    channel_id: channel,
+                    principal_id: principal,
+                    thread_id: thread,
+                })?,
                 std::cmp::min(actor_level, level),
             ))
         }
@@ -166,16 +172,16 @@ async fn insert_call(
     let NativeHarnessSelection::Agent { digest, .. } = &owner.harness else {
         return Err(missing());
     };
-    let (channel, thread) = binding_rows::association_columns(owner.association);
+    let association = association::association_columns(owner.association);
     sqlx::query("INSERT INTO native_mcp_calls(company_id,id,broker_id,operation_id,machine_id,installation_id,session_id,
         native_thread_id,native_turn_id,client_request_id,model_call_id,actor_id,harness_digest,argument_digest,
-        original_run_id,run_id,channel_id,thread_id,input,deadline,source_operation_id,source_session_id)
-        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$16,$17,$18,$19,$4,$7)")
+        original_run_id,run_id,channel_id,thread_id,input,deadline,source_operation_id,source_session_id,principal_id)
+        VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$15,$16,$17,$18,$19,$4,$7,$20)")
         .bind(owner.company.as_uuid()).bind(call.as_uuid()).bind(broker.id)
         .bind(owner.operation.as_uuid()).bind(owner.machine.as_uuid()).bind(owner.installation.as_uuid())
         .bind(owner.session.as_uuid()).bind(owner.invocation.thread_id.as_str()).bind(owner.invocation.turn_id.as_str())
         .bind(owner.invocation.client_request_id.as_str()).bind(owner.invocation.model_call_id.as_str())
         .bind(owner.actor.user_id()).bind(digest.as_str()).bind(prepared.argument_digest())
-        .bind(run.as_uuid()).bind(channel).bind(thread).bind(prepared.input()).bind(owner.deadline).execute(db).await?;
+        .bind(run.as_uuid()).bind(association.channel_id).bind(association.thread_id).bind(prepared.input()).bind(owner.deadline).bind(association.principal_id).execute(db).await?;
     Ok(())
 }

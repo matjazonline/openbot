@@ -31,6 +31,33 @@ pub struct AgentReferenceUse {
     pub mode: AgentUseMode,
 }
 
+/// A requirement frozen with the procedure; holders are resolved only at admission.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RoleReference {
+    pub step: StepId,
+    pub role: crate::entities::department::DepartmentRole,
+    pub mode: RoleUseMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoleUseMode {
+    ModelOnly,
+    Tools,
+    People,
+}
+
+impl RoleUseMode {
+    pub fn agent_mode(self) -> Option<AgentUseMode> {
+        match self {
+            Self::ModelOnly => Some(AgentUseMode::ModelOnly),
+            Self::Tools => Some(AgentUseMode::Tools),
+            Self::People => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum AgentUseMode {
@@ -69,6 +96,8 @@ pub enum ToolKind<'a> {
     /// A trusted built-in provisioning tool (p08 D2.1). Only a name-only snapshot carries a
     /// provisioning name this way; an MCP tool of the same name stays a slot tool.
     Provisioning,
+    /// Explicitly granted administrative escalation capabilities.
+    Escalation,
     /// A name-only, exactly verified local knowledge search built-in.
     Knowledge,
     /// A name-only, exactly verified memory service built-in (phase 05 E5).
@@ -102,6 +131,14 @@ impl ToolSnapshot {
             )
         {
             return ToolKind::Provisioning;
+        }
+        if self.contract.connection.is_none()
+            && crate::application::workflow::escalation::tools::EscalationTool::parse(
+                self.contract.name.as_str(),
+            )
+            .is_some()
+        {
+            return ToolKind::Escalation;
         }
         if self.contract.connection.is_none()
             && crate::application::workflow::knowledge::is_builtin_knowledge_tool(

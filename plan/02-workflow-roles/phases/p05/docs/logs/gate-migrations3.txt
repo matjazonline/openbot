@@ -1,0 +1,2 @@
+Applied 20260817000000/migrate init schema (519.027583ms)
+EXIT 0

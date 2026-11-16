@@ -1,0 +1,58 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/direct_role_binding_tests.rs:196:62
+    |
+196 |     let ((activation, placement), ()) = tokio::time::timeout(Duration::from_secs(10), async {
+    |                                                              ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  3 + use std::time::Duration;
+    |
+
+error[E0599]: no method named `remove_member` found for reference `&persistence::PostgresPersistence` in the current scope
+  --> src/adapters/persistence/workflow/direct_workflow_read_tests.rs:99:7
+   |
+99 |     p.remove_member(private.company(), private.user)
+   |       ^^^^^^^^^^^^^ method not found in `&persistence::PostgresPersistence`
+   |
+   = help: items from traits can only be used if the trait is in scope
+help: trait `CompanyInvitePersistence` which provides `remove_member` is implemented but not in scope; perhaps you want to import it
+   |
+ 3 + use crate::application::use_cases::company_invite::CompanyInvitePersistence;
+   |
+
+error[E0277]: `application::workflow::lifecycle::contracts::BindingState` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/workflow/direct_role_binding_tests.rs:91:56
+    |
+ 91 |     let error = f.service().activate(activity()).await.unwrap_err();
+    |                                                        ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::workflow::lifecycle::contracts::BindingState`
+   --> src/application/workflow/lifecycle/contracts.rs:129:1
+    |
+129 | pub struct BindingState {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::workflow::lifecycle::contracts::BindingState` or manually `impl std::fmt::Debug for application::workflow::lifecycle::contracts::BindingState`
+note: required by a bound in `std::result::Result::<T, E>::unwrap_err`
+   --> /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/result.rs:1323:4
+
+error[E0277]: `application::workflow::lifecycle::contracts::BindingState` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/workflow/direct_role_binding_tests.rs:155:10
+    |
+155 |         .unwrap_err();
+    |          ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::workflow::lifecycle::contracts::BindingState`
+   --> src/application/workflow/lifecycle/contracts.rs:129:1
+    |
+129 | pub struct BindingState {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::workflow::lifecycle::contracts::BindingState` or manually `impl std::fmt::Debug for application::workflow::lifecycle::contracts::BindingState`
+note: required by a bound in `std::result::Result::<T, E>::unwrap_err`
+   --> /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/result.rs:1323:4
+
+Some errors have detailed explanations: E0277, E0433, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

@@ -18,6 +18,7 @@ pub(super) fn build(
             f.config.clone(),
             threads,
             f.storage.clone(),
+            f.scanner.clone(),
         )))
         .map_err(|error| {
             anyhow::anyhow!("Could not register the Resend inbound decoder: {error}")

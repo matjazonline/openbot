@@ -71,7 +71,7 @@ impl Conversation {
         .unwrap();
         let mut request = f.request(key, trigger);
         request.association = RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(self.channel),
+            target: crate::entities::address::AddressTarget::Desk(self.channel),
             thread_id: RelatedThreadId::new(self.thread),
         };
         request
@@ -287,7 +287,7 @@ async fn workflow_admit_sql_replay_rejects_changed_association_for_command_and_a
     for key in ["original", "alias"] {
         let mut request = f.request(key, trigger.clone());
         request.association = RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(c.channel),
+            target: crate::entities::address::AddressTarget::Desk(c.channel),
             thread_id: RelatedThreadId::new(c.thread),
         };
         let changed = f.prepare(request).await;
@@ -309,12 +309,12 @@ async fn workflow_admit_sql_binding_scope_narrowing_matrix() {
         RelatedAssociation::Company,
         RelatedAssociation::Channel(RelatedChannelId::new(a.channel)),
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(a.channel),
+            target: crate::entities::address::AddressTarget::Desk(a.channel),
             thread_id: RelatedThreadId::new(a.thread),
         },
         RelatedAssociation::Channel(RelatedChannelId::new(b.channel)),
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(b.channel),
+            target: crate::entities::address::AddressTarget::Desk(b.channel),
             thread_id: RelatedThreadId::new(b.thread),
         },
     ];

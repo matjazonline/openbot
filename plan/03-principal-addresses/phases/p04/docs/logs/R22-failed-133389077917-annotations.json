@@ -1,0 +1,38 @@
+[
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/76925ef6836250171f556892ba449e9575dc4308/.github",
+    "start_line": 2,
+    "start_column": null,
+    "end_line": 2,
+    "end_column": null,
+    "annotation_level": "warning",
+    "title": "",
+    "message": "Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4, docker/setup-docker-action@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/76925ef6836250171f556892ba449e9575dc4308/.github",
+    "start_line": 714,
+    "start_column": null,
+    "end_line": 714,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Process completed with exit code 1.",
+    "raw_details": ""
+  },
+  {
+    "path": ".github",
+    "blob_href": "https://github.com/matjazonline/openbot/blob/76925ef6836250171f556892ba449e9575dc4308/.github",
+    "start_line": 704,
+    "start_column": null,
+    "end_line": 704,
+    "end_column": null,
+    "annotation_level": "failure",
+    "title": "",
+    "message": "Doop gate failed: python3 scripts/doop-test.py acceptance --directory /home/runner/work/_temp/doop-check/source --image /home/runner/work/_temp/doop-check/image/image.json --output /home/runner/work/_temp/doop-check/acceptance --openbot-test-binary /home/runner/work/_temp/doop-check/openbot-doop-libtest --openbot-test-database ***localhost:5432/open_bots_doop_test --ui-chrome /usr/bin/google-chrome\nDoop test setup/run failed: Required private acceptance run failed: all-disk\n",
+    "raw_details": ""
+  }
+]

@@ -70,6 +70,10 @@ use crate::transport::TransportPayload;
 /// The suffix that separates the tests' database from the one you develop against.
 const TEST_DB_SUFFIX: &str = "_test";
 
+#[path = "test_support/native_agent.rs"]
+mod native_agent;
+pub(crate) use native_agent::{register_native_agent_address, rename_native_agent};
+
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
 
@@ -103,7 +107,7 @@ fn permits_skipping(value: Option<&str>) -> bool {
 ///
 /// Panics when neither is set and [`ALLOW_MISSING_URL_VAR`] is absent — see the module docs for
 /// why an unset variable is a failure rather than a skip.
-fn test_database_url() -> Option<String> {
+pub(super) fn test_database_url() -> Option<String> {
     let explicit = std::env::var("TEST_DATABASE_URL")
         .ok()
         .filter(|url| !url.trim().is_empty());
@@ -364,7 +368,7 @@ pub struct DeliveryFixture {
 /// What a fixture delivery should look like. Defaults to a plain email reply to one recipient.
 pub struct DeliveryFixtureRequest<'a> {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub thread_id: Uuid,
     /// Distinguishes one fixture delivery from another within the same interface, which is what
     /// the unique index is over.
@@ -381,9 +385,23 @@ pub struct DeliveryFixtureRequest<'a> {
 
 impl<'a> DeliveryFixtureRequest<'a> {
     pub fn new(company_id: Uuid, channel_id: Uuid, thread_id: Uuid, source_key: &'a str) -> Self {
+        Self::for_target(
+            company_id,
+            crate::entities::address::AddressTarget::Desk(channel_id),
+            thread_id,
+            source_key,
+        )
+    }
+
+    pub fn for_target(
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
+        thread_id: Uuid,
+        source_key: &'a str,
+    ) -> Self {
         Self {
             company_id,
-            channel_id,
+            target,
             thread_id,
             source_key,
             recipient: "customer@example.com",
@@ -405,16 +423,16 @@ pub async fn delivery_fixture(
     persistence: &PostgresPersistence,
     request: DeliveryFixtureRequest<'_>,
 ) -> DeliveryFixture {
-    let binding = ChannelBindingPersistence::active_bindings_for_channel(
+    let binding = ChannelBindingPersistence::active_bindings_for_target(
         persistence,
         request.company_id,
-        request.channel_id,
+        request.target,
     )
     .await
     .expect("the channel's interfaces are readable")
     .into_iter()
     .find(|binding| binding.transport == TransportKind::Email)
-    .expect("a channel is created with its canonical email interface");
+    .expect("the inbox has its canonical email interface");
 
     let write = MessageWrite::internal(
         request.thread_id,
@@ -444,7 +462,7 @@ pub async fn delivery_fixture(
         delivery: NewDelivery {
             id: DeliveryId::random(),
             company_id: request.company_id,
-            channel_id: request.channel_id,
+            target: request.target,
             message_id,
             message_audience: crate::entities::message::MessageAudience::ExternalConversation,
             source_binding_id: binding.id,
@@ -730,6 +748,95 @@ pub fn company_agents(
         persistence.clone(),
         provisioning_templates(),
     ))
+}
+
+/// The key the notification worker mints for an agent notice, with the renderer
+/// [`notification_worker`] registers, for tests that commit a projection by hand.
+pub(crate) fn minted_agent_notice_key(
+    projection: &crate::entities::notification::NotificationProjection,
+) -> Option<crate::entities::transport::ExternalMessageKey> {
+    let renderer = crate::adapters::protocols::email::EmailRenderer::new("example.test");
+    crate::application::notification::agent_notice_key(projection, || Ok(&renderer)).unwrap()
+}
+
+pub(crate) fn minted_agent_notice_recipient(
+    projection: &crate::entities::notification::NotificationProjection,
+) -> Option<crate::entities::transport::QualifiedIdentity> {
+    use crate::entities::notification::NotificationDisposition;
+    use crate::transport::TransportRenderer;
+    let NotificationDisposition::Agent {
+        company,
+        address_slug: Some(address),
+        ..
+    } = &projection.disposition
+    else {
+        return None;
+    };
+    Some(
+        crate::adapters::protocols::email::EmailRenderer::new("example.test")
+            .application_address(company, address)
+            .unwrap(),
+    )
+}
+
+pub(crate) fn notification_worker(
+    persistence: &super::PostgresPersistence,
+    escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
+) -> crate::application::services::notification_worker::NotificationWorker {
+    use crate::application::transport::{DeliveryComposer, TransportRenderers};
+    use std::sync::Arc;
+    let store = Arc::new(persistence.clone());
+    let renderers = TransportRenderers::new()
+        .register(Arc::new(
+            crate::adapters::protocols::email::EmailRenderer::new("example.test"),
+        ))
+        .unwrap();
+    crate::application::services::notification_worker::NotificationWorker::new(
+        store.clone(),
+        DeliveryComposer::new(Arc::new(renderers), store),
+        crate::application::settings::NotificationMailSettings {
+            escalation_ack_hours,
+            mail_domain: "example.test".into(),
+            public_base_url: "https://example.test".into(),
+        },
+        Arc::new(crate::adapters::monitoring::InMemoryMonitor::new()),
+    )
+}
+
+/// The real shared ingress stack for fixture-owned persistence and a routed test domain.
+pub(crate) fn thread_use_cases(
+    persistence: &super::PostgresPersistence,
+    domain: &str,
+) -> crate::use_cases::thread::ThreadUseCases {
+    use crate::transport::ports::TransportRenderers;
+    use crate::use_cases::thread::{InboundIngestPorts, ThreadStores, ThreadUseCases};
+    use std::sync::Arc;
+    let shared = Arc::new(persistence.clone());
+    ThreadUseCases::new(
+        ThreadStores {
+            threads: shared.clone(),
+            channels: shared.clone(),
+            companies: shared.clone(),
+            participants: shared.clone(),
+        },
+        InboundIngestPorts {
+            committer: shared.clone(),
+            correlation: shared.clone(),
+            bindings: shared.clone(),
+            standalone_deliveries: shared,
+        },
+        Arc::new(
+            TransportRenderers::new()
+                .register(Arc::new(
+                    crate::adapters::protocols::email::EmailRenderer::new(domain),
+                ))
+                .unwrap(),
+        ),
+        Arc::new(crate::application::settings::ThreadSettings {
+            mail_domain: domain.into(),
+            max_spam_score: 5.0,
+        }),
+    )
 }
 
 #[cfg(test)]

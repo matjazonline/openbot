@@ -5,7 +5,7 @@ use super::*;
 fn decision_source(workflow: Uuid, reviewer: Uuid) -> Value {
     let mut source = example("decision.human", workflow);
     let start = &mut source["steps"]["start"];
-    start["with"]["reviewers"] = json!({"literal": [{"kind": "user", "id": reviewer}]});
+    start["with"]["reviewers"] = json!({"literal": [{"kind": "principal", "id": reviewer}]});
     start["with"]["deadline"] =
         json!({"literal": (chrono::Utc::now() + chrono::Duration::minutes(20)).to_rfc3339()});
     start["with"]["data_schema"] = json!({"literal": {"type": "string", "maxLength": 32}});
@@ -13,6 +13,18 @@ fn decision_source(workflow: Uuid, reviewer: Uuid) -> Value {
     source["steps"]["finish"] = json!({"type": "data.map", "with": {"value": {"literal": 1},
         "output_schema": {"literal": {"type": "integer"}}}, "routes": {"success": "$end"}});
     source
+}
+
+/// A reviewer is a person principal, not an account: the owner's.
+async fn owner_principal(f: &Fixture) -> Uuid {
+    sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(f.company)
+    .bind(f.owner)
+    .fetch_one(f.persistence.pool())
+    .await
+    .unwrap()
 }
 
 /// The decision a review notice links to, through the production engine: the page and the API
@@ -23,8 +35,13 @@ async fn decision_routes_and_page_drive_a_parked_decision() {
     let Some(f) = Fixture::new().await else {
         return;
     };
+    let reviewer = owner_principal(&f).await;
     let (_, version) = f
-        .published(f.owner, f.company, decision_source(Uuid::new_v4(), f.owner))
+        .published(
+            f.owner,
+            f.company,
+            decision_source(Uuid::new_v4(), reviewer),
+        )
         .await;
     let binding = f.bound(f.owner, f.company, version).await;
     let (status, started) = f

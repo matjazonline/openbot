@@ -96,7 +96,10 @@ async fn conversation_reads_refuse_foreign_scope_and_private_channels() {
             HeaderMap::new(),
             Query(ThreadStreamQuery {
                 company_id,
-                channel_id: h.channel_id,
+                inbox: crate::adapters::http::routes::ui::InboxSelection {
+                    channel_id: Some(h.channel_id),
+                    principal_id: None,
+                },
                 thread_id: thread,
                 after: None,
             }),
@@ -110,7 +113,10 @@ async fn conversation_reads_refuse_foreign_scope_and_private_channels() {
             viewer,
             Query(ThreadQuery {
                 company_id,
-                channel_id: h.channel_id,
+                inbox: crate::adapters::http::routes::ui::InboxSelection {
+                    channel_id: Some(h.channel_id),
+                    principal_id: None,
+                },
                 thread_id: thread,
             }),
         )

@@ -1,0 +1,17 @@
+[
+  {
+    "selection": "direct_target_native",
+    "exit": 0,
+    "log": "B1-native-lifecycle-tests1.txt"
+  },
+  {
+    "selection": "agent_address_delete_retained",
+    "exit": 0,
+    "log": "B1-retained-direct-delete-tests1.txt"
+  },
+  {
+    "selection": "workflow_escalation_agent_",
+    "exit": 0,
+    "log": "B1-notice-runtime-tests4.txt"
+  }
+]

@@ -1,0 +1,11 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+   Compiling pa02_review_b2_audit_probe v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/phases/p02/docs/logs/reviewer-b2-audit-probe)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 1m 51s
+     Running `/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/pa02_review_b2_audit_probe`
+membership removed while actual audit payload query blocked
+audit after removal: Ok(Some(MessageAuditView { access_level: L0, id: 3593a769-77e4-4097-9323-c828d0ec9842, canonical_id: CanonicalMessageId(7e488c9d-61dd-4021-b7cc-a731f7b9823e), company_id: c863d23f-832d-4d36-9cd7-a5425c95cc14, thread_id: ea6f65f8-5f08-4a5c-a182-9f301821e0ad, target: Principal(PrincipalId(54ece7dd-c583-4618-bf49-00fc7fc95f76)), author: AuthorView { principal_id: PrincipalId(54ece7dd-c583-4618-bf49-00fc7fc95f76), label: "member_1320ce10c6f44775b08b434e2eb912c4", handle: Some("member-1320ce10c6f44775b08b434e2eb912c4@example.test"), transport: Some(Email) }, direction: Inbound, role: Human, audience: ExternalConversation, entry_kind: Conversation, correlation_id: CorrelationId(89cfe953-d23d-4b20-b961-9bdaf4b55a3f), external_keys: [ExternalMessageRef { binding_id: ChannelBindingId(10903416-6f6c-4267-9109-1895c6772914), transport: Email, key: ExternalMessageKey("<6e7a51cf-fb20-49ad-825c-da6153d90b97@audit-1320ce10c6f44775b08b434e2eb912c4.direct.test>") }], created_at: 2026-11-15T04:03:32.504355Z }))
+history after removal: Err(NotFound("Thread not found"))
+
+thread 'main' (14880325) panicked at main.rs:26:2:
+SECURITY: former member received direct diagnostics after removal committed during payload read
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace

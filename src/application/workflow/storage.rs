@@ -49,16 +49,35 @@ pub struct HistoryPage {
     pub candidates: Vec<HistoryCandidate>,
 }
 
+/// Discovery only; deletion must recheck every live canonical owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NotificationOriginCursor {
+    pub company: CompanyId,
+    pub origin: uuid::Uuid,
+}
+
+#[derive(Debug)]
+pub struct NotificationOriginSweep {
+    pub deleted: u64,
+    pub next: Option<NotificationOriginCursor>,
+}
+
 #[derive(Default)]
 struct SweepCursor {
     root: Option<RetentionRoot>,
     history: Option<HistoryCandidate>,
     history_scope: Option<CompanyId>,
+    notification_origin: Option<NotificationOriginCursor>,
 }
 
 #[async_trait]
 pub trait WorkflowStorageMaintenance: Send + Sync {
     async fn sweep_obsolete_witnesses(&self, limit: u16) -> AppResult<u64>;
+    async fn sweep_notification_origins(
+        &self,
+        after: Option<NotificationOriginCursor>,
+        limit: u16,
+    ) -> AppResult<NotificationOriginSweep>;
     async fn history_page(&self, after: Option<HistoryCandidate>) -> AppResult<HistoryPage>;
     /// Lock current source ownership and recheck every pin before clearing history copies.
     async fn expire_history(&self, candidate: HistoryCandidate) -> AppResult<bool>;
@@ -101,6 +120,19 @@ async fn sweep(
     .await
     {
         monitoring.increment_counter("workflow_storage_witnesses_deleted_total", count, &[]);
+    }
+    if let Ok(swept) = bounded(
+        port.sweep_notification_origins(cursor.notification_origin, STORAGE_SWEEP_LIMIT),
+        monitoring,
+    )
+    .await
+    {
+        cursor.notification_origin = swept.next;
+        monitoring.increment_counter(
+            "workflow_storage_notification_origins_deleted_total",
+            swept.deleted,
+            &[],
+        );
     }
     sweep_history(port, monitoring, cursor).await;
     if let Ok(page) = bounded(port.retention_page(cursor.root), monitoring).await {

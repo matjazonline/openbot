@@ -68,11 +68,16 @@ pub(super) async fn authorize_with_locks_on(
         return Err(missing());
     }
     let actor = row.actor_id.ok_or_else(missing)?;
-    crate::adapters::persistence::workflow::authority::authorize_company_with_locks(
-        tx,
-        CompanyId::new(authentication.company_id),
-        WorkflowActor::authenticated(actor)?,
-        locks,
+    // Box the shared native/workflow authority seam to keep the poll frame bounded.
+    Box::pin(
+        crate::adapters::persistence::workflow::local_agents::authorize_native_source_on(
+            tx,
+            CompanyId::new(authentication.company_id),
+            operation.id(),
+            WorkflowActor::authenticated(actor)?,
+            row.origin()?,
+            locks,
+        ),
     )
     .await?;
     commands::authorize_session_with_locks(

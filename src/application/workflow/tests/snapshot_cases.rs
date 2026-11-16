@@ -82,6 +82,7 @@ fn resource_binding(
     Arc::new(
         binding::ConfiguredBinding::new(
             binding::BindingConfiguration {
+                escalation: None,
                 id: WorkflowBindingId::new(logical.as_uuid()),
                 revision: BindingRevision::new(revision).unwrap(),
                 company_id: company,

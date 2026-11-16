@@ -1,0 +1,4 @@
+✓ wiring: 32415 nodes (21235 function, 3339 struct, 2339 module, 2313 file, 1328 constant, 866 enum, 500 method, 240 type, 216 interface, 39 class), 49211 edges, 2310 cards [javascript, python, rust, typescript]
+  parsed: 1 of 2313 files (2312 replayed from cache)
+  → /Users/mac02/orca/workspaces/openbot/plan03-04/.trail/cache
+  .trail/cache/ is git-ignored (added automatically), a local cache; teammates run `trail build` to get their own.

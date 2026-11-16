@@ -1,0 +1,21 @@
+﻿2026-11-16T14:18:27.7238958Z ##[group]Run python3 -I scripts/tests/network-isolation-scope.py
+2026-11-16T14:18:27.7239355Z [36;1mpython3 -I scripts/tests/network-isolation-scope.py[0m
+2026-11-16T14:18:27.7261751Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:18:27.7261962Z env:
+2026-11-16T14:18:27.7262138Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:18:27.7262334Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:18:27.7262723Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:18:27.7262958Z   SQLX_OFFLINE: true
+2026-11-16T14:18:27.7263145Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:18:27.7263343Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:18:27.7263518Z   CARGO_TERM_COLOR: always
+2026-11-16T14:18:27.7263700Z   CACHE_ON_FAILURE: false
+2026-11-16T14:18:27.7263877Z ##[endgroup]
+2026-11-16T14:18:28.9211467Z PASS: both concurrent entrypoints isolate descendants and preserve supervisor/UID/environment/status
+2026-11-16T14:18:29.3343056Z PASS: changing only the selector to UID blocks the supervisor
+2026-11-16T14:18:30.9037948Z PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints
+2026-11-16T14:18:34.7021174Z PASS: cleanup deadline and visible failure for entrypoint0 (3.76s)
+2026-11-16T14:18:38.4847215Z PASS: cleanup deadline and visible failure for entrypoint1 (3.76s)
+2026-11-16T14:19:13.4315569Z PASS: real group/chain/hook mutations followed by error/timeout clean both entrypoints and preserve unrelated objects
+2026-11-16T14:19:14.8891652Z PASS: preexisting groups/chains survive and failed absence probes never authorize mutation
+2026-11-16T14:19:16.2729287Z PASS: setup, partial firewall and guarded-preflight failures leave no command or resources

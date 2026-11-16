@@ -1,0 +1,35 @@
+9502: ADD CONSTRAINT agent_skills_agent_id_fkey FOREIGN KEY (agent_id) REFERENCES public.agents(id) ON DELETE CASCADE;
+10094: ADD CONSTRAINT principals_company_agent_fk FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id);
+10174: ADD CONSTRAINT task_harness_runs_company_id_agent_id_fkey FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+10730: ADD CONSTRAINT workflow_binding_revisions_company_id_version_id_fkey FOREIGN KEY (company_id, version_id) REFERENCES public.workflow_versions(company_id, id);
+10843: ADD CONSTRAINT workflow_definition_events_company_id_workflow_id_fkey FOREIGN KEY (company_id, workflow_id) REFERENCES public.workflow_definitions(company_id, id) ON DELETE CASCADE;
+10851: ADD CONSTRAINT workflow_definition_events_company_id_workflow_id_version__fkey FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+10932: ADD CONSTRAINT workflow_tool_registration_pin FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+11304: ADD CONSTRAINT workflow_runs_company_id_workflow_id_version_id_fkey FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES public.workflow_versions(company_id, workflow_id, id);
+11320: ADD CONSTRAINT workflow_versions_company_id_workflow_id_fkey FOREIGN KEY (company_id, workflow_id) REFERENCES public.workflow_definitions(company_id, id) ON DELETE CASCADE;
+11415: FOREIGN KEY(company_id, agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12021: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12022: FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id)
+12348: agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12364: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12370: FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED,
+12389: agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12398: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED
+12402: agent_id uuid NOT NULL REFERENCES public.agents(id) ON DELETE CASCADE,
+12409: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12430: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12444: FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) ON DELETE CASCADE,
+12456: FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) ON DELETE CASCADE,
+12464: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+12465: FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+12509: FOREIGN KEY(company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+12518: FOREIGN KEY(company_id,workflow_id,version_id) REFERENCES public.workflow_versions(company_id,workflow_id,id) DEFERRABLE INITIALLY DEFERRED
+12765: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id) DEFERRABLE INITIALLY DEFERRED,
+12767: REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+12769: REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED
+14306: FOREIGN KEY (company_id,agent_id) REFERENCES public.agents(company_id,id),
+14456: FOREIGN KEY (company_id,agent_id,revision_id) REFERENCES public.agent_revisions(company_id,agent_id,id),
+15793: FOREIGN KEY (company_id, agent_id) REFERENCES public.agents(company_id, id) ON DELETE CASCADE
+15963: REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
+19138: REFERENCES public.agents(company_id,id) ON DELETE CASCADE,
+19154: FOREIGN KEY(company_id,agent_id) REFERENCES public.agents(company_id,id)

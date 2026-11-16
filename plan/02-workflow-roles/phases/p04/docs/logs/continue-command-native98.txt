@@ -1,0 +1,39 @@
+
+running 14 tests
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_ui_submits_reassignment_and_acknowledgement_on_the_same_decision_surface ... ok
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_api_reads_current_authority_and_audits_exact_command_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_database_refuses_an_unassigned_current_member_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation' (4469415) panicked at src/adapters/persistence/workflow/escalation_cancellation_tests.rs:44:5:
+assertion `left == right` failed
+  left: 2
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands' (4469486) panicked at src/adapters/persistence/workflow/escalation_cancellation_tests.rs:181:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "workflow knowledge facts cannot be lowered or rewritten", detail: None, hint: None, position: None, where: Some("PL/pgSQL function guard_workflow_run_knowledge() line 9 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("workflow_guard:workflow_run_knowledge"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands
+
+test result: FAILED. 12 passed; 2 failed; 0 ignored; 0 measured; 4434 filtered out; finished in 10.72s
+

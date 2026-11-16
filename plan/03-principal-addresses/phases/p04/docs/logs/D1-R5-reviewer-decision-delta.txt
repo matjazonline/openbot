@@ -1,0 +1,75 @@
+--- plan/03-principal-addresses/phases/p04/docs/logs/D1-r4.md	2026-11-15 18:21:47
++++ plan/03-principal-addresses/phases/p04/docs/logs/D1-r5.md	2026-11-15 18:27:11
+@@ -1,4 +1,4 @@
+-# 03PA-P04 D1/r4 — Native action entry owns the original account prefix
++# 03PA-P04 D1/r5 — Native action entry owns the original account prefix
+ 
+ No backward compatibility. No new producer, schema, authorization policy or timeout increase.
+ D1/r1–r3 remain historical. This revision specifies the shared entry implementation needed to
+@@ -39,19 +39,47 @@
+    ToolCallOrigin (native actions intentionally have Workflow origin). Structural historical proof
+    remains provenance::restore_on and never gains current authority from a newly looked-up person.
+ 
++## Explicit live operation selection (corrects D1-R4/F1)
++
++The discriminator is the OPERATION being authorized, never existence of an approval, reservation,
++dispatch, receipt or retired-call row. A marker can exist before actual gateway entry. No stored
++marker can by itself exempt a live operation from the original-source prefix.
++
++Extend the existing account-hints owner with an explicit internal live-effect prefix entry/result
++(actor plus RowLocks). Its native branch reads original source hints and merges them into the same
++purpose-specific union; its ordinary branch retains existing policy. Keep the existing generic
++actor/history/checkpoint helpers for their established operations rather than globally infer
++live-versus-observation from rows. Existing RowLocks and a small internal prefix result suffice;
++no public port or persisted type change. Dispatch prelocking is a live-effect entry; its existing
++approval/escalation hints still participate. Live callers pass the selected mode to run authority.
++
++The following operations ALWAYS need the current source prefix for a native run, including after
++reservation/approval/marker insertion: constructing a fresh native step request (facts), freezing a
++fresh action intent, looking up MCP credentials for use, reserving a remote call, enter_remote's
++revalidation, return_authorized's live output check, and HostDispatchAuthority's final credential
++serialization guard. This includes the after-marker enter/final-guard operations. Fresh requests
++with retired/missing/changed source refuse; they never become ordinary or historical.
++
++The exemptions are only existing semantic branches that cannot authorize a new effect/output:
++actions::prepare's exact existing-intent structural replay, saved receipt/result lookup, immutable
++provenance restore, and explicit reconciliation/history APIs. Retain their original authority and
++visibility checks; they do not invoke the new live prefix. Generic ActionAuthorities lookups are
++policy/history inspection, not final dispatch permission; they retain their existing contract, and
++a later effect always crosses the corrected live entry. Generic checkpoint/observation helpers do
++not gain a new parked-source requirement simply because a run has a native marker. Reviewer must
++trace any wrapper that reaches an effect and verify its subsequent live entry.
++
+ ## Historical and consumer dispositions
+ 
+-- actions::prepare keeps its read-existing-intent branch and immutable replay contract; a replay
+-  does not run a new current-source prefix. Fresh intent authorization does. The existing recorded
+-  dispatch/receipt paths retain their observation semantics and do not acquire original-source
+-  requester accounts or require a surviving parked source. Existing recorded/retired markers must
+-  explicitly select observation before current native lineage lookup. Missing live lineage is
+-  refused for fresh effects; it is not reclassified as an ordinary effect.
++- actions::prepare keeps its read-existing-intent branch and immutable replay contract; replay
++  does not run the new live prefix. Only a fresh intent does. Explicit saved receipt/provenance/
++  reconciliation observation retains historical semantics independently of marker existence.
+ - mcp_step_request/shared facts uses the corrected prefix and native run mode before preparing an
+   ActionRequest. Normal HTTP/tool callers keep their established policy.
+ - mcp_use native branch establishes the same prefix before its first company/run authorization;
+   ordinary branch preserves current semantics. Later live_on remains required.
+-- Dispatch and integration final guard use the same account-hints owner (including their reviewer/
++- Dispatch (reservation AND enter_remote), live return_authorized and integration final guard
++  use the same account-hints owner (including their reviewer/
+   credential owner), before company/fence/run/resource validation. Native load_on run locking uses
+   NoWait. Existing job/attempt/fence ownership/lease/commit mechanics are unchanged; this change
+   owns added source authority and account/company/run acquisition, not a new worker-claim protocol.
+@@ -69,7 +97,10 @@
+ 
+ Focused assertions retain both saved F1 tests, and expand the same real production fixture to cover
+ fresh ActionService prepare, mcp_use and actual dispatch/final integration guard where admitted,
+-with competing actor and distinct requester; include source revision and native run contention in
++with competing actor and distinct requester; explicitly test enter_remote AFTER a real committed
++reservation and test final integration credential guard on a real admitted integration where applicable.
++A recorded approval must not remove source accounts from the first actual dispatch. Include source
++revision and native run contention in
+ relevant outer preparation cases. Assert unchanged effect state and successful retry, not helper
+ success alone. Existing immutable-intent replay/recorded dispatch/unknown recovery after original
+ actor or principal deletion must still pass without live-source dependencies. Run native_mcp_,

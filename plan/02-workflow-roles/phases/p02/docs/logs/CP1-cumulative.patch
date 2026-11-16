@@ -1,0 +1,2729 @@
+diff --git a/docs/workflow-language-v1.md b/docs/workflow-language-v1.md
+index 863866fd..32a239d8 100644
+--- a/docs/workflow-language-v1.md
++++ b/docs/workflow-language-v1.md
+@@ -451,3 +451,29 @@ leave the generic script `tokens` at zero. Samples charge one simulated model ca
+ and enforce their token allowance, without billing or external access.
+ Contracts checked against [TypeSafe Images](https://docs.typesafe.ai/images)
+ and [Box](https://docs.typesafe.ai/primitives/box).
++
++## Roles
++
++`agent.run`, `decision.agent` and `ai.classify` take exactly one of `agent` or a
++literal `role`, using the fixed vocabulary `lead` and `reviewer`:
++
++```yaml
++role: {literal: lead}
++```
++
++The published procedure freezes the role requirement. At admission it resolves
++against the desk's owning department, walking to the nearest ancestor that holds
++the role within depth 8, and freezes the selected principal and agent revision.
++An agent step requires exactly one agent holder; missing, ambiguous or person
++holders refuse admission. Later role changes affect later runs. Active bindings
++for a role procedure require a department-owned desk; remove or deactivate those
++bindings before clearing its department. Pinned agent selection remains available.
++
++Agent identity, revision and grants freeze at admission, including requirements in pinned child
++workflows. Informational department framing (roster, current lead and charter) freezes when the
++agent is first prepared; it cannot select another agent or grant capabilities. Run inspection
++and board cards label captured holders with “via role”. Agent filters include the root's frozen
++role selections for its children as well as the published pinned-agent universe.
++
++See `src/application/workflow/fixtures/role-lead-response.yaml` for the reusable
++`context.history` → role-based `agent.run` → reply example.
+diff --git a/migrations/20260817000000_init_schema.sql b/migrations/20260817000000_init_schema.sql
+index 8c53307d..cb0257d2 100644
+--- a/migrations/20260817000000_init_schema.sql
++++ b/migrations/20260817000000_init_schema.sql
+@@ -15443,7 +15443,7 @@ CREATE TABLE public.department_roles (
+     created_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+     CONSTRAINT department_roles_pkey PRIMARY KEY (department_id, role, principal_id),
+     -- Widened by later plans; the string is always `DepartmentRole::as_str`.
+-    CONSTRAINT department_roles_role_check CHECK ((role = 'lead'::text)),
++    CONSTRAINT department_roles_role_check CHECK ((role IN ('lead', 'reviewer'))),
+     CONSTRAINT department_roles_department_fk FOREIGN KEY (company_id, department_id)
+         REFERENCES public.departments(company_id, id) ON DELETE CASCADE,
+     CONSTRAINT department_roles_principal_fk FOREIGN KEY (company_id, principal_id)
+@@ -15753,3 +15753,215 @@ CREATE TABLE public.workflow_memory_consumptions (
+     FOREIGN KEY (company_id, run_id) REFERENCES public.workflow_runs(company_id, id) ON DELETE CASCADE,
+     CHECK (exposed_level <= read_ceiling)
+ );
++
++
++-- Admission role requirements and complete principal sets are sealed in the immutable root
++-- dependency manifest (02WR-P02-D1/r2). These rows index that fact; they are not live role lookups.
++ALTER TABLE public.agent_dependency_manifests ADD CONSTRAINT agent_manifest_roles_shape CHECK (
++    (jsonb_typeof(content::jsonb->'roles') = 'array') IS TRUE
++);
++CREATE TABLE public.workflow_run_role_bindings (
++    company_id uuid NOT NULL,
++    run_id uuid NOT NULL,
++    manifest_id uuid NOT NULL,
++    version_id uuid NOT NULL,
++    step text NOT NULL CHECK (octet_length(step) BETWEEN 1 AND 128 AND step ~ '^[A-Za-z_][A-Za-z0-9_-]*$'),
++    role text NOT NULL CHECK (role IN ('lead','reviewer')),
++    resolution_revision bigint NOT NULL DEFAULT 0 CHECK (resolution_revision = 0),
++    department_id uuid NOT NULL,
++    principal_id uuid NOT NULL,
++    agent_id uuid,
++    agent_revision_id uuid,
++    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
++    PRIMARY KEY (company_id,run_id,version_id,step,role,resolution_revision,principal_id),
++    CHECK ((agent_id IS NULL) = (agent_revision_id IS NULL)),
++    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
++    FOREIGN KEY (company_id,run_id,manifest_id)
++        REFERENCES public.run_dependency_manifests(company_id,run_id,manifest_id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,manifest_id,run_id)
++        REFERENCES public.agent_dependency_manifests(company_id,id,root_run_id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,manifest_id,version_id)
++        REFERENCES public.agent_manifest_workflows(company_id,manifest_id,version_id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,department_id) REFERENCES public.departments(company_id,id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,principal_id) REFERENCES public.principals(company_id,id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,agent_id,agent_revision_id)
++        REFERENCES public.agent_revisions(company_id,agent_id,id) DEFERRABLE INITIALLY DEFERRED,
++    FOREIGN KEY (company_id,manifest_id,agent_id,agent_revision_id)
++        REFERENCES public.agent_manifest_revisions(company_id,manifest_id,agent_id,revision_id) DEFERRABLE INITIALLY DEFERRED
++);
++CREATE UNIQUE INDEX workflow_role_binding_one_agent ON public.workflow_run_role_bindings
++    (company_id,run_id,version_id,step,role,resolution_revision) WHERE agent_id IS NOT NULL;
++-- Agent filters join captured roots to all their children. Without these leading keys a
++-- generic prepared plan repeatedly scans a company's entire ownership index per role root.
++CREATE INDEX workflow_role_bindings_by_agent ON public.workflow_run_role_bindings
++    (company_id,agent_id,run_id,manifest_id) WHERE resolution_revision=0 AND agent_id IS NOT NULL;
++CREATE INDEX run_dependency_manifests_by_root ON public.run_dependency_manifests
++    (company_id,root_run_id,manifest_id,run_id);
++COMMENT ON TABLE public.workflow_run_role_bindings IS
++    'Index of canonical admission role resolutions. Resolution0 is sealed by the root manifest; later human resolutions require their own immutable canonical record and complete membership guard before enabling nonzero revisions.';
++
++CREATE FUNCTION public.guard_workflow_role_binding() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE holder_kind text; holder_agent uuid;
++BEGIN
++    IF TG_OP = 'DELETE' THEN
++        IF NOT EXISTS (SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id)
++            THEN RETURN OLD; END IF;
++        RAISE EXCEPTION 'captured role binding is immutable'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
++    ELSIF TG_OP = 'UPDATE' THEN
++        IF NEW IS NOT DISTINCT FROM OLD THEN RETURN NEW; END IF;
++        RAISE EXCEPTION 'captured role binding is immutable'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
++    END IF;
++    -- Same order as admission/deletion, including for a caller bypassing the adapter.
++    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR NO KEY UPDATE;
++    IF NEW.agent_id IS NOT NULL THEN
++        PERFORM 1 FROM public.agents WHERE company_id=NEW.company_id AND id=NEW.agent_id FOR SHARE;
++    END IF;
++    SELECT principal.kind,principal.agent_id INTO holder_kind,holder_agent
++        FROM public.principals AS principal
++        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id FOR KEY SHARE;
++    IF (NEW.agent_id IS NOT NULL AND (holder_kind IS DISTINCT FROM 'agent' OR holder_agent IS DISTINCT FROM NEW.agent_id))
++        OR (NEW.agent_id IS NULL AND holder_kind IS DISTINCT FROM 'person') THEN
++        RAISE EXCEPTION 'captured role principal kind or agent does not match'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:guard_workflow_role_binding';
++    END IF;
++    RETURN NEW;
++END $$;
++CREATE TRIGGER workflow_role_binding_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_role_bindings
++    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_role_binding();
++
++-- Validate before expansion: an absent or malformed array must never silently become no roles.
++CREATE FUNCTION public.workflow_publication_role_requirements(payload bytea, selected_version uuid)
++RETURNS jsonb LANGUAGE plpgsql IMMUTABLE STRICT AS $$
++DECLARE document jsonb; stored jsonb; requirements jsonb := '[]';
++BEGIN
++    document := convert_from(payload,'UTF8')::jsonb;
++    IF document->>'root' IS DISTINCT FROM selected_version::text
++        OR jsonb_typeof(document->'versions') IS DISTINCT FROM 'array' THEN
++        RAISE EXCEPTION 'invalid frozen publication role source'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++    END IF;
++    IF NOT EXISTS (SELECT 1 FROM jsonb_array_elements(document->'versions') AS member(item)
++        WHERE member.item->>'version'=selected_version::text) THEN
++        RAISE EXCEPTION 'missing frozen publication role source'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++    END IF;
++    FOR stored IN SELECT item FROM jsonb_array_elements(document->'versions') AS member(item) LOOP
++        IF jsonb_typeof(stored->'compiled'->'roles') IS DISTINCT FROM 'array' THEN
++            RAISE EXCEPTION 'invalid frozen publication role requirements'
++                USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++        END IF;
++        SELECT requirements || coalesce(jsonb_agg(jsonb_build_object(
++            'version_id',stored->'version','step',item->'step','role',item->'role',
++            'need',CASE WHEN item->>'mode' IN ('tools','model_only') THEN 'agent'
++                WHEN item->>'mode'='people' THEN 'people' ELSE 'unknown' END)),'[]')
++            INTO requirements FROM jsonb_array_elements(stored->'compiled'->'roles') AS requirement(item);
++    END LOOP;
++    RETURN requirements;
++END $$;
++
++CREATE FUNCTION public.check_workflow_role_manifest() RETURNS trigger LANGUAGE plpgsql AS $$
++DECLARE owner_company uuid; manifest uuid; saved jsonb; root uuid; expected jsonb; actual jsonb;
++BEGIN
++    owner_company := NEW.company_id;
++    IF TG_TABLE_NAME='agent_dependency_manifests' THEN manifest:=NEW.id; ELSE manifest:=NEW.manifest_id; END IF;
++    SELECT content::jsonb,root_run_id INTO saved,root FROM public.agent_dependency_manifests
++        WHERE company_id=owner_company AND id=manifest FOR UPDATE;
++    IF saved IS NULL THEN RETURN NULL; END IF;
++    IF jsonb_typeof(saved->'roles') IS DISTINCT FROM 'array' OR EXISTS (
++        SELECT 1 FROM jsonb_array_elements(saved->'roles') AS resolution(item)
++        WHERE jsonb_typeof(resolution.item->'principals') IS DISTINCT FROM 'array'
++           OR jsonb_array_length(resolution.item->'principals') NOT BETWEEN 1 AND 16
++    ) THEN
++        RAISE EXCEPTION 'invalid canonical role resolutions'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++    END IF;
++    -- A stored publication is immutable and was rebuilt/validated by capture. Read its complete
++    -- pinned closure so an omitted child/requirement cannot turn an incomplete capture into a pass.
++    WITH sources AS (
++        SELECT workflow_id,version_id FROM public.workflow_runs WHERE company_id=owner_company AND id=root
++        UNION SELECT workflow_id,version_id FROM public.agent_manifest_workflows
++            WHERE company_id=owner_company AND manifest_id=manifest
++    ), requirements AS (
++        SELECT DISTINCT (requirement.item->>'version_id')::uuid AS version_id,
++            requirement.item->>'step' AS step, requirement.item->>'role' AS role,
++            requirement.item->>'need' AS need
++        FROM sources AS selected
++        JOIN public.workflow_versions AS publication ON publication.company_id=owner_company
++            AND publication.workflow_id=selected.workflow_id AND publication.id=selected.version_id
++        CROSS JOIN LATERAL jsonb_array_elements(public.workflow_publication_role_requirements(
++            publication.bundle,selected.version_id)) AS requirement(item)
++    ) SELECT coalesce(jsonb_agg(jsonb_build_object('version_id',version_id,'step',step,'role',role,'need',need)
++        ORDER BY version_id,step,role),'[]') INTO expected FROM requirements;
++    SELECT coalesce(jsonb_agg(jsonb_build_object('version_id',item->'version_id','step',item->'step','role',item->'role',
++        'need',CASE WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(item->'principals') AS holder(value)
++                        WHERE holder.value->>'agent_id' IS NULL OR holder.value->>'revision_id' IS NULL) THEN 'agent'
++                    WHEN NOT EXISTS (SELECT 1 FROM jsonb_array_elements(item->'principals') AS holder(value)
++                        WHERE holder.value->>'agent_id' IS NOT NULL OR holder.value->>'revision_id' IS NOT NULL) THEN 'people'
++                    ELSE 'mixed' END)
++        ORDER BY item->>'version_id',item->>'step',item->>'role'),'[]') INTO actual
++        FROM jsonb_array_elements(saved->'roles') AS captured(item);
++    IF expected IS DISTINCT FROM actual THEN
++        RAISE EXCEPTION 'captured roles must exactly cover frozen workflow requirements'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++    END IF;
++    SELECT coalesce(jsonb_agg(jsonb_build_object(
++        'version_id',resolution.item->'version_id','step',resolution.item->'step','role',resolution.item->'role',
++        'department_id',resolution.item->'department_id','principal_id',holder.item->'principal_id',
++        'agent_id',holder.item->'agent_id','revision_id',holder.item->'revision_id')
++        ORDER BY resolution.item->>'version_id',resolution.item->>'step',resolution.item->>'role',holder.item->>'principal_id'),'[]')
++        INTO expected FROM jsonb_array_elements(saved->'roles') AS resolution(item)
++        CROSS JOIN LATERAL jsonb_array_elements(resolution.item->'principals') AS holder(item);
++    SELECT coalesce(jsonb_agg(jsonb_build_object(
++        'version_id',version_id,'step',step,'role',role,'department_id',department_id,
++        'principal_id',principal_id,'agent_id',agent_id,'revision_id',agent_revision_id)
++        ORDER BY version_id,step,role,principal_id),'[]') INTO actual
++        FROM public.workflow_run_role_bindings WHERE company_id=owner_company AND manifest_id=manifest
++            AND run_id=root AND resolution_revision=0;
++    IF expected IS DISTINCT FROM actual THEN
++        RAISE EXCEPTION 'role members must exactly match immutable canonical resolution'
++            USING ERRCODE='23514', CONSTRAINT='workflow_guard:check_workflow_role_manifest';
++    END IF;
++    RETURN NULL;
++END $$;
++CREATE CONSTRAINT TRIGGER workflow_role_manifest_complete AFTER INSERT ON public.agent_dependency_manifests
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_role_manifest();
++CREATE CONSTRAINT TRIGGER workflow_role_members_complete AFTER INSERT ON public.workflow_run_role_bindings
++    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_workflow_role_manifest();
++
++
++-- Preserve the existing64-byte refusal code limit. Bounded typed context is a separate fact.
++CREATE FUNCTION public.workflow_role_refusal_code(value jsonb) RETURNS text LANGUAGE sql IMMUTABLE STRICT AS $$
++    SELECT CASE value->>'kind'
++        WHEN 'no_holder' THEN 'workflow.role_no_holder'
++        WHEN 'wrong_kind' THEN 'workflow.role_wrong_kind'
++        WHEN 'ambiguous' THEN 'workflow.role_ambiguous'
++        WHEN 'depth_bound' THEN 'workflow.role_depth_bound'
++        WHEN 'too_many' THEN 'workflow.role_too_many'
++        WHEN 'unavailable' THEN 'workflow.role_unavailable'
++        WHEN 'missing_department' THEN 'workflow.role_needs_department'
++    END
++$$;
++CREATE FUNCTION public.valid_workflow_role_refusal(value jsonb) RETURNS boolean LANGUAGE sql IMMUTABLE STRICT AS $$
++    SELECT (jsonb_typeof(value)='object' AND octet_length(value::text)<=512
++        AND value->>'format'='workflow-role-refusal-v1'
++        AND jsonb_typeof(value->'step')='string' AND octet_length(value->>'step') BETWEEN 1 AND 128
++        AND value->>'step' ~ '^[A-Za-z_][A-Za-z0-9_-]*$'
++        AND value->>'role' IN ('lead','reviewer')
++        AND public.workflow_role_refusal_code(value) IS NOT NULL
++        AND (value-ARRAY['format','step','role','kind'])='{}'::jsonb) IS TRUE
++$$;
++ALTER TABLE public.workflow_message_intent_bindings ADD COLUMN role_refusal jsonb,
++    ADD CONSTRAINT workflow_message_role_refusal CHECK ((role_refusal IS NULL OR (
++        public.valid_workflow_role_refusal(role_refusal) AND outcome='refused'
++        AND reason=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
++ALTER TABLE public.schedule_runs ADD COLUMN role_refusal jsonb,
++    ADD CONSTRAINT workflow_schedule_role_refusal CHECK ((role_refusal IS NULL OR (
++        public.valid_workflow_role_refusal(role_refusal) AND materialization_status='failed'
++        AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
++ALTER TABLE public.schedule_runs DROP CONSTRAINT schedule_runs_refusal_check,
++    ADD CONSTRAINT schedule_runs_refusal_check CHECK ((refusal IS NULL
++        OR refusal IN ('unavailable','input_rejected','key_conflict')
++        OR (role_refusal IS NOT NULL AND public.valid_workflow_role_refusal(role_refusal)
++            AND refusal=public.workflow_role_refusal_code(role_refusal))) IS TRUE);
+diff --git a/scripts/tests/run-list-query-plan.py b/scripts/tests/run-list-query-plan.py
+index 3e60786f..d229f9af 100644
+--- a/scripts/tests/run-list-query-plan.py
++++ b/scripts/tests/run-list-query-plan.py
+@@ -27,6 +27,8 @@ SEED = r"""
+ SET client_min_messages = warning;
+ CREATE TEMP TABLE workflow_versions (LIKE public.workflow_versions INCLUDING ALL);
+ CREATE TEMP TABLE workflow_runs (LIKE public.workflow_runs INCLUDING ALL);
++CREATE TEMP TABLE run_dependency_manifests (LIKE public.run_dependency_manifests INCLUDING ALL);
++CREATE TEMP TABLE workflow_run_role_bindings (LIKE public.workflow_run_role_bindings INCLUDING ALL);
+ -- 100 tenants x 40 workflows x 20 published versions. Agent k of tenant t is md5('agent'||t||'-'||k).
+ -- Agent 0 is dense (every even version of every workflow); agent 63 is sparse (workflow 0's first
+ -- version only); every version also uses one of agents 1..62.
+@@ -52,7 +54,7 @@ FROM generate_series(1, 100) AS tenants(t), generate_series(0, 39) AS workflows(
+ INSERT INTO workflow_runs
+     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
+      correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
+-     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling)
++     created_at, state, waiting_reason, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling, content_exact)
+ SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' || w)::uuid, 1,
+        md5('workflow' || t || '-' || w)::uuid, md5('version' || t || '-' || w || '-' || v)::uuid,
+        md5('actor' || t)::uuid, md5('trigger' || t || '-' || n)::uuid,
+@@ -64,7 +66,7 @@ SELECT company, md5('run' || t || '-' || n)::uuid, md5('binding' || t || '-' ||
+        CASE WHEN w < 32 THEN md5('channel' || t || '-' || w)::uuid END,
+        CASE WHEN state IN ('succeeded', 'failed', 'cancelled')
+             THEN created + interval '10 minutes' END,
+-       CASE WHEN state IN ('succeeded','failed') THEN md5('terminal' || t || '-' || n)::uuid END, 9
++       CASE WHEN state IN ('succeeded','failed') THEN md5('terminal' || t || '-' || n)::uuid END, 9, true
+ FROM (SELECT t, n, n % 40 AS w, 20 * n / total AS v, md5('company' || t)::uuid AS company,
+              now() - interval '2 years' + (n::double precision / total) * interval '2 years' AS created,
+              CASE WHEN n % 20 = 0 THEN (ARRAY['queued', 'running', 'waiting'])[1 + (n / 20) % 3]
+@@ -72,8 +74,27 @@ FROM (SELECT t, n, n % 40 AS w, 20 * n / total AS v, md5('company' || t)::uuid A
+       FROM (SELECT t, CASE WHEN t <= 4 THEN 250000 ELSE 1000 END AS total
+             FROM generate_series(1, 100) AS tenants(t)) AS tenant,
+            generate_series(0, total - 1) AS runs(n)) AS seed;
++-- Every run owns or inherits a root manifest. Some roots have a role-only agent64;
++-- children inherit their parent's capture. No published version pins that agent.
++INSERT INTO run_dependency_manifests(company_id,run_id,root_run_id,manifest_id)
++SELECT company_id,id,coalesce(parent_run_id,id),md5('manifest'||coalesce(parent_run_id,id)::text)::uuid
++FROM workflow_runs;
++INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,
++    department_id,principal_id,agent_id,agent_revision_id)
++SELECT run.company_id,run.id,md5('manifest'||run.id::text)::uuid,run.version_id,'start','lead',
++    md5('department'||tenant.t)::uuid,md5('principal'||tenant.t)::uuid,
++    md5('agent'||tenant.t||'-64')::uuid,md5('revision'||tenant.t)::uuid
++FROM generate_series(1,100) AS tenant(t)
++JOIN workflow_runs AS run ON run.company_id=md5('company'||tenant.t)::uuid
++WHERE run.parent_run_id IS NULL AND run.channel_id IN (
++    md5('channel'||tenant.t||'-0')::uuid,md5('channel'||tenant.t||'-4')::uuid,
++    md5('channel'||tenant.t||'-10')::uuid,md5('channel'||tenant.t||'-14')::uuid,
++    md5('channel'||tenant.t||'-20')::uuid,md5('channel'||tenant.t||'-24')::uuid,
++    md5('channel'||tenant.t||'-30')::uuid);
+ ANALYZE workflow_versions;
+ ANALYZE workflow_runs;
++ANALYZE run_dependency_manifests;
++ANALYZE workflow_run_role_bindings;
+ \echo '== Table and index sizes (temporary clones)'
+ SELECT class.relname, class.reltuples::bigint AS rows, pg_size_pretty(pg_relation_size(class.oid)) AS size
+   FROM pg_class AS class
+@@ -96,7 +117,8 @@ VALUES = {
+ # (`LIST_PAGE`), and 200 (`MAX_LISTED`), the JSON route's default and the UI's refresh of a list
+ # that "Load more" has grown.
+ LIMITS = {"page 50": "51", "page 200": "201"}
+-AGENTS = {"dense": "md5('agent1-0')::uuid", "sparse": "md5('agent1-63')::uuid"}
++AGENTS = {"dense": "md5('agent1-0')::uuid", "sparse": "md5('agent1-63')::uuid",
++          "role_only": "md5('agent1-64')::uuid"}
+ # A common terminal state (a third of runs) and a rare open one (under 2%), which no keyset index
+ # serves: a range that holds fewer matches than a page is read to its end.
+ STATES = {"failed": "'failed'", "queued": "'queued'"}
+@@ -122,9 +144,14 @@ def cursor_lookup(agent: str, name: str) -> str:
+     """psql that stores the (created_at, id) of the agent list's row at CURSOR_DEPTH in :name_*."""
+     return (
+         "SELECT created_at, id FROM workflow_runs "
+-        f"WHERE company_id = {VALUES['company']} AND version_id IN (SELECT version.id FROM "
++        f"WHERE company_id = {VALUES['company']} AND (version_id IN (SELECT version.id FROM "
+         f"workflow_versions AS version WHERE version.company_id = {VALUES['company']} AND "
+-        f"{agent} = ANY(version.agent_ids)) ORDER BY created_at DESC, id DESC "
++        f"{agent} = ANY(version.agent_ids)) OR id IN (SELECT ownership.run_id "
++        "FROM run_dependency_manifests AS ownership JOIN workflow_run_role_bindings AS role_binding "
++        "ON role_binding.company_id=ownership.company_id AND role_binding.run_id=ownership.root_run_id "
++        "AND role_binding.manifest_id=ownership.manifest_id "
++        f"WHERE ownership.company_id={VALUES['company']} AND role_binding.agent_id={agent} "
++        "AND role_binding.resolution_revision=0)) ORDER BY created_at DESC, id DESC "
+         f"OFFSET {CURSOR_DEPTH - 1} LIMIT 1 \\gset {name}_\n")
+ 
+ 
+@@ -266,20 +293,22 @@ def board_measurements(shapes: list) -> str:
+ # (run n is a child when n % 10 = 5), and its version 18 uses the dense agent. Run last, after the
+ # main measurements, because it changes the data.
+ CHILD_HISTORY = r"""
++SET statement_timeout = '120s';
+ INSERT INTO workflow_runs
+     (company_id, id, binding_id, binding_revision, workflow_id, version_id, actor_id, trigger_id,
+      correlation_id, bundle_digest, input, params, resources, max_steps, max_context_bytes, deadline,
+-     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling)
++     created_at, state, parent_run_id, parent_execution_id, channel_id, finished_at, terminal_execution_id, knowledge_ceiling, content_exact)
+ SELECT md5('company1')::uuid, md5('extra-run1-' || n)::uuid, md5('binding1-5')::uuid, 1,
+        md5('workflow1-5')::uuid, md5('version1-5-18')::uuid, md5('actor1')::uuid,
+        md5('extra-trigger1-' || n)::uuid, md5('extra-correlation1-' || n)::uuid, sha256('\x00'::bytea),
+        '{}', '{}', '{}', 100, 65536, created + interval '1 day', created, 'succeeded',
+        md5('run1-4')::uuid, md5('extra-execution1-' || n)::uuid, md5('channel1-5')::uuid,
+-       created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid, 9
++       created + interval '10 minutes',md5('extra-terminal1-' || n)::uuid, 9, true
+ FROM (SELECT n, now() - interval '30 days' + n * interval '1 second' AS created
+       FROM generate_series(1, 100000) AS extra(n)) AS seed;
+ ANALYZE workflow_runs;
+ SET plan_cache_mode = force_generic_plan;
++SET statement_timeout = '15s';
+ """
+ # The temporary clone of `workflow_runs_version_top_level`, dropped to show what it saves.
+ DROP_TOP_LEVEL_INDEX = r"""
+@@ -314,7 +343,9 @@ def main() -> int:
+     args = parser.parse_args()
+     shapes = json.loads(pathlib.Path(args.shapes).read_text()) if args.shapes else dump_shapes()
+     # The board runs before the child-only history, which changes the data.
+-    script = SEED + measurements(shapes) + board_measurements(shapes) + child_history(shapes)
++    script = ("SET statement_timeout = '120s';\n" + SEED
++              + "SET statement_timeout = '15s';\n" + measurements(shapes)
++              + board_measurements(shapes) + child_history(shapes))
+     result = subprocess.run(["psql", args.database_url, "-X", "-q", "-v", "ON_ERROR_STOP=1"],
+                             input=script, text=True, capture_output=True)
+     # psql pads its column headers; strip the padding so the committed evidence passes
+diff --git a/src/adapters/http/app_error_impl.rs b/src/adapters/http/app_error_impl.rs
+index e0895544..da121416 100644
+--- a/src/adapters/http/app_error_impl.rs
++++ b/src/adapters/http/app_error_impl.rs
+@@ -9,6 +9,7 @@ impl IntoResponse for AppError {
+         // Error messages can contain provider responses, request URLs, or caller text. The
+         // request span and response event supply correlation/status; log only a fixed category.
+         let error_kind = match &self {
++            AppError::WorkflowRole(_) => "workflow_role",
+             AppError::KnowledgeTrigger { .. } => "knowledge_trigger",
+             AppError::KnowledgeRelease { .. } => "knowledge_release",
+             AppError::Execution(_) => "execution",
+@@ -30,6 +31,10 @@ impl IntoResponse for AppError {
+ 
+         let knowledge_code = self.knowledge_code();
+         match self {
++            AppError::WorkflowRole(refusal) => (
++                StatusCode::BAD_REQUEST,
++                axum::Json(serde_json::json!({"code":refusal.kind.code(),"error":refusal.to_string(),"step":refusal.step,"role":refusal.role})),
++            ).into_response(),
+             AppError::KnowledgeTrigger { .. } => (
+                 StatusCode::BAD_REQUEST,
+                 axum::Json(serde_json::json!({"code":knowledge_code,"error":"The triggering message exceeds this audience's access level"})),
+@@ -77,3 +82,30 @@ impl IntoResponse for AppError {
+         }
+     }
+ }
++
++#[cfg(test)]
++mod role_tests {
++    use super::*;
++    use crate::domain::workflow::StepId;
++    use crate::entities::department::{DepartmentRole, RoleAdmissionRefusal, RoleRefusalKind};
++
++    #[tokio::test]
++    async fn workflow_role_http_refusal_is_a_bounded_named_bad_request() {
++        let refusal = RoleAdmissionRefusal::new(
++            StepId::parse("draft").unwrap(),
++            DepartmentRole::Lead,
++            RoleRefusalKind::NoHolder,
++        );
++        let response = AppError::WorkflowRole(refusal).into_response();
++        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
++        let bytes = axum::body::to_bytes(response.into_body(), 1024)
++            .await
++            .unwrap();
++        let value: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
++        assert_eq!(value["code"], "workflow.role_no_holder");
++        assert_eq!(value["step"], "draft");
++        assert_eq!(value["role"], "lead");
++        assert_eq!(value.as_object().unwrap().len(), 4);
++        assert!(value["error"].as_str().unwrap().contains("draft"));
++    }
++}
+diff --git a/src/adapters/http/pages/simulation/live.rs b/src/adapters/http/pages/simulation/live.rs
+index 575cf8c5..020b4d78 100644
+--- a/src/adapters/http/pages/simulation/live.rs
++++ b/src/adapters/http/pages/simulation/live.rs
+@@ -63,6 +63,13 @@ fn binding_outcome_card(outcome: &MessageBindingOutcome) -> String {
+             ),
+             admitted_run_detail(run),
+         ),
++        BindingOutcome::RoleRefused(refusal) => (
++            r##"<span class="badge badge-sm badge-ghost">Refused</span>"##.to_string(),
++            format!(
++                r##"<div class="text-xs font-mono">{}</div>"##,
++                escape_html_text(&refusal.to_string())
++            ),
++        ),
+         BindingOutcome::Refused { reason } => (
+             r##"<span class="badge badge-sm badge-ghost">Refused</span>"##.to_string(),
+             format!(
+diff --git a/src/adapters/http/pages/workflow_runs/board.rs b/src/adapters/http/pages/workflow_runs/board.rs
+index c6d7467a..b99a1fb1 100644
+--- a/src/adapters/http/pages/workflow_runs/board.rs
++++ b/src/adapters/http/pages/workflow_runs/board.rs
+@@ -144,7 +144,7 @@ fn board_card(view: &RunBoardView<'_>, run: &RunSummary) -> String {
+         r##"<li><a {attrs} data-run="{id}"{current}
+             class="flex flex-col items-start gap-1 rounded-box border bg-base-100 p-2 text-sm hover:bg-base-200 aria-busy:cursor-progress aria-busy:opacity-60 {edge}">
+             <span class="w-full truncate font-semibold" title="{title_attr}">{title}</span>
+-            {state}
++            {state}{roles}
+             <span class="font-mono text-[11px] opacity-70">run {short} · {age}</span>{rerun}{children}</a></li>"##,
+         attrs = card_attrs(view, id),
+         current = if selected {
+@@ -160,6 +160,7 @@ fn board_card(view: &RunBoardView<'_>, run: &RunSummary) -> String {
+         title_attr = escape_html_attr(title),
+         title = escape_html_text(title),
+         state = run_state_badge(&run.state, run.waiting_reason.as_deref()),
++        roles = super::provenance::role_markers(&run.role_holders, run.role_holders_truncated),
+         short = short_id(id),
+         children = child_rollup(view.children.get(&run.run).copied().unwrap_or_default()),
+     )
+diff --git a/src/adapters/http/pages/workflow_runs/provenance.rs b/src/adapters/http/pages/workflow_runs/provenance.rs
+index 75290316..21f82ea5 100644
+--- a/src/adapters/http/pages/workflow_runs/provenance.rs
++++ b/src/adapters/http/pages/workflow_runs/provenance.rs
+@@ -26,9 +26,13 @@ pub(super) fn dependencies(run: &RunView) -> String {
+             )
+         })
+         .collect::<String>();
++    let roles = role_markers(
++        &run.detail.summary.role_holders,
++        run.detail.summary.role_holders_truncated,
++    );
+     format!(
+         r#"<section class="space-y-2"><h3 class="font-semibold">Captured dependencies</h3>
+-        <p class="break-all text-xs">Manifest {} · root run {}</p>
++        <p class="break-all text-xs">Manifest {} · root run {}</p>{roles}
+         <p class="text-xs opacity-70">Selected at root admission and retained by retries and children. Published definitions describe available capabilities; model-only steps use no tools or skills.</p>
+         <details><summary class="cursor-pointer">Agent revisions and workflow versions</summary>{agents}<ul>{workflows}</ul>{cut}</details></section>{calls}"#,
+         selected.manifest.as_uuid(),
+@@ -41,7 +45,36 @@ pub(super) fn dependencies(run: &RunView) -> String {
+     )
+ }
+ 
++pub(super) fn role_markers(
++    holders: &[crate::application::workflow::reads::RunRoleHolder],
++    truncated: bool,
++) -> String {
++    let mut seen = std::collections::BTreeSet::new();
++    let mut result = String::new();
++    let limit = crate::application::workflow::run_views::MAX_STEP_ITEMS as usize;
++    for holder in holders.iter().take(limit) {
++        if seen.insert((holder.role.as_str(), holder.principal)) {
++            result.push_str(&format!(
++                r#"<span class="badge badge-sm badge-ghost">{}: {} · via role</span>"#,
++                holder.role.as_str(),
++                escape_html_text(&holder.label)
++            ));
++        }
++    }
++    if truncated || holders.len() > limit {
++        result.push_str(
++            r#"<span class="text-xs opacity-70">More role resolutions are omitted.</span>"#,
++        );
++    }
++    result
++}
++
+ pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
++    let role = agent
++        .via_role
++        .as_ref()
++        .map(|holder| role_markers(std::slice::from_ref(holder), false))
++        .unwrap_or_default();
+     let bindings = agent
+         .bindings
+         .iter()
+@@ -78,7 +111,7 @@ pub(super) fn agent_revision(agent: &SelectedAgentSummary) -> String {
+         }
+     };
+     format!(
+-        r#"<div class="space-y-1 py-2"><p class="text-sm">@{} · {}</p>
++        r#"<div class="space-y-1 py-2"><p class="text-sm">@{} · {}</p>{role}
+         <p class="break-all text-xs">Agent {} · revision {} · manifest {}</p>
+         <p class="text-xs">tools {}; skills {}</p><ul>{bindings}{assignments}</ul></div>"#,
+         escape_html_text(&agent.key),
+@@ -134,3 +167,39 @@ fn truncation(truncated: bool, message: &str) -> String {
+         String::new()
+     }
+ }
++
++#[cfg(test)]
++mod role_tests {
++    use super::*;
++    use crate::application::workflow::reads::RunRoleHolder;
++    use crate::domain::workflow::{StepId, VersionId};
++    use crate::entities::department::{DepartmentId, DepartmentRole};
++    use crate::entities::transport::PrincipalId;
++
++    #[test]
++    fn workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers() {
++        let holder = RunRoleHolder {
++            version: VersionId::new(Uuid::new_v4()),
++            step: StepId::parse("start").unwrap(),
++            role: DepartmentRole::Lead,
++            department: DepartmentId::new(Uuid::new_v4()),
++            principal: PrincipalId::new(Uuid::new_v4()),
++            label: "<img src=x onerror=alert(1)>".into(),
++        };
++        let duplicate = role_markers(&[holder.clone(), holder.clone()], false);
++        assert_eq!(duplicate.matches("via role").count(), 1);
++        assert!(duplicate.contains("&lt;img"));
++        assert!(!duplicate.contains("<img"));
++        let holders: Vec<_> = (0..51)
++            .map(|_| RunRoleHolder {
++                principal: PrincipalId::new(Uuid::new_v4()),
++                ..holder.clone()
++            })
++            .collect();
++        let bounded = role_markers(&holders, false);
++        assert_eq!(bounded.matches("via role").count(), 50);
++        assert!(bounded.contains("More role resolutions are omitted"));
++        assert!(role_markers(&[], true).contains("More role resolutions are omitted"));
++        assert!(role_markers(&[], false).is_empty());
++    }
++}
+diff --git a/src/adapters/http/routes/ui_schedules.rs b/src/adapters/http/routes/ui_schedules.rs
+index af6dd034..ac77a168 100644
+--- a/src/adapters/http/routes/ui_schedules.rs
++++ b/src/adapters/http/routes/ui_schedules.rs
+@@ -676,6 +676,7 @@ mod tests {
+ 
+     fn occurrence(status: OccurrenceStatus) -> ScheduleRun {
+         ScheduleRun {
++            role_refusal: None,
+             id: Uuid::new_v4(),
+             scheduled_for: Utc::now(),
+             manual: false,
+diff --git a/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs b/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+index 635996ba..b806eb72 100644
+--- a/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
++++ b/src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+@@ -45,6 +45,7 @@ fn reconciliation_is_offered_as_an_annotation_and_a_step_shows_usage_and_receipt
+     let step_view = StepView {
+         agent: Some(
+             crate::application::workflow::run_views::SelectedAgentSummary {
++                via_role: None,
+                 manifest: crate::entities::agent_capability::DependencyManifestId::new(
+                     Uuid::new_v4(),
+                 ),
+@@ -133,6 +134,8 @@ fn sample_view(
+         calls: Default::default(),
+         detail: RunDetail {
+             summary: RunSummary {
++                role_holders: Vec::new(),
++                role_holders_truncated: false,
+                 run: RunId::new(Uuid::new_v4()),
+                 binding: WorkflowBindingId::new(Uuid::new_v4()),
+                 workflow: WorkflowId::new(Uuid::new_v4()),
+diff --git a/src/adapters/persistence/agent.rs b/src/adapters/persistence/agent.rs
+index cc132a65..546ef5b3 100644
+--- a/src/adapters/persistence/agent.rs
++++ b/src/adapters/persistence/agent.rs
+@@ -422,13 +422,14 @@ pub(in crate::adapters::persistence) struct AgentDeleteLocks {
+     company: Option<Uuid>,
+ }
+ 
+-/// The locks agent deletion takes before writing: its company `FOR KEY SHARE`, then the agent
++/// The locks agent deletion takes before writing: its company `FOR NO KEY UPDATE`, then the agent
+ /// `FOR UPDATE`. `None` when the agent is gone.
+ ///
+ /// The company comes first (memory E2 order users → company → … → agent): company deletion
+ /// takes `FOR UPDATE` and then the memory rows before cascading to agents, so an agent delete
+ /// holding the agent and then retiring its namespaces would deadlock with it (review p7b r1 M4).
+-/// `KEY SHARE` blocks only that deletion, never `FOR NO KEY UPDATE` writers.
++/// The company lock also serializes principal demotion and derived channel-grant cleanup with
++/// admission and department writers, before either side locks channels or the agent (02WR-P02-D1/r2).
+ ///
+ /// Locking the agent next means a concurrent `create_agent_principal_on` -- whose foreign key
+ /// check needs a share lock on this row -- either committed before us, so its principal is
+@@ -447,7 +448,7 @@ pub(in crate::adapters::persistence) async fn lock_agent_delete_on(
+         return Ok(None);
+     };
+     if let Some(company) = company {
+-        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR KEY SHARE")
++        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+             .bind(company)
+             .fetch_optional(&mut **transaction)
+             .await?;
+diff --git a/src/adapters/persistence/agent_publication/commands.rs b/src/adapters/persistence/agent_publication/commands.rs
+index 63aaeff7..b6e2e239 100644
+--- a/src/adapters/persistence/agent_publication/commands.rs
++++ b/src/adapters/persistence/agent_publication/commands.rs
+@@ -107,6 +107,7 @@ impl AgentPublications for PostgresPersistence {
+ 
+ fn publication_failure(error: &AppError) -> &'static str {
+     match error {
++        AppError::WorkflowRole(_) => "role_resolution_refused",
+         AppError::BadRequest(_) => "invalid_definition",
+         AppError::Conflict(_) | AppError::Superseded(_) => "conflict",
+         AppError::Forbidden(_) | AppError::InvalidCredentials => "forbidden",
+diff --git a/src/adapters/persistence/channel.rs b/src/adapters/persistence/channel.rs
+index db3ff9ca..1aa0db25 100644
+--- a/src/adapters/persistence/channel.rs
++++ b/src/adapters/persistence/channel.rs
+@@ -495,6 +495,9 @@ pub(super) async fn write_channel_settings_on(
+         .ownership
+         .map_or(current, |edit| current.merged(&edit));
+     let access_mode = ownership.stored_mode(access_mode)?;
++    if current.department_id.is_some() && ownership.department_id.is_none() {
++        super::workflow::role_binding::check_detach_on(tx, CompanyId::new(company_id), id).await?;
++    }
+     sqlx::query(
+         r#"UPDATE channels
+                SET name = $1, description = $2, access_mode = $3, enabled = $4,
+diff --git a/src/adapters/persistence/department.rs b/src/adapters/persistence/department.rs
+index 18c0c788..b46c0a91 100644
+--- a/src/adapters/persistence/department.rs
++++ b/src/adapters/persistence/department.rs
+@@ -47,6 +47,11 @@ use crate::entities::value_objects::DepartmentSlug;
+ use crate::use_cases::company::company_not_found;
+ use crate::use_cases::department::department_not_found;
+ 
++mod lifecycle;
++pub(crate) use lifecycle::{
++    create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
++};
++
+ /// A principal named as the department pages show it: an agent by its current name and handle, a
+ /// person by their account's username and email (not `display_label`, which a rename leaves).
+ const PRINCIPAL_CHOICE: &str = "SELECT principal.id, principal.kind, \
+@@ -297,231 +302,6 @@ async fn lock_principals_on(
+     Ok(())
+ }
+ 
+-/// Create a department with its desk, and its lead when one is named (01DEP-P03-D8). The caller
+-/// holds the company write lock and `actor`'s account row.
+-pub(crate) async fn create_department_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    company: CompanyId,
+-    actor: WorkflowActor,
+-    write: &DepartmentWrite,
+-    lead: Option<PrincipalId>,
+-) -> AppResult<Department> {
+-    create_department_with_id_on(
+-        tx,
+-        templates,
+-        company,
+-        actor,
+-        DepartmentId::random(),
+-        write,
+-        lead,
+-    )
+-    .await
+-}
+-
+-/// [`create_department_on`] under a caller-chosen id, for a creator that replays by id
+-/// (onboarding's first department, 01DEP-P03-D4).
+-pub(crate) async fn create_department_with_id_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    templates: &ProvisioningDeployment,
+-    company: CompanyId,
+-    actor: WorkflowActor,
+-    id: DepartmentId,
+-    write: &DepartmentWrite,
+-    lead: Option<PrincipalId>,
+-) -> AppResult<Department> {
+-    if let Some(parent) = write.parent_id {
+-        let parent = lock_parent_on(tx, company, parent).await?;
+-        check_shape_on(tx, company, id, &write.name, &parent).await?;
+-    }
+-    let created_by = serde_json::to_value(
+-        write
+-            .created_by
+-            .clone()
+-            .unwrap_or_else(CreationProvenance::system),
+-    )
+-    .map_err(|error| AppError::Internal(error.to_string()))?;
+-    let department = sqlx::query_as::<_, DepartmentDb>(&format!(
+-        "INSERT INTO departments AS department \
+-             (id, company_id, name, slug, description, charter, parent_id, created_by) \
+-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING {DEPARTMENT_COLUMNS}"
+-    ))
+-    .bind(id.as_uuid())
+-    .bind(company.as_uuid())
+-    .bind(&write.name)
+-    .bind(&write.slug)
+-    .bind(&write.description)
+-    .bind(&write.charter)
+-    .bind(write.parent_id.map(DepartmentId::as_uuid))
+-    .bind(created_by)
+-    .fetch_one(&mut **tx)
+-    .await
+-    .map_err(|error| slug_conflict(error, &write.slug))?;
+-    let department = Department::try_from(department)?;
+-    // Boxed: an agent lead's desk descends into template compilation and publication.
+-    Box::pin(provision_department_desk_on(
+-        tx,
+-        templates,
+-        company,
+-        actor,
+-        &department,
+-        lead,
+-    ))
+-    .await?;
+-    if let Some(lead) = lead {
+-        assign_department_role_on(
+-            tx,
+-            templates,
+-            company,
+-            actor,
+-            department.id,
+-            DepartmentRole::Lead,
+-            lead,
+-        )
+-        .await?;
+-    }
+-    Ok(department)
+-}
+-
+-/// Apply an edit to a department under its row lock. The caller holds the company write lock.
+-pub(crate) async fn update_department_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    company: CompanyId,
+-    department: DepartmentId,
+-    edit: &DepartmentEdit,
+-) -> AppResult<Department> {
+-    let current = lock_department_on(tx, company, department).await?;
+-    let name = edit.name.clone().unwrap_or_else(|| current.name.clone());
+-    let slug = edit
+-        .slug
+-        .clone()
+-        .unwrap_or_else(|| current.slug.to_string());
+-    let description = edit
+-        .description
+-        .clone()
+-        .unwrap_or_else(|| current.description.clone());
+-    let charter = edit
+-        .charter
+-        .clone()
+-        .unwrap_or_else(|| current.charter.clone());
+-    let parent_id = edit.parent_id.unwrap_or(current.parent_id);
+-    if parent_id != current.parent_id
+-        && let Some(parent) = parent_id
+-    {
+-        let parent = lock_parent_on(tx, company, parent).await?;
+-        check_shape_on(tx, company, department, &name, &parent).await?;
+-    }
+-    let updated = sqlx::query_as::<_, DepartmentDb>(&format!(
+-        "UPDATE departments AS department \
+-            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7 \
+-          WHERE department.company_id = $1 AND department.id = $2 \
+-         RETURNING {DEPARTMENT_COLUMNS}"
+-    ))
+-    .bind(company.as_uuid())
+-    .bind(department.as_uuid())
+-    .bind(&name)
+-    .bind(&slug)
+-    .bind(&description)
+-    .bind(&charter)
+-    .bind(parent_id.map(DepartmentId::as_uuid))
+-    .fetch_one(&mut **tx)
+-    .await
+-    .map_err(|error| slug_conflict(error, &slug))?;
+-    let updated = Department::try_from(updated)?;
+-    // The moved department's desks gain a new parent lead; the old and the new parent's desks
+-    // lose and gain it as a child lead (01DEP-C002).
+-    if updated.parent_id != current.parent_id {
+-        let mut reach = vec![department];
+-        reach.extend(current.parent_id);
+-        reach.extend(updated.parent_id);
+-        sync_department_grants_on(tx, company, &reach).await?;
+-    }
+-    Ok(updated)
+-}
+-
+-/// Delete a department that has no child departments; its members and roles go with it. The
+-/// caller holds the company write lock.
+-pub(crate) async fn delete_department_on(
+-    tx: &mut Transaction<'_, Postgres>,
+-    company: CompanyId,
+-    department: DepartmentId,
+-) -> AppResult<()> {
+-    let current = lock_department_on(tx, company, department).await?;
+-    let has_children: bool = sqlx::query_scalar(
+-        "SELECT EXISTS (SELECT 1 FROM departments AS child \
+-                         WHERE child.company_id = $1 AND child.parent_id = $2)",
+-    )
+-    .bind(company.as_uuid())
+-    .bind(department.as_uuid())
+-    .fetch_one(&mut **tx)
+-    .await?;
+-    if has_children {
+-        return Err(AppError::Conflict(format!(
+-            "Department '{}' still has child departments. Move or delete them first.",
+-            current.name
+-        )));
+-    }
+-    let owns_desks: bool = sqlx::query_scalar(
+-        "SELECT EXISTS (SELECT 1 FROM channels AS desk \
+-                         WHERE desk.company_id = $1 AND desk.department_id = $2)",
+-    )
+-    .bind(company.as_uuid())
+-    .bind(department.as_uuid())
+-    .fetch_one(&mut **tx)
+-    .await?;
+-    if owns_desks {
+-        return Err(AppError::Conflict(format!(
+-            "Department '{}' still owns desks. Move them to another department or delete them first.",
+-            current.name
+-        )));
+-    }
+-    // Its member and role rows cascade with it: lock their principals first, as row deletes do.
+-    let placed: Vec<Uuid> = sqlx::query_scalar(
+-        "SELECT member.principal_id FROM department_members AS member \
+-          WHERE member.company_id = $1 AND member.department_id = $2 \
+-         UNION \
+-         SELECT holder.principal_id FROM department_roles AS holder \
+-          WHERE holder.company_id = $1 AND holder.department_id = $2 \
+-         ORDER BY 1",
+-    )
+-    .bind(company.as_uuid())
+-    .bind(department.as_uuid())
+-    .fetch_all(&mut **tx)
+-    .await?;
+-    lock_principals_on(tx, company, &placed).await?;
+-    sqlx::query("DELETE FROM departments WHERE company_id = $1 AND id = $2")
+-        .bind(company.as_uuid())
+-        .bind(department.as_uuid())
+-        .execute(&mut **tx)
+-        .await
+-        .map_err(|error| {
+-            if error
+-                .as_database_error()
+-                .is_some_and(|database| database.is_foreign_key_violation())
+-            {
+-                AppError::Conflict(format!(
+-                    "Department '{}' is still referenced and cannot be deleted.",
+-                    current.name
+-                ))
+-            } else {
+-                AppError::from(error)
+-            }
+-        })?;
+-    // Its lead was a child lead of the parent's desks.
+-    if let Some(parent) = current.parent_id {
+-        sync_department_grants_on(tx, company, &[parent]).await?;
+-    }
+-    // Its desk is gone or detached by now (it owned none); so goes the record of it.
+-    sqlx::query(
+-        "DELETE FROM workflow_provisioning_commands WHERE company_id = $1 AND command_key = $2",
+-    )
+-    .bind(company.as_uuid())
+-    .bind(department_desk_key(department))
+-    .execute(&mut **tx)
+-    .await?;
+-    Ok(())
+-}
+-
+ /// Give `principal` the role. A single-holder role replaces its current holder in this same
+ /// transaction, so the one-lead index is never the person's error. Assigning the current holder
+ /// again changes nothing. The caller holds the company write lock.
+diff --git a/src/adapters/persistence/department_desks.rs b/src/adapters/persistence/department_desks.rs
+index 6b1c52b7..e4b0f93b 100644
+--- a/src/adapters/persistence/department_desks.rs
++++ b/src/adapters/persistence/department_desks.rs
+@@ -388,6 +388,9 @@ pub(crate) async fn set_desk_ownership_on(
+             .map_err(|error| AppError::Internal(error.to_string()))?
+     };
+     let mode = target.stored_mode(from_emails)?;
++    if target.department_id.is_none() {
++        super::workflow::role_binding::check_detach_on(tx, company, desk).await?;
++    }
+     sqlx::query(
+         "UPDATE channels SET department_id = $3, members_only = $4, access_mode = $5, \
+                 settings_revision = settings_revision + 1 \
+diff --git a/src/adapters/persistence/workflow/admission_tests.rs b/src/adapters/persistence/workflow/admission_tests.rs
+index 39d17831..61ddaaa7 100644
+--- a/src/adapters/persistence/workflow/admission_tests.rs
++++ b/src/adapters/persistence/workflow/admission_tests.rs
+@@ -23,6 +23,8 @@ mod history_reader_tests;
+ pub(in crate::adapters::persistence::workflow) mod lease_tests;
+ #[path = "model_usage_tests.rs"]
+ mod model_usage_tests;
++#[path = "role_snapshot_tests.rs"]
++mod role_snapshot_tests;
+ #[path = "run_board_tests.rs"]
+ mod run_board_tests;
+ #[path = "run_finished_at_tests.rs"]
+diff --git a/src/adapters/persistence/workflow/agent_manifest/capture.rs b/src/adapters/persistence/workflow/agent_manifest/capture.rs
+index ecd81d28..7c487b19 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/capture.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/capture.rs
+@@ -40,9 +40,9 @@ impl Closure {
+             },
+         )
+         .await?;
+-        Ok(crate::application::agent::dependency::workflow_edges(
+-            &bundle,
+-        ))
++        let mut edges = crate::application::agent::dependency::workflow_edges(&bundle);
++        edges.extend(self.role_edges_on(tx, &bundle).await?);
++        Ok(edges)
+     }
+ 
+     pub(super) async fn agent_edges(
+diff --git a/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs b/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+index be7ccfc1..db194329 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/capture_tests.rs
+@@ -16,6 +16,9 @@ async fn autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_
+             .map(|_| (VersionId::new(Uuid::new_v4()), workflow))
+             .collect(),
+         deadline: Instant::now() + Duration::from_secs(5),
++        association: RelatedAssociation::Company,
++        role_facts: None,
++        roles: BTreeMap::new(),
+     };
+     let new_workflow = Node::Workflow(workflow, VersionId::new(Uuid::new_v4()));
+     let new_agent = Node::Agent(AgentId::new(Uuid::new_v4()), AgentUseMode::Tools);
+diff --git a/src/adapters/persistence/workflow/agent_manifest/mod.rs b/src/adapters/persistence/workflow/agent_manifest/mod.rs
+index 447cbdcd..3bddbc4b 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/mod.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/mod.rs
+@@ -10,12 +10,14 @@ use std::collections::BTreeMap;
+ use std::time::{Duration, Instant};
+ 
+ mod capture;
++mod roles;
+ mod storage;
+ #[cfg(test)]
+ #[path = "capture_tests.rs"]
+ mod tests;
+ pub(super) use storage::{
+-    attach_child_on, execution_selection_on, persist_on, selected_on, workflow_bundle_on,
++    agent_for_step_on, attach_child_on, execution_selection_on, persist_on, selected_on,
++    workflow_bundle_on,
+ };
+ 
+ struct Closure {
+@@ -25,6 +27,9 @@ struct Closure {
+     agents: BTreeMap<AgentId, AgentRevisionId>,
+     workflows: BTreeMap<VersionId, WorkflowId>,
+     deadline: Instant,
++    association: RelatedAssociation,
++    role_facts: Option<roles::RoleFacts>,
++    roles: BTreeMap<(VersionId, StepId), roles::RoleCapture>,
+ }
+ 
+ fn refused() -> AppError {
+@@ -55,15 +60,24 @@ pub(super) async fn capture_on(
+         agents: BTreeMap::new(),
+         workflows: BTreeMap::new(),
+         deadline: Instant::now() + Duration::from_secs(5),
++        association: command.association(),
++        role_facts: None,
++        roles: BTreeMap::new(),
+     };
+     sqlx::query("SELECT set_config('lock_timeout','1000ms',true),set_config('statement_timeout','5000ms',true)")
+         .execute(&mut **tx).await?;
+-    tokio::time::timeout(
++    let roles = tokio::time::timeout(
+         Duration::from_secs(5),
+-        closure.walk(
+-            tx,
+-            Node::Workflow(definition.workflow_id, definition.version_id),
+-        ),
++        // Keep the bounded graph/capture query futures off the admission poll stack.
++        Box::pin(async {
++            closure
++                .walk(
++                    tx,
++                    Node::Workflow(definition.workflow_id, definition.version_id),
++                )
++                .await?;
++            closure.finish_roles_on(tx).await
++        }),
+     )
+     .await
+     .map_err(|_| AppError::Timeout("Agent dependency capture exceeded five seconds".into()))??;
+@@ -86,6 +100,7 @@ pub(super) async fn capture_on(
+                 version_id,
+             })
+             .collect(),
++        roles,
+     };
+     manifest.canonical_content()?;
+     Ok(manifest)
+@@ -130,7 +145,10 @@ impl Closure {
+         self.check_node_capacity(node)?;
+         let children = match node {
+             Node::Workflow(workflow, version) => self.workflow_edges(tx, workflow, version).await?,
+-            Node::Agent(agent, mode) => self.agent_edges(tx, agent, mode).await?,
++            Node::Agent(agent, mode) => self
++                .agent_edges(tx, agent, mode)
++                .await
++                .map_err(|error| self.role_agent_error(agent, error))?,
+         };
+         self.within_bound()?;
+         Ok(children)
+diff --git a/src/adapters/persistence/workflow/agent_manifest/storage.rs b/src/adapters/persistence/workflow/agent_manifest/storage.rs
+index 76fab55f..ec635f12 100644
+--- a/src/adapters/persistence/workflow/agent_manifest/storage.rs
++++ b/src/adapters/persistence/workflow/agent_manifest/storage.rs
+@@ -22,7 +22,16 @@ pub(in crate::adapters::persistence::workflow) async fn persist_on(
+             .execute(&mut *db).await?;
+     }
+     sqlx::query("INSERT INTO run_dependency_manifests(company_id,run_id,root_run_id,manifest_id) VALUES($1,$2,$2,$3)")
+-        .bind(company).bind(root).bind(id.as_uuid()).execute(db).await?;
++        .bind(company).bind(root).bind(id.as_uuid()).execute(&mut *db).await?;
++    for role in &manifest.roles {
++        for principal in &role.principals {
++            sqlx::query("INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
++                .bind(company).bind(root).bind(id.as_uuid()).bind(role.version_id.as_uuid())
++                .bind(role.step.as_str()).bind(role.role.as_str()).bind(role.department_id.as_uuid())
++                .bind(principal.principal_id.as_uuid()).bind(principal.agent_id.map(|agent| agent.as_uuid()))
++                .bind(principal.revision_id.map(|revision| revision.as_uuid())).execute(&mut *db).await?;
++        }
++    }
+     Ok(id)
+ }
+ 
+@@ -129,21 +138,74 @@ pub(in crate::adapters::persistence::workflow) async fn execution_selection_on(
+     } else {
+         AgentUseMode::ModelOnly
+     };
++    let agent = agent_for_step_on(db, scope.company, scope.run, bundle, &step, &inputs).await?;
++    let selection = selected_on(db, scope.company, scope.run, actor, agent).await?;
++    Ok(match mode {
++        AgentUseMode::Tools => selection,
++        AgentUseMode::ModelOnly => selection.model_only(),
++    })
++}
++
++/// One selector for execution, checkpoints and inspection. Role authority is the sealed root
++/// capture, indexed by version as well as step; current department tables are never read here.
++pub(in crate::adapters::persistence::workflow) async fn agent_for_step_on(
++    db: &mut PgConnection,
++    company: CompanyId,
++    run: RunId,
++    bundle: &PublishedBundle,
++    step: &StepId,
++    inputs: &serde_json::Value,
++) -> AppResult<AgentId> {
++    let definition = bundle.compiled().graph().definition();
++    let kind = definition
++        .steps
++        .get(step)
++        .and_then(|step| {
++            crate::application::workflow::registry::ModelStep::of(step.step_type.as_str())
++        })
++        .ok_or_else(missing)?;
++    let mode = if kind.uses_capabilities() {
++        AgentUseMode::Tools
++    } else {
++        AgentUseMode::ModelOnly
++    };
++    if let Some(reference) = bundle
++        .compiled()
++        .role_references()
++        .iter()
++        .find(|reference| &reference.step == step)
++    {
++        if reference.mode != mode
++            || inputs["role"].as_str() != Some(reference.role.as_str())
++            || inputs.get("agent").is_some()
++        {
++            return Err(missing());
++        }
++        let agent: Uuid = sqlx::query_scalar(
++            "SELECT role_binding.agent_id FROM run_dependency_manifests AS ownership \
++             JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \
++               AND role_binding.run_id=ownership.root_run_id AND role_binding.manifest_id=ownership.manifest_id \
++             JOIN agent_manifest_revisions AS selection ON selection.company_id=role_binding.company_id \
++               AND selection.manifest_id=role_binding.manifest_id AND selection.agent_id=role_binding.agent_id \
++               AND selection.revision_id=role_binding.agent_revision_id \
++             WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND role_binding.version_id=$3 \
++               AND role_binding.step=$4 AND role_binding.role=$5 AND role_binding.resolution_revision=0 \
++               AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection",
++        ).bind(company.as_uuid()).bind(run.as_uuid()).bind(definition.version_id.as_uuid())
++            .bind(step.as_str()).bind(reference.role.as_str()).fetch_optional(db).await?.ok_or_else(missing)?;
++        return Ok(AgentId::new(agent));
++    }
+     let key = inputs["agent"]
+         .as_str()
+         .and_then(crate::application::agent::AgentKey::parse)
+         .ok_or_else(missing)?;
+-    let reference = bundle.agent_reference(scope.company, &key)?;
++    let reference = bundle.agent_reference(company, &key)?;
+     if !reference
+         .uses
+         .iter()
+-        .any(|usage| usage.step == step && usage.mode == mode)
++        .any(|usage| &usage.step == step && usage.mode == mode)
+     {
+         return Err(missing());
+     }
+-    let selection = selected_on(db, scope.company, scope.run, actor, reference.agent_id).await?;
+-    Ok(match mode {
+-        AgentUseMode::Tools => selection,
+-        AgentUseMode::ModelOnly => selection.model_only(),
+-    })
++    Ok(reference.agent_id)
+ }
+diff --git a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+index b4a93928..f53d198a 100644
+--- a/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
++++ b/src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+@@ -154,6 +154,7 @@ pub(super) async fn manifest_for(
+     .await
+     .unwrap();
+     DependencyManifest {
++        roles: vec![],
+         company_id: f.binding.target.company,
+         root_run_id: run,
+         agents: vec![AgentRevisionSelection {
+diff --git a/src/adapters/persistence/workflow/bindings.rs b/src/adapters/persistence/workflow/bindings.rs
+index 04070944..fb8e13ae 100644
+--- a/src/adapters/persistence/workflow/bindings.rs
++++ b/src/adapters/persistence/workflow/bindings.rs
+@@ -50,6 +50,9 @@ pub(super) async fn save_binding_on(
+     // All workflow lifecycle mutations serialize on company before their heads.
+     let current = read_binding(tx, company, configuration.id()).await?;
+     let change = validate_change(command, current.as_ref())?;
++    if state.active {
++        super::role_binding::check_on(tx, configuration, state.association).await?;
++    }
+     if !matches!(change, Change::Deactivate) {
+         verify_selection(tx, configuration).await?;
+         resources::check_readiness(tx, configuration.as_ref().into()).await?;
+diff --git a/src/adapters/persistence/workflow/board_reads.rs b/src/adapters/persistence/workflow/board_reads.rs
+index dc8c0ce0..eeb60e0f 100644
+--- a/src/adapters/persistence/workflow/board_reads.rs
++++ b/src/adapters/persistence/workflow/board_reads.rs
+@@ -63,13 +63,21 @@ fn push_scope(
+         query
+             .push(keyword)
+             .push(
+-                "version_id IN (SELECT version.id FROM workflow_versions AS version \
++                "(version_id IN (SELECT version.id FROM workflow_versions AS version \
+                  WHERE version.company_id = ",
+             )
+             .push_bind(company.as_uuid())
+             .push(" AND ")
+             .push_bind(agent)
+             .push(" = ANY(version.agent_ids))");
++        query.push(" OR ");
++        super::reads::push_role_agent_scope(
++            query,
++            company,
++            agent,
++            super::reads::RoleAgentScope::BoardWindow,
++        );
++        query.push(")");
+         keyword = " AND ";
+     }
+     if let Some(department) = scope.department {
+@@ -90,7 +98,7 @@ pub(super) fn board_counts_query(
+     cutoff: DateTime<Utc>,
+ ) -> QueryBuilder<'static, Postgres> {
+     let working =
+-        "SELECT state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
++        "SELECT id, state, channel_id, binding_id, workflow_id, version_id FROM workflow_runs";
+     let mut query = QueryBuilder::new(format!(
+         "WITH working AS MATERIALIZED ({working} WHERE company_id = "
+     ));
+@@ -104,7 +112,7 @@ pub(super) fn board_counts_query(
+         .push_bind(cutoff)
+         .push(
+             " AND parent_run_id IS NULL) \
+-             SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working",
++             SELECT state, channel_id, COUNT(*)::bigint AS runs FROM working AS run_scope",
+         );
+     push_scope(&mut query, company, scope);
+     query.push(" GROUP BY state, channel_id");
+@@ -140,7 +148,7 @@ pub(super) fn board_cards_query(
+         }
+         query.push(format!("(SELECT {RUN_COLUMNS} FROM "));
+         if scoped(scope) {
+-            query.push(state.as_str());
++            query.push(state.as_str()).push(" AS run_scope");
+             push_scope(&mut query, company, scope);
+         } else {
+             push_column(&mut query, company, state, cutoff, visible);
+diff --git a/src/adapters/persistence/workflow/knowledge_checkpoint.rs b/src/adapters/persistence/workflow/knowledge_checkpoint.rs
+index d466eabd..0c317925 100644
+--- a/src/adapters/persistence/workflow/knowledge_checkpoint.rs
++++ b/src/adapters/persistence/workflow/knowledge_checkpoint.rs
+@@ -1,7 +1,6 @@
+ //! A local read commits directly into the canonical harness invocation. The driver's normal
+ //! result update then observes the exact AlreadyApplied value, without a second state machine.
+ use super::*;
+-use crate::application::agent::AgentKey;
+ use crate::{
+     application::{
+         knowledge::search::KnowledgeObservation,
+@@ -233,19 +232,22 @@ pub(super) async fn frozen_selection(
+     {
+         return Err(missing());
+     }
+-    let key = row
+-        .frozen_inputs
+-        .get("agent")
+-        .and_then(Value::as_str)
+-        .and_then(AgentKey::parse)
+-        .ok_or_else(missing)?;
++    let agent = super::super::agent_manifest::agent_for_step_on(
++        tx,
++        scope.company,
++        scope.run,
++        &facts.bundle,
++        &step,
++        &row.frozen_inputs,
++    )
++    .await?;
+     Ok(FrozenSelection {
+         selection: super::super::agent_manifest::selected_on(
+             tx,
+             scope.company,
+             scope.run,
+             facts.actor,
+-            facts.bundle.agent_reference(scope.company, &key)?.agent_id,
++            agent,
+         )
+         .await?,
+         access: KnowledgeSearchAccess {
+diff --git a/src/adapters/persistence/workflow/message_ingress_tests.rs b/src/adapters/persistence/workflow/message_ingress_tests.rs
+index adc420b2..18674f57 100644
+--- a/src/adapters/persistence/workflow/message_ingress_tests.rs
++++ b/src/adapters/persistence/workflow/message_ingress_tests.rs
+@@ -35,6 +35,9 @@ mod schedule_runtime_tests;
+ #[path = "provisioning_runtime_tests.rs"]
+ mod provisioning_runtime_tests;
+ 
++#[path = "role_runtime_tests.rs"]
++mod role_runtime_tests;
++
+ #[path = "reviewed_delivery_tests.rs"]
+ mod reviewed_delivery_tests;
+ 
+diff --git a/src/adapters/persistence/workflow/message_intent_tests.rs b/src/adapters/persistence/workflow/message_intent_tests.rs
+index 28bd01e6..3ff06e80 100644
+--- a/src/adapters/persistence/workflow/message_intent_tests.rs
++++ b/src/adapters/persistence/workflow/message_intent_tests.rs
+@@ -1478,6 +1478,7 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message()
+                 assert!(!run.executions.is_empty(), "the admitted first step");
+                 assert!(run.model_usage.is_empty());
+             }
++            BindingOutcome::RoleRefused(_) => panic!("no role admission was configured"),
+             BindingOutcome::Failed { .. } => panic!("no admission failed"),
+         }
+     }
+diff --git a/src/adapters/persistence/workflow/message_intents.rs b/src/adapters/persistence/workflow/message_intents.rs
+index b2ad7919..82e955ed 100644
+--- a/src/adapters/persistence/workflow/message_intents.rs
++++ b/src/adapters/persistence/workflow/message_intents.rs
+@@ -10,6 +10,45 @@ use crate::domain::entities::message::CanonicalMessageId;
+ use crate::domain::entities::transport::RecipientRole;
+ use chrono::{DateTime, Utc};
+ 
++struct OutcomeWrite {
++    name: &'static str,
++    run: Option<Uuid>,
++    reason: Option<&'static str>,
++    role_refusal: Option<serde_json::Value>,
++}
++
++impl TryFrom<BindingOutcome> for OutcomeWrite {
++    type Error = AppError;
++    fn try_from(outcome: BindingOutcome) -> AppResult<Self> {
++        Ok(match outcome {
++            BindingOutcome::Admitted(run) => Self {
++                name: "admitted",
++                run: Some(run.as_uuid()),
++                reason: None,
++                role_refusal: None,
++            },
++            BindingOutcome::Refused(reason) => Self {
++                name: "refused",
++                run: None,
++                reason: Some(reason),
++                role_refusal: None,
++            },
++            BindingOutcome::Failed(reason) => Self {
++                name: "failed",
++                run: None,
++                reason: Some(reason),
++                role_refusal: None,
++            },
++            BindingOutcome::RoleRefused(refusal) => Self {
++                name: "refused",
++                run: None,
++                reason: Some(refusal.kind.code()),
++                role_refusal: Some(serde_json::to_value(refusal).map_err(|_| invalid())?),
++            },
++        })
++    }
++}
++
+ #[derive(sqlx::FromRow)]
+ struct IntentRow {
+     company_id: Uuid,
+@@ -245,16 +284,12 @@ impl MessageIntentQueue for PostgresPersistence {
+         binding: &CandidateBinding,
+         outcome: BindingOutcome,
+     ) -> AppResult<bool> {
+-        let (name, run, reason) = match outcome {
+-            BindingOutcome::Admitted(run) => ("admitted", Some(run.as_uuid()), None),
+-            BindingOutcome::Refused(reason) => ("refused", None, Some(reason)),
+-            BindingOutcome::Failed(reason) => ("failed", None, Some(reason)),
+-        };
++        let outcome = OutcomeWrite::try_from(outcome)?;
+         let written = sqlx::query(&format!(
+             "WITH fence AS ({FENCE}) \
+              INSERT INTO workflow_message_intent_bindings \
+-               (company_id, intent_id, binding_id, binding_revision, outcome, run_id, reason) \
+-             SELECT $1, fence.id, $5, $6, $7, $8, $9 FROM fence \
++               (company_id, intent_id, binding_id, binding_revision, outcome, run_id, reason, role_refusal) \
++             SELECT $1, fence.id, $5, $6, $7, $8, $9, $10 FROM fence \
+              ON CONFLICT (company_id, intent_id, binding_id) DO NOTHING"
+         ))
+         .bind(claim.company.as_uuid())
+@@ -263,9 +298,10 @@ impl MessageIntentQueue for PostgresPersistence {
+         .bind(claim.generation)
+         .bind(binding.id.as_uuid())
+         .bind(revision(binding.revision.get())?)
+-        .bind(name)
+-        .bind(run)
+-        .bind(reason)
++        .bind(outcome.name)
++        .bind(outcome.run)
++        .bind(outcome.reason)
++        .bind(outcome.role_refusal)
+         .execute(&self.pool)
+         .await?;
+         if written.rows_affected() == 1 {
+diff --git a/src/adapters/persistence/workflow/message_outcomes.rs b/src/adapters/persistence/workflow/message_outcomes.rs
+index 0a9d9f46..5759cbcc 100644
+--- a/src/adapters/persistence/workflow/message_outcomes.rs
++++ b/src/adapters/persistence/workflow/message_outcomes.rs
+@@ -17,7 +17,7 @@ use crate::{
+ /// intent per channel and an intent one outcome per binding.
+ pub(crate) const MESSAGE_OUTCOMES_SQL: &str = r#"
+ SELECT intent.message_id, outcome.binding_id, version.title AS workflow_title, outcome.outcome,
+-       outcome.reason, outcome.run_id, run.state, run.waiting_reason
++       outcome.reason, outcome.run_id, run.state, run.waiting_reason, outcome.role_refusal
+   FROM workflow_message_intents AS intent
+   JOIN workflow_message_intent_bindings AS outcome
+     ON (outcome.company_id, outcome.intent_id) = (intent.company_id, intent.id)
+@@ -69,6 +69,7 @@ struct OutcomeRow {
+     run_id: Option<Uuid>,
+     state: Option<String>,
+     waiting_reason: Option<String>,
++    role_refusal: Option<serde_json::Value>,
+ }
+ 
+ #[derive(sqlx::FromRow)]
+@@ -144,7 +145,18 @@ impl MessageOutcomeReader for PostgresPersistence {
+                         project_outcome(&mut run, visibility);
+                         run
+                     }),
+-                    ("refused", None, Some(reason)) => BindingOutcome::Refused { reason },
++                    ("refused", None, Some(reason)) => {
++                        if let Some(value) = row.role_refusal {
++                            let refusal: crate::entities::department::RoleAdmissionRefusal =
++                                serde_json::from_value(value).map_err(|_| invalid())?;
++                            if refusal.kind.code() != reason {
++                                return Err(invalid());
++                            }
++                            BindingOutcome::RoleRefused(refusal)
++                        } else {
++                            BindingOutcome::Refused { reason }
++                        }
++                    }
+                     ("failed", None, Some(reason)) => BindingOutcome::Failed { reason },
+                     _ => return Err(invalid()),
+                 };
+diff --git a/src/adapters/persistence/workflow/mod.rs b/src/adapters/persistence/workflow/mod.rs
+index 5d4f4173..7dab5395 100644
+--- a/src/adapters/persistence/workflow/mod.rs
++++ b/src/adapters/persistence/workflow/mod.rs
+@@ -86,6 +86,8 @@ pub mod provisioning;
+ mod reads;
+ mod reply_waits;
+ mod resources;
++pub(crate) mod role_binding;
++mod role_views;
+ mod rows;
+ mod run_provenance;
+ mod run_views;
+diff --git a/src/adapters/persistence/workflow/reads.rs b/src/adapters/persistence/workflow/reads.rs
+index 660cf12e..136641e9 100644
+--- a/src/adapters/persistence/workflow/reads.rs
++++ b/src/adapters/persistence/workflow/reads.rs
+@@ -130,6 +130,8 @@ pub(super) const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, c
+ 
+ pub(super) fn run_summary(row: RunRow) -> AppResult<RunSummary> {
+     Ok(RunSummary {
++        role_holders: Vec::new(),
++        role_holders_truncated: false,
+         run: RunId::new(row.id),
+         binding: WorkflowBindingId::new(row.binding_id),
+         workflow: WorkflowId::new(row.workflow_id),
+@@ -167,12 +169,19 @@ fn run_list_query(
+ ) -> QueryBuilder<'static, Postgres> {
+     let mut query = QueryBuilder::new("");
+     let Some(agent) = filter.agent else {
+-        push_run_page(&mut query, company, None, filter, cursor, limit);
++        push_run_page(
++            &mut query,
++            company,
++            RunPageSelection::All,
++            filter,
++            cursor,
++            limit,
++        );
+         return query;
+     };
+     query
+         .push(format!(
+-            "SELECT {RUN_COLUMNS} FROM (SELECT version.id AS used_version \
++            "SELECT {RUN_COLUMNS} FROM ((SELECT {RUN_COLUMNS} FROM (SELECT version.id AS used_version \
+              FROM workflow_versions AS version WHERE version.company_id = "
+         ))
+         .push_bind(company.as_uuid())
+@@ -182,7 +191,7 @@ fn run_list_query(
+     push_run_page(
+         &mut query,
+         company,
+-        Some("agent_versions.used_version"),
++        RunPageSelection::Version("agent_versions.used_version"),
+         filter,
+         cursor,
+         limit,
+@@ -190,7 +199,54 @@ fn run_list_query(
+     query
+         .push(") AS run ORDER BY created_at DESC, id DESC LIMIT ")
+         .push_bind(limit);
++    query.push(") UNION (");
++    push_run_page(
++        &mut query,
++        company,
++        RunPageSelection::RoleAgent(agent),
++        filter,
++        cursor,
++        limit,
++    );
+     query
++        .push(")) AS matching_runs ORDER BY created_at DESC, id DESC LIMIT ")
++        .push_bind(limit);
++    query
++}
++
++enum RunPageSelection {
++    All,
++    Version(&'static str),
++    RoleAgent(Uuid),
++}
++
++pub(super) enum RoleAgentScope {
++    List,
++    BoardWindow,
++}
++
++/// Role selections belong to the root capture and are inherited by its child runs.
++pub(super) fn push_role_agent_scope(
++    query: &mut QueryBuilder<'static, Postgres>,
++    company: CompanyId,
++    agent: Uuid,
++    scope: RoleAgentScope,
++) {
++    query.push(match scope {
++        RoleAgentScope::List => "id IN (SELECT ownership.run_id ",
++        RoleAgentScope::BoardWindow => "EXISTS (SELECT 1 ",
++    });
++    query.push("FROM run_dependency_manifests AS ownership \
++        JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \
++          AND role_binding.run_id=ownership.root_run_id AND role_binding.manifest_id=ownership.manifest_id \
++        WHERE ownership.company_id=").push_bind(company.as_uuid())
++        .push(" AND role_binding.agent_id=").push_bind(agent).push(" AND role_binding.resolution_revision=0");
++    if matches!(scope, RoleAgentScope::BoardWindow) {
++        // The board already materialized its bounded window. Preserve correlation so a generic
++        // plan probes each visible run rather than rebuilding the agent's entire history six times.
++        query.push(" AND ownership.run_id=run_scope.id OFFSET 0");
++    }
++    query.push(")");
+ }
+ 
+ /// One newest-first page of the company's runs with the filters present — only those, because a
+@@ -200,7 +256,7 @@ fn run_list_query(
+ fn push_run_page(
+     query: &mut QueryBuilder<'static, Postgres>,
+     company: CompanyId,
+-    version: Option<&'static str>,
++    selection: RunPageSelection,
+     filter: &RunFilter,
+     cursor: Option<(DateTime<Utc>, Uuid)>,
+     limit: i64,
+@@ -210,8 +266,15 @@ fn push_run_page(
+             "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = "
+         ))
+         .push_bind(company.as_uuid());
+-    if let Some(version) = version {
+-        query.push(format!(" AND version_id = {version}"));
++    match selection {
++        RunPageSelection::All => {}
++        RunPageSelection::Version(version) => {
++            query.push(format!(" AND version_id = {version}"));
++        }
++        RunPageSelection::RoleAgent(agent) => {
++            query.push(" AND ");
++            push_role_agent_scope(query, company, agent, RoleAgentScope::List);
++        }
+     }
+     if let Some(binding) = filter.binding {
+         query
+@@ -450,16 +513,17 @@ impl WorkflowReads for PostgresPersistence {
+             .build_query_as::<RunRow>()
+             .fetch_all(self.pool())
+             .await?;
+-        warn_if_run_list_is_slow(company, filter, page.size, rows.len(), started.elapsed());
+-        let rows = rows
++        let mut rows = rows
+             .into_iter()
+             .map(run_summary)
+             .collect::<AppResult<Vec<_>>>()?;
++        super::role_views::populate(self, company, &mut rows).await?;
++        warn_if_run_list_is_slow(company, filter, page.size, rows.len(), started.elapsed());
+         Ok(paged(rows, page.size))
+     }
+ 
+     async fn run_summary(&self, company: CompanyId, run: RunId) -> AppResult<Option<RunSummary>> {
+-        sqlx::query_as::<_, RunRow>(&format!(
++        let mut summary = sqlx::query_as::<_, RunRow>(&format!(
+             "SELECT {RUN_COLUMNS} FROM workflow_runs WHERE company_id = $1 AND id = $2"
+         ))
+         .bind(company.as_uuid())
+@@ -467,7 +531,11 @@ impl WorkflowReads for PostgresPersistence {
+         .fetch_optional(self.pool())
+         .await?
+         .map(run_summary)
+-        .transpose()
++        .transpose()?;
++        if let Some(summary) = &mut summary {
++            super::role_views::populate(self, company, std::slice::from_mut(summary)).await?;
++        }
++        Ok(summary)
+     }
+ 
+     async fn run_board_counts(
+@@ -501,13 +569,15 @@ impl WorkflowReads for PostgresPersistence {
+         if visible.is_empty() {
+             return Ok(Vec::new());
+         }
+-        board_reads::board_cards_query(company, scope, cutoff, visible)
++        let mut rows = board_reads::board_cards_query(company, scope, cutoff, visible)
+             .build_query_as::<RunRow>()
+             .fetch_all(self.pool())
+             .await?
+             .into_iter()
+             .map(run_summary)
+-            .collect()
++            .collect::<AppResult<Vec<_>>>()?;
++        super::role_views::populate(self, company, &mut rows).await?;
++        Ok(rows)
+     }
+ 
+     async fn child_rollup(
+diff --git a/src/adapters/persistence/workflow/reads_tests.rs b/src/adapters/persistence/workflow/reads_tests.rs
+index e5b1d64b..4bc1b924 100644
+--- a/src/adapters/persistence/workflow/reads_tests.rs
++++ b/src/adapters/persistence/workflow/reads_tests.rs
+@@ -37,6 +37,24 @@ fn parameters(shape: &Shape) -> Vec<(&'static str, &'static str)> {
+     if agent {
+         // The merge of the per-version ranges takes the same page size.
+         parameters.push(("limit", " LIMIT "));
++        parameters.push(("company", "FROM workflow_runs WHERE company_id = "));
++        parameters.push(("company", "WHERE ownership.company_id="));
++        parameters.push(("agent", " AND role_binding.agent_id="));
++        if shape.filter.binding.is_some() {
++            parameters.push(("binding", " AND binding_id = "));
++        }
++        if shape.filter.workflow.is_some() {
++            parameters.push(("workflow", " AND workflow_id = "));
++        }
++        if shape.filter.state.is_some() {
++            parameters.push(("state", " AND state = "));
++        }
++        if shape.cursor {
++            parameters.push(("cursor_created", " AND (created_at, id) < ("));
++            parameters.push(("cursor_id", ", "));
++        }
++        parameters.push(("limit", " LIMIT "));
++        parameters.push(("limit", " LIMIT "));
+     }
+     parameters
+ }
+@@ -135,7 +153,8 @@ fn run_list_query_binds_each_present_filter_once_in_placeholder_order() {
+         // each version's range when an agent is present.
+         assert_eq!(
+             sql.matches(" AND parent_run_id IS NULL").count(),
+-            usize::from(shape.filter.lineage == RunLineage::TopLevel),
++            usize::from(shape.filter.lineage == RunLineage::TopLevel)
++                * if shape.filter.agent.is_some() { 2 } else { 1 },
+             "{}: {sql}",
+             shape.name
+         );
+@@ -194,6 +213,8 @@ fn board_scope_parameters(
+     if scope.agent.is_some() {
+         parameters.push(("company", "WHERE version.company_id = "));
+         parameters.push(("agent", " AND "));
++        parameters.push(("company", "WHERE ownership.company_id="));
++        parameters.push(("agent", " AND role_binding.agent_id="));
+     }
+ }
+ 
+diff --git a/src/adapters/persistence/workflow/run_provenance/mod.rs b/src/adapters/persistence/workflow/run_provenance/mod.rs
+index b2d7f559..418e3b6b 100644
+--- a/src/adapters/persistence/workflow/run_provenance/mod.rs
++++ b/src/adapters/persistence/workflow/run_provenance/mod.rs
+@@ -71,6 +71,7 @@ impl RevisionRow {
+             })
+             .collect::<Vec<_>>();
+         Ok(SelectedAgentSummary {
++            via_role: None,
+             manifest: DependencyManifestId::new(self.manifest_id),
+             agent_id: definition.agent_id,
+             revision_id: AgentRevisionId::new(self.id),
+diff --git a/src/adapters/persistence/workflow/run_views.rs b/src/adapters/persistence/workflow/run_views.rs
+index dd9e181e..95ade7d9 100644
+--- a/src/adapters/persistence/workflow/run_views.rs
++++ b/src/adapters/persistence/workflow/run_views.rs
+@@ -651,27 +651,60 @@ async fn selected_agent_summary(
+     run: RunId,
+     step: &StepRow,
+ ) -> AppResult<Option<SelectedAgentSummary>> {
+-    let Some(key) = step
+-        .frozen_inputs
+-        .as_ref()
+-        .and_then(|inputs| inputs["agent"].as_str())
+-        .and_then(crate::application::agent::AgentKey::parse)
+-    else {
++    let Some(inputs) = step.frozen_inputs.as_ref() else {
+         return Ok(None);
+     };
++    if inputs.get("agent").is_none() && inputs.get("role").is_none() {
++        return Ok(None);
++    }
+     let bundle = persistence
+         .run_bundle(company, run)
+         .await?
+         .ok_or_else(missing)?;
+-    let reference = bundle.agent_reference(company, &key)?;
++    let id = StepId::parse(&step.step_id).map_err(|_| invalid())?;
++    let definition = bundle.compiled().graph().definition();
++    let Some(kind) = definition
++        .steps
++        .get(&id)
++        .and_then(|step| registry::ModelStep::of(step.step_type.as_str()))
++    else {
++        return Ok(None);
++    };
++    let agent = super::agent_manifest::agent_for_step_on(
++        &mut *persistence.pool().acquire().await?,
++        company,
++        run,
++        &bundle,
++        &id,
++        inputs,
++    )
++    .await?;
+     let mut summary = persistence
+-        .selected_agent_metadata(company, run, reference.agent_id)
++        .selected_agent_metadata(company, run, agent)
+         .await?;
+-    summary.key = reference.key.as_str().to_owned();
+-    let model_only = !reference
+-        .uses
++    if bundle
++        .compiled()
++        .role_references()
+         .iter()
+-        .any(|usage| usage.step.as_str() == step.step_id && usage.mode == AgentUseMode::Tools);
++        .any(|reference| reference.step == id)
++    {
++        summary.via_role = Some(
++            super::role_views::for_step(persistence, company, run, definition.version_id, &id)
++                .await?
++                .ok_or_else(missing)?,
++        );
++    } else {
++        let key = inputs["agent"]
++            .as_str()
++            .and_then(crate::application::agent::AgentKey::parse)
++            .ok_or_else(missing)?;
++        summary.key = bundle
++            .agent_reference(company, &key)?
++            .key
++            .as_str()
++            .to_owned();
++    }
++    let model_only = !kind.uses_capabilities();
+     if model_only {
+         summary.tools.clear();
+         summary.skills.clear();
+diff --git a/src/adapters/persistence/workflow/schedule_tests.rs b/src/adapters/persistence/workflow/schedule_tests.rs
+index 03e8f35f..56e76396 100644
+--- a/src/adapters/persistence/workflow/schedule_tests.rs
++++ b/src/adapters/persistence/workflow/schedule_tests.rs
+@@ -551,7 +551,12 @@ async fn schedule_outcome_writes_are_fenced_by_the_claim() {
+         },
+     ] {
+         assert!(!s.p().record_run(stale, run).await.unwrap());
+-        assert!(!s.p().record_refusal(stale, "unavailable").await.unwrap());
++        assert!(
++            !s.p()
++                .record_refusal(stale, "unavailable", None)
++                .await
++                .unwrap()
++        );
+         assert_eq!(
+             s.p().record_error(stale, "lost").await.unwrap(),
+             ErrorRecorded::Lost
+@@ -1364,7 +1369,12 @@ async fn a_lapsed_but_unreclaimed_claim_still_records_its_outcome() {
+         worker,
+         generation: claimed[0].materialization_generation,
+     };
+-    assert!(s.p().record_refusal(claim, "unavailable").await.unwrap());
++    assert!(
++        s.p()
++            .record_refusal(claim, "unavailable", None)
++            .await
++            .unwrap()
++    );
+     let (_, status, _, refusal, _) = s.occurrences(schedule.id).await[0].clone();
+     assert_eq!(
+         (status.as_str(), refusal.as_deref()),
+diff --git a/src/adapters/persistence/workflow/schedules.rs b/src/adapters/persistence/workflow/schedules.rs
+index 3d755c47..337a4400 100644
+--- a/src/adapters/persistence/workflow/schedules.rs
++++ b/src/adapters/persistence/workflow/schedules.rs
+@@ -70,6 +70,7 @@ struct RunRow {
+     run_id: Option<Uuid>,
+     run_state: Option<String>,
+     refusal: Option<String>,
++    role_refusal: Option<serde_json::Value>,
+     last_error: Option<String>,
+     created_at: DateTime<Utc>,
+     updated_at: DateTime<Utc>,
+@@ -86,6 +87,11 @@ impl RunRow {
+             run_id: self.run_id,
+             run_state: self.run_state,
+             refusal: self.refusal,
++            role_refusal: self
++                .role_refusal
++                .map(serde_json::from_value)
++                .transpose()
++                .map_err(|_| invalid())?,
+             last_error: self.last_error,
+             created_at: self.created_at,
+             updated_at: self.updated_at,
+@@ -96,7 +102,7 @@ impl RunRow {
+ const RUNS: &str = "SELECT occurrence.id, occurrence.scheduled_for, \
+        occurrence.command_key IS NOT NULL AS manual, occurrence.materialization_status, \
+        occurrence.run_id, run.state AS run_state, occurrence.refusal, occurrence.last_error, \
+-       occurrence.created_at, occurrence.updated_at \
++       occurrence.created_at, occurrence.updated_at, occurrence.role_refusal \
+      FROM schedule_runs AS occurrence \
+      LEFT JOIN workflow_runs AS run ON run.company_id = occurrence.company_id AND run.id = occurrence.run_id \
+      WHERE occurrence.company_id = $1 AND occurrence.schedule_id = $2";
+@@ -819,13 +825,20 @@ impl ScheduleOccurrences for PostgresPersistence {
+         &self,
+         claim: OccurrenceClaim,
+         refusal: &'static str,
++        role: Option<&crate::entities::department::RoleAdmissionRefusal>,
+     ) -> AppResult<bool> {
+-        let error = format!("The workflow binding refused this occurrence ({refusal})");
++        let error = role
++            .map(ToString::to_string)
++            .unwrap_or_else(|| format!("The workflow binding refused this occurrence ({refusal})"));
++        let role = role
++            .map(serde_json::to_value)
++            .transpose()
++            .map_err(|_| invalid())?;
+         Ok(self
+             .record(
+                 claim,
+-                "refusal = $5, last_error = $6, materialization_status = 'failed'",
+-                Outcome::Refusal(refusal, error.clone()),
++                "refusal = $5, last_error = $6, materialization_status = 'failed', role_refusal = $7",
++                Outcome::Refusal { code: refusal, message: error.clone(), role },
+                 Some(&error),
+             )
+             .await?
+@@ -860,7 +873,11 @@ const LEASE_EXPIRED_AT_LIMIT: &str = "Materialization lease expired at retry lim
+ /// The values a fenced outcome write binds after the claim (`$5`, `$6`).
+ enum Outcome {
+     Run(Uuid),
+-    Refusal(&'static str, String),
++    Refusal {
++        code: &'static str,
++        message: String,
++        role: Option<serde_json::Value>,
++    },
+     Error(String),
+ }
+ 
+@@ -910,7 +927,11 @@ impl PostgresPersistence {
+             .bind(claim.generation);
+         let query = match outcome {
+             Outcome::Run(run) => query.bind(run),
+-            Outcome::Refusal(refusal, error) => query.bind(refusal).bind(error),
++            Outcome::Refusal {
++                code,
++                message,
++                role,
++            } => query.bind(code).bind(message).bind(role),
+             Outcome::Error(error) => query.bind(error),
+         };
+         let status = query.fetch_optional(&mut *tx).await?;
+diff --git a/src/adapters/persistence/workflow/tests.rs b/src/adapters/persistence/workflow/tests.rs
+index d6fe425a..4832a0b9 100644
+--- a/src/adapters/persistence/workflow/tests.rs
++++ b/src/adapters/persistence/workflow/tests.rs
+@@ -21,6 +21,8 @@ mod http_tests;
+ mod jev_tests;
+ #[path = "projection_test_support.rs"]
+ mod projection_test_support;
++#[path = "role_binding_tests.rs"]
++mod role_binding_tests;
+ pub(crate) use http_tests::reconciliation_fixture;
+ #[path = "local_agent_tests.rs"]
+ mod local_agent_tests;
+diff --git a/src/application/agent/contract_tests.rs b/src/application/agent/contract_tests.rs
+index 72302ea6..df4f3b0e 100644
+--- a/src/application/agent/contract_tests.rs
++++ b/src/application/agent/contract_tests.rs
+@@ -191,6 +191,7 @@ fn autonomous_agent_contract_canonical_content_keeps_order_and_all_effect_facts(
+ #[test]
+ fn autonomous_agent_contract_manifest_is_canonical_unique_bounded_identity_content() {
+     let mut manifest = DependencyManifest {
++        roles: vec![],
+         company_id: CompanyId::new(Uuid::new_v4()),
+         root_run_id: RunId::new(Uuid::new_v4()),
+         agents: (0..2)
+diff --git a/src/application/agent/manifest.rs b/src/application/agent/manifest.rs
+index db04de4a..7c3cb019 100644
+--- a/src/application/agent/manifest.rs
++++ b/src/application/agent/manifest.rs
+@@ -1,7 +1,10 @@
+ use super::definition::invalid;
+ use crate::app_error::AppResult;
+ use crate::domain::entities::agent_capability::{AgentId, AgentRevisionId, DependencyManifestId};
++use crate::domain::workflow::StepId;
+ use crate::domain::workflow::{CompanyId, RunId, VersionId, WorkflowId};
++use crate::entities::department::{DepartmentId, DepartmentRole};
++use crate::entities::transport::PrincipalId;
+ use serde::{Deserialize, Serialize};
+ use sha2::{Digest, Sha256};
+ use std::collections::BTreeSet;
+@@ -24,6 +27,24 @@ pub struct WorkflowVersionSelection {
+     pub version_id: VersionId,
+ }
+ 
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct RolePrincipalSelection {
++    pub principal_id: PrincipalId,
++    pub agent_id: Option<AgentId>,
++    pub revision_id: Option<AgentRevisionId>,
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct RoleResolution {
++    pub version_id: VersionId,
++    pub step: StepId,
++    pub role: DepartmentRole,
++    pub department_id: DepartmentId,
++    pub principals: Vec<RolePrincipalSelection>,
++}
++
+ /// Durable identity selections only. Closure assembly is the admission transaction's job.
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+@@ -32,6 +53,7 @@ pub struct DependencyManifest {
+     pub root_run_id: RunId,
+     pub agents: Vec<AgentRevisionSelection>,
+     pub workflows: Vec<WorkflowVersionSelection>,
++    pub roles: Vec<RoleResolution>,
+ }
+ 
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+@@ -67,6 +89,40 @@ impl DependencyManifest {
+         if agents.len() != self.agents.len() || workflows.len() != self.workflows.len() {
+             return Err(invalid("Duplicate agent or workflow dependency selection"));
+         }
++        self.validate_roles(&workflows)?;
++        Ok(())
++    }
++
++    fn validate_roles(&self, workflows: &BTreeSet<VersionId>) -> AppResult<()> {
++        let mut identities = BTreeSet::new();
++        for role in &self.roles {
++            if !workflows.contains(&role.version_id)
++                || !identities.insert((role.version_id, &role.step, role.role.as_str()))
++                || role.principals.is_empty()
++                || role.principals.len() > crate::domain::workflow::TokenAllowance::MAX_REVIEWERS
++            {
++                return Err(invalid("Invalid or duplicate captured role requirement"));
++            }
++            let mut principals = BTreeSet::new();
++            for holder in &role.principals {
++                if !principals.insert(holder.principal_id) {
++                    return Err(invalid("Duplicate captured role principal"));
++                }
++                match (holder.agent_id, holder.revision_id) {
++                    (None, None) => {}
++                    (Some(agent), Some(revision))
++                        if role.principals.len() == 1
++                            && self.agents.iter().any(|selected| {
++                                selected.agent_id == agent && selected.revision_id == revision
++                            }) => {}
++                    _ => {
++                        return Err(invalid(
++                            "Role holder does not match the captured agent revision",
++                        ));
++                    }
++                }
++            }
++        }
+         Ok(())
+     }
+ 
+@@ -77,6 +133,12 @@ impl DependencyManifest {
+         manifest
+             .workflows
+             .sort_by_key(|entry| (entry.workflow_id, entry.version_id));
++        manifest
++            .roles
++            .sort_by_key(|entry| (entry.version_id, entry.step.clone(), entry.role.as_str()));
++        for role in &mut manifest.roles {
++            role.principals.sort_by_key(|entry| entry.principal_id);
++        }
+         let value =
+             serde_json::to_value(manifest).map_err(|_| invalid("Invalid dependency manifest"))?;
+         let bytes =
+diff --git a/src/application/app_error.rs b/src/application/app_error.rs
+index 4e565db3..66594fac 100644
+--- a/src/application/app_error.rs
++++ b/src/application/app_error.rs
+@@ -4,6 +4,8 @@ use thiserror::Error;
+ /// out a successful one. See `services::dashboard_snapshot`.
+ #[derive(Error, Debug, Clone)]
+ pub enum AppError {
++    #[error("{0}")]
++    WorkflowRole(crate::entities::department::RoleAdmissionRefusal),
+     #[error("The triggering message exceeds this audience's access level")]
+     KnowledgeTrigger {
+         content: crate::entities::access_level::AccessLevel,
+diff --git a/src/application/services/inbound_event_worker.rs b/src/application/services/inbound_event_worker.rs
+index 1ae3b373..b81ed09a 100644
+--- a/src/application/services/inbound_event_worker.rs
++++ b/src/application/services/inbound_event_worker.rs
+@@ -657,7 +657,8 @@ fn validate_commit_request(
+ 
+ fn classify_commit_error(error: &AppError) -> (InboundEventErrorClass, bool) {
+     match error {
+-        AppError::KnowledgeTrigger { .. }
++        AppError::WorkflowRole(_)
++        | AppError::KnowledgeTrigger { .. }
+         | AppError::KnowledgeRelease { .. }
+         | AppError::Execution(_)
+         | AppError::McpAuthentication
+diff --git a/src/application/workflow/board_tests.rs b/src/application/workflow/board_tests.rs
+index 051a21ff..281d204a 100644
+--- a/src/application/workflow/board_tests.rs
++++ b/src/application/workflow/board_tests.rs
+@@ -6,6 +6,8 @@ use crate::domain::workflow::{RunId, VersionId, WorkflowId};
+ fn card(state: RunStateName) -> RunSummary {
+     let now = chrono::Utc::now();
+     RunSummary {
++        role_holders: Vec::new(),
++        role_holders_truncated: false,
+         run: RunId::new(Uuid::new_v4()),
+         binding: WorkflowBindingId::new(Uuid::new_v4()),
+         workflow: WorkflowId::new(Uuid::new_v4()),
+diff --git a/src/application/workflow/compiler/compile.rs b/src/application/workflow/compiler/compile.rs
+index 0b21e399..22624033 100644
+--- a/src/application/workflow/compiler/compile.rs
++++ b/src/application/workflow/compiler/compile.rs
+@@ -45,6 +45,7 @@ pub struct CompileFacts<'a> {
+ }
+ 
+ pub struct CompiledWorkflow {
++    roles: Vec<crate::application::workflow::publication::RoleReference>,
+     source: String,
+     representation: Value,
+     source_map: BTreeMap<String, SourceSpan>,
+@@ -70,6 +71,9 @@ impl PreparedInputs {
+ }
+ 
+ impl CompiledWorkflow {
++    pub fn role_references(&self) -> &[crate::application::workflow::publication::RoleReference] {
++        &self.roles
++    }
+     pub fn source(&self) -> &str {
+         &self.source
+     }
+@@ -682,6 +686,7 @@ pub(crate) fn compile_resolved(
+     dependencies: &BTreeMap<WorkflowId, BTreeSet<WorkflowId>>,
+     tool_workflows: &BTreeSet<WorkflowId>,
+ ) -> Result<CompiledWorkflow, Diagnostic> {
++    let roles = super::roles::references(&parsed)?;
+     let dependencies = dependency_facts(&parsed, dependencies, tool_workflows)?;
+     check_expanded_facts(descriptors, &dependencies, located(&parsed, "/steps"))?;
+     let graph = validate(parsed.definition.clone()).map_err(|error| graph_error(error, &parsed))?;
+@@ -711,6 +716,7 @@ pub(crate) fn compile_resolved(
+         "definition": super::json_value(&decoded.root, "")?,
+         "descriptors": steps.facts,
+         "dependencies": dependencies,
++        "roles": roles,
+         "root_budget": {
+             "activations": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::Activation),
+             "model_calls": parsed.definition.limits.root_budget.limit(crate::domain::workflow::BudgetResource::ModelCall),
+@@ -722,6 +728,7 @@ pub(crate) fn compile_resolved(
+     }
+     let content_hash = identity(&decoded.source, &representation);
+     Ok(CompiledWorkflow {
++        roles,
+         source: decoded.source,
+         representation,
+         source_map: parsed.locations,
+diff --git a/src/application/workflow/compiler/mod.rs b/src/application/workflow/compiler/mod.rs
+index 2f0341bb..17f54655 100644
+--- a/src/application/workflow/compiler/mod.rs
++++ b/src/application/workflow/compiler/mod.rs
+@@ -6,13 +6,14 @@
+ /// context/evaluation budgets, registry specialization or interpreter semantics,
+ /// even when the serialized representation would remain identical. Old revisions
+ /// require an explicit compatible loader; they must never be silently recompiled.
+-pub const SEMANTIC_REVISION: u32 = 9;
++pub const SEMANTIC_REVISION: u32 = 10;
+ mod agent_selection;
+ mod analysis;
+ mod binding;
+ mod compile;
+ mod fact_budget;
+ mod rebase;
++mod roles;
+ pub use agent_selection::{AgentReferenceStep, agent_reference_steps, select_agent_reference};
+ mod schema;
+ mod schema_budget;
+diff --git a/src/application/workflow/fixtures/mod.rs b/src/application/workflow/fixtures/mod.rs
+index a652c3f5..32438c6b 100644
+--- a/src/application/workflow/fixtures/mod.rs
++++ b/src/application/workflow/fixtures/mod.rs
+@@ -22,9 +22,10 @@ pub enum Fixture {
+     ReviewFeedbackSuccessor,
+     /// A department lead's desk (01DEP-P03-D12); its department framing comes from preparation.
+     DepartmentLead,
++    RoleLeadResponse,
+ }
+ 
+-pub const ALL: [Fixture; 8] = [
++pub const ALL: [Fixture; 9] = [
+     Fixture::ReviewedSupport,
+     Fixture::AutonomousResponse,
+     Fixture::TriageRouting,
+@@ -33,6 +34,7 @@ pub const ALL: [Fixture; 8] = [
+     Fixture::McpLookup,
+     Fixture::ReviewFeedbackSuccessor,
+     Fixture::DepartmentLead,
++    Fixture::RoleLeadResponse,
+ ];
+ 
+ impl Fixture {
+@@ -46,6 +48,7 @@ impl Fixture {
+             Self::McpLookup => include_str!("mcp-lookup.yaml"),
+             Self::ReviewFeedbackSuccessor => include_str!("review-feedback-successor.yaml"),
+             Self::DepartmentLead => include_str!("department-lead.yaml"),
++            Self::RoleLeadResponse => include_str!("role-lead-response.yaml"),
+         }
+     }
+ 
+@@ -59,6 +62,7 @@ impl Fixture {
+             Self::McpLookup => 106,
+             Self::ReviewFeedbackSuccessor => 107,
+             Self::DepartmentLead => 108,
++            Self::RoleLeadResponse => 109,
+         };
+         VersionId::new(Uuid::from_u128(suffix))
+     }
+@@ -70,6 +74,7 @@ impl Fixture {
+     /// Caller chooses the test tenant. These synthetic facts never confer authority.
+     pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {
+         match self {
++            Self::RoleLeadResponse => DependencySnapshots::default(),
+             Self::ReviewedSupport
+             | Self::AutonomousResponse
+             | Self::RepeatedHumanRevision
+@@ -101,7 +106,7 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots
+         ],
+         Fixture::RepeatedHumanRevision => &[("specialist", AgentUseMode::Tools)],
+         Fixture::DepartmentLead => &[("lead", AgentUseMode::Tools)],
+-        Fixture::McpLookup => &[],
++        Fixture::McpLookup | Fixture::RoleLeadResponse => &[],
+     };
+     let key = match fixture {
+         Fixture::DepartmentLead => "lead",
+diff --git a/src/application/workflow/message_admission.rs b/src/application/workflow/message_admission.rs
+index 5132cff6..bbb01bb8 100644
+--- a/src/application/workflow/message_admission.rs
++++ b/src/application/workflow/message_admission.rs
+@@ -88,11 +88,12 @@ pub struct CandidateBinding {
+     pub trigger: MessageTrigger,
+ }
+ 
+-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++#[derive(Debug, Clone, PartialEq, Eq)]
+ pub enum BindingOutcome {
+     Admitted(RunId),
+     /// A deterministic refusal; the code is bounded and names no foreign record.
+     Refused(&'static str),
++    RoleRefused(crate::entities::department::RoleAdmissionRefusal),
+     Failed(&'static str),
+ }
+ 
+@@ -248,10 +249,11 @@ where
+             }
+             match self.admit_binding(&intent, binding).await? {
+                 Attempt::Outcome(outcome) => {
++                    let admitted = matches!(&outcome, BindingOutcome::Admitted(_));
+                     if !self.record(&intent, &binding, outcome).await? {
+                         return Ok(()); // The claim was lost; its new owner continues.
+                     }
+-                    if matches!(outcome, BindingOutcome::Admitted(_)) {
++                    if admitted {
+                         self.wake_workers();
+                     }
+                 }
+@@ -411,7 +413,12 @@ where
+         binding: &CandidateBinding,
+         outcome: BindingOutcome,
+     ) -> AppResult<bool> {
+-        if let BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason) = outcome {
++        let reason = match &outcome {
++            BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason) => Some(*reason),
++            BindingOutcome::RoleRefused(refusal) => Some(refusal.kind.code()),
++            BindingOutcome::Admitted(_) => None,
++        };
++        if let Some(reason) = reason {
+             tracing::warn!(
+                 company_id = %intent.claim.company.as_uuid(),
+                 binding_id = %binding.id.as_uuid(),
+@@ -443,6 +450,9 @@ pub(super) enum Classified {
+ /// this binding or input is permanent, and anything else may succeed later.
+ pub(super) fn classify(result: AppResult<AdmissionResult>) -> Classified {
+     match result {
++        Err(AppError::WorkflowRole(refusal)) => {
++            Classified::Settled(BindingOutcome::RoleRefused(refusal))
++        }
+         Ok(AdmissionResult::Created(run) | AdmissionResult::Replayed(run)) => {
+             Classified::Settled(BindingOutcome::Admitted(run))
+         }
+diff --git a/src/application/workflow/mod.rs b/src/application/workflow/mod.rs
+index 748c9c27..9769f4d0 100644
+--- a/src/application/workflow/mod.rs
++++ b/src/application/workflow/mod.rs
+@@ -48,6 +48,7 @@ pub mod provisioning;
+ pub mod publication;
+ pub mod reads;
+ pub mod registry;
++pub mod roles;
+ pub mod run_views;
+ pub mod sample;
+ pub mod sample_capture;
+diff --git a/src/application/workflow/publication/capabilities.rs b/src/application/workflow/publication/capabilities.rs
+index d39b0c23..f23c5ad0 100644
+--- a/src/application/workflow/publication/capabilities.rs
++++ b/src/application/workflow/publication/capabilities.rs
+@@ -105,6 +105,10 @@ pub(super) fn reference_uses(
+         else {
+             continue;
+         };
++        if step.inputs.contains_key("role") && !step.inputs.contains_key("agent") {
++            // The compiler validates the fixed literal requirement. No holder is captured here.
++            continue;
++        }
+         let mode = if kind == crate::application::workflow::registry::ModelStep::AgentRun {
+             AgentUseMode::Tools
+         } else {
+diff --git a/src/application/workflow/publication/mod.rs b/src/application/workflow/publication/mod.rs
+index 70aa9aaa..7162a697 100644
+--- a/src/application/workflow/publication/mod.rs
++++ b/src/application/workflow/publication/mod.rs
+@@ -36,6 +36,22 @@ pub struct PublishedBundle {
+ }
+ 
+ impl PublishedBundle {
++    /// Requirements in pinned children need the same intake department as the root.
++    pub fn first_role_reference(&self) -> Option<&RoleReference> {
++        let mut pending = vec![self];
++        let mut visited = std::collections::BTreeSet::new();
++        while let Some(bundle) = pending.pop() {
++            if !visited.insert(bundle.compiled.graph().definition().version_id) {
++                continue;
++            }
++            if let Some(reference) = bundle.compiled.role_references().first() {
++                return Some(reference);
++            }
++            pending.extend(bundle.children.values().map(AsRef::as_ref));
++        }
++        None
++    }
++
+     pub fn company_id(&self) -> CompanyId {
+         self.company_id
+     }
+@@ -89,6 +105,22 @@ impl PublishedBundle {
+         let inputs = self.compiled.prepare_step_inputs(step, context)?;
+         let definition = &self.compiled.graph().definition().steps[step];
+         if registry::ModelStep::of(definition.step_type.as_str()).is_some() {
++            if let Some(reference) = self
++                .compiled
++                .role_references()
++                .iter()
++                .find(|reference| &reference.step == step)
++            {
++                if inputs.value()["role"].as_str() != Some(reference.role.as_str()) {
++                    return Err(validation::error(
++                        &self.compiled,
++                        &format!("/steps/{step}/with/role"),
++                        "publication.role",
++                        "Role selection does not match this frozen requirement",
++                    ));
++                }
++                return Ok(inputs);
++            }
+             let selected = inputs.value()["agent"].as_str();
+             if !self
+                 .snapshots
+@@ -190,6 +222,7 @@ fn manifest(
+         "format":"workflow-publication-v2", "company_id":company_id,
+         "version_id":version_id, "compiled_hash":compiled.content_hash(),
+         "dependencies":dependencies, "dependency_hashes":dependency_hashes,
++        "roles":compiled.role_references(),
+         "child_hashes":child_hashes,
+         "resources":compiled.representation()["definition"]["resources"],
+     });
+diff --git a/src/application/workflow/publication/tests.rs b/src/application/workflow/publication/tests.rs
+index a201a4a7..87c93617 100644
+--- a/src/application/workflow/publication/tests.rs
++++ b/src/application/workflow/publication/tests.rs
+@@ -9,6 +9,9 @@ use uuid::Uuid;
+ #[path = "capabilities_tests.rs"]
+ mod capabilities_tests;
+ 
++#[path = "role_tests.rs"]
++mod role_tests;
++
+ #[path = "../agent_tests.rs"]
+ mod agent_tests;
+ 
+diff --git a/src/application/workflow/publication/types.rs b/src/application/workflow/publication/types.rs
+index 668a2b45..3b1d18c2 100644
+--- a/src/application/workflow/publication/types.rs
++++ b/src/application/workflow/publication/types.rs
+@@ -31,6 +31,15 @@ pub struct AgentReferenceUse {
+     pub mode: AgentUseMode,
+ }
+ 
++/// A requirement frozen with the procedure; holders are resolved only at admission.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct RoleReference {
++    pub step: StepId,
++    pub role: crate::entities::department::DepartmentRole,
++    pub mode: AgentUseMode,
++}
++
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+ #[serde(rename_all = "snake_case")]
+ pub enum AgentUseMode {
+diff --git a/src/application/workflow/reads.rs b/src/application/workflow/reads.rs
+index 1b533e74..2d3d9106 100644
+--- a/src/application/workflow/reads.rs
++++ b/src/application/workflow/reads.rs
+@@ -86,6 +86,8 @@ pub struct BindingSummary {
+ 
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct RunSummary {
++    pub role_holders: Vec<RunRoleHolder>,
++    pub role_holders_truncated: bool,
+     pub run: RunId,
+     pub binding: WorkflowBindingId,
+     pub workflow: WorkflowId,
+@@ -104,6 +106,17 @@ pub struct RunSummary {
+     pub finished_at: Option<DateTime<Utc>>,
+ }
+ 
++/// Initial role holders from the sealed root capture, never today's role assignments.
++#[derive(Debug, Clone, PartialEq, Eq)]
++pub struct RunRoleHolder {
++    pub version: VersionId,
++    pub step: crate::domain::workflow::StepId,
++    pub role: crate::entities::department::DepartmentRole,
++    pub department: crate::entities::department::DepartmentId,
++    pub principal: crate::entities::transport::PrincipalId,
++    pub label: String,
++}
++
+ /// The six values `workflow_runs.state` stores, in the run board's column order. One list for the
+ /// board, the child rollup, the slow-read logs and the list's state filter; the database's own
+ /// terminal set (`workflow_run_finished_shape`, `stamp_workflow_run_finished`) is pinned to
+@@ -255,11 +268,9 @@ pub struct RunFilter {
+     /// definition of the company) before it gets here.
+     pub workflow: Option<WorkflowId>,
+     pub state: Option<String>,
+-    /// Runs of versions that *use* this agent: its id is in the version's `agent_ids` display
+-    /// index, directly or through a pinned child, including branches a run never took. Not the
+-    /// agents a run actually called: `model_usage_calls.agent_id` exists only once a model call
+-    /// has happened, so a queued run would never match. The route resolves the id
+-    /// company-scoped before it gets here.
++    /// Runs whose published pinned-agent universe or frozen root role capture includes this
++    /// agent, including unexecuted branches and inherited child selections. Queued runs match
++    /// without a model usage row. The route resolves the id company-scoped before this read.
+     pub agent: Option<Uuid>,
+     pub lineage: RunLineage,
+     /// Runs on the desks this department owns now (01-departments 04B.4): the department is the
+diff --git a/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs b/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
+index 80e94147..8426e52f 100644
+--- a/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
++++ b/src/application/workflow/registry/channel_reply_terminal_contract_tests.rs
+@@ -14,7 +14,7 @@ fn channel_reply_terminal_contract_roundtrip_and_identity() {
+     )
+     .unwrap();
+     assert_eq!(roundtrip.representation(), compiled.representation());
+-    assert_eq!(compiler::SEMANTIC_REVISION, 9);
++    assert_eq!(compiler::SEMANTIC_REVISION, 10);
+     assert_eq!(
+         compiled.representation()["descriptors"]["start"]["registration"]["revision"],
+         CONTRACT_REVISION
+diff --git a/src/application/workflow/registry/help.rs b/src/application/workflow/registry/help.rs
+index a111f300..71172433 100644
+--- a/src/application/workflow/registry/help.rs
++++ b/src/application/workflow/registry/help.rs
+@@ -63,10 +63,10 @@ fn notes(name: &str) -> &'static str {
+             "TypeSafe System One: literal typesafe connection slot, exact versioned model, and 1–32 independent typed questions; state is a string, object or array. Noul is a probability, Choice has up to 64 options, Score has 2–10 levels. Instructions/descriptions are literal strings up to 16384 UTF-8 bytes. Request and response are at most 65536 serialized bytes, also subject to workflow context/schema budgets. Experimental images: literal assets names immutable private channel/thread/SHA256 references (1–4, PNG/JPEG <=24 KiB, 280–1024 pixels per side), original state under content and images at assets.NAME. Box requires Jev 1.14 and instructions naming a declared `assets.NAME`; no criteria; normalized coordinates have positive width/height. Image-capable families: Jev 1.13/1.14. Probability sums allow absolute error 0.000001. Confidence is not correctness; decision.rule owns thresholds. Noul has no separate confidence: its noul field is the probability itself. For the mixed example, exact paths are /steps/start/output/answers/urgent/noul, /steps/start/output/answers/department/choice, /steps/start/output/answers/department/confidence, /steps/start/output/answers/department/probabilities/billing, /steps/start/output/answers/severity/score, /steps/start/output/answers/severity/confidence and /steps/start/output/answers/severity/probabilities/2. Manage TypeSafe connections in company settings; bind a ready connection allowing the exact source model."
+         }
+         "ai.classify" => {
+-            "The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
++            "Choose exactly one of agent or literal role (lead, reviewer). Admission resolves the owning department or nearest ancestor holding the role, within depth 8, and freezes the holder; an agent step requires exactly one agent. The selected agent's model and instructions classify the context into a finite label set; no tools or skills. Invalid labels get bounded repair, then fail terminally."
+         }
+         "agent.run" => {
+-            "Runs the selected agent with exactly its saved tools and skills, frozen at publication; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair. Optional literal mcp_error_policy is observe (default) or fail_step: fail_step stops on a saved MCP isError or an ungranted tool, before another model turn or final output, including checkpoint replay. It does not interpret other tools' business fields. Automatic history stores the exact supplied context and accepted logical output per actual agent and thread/private session. The prompt uses a bounded, level-filtered recent suffix, frozen once for retries and human continuation. Child calls have private branch history. Inspect Agent history in the run step for exact context, omissions and expiry. Produced output and message delivery have separate states; history inspection never reruns the model."
++            "Choose exactly one of agent or literal role (lead, reviewer). Admission resolves the owning department or nearest ancestor holding the role, within depth 8, and freezes the holder; an agent step requires exactly one agent. Runs the selected agent with exactly its saved tools and skills, frozen at admission; current revocation still applies. Context is untrusted data; output follows output_schema with bounded repair. Optional literal mcp_error_policy is observe (default) or fail_step: fail_step stops on a saved MCP isError or an ungranted tool, before another model turn or final output, including checkpoint replay. It does not interpret other tools' business fields. Automatic history stores the exact supplied context and accepted logical output per actual agent and thread/private session. The prompt uses a bounded, level-filtered recent suffix, frozen once for retries and human continuation. Child calls have private branch history. Inspect Agent history in the run step for exact context, omissions and expiry. Produced output and message delivery have separate states; history inspection never reruns the model."
+         }
+         "local_agent.run" => {
+             "Runs an authorized company local profile through Cloudroom. Input is a bounded prompt and optional explicit session; exact project/provider/model and deadline freeze before approval. The workflow parks without holding a worker lease. Native permissions are answered in Cloudroom; output cannot grant approval or publish a message. Unknown native outcomes require recovery and never silently retry or fail over."
+@@ -78,7 +78,7 @@ fn notes(name: &str) -> &'static str {
+             "Durable review deadline required; never automatically accepts. Reviewers are an explicit static list of company users; first valid authorized submission wins. Timeout fails Terminal decision.timed_out through the declared error route; optional feedback requirements name declared choices."
+         }
+         "decision.agent" => {
+-            "The selected agent's model and instructions choose one declared choice, with no tools or skills; data follows data_schema. The model cannot name another step or add a route."
++            "Choose exactly one of agent or literal role (lead, reviewer). Admission resolves the owning department or nearest ancestor holding the role, within depth 8, and freezes the holder; an agent step requires exactly one agent. The selected agent's model and instructions choose one declared choice, with no tools or skills; data follows data_schema. The model cannot name another step or add a route."
+         }
+         "data.map" => {
+             "Pure typed construction, no scripts; output is value itself and follows output_schema."
+diff --git a/src/application/workflow/registry/mod.rs b/src/application/workflow/registry/mod.rs
+index 145df97c..246b9500 100644
+--- a/src/application/workflow/registry/mod.rs
++++ b/src/application/workflow/registry/mod.rs
+@@ -11,6 +11,7 @@ pub mod jev;
+ pub(crate) mod mcp;
+ pub(crate) use mcp::tool_result as mcp_tool_result;
+ mod metadata;
++mod roles;
+ mod schemas;
+ pub use examples::{AuthoringExample, example};
+ 
+@@ -31,7 +32,7 @@ use schemas::*;
+ use serde_json::{Value, json};
+ use std::collections::{BTreeMap, BTreeSet};
+ 
+-pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.9";
++pub const CONTRACT_REVISION: &str = "workflow-catalogue-v1.10";
+ pub const MAX_FACTS: usize = 256;
+ pub const MAX_SELECTIONS: usize = 128;
+ /// Explicit reviewers of one `decision.human` (user decision Q1, 05-D2 §2): at most this many
+@@ -346,12 +347,16 @@ impl<'a> Registration<'a> {
+                     .unwrap_or(self.parsed.locations[""]),
+             ));
+         }
+-        let contract = match self.name() {
++        let selector = self.agent_or_role()?;
++        let mut contract = match self.name() {
+             "http.request" | "tool.call" | "mcp.call" | "message.send" | "message.reply"
+             | "message.ask" | "local_agent.run" => self.action()?,
+             "workflow.call" | "flow.repeat" => self.child()?,
+             _ => self.basic()?,
+         };
++        if let Some(selector) = selector {
++            roles::selector_contract(&mut contract, selector);
++        }
+         let name = self.name();
+         let choices = if name.starts_with("decision.") {
+             Some(self.choices()?)
+diff --git a/src/application/workflow/run_views.rs b/src/application/workflow/run_views.rs
+index de5984db..b22701e5 100644
+--- a/src/application/workflow/run_views.rs
++++ b/src/application/workflow/run_views.rs
+@@ -189,6 +189,7 @@ pub struct CallProvenancePage {
+ 
+ #[derive(Debug, Clone, PartialEq)]
+ pub struct SelectedAgentSummary {
++    pub via_role: Option<super::reads::RunRoleHolder>,
+     pub manifest: DependencyManifestId,
+     pub bindings: Vec<SelectedToolSummary>,
+     pub assignments: Vec<SelectedSkillSummary>,
+@@ -277,6 +278,8 @@ impl RunView {
+         self.payload_restricted = true;
+         self.response = None;
+         self.dependencies = None;
++        self.detail.summary.role_holders.clear();
++        self.detail.summary.role_holders_truncated = false;
+         for child in &mut self.children {
+             child.dependency = None;
+         }
+diff --git a/src/application/workflow/sample/dispatch.rs b/src/application/workflow/sample/dispatch.rs
+index a020a90a..d5ace976 100644
+--- a/src/application/workflow/sample/dispatch.rs
++++ b/src/application/workflow/sample/dispatch.rs
+@@ -19,6 +19,7 @@ impl Session {
+         activation: &ActivatedExecution,
+         path: &SamplePath,
+     ) -> AppResult<PureCompletion> {
++        super::super::roles::refuse_unresolved_sample_role(bundle, &activation.step)?;
+         if let Some(done) = execute_pure(bundle, activation)? {
+             return Ok(done);
+         }
+diff --git a/src/application/workflow/sample/history.rs b/src/application/workflow/sample/history.rs
+index ca0d102c..cbd94a91 100644
+--- a/src/application/workflow/sample/history.rs
++++ b/src/application/workflow/sample/history.rs
+@@ -34,6 +34,7 @@ impl SampleHistoryStore {
+         frame: &Frame,
+         activation: &ActivatedExecution,
+     ) -> AppResult<Option<Capture>> {
++        super::super::roles::refuse_unresolved_sample_role(bundle, &activation.step)?;
+         let kind = bundle.compiled().graph().definition().steps[&activation.step]
+             .step_type
+             .as_str();
+diff --git a/src/application/workflow/schedule_admission.rs b/src/application/workflow/schedule_admission.rs
+index 6bc194eb..c57f70c2 100644
+--- a/src/application/workflow/schedule_admission.rs
++++ b/src/application/workflow/schedule_admission.rs
+@@ -120,6 +120,7 @@ pub trait ScheduleOccurrences: Send + Sync {
+         &self,
+         claim: OccurrenceClaim,
+         refusal: &'static str,
++        role: Option<&crate::entities::department::RoleAdmissionRefusal>,
+     ) -> AppResult<bool>;
+     /// Pending again after backoff, or failed after the last attempt; either way the schedule's
+     /// `last_error` names it.
+@@ -200,7 +201,7 @@ where
+         let mut current = self.queue.schedule_binding(claim.company, binding).await?;
+         for _ in 0..MAX_STALE_RETRIES {
+             let Some(binding) = current else {
+-                return self.refuse(claim, "unavailable").await;
++                return self.refuse(claim, "unavailable", None).await;
+             };
+             let result = self
+                 .admitter
+@@ -219,7 +220,10 @@ where
+                 }
+                 Classified::Settled(
+                     BindingOutcome::Refused(reason) | BindingOutcome::Failed(reason),
+-                ) => return self.refuse(claim, reason).await,
++                ) => return self.refuse(claim, reason, None).await,
++                Classified::Settled(BindingOutcome::RoleRefused(refusal)) => {
++                    return self.refuse(claim, refusal.kind.code(), Some(refusal)).await;
++                }
+                 Classified::Transient => {
+                     let error = error.unwrap_or_else(|| "transient admission failure".into());
+                     return self.defer(claim, &error).await;
+@@ -240,6 +244,7 @@ where
+         &self,
+         claim: OccurrenceClaim,
+         reason: &'static str,
++        role: Option<crate::entities::department::RoleAdmissionRefusal>,
+     ) -> AppResult<Materialized> {
+         tracing::warn!(
+             company_id = %claim.company.as_uuid(),
+@@ -254,11 +259,17 @@ where
+                 &[("reason", reason)],
+             );
+         }
+-        Ok(if self.queue.record_refusal(claim, reason).await? {
+-            Materialized::Refused(reason)
+-        } else {
+-            self.lost(claim)
+-        })
++        Ok(
++            if self
++                .queue
++                .record_refusal(claim, reason, role.as_ref())
++                .await?
++            {
++                Materialized::Refused(reason)
++            } else {
++                self.lost(claim)
++            },
++        )
+     }
+ 
+     async fn defer(&self, claim: OccurrenceClaim, error: &str) -> AppResult<Materialized> {
+diff --git a/src/domain/entities/department.rs b/src/domain/entities/department.rs
+index 088608f3..7029edc6 100644
+--- a/src/domain/entities/department.rs
++++ b/src/domain/entities/department.rs
+@@ -46,14 +46,16 @@ pub struct Department {
+ #[serde(rename_all = "snake_case")]
+ pub enum DepartmentRole {
+     Lead,
++    Reviewer,
+ }
+ 
+ impl DepartmentRole {
+-    pub const ALL: [Self; 1] = [Self::Lead];
++    pub const ALL: [Self; 2] = [Self::Lead, Self::Reviewer];
+ 
+     pub const fn as_str(self) -> &'static str {
+         match self {
+             Self::Lead => "lead",
++            Self::Reviewer => "reviewer",
+         }
+     }
+ 
+@@ -62,6 +64,7 @@ impl DepartmentRole {
+     pub const fn is_single_holder(self) -> bool {
+         match self {
+             Self::Lead => true,
++            Self::Reviewer => false,
+         }
+     }
+ }
+@@ -89,6 +92,7 @@ impl FromStr for DepartmentRole {
+     fn from_str(value: &str) -> Result<Self, Self::Err> {
+         match value {
+             "lead" => Ok(Self::Lead),
++            "reviewer" => Ok(Self::Reviewer),
+             _ => Err(InvalidDepartmentRole(value.to_string())),
+         }
+     }
+@@ -101,6 +105,75 @@ pub struct DepartmentRoleHolder {
+     pub principal_id: PrincipalId,
+ }
+ 
++/// A bounded admission refusal. It deliberately carries no holder identities or labels.
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "snake_case")]
++pub enum RoleRefusalKind {
++    NoHolder,
++    WrongKind,
++    Ambiguous,
++    DepthBound,
++    TooMany,
++    Unavailable,
++    MissingDepartment,
++}
++
++impl RoleRefusalKind {
++    pub const fn code(self) -> &'static str {
++        match self {
++            Self::NoHolder => "workflow.role_no_holder",
++            Self::WrongKind => "workflow.role_wrong_kind",
++            Self::Ambiguous => "workflow.role_ambiguous",
++            Self::DepthBound => "workflow.role_depth_bound",
++            Self::TooMany => "workflow.role_too_many",
++            Self::Unavailable => "workflow.role_unavailable",
++            Self::MissingDepartment => "workflow.role_needs_department",
++        }
++    }
++}
++
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct RoleAdmissionRefusal {
++    format: RoleRefusalFormat,
++    pub step: crate::domain::workflow::StepId,
++    pub role: DepartmentRole,
++    pub kind: RoleRefusalKind,
++}
++
++#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
++enum RoleRefusalFormat {
++    #[serde(rename = "workflow-role-refusal-v1")]
++    V1,
++}
++
++impl RoleAdmissionRefusal {
++    pub fn new(
++        step: crate::domain::workflow::StepId,
++        role: DepartmentRole,
++        kind: RoleRefusalKind,
++    ) -> Self {
++        Self {
++            format: RoleRefusalFormat::V1,
++            step,
++            role,
++            kind,
++        }
++    }
++}
++
++impl fmt::Display for RoleAdmissionRefusal {
++    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
++        write!(
++            formatter,
++            "{}: step {} requires role {}",
++            self.kind.code(),
++            self.step,
++            self.role
++        )
++    }
++}
++
+ /// One role a principal holds, as that principal's role list shows.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub struct HeldDepartmentRole {
+@@ -276,5 +349,6 @@ mod tests {
+     #[test]
+     fn the_lead_has_a_single_holder() {
+         assert!(DepartmentRole::Lead.is_single_holder());
++        assert!(!DepartmentRole::Reviewer.is_single_holder());
+     }
+ }
+diff --git a/src/domain/entities/message_outcome.rs b/src/domain/entities/message_outcome.rs
+index ce63f541..cd949ffb 100644
+--- a/src/domain/entities/message_outcome.rs
++++ b/src/domain/entities/message_outcome.rs
+@@ -20,9 +20,14 @@ pub enum BindingOutcome {
+     /// The binding started a run for the message.
+     Admitted(AdmittedRun),
+     /// The binding declined the message, for the stored reason.
+-    Refused { reason: String },
++    Refused {
++        reason: String,
++    },
++    RoleRefused(super::department::RoleAdmissionRefusal),
+     /// Admission failed, for the stored reason.
+-    Failed { reason: String },
++    Failed {
++        reason: String,
++    },
+ }
+ 
+ /// The run an admission started, as it stands now.
+diff --git a/src/domain/entities/schedule.rs b/src/domain/entities/schedule.rs
+index f06f40ca..a3c80994 100644
+--- a/src/domain/entities/schedule.rs
++++ b/src/domain/entities/schedule.rs
+@@ -254,6 +254,7 @@ pub struct ScheduleRun {
+     pub run_state: Option<String>,
+     /// Why admission refused the occurrence (`unavailable`, `input_rejected`, `key_conflict`).
+     pub refusal: Option<String>,
++    pub role_refusal: Option<super::department::RoleAdmissionRefusal>,
+     pub last_error: Option<String>,
+     pub created_at: DateTime<Utc>,
+     pub updated_at: DateTime<Utc>,

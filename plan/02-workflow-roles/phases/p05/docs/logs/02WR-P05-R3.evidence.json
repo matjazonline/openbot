@@ -1,0 +1,91 @@
+{
+ "version": 1,
+ "round": "02WR-P05-R3",
+ "artifact": "bd5279a566cdffd7b50e30277160ecb512e6cc9f3871b431422b695391a01da7",
+ "checks": [
+  {
+   "criteria": [
+    "R2/F4",
+    "R1/F2"
+   ],
+   "command": "open_bots lib (f4delta) escalation_agent escalation_origin + the 4 doop tests that timed out in gate 3's stack-budget run, at RUST_MIN_STACK=2097152 -- 39 PASS incl. workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice",
+   "fixture": "fresh openbot_roles_p05_focus4 migrated by test support",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-f4delta.txt",
+     "sha256": "6a0117b8ccc1fde9dbb36b4f2722faae2c2360c8d8e47a0de7af343c3f088be7"
+    },
+    {
+     "path": "logs/continue-build-f4delta.txt",
+     "sha256": "82ed515a21bb421fbb9a8210c81b5a3e7d431ba93887f7e5a51bfb970efed413"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "R2/F4",
+    "GATE"
+   ],
+   "command": "scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh with rg (Claude Code bundled ripgrep) on PATH",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-transport-boundary4.txt",
+     "sha256": "ea0730a748718849f06e906fd377021519a566458247a23bc210efe17335dbf4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "R2/F4"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets --keep-going -- -D warnings, allowing only the 5 pre-plan02 lint names (diagnostic, not a gate substitute)",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-clippy5-diagnostic.txt",
+     "sha256": "e7bf6160b6af5eb74af3ea2ba7253ce4986600639b9df309d1408d5792ba3c3a"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "git diff HEAD --check && cargo fmt --check, after trimming the trailing blank line from COORDINATION.md and editing the guard test",
+   "fixture": "static",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-whitespace-fmt4.txt",
+     "sha256": "af1ce9bbdf5a11cc1f515ef7205a287f125805f6c4e58e055feeb6a2ec5fd30f"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "scripts/check.sh run 3 on digest c3ababd8 (differs from this artifact only in escalation_agent_guard_tests.rs line 144-145 and excluded COORDINATION.md EOF): FAIL on Patch whitespace (COORDINATION.md EOF, fixed), Transport abstraction boundary (F4, fixed), Clippy (7 pre-plan02 lints), DB suite (5 known unrelated), Stack budget (same 5 + 4 doop load timeouts, pass in isolation); PASS on every other step incl. Migrations, SQLx metadata, Compile tests, Lease budget",
+   "fixture": "fresh openbot_roles_p05_gate3",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/gate-check3.txt",
+     "sha256": "a0dadfcdea012bb00b3e408f6433a432383f4dab61a5da6a8cf3f77687dba3f3"
+    },
+    {
+     "path": "logs/gate-migrations3.txt",
+     "sha256": "a4eecd782678487bdbd900a4b02b74b8baafcfab6c1b9e5862e810886a2b1a3f"
+    },
+    {
+     "path": "logs/gate-sqlx-prepare3.txt",
+     "sha256": "6060e824aa54a9fef094fa7ed33313209e1322d5d7676b7e755ad1b7b857372e"
+    }
+   ]
+  }
+ ]
+}

@@ -1,0 +1,25 @@
+base:   f059f49808777abf0367d3a7f82d11e14bbd4e20
+digest: 3afe41d0dd998fb1209be1ed1e017ce940c06d6dc9b2185079d5496445e652df
+files:
+  .github/workflows/ci.yml
+  .github/workflows/memory-service.yml
+  .trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md
+  src/adapters/persistence/workflow/action_account_hints.rs
+  src/adapters/persistence/workflow/action_authority.rs
+  src/adapters/persistence/workflow/action_dispatch.rs
+  src/adapters/persistence/workflow/action_receipts.rs
+  src/adapters/persistence/workflow/actions.rs
+  src/adapters/persistence/workflow/http.rs
+  src/adapters/persistence/workflow/http_runtime.rs
+  src/adapters/persistence/workflow/integration_authority.rs
+  src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs
+  src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs
+  src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs
+  src/adapters/persistence/workflow/local_agents/delivery.rs
+  src/adapters/persistence/workflow/local_agents/mod.rs
+  src/adapters/persistence/workflow/local_agents/resolution.rs
+  src/adapters/persistence/workflow/mcp.rs
+  src/adapters/persistence/workflow/message_publish.rs
+  src/adapters/persistence/workflow/native_mcp/accounts.rs
+  src/adapters/persistence/workflow/native_mcp/live.rs
+  src/adapters/persistence/workflow/native_mcp/mod.rs

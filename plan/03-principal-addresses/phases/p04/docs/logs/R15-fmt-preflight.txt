@@ -1,0 +1,20 @@
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/agent_history_process_driver.rs:76:
+     )
+     .unwrap();
+     spec.validate_fixture();
+[31m-    let options =
+(B[m[31m-        sqlx::postgres::PgConnectOptions::from_str(
+(B[m[31m-            &crate::adapters::persistence::test_support::test_database_url()
+(B[m[31m-                .expect("parent-owned database configuration"),
+(B[m[31m-        )
+(B[m[31m-        .unwrap()
+(B[m[31m-        .database(&spec.database.0);
+(B[m[32m+    let options = sqlx::postgres::PgConnectOptions::from_str(
+(B[m[32m+        &crate::adapters::persistence::test_support::test_database_url()
+(B[m[32m+            .expect("parent-owned database configuration"),
+(B[m[32m+    )
+(B[m[32m+    .unwrap()
+(B[m[32m+    .database(&spec.database.0);
+(B[m     let pool = sqlx::postgres::PgPoolOptions::new()
+         .max_connections(2)
+         .connect_with(options)

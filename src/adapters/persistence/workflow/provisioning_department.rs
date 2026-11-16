@@ -171,7 +171,7 @@ async fn insert_plain_desk_on(
     write: &ChannelWrite,
 ) -> AppResult<()> {
     insert_channel_row_on(tx, company.as_uuid(), desk, write).await?;
-    insert_channel_slugs(tx, company.as_uuid(), desk, &write.slug, &write.alias_slugs).await?;
+    insert_desk_addresses(tx, company.as_uuid(), desk, &write.slug, &write.alias_slugs).await?;
     write_channel_email_binding(tx, company.as_uuid(), desk, write).await?;
     sync_desk_grants_on(tx, company, desk).await
 }
@@ -237,7 +237,12 @@ pub(crate) async fn follow_department_lead_on(
     let Some(desk) = department_desk_on(tx, company, department).await? else {
         return Ok(());
     };
-    let settings = super::channel_reply::settings_on(tx, company, desk.channel).await?;
+    let settings = super::channel_reply::settings_on(
+        tx,
+        company,
+        crate::entities::address::AddressTarget::Desk((desk.channel).as_uuid()),
+    )
+    .await?;
     let selected = settings
         .as_ref()
         .and_then(|settings| settings.responder.as_ref());
@@ -261,7 +266,7 @@ pub(crate) async fn follow_department_lead_on(
                 tx,
                 &ConfigureChannelReply {
                     company,
-                    channel: desk.channel,
+                    target: AddressTarget::Desk(desk.channel.as_uuid()),
                     actor,
                     expected: Some(settings.revision),
                     responder: None,
@@ -479,10 +484,12 @@ async fn provision_on_desk_on(
     let native = Box::pin(super::native::provision_workflow_on(
         tx,
         templates,
-        &provisioning,
-        slug,
-        desk.channel.as_uuid(),
-        settings.is_none(),
+        provisioning.workflow(slug),
+        if settings.is_none() {
+            super::native::WorkflowTarget::NewDesk(desk.channel.as_uuid())
+        } else {
+            super::native::WorkflowTarget::ExistingDesk(desk.channel.as_uuid())
+        },
     ))
     .await?
     .map_err(refusal_error)?;
@@ -519,7 +526,7 @@ async fn select_on(
         return super::channel_reply::bootstrap_native_on(
             tx,
             company,
-            desk.channel,
+            crate::entities::address::AddressTarget::Desk((desk.channel).as_uuid()),
             actor,
             state.configuration.id(),
         )
@@ -529,7 +536,7 @@ async fn select_on(
         tx,
         &ConfigureChannelReply {
             company,
-            channel: desk.channel,
+            target: AddressTarget::Desk(desk.channel.as_uuid()),
             actor,
             expected: Some(settings.revision),
             responder: Some(ConfigureResponder {

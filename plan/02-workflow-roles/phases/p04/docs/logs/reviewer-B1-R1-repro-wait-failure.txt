@@ -1,0 +1,57 @@
+Scratch copy: rsync of the worktree (excluding .git/plan/.trail/node_modules/target/output/website/marketing) to the B scratchpad plus ONE appended test in src/adapters/persistence/workflow/escalation_wait_deadline_tests.rs (reviewer_b1r1_wait_sweeper_failure_starts_the_ladder). Built with the author's flags; BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+CMD RUST_MIN_STACK=2097152 $B reviewer_b1r1_wait_sweeper_failure_starts_the_ladder --nocapture (fixture TEST_DATABASE_URL openbot_roles_p04_resume19_test @127.0.0.1:52471)
+
+running 1 test
+REPRO wait failure_code=Some("activation_limit") state={"cases":0,"controls":0,"guard_events":0,"hops":0,"notices":0,"runs":1,"state":"failed"}
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::reviewer_b1r1_wait_sweeper_failure_starts_the_ladder' (5968996) panicked at src/adapters/persistence/workflow/escalation_wait_deadline_tests.rs:138:5:
+assertion `left == right` failed: an unhandled root failure by the wait sweeper must open one case
+  left: Number(0)
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::reviewer_b1r1_wait_sweeper_failure_starts_the_ladder ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::reviewer_b1r1_wait_sweeper_failure_starts_the_ladder
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4470 filtered out; finished in 1.72s
+
+EXIT 101
+
+---- reproduction test source (scratch copy only; diff vs worktree file) ----
+108a109,139
+> 
+> /// Reviewer B 02WR-P04-B1-R1 reproduction (scratch copy only, never in the worktree):
+> /// a root run with an opted-in policy fails through the real wait sweeper on its wake
+> /// (activation limit -> wait_commit::fail). The ladder must start (D1.3 "wait failure").
+> #[tokio::test]
+> async fn reviewer_b1r1_wait_sweeper_failure_starts_the_ladder() {
+>     let people = Box::pin(PeopleFixture::new(1)).await;
+>     let mut source: Value =
+>         serde_json::from_str(&registry::example("wait.timer").unwrap().source).unwrap();
+>     source["input_schema"] = json!(true);
+>     source["steps"]["start"]["with"]["deadline"] =
+>         json!({"literal":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
+>     source["steps"]["start"]["routes"]["success"] = json!("finish");
+>     source["steps"]["finish"] = json!({"type":"data.map","with":{"value":{"literal":1},"output_schema":{"literal":{"type":"integer"}}},"routes":{"success":"$end"}});
+>     let version = republish(&people, source).await;
+>     let f = Box::pin(GuardFixture::admit(people, Some(policy()), Some(version))).await;
+>     assert!(f.p().park_wait(f.scope).await.unwrap().is_some());
+>     sqlx::query("UPDATE workflow_waits SET created_at=clock_timestamp()-interval '2 seconds', \
+>          deadline=clock_timestamp()-interval '1 second' WHERE company_id=$1 AND run_id=$2 AND state='waiting'")
+>         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).execute(f.p().pool()).await.unwrap();
+>     sqlx::query("UPDATE workflow_runs SET max_steps=1 WHERE company_id=$1 AND id=$2")
+>         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).execute(f.p().pool()).await.unwrap();
+>     assert_eq!(f.p().sweep_waits(128).await.unwrap(), 1);
+>     let failure: Option<String> = sqlx::query_scalar(
+>         "SELECT failure_code FROM workflow_waits WHERE company_id=$1 AND run_id=$2")
+>         .bind(f.scope.company.as_uuid()).bind(f.scope.run.as_uuid()).fetch_one(f.p().pool()).await.unwrap();
+>     eprintln!("REPRO wait failure_code={failure:?} state={}", f.state().await);
+>     assert_eq!(failure.as_deref(), Some("activation_limit"));
+>     assert_eq!(f.state().await["state"], "failed");
+>     assert_eq!(f.state().await["cases"], 1, "an unhandled root failure by the wait sweeper must open one case");
+> }
+---- scratch tree differs from worktree only in that file: ----
+Files /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/workflow/escalation_wait_deadline_tests.rs and /private/tmp/claude-501/-Users-mac02--gui-cloudroom-plugins-environment-git-worktree-host-data-worktrees-thr-jt43h4qc8d-1-openbot/d139d6f0-976b-419b-b64a-47335b295a58/scratchpad/repro/openbot/src/adapters/persistence/workflow/escalation_wait_deadline_tests.rs differ

@@ -12,7 +12,7 @@ use tracing::{error, info, warn};
 use crate::{
     adapters::{
         protocols::email::{
-            EmailChannelSelectorParser, EmailIdentity, EmailIngressAdapter, EmailIngressTrust,
+            EmailAddressParser, EmailIdentity, EmailIngressAdapter, EmailIngressTrust,
             VerifiedEmailAuth, parse_raw_mime_to_payload,
             parser::{MAX_INBOUND_MESSAGE_BYTES, RawInboundPayload, extract_email},
             verify_email_authentication,
@@ -114,6 +114,8 @@ pub struct SmtpServer {
     /// moving this to shared storage (Postgres or Redis) and paying a round trip per connection.
     active_conns: Arc<RwLock<HashMap<IpAddr, usize>>>,
     connection_slots: Arc<Semaphore>,
+    #[cfg(test)]
+    test_resolver: Option<mail_auth::MessageAuthenticator>,
 }
 
 impl SmtpServer {
@@ -131,6 +133,8 @@ impl SmtpServer {
             monitoring: None,
             active_conns: Arc::new(RwLock::new(HashMap::new())),
             connection_slots: Arc::new(Semaphore::new(MAX_CONNECTIONS)),
+            #[cfg(test)]
+            test_resolver: None,
         }
     }
 
@@ -141,6 +145,15 @@ impl SmtpServer {
                 .expect("valid fixture scanner"),
         );
         Self::new(threads, config, scanner)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_resolver_for_test(
+        mut self,
+        resolver: mail_auth::MessageAuthenticator,
+    ) -> Self {
+        self.test_resolver = Some(resolver);
+        self
     }
 
     pub fn with_monitoring(mut self, monitoring: Arc<dyn MonitoringService>) -> Self {
@@ -218,7 +231,7 @@ impl SmtpServer {
         while connections.join_next().await.is_some() {}
     }
 
-    async fn handle_connection(
+    pub(crate) async fn handle_connection(
         &self,
         stream: TcpStream,
         peer_addr: std::net::SocketAddr,
@@ -541,10 +554,15 @@ impl SmtpServer {
         start_time: Instant,
     ) -> anyhow::Result<()> {
         let client_ip = peer_addr.ip();
+        #[cfg(test)]
+        let resolver = self.test_resolver.as_ref();
+        #[cfg(not(test))]
+        let resolver = None;
         let auth = verify_email_authentication(
             &session.data_buffer,
             session.mailfrom.as_deref(),
             client_ip,
+            resolver,
         )
         .await;
 
@@ -628,7 +646,7 @@ impl SmtpServer {
     /// Spam scanning is for strangers: a sender the destination channel already trusts skips it.
     async fn sender_needs_spam_scan(&self, raw_payload: &RawInboundPayload) -> bool {
         let Some(selection) =
-            EmailChannelSelectorParser::new(&self.config.app_domain_name).parse(&raw_payload.to)
+            EmailAddressParser::new(&self.config.app_domain_name).parse(&raw_payload.to)
         else {
             return true;
         };
@@ -881,6 +899,7 @@ mod answer_tests {
             company_slug: "acme".into(),
             invalid_slugs: Vec::new(),
             disabled_slugs: Vec::new(),
+            principals: vec![],
             suggestions: Vec::new(),
             available_channels: Vec::new(),
             original_subject: "Hello".to_string(),
@@ -1100,6 +1119,32 @@ mod tests {
                 .find(|w| w.matches_slug(channel_slug))
                 .cloned())
         }
+        async fn address_for_target(
+            &self,
+            company_id: Uuid,
+            target: crate::entities::address::AddressTarget,
+        ) -> AppResult<Option<crate::entities::address::ResolvedAddress>> {
+            Ok(self
+                .list_by_company_id(company_id)
+                .await?
+                .into_iter()
+                .find(|desk| target == crate::entities::address::AddressTarget::Desk(desk.id))
+                .map(|desk| crate::entities::address::ResolvedAddress {
+                    slug: desk.slug,
+                    target,
+                }))
+        }
+        async fn address_targets(
+            &self,
+            company_id: Uuid,
+            slugs: &[crate::entities::value_objects::ChannelSlug],
+        ) -> AppResult<Vec<crate::entities::address::ResolvedAddress>> {
+            Ok(crate::entities::address::desk_addresses(
+                &self.list_by_company_id(company_id).await?,
+                slugs,
+            ))
+        }
+
         async fn list_by_company_id(&self, _company_id: Uuid) -> AppResult<Vec<Channel>> {
             Ok(self.channels.lock().unwrap().clone())
         }
@@ -1194,6 +1239,7 @@ mod tests {
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -1418,6 +1464,7 @@ regis";
         let thread_persistence = Arc::new(InMemoryThreads::new());
 
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -1542,6 +1589,7 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
         });
         let thread_persistence = Arc::new(InMemoryThreads::new());
         let config = Arc::new(AppConfig {
+            escalation_ack_hours: Default::default(),
             knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
             knowledge_search_limit:
                 crate::application::knowledge::search::KnowledgeSearchLimit::default(),
@@ -1674,6 +1722,95 @@ Message-ID: <CAGj=2VKEn_MHfovWkBCqn4sp3AXPR=ZTLMso=mPjWtnMDStiRw@mail.gmail.com>
             "{logged}"
         );
         assert!(logged.contains("mock database is unavailable"), "{logged}");
+    }
+
+    /// The 550 a member's address earns over SMTP, against a real address namespace: a stranger
+    /// gets exactly the line a slug that names nothing gets, and a teammate is told why.
+    #[tokio::test]
+    async fn address_external_ingress_smtp_does_not_confirm_a_members_address() {
+        use crate::{
+            adapters::persistence::{PostgresPersistence, test_support::own_database},
+            use_cases::{
+                company::{CompanyPersistence, CompanyWrite},
+                user::UserPersistence,
+            },
+        };
+        let db = own_database()
+            .await
+            .expect("SMTP address test requires PostgreSQL");
+        let persistence = Arc::new(PostgresPersistence::new(db.pool.clone()));
+        // The owner is the company's first person, so `owner` is their derived address.
+        let owner = persistence
+            .create_user("owner", "owner@example.test", "hash")
+            .await
+            .unwrap()
+            .id;
+        let company = CompanyPersistence::create(
+            persistence.as_ref(),
+            owner,
+            CompanyWrite {
+                name: "Acme".into(),
+                slug: "acme".into(),
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        ChannelPersistence::create(
+            persistence.as_ref(),
+            company.id,
+            ChannelWrite {
+                name: "Desk".into(),
+                slug: "desk".into(),
+                enabled: true,
+                ..Default::default()
+            },
+        )
+        .await
+        .unwrap();
+        let config = Arc::new(AppConfig {
+            knowledge_model_dir: std::path::PathBuf::from("/test/no-model-required"),
+            app_domain_name: "mailagents.com".into(),
+            ..AppConfig::for_test()
+        });
+        let use_cases = ThreadUseCases::for_test(
+            Arc::new(InMemoryThreads::new()),
+            persistence.clone(),
+            persistence.clone(),
+            persistence,
+            (config.clone()).thread_settings(),
+        );
+        let answer = |recipient: &str, sender: &str| {
+            let payload = RawInboundPayload {
+                to: recipient.into(),
+                from: sender.into(),
+                subject: Some("Hello".into()),
+                text: Some("Hello there".into()),
+                ..Default::default()
+            };
+            let use_cases = &use_cases;
+            async move {
+                let ingest = use_cases.ingest_test_email(payload).await.unwrap();
+                SmtpAnswer::for_ingest(&ingest).line()
+            }
+        };
+
+        let member = answer("owner@acme.mailagents.com", "stranger@example.test").await;
+        let nobody = answer("nobody@acme.mailagents.com", "stranger@example.test").await;
+        assert_eq!(
+            member,
+            "550 5.7.1 Message rejected (Channel address not found or misspelled)\r\n"
+        );
+        assert_eq!(
+            member, nobody,
+            "a stranger cannot tell a member from nobody"
+        );
+
+        let teammate = answer("owner@acme.mailagents.com", "owner@example.test").await;
+        assert_eq!(teammate, "250 2.0.0 Message queued for delivery\r\n");
+        // The desk beside the person still takes mail through the same namespace.
+        let desk = answer("desk@acme.mailagents.com", "owner@example.test").await;
+        assert!(desk.starts_with("250 "), "{desk}");
     }
 
     #[tokio::test]

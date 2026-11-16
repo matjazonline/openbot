@@ -1,0 +1,33 @@
+[
+  {
+    "path": "src/adapters/http/routes/ui_schedules.rs",
+    "matches_baseline": true,
+    "matches_evidence_hash": true
+  },
+  {
+    "path": "src/adapters/http/routes/knowledge/upload.rs",
+    "matches_baseline": true,
+    "matches_evidence_hash": true
+  },
+  {
+    "path": "src/adapters/persistence/department.rs",
+    "matches_baseline": true,
+    "matches_evidence_hash": true
+  },
+  {
+    "path": "src/application/services/model_usage/mod.rs",
+    "matches_baseline": true,
+    "matches_evidence_hash": true
+  },
+  {
+    "path": "src/domain/workflow/reply_integrity.rs",
+    "matches_baseline": true,
+    "matches_evidence_hash": true
+  },
+  {
+    "css_equal_HEAD": true,
+    "profile_equal_preexisting": true,
+    "old_profile_has_missing_utilities": true,
+    "unchanged_css_missing_utilities": true
+  }
+]

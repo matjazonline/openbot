@@ -1,0 +1,101 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error: this pattern is unneeded as the `..` pattern can match that element
+   --> src/adapters/http/routes/ui_schedules.rs:373:9
+    |
+373 | /         membership: _,
+374 | |         ..
+    | |________^ help: remove it
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unneeded_wildcard_pattern
+    = note: `-D clippy::unneeded-wildcard-pattern` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unneeded_wildcard_pattern)]`
+
+error: this pattern is unneeded as the `..` pattern can match that element
+   --> src/adapters/http/routes/ui_schedules.rs:407:9
+    |
+407 | /         membership: _,
+408 | |         ..
+    | |________^ help: remove it
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#unneeded_wildcard_pattern
+
+error: the `Err`-variant returned from this function is very large
+  --> src/adapters/http/routes/knowledge/upload.rs:10:6
+   |
+10 | ) -> Result<Vec<KnowledgeDocumentLayer>, Response> {
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 128 bytes
+   |
+   = help: try reducing the size of `rig_core::http_client::Response<axum::body::Body>`, for example by boxing large elements or replacing it with `Box<rig_core::http_client::Response<axum::body::Body>>`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#result_large_err
+   = note: `-D clippy::result-large-err` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::result_large_err)]`
+
+error: the `Err`-variant returned from this function is very large
+  --> src/adapters/http/routes/knowledge/upload.rs:38:56
+   |
+38 | pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploadFile>, Response> {
+   |                                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ the `Err`-variant is at least 128 bytes
+   |
+   = help: try reducing the size of `rig_core::http_client::Response<axum::body::Body>`, for example by boxing large elements or replacing it with `Box<rig_core::http_client::Response<axum::body::Body>>`
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#result_large_err
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+   --> src/adapters/persistence/department.rs:346:5
+    |
+346 | /     match role {
+347 | |         Some(role) => {
+348 | |             follow_lead_on(
+349 | |                 tx,
+...   |
+359 | |         None => {}
+360 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#single_match
+    = note: `-D clippy::single-match` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::single_match)]`
+help: try
+    |
+346 ~     if let Some(role) = role {
+347 +         follow_lead_on(
+348 +             tx,
+349 +             templates,
+350 +             company,
+351 +             actor,
+352 +             department,
+353 +             role,
+354 +             Some(principal),
+355 +         )
+356 +         .await?;
+357 +     }
+    |
+
+error: expression can be simplified using `Option::unwrap_or()`
+  --> src/application/services/model_usage/mod.rs:24:33
+   |
+24 |         let (whole, fraction) = value.split_once('.').map_or((value, ""), |parts| parts);
+   |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#map_or_identity
+   = note: `-D clippy::map-or-identity` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::map_or_identity)]`
+help: consider using `unwrap_or`
+   |
+24 -         let (whole, fraction) = value.split_once('.').map_or((value, ""), |parts| parts);
+24 +         let (whole, fraction) = value.split_once('.').unwrap_or((value, ""));
+   |
+
+error: using `chunks_exact` with a constant chunk size
+  --> src/domain/workflow/reply_integrity.rs:29:47
+   |
+29 |         for (index, pair) in value.as_bytes().chunks_exact(2).enumerate() {
+   |                                               ^^^^^^^^^^^^^^^ help: consider using `as_chunks` instead: `as_chunks::<2>().0.iter()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.99.0/index.html#chunks_exact_to_as_chunks
+   = note: `-D clippy::chunks-exact-to-as-chunks` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::chunks_exact_to_as_chunks)]`
+
+error: could not compile `open_bots` (lib) due to 7 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `open_bots` (lib test) due to 7 previous errors
+EXIT 101

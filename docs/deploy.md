@@ -512,6 +512,7 @@ documents the full set.
 | `DATABASE_MAX_CONNECTIONS` | Database pool size, default 20. Startup refuses a pool smaller than `14 + 2 × WORKFLOW_WORKER_SLOTS`, naming both keys. |
 | `WORKFLOW_WORKER_SLOTS` | Concurrent workflow workers per process; 1–16, default 2. Each slot needs two pool connections (its claim or handler transaction and its lease renewal). |
 | `RUNTIME_THREAD_STACK_BYTES` | Stack reserved per async runtime thread; 2 MiB–256 MiB, default 16 MiB. A background job's chain of `async fn` frames can overrun Tokio's 2 MiB default in an unoptimized build; `scripts/stack-budget.sh` is what notices it growing. |
+| `ESCALATION_ACK_HOURS` | Hours an escalation hop waits for acknowledgement before the next hop (see [departments](departments.md#escalation)); integer 1–168, default 24. Startup refuses any other value. A case keeps the value it started with. |
 | `SMTP_ALLOW_PLAINTEXT_LOCAL` | Development-only, default `false`; plaintext is accepted only with no credentials and a host that resolves exclusively to loopback. Never enable it for a deployed relay. |
 
 `RUNTIME_THREAD_STACK_BYTES` does not reach threads the process did not spawn itself, which means

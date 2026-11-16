@@ -1,0 +1,22 @@
+{
+  "acceptance": "02WR-P02-B1-A1",
+  "status": "accepted in phase; integration/final full-suite gate pending p05",
+  "artifact": "be7fd9d4c0c6e45c67ad288ed4d1a9ccfb221f6a816a7dbaf8a7c24fe44de6ba",
+  "base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "review": "02WR-P02-B1-R1",
+  "note": "02WR-P02-B1-R1/N1",
+  "coordination_revision": 7,
+  "notices": [
+    "I001/r1",
+    "I002/r1",
+    "I003/r1",
+    "02WR-C001/r1",
+    "02WR-C002/r2",
+    "02WR-C003/r2"
+  ],
+  "limits": [
+    "full role sample execution unexercised; helper/call-site coverage scoped by B",
+    "role-specific knowledge/memory provider I/O unexercised; shared-selector and inherited consumer evidence scoped by B",
+    "full repository/CI suite deferred to required p05 final gate"
+  ]
+}

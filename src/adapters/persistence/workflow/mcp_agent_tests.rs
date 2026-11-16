@@ -105,6 +105,7 @@ async fn published_mcp_agent(
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(&p, &agent).await;
     CompanyPersistence::replace_model_connections_for_user(
         &p,
         fixture.target.actor.user_id(),
@@ -223,6 +224,7 @@ async fn bind_without_slots(fixture: &Fixture, version: VersionId) -> BindingTar
     let service = BindingService::new(Preflight, p.clone(), p.clone(), p.clone());
     let configured = service
         .configure(ConfigureBinding {
+            escalation: None,
             target,
             expected: None,
             association: RelatedAssociation::Company,

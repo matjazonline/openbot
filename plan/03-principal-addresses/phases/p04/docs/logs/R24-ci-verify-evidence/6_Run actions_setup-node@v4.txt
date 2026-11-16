@@ -1,0 +1,32 @@
+﻿2026-11-16T14:16:26.7819603Z ##[group]Run actions/setup-node@v4
+2026-11-16T14:16:26.7819906Z with:
+2026-11-16T14:16:26.7820299Z   node-version: 24.21.0
+2026-11-16T14:16:26.7820526Z   cache: npm
+2026-11-16T14:16:26.7820728Z   always-auth: false
+2026-11-16T14:16:26.7820983Z   check-latest: false
+2026-11-16T14:16:26.7822764Z   token: ***
+2026-11-16T14:16:26.7822987Z env:
+2026-11-16T14:16:26.7823205Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:16:26.7823444Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:16:26.7823873Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:16:26.7824165Z   SQLX_OFFLINE: true
+2026-11-16T14:16:26.7824459Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:16:26.7824717Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:16:26.7824936Z   CARGO_TERM_COLOR: always
+2026-11-16T14:16:26.7825210Z   CACHE_ON_FAILURE: false
+2026-11-16T14:16:26.7825435Z ##[endgroup]
+2026-11-16T14:16:26.8878048Z Attempting to download 24.21.0...
+2026-11-16T14:16:26.8955246Z (node:2787) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-11-16T14:16:26.8956963Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-11-16T14:16:27.4758597Z Acquiring 24.21.0 - x64 from https://github.com/actions/node-versions/releases/download/24.21.0-34304089047/node-24.21.0-linux-x64.tar.gz
+2026-11-16T14:16:27.7872353Z Extracting ...
+2026-11-16T14:16:27.7954860Z [command]/usr/bin/tar xz --strip 1 --warning=no-unknown-keyword --overwrite -C /home/runner/work/_temp/65c0fc5c-dced-442a-a081-afc0fa72e80f -f /home/runner/work/_temp/2f44ad04-b53c-4a14-b553-fb8adbfa57a5
+2026-11-16T14:16:28.8519090Z Adding to the cache ...
+2026-11-16T14:16:29.7926073Z ##[group]Environment details
+2026-11-16T14:16:30.3330390Z node: v24.21.0
+2026-11-16T14:16:30.3330881Z npm: 11.19.0
+2026-11-16T14:16:30.3331133Z yarn: 1.22.22
+2026-11-16T14:16:30.3331692Z ##[endgroup]
+2026-11-16T14:16:30.3343181Z [command]/opt/hostedtoolcache/node/24.21.0/x64/bin/npm config get cache
+2026-11-16T14:16:30.4031270Z /home/runner/.npm
+2026-11-16T14:16:30.4639919Z npm cache is not found

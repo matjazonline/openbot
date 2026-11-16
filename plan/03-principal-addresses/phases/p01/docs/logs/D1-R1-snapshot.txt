@@ -1,0 +1,14 @@
+base:   cb46c6fdfc728634f4943e5e7b47a30fd89ce5c1
+digest: eff341d36a36dddbf9b081322d91e1cc1a9f759425ab4546d812a9948be5d991
+files:
+  .claude/helpers/graft-hooks.cjs
+  .claude/helpers/graft-statusline.cjs
+  .claude/settings.json
+  .claude/skills/graft/SKILL.md
+  .mcp.json
+  .trail/.gitignore
+  .trail/hook.cjs
+  .trail/learnings/2026-11-14-internal-platform-messages-get-their-message-mac02.md
+  .trail/learnings/2026-11-14-the-transport-boundary-check-passes-silently-mac02.md
+  .trail/README.md
+  AGENTS.md

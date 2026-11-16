@@ -1,0 +1,74 @@
+{
+  "minimum_saved_tokens": 526684,
+  "scope": "Only retained unique output lines; additional direct tool results are not counted here. No dollar estimates reported.",
+  "calls": [
+    {
+      "retained_output": "/tmp/openbot-02-discovery.txt",
+      "reported_tokens_saved": 18621
+    },
+    {
+      "retained_output": "/tmp/openbot-02-bindings.txt",
+      "reported_tokens_saved": 20344
+    },
+    {
+      "retained_output": "/tmp/openbot-02-semantic-revision.txt",
+      "reported_tokens_saved": 8195
+    },
+    {
+      "retained_output": "/tmp/openbot-02-binding-write.txt",
+      "reported_tokens_saved": 9626
+    },
+    {
+      "retained_output": "/tmp/openbot-02-active-binding.txt",
+      "reported_tokens_saved": 81312
+    },
+    {
+      "retained_output": "/tmp/openbot-02-resolve-agent.txt",
+      "reported_tokens_saved": 22139
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-snapshot.txt",
+      "reported_tokens_saved": 1620
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-callers.txt",
+      "reported_tokens_saved": 51599
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-universe.txt",
+      "reported_tokens_saved": 8647
+    },
+    {
+      "retained_output": "/tmp/openbot-02-agent-reference.txt",
+      "reported_tokens_saved": 29297
+    },
+    {
+      "retained_output": "/tmp/openbot-02-save-binding-callers.txt",
+      "reported_tokens_saved": 35895
+    },
+    {
+      "retained_output": "/tmp/openbot-02-readiness-callers.txt",
+      "reported_tokens_saved": 3117
+    },
+    {
+      "retained_output": "/tmp/openbot-02-channel-write-callers.txt",
+      "reported_tokens_saved": 25453
+    },
+    {
+      "retained_output": "/tmp/openbot-02-department-role.txt",
+      "reported_tokens_saved": 117639
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/compile-resolved-callers.txt",
+      "reported_tokens_saved": 11602
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/set-desk-ownership-callers.txt",
+      "reported_tokens_saved": 44271
+    },
+    {
+      "retained_output": "plan/02-workflow-roles/phases/p01/docs/logs/reference-uses-callers.txt",
+      "reported_tokens_saved": 37307
+    }
+  ]
+}

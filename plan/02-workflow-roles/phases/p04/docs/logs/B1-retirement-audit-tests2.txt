@@ -1,0 +1,35 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+warning: function `invalid` is never used
+   --> src/application/workflow/escalation.rs:212:15
+    |
+212 | pub(crate) fn invalid() -> AppError {
+    |               ^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 25s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 5 tests
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle ... FAILED
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_name_representation_never_blocks_valid_long_names ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_rejects_corrupt_actual_source_and_rolls_back ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_requires_material_clear_only_in_its_creation_transaction ... ok
+
+failures:
+
+---- adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle stdout ----
+
+thread 'adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle' (50000465) panicked at src/adapters/persistence/department_retirement_audit_tests.rs:441:10:
+called `Result::unwrap()` on an `Err` value: Conflict("This agent has published revisions and cannot be deleted. Deactivate it instead.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 4251 filtered out; finished in 4.36s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,40 @@
+
+running 5 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_do_not_lock_former_run_actor ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_former_run_actor_removal_preserves_owner_history_and_vote ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers ... FAILED
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_wait_park_company_precedes_run_during_actual_retirement ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_do_not_lock_former_run_actor stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_do_not_lock_former_run_actor' (1972713) panicked at src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:176:13:
+a current owner's cancel must not wait for the former run actor account
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers' (1972758) panicked at src/adapters/persistence/workflow/reviewer_wait_hint_tests.rs:96:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers' (1972807) panicked at src/adapters/persistence/workflow/reviewer_wait_hint_tests.rs:68:10:
+called `Result::unwrap()` on an `Err` value: NotFound("Workflow resource")
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_wait_park_company_precedes_run_during_actual_retirement stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_wait_park_company_precedes_run_during_actual_retirement' (1972838) panicked at src/adapters/persistence/workflow/reviewer_wait_hint_tests.rs:137:35:
+wait owner must first wait for retirement's company: Err(NotFound("Workflow resource"))
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::control_hints::workflow_reviewer_follow_owner_cancel_and_replay_do_not_lock_former_run_actor
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_child_park_and_replay_ignore_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_timer_park_and_replay_ignore_unused_retired_final_reviewers
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::wait_hints::workflow_reviewer_follow_wait_park_company_precedes_run_during_actual_retirement
+
+test result: FAILED. 1 passed; 4 failed; 0 ignored; 0 measured; 4341 filtered out; finished in 3.93s
+

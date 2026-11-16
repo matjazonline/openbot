@@ -23,9 +23,18 @@ for someone outside the company.
 **Members** are principals: the company's people and agents. A principal may be in several
 departments. Membership grants nothing by itself; it is a fact the desk rules below read.
 
-**Roles** are held by principals. The only role is `lead`, with at most one holder: assigning a
-new lead replaces the old one, and clearing it leaves none. The lead need not be a member. An agent
-lead must be a company agent that can be published.
+**Roles** are held by principals. There are two. `lead` has at most one holder: assigning a new
+lead replaces the old one, and clearing it leaves none. An agent lead must be a company agent that
+can be published. `reviewer` may have several holders. A holder need not be a member. Workflows can
+name a role instead of a fixed person or agent (see [Roles](workflow-language-v1.md#roles)), and a
+desk's workflow binding can escalate to a role's holders (see "Escalation").
+
+Deleting an agent, or removing a person from the company, clears every role they hold in the same
+transaction and records each cleared role as a department administration event. Nobody is
+appointed in their place. Until someone is, a workflow role step and an escalation's first hop
+fall back to the nearest ancestor department with a holder of that role; when there is none, the
+step is refused with `workflow.role_no_holder` and the escalation moves on as "Escalation"
+describes.
 
 ## Desks and ownership
 
@@ -54,16 +63,18 @@ Messages that other desks in the company hand to a members-only desk are still a
 the usual hop budget and loop refusal (see `inter_channel_agent_communication.md`): the
 restriction is on people and outside senders, not on desk-to-desk relays.
 
-### Agents' own desks
+### Agents' direct addresses
 
-Every company agent gets its own desk when it is created, on every creation path (the agents page,
-the JSON API, a library copy, onboarding, the Agent Builder): a team desk at the agent's slug,
-answered by that agent through the autonomous workflow. Creating the agent needs a model
-connection with an API key, because the desk answers on an explicit model; a taken address refuses
-the whole creation. The agent's settings show this desk's address and the departments it is in;
-"Create additional desk" adds more. Library agents get no desk until copied into a company.
+Every company agent gets a principal address at its slug and an active published workflow binding
+when created through the agents page, JSON API, library copy, onboarding or Agent Builder. This
+creates no desk. A keyed model connection is required and a taken address refuses the whole
+transaction. Agent settings show the direct address and departments. **Create additional desk**
+creates an optional shared desk answered by that agent. Library agents receive company addresses
+when copied into a company.
 
-An agent's own desk belongs to no department, even when the agent is a member of one.
+The agent's direct address has its own **Allow external messages** setting. A private agent can
+answer a public department desk without making its direct address public. Department membership
+and role-derived desk grants apply to an authenticated agent's relay identity.
 
 ### The department's desk
 
@@ -84,13 +95,13 @@ hand over. Detach the desk, or fix its workflow, first.
 An `agent.run` on a desk a department owns gets the department's context as system text after
 the agent's own instructions: the department's name and charter, that the agent answers as the
 department's lead when it holds the `lead` role, and — on a desk that is not public — the desks
-around the department: its own desk, its parent's, its direct children's and its agents' own desks,
+around the department: its own desk, its parent's, its direct children's and its agents' principal addresses,
 each by address (at most 20 children and 50 agents, with a note when there are more). People are
 not listed. The context is frozen with the run's prepared request, so a retry sees what the first
 attempt saw.
 
-The Agent Builder's `list_company_agents` tool names each agent's departments, roles and own
-desk and can list one department (`department` slug); it stays an owner's or admin's tool. The
+The Agent Builder's `list_company_agents` tool names each agent's departments, roles and direct
+address and can list one department (`department` slug); it stays an owner's or admin's tool. The
 plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
 one yet.
 
@@ -101,6 +112,55 @@ desk's address. Today such a message is delivered as an outbound message on the 
 does not start the target desk's workflow, and a reply that comes back along the same trace is
 refused as a loop. Dispatch that starts the member's work and returns an answer waits for
 `channel.call` (agent-workflow-call).
+
+## Escalation
+
+A workflow binding on a department-owned desk can opt into escalation in its configuration:
+
+```json
+"escalation": {"notify": "lead", "hops": 2}
+```
+
+`notify` is `lead` or `reviewer`; `hops` is 1 or 2. Without it nothing escalates. Activating a
+binding that escalates on a desk without a department, or detaching the department from a desk
+with such a binding active, is refused with `binding.escalation_needs_department`.
+
+A binding's work escalates when it fails and no authored error route handles the failure:
+
+- a role refusal at admission (no run is created);
+- a run failed by a guard, the wait sweeper, its deadline or recovery;
+- a `decision.human` past its deadline, or a rejected or expired action approval or token
+  allowance;
+- a refused delivery, final response or local agent call;
+- a child failure that no parent route consumes, escalated once from the root parent, never from
+  the child;
+- a parked decision that follows its role and is left with no reviewers.
+
+Each run, or refused admission, opens at most one case, and the case keeps its first reason. A
+user cancelling a run does not escalate, and work started by an escalation notice never opens
+another case.
+
+- **Hop 1** notifies every holder of the `notify` role in the desk's department or, when it has
+  none, in the nearest ancestor that has holders. More than 16 holders is refused as a recipient
+  limit rather than notifying some of them.
+- If hop 1 reaches nobody who can receive it, or nobody settles it within `ESCALATION_ACK_HOURS`
+  (default 24), and `hops` is 2, **hop 2** notifies the parent department's lead.
+- After the last hop the case waits for the company owner in **Waiting on a person**. Nothing is
+  sent a third time.
+
+People get an in-app notification, and email unless they opted out of it. Agents get an internal
+message on their exact principal binding and act through the `read_escalation` and `respond_to_escalation` tools
+when their published tools include them; a successful run is not an acknowledgement. A person's
+notice only says that something needs attention and links to the escalation decision, which shows
+the run, the step and the reason. An agent's notice also names the reason code and the step.
+
+The escalation decision (`/ui/workflow-decisions/escalations/{decision_id}`) offers
+**Acknowledge**, **Reassign** to another person or agent of the company, and **Cancel** the run.
+The current recipients and the company's owners and admins can acknowledge or reassign;
+cancelling also needs permission to control that run and is unavailable for a refused admission.
+Reassigning stops the automatic ladder and notifies the new assignee, who can acknowledge or
+reassign again, up to 32 assignments per case. A role grants no other access: a holder still
+needs to be able to see the run to act on it.
 
 ## Where departments show up
 
@@ -114,8 +174,8 @@ refused as a loop. Dispatch that starts the member's work and returns an answer 
   charts stay the whole company's.
 - **Model usage**: "Group by Department" shows spend by the department that owns each run's desk
   now. Archived usage keeps no run and counts under "No department".
-- **`_help` replies and undeliverable-address bounces** list the desks a teammate may write to
-  under their department's heading, root first.
+- **`_help` replies and undeliverable-address bounces** list writable desks
+  under their department headings, followed by **People and agents** with writable principal addresses.
 - **JSON**: desk responses carry `department_id` and `members_only`; agent responses carry
   `departments` (`id`, `name`, `slug`, `roles`) and `more_departments`.
 
@@ -144,7 +204,7 @@ someone outside the company.
 | `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for `parent_id` makes it top level. |
 | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
-| `PUT` / `DELETE /departments/{department_id}/roles/lead/{principal_id}` | Assigns or clears the lead. |
+| `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role: `lead` replaces the current lead; `reviewer` adds or removes that holder. |
 
 Refusals: `409 Conflict` for a taken slug or a department that still owns desks or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither

@@ -1,0 +1,688 @@
+{
+  "artifact": "411abe73337fe93ccde3a39560722bca1125df70dcc0c32e106b9a233e59e52e",
+  "files": [
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "lines": 812
+    },
+    {
+      "path": "src/adapters/http/pages/desk_wording_tests.rs",
+      "lines": 18
+    },
+    {
+      "path": "src/adapters/http/pages/knowledge_view_tests.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/adapters/http/pages/local_agents/mod.rs",
+      "lines": 26
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "lines": 577
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox/inbox.rs",
+      "lines": 70
+    },
+    {
+      "path": "src/adapters/http/pages/notifications.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/adapters/http/pages/tests.rs",
+      "lines": 569
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_conversation_tests.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "lines": 17
+    },
+    {
+      "path": "src/adapters/http/routes/authorization_test_support.rs",
+      "lines": 27
+    },
+    {
+      "path": "src/adapters/http/routes/channel.rs",
+      "lines": 100
+    },
+    {
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+      "lines": 42
+    },
+    {
+      "path": "src/adapters/http/routes/live_updates.rs",
+      "lines": 55
+    },
+    {
+      "path": "src/adapters/http/routes/ui.rs",
+      "lines": 711
+    },
+    {
+      "path": "src/adapters/http/routes/ui/inbox.rs",
+      "lines": 63
+    },
+    {
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "lines": 51
+    },
+    {
+      "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+      "lines": 26
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_asset_tests.rs",
+      "lines": 142
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_tests.rs",
+      "lines": 513
+    },
+    {
+      "path": "src/adapters/http/routes/ui_internal_notes.rs",
+      "lines": 157
+    },
+    {
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "lines": 99
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents.rs",
+      "lines": 16
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents_tests.rs",
+      "lines": 24
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message.rs",
+      "lines": 53
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_diagnostics.rs",
+      "lines": 51
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "lines": 74
+    },
+    {
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "lines": 97
+    },
+    {
+      "path": "src/adapters/persistence/account_identity.rs",
+      "lines": 17
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/bindings.rs",
+      "lines": 257
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/direct.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/identity_races.rs",
+      "lines": 379
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/ingress.rs",
+      "lines": 478
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_authority_tests.rs",
+      "lines": 209
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_race_tests.rs",
+      "lines": 241
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notifications.rs",
+      "lines": 423
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/rejoin.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/status.rs",
+      "lines": 192
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/validation.rs",
+      "lines": 254
+    },
+    {
+      "path": "src/adapters/persistence/channel.rs",
+      "lines": 42
+    },
+    {
+      "path": "src/adapters/persistence/dashboard_tests.rs",
+      "lines": 40
+    },
+    {
+      "path": "src/adapters/persistence/delivery/tests.rs",
+      "lines": 21
+    },
+    {
+      "path": "src/adapters/persistence/integration/binding.rs",
+      "lines": 116
+    },
+    {
+      "path": "src/adapters/persistence/integration/email_binding.rs",
+      "lines": 315
+    },
+    {
+      "path": "src/adapters/persistence/integration/mod.rs",
+      "lines": 51
+    },
+    {
+      "path": "src/adapters/persistence/integration/tests.rs",
+      "lines": 117
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/management/tests.rs",
+      "lines": 24
+    },
+    {
+      "path": "src/adapters/persistence/notification.rs",
+      "lines": 79
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_message.rs",
+      "lines": 20
+    },
+    {
+      "path": "src/adapters/persistence/notification/direct_message.rs",
+      "lines": 63
+    },
+    {
+      "path": "src/adapters/persistence/notification/escalation_notice.rs",
+      "lines": 13
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection.rs",
+      "lines": 125
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection_lock.rs",
+      "lines": 12
+    },
+    {
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "lines": 13
+    },
+    {
+      "path": "src/adapters/persistence/participant.rs",
+      "lines": 61
+    },
+    {
+      "path": "src/adapters/persistence/test_support.rs",
+      "lines": 15
+    },
+    {
+      "path": "src/adapters/persistence/thread/external.rs",
+      "lines": 83
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "lines": 337
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+      "lines": 63
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_target.rs",
+      "lines": 171
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "lines": 229
+    },
+    {
+      "path": "src/adapters/persistence/thread/internal_note.rs",
+      "lines": 161
+    },
+    {
+      "path": "src/adapters/persistence/thread/message.rs",
+      "lines": 123
+    },
+    {
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "lines": 475
+    },
+    {
+      "path": "src/adapters/persistence/thread/read_tests.rs",
+      "lines": 143
+    },
+    {
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "lines": 26
+    },
+    {
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "lines": 74
+    },
+    {
+      "path": "src/adapters/persistence/thread/view_tests.rs",
+      "lines": 40
+    },
+    {
+      "path": "src/adapters/persistence/thread/views.rs",
+      "lines": 34
+    },
+    {
+      "path": "src/adapters/persistence/user.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_capacity_tests.rs",
+      "lines": 12
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+      "lines": 13
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_membership_tests.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs",
+      "lines": 15
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_binding_tests.rs",
+      "lines": 20
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "lines": 48
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_tests.rs",
+      "lines": 23
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_delivery_tests.rs",
+      "lines": 14
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "lines": 25
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "lines": 28
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "lines": 88
+    },
+    {
+      "path": "src/adapters/protocols/email/egress.rs",
+      "lines": 106
+    },
+    {
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "lines": 30
+    },
+    {
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "lines": 38
+    },
+    {
+      "path": "src/adapters/protocols/email/parser.rs",
+      "lines": 116
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_egress_tests.rs",
+      "lines": 73
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_tests.rs",
+      "lines": 69
+    },
+    {
+      "path": "src/adapters/smtp/server.rs",
+      "lines": 36
+    },
+    {
+      "path": "src/application/ports/channel.rs",
+      "lines": 16
+    },
+    {
+      "path": "src/application/ports/integration.rs",
+      "lines": 56
+    },
+    {
+      "path": "src/application/ports/participant.rs",
+      "lines": 31
+    },
+    {
+      "path": "src/application/ports/thread/mod.rs",
+      "lines": 63
+    },
+    {
+      "path": "src/application/services/test_support.rs",
+      "lines": 24
+    },
+    {
+      "path": "src/application/transport/compose.rs",
+      "lines": 14
+    },
+    {
+      "path": "src/application/transport/delivery.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/application/transport/ingress.rs",
+      "lines": 82
+    },
+    {
+      "path": "src/application/transport/mod.rs",
+      "lines": 14
+    },
+    {
+      "path": "src/application/transport/ports.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/application/transport/tests.rs",
+      "lines": 20
+    },
+    {
+      "path": "src/application/use_cases/channel.rs",
+      "lines": 24
+    },
+    {
+      "path": "src/application/use_cases/integration.rs",
+      "lines": 57
+    },
+    {
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "lines": 102
+    },
+    {
+      "path": "src/application/use_cases/thread/address_grouping_tests.rs",
+      "lines": 25
+    },
+    {
+      "path": "src/application/use_cases/thread/address_resolution_tests.rs",
+      "lines": 221
+    },
+    {
+      "path": "src/application/use_cases/thread/department_desk_relay_tests.rs",
+      "lines": 14
+    },
+    {
+      "path": "src/application/use_cases/thread/inbox.rs",
+      "lines": 174
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "lines": 105
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "lines": 68
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "lines": 71
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "lines": 223
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "lines": 513
+    },
+    {
+      "path": "src/application/use_cases/thread/mod.rs",
+      "lines": 223
+    },
+    {
+      "path": "src/application/use_cases/thread/notices.rs",
+      "lines": 142
+    },
+    {
+      "path": "src/application/use_cases/thread/reads.rs",
+      "lines": 279
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "lines": 488
+    },
+    {
+      "path": "src/application/use_cases/thread/tests.rs",
+      "lines": 243
+    },
+    {
+      "path": "src/application/workflow/authorization.rs",
+      "lines": 45
+    },
+    {
+      "path": "src/application/workflow/message.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/application/workflow/message_planner.rs",
+      "lines": 25
+    },
+    {
+      "path": "src/application/workflow/templates/test_support.rs",
+      "lines": 29
+    },
+    {
+      "path": "src/application/workflow/tests.rs",
+      "lines": 33
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/association.rs",
+      "lines": 20
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/cancellation.rs",
+      "lines": 16
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/mod.rs",
+      "lines": 16
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/reader_errors.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/domain/entities/address.rs",
+      "lines": 46
+    },
+    {
+      "path": "src/domain/entities/internal_note.rs",
+      "lines": 29
+    },
+    {
+      "path": "src/domain/entities/message_view.rs",
+      "lines": 11
+    },
+    {
+      "path": "src/domain/entities/notification.rs",
+      "lines": 133
+    },
+    {
+      "path": "src/domain/entities/thread.rs",
+      "lines": 42
+    },
+    {
+      "path": "src/domain/entities/transport/integration.rs",
+      "lines": 56
+    },
+    {
+      "path": "src/infra/events.rs",
+      "lines": 44
+    }
+  ],
+  "reviewed": [
+    "migrations/20260817000000_init_schema.sql",
+    "src/adapters/http/pages/desk_wording_tests.rs",
+    "src/adapters/http/pages/knowledge_view_tests.rs",
+    "src/adapters/http/pages/local_agents/mod.rs",
+    "src/adapters/http/pages/mailbox.rs",
+    "src/adapters/http/pages/mailbox/inbox.rs",
+    "src/adapters/http/pages/notifications.rs",
+    "src/adapters/http/pages/tests.rs",
+    "src/adapters/http/pages/workflow_conversation_tests.rs",
+    "src/adapters/http/pages/workflow_decision.rs",
+    "src/adapters/http/routes/authorization_test_support.rs",
+    "src/adapters/http/routes/channel.rs",
+    "src/adapters/http/routes/channel/simulation.rs",
+    "src/adapters/http/routes/channel_authorization_tests.rs",
+    "src/adapters/http/routes/live_updates.rs",
+    "src/adapters/http/routes/ui.rs",
+    "src/adapters/http/routes/ui/inbox.rs",
+    "src/adapters/http/routes/ui_attachments.rs",
+    "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+    "src/adapters/http/routes/ui_direct_asset_tests.rs",
+    "src/adapters/http/routes/ui_direct_tests.rs",
+    "src/adapters/http/routes/ui_internal_notes.rs",
+    "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+    "src/adapters/http/routes/ui_local_agents.rs",
+    "src/adapters/http/routes/ui_local_agents_tests.rs",
+    "src/adapters/http/routes/ui_message.rs",
+    "src/adapters/http/routes/ui_message_diagnostics.rs",
+    "src/adapters/http/routes/ui_message_tests.rs",
+    "src/adapters/http/routes/ui_stream_tests.rs",
+    "src/adapters/persistence/account_identity.rs",
+    "src/adapters/persistence/address_tests/bindings.rs",
+    "src/adapters/persistence/address_tests/direct.rs",
+    "src/adapters/persistence/address_tests/identity_races.rs",
+    "src/adapters/persistence/address_tests/ingress.rs",
+    "src/adapters/persistence/address_tests/notification_authority_tests.rs",
+    "src/adapters/persistence/address_tests/notification_race_tests.rs",
+    "src/adapters/persistence/address_tests/notifications.rs",
+    "src/adapters/persistence/address_tests/rejoin.rs",
+    "src/adapters/persistence/address_tests/status.rs",
+    "src/adapters/persistence/address_tests/validation.rs",
+    "src/adapters/persistence/channel.rs",
+    "src/adapters/persistence/dashboard_tests.rs",
+    "src/adapters/persistence/delivery/tests.rs",
+    "src/adapters/persistence/integration/binding.rs",
+    "src/adapters/persistence/integration/email_binding.rs",
+    "src/adapters/persistence/integration/mod.rs",
+    "src/adapters/persistence/integration/tests.rs",
+    "src/adapters/persistence/local_agents/management/tests.rs",
+    "src/adapters/persistence/notification.rs",
+    "src/adapters/persistence/notification/agent_notice_message.rs",
+    "src/adapters/persistence/notification/direct_message.rs",
+    "src/adapters/persistence/notification/escalation_notice.rs",
+    "src/adapters/persistence/notification/projection.rs",
+    "src/adapters/persistence/notification/projection_lock.rs",
+    "src/adapters/persistence/notification/reviewer_notice.rs",
+    "src/adapters/persistence/participant.rs",
+    "src/adapters/persistence/test_support.rs",
+    "src/adapters/persistence/thread/external.rs",
+    "src/adapters/persistence/thread/inbound.rs",
+    "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+    "src/adapters/persistence/thread/inbound_target.rs",
+    "src/adapters/persistence/thread/inbound_tests.rs",
+    "src/adapters/persistence/thread/internal_note.rs",
+    "src/adapters/persistence/thread/message.rs",
+    "src/adapters/persistence/thread/mod.rs",
+    "src/adapters/persistence/thread/read_tests.rs",
+    "src/adapters/persistence/thread/test_support.rs",
+    "src/adapters/persistence/thread/tests.rs",
+    "src/adapters/persistence/thread/view_tests.rs",
+    "src/adapters/persistence/thread/views.rs",
+    "src/adapters/persistence/user.rs",
+    "src/adapters/persistence/workflow/agent_history_capacity_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_membership_tests.rs",
+    "src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs",
+    "src/adapters/persistence/workflow/escalation_agent_binding_tests.rs",
+    "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+    "src/adapters/persistence/workflow/knowledge_e2e_tests.rs",
+    "src/adapters/persistence/workflow/message.rs",
+    "src/adapters/persistence/workflow/message_delivery_tests.rs",
+    "src/adapters/persistence/workflow/message_intent_tests.rs",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/message_thread_tests.rs",
+    "src/adapters/protocols/email/egress.rs",
+    "src/adapters/protocols/email/egress_tests.rs",
+    "src/adapters/protocols/email/ingress.rs",
+    "src/adapters/protocols/email/parser.rs",
+    "src/adapters/protocols/email/test_support.rs",
+    "src/adapters/protocols/email/trace_egress_tests.rs",
+    "src/adapters/protocols/email/trace_tests.rs",
+    "src/adapters/smtp/server.rs",
+    "src/application/ports/channel.rs",
+    "src/application/ports/integration.rs",
+    "src/application/ports/participant.rs",
+    "src/application/ports/thread/mod.rs",
+    "src/application/services/test_support.rs",
+    "src/application/transport/compose.rs",
+    "src/application/transport/delivery.rs",
+    "src/application/transport/ingress.rs",
+    "src/application/transport/mod.rs",
+    "src/application/transport/ports.rs",
+    "src/application/transport/tests.rs",
+    "src/application/use_cases/channel.rs",
+    "src/application/use_cases/integration.rs",
+    "src/application/use_cases/participant/test_support.rs",
+    "src/application/use_cases/thread/address_grouping_tests.rs",
+    "src/application/use_cases/thread/address_resolution_tests.rs",
+    "src/application/use_cases/thread/department_desk_relay_tests.rs",
+    "src/application/use_cases/thread/inbox.rs",
+    "src/application/use_cases/thread/ingest/canonical.rs",
+    "src/application/use_cases/thread/ingest/commit.rs",
+    "src/application/use_cases/thread/ingest/mod.rs",
+    "src/application/use_cases/thread/ingest/policy.rs",
+    "src/application/use_cases/thread/ingest/relay.rs",
+    "src/application/use_cases/thread/ingest/routing.rs",
+    "src/application/use_cases/thread/mod.rs",
+    "src/application/use_cases/thread/notices.rs",
+    "src/application/use_cases/thread/reads.rs",
+    "src/application/use_cases/thread/test_support.rs",
+    "src/application/use_cases/thread/tests.rs",
+    "src/application/workflow/authorization.rs",
+    "src/application/workflow/message.rs",
+    "src/application/workflow/message_planner.rs",
+    "src/application/workflow/templates/test_support.rs",
+    "src/application/workflow/tests.rs",
+    "src/application/workflow/tests/authorization_cases/association.rs",
+    "src/application/workflow/tests/authorization_cases/cancellation.rs",
+    "src/application/workflow/tests/authorization_cases/mod.rs",
+    "src/application/workflow/tests/authorization_cases/reader_errors.rs",
+    "src/domain/entities/address.rs",
+    "src/domain/entities/internal_note.rs",
+    "src/domain/entities/message_view.rs",
+    "src/domain/entities/notification.rs",
+    "src/domain/entities/thread.rs",
+    "src/domain/entities/transport/integration.rs",
+    "src/infra/events.rs"
+  ],
+  "coverage_note": "All 136 B2 delta paths inspected. Mechanical fixture/signature propagations reviewed as deltas; unchanged bodies were not uniformly reread. Production targets, locks, lifecycle guards, shared readers, UI, notification worker paths and decisive new test assertions received deeper source review."
+}

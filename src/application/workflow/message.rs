@@ -240,8 +240,8 @@ pub(crate) fn invalid_message() -> AppError {
 /// A channel this message may be sent through or published into, as persistence read it.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct ChannelRoute {
-    pub id: Uuid,
+pub struct MessageSender {
+    pub target: crate::entities::address::AddressTarget,
     pub slug: ChannelSlug,
     pub name: String,
 }
@@ -254,8 +254,52 @@ pub struct MessageRoutes {
     pub company_slug: CompanySlug,
     pub correlation_id: CorrelationId,
     pub targets: Vec<RouteTarget>,
+    pub author: WorkflowMessageAuthor,
     /// The run's: `InAppOnly` publishes every email target in-app, with no delivery (p08 D1.7).
     pub delivery_policy: crate::application::workflow::DeliveryPolicy,
+}
+
+/// The authenticated producer, independent of the mailbox used for delivery.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(
+    tag = "kind",
+    content = "principal",
+    rename_all = "snake_case",
+    deny_unknown_fields
+)]
+pub enum WorkflowMessageAuthor {
+    System,
+    Agent(crate::entities::transport::PrincipalId),
+}
+
+impl WorkflowMessageAuthor {
+    pub(crate) fn matches_write(
+        self,
+        author: &crate::application::ports::thread::MessageAuthorWrite,
+    ) -> bool {
+        use crate::application::ports::thread::MessageAuthorWrite;
+        match (self, author) {
+            (Self::System, MessageAuthorWrite::Platform) => true,
+            (Self::Agent(expected), MessageAuthorWrite::Principal(actual)) => expected == *actual,
+            _ => false,
+        }
+    }
+
+    pub fn message_author(self) -> crate::application::ports::thread::MessageAuthorWrite {
+        match self {
+            Self::System => crate::application::ports::thread::MessageAuthorWrite::Platform,
+            Self::Agent(principal) => {
+                crate::application::ports::thread::MessageAuthorWrite::Principal(principal)
+            }
+        }
+    }
+
+    pub const fn role(self) -> crate::entities::message::MessageRole {
+        match self {
+            Self::System => crate::entities::message::MessageRole::System,
+            Self::Agent(_) => crate::entities::message::MessageRole::Agent,
+        }
+    }
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -268,12 +312,12 @@ pub enum RouteTarget {
         user: Uuid,
         principal: Uuid,
         email: EmailAddress,
-        sender: ChannelRoute,
+        sender: MessageSender,
     },
     ReplyEmail {
         source: CanonicalMessageId,
         thread: Uuid,
-        sender: ChannelRoute,
+        sender: MessageSender,
         recipient: EmailAddress,
         in_reply_to: MessageId,
         references: Vec<MessageId>,
@@ -283,7 +327,7 @@ pub enum RouteTarget {
     ReplyInternal {
         source: CanonicalMessageId,
         thread: Uuid,
-        channel: Uuid,
+        target: crate::entities::address::AddressTarget,
     },
 }
 
@@ -294,7 +338,7 @@ pub enum RouteTarget {
 #[serde(deny_unknown_fields)]
 pub struct SourceRelay {
     pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
+    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
 }
 
 /// What publication must find unchanged under its locks.
@@ -307,19 +351,19 @@ pub enum RouteCheck {
         user: Uuid,
         principal: Uuid,
         email: EmailAddress,
-        sender: Uuid,
+        sender: crate::entities::address::AddressTarget,
     },
     Source {
         source: CanonicalMessageId,
         thread: Uuid,
-        channel: Uuid,
+        target: crate::entities::address::AddressTarget,
     },
 }
 
 #[derive(Debug, Clone)]
 pub struct NewThread {
     pub id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub subject: String,
 }
 
@@ -328,9 +372,8 @@ pub struct PlannedDestination {
     pub kind: DestinationKind,
     pub destination_id: Uuid,
     pub new_thread: Option<NewThread>,
-    /// The channel of `thread_id`, stored so the destination row proves its message is filed in
-    /// that thread of that channel.
-    pub channel_id: Uuid,
+    /// The exact inbox of `thread_id`, enforced by the destination's message membership key.
+    pub target: crate::entities::address::AddressTarget,
     pub thread_id: Uuid,
     pub message: MessageWrite,
     pub delivery: Option<NewDelivery>,

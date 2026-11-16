@@ -133,6 +133,7 @@ impl Fixture {
             self.actor(),
             binding,
             BindingRequest {
+                escalation: None,
                 expected_state_revision: None,
                 association,
                 version,
@@ -345,6 +346,7 @@ fn ui_over(persistence: &PostgresPersistence, engine: &Engine, user: Uuid) -> Ui
             shared.clone(),
             shared.clone(),
             shared.clone(),
+            crate::use_cases::agent::SpamScanning::Unavailable,
         )),
         departments: reads.0,
         attention: reads.1,

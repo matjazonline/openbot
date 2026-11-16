@@ -1,0 +1,19 @@
+{
+  "dark": {
+    "light": false,
+    "buttonColor": "oklch(0.92 0.004 286.32)",
+    "buttonBackground": "oklch(0.14 0.005 285.823)",
+    "selectRadius": "4px"
+  },
+  "light": {
+    "light": true,
+    "buttonColor": "oklab(0.92 0.00112401 -0.00383883)",
+    "buttonBackground": "oklch(0.14 0.005 285.823)",
+    "selectRadius": "4px"
+  },
+  "pending": {
+    "request": true,
+    "disabled": true,
+    "saving": true
+  }
+}

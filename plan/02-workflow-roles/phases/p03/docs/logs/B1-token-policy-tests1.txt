@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'application::workflow::compiler::compile::budget_tests::workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_policy' (48692660) panicked at src/application/workflow/compiler/budget_tests.rs:82:64:
+called `Result::unwrap()` on an `Err` value: Diagnostic { code: "budget.reviewers", message: "Token reviewers must be explicit person principals", field_path: "/limits/root_budget/tokens/reviewers/0", span: SourceSpan { start: 442, end: 443, line: 14, column: 111 }, instance_path: None, schema_path: None }
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test application::workflow::compiler::compile::budget_tests::workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_policy ... FAILED
+
+failures:
+
+failures:
+    application::workflow::compiler::compile::budget_tests::workflow_token_allowance_freezes_explicit_reviewers_and_rejects_invalid_policy
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4207 filtered out; finished in 0.05s
+

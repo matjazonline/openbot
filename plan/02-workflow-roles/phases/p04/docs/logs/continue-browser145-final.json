@@ -1,0 +1,27 @@
+{
+  "body": "Decisions\n\nEscalation decision\n\nAcknowledged · hop 1\n\nEscalation decision saved\n\nrun b483c067\n\nReason: workflow.guard_violation · step start\n\nManually assigned; the automatic ladder has stopped.\n\nAssigned recipients\nReview <img src=x onerror=alert(1)> & \"team\" · Withdrawn\nCommand history\n\nAcknowledged\n\nAccount f5c3a0cf-84df-4c47-9f99-8e50df24ebd6 · principal f1895d53-0667-4f02-9d91-78aed3800824 · 2026-11-14T02:01:01.199444+00:00\n\nYou cannot submit a new command for this assignment.",
+  "forms": 0,
+  "images": 0,
+  "steps": [
+    {
+      "reassign_forms": 1,
+      "options": [
+        "Review <img src=x onerror=alert(1)> & \"team\"",
+        "admin",
+        "member"
+      ]
+    },
+    {
+      "post": "/ui/workflow-decisions/escalations/3193d8b0-3564-41ce-816e-c4a29ebe892a/submit"
+    },
+    {
+      "after_reassign": "Decisions\n\nEscalation decision\n\nReassigned · hop 1\n\nEscalation decision saved\n\nrun b483c067\n\nReason: workflow.guard_violation · step start\n\nAcknowledgement deadline: 2026-11-15T02:00:58.432268+00:00\n\nAssigned recipients\nReview <img src=x onerror=alert(1)> & \"team\" · Withdrawn\nCommand history\n\nReassigned to f1895d53-0667-4f02-9d91-78aed3800824\n\nAccount f5c3a0cf-84df-4c47-9f99-8e50df24ebd6 · principal f1895d53-0667-4f02-9d91-78aed3800824 · 2026-11-14T02:01:00.535426+00:00\n\nView current assignment\n\nYou cannot submit a new command for this assignment."
+    },
+    {
+      "current": "http://127.0.0.1:65266/ui/workflow-decisions/escalations/090bd09b-3230-4712-a251-44ee2858bdc4"
+    },
+    {
+      "post": "/ui/workflow-decisions/escalations/090bd09b-3230-4712-a251-44ee2858bdc4/submit"
+    }
+  ]
+}

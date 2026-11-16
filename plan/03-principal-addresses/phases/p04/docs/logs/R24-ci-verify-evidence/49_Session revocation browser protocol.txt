@@ -1,0 +1,32 @@
+﻿2026-11-16T14:46:05.1553884Z ##[group]Run cargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored
+2026-11-16T14:46:05.1554588Z [36;1mcargo test --locked --offline --lib dump_session_revocation_browser_fixtures -- --ignored[0m
+2026-11-16T14:46:05.1555145Z [36;1mnode --test scripts/tests/session-revocation-browser.mjs[0m
+2026-11-16T14:46:05.1582538Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:46:05.1582936Z env:
+2026-11-16T14:46:05.1583271Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:46:05.1583728Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:46:05.1584273Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:46:05.1584661Z   SQLX_OFFLINE: true
+2026-11-16T14:46:05.1585005Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:46:05.1585361Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:46:05.1585894Z   CARGO_TERM_COLOR: always
+2026-11-16T14:46:05.1586270Z   CACHE_ON_FAILURE: false
+2026-11-16T14:46:05.1586674Z   SESSION_REVOCATION_BROWSER_FIXTURES: /tmp/session-revocation-browser
+2026-11-16T14:46:05.1587099Z ##[endgroup]
+2026-11-16T14:46:05.3538658Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:46:05.3717390Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:46:05.3787432Z 
+2026-11-16T14:46:05.3787899Z running 1 test
+2026-11-16T14:46:06.1620733Z test adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures ... ok
+2026-11-16T14:46:06.1621364Z 
+2026-11-16T14:46:06.1621754Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.78s
+2026-11-16T14:46:06.1622197Z 
+2026-11-16T14:46:06.8661735Z ✔ failed password change preserves the browser; a committed change clears its cookie and navigates to login (428.569877ms)
+2026-11-16T14:46:06.8773876Z ℹ tests 1
+2026-11-16T14:46:06.8774566Z ℹ suites 0
+2026-11-16T14:46:06.8775077Z ℹ pass 1
+2026-11-16T14:46:06.8775515Z ℹ fail 0
+2026-11-16T14:46:06.8776353Z ℹ cancelled 0
+2026-11-16T14:46:06.8776972Z ℹ skipped 0
+2026-11-16T14:46:06.8777450Z ℹ todo 0
+2026-11-16T14:46:06.8778005Z ℹ duration_ms 682.170669

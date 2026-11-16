@@ -93,6 +93,7 @@ impl BindingFixture {
     }
     pub(super) fn request(&self, expected: Option<BindingStateRevision>) -> ConfigureBinding {
         ConfigureBinding {
+            escalation: None,
             target: self.target,
             expected,
             association: RelatedAssociation::Company,

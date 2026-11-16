@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 24s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 4 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_actual_worker_proves_outbox_opt_out_and_secure_open_without_a_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_one_retired_recipient_preserves_the_capable_recipients_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_receipts_reject_forged_opt_out_and_source_rebinding ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4274 filtered out; finished in 3.83s
+

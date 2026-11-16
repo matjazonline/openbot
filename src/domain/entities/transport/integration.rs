@@ -1,8 +1,7 @@
-//! Provider accounts a company has installed, and the protocol interfaces a business channel
-//! exposes through them.
+//! Provider accounts a company has installed, and protocol interfaces on desks and principals.
 //!
 //! A [`Channel`](crate::entities::channel::Channel) is not an inbox and not a conversation. It
-//! owns agents, policy and threads; a [`ChannelBinding`] is one protocol-facing interface onto it.
+//! owns shared intake and its policy; a [`ChannelBinding`] is an interface onto an addressable target.
 //! That is what lets a channel gain a second transport without a nullable column per provider,
 //! and what lets one interface be paused while the rest of the channel keeps working.
 //!
@@ -20,7 +19,7 @@ use super::{
     BindingAuditEventId, ChannelBindingId, EndpointNamespace, ExternalEndpointKey,
     ExternalTenantKey, InstallationId, InvalidTransportValue, TransportKind, stored_enum,
 };
-use crate::entities::creation::CreationProvenance;
+use crate::entities::{address::AddressTarget, creation::CreationProvenance};
 
 stored_enum! {
     /// Whether a provider account can currently be used, and if not, why not.
@@ -78,13 +77,13 @@ impl BindingStatus {
 stored_enum! {
     /// Who may read and write through this interface.
     ///
-    /// `ChannelAcl` defers entirely to the channel's principal grants.
+    /// `TargetAcl` defers to the addressed desk's or principal's access policy.
     /// `ConversationMembersReadAndParticipate` is the explicit, audited grant that linking a
     /// private provider conversation makes to every current *and future* member of it -- the name
     /// is the one `docs/transport_architecture.md` fixes, spelled out because "members" alone does
     /// not say that it also lets them submit messages.
     BindingAccessPolicy as "binding access policy" {
-        ChannelAcl => "channel_acl",
+        TargetAcl => "target_acl",
         ConversationMembersReadAndParticipate => "conversation_members_read_and_participate",
     }
 }
@@ -115,6 +114,8 @@ stored_enum! {
         ChannelDisabled => "channel_disabled",
         /// Provider state and stored state disagree; a human has to look.
         ProviderDrift => "provider_drift",
+        /// A direct address was retired; history keeps its interface, without a live endpoint.
+        PrincipalRetired => "principal_retired",
     }
 }
 
@@ -234,7 +235,7 @@ impl BindingAccessSnapshot {
 pub struct ChannelBinding {
     pub id: ChannelBindingId,
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
     pub installation_id: Option<InstallationId>,
     pub transport: TransportKind,
     /// The scope in which `external_endpoint_key` is unique: a provider workspace for an

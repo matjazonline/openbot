@@ -1,0 +1,9 @@
+All 8 declared retained evidence hashes match. Static inspection identities only; no behavioral or implementation acceptance.
+logs/C1-r1.md
+logs/C1-R1-inputs.json
+logs/B1-preparation-role-errors-app.txt
+logs/B1-preparation-role-constructors-app.txt
+logs/B1-preparation-sample-refusal-callers.txt
+logs/B1-preparation-refusal-persistence-all.txt
+logs/B1-preparation-capture-error-callers.txt
+logs/B1-preparation-bounded-snapshots-callers.txt

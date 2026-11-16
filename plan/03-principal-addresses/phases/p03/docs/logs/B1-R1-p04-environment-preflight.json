@@ -1,0 +1,11 @@
+{
+  "node": "/opt/homebrew/bin/node",
+  "npm": "/opt/homebrew/bin/npm",
+  "docker": null,
+  "cargo": "/Users/mac02/.cargo/bin/cargo",
+  "psql": "/opt/homebrew/bin/psql",
+  "trail": "/opt/homebrew/bin/trail",
+  "frontend_dependencies": true,
+  "cloudroom_dependencies": true,
+  "memory_model_manifest": true
+}

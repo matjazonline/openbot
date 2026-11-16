@@ -26,13 +26,13 @@ async fn pending_final_question() -> FinalQuestion {
         "deadline":{"literal":(chrono::Utc::now()+chrono::Duration::minutes(10)).to_rfc3339()},
         "payload_schema":{"literal":MessageTriggerInput::schema()}});
     let s = Box::pin(Intents::new()).await;
-    let owner = s.owner().user_id();
+    let owner_principal = s.owner_principal();
     let fixture = Box::pin(FinalFixture::from_case(
         s,
         FinalCase {
             source,
             contract: literal_contract("Approved response"),
-            policy: Some(ReplyApprovalPolicy::new(vec![owner], 60).unwrap()),
+            policy: Some(ReplyApprovalPolicy::new(vec![owner_principal], 60).unwrap()),
             run_as: None,
             publication: FinalPublication::Messaging,
             delivery_policy: DeliveryPolicy::Deliver,

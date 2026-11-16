@@ -20,7 +20,10 @@ use crate::{
 
 pub(crate) const AGENT_COLUMNS: &str = "\
     agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \
-    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, agent.native_permissions";
+    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, agent.native_permissions, \
+    COALESCE((SELECT principal.open_to_public FROM principals AS principal \
+      WHERE principal.company_id = agent.company_id AND principal.agent_id = agent.id \
+        AND principal.kind = 'agent'), false) AS open_to_public";
 
 #[derive(sqlx::FromRow, Debug, Serialize)]
 pub struct AgentDb {
@@ -37,6 +40,7 @@ pub struct AgentDb {
     pub created_by: serde_json::Value,
     pub created_at: DateTime<Utc>,
     pub draft_revision: i64,
+    pub open_to_public: bool,
 }
 
 #[derive(sqlx::FromRow)]
@@ -58,6 +62,7 @@ impl TryFrom<AgentDb> for Agent {
                 })
                 .ok_or_else(|| AppError::Internal("Invalid agents.draft_revision".into()))?,
             company_id: db.company_id,
+            open_to_public: db.open_to_public,
             name: db.name,
             slug: db.slug,
             provider: db.provider,
@@ -103,6 +108,11 @@ pub(crate) async fn insert_agent_on(
     write: &AgentWrite,
 ) -> AppResult<()> {
     let created_by = validated_created_by(write)?;
+    if company_id.is_none() && write.open_to_public {
+        return Err(AppError::BadRequest(
+            "Library agents have no direct address to open.".into(),
+        ));
+    }
     sqlx::query(
         r#"INSERT INTO agents
            (id, company_id, name, slug, provider, model, system_prompt, description,
@@ -281,6 +291,36 @@ pub(crate) async fn update_agent(
     db.try_into()
 }
 
+pub(super) async fn write_direct_settings_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company_id: Option<Uuid>,
+    id: Uuid,
+    write: &AgentWrite,
+) -> AppResult<()> {
+    let Some(company) = company_id else {
+        return if write.open_to_public {
+            Err(AppError::BadRequest(
+                "Library agents have no direct address to open.".into(),
+            ))
+        } else {
+            Ok(())
+        };
+    };
+    let updated: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE principals AS principal SET open_to_public = $3, display_label = $4, \
+           settings_revision = principal.settings_revision + CASE WHEN agent.slug::text <> $5 THEN 1 ELSE 0 END, \
+           updated_at = CURRENT_TIMESTAMP \
+         FROM agents AS agent WHERE principal.company_id = $1 AND principal.agent_id = $2 \
+           AND principal.kind = 'agent' AND agent.company_id = principal.company_id \
+           AND agent.id = principal.agent_id RETURNING principal.id",
+    )
+    .bind(company).bind(id).bind(write.open_to_public).bind(&write.name).bind(&write.slug)
+    .fetch_optional(&mut **tx).await?;
+    updated
+        .ok_or_else(|| AppError::NotFound("Agent principal not found in this company.".into()))?;
+    Ok(())
+}
+
 pub(in crate::adapters::persistence) async fn update_agent_on(
     tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
     company_id: Option<Uuid>,
@@ -288,8 +328,9 @@ pub(in crate::adapters::persistence) async fn update_agent_on(
     write: &AgentWrite,
 ) -> AppResult<AgentDb> {
     validated_created_by(write)?;
+    write_direct_settings_on(tx, company_id, id, write).await?;
     replace_agent_capabilities_on(tx, company_id, id, write).await?;
-    sqlx::query_as::<_, AgentDb>(&format!(
+    let stored = sqlx::query_as::<_, AgentDb>(&format!(
         r#"UPDATE agents AS agent
            SET name = $1, slug = $2, provider = $3, model = $4, system_prompt = $5,
                description = $6, avatar_url = $7, draft_revision = draft_revision + 1,
@@ -310,7 +351,40 @@ pub(in crate::adapters::persistence) async fn update_agent_on(
     .fetch_optional(&mut **tx)
     .await
     .map_err(slug_conflict)?
-    .ok_or_else(crate::use_cases::agent::agent_not_found)
+    .ok_or_else(crate::use_cases::agent::agent_not_found)?;
+    if let Some(company) = company_id {
+        sync_agent_address_on(tx, company, id, &write.slug).await?;
+    }
+    Ok(stored)
+}
+
+async fn sync_agent_address_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company: Uuid,
+    agent: Uuid,
+    slug: &str,
+) -> AppResult<()> {
+    // write_direct_settings_on already holds this principal before any binding lock.
+    let principal: Option<Uuid> = sqlx::query_scalar(
+        "UPDATE addresses AS address SET slug=$3 FROM principals AS principal \
+         WHERE principal.company_id=$1 AND principal.agent_id=$2 AND principal.kind='agent' \
+           AND address.company_id=principal.company_id AND address.principal_id=principal.id \
+         RETURNING principal.id",
+    )
+    .bind(company)
+    .bind(agent)
+    .bind(slug)
+    .fetch_optional(&mut **tx)
+    .await
+    .map_err(slug_conflict)?;
+    let principal = principal
+        .ok_or_else(|| AppError::Internal("Company agent has no direct address".into()))?;
+    super::integration::email_binding::sync_principal_email_binding_on(
+        tx,
+        company,
+        crate::entities::transport::PrincipalId::new(principal),
+    )
+    .await
 }
 
 fn slug_conflict(error: sqlx::Error) -> AppError {
@@ -339,6 +413,7 @@ impl AgentPersistence for PostgresPersistence {
             &write.name,
         )
         .await?;
+        write_direct_settings_on(&mut transaction, Some(company_id), id, &write).await?;
         let db = sqlx::query_as::<_, AgentDb>(&format!(
             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE id = $1"
         ))
@@ -432,13 +507,14 @@ pub(in crate::adapters::persistence) struct AgentDeleteLocks {
     company: Option<Uuid>,
 }
 
-/// The locks agent deletion takes before writing: its company `FOR KEY SHARE`, then the agent
+/// The locks agent deletion takes before writing: its company `FOR NO KEY UPDATE`, then the agent
 /// `FOR UPDATE`. `None` when the agent is gone.
 ///
 /// The company comes first (memory E2 order users → company → … → agent): company deletion
 /// takes `FOR UPDATE` and then the memory rows before cascading to agents, so an agent delete
 /// holding the agent and then retiring its namespaces would deadlock with it (review p7b r1 M4).
-/// `KEY SHARE` blocks only that deletion, never `FOR NO KEY UPDATE` writers.
+/// The company lock also serializes principal demotion and derived channel-grant cleanup with
+/// admission and department writers, before either side locks channels or the agent (02WR-P02-D1/r2).
 ///
 /// Locking the agent next means a concurrent `create_agent_principal_on` -- whose foreign key
 /// check needs a share lock on this row -- either committed before us, so its principal is
@@ -457,7 +533,7 @@ pub(in crate::adapters::persistence) async fn lock_agent_delete_on(
         return Ok(None);
     };
     if let Some(company) = company {
-        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR KEY SHARE")
+        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
             .bind(company)
             .fetch_optional(&mut **transaction)
             .await?;
@@ -484,6 +560,7 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
     // principal, as `remove_member` leaves a removed member's: with no identity left, no
     // inbound address can reach them.
     if let Some(company_id) = company_id {
+        retire_direct_workflow_on(transaction, company_id, id).await?;
         // After the agent lock (memory E9): a lazy provisioning holding it `FOR SHARE`
         // committed first and its namespace is retired here, or it waits and finds no agent.
         super::memory::retire_namespaces_on(
@@ -507,6 +584,54 @@ pub(in crate::adapters::persistence) async fn finish_agent_delete_on(
         .execute(&mut **transaction)
         .await
         .map_err(agent_delete_error)?;
+    if let Some(company) = company_id {
+        Box::pin(super::workflow::follow_reviewers::refresh_on(
+            transaction,
+            crate::domain::workflow::CompanyId::new(company),
+        ))
+        .await?;
+    }
+    Ok(())
+}
+
+async fn retire_direct_workflow_on(
+    tx: &mut sqlx::Transaction<'_, sqlx::Postgres>,
+    company: Uuid,
+    agent: Uuid,
+) -> AppResult<()> {
+    let principal: Option<Uuid> = sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 FOR UPDATE",
+    )
+    .bind(company)
+    .bind(agent)
+    .fetch_optional(&mut **tx)
+    .await?;
+    let Some(principal) = principal else {
+        return Ok(());
+    };
+    let retained: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM threads WHERE company_id=$1 AND principal_id=$2) \
+         OR EXISTS(SELECT 1 FROM workflow_runs WHERE company_id=$1 AND principal_id=$2)",
+    )
+    .bind(company)
+    .bind(principal)
+    .fetch_one(&mut **tx)
+    .await?;
+    if retained {
+        return Err(AppError::Conflict(
+            "This agent has direct threads or runs and cannot be deleted.".into(),
+        ));
+    }
+    // Keep the settings revision; clear its selection before removing the actual binding.
+    sqlx::query(
+        "UPDATE channel_reply_settings SET revision=revision+1,binding_id=NULL,binding_revision=NULL, \
+         contract=NULL,approval_policy=NULL WHERE company_id=$1 AND principal_id=$2 AND binding_id IS NOT NULL",
+    ).bind(company).bind(principal).execute(&mut **tx).await?;
+    sqlx::query("DELETE FROM workflow_bindings WHERE company_id=$1 AND principal_id=$2")
+        .bind(company)
+        .bind(principal)
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }
 
@@ -523,6 +648,12 @@ fn agent_delete_error(error: sqlx::Error) -> AppError {
         Some("agent_revisions_company_id_agent_id_fkey") => AppError::Conflict(
             "This agent has published revisions and cannot be deleted. Deactivate it instead."
                 .into(),
+        ),
+        Some("workflow_binding_revisions_company_id_version_id_fkey" | "agent_manifest_revisions_company_id_agent_id_revision_id_fkey") => AppError::Conflict(
+            "This agent is referenced by a retained workflow binding or manifest and cannot be deleted.".into(),
+        ),
+        Some("agent_binding_grants_company_id_agent_id_binding_id_fkey" | "agent_skill_grants_company_id_agent_id_assignment_id_skill_fkey") => AppError::Conflict(
+            "This agent has retained capability grant records and cannot be deleted.".into(),
         ),
         Some(
             "task_harness_runs_company_id_agent_id_fkey"
@@ -597,6 +728,7 @@ mod tests {
         let db = AgentDb {
             native_permissions: "full".into(),
             draft_revision: 1,
+            open_to_public: false,
             id: Uuid::new_v4(),
             company_id: None,
             name: "Broken".into(),
@@ -698,6 +830,11 @@ mod tests {
         .await
         .unwrap();
 
+        crate::adapters::persistence::test_support::register_native_agent_address(
+            &persistence,
+            &agent,
+        )
+        .await;
         assert_eq!(agent.name, "Support Agent");
         assert_eq!(agent.slug, "support-agent");
         assert_eq!(agent.provider.as_deref(), Some("openai"));

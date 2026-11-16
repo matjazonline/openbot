@@ -18,6 +18,9 @@ use crate::application::workflow::completion::{
 use crate::domain::workflow::{RouteSelection, StepId, TransitionTarget};
 use std::sync::atomic::AtomicBool;
 
+#[path = "action_cancellation_completion_lock_support.rs"]
+mod lock_support;
+
 #[derive(Clone, Copy, Debug)]
 enum Route {
     /// The step routes to `$end`: a committed completion makes the run terminal.
@@ -169,38 +172,19 @@ async fn race(
     });
     let cancel = f.persistence().cancel(command);
     tokio::pin!(completion, cancel);
-    let (first_pid, second_pid) = match first {
-        First::Cancel => {
-            let cancel_pid = blocked(
-                &mut observer,
-                gate_pid,
-                "SELECT id FROM workflow_executions",
-                cancel.as_mut(),
-            )
-            .await;
-            probe_run(&mut observer, request, RunLock::Held).await;
-            let completion_pid = tokio::select! {
-                result = cancel.as_mut() => panic!("cancel escaped its execution gate: {result:?}"),
-                pid = blocked(&mut observer, cancel_pid, "SELECT binding_id,max_steps FROM workflow_runs", completion.as_mut()) => pid,
-            };
-            (cancel_pid, completion_pid)
-        }
-        First::Completion => {
-            let completion_pid = blocked(
-                &mut observer,
-                gate_pid,
-                "SELECT response_disposition,completed_at,committed_output",
-                completion.as_mut(),
-            )
-            .await;
-            probe_run(&mut observer, request, RunLock::Held).await;
-            let cancel_pid = tokio::select! {
-                result = completion.as_mut() => panic!("completion escaped its execution gate: {result:?}"),
-                pid = blocked(&mut observer, completion_pid, "FROM workflow_runs AS run", cancel.as_mut()) => pid,
-            };
-            (completion_pid, cancel_pid)
-        }
-    };
+    // Box the observation phase to keep both real contenders off the debug parent frame.
+    let lock_support::Owners {
+        first: first_pid,
+        second: second_pid,
+    } = Box::pin(lock_support::ordinary(
+        &mut observer,
+        request,
+        gate_pid,
+        first,
+        cancel.as_mut(),
+        completion.as_mut(),
+    ))
+    .await;
     assert_ne!(first_pid, second_pid);
     gate.rollback().await.unwrap();
     let released_ms = started.elapsed().as_millis();
@@ -561,21 +545,23 @@ async fn workflow_action_cancellation_completion_race_resolved_commit_fails_ordi
     };
     let cancel = f.persistence().cancel(command);
     tokio::pin!(completion, cancel);
-    let running = || !done.load(Ordering::SeqCst);
-    let waiting: [&dyn Fn() -> bool; 1] = [&running];
-    let completing = tokio::select! {
-        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
-        pid = gate.stalled(&mut observer, &waiting) => pid,
-    };
-    probe_run(&mut observer, &request, RunLock::Held).await;
-    let resolution = tokio::select! {
-        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
-        pid = resolution_behind(&mut observer, completing, policy, &waiting) => pid,
-    };
-    let cancel_pid = tokio::select! {
-        result = completion.as_mut() => panic!("completion escaped its COMMIT gate: {result:?}"),
-        pid = blocked(&mut observer, resolution, "FROM workflow_runs AS run", cancel.as_mut()) => pid,
-    };
+    // Box the gated resolution observation without widening its attempt/observer bounds.
+    let lock_support::ResolutionOwners {
+        completing,
+        resolution,
+        cancel: cancel_pid,
+    } = Box::pin(lock_support::resolution(
+        lock_support::CommitObservation {
+            observer: &mut observer,
+            gate: &mut gate,
+            request: &request,
+            policy,
+            done: &done,
+        },
+        completion.as_mut(),
+        cancel.as_mut(),
+    ))
+    .await;
     eprintln!(
         "resolved-commit control: completing={completing} resolution={resolution} cancel={cancel_pid}"
     );

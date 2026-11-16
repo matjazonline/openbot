@@ -12,7 +12,8 @@ use serde_json::{Value, json};
 pub(super) struct RootReply {
     pub intent_id: Uuid,
     pub message_id: Uuid,
-    pub channel_id: Uuid,
+    pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Uuid,
     pub actor_id: Uuid,
     pub contract: Value,
@@ -22,11 +23,22 @@ pub(super) struct RootReply {
     binding_id: Uuid,
 }
 
+impl RootReply {
+    fn target(&self) -> AppResult<AddressTarget> {
+        AddressTarget::from_parts(
+            self.channel_id,
+            self.principal_id
+                .map(crate::entities::transport::PrincipalId::new),
+        )
+        .ok_or_else(invalid)
+    }
+}
+
 pub(super) async fn root_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<RootReply>> {
-    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.thread_id,context.actor_id, \
+    Ok(sqlx::query_as("SELECT context.intent_id,context.message_id,context.channel_id,context.principal_id,context.thread_id,context.actor_id, \
         context.contract,context.approval_policy,context.source,run.deadline,run.binding_id \
         FROM channel_reply_runs AS owned JOIN channel_reply_contexts AS context USING(company_id,intent_id) \
         JOIN workflow_runs AS run ON run.company_id=owned.company_id AND run.id=owned.run_id \
@@ -34,60 +46,24 @@ pub(super) async fn root_on(
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(db).await?)
 }
 
-/// Account/company locks precede run locks even when suppression needs no message grant.
-pub(super) async fn prelock_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<()> {
-    let owned: bool = sqlx::query_scalar(
-        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs WHERE company_id=$1 AND run_id=$2)",
+pub(super) fn pending_reply_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+) -> impl std::future::Future<Output = Result<bool, sqlx::Error>> + '_ {
+    sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM channel_reply_runs AS owned \
+         JOIN workflow_executions AS execution ON execution.company_id=owned.company_id AND execution.run_id=owned.run_id \
+         JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
+         WHERE owned.company_id=$1 AND owned.run_id=$2 AND execution.id=$3 AND job.id=$4 AND execution.completed_at IS NULL)",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
-    .fetch_one(&mut *db)
-    .await?;
-    if owned {
-        action_authority::prelock_on(
-            db,
-            ActionScope {
-                company: scope.company,
-                run: scope.run,
-                execution: scope.execution,
-            },
-        )
-        .await?;
-    }
-    Ok(())
+    .bind(scope.execution.as_uuid())
+    .bind(scope.job.0)
+    .fetch_one(db)
 }
 
-#[derive(sqlx::FromRow)]
-struct ControlScope {
-    execution_id: Uuid,
-}
-pub(super) async fn prelock_control_on(
-    db: &mut PgConnection,
-    company: CompanyId,
-    run: RunId,
-    actor: WorkflowActor,
-) -> AppResult<()> {
-    let scope: Option<ControlScope>=sqlx::query_as("SELECT execution.id AS execution_id FROM channel_reply_runs AS owned \
-        JOIN workflow_executions AS execution ON execution.company_id=owned.company_id AND execution.run_id=owned.run_id \
-        JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
-        WHERE owned.company_id=$1 AND owned.run_id=$2 ORDER BY execution.activation DESC LIMIT 1")
-        .bind(company.as_uuid()).bind(run.as_uuid()).fetch_optional(&mut *db).await?;
-    if let Some(scope) = scope {
-        action_authority::prelock_accounts_on(
-            db,
-            ActionScope {
-                company,
-                run,
-                execution: ExecutionId::new(scope.execution_id),
-            },
-            Some(actor),
-        )
-        .await?;
-        // The scope is a lock hint only. The control reloads the real run under its own lock.
-    }
-    Ok(())
-}
-
+/// Account/company locks precede run locks; immutable completed facts need no live recipients.
 pub(super) async fn authorize_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -112,7 +88,7 @@ pub(super) async fn authorize_source_on(
         scope.company,
         actor,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(root.channel_id),
+            target: root.target()?,
             thread_id: RelatedThreadId::new(root.thread_id),
         },
     )
@@ -126,10 +102,12 @@ pub(super) async fn policy_current_on(
 ) -> AppResult<bool> {
     let current: Option<Option<Value>> = sqlx::query_scalar(
         "SELECT approval_policy FROM channel_reply_settings \
-        WHERE company_id=$1 AND channel_id=$2 AND binding_id IS NOT NULL FOR SHARE",
+        WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2::uuid \
+            AND principal_id IS NOT DISTINCT FROM $3::uuid AND binding_id IS NOT NULL FOR SHARE",
     )
     .bind(scope.company.as_uuid())
     .bind(root.channel_id)
+    .bind(root.principal_id)
     .fetch_optional(&mut *db)
     .await?;
     Ok(current.as_ref() == Some(&root.approval_policy))
@@ -148,6 +126,13 @@ pub(super) enum PreparedFinal {
     Parked,
 }
 
+pub(super) fn final_response_disposition(
+    completion: &PureCompletion,
+) -> Option<ResponseDisposition> {
+    (completion.state == RunState::Succeeded && completion.target == TransitionTarget::End)
+        .then_some(completion.response_disposition)
+}
+
 pub(super) async fn prepare_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -155,13 +140,13 @@ pub(super) async fn prepare_on(
     owner: completion_job::CompletionOwner,
     notices: Option<&DecisionNotices>,
 ) -> AppResult<PreparedFinal> {
-    if completion.state != RunState::Succeeded || completion.target != TransitionTarget::End {
+    let Some(disposition) = final_response_disposition(completion) else {
         return Ok(PreparedFinal::Unowned);
-    }
+    };
     let Some(root) = root_on(db, scope).await? else {
         return Ok(PreparedFinal::Unowned);
     };
-    if completion.response_disposition == ResponseDisposition::Suppressed {
+    if disposition == ResponseDisposition::Suppressed {
         return Ok(PreparedFinal::Suppressed {
             intent: root.intent_id,
         });
@@ -274,7 +259,7 @@ async fn stage_on(
             .await?;
     let document = json!({"company":scope.company.as_uuid(),"run":scope.run.as_uuid(),"execution":scope.execution.as_uuid(),
         "proposal":proposal,"intent":root.intent_id,"source":root.source,"source_message":root.message_id,
-        "actor":root.actor_id,"channel":root.channel_id,"thread":root.thread_id,"output":completion.output,
+        "actor":root.actor_id,"target":root.target()?,"thread":root.thread_id,"output":completion.output,
         "content":content,"recipients":recipients,"route_snapshot":route_snapshot,"approval_policy":root.approval_policy,"approval_deadline":approval.as_ref().map(|a|a.deadline)});
     let integrity = integrity_on(db, &document).await?;
     let action = final_action(action_scope, root, proposal, integrity, content.clone())?;

@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Probe: which row-lock mode does `UPDATE principals SET kind=...` take when `kind` is part of
+# a non-partial UNIQUE (company_id, id, kind) constraint, as in the init schema?
+# Disposable database, created and dropped here. No project data is touched.
+set -u
+BASE="postgres://mac02@127.0.0.1:52471"
+DB="b_lockprobe_$(date +%s)_$$"
+createdb -h 127.0.0.1 -p 52471 -U mac02 "$DB" || exit 1
+URL="$BASE/$DB"
+trap 'dropdb -h 127.0.0.1 -p 52471 -U mac02 --if-exists "$DB"' EXIT
+
+psql -X -q "$URL" -v ON_ERROR_STOP=1 <<'SQL'
+CREATE TABLE principals (
+    id uuid PRIMARY KEY, company_id uuid NOT NULL, kind text NOT NULL, display_label text NOT NULL,
+    CONSTRAINT principals_company_id_id_key UNIQUE (company_id, id),
+    CONSTRAINT principals_company_id_id_kind_key UNIQUE (company_id, id, kind));
+INSERT INTO principals VALUES ('00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-0000000000c1','person','P');
+SQL
+
+# Session A holds a row lock of the given mode for 3 s; session B tries an UPDATE with a 1 s lock_timeout.
+probe() {
+  local mode="$1" update="$2"
+  psql -X -q "$URL" -c "BEGIN; SELECT id FROM principals WHERE id='00000000-0000-0000-0000-000000000001' $mode; SELECT pg_sleep(3); ROLLBACK;" >/dev/null &
+  local holder=$!
+  sleep 0.7
+  local out
+  out=$(psql -X -q "$URL" -c "SET lock_timeout='1s'; BEGIN; $update; ROLLBACK;" 2>&1)
+  if echo "$out" | grep -q "lock timeout"; then result="BLOCKED"; else result="proceeded"; fi
+  printf '%-16s | %-58s | %s\n' "$mode" "$update" "$result"
+  wait "$holder"
+}
+
+echo "holder lock      | concurrent statement                                       | outcome"
+probe "FOR KEY SHARE" "UPDATE principals SET kind='external'"
+probe "FOR KEY SHARE" "UPDATE principals SET display_label='Q'"
+probe "FOR SHARE"     "UPDATE principals SET kind='external'"
+probe "FOR SHARE"     "UPDATE principals SET display_label='Q'"

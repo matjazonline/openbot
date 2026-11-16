@@ -1,0 +1,34 @@
+{
+  "round": "02WR-P04-D4-R1",
+  "note": "02WR-P04-D4-R1/N1",
+  "stage": "architecture gate only",
+  "decision": "02WR-P04-D4/r1",
+  "worktree": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot",
+  "branch": "room/check-last-handoff-md-under-plan-02-work-qc8d",
+  "review_base": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "head": "2bbe2649024aa6a4617b74b0c0c7868b14590b5f",
+  "artifact": "433c79c9a1660fb2766c01b4d5ad5fdedc425d96d8d6c8b7c56bbbb84bda6367",
+  "entry_snapshot_observed": "433c79c9a1660fb2766c01b4d5ad5fdedc425d96d8d6c8b7c56bbbb84bda6367",
+  "excludes": [
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p01/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p02/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p03/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/phases/p04/docs",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/COORDINATION.md",
+    "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md"
+  ],
+  "coordination_revision": 36,
+  "coordination_path": "/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/02-workflow-roles/COORDINATION.md",
+  "reviewer_thread": "thr_9t82uwgsiu",
+  "requested_model": "gpt-6-astra",
+  "requested_effort": "high",
+  "actual_settings_evidence": "Coordinator thr_c7pja4f7ef reported Cloudroom execution metadata confirms gpt-6-astra/high during this review; no direct provider telemetry exposed to reviewer.",
+  "inputs": {
+    "logs/D4-r1.md": "db4f960de6d7fee0ecb598ddf225935faf63e93a9fce7bff885bf25d219ebcc6",
+    "logs/D4-r1-coordination.md": "ee72ad94707f92f6543905232f5e185ffb551e96fcdf10b735fa210ddd10fdde",
+    "logs/D4-r1-inputs.json": "d8be8dc8dddd2d7ce19ea45d42c38f591e1d1b93d9d65198482f4a60cfd09be9",
+    "logs/D1-r3.md": "4108fc4f34238bc9ebb5dbd28397ca50b6d72022a871e7fb0d9bd6561d9716e6",
+    "logs/D2-r2.md": "9d356f988ef5059d3703804837db066fe34d52a9a95331135dab1dbf1c8be448",
+    "logs/D3-r1.md": "08eb7ffb51a1e2e7f6165265b0f510f83e71a7b39d70dc625bae8de47b36764c"
+  }
+}

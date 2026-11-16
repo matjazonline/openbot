@@ -16,14 +16,14 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, ChannelSelector, ExternalMessageKey, ExternalThreadKey,
+            AddressSelector, ChannelBindingId, DeliveryId, ExternalMessageKey, ExternalThreadKey,
             TransportKind, UnsupportedTransport,
         },
         value_objects::{EmailAddress, MessageId},
     },
     transport::{
         delivery::{
-            DeliveryEnvelope, DeliveryIntent, DeliveryPlanRequest, ProviderSendOutcome,
+            DeliveryEnvelope, DeliveryIntent, DeliveryPlanRequest, PartIndex, ProviderSendOutcome,
             RenderedPart, StandaloneDeliveryEnvelope,
         },
         ingress::{InboundCommitOutcome, InboundCommitRequest},
@@ -40,10 +40,22 @@ use crate::{
 /// the mapping that would deduplicate its redelivery.
 #[async_trait]
 pub trait InboundMessageCommitter: Send + Sync {
+    /// Authenticate the stored delivery part before considering its recipients.
+    async fn authenticate_internal_relay(
+        &self,
+        mail: &InternalRelayMail<'_>,
+    ) -> AppResult<Option<AuthenticatedRelaySource>>;
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuthenticatedRelaySource {
+    pub company_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
+    pub agent_principal: Option<crate::entities::transport::PrincipalId>,
 }
 
 /// Read-only resolution of provider keys, for the decisions that must happen before the commit.
@@ -139,6 +151,13 @@ pub trait TransportRenderer: Send + Sync {
         company: &crate::entities::value_objects::CompanySlug,
         nonce: Uuid,
     ) -> AppResult<ExternalMessageKey>;
+
+    /// Render a registered application address using this deployment's transport namespace.
+    fn application_address(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity>;
 }
 
 /// One external request, and what the provider said about it.
@@ -183,7 +202,7 @@ pub trait InternalMailRelay: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct InternalRelayMail<'a> {
     /// The email adapter has already interpreted its own address syntax into application intent.
-    pub target: &'a ChannelSelector,
+    pub target: &'a AddressSelector,
     pub from: &'a EmailAddress,
     pub recipient_to: &'a EmailAddress,
     pub subject: &'a str,
@@ -193,12 +212,66 @@ pub struct InternalRelayMail<'a> {
     pub references: &'a [MessageId],
     /// The channel this mail goes out as. Checked against the stated sender address, so a relayed
     /// message cannot claim to come from a channel it does not.
-    pub source_channel_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
     /// Hops this message *is*, not hops it answers: the same value the wire header carries, so an
     /// internal hop costs exactly what an external one costs.
     pub hop_count: u32,
-    pub trace: Vec<Uuid>,
+    pub trace: Vec<crate::entities::address::AddressTarget>,
     pub correlation_id: CorrelationId,
+    /// Which frozen delivery part this mail is. The receiving commit proves it against the stored
+    /// part, so a hop inherits its source message's provenance only through a real delivery.
+    pub proof: InternalRelayProof,
+}
+
+/// The claimed delivery part one internal hop carries, as the delivery worker handed it over.
+///
+/// Server-internal by construction: neither serializable nor parsed from a header, so no inbound
+/// adapter can state it. It is a claim, not a verdict -- the receiving commit checks every field
+/// against the persisted delivery, its frozen part and the stored message before accepting it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct InternalRelayProof {
+    company_id: Uuid,
+    delivery_id: DeliveryId,
+    part_index: PartIndex,
+}
+
+impl InternalRelayProof {
+    /// The proof of the part a sender is posting, from the record and part it was handed.
+    pub fn of(delivery: &DeliveryRecord, part: &RenderedPart) -> Self {
+        Self {
+            company_id: delivery.company_id,
+            delivery_id: delivery.id,
+            part_index: part.index,
+        }
+    }
+
+    /// A claim naming a delivery part outright: for a test whose commit is a double that records
+    /// it, or whose claim the real commit is meant to refuse. Production proofs come only from
+    /// [`Self::of`].
+    #[cfg(test)]
+    pub(crate) const fn claiming(
+        company_id: Uuid,
+        delivery_id: DeliveryId,
+        part_index: PartIndex,
+    ) -> Self {
+        Self {
+            company_id,
+            delivery_id,
+            part_index,
+        }
+    }
+
+    pub const fn company_id(self) -> Uuid {
+        self.company_id
+    }
+
+    pub const fn delivery_id(self) -> DeliveryId {
+        self.delivery_id
+    }
+
+    pub const fn part_index(self) -> PartIndex {
+        self.part_index
+    }
 }
 
 /// What the internal relay did with a mail.

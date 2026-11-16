@@ -22,9 +22,10 @@ pub enum Fixture {
     ReviewFeedbackSuccessor,
     /// A department lead's desk (01DEP-P03-D12); its department framing comes from preparation.
     DepartmentLead,
+    RoleLeadResponse,
 }
 
-pub const ALL: [Fixture; 8] = [
+pub const ALL: [Fixture; 9] = [
     Fixture::ReviewedSupport,
     Fixture::AutonomousResponse,
     Fixture::TriageRouting,
@@ -33,6 +34,7 @@ pub const ALL: [Fixture; 8] = [
     Fixture::McpLookup,
     Fixture::ReviewFeedbackSuccessor,
     Fixture::DepartmentLead,
+    Fixture::RoleLeadResponse,
 ];
 
 impl Fixture {
@@ -46,6 +48,7 @@ impl Fixture {
             Self::McpLookup => include_str!("mcp-lookup.yaml"),
             Self::ReviewFeedbackSuccessor => include_str!("review-feedback-successor.yaml"),
             Self::DepartmentLead => include_str!("department-lead.yaml"),
+            Self::RoleLeadResponse => include_str!("role-lead-response.yaml"),
         }
     }
 
@@ -59,6 +62,7 @@ impl Fixture {
             Self::McpLookup => 106,
             Self::ReviewFeedbackSuccessor => 107,
             Self::DepartmentLead => 108,
+            Self::RoleLeadResponse => 109,
         };
         VersionId::new(Uuid::from_u128(suffix))
     }
@@ -70,6 +74,7 @@ impl Fixture {
     /// Caller chooses the test tenant. These synthetic facts never confer authority.
     pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {
         match self {
+            Self::RoleLeadResponse => DependencySnapshots::default(),
             Self::ReviewedSupport
             | Self::AutonomousResponse
             | Self::RepeatedHumanRevision
@@ -101,7 +106,7 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots 
         ],
         Fixture::RepeatedHumanRevision => &[("specialist", AgentUseMode::Tools)],
         Fixture::DepartmentLead => &[("lead", AgentUseMode::Tools)],
-        Fixture::McpLookup => &[],
+        Fixture::McpLookup | Fixture::RoleLeadResponse => &[],
     };
     let key = match fixture {
         Fixture::DepartmentLead => "lead",

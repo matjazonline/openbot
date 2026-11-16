@@ -1,0 +1,2 @@
+plan/attribution-service/phases/p10/docs/logs/AS-P10-PUSH-R1.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 1, "PASS": 8}
+1 evidence manifest(s) validated; declared results are not acceptance

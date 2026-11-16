@@ -1,0 +1,176 @@
+
+running 15 tests
+probe run=ac42e1b7-f0c9-416c-ad53-6a6a0382e710 company=77d5e3e9-4699-4992-8bca-a9a7f6e84649 phase=query_and_drain elapsed_us=0
+probe run=ac42e1b7-f0c9-416c-ad53-6a6a0382e710 company=77d5e3e9-4699-4992-8bca-a9a7f6e84649 phase=done elapsed_us=3259 sqlstate=None
+probe run=acac38df-3002-4648-9c63-e65dcf39acbe company=77d5e3e9-4699-4992-8bca-a9a7f6e84649 phase=query_and_drain elapsed_us=0
+probe run=acac38df-3002-4648-9c63-e65dcf39acbe company=77d5e3e9-4699-4992-8bca-a9a7f6e84649 phase=done elapsed_us=504 sqlstate=None
+probe controls unlocked_rejected=true missing_rejected=true observer_pid=28524 clean=true
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::contention::workflow_action_reconciliation_control_serialization_probe_negative_controls ... ok
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=query_and_drain elapsed_us=0
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=done elapsed_us=468 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28532 pid=28431 elapsed_ms=9 hang_guard=10s
+held probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a first_pid=28431 gate_pid=28532 observer_pid=28533
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=query_and_drain elapsed_us=0
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=done elapsed_us=180 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28431 pid=28531 elapsed_ms=8 hang_guard=10s
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=query_and_drain elapsed_us=0
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=done elapsed_us=254 sqlstate=None
+probe run=83293902-6fa5-4803-99de-c5d8b16c7ad9 company=b17d8a40-7fa9-4746-a566-0c7512537d6a phase=quiescent first_pid=28431 second_pid=28531 observer_pid=28533 inspector_pid=28532 drain_ms=1 first_busy=null
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=query_and_drain elapsed_us=0
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=done elapsed_us=434 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28535 pid=28540 elapsed_ms=1 hang_guard=10s
+held probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 first_pid=28540 gate_pid=28535 observer_pid=28542
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=query_and_drain elapsed_us=0
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=done elapsed_us=191 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28540 pid=28539 elapsed_ms=8 hang_guard=10s
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=query_and_drain elapsed_us=0
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=done elapsed_us=248 sqlstate=None
+probe run=604384d0-8c81-4376-afb7-f3b335a8883f company=656e6796-1040-4565-9d27-e279bc6e1eb8 phase=quiescent first_pid=28540 second_pid=28539 observer_pid=28542 inspector_pid=28535 drain_ms=1 first_busy=null
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=query_and_drain elapsed_us=0
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=done elapsed_us=462 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28556 pid=28553 elapsed_ms=8 hang_guard=10s
+held probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 first_pid=28553 gate_pid=28556 observer_pid=28555
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=query_and_drain elapsed_us=0
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=done elapsed_us=231 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28553 pid=28554 elapsed_ms=8 hang_guard=10s
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=query_and_drain elapsed_us=0
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=done elapsed_us=276 sqlstate=None
+probe run=19ac02b5-4685-485f-9123-e2fc9bdde41a company=0512bbce-ac33-401b-8f6d-372819f5c697 phase=quiescent first_pid=28553 second_pid=28554 observer_pid=28555 inspector_pid=28556 drain_ms=1 first_busy=null
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=query_and_drain elapsed_us=0
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=done elapsed_us=402 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28563 pid=28560 elapsed_ms=1 hang_guard=10s
+held probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 first_pid=28560 gate_pid=28563 observer_pid=28557
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=query_and_drain elapsed_us=0
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=done elapsed_us=208 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28560 pid=28562 elapsed_ms=7 hang_guard=10s
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=query_and_drain elapsed_us=0
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=done elapsed_us=238 sqlstate=None
+probe run=fc76e6bb-4b4a-41ea-913f-9997e5de7aaf company=24a9b921-765e-40b1-9050-b0af5f8acf09 phase=quiescent first_pid=28560 second_pid=28562 observer_pid=28557 inspector_pid=28563 drain_ms=1 first_busy=null
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=query_and_drain elapsed_us=0
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=done elapsed_us=406 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28572 pid=28565 elapsed_ms=8 hang_guard=10s
+held probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 first_pid=28565 gate_pid=28572 observer_pid=28571
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=query_and_drain elapsed_us=0
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=done elapsed_us=215 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28565 pid=28569 elapsed_ms=7 hang_guard=10s
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=query_and_drain elapsed_us=0
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=done elapsed_us=242 sqlstate=None
+probe run=f4cfd880-b2ac-4d2f-ac79-2d9a3d70f251 company=0ea3411c-39b0-48b0-9de0-e35f3800fdf1 phase=quiescent first_pid=28565 second_pid=28569 observer_pid=28571 inspector_pid=28572 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_cancel_before_command ... ok
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=query_and_drain elapsed_us=0
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=done elapsed_us=390 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28577 pid=28573 elapsed_ms=1 hang_guard=10s
+held probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 first_pid=28573 gate_pid=28577 observer_pid=28579
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=query_and_drain elapsed_us=0
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=done elapsed_us=166 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28573 pid=28576 elapsed_ms=7 hang_guard=10s
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=query_and_drain elapsed_us=0
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=done elapsed_us=267 sqlstate=None
+probe run=d1270259-3a54-4c9d-814b-01d25c3d565a company=d4fe9786-9214-4b02-8c7f-5855ec0157a0 phase=quiescent first_pid=28573 second_pid=28576 observer_pid=28579 inspector_pid=28577 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_cancel ... ok
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=query_and_drain elapsed_us=0
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=done elapsed_us=482 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28588 pid=28586 elapsed_ms=1 hang_guard=10s
+held probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 first_pid=28586 gate_pid=28588 observer_pid=28581
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=query_and_drain elapsed_us=0
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=done elapsed_us=205 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28586 pid=28585 elapsed_ms=7 hang_guard=10s
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=query_and_drain elapsed_us=0
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=done elapsed_us=258 sqlstate=None
+probe run=370deb03-7068-47eb-90ec-9a5bbaa97661 company=fd3b2ea5-85c7-43db-a4e7-55217cb90969 phase=quiescent first_pid=28586 second_pid=28585 observer_pid=28581 inspector_pid=28588 drain_ms=1 first_busy=null
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=query_and_drain elapsed_us=0
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=done elapsed_us=475 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28596 pid=28593 elapsed_ms=9 hang_guard=10s
+held probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b first_pid=28593 gate_pid=28596 observer_pid=28589
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=query_and_drain elapsed_us=0
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=done elapsed_us=211 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28593 pid=28594 elapsed_ms=7 hang_guard=10s
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=query_and_drain elapsed_us=0
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=done elapsed_us=250 sqlstate=None
+probe run=ed2cd7ed-e5f1-4bdc-8412-f73314e347f3 company=294d85c1-46ae-46b8-b813-af1587cfc26b phase=quiescent first_pid=28593 second_pid=28594 observer_pid=28589 inspector_pid=28596 drain_ms=1 first_busy=null
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=query_and_drain elapsed_us=0
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=done elapsed_us=402 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28599 pid=28605 elapsed_ms=1 hang_guard=10s
+held probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e first_pid=28605 gate_pid=28599 observer_pid=28606
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=query_and_drain elapsed_us=0
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=done elapsed_us=173 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28605 pid=28607 elapsed_ms=8 hang_guard=10s
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=query_and_drain elapsed_us=0
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=done elapsed_us=230 sqlstate=None
+probe run=96ac616e-5085-4ae3-811d-691ffd9e6c4d company=96ed3013-f417-4a29-aeb0-589fd7b6133e phase=quiescent first_pid=28605 second_pid=28607 observer_pid=28606 inspector_pid=28599 drain_ms=1 first_busy=null
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=query_and_drain elapsed_us=0
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=done elapsed_us=414 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28610 pid=28613 elapsed_ms=9 hang_guard=10s
+held probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d first_pid=28613 gate_pid=28610 observer_pid=28614
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=query_and_drain elapsed_us=0
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=done elapsed_us=190 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28613 pid=28615 elapsed_ms=7 hang_guard=10s
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=query_and_drain elapsed_us=0
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=done elapsed_us=225 sqlstate=None
+probe run=9aec8014-2fb2-457b-9834-e08e8f6f7d56 company=d4c3094b-1315-420b-9433-7bd576cbfe0d phase=quiescent first_pid=28613 second_pid=28615 observer_pid=28614 inspector_pid=28610 drain_ms=1 first_busy=null
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=query_and_drain elapsed_us=0
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=done elapsed_us=453 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28624 pid=28621 elapsed_ms=1 hang_guard=10s
+held probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e first_pid=28621 gate_pid=28624 observer_pid=28618
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=query_and_drain elapsed_us=0
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=done elapsed_us=174 sqlstate=None
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28621 pid=28622 elapsed_ms=7 hang_guard=10s
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=query_and_drain elapsed_us=0
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=done elapsed_us=235 sqlstate=None
+probe run=7550eead-6739-42eb-ad99-dcc656dde04b company=294719be-5d36-4db8-b0d6-e9be4d579b0e phase=quiescent first_pid=28621 second_pid=28622 observer_pid=28618 inspector_pid=28624 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_command_before_expire ... ok
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=query_and_drain elapsed_us=0
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=done elapsed_us=455 sqlstate=None
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28636 pid=28633 elapsed_ms=8 hang_guard=10s
+held probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a first_pid=28633 gate_pid=28636 observer_pid=28630
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=query_and_drain elapsed_us=0
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=done elapsed_us=191 sqlstate=None
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28633 pid=28635 elapsed_ms=8 hang_guard=10s
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=query_and_drain elapsed_us=0
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=done elapsed_us=250 sqlstate=None
+probe run=94217f70-a884-4e65-b47b-217b49906c0a company=d7eef46c-470a-4224-a4b7-e1c1e347628a phase=quiescent first_pid=28633 second_pid=28635 observer_pid=28630 inspector_pid=28636 drain_ms=1 first_busy=null
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::workflow_action_reconciliation_control_serialization_expire_before_command ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28642 pid=28644 elapsed_ms=7 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28644 pid=28645 elapsed_ms=7 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28645 pid=28638 elapsed_ms=8 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_claim_first_dispatches_once ... ok
+observed lock wait statement="INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)" blocker=28652 pid=28653 elapsed_ms=8 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28653 pid=28654 elapsed_ms=8 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28654 pid=28648 elapsed_ms=6 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_debit_first_refuses_both_claimants ... ok
+observed lock wait statement="INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)" blocker=28661 pid=28662 elapsed_ms=9 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28662 pid=28659 elapsed_ms=8 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28659 pid=28660 elapsed_ms=7 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_race_tests::workflow_action_reconciliation_claim_race_rolled_back_debit_preserves_allowance ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28672 pid=28664 elapsed_ms=14 hang_guard=10s
+observed lock wait statement="SELECT id FROM workflow_executions" blocker=28682 pid=28679 elapsed_ms=9 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28679 pid=28680 elapsed_ms=7 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_cancel_first ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28686 pid=28689 elapsed_ms=8 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_aborted_task_usage_wait ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28696 pid=28695 elapsed_ms=9 hang_guard=10s
+observed lock wait statement="SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE" blocker=28695 pid=28694 elapsed_ms=6 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28708 pid=28699 elapsed_ms=16 hang_guard=10s
+public commit fault reached after verified prerequisites: error returned from database: injected deferred candidate claim commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_deferred_candidate ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28725 pid=28726 elapsed_ms=12 hang_guard=10s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_dropped_usage_wait ... ok
+public commit fault reached after verified prerequisites: error returned from database: injected deferred budget refusal commit
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_deferred_refusal ... ok
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28738 pid=28741 elapsed_ms=7 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28741 pid=28739 elapsed_ms=7 hang_guard=10s
+live DB deadline: usage waiter 28741 blocked by 28738, company waiter 28739 blocked by 28741
+observed DB expiry and released usage gate at 969.39875ms
+deadline rejection settled at 974.79ms
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28770 pid=28749 elapsed_ms=7 hang_guard=10s
+observed lock wait statement="SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE" blocker=28749 pid=28771 elapsed_ms=8 hang_guard=10s
+live DB deadline: usage waiter 28749 blocked by 28770, company waiter 28771 blocked by 28749
+observed DB expiry and released usage gate at 969.05875ms
+deadline rejection settled at 975.222125ms
+observed lock wait statement="SELECT usage.root_run_id FROM workflow_root_budget_usage" blocker=28790 pid=28785 elapsed_ms=14 hang_guard=10s
+usage waiter 28785 blocked by 28790, bounded timer returned Err(DatabaseTimeout("Workflow lease.claim not applied: persistence bound elapsed before commit")) after 1.001308416s
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::workflow_action_reconciliation_claim_abort_usage_deadline_and_timeout ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 4323 filtered out; finished in 20.20s
+

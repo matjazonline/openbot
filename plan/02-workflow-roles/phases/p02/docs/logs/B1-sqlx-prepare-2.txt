@@ -1,0 +1,4 @@
+$ cargo sqlx prepare -- --all-targets
+    Checking open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 21.85s
+query data written to .sqlx in the current directory; please check this into version control

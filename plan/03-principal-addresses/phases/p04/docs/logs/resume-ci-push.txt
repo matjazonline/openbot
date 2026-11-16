@@ -1,0 +1,6 @@
+remote: 
+remote: Create a pull request for 'codex/plan03-p04-cleanup-65d722f1' on GitHub by visiting:        
+remote:      https://github.com/matjazonline/openbot/pull/new/codex/plan03-p04-cleanup-65d722f1        
+remote: 
+To github.com:matjazonline/openbot.git
+ * [new branch]        65d722f1a5a3c5584b3b84ce901e6ab77635e633 -> codex/plan03-p04-cleanup-65d722f1

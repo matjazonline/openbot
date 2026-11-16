@@ -1,0 +1,130 @@
+{
+  "cases": 322,
+  "errors": [],
+  "max_ms": 554.94,
+  "over_500ms": 11,
+  "slowest": [
+    {
+      "ms": 554.94,
+      "case": "== agent_state role_only queued page 200 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 538.299,
+      "case": "== agent_top_level role_only page 50 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 534.986,
+      "case": "== agent_state role_only failed page 200 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 533.981,
+      "case": "== agent_cursor role_only page 50 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 524.713,
+      "case": "== agent_state role_only queued page 50 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 518.472,
+      "case": "== agent_top_level role_only page 200 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 517.3,
+      "case": "== agent role_only page 200 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 511.373,
+      "case": "== agent_cursor role_only page 200 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 509.85,
+      "case": "== agent_state role_only queued page 50 (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 508.359,
+      "case": "== agent_state role_only failed page 50 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 500.742,
+      "case": "== agent role_only page 50 (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 492.623,
+      "case": "== agent_cursor role_only page 200 (plan_cache_mode = auto)"
+    }
+  ],
+  "role_board_cases": [
+    {
+      "ms": 155.902,
+      "case": "== board_counts_agent role_only heavy week [no finished index] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 253.408,
+      "case": "== board_cards_agent role_only heavy week all visible [no finished index] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 233.179,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [no finished index] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 194.428,
+      "case": "== board_counts_agent role_only heavy week [no finished index] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 360.968,
+      "case": "== board_cards_agent role_only heavy week all visible [no finished index] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 242.937,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [no finished index] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 115.916,
+      "case": "== board_counts_agent role_only heavy week [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 144.794,
+      "case": "== board_cards_agent role_only heavy week all visible [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 251.251,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 153.369,
+      "case": "== board_counts_agent role_only heavy week [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 354.248,
+      "case": "== board_cards_agent role_only heavy week all visible [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 228.143,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [(A) (company_id, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 108.447,
+      "case": "== board_counts_agent role_only heavy week [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 132.641,
+      "case": "== board_cards_agent role_only heavy week all visible [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 66.717,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = auto)"
+    },
+    {
+      "ms": 142.886,
+      "case": "== board_counts_agent role_only heavy week [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 140.58,
+      "case": "== board_cards_agent role_only heavy week all visible [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    },
+    {
+      "ms": 72.869,
+      "case": "== board_cards_agent role_only heavy week 8 of 32 visible, no company runs [(B) (company_id, state, finished_at DESC, id DESC) top-level] (plan_cache_mode = force_generic_plan)"
+    }
+  ]
+}

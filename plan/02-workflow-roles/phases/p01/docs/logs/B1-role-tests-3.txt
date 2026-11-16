@@ -1,0 +1,16 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 59.12s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 8 tests
+test application::workflow::publication::tests::role_tests::workflow_role_publication_mixed_steps_keep_only_the_pinned_agent ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_sample_and_help_explain_the_same_requirement ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_publication_has_requirements_without_agent_capture_and_restores_exactly ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4168 filtered out; finished in 2.50s
+

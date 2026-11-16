@@ -1,0 +1,92 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0432]: unresolved import `crate::application::ports::department::Departments`
+  --> src/adapters/persistence/workflow/relay_identity_tests.rs:5:5
+   |
+ 5 | use crate::application::ports::department::Departments;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^-----------
+   |                                            |
+   |                                            no `Departments` in `application::ports::department`
+   |
+note: these items exist but are inaccessible
+  --> src/adapters/http/pages/company_settings.rs:24:5
+   |
+24 |     Departments,
+   |     ^^^^^^^^^^^ `crate::adapters::http::routes::ui_companies::tests::CompanyTab::Departments`: not accessible
+   |
+  ::: src/adapters/persistence/department_tests.rs:19:1
+   |
+19 | struct Departments {
+   | ^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::department::tests::Departments`: not accessible
+help: a similar name exists in the module
+   |
+ 5 - use crate::application::ports::department::Departments;
+ 5 + use crate::application::ports::department::Department;
+   |
+help: consider importing this variant instead
+   |
+ 5 - use crate::application::ports::department::Departments;
+ 5 + use crate::adapters::http::pages::CompanyPaneBody::Departments;
+   |
+
+error[E0603]: struct import `DepartmentScope` is private
+  --> src/adapters/persistence/workflow/relay_identity_tests.rs:6:49
+   |
+ 6 | use crate::application::use_cases::department::{DepartmentScope, DepartmentWrite};
+   |                                                 ^^^^^^^^^^^^^^^ private struct import
+   |
+note: the struct import `DepartmentScope` is defined here...
+  --> src/application/use_cases/department.rs:15:52
+   |
+15 |             DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,
+   |                                                    ^^^^^^^^^^^^^^^
+note: ...and refers to the struct `DepartmentScope` which is defined here
+  --> src/application/ports/department.rs:50:1
+   |
+50 | pub struct DepartmentScope {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+
+error[E0603]: struct import `DepartmentWrite` is private
+  --> src/adapters/persistence/workflow/relay_identity_tests.rs:6:66
+   |
+ 6 | use crate::application::use_cases::department::{DepartmentScope, DepartmentWrite};
+   |                                                                  ^^^^^^^^^^^^^^^ private struct import
+   |
+note: the struct import `DepartmentWrite` is defined here...
+  --> src/application/use_cases/department.rs:15:69
+   |
+15 |             DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,
+   |                                                                     ^^^^^^^^^^^^^^^
+note: ...and refers to the struct `DepartmentWrite` which is defined here
+  --> src/application/ports/department.rs:23:1
+   |
+23 | pub struct DepartmentWrite {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ you could import this directly
+
+error[E0599]: no method named `create` found for struct `persistence::department::PostgresDepartments` in the current scope
+   --> src/adapters/persistence/workflow/relay_identity_tests.rs:30:14
+    |
+ 26 | /             PostgresDepartments::new(
+ 27 | |                 p.clone(),
+ 28 | |                 crate::adapters::persistence::test_support::provisioning_templates(),
+ 29 | |             )
+ 30 | |             .create(
+    | |             -^^^^^^ method not found in `persistence::department::PostgresDepartments`
+    | |_____________|
+    |
+    |
+   ::: src/application/ports/department.rs:57:14
+    |
+ 57 |       async fn create(
+    |                ------ the method is available for `persistence::department::PostgresDepartments` here
+    |
+   ::: src/adapters/persistence/department.rs:580:1
+    |
+580 |   pub struct PostgresDepartments {
+    |   ------------------------------ method `create` not found for this struct
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: trait `DepartmentPersistence` which provides `create` is implemented but not in scope; perhaps you want to import it
+    |
+  2 + use crate::application::ports::department::DepartmentPersistence;
+    |
+

@@ -1,0 +1,33 @@
+﻿2026-11-16T14:45:56.6728258Z ##[group]Run cargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored
+2026-11-16T14:45:56.6728932Z [36;1mcargo test --locked --offline --lib dump_cloudroom_management_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:56.6729501Z [36;1mnode --test scripts/tests/local-agents-browser.mjs[0m
+2026-11-16T14:45:56.6757670Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:56.6758055Z env:
+2026-11-16T14:45:56.6758418Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:56.6758797Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:56.6759374Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:56.6759775Z   SQLX_OFFLINE: true
+2026-11-16T14:45:56.6760137Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:56.6760481Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:56.6760802Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:56.6761126Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:56.6761602Z   CLOUDROOM_MANAGEMENT_BROWSER_FIXTURES: /tmp/cloudroom-management-browser
+2026-11-16T14:45:56.6762089Z ##[endgroup]
+2026-11-16T14:45:56.8700286Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:56.8885289Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:56.8958132Z 
+2026-11-16T14:45:56.8958503Z running 1 test
+2026-11-16T14:45:57.9044823Z test adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures ... ok
+2026-11-16T14:45:57.9045513Z 
+2026-11-16T14:45:57.9046141Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 1.01s
+2026-11-16T14:45:57.9046957Z 
+2026-11-16T14:45:59.1200537Z ✔ local profile and session forms escape native output and acknowledge accepted writes (939.909405ms)
+2026-11-16T14:45:59.3992774Z ✔ an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation (280.909367ms)
+2026-11-16T14:45:59.4125791Z ℹ tests 2
+2026-11-16T14:45:59.4126545Z ℹ suites 0
+2026-11-16T14:45:59.4127038Z ℹ pass 2
+2026-11-16T14:45:59.4127576Z ℹ fail 0
+2026-11-16T14:45:59.4128007Z ℹ cancelled 0
+2026-11-16T14:45:59.4128443Z ℹ skipped 0
+2026-11-16T14:45:59.4128951Z ℹ todo 0
+2026-11-16T14:45:59.4129373Z ℹ duration_ms 1473.977951

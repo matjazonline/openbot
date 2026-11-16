@@ -14,6 +14,8 @@ pub struct Agent {
     pub company_id: Option<Uuid>,
     pub name: String,
     pub slug: String,
+    /// Admission to the principal address, independent of any desk this agent staffs.
+    pub open_to_public: bool,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,

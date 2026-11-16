@@ -34,7 +34,7 @@ async fn park_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
 ) -> AppResult<Option<ParkedWorkflow>> {
-    let Some(run) = waits::lock(db, scope).await? else {
+    let Some(run) = waits::lock(db, scope, waits::LockPurpose::Transition).await? else {
         return Ok(None);
     };
     if let Some(wait) = waits::row(db, scope, waits::WaitSelection::Execution).await? {
@@ -177,6 +177,7 @@ pub(super) fn configured_child(
         .collect();
     Ok(ConfiguredBinding::new(
         BindingConfiguration {
+            escalation: parent.escalation(),
             company_id: parent.company_id(),
             id: parent.id(),
             revision: parent.revision(),
@@ -218,6 +219,7 @@ struct ParentRun {
     content_exact: bool,
     actor_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     correlation_id: Uuid,
     delivery_policy: String,
@@ -233,14 +235,18 @@ pub(super) async fn create_on(
     start: &ChildStart<'_>,
 ) -> AppResult<ParkedWorkflow> {
     let parent = sqlx::query_as::<_, ParentRun>(
-        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level, content_exact FROM workflow_runs \
+        "SELECT actor_id, channel_id, principal_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level, content_exact FROM workflow_runs \
          WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
     .fetch_one(&mut *db)
     .await?;
-    let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: parent.channel_id,
+        principal_id: parent.principal_id,
+        thread_id: parent.thread_id,
+    })?;
     let child = RunId::new(Uuid::new_v4());
     let coordinates = child_coordinates(scope, start)?;
     let trigger = TriggerRef::new(

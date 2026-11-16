@@ -1,0 +1,88 @@
+{
+  "fixture": "open_bots_own_336bbb593207442aa01ffa9f9c234ba4",
+  "state": {
+    "runs": [
+      {
+        "id": "c9a3e2b7-aed1-48f1-988b-41c62110ec70",
+        "state": "running",
+        "target": "57756ac5-d5b1-412e-bbf4-275b4c93cd3c",
+        "binding": "04745c53-b26a-8983-babf-49cfa4fa6309",
+        "revision": 1
+      }
+    ],
+    "owned": [
+      {
+        "run_id": "c9a3e2b7-aed1-48f1-988b-41c62110ec70",
+        "intent_id": "315f37b8-db0e-464f-8a3a-c288d264370b",
+        "binding_id": "04745c53-b26a-8983-babf-49cfa4fa6309",
+        "company_id": "704c5d69-731e-4d3f-a86f-1c38e4b5e398",
+        "binding_revision": 1
+      }
+    ],
+    "contexts": [
+      {
+        "source": {
+          "id": "315f37b8-db0e-464f-8a3a-c288d264370b",
+          "role": "to",
+          "origin": "external",
+          "hop_count": 0,
+          "mentioned": false,
+          "thread_id": "388fb171-78d4-4f38-85c4-83d15a05ffae",
+          "admissible": true,
+          "channel_id": null,
+          "company_id": "704c5d69-731e-4d3f-a86f-1c38e4b5e398",
+          "created_at": "2026-11-15T11:19:30.245373+00:00",
+          "message_id": "cfb3ec32-813a-4b10-977d-f9567a39d654",
+          "principal_id": "57756ac5-d5b1-412e-bbf4-275b4c93cd3c",
+          "trace_targets": [],
+          "correlation_id": "20cfa377-0499-4551-8e66-953cf1e66f87",
+          "delivery_policy": "deliver",
+          "reply_to_message_id": null,
+          "responder_principal_id": "a935db7f-ef22-471b-a3f8-cfca6bb1643c"
+        },
+        "actor_id": "cc9b6bf4-b669-4110-806c-b00b988cfef7",
+        "contract": {
+          "body": {
+            "ref": "/input/body"
+          },
+          "subject": {
+            "literal": "Response"
+          },
+          "format_version": 1
+        },
+        "intent_id": "315f37b8-db0e-464f-8a3a-c288d264370b",
+        "thread_id": "388fb171-78d4-4f38-85c4-83d15a05ffae",
+        "binding_id": "04745c53-b26a-8983-babf-49cfa4fa6309",
+        "channel_id": null,
+        "company_id": "704c5d69-731e-4d3f-a86f-1c38e4b5e398",
+        "message_id": "cfb3ec32-813a-4b10-977d-f9567a39d654",
+        "principal_id": "57756ac5-d5b1-412e-bbf4-275b4c93cd3c",
+        "approval_policy": null,
+        "delivery_policy": "deliver",
+        "binding_revision": 1,
+        "settings_revision": 1,
+        "responder_principal_id": "a935db7f-ef22-471b-a3f8-cfca6bb1643c"
+      }
+    ],
+    "decisions": null,
+    "deliveries": null,
+    "executions": [
+      {
+        "step": "context",
+        "output": {
+          "items": [],
+          "omitted": 1,
+          "token_count": 0
+        },
+        "target": "draft",
+        "response": "automatic"
+      },
+      {
+        "step": "draft",
+        "output": null,
+        "target": null,
+        "response": "automatic"
+      }
+    ]
+  }
+}

@@ -1,0 +1,627 @@
+[
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "conflicts": [
+      {
+        "start": 16031,
+        "end": 17435,
+        "context": [
+          ");",
+          "",
+          ""
+        ],
+        "ours_lines": 1274,
+        "theirs_lines": 128,
+        "ours": [
+          "-- Admission role requirements and complete principal sets are sealed in the immutable root",
+          "-- dependency manifest (02WR-P02-D1/r2). These rows index that fact; they are not live role lookups.",
+          "ALTER TABLE public.agent_dependency_manifests ADD CONSTRAINT agent_manifest_roles_shape CHECK (",
+          "    (jsonb_typeof(content::jsonb->'roles') = 'array') IS TRUE",
+          ");",
+          "[more lines]",
+          "                    AND NOT EXISTS (SELECT 1 FROM public.workflow_decision_reviewers AS reviewer",
+          "                        WHERE reviewer.company_id=NEW.company_id AND reviewer.decision_id=NEW.empty_decision_id)))) THEN",
+          "            RAISE EXCEPTION 'escalation case must match its authoritative run'",
+          "                USING ERRCODE='23514',CONSTRAINT='workflow_escalation_case_guard';"
+        ],
+        "theirs": [
+          "-- Native MCP uses real private workflow publications and real worker-owned actions.",
+          "-- No backward compatibility: reset disposable databases for this provenance contract.",
+          "ALTER TABLE public.workflow_runs ADD COLUMN native_mcp_call_id uuid;",
+          "ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_native_call_identity",
+          "    UNIQUE(company_id,id,native_mcp_call_id);",
+          "[more lines]",
+          "                  AND run.finished_at<clock_timestamp()-interval '90 days' AND operation.settled_at IS NOT NULL",
+          "                  AND NEW.retained_content_level=run.content_level)",
+          "            OR public.native_mcp_has_unknown(OLD.company_id,OLD.run_id) THEN",
+          "            RAISE EXCEPTION 'native MCP retirement requires resolved old owners' USING ERRCODE='23514';"
+        ]
+      },
+      {
+        "start": 17440,
+        "end": 19657,
+        "context": [
+          "    END IF;",
+          "    RETURN NEW;",
+          "END $$;"
+        ],
+        "ours_lines": 1978,
+        "theirs_lines": 237,
+        "ours": [
+          "CREATE TRIGGER workflow_escalation_case_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_escalation_cases",
+          "    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_escalation_case();",
+          "",
+          "ALTER TABLE public.notification_events",
+          "    DROP CONSTRAINT notification_events_source_kind_check,",
+          "[more lines]",
+          "CREATE CONSTRAINT TRIGGER agent_address_slug_matches AFTER INSERT OR UPDATE ON public.agents",
+          "    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_address_slug();",
+          "CREATE CONSTRAINT TRIGGER address_agent_slug_matches AFTER INSERT OR UPDATE ON public.addresses",
+          "    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE FUNCTION public.check_agent_address_slug();"
+        ],
+        "theirs": [
+          "CREATE TRIGGER native_mcp_call_immutable BEFORE UPDATE OR DELETE ON public.native_mcp_calls",
+          "    FOR EACH ROW EXECUTE FUNCTION public.native_mcp_call_immutable();",
+          "",
+          "CREATE FUNCTION public.native_mcp_run_discriminator() RETURNS trigger LANGUAGE plpgsql AS $$",
+          "BEGIN",
+          "[more lines]",
+          "                    AND (intent.origin_kind='workflow' OR (intent.origin_kind='agent'",
+          "                        AND public.native_mcp_parent_agent_live(tenant,intent.agent_revision_id)))))",
+          "    );",
+          "END $$;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/http/pages/agent_settings.rs",
+    "conflicts": [
+      {
+        "start": 759,
+        "end": 799,
+        "context": [
+          "    )",
+          "}",
+          ""
+        ],
+        "ours_lines": 20,
+        "theirs_lines": 18,
+        "ours": [
+          "pub(super) fn direct_settings_fields(draft: &AgentDraft<'_>) -> String {",
+          "    let public = if draft.open_to_public { \" checked\" } else { \"\" };",
+          "    let confirmed = if draft.confirm_spam_disabled {",
+          "        \" checked\"",
+          "    } else {",
+          "[more lines]",
+          "                <input type=\"checkbox\" name=\"confirm_spam_disabled\" value=\"true\" class=\"checkbox checkbox-sm\"{confirmed}>",
+          "                <span class=\"text-xs\">If spam scanning is unavailable, I accept external mail without scanning.</span>",
+          "            </label>",
+          "        </fieldset>\"#,"
+        ],
+        "theirs": [
+          "fn native_permissions_field(selected: crate::domain::local_agents::LocalPermissions) -> String {",
+          "    use crate::domain::local_agents::LocalPermissions;",
+          "    let options: String = [",
+          "        (LocalPermissions::Full, \"Full access\"),",
+          "        (LocalPermissions::Auto, \"Automatic approval\"),",
+          "[more lines]",
+          "    })",
+          "    .collect();",
+          "    format!(",
+          "        r#\"<label class=\"form-control w-full\"><div class=\"label\"><span class=\"text-xs opacity-70\">Native permissions</span></div><select name=\"native_permissions\" class=\"select w-full\">{options}</select><div class=\"label\"><span class=\"text-xs opacity-60\">Used by Local Agents profiles that select this agent.</span></div></label>\"#"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/http/pages/tests.rs",
+    "conflicts": [
+      {
+        "start": 1446,
+        "end": 1450,
+        "context": [
+          "",
+          "fn settings_agent(company_id: Uuid, name: &str, slug: &str) -> Agent {",
+          "    Agent {"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "        open_to_public: false,"
+        ],
+        "theirs": [
+          "        native_permissions: Default::default(),"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/http/routes/agent.rs",
+    "conflicts": [
+      {
+        "start": 944,
+        "end": 948,
+        "context": [
+          "        };",
+          "",
+          "        let agent = Agent {"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "            open_to_public: false,"
+        ],
+        "theirs": [
+          "            native_permissions: Default::default(),"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/http/routes/onboarding.rs",
+    "conflicts": [
+      {
+        "start": 359,
+        "end": 363,
+        "context": [
+          "",
+          "    fn library_agent(name: &str, slug: &str) -> Agent {",
+          "        Agent {"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "            open_to_public: false,"
+        ],
+        "theirs": [
+          "            native_permissions: Default::default(),"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/agent.rs",
+    "conflicts": [
+      {
+        "start": 23,
+        "end": 30,
+        "context": [
+          "",
+          "pub(crate) const AGENT_COLUMNS: &str = \"\\",
+          "    agent.id, agent.company_id, agent.name, agent.slug::text AS slug, agent.provider, agent.model, \\"
+        ],
+        "ours_lines": 4,
+        "theirs_lines": 1,
+        "ours": [
+          "    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, \\",
+          "    COALESCE((SELECT principal.open_to_public FROM principals AS principal \\",
+          "      WHERE principal.company_id = agent.company_id AND principal.agent_id = agent.id \\",
+          "        AND principal.kind = 'agent'), false) AS open_to_public\";"
+        ],
+        "theirs": [
+          "    agent.system_prompt, agent.description, agent.avatar_url, agent.created_by, agent.created_at, agent.draft_revision, agent.native_permissions\";"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/agent_publication/commands.rs",
+    "conflicts": [
+      {
+        "start": 110,
+        "end": 115,
+        "context": [
+          "",
+          "fn publication_failure(error: &AppError) -> &'static str {",
+          "    match error {"
+        ],
+        "ours_lines": 2,
+        "theirs_lines": 1,
+        "ours": [
+          "        AppError::WorkflowRole(_) => \"role_resolution_refused\",",
+          "        AppError::BadRequest(_) => \"invalid_definition\","
+        ],
+        "theirs": [
+          "        AppError::BadRequest(_) | AppError::NativeMcpNotAdmitted => \"invalid_definition\","
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+    "conflicts": [
+      {
+        "start": 65,
+        "end": 98,
+        "context": [
+          "        if origin == OperationOrigin::Workflow {",
+          "            return Err(missing());",
+          "        }"
+        ],
+        "ours_lines": 8,
+        "theirs_lines": 23,
+        "ours": [
+          "        let conversation = stored",
+          "            .conversation_id",
+          "            .ok_or_else(|| invalid(\"session association\"))?;",
+          "        super::super::super::workflow::association::authorize_thread(",
+          "            db,",
+          "            CompanyId::new(company),",
+          "            WorkflowActor::authenticated(actor)?,",
+          "            conversation,"
+        ],
+        "theirs": [
+          "        let SessionAssociation::Conversation {",
+          "            conversation_id: conversation,",
+          "        } = stored.association",
+          "        else {",
+          "            return Err(missing());",
+          "[more lines]",
+          "                channel_id: RelatedChannelId::new(channel),",
+          "                thread_id: RelatedThreadId::new(conversation),",
+          "            },",
+          "            locks,"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/action_authority.rs",
+    "conflicts": [
+      {
+        "start": 42,
+        "end": 111,
+        "context": [
+          "    prelock_accounts_on(db, scope, None)",
+          "}",
+          ""
+        ],
+        "ours_lines": 5,
+        "theirs_lines": 62,
+        "ours": [
+          "#[path = \"action_account_hints.rs\"]",
+          "mod account_hints;",
+          "pub(super) use account_hints::{",
+          "    actor_hints_on, prelock_accounts_on, prelock_dispatch_on, prelock_message_on, prelock_reply_on,",
+          "};"
+        ],
+        "theirs": [
+          "pub(super) async fn prelock_accounts_on(",
+          "    tx: &mut PgConnection,",
+          "    scope: ActionScope,",
+          "    reviewer: Option<WorkflowActor>,",
+          ") -> AppResult<Option<WorkflowActor>> {",
+          "[more lines]",
+          "        Err(AppError::NotFound(_)) => Ok(None),",
+          "        Err(error) => Err(error),",
+          "    }",
+          "}"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/admission_write.rs",
+    "conflicts": [
+      {
+        "start": 146,
+        "end": 154,
+        "context": [
+          "        \"INSERT INTO workflow_runs (company_id, id, binding_id, binding_revision, workflow_id, version_id, \\",
+          "         channel_id, thread_id, actor_id, trigger_id, correlation_id, bundle_digest, input, params, resources, \\",
+          "         max_steps, max_context_bytes, deadline, parent_run_id, parent_execution_id, rerun_of_run_id, \\"
+        ],
+        "ours_lines": 3,
+        "theirs_lines": 3,
+        "ours": [
+          "         delivery_policy, knowledge_ceiling, content_level, content_exact, escalation, principal_id) \\",
+          "         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \\",
+          "         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27, $28)\","
+        ],
+        "theirs": [
+          "         delivery_policy, knowledge_ceiling, content_level, content_exact, native_mcp_call_id) \\",
+          "         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17, \\",
+          "         COALESCE($18, CURRENT_TIMESTAMP + make_interval(secs => $19)), $20, $21, $22, $23, $24::smallint, $25::smallint, $26, $27)\","
+        ]
+      },
+      {
+        "start": 169,
+        "end": 176,
+        "context": [
+          "        .bind(row.parent.map(|parent| parent.execution.as_uuid()))",
+          "        .bind(row.rerun_of.map(|original| original.as_uuid()))",
+          "        .bind(row.delivery_policy.as_str()).bind(row.knowledge.ceiling().as_i16()).bind(row.knowledge.content().as_i16())"
+        ],
+        "ours_lines": 4,
+        "theirs_lines": 1,
+        "ours": [
+          "        .bind(row.content_exact)",
+          "        .bind(row.binding.escalation().map(serde_json::to_value).transpose().map_err(|_| invalid())?)",
+          "        .bind(association.principal_id)",
+          "        .execute(db).await?;"
+        ],
+        "theirs": [
+          "        .bind(row.content_exact).bind(row.native_mcp_call.map(crate::domain::local_agents::NativeMcpCallId::as_uuid)).execute(db).await?;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+    "conflicts": [
+      {
+        "start": 22,
+        "end": 28,
+        "context": [
+          "#[path = \"capture_tests.rs\"]",
+          "mod tests;",
+          "pub(super) use storage::{"
+        ],
+        "ours_lines": 2,
+        "theirs_lines": 2,
+        "ours": [
+          "    agent_for_step_on, attach_child_on, execution_selection_on, persist_on, selected_on,",
+          "    workflow_bundle_on,"
+        ],
+        "theirs": [
+          "    attach_child_on, execution_selection_on, execution_selection_with_locks_on, persist_on,",
+          "    selected_on, workflow_bundle_on,"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+    "conflicts": [
+      {
+        "start": 181,
+        "end": 206,
+        "context": [
+          "    } else {",
+          "        AgentUseMode::ModelOnly",
+          "    };"
+        ],
+        "ours_lines": 2,
+        "theirs_lines": 21,
+        "ours": [
+          "    let agent = agent_for_step_on(db, scope.company, scope.run, bundle, &step, &inputs).await?;",
+          "    let selection = selected_on(db, scope.company, scope.run, actor, agent).await?;"
+        ],
+        "theirs": [
+          "    let key = inputs[\"agent\"]",
+          "        .as_str()",
+          "        .and_then(crate::application::agent::AgentKey::parse)",
+          "        .ok_or_else(missing)?;",
+          "    let reference = bundle.agent_reference(scope.company, &key)?;",
+          "[more lines]",
+          "        reference.agent_id,",
+          "        locks,",
+          "    )",
+          "    .await?;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/association.rs",
+    "conflicts": [
+      {
+        "start": 31,
+        "end": 59,
+        "context": [
+          "    actor: WorkflowActor,",
+          "    association: RelatedAssociation,",
+          ") -> AppResult<()> {"
+        ],
+        "ours_lines": 2,
+        "theirs_lines": 24,
+        "ours": [
+          "    let Some(target) = association.target() else {",
+          "        return Ok(());"
+        ],
+        "theirs": [
+          "    authorize_association_with_locks(",
+          "        tx,",
+          "        company,",
+          "        actor,",
+          "        association,",
+          "[more lines]",
+          "        | RelatedAssociation::Thread {",
+          "            channel_id: channel,",
+          "            ..",
+          "        } => channel,"
+        ]
+      },
+      {
+        "start": 146,
+        "end": 154,
+        "context": [
+          "        }",
+          "        _ => return Err(invalid()),",
+          "    }"
+        ],
+        "ours_lines": 0,
+        "theirs_lines": 6,
+        "ours": [],
+        "theirs": [
+          "    if let RelatedAssociation::Thread { thread_id, .. } = association {",
+          "        sqlx::query_scalar::<_, Uuid>(",
+          "            &locks.sql(\"SELECT id FROM threads WHERE company_id = $1 AND channel_id = $2 AND id = $3 FOR SHARE\"),",
+          "        ).bind(company.as_uuid()).bind(channel.as_uuid()).bind(thread_id.as_uuid())",
+          "            .fetch_optional(&mut *tx).await?.ok_or_else(missing)?;",
+          "    }"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "conflicts": [
+      {
+        "start": 153,
+        "end": 171,
+        "context": [
+          "    run: Uuid,",
+          "    actor: WorkflowActor,",
+          ") -> AppResult<RunAssociation> {"
+        ],
+        "ours_lines": 3,
+        "theirs_lines": 13,
+        "ours": [
+          "    let stored = sqlx::query_as::<_, RunAssociation>(",
+          "        \"SELECT channel_id,principal_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE\",",
+          "    )"
+        ],
+        "theirs": [
+          "    authorize_run_with_locks_on(db, company, run, actor, super::row_locks::RowLocks::Wait).await",
+          "}",
+          "",
+          "pub(in crate::adapters::persistence) async fn authorize_run_with_locks_on(",
+          "    db: &mut PgConnection,",
+          "    company: CompanyId,",
+          "    run: Uuid,",
+          "    actor: WorkflowActor,",
+          "    locks: super::row_locks::RowLocks,",
+          ") -> AppResult<RunAssociation> {",
+          "    let stored = sqlx::query_as::<_, RunAssociation>(&locks.sql(",
+          "        \"SELECT channel_id,thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR SHARE\",",
+          "    ))"
+        ]
+      },
+      {
+        "start": 177,
+        "end": 195,
+        "context": [
+          "    .fetch_optional(&mut *db)",
+          "    .await?",
+          "    .ok_or_else(missing)?;"
+        ],
+        "ours_lines": 6,
+        "theirs_lines": 10,
+        "ours": [
+          "    let association = association::association_from_columns(association::AssociationColumns {",
+          "        channel_id: stored.channel_id,",
+          "        principal_id: stored.principal_id,",
+          "        thread_id: stored.thread_id,",
+          "    })?;",
+          "    association::authorize_association(db, company, actor, association).await?;"
+        ],
+        "theirs": [
+          "    let association = match (stored.channel_id, stored.thread_id) {",
+          "        (None, None) => RelatedAssociation::Company,",
+          "        (Some(channel), None) => RelatedAssociation::Channel(RelatedChannelId::new(channel)),",
+          "        (Some(channel), Some(thread)) => RelatedAssociation::Thread {",
+          "            channel_id: RelatedChannelId::new(channel),",
+          "            thread_id: RelatedThreadId::new(thread),",
+          "        },",
+          "        _ => return Err(invalid()),",
+          "    };",
+          "    association::authorize_association_with_locks(db, company, actor, association, locks).await?;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/mod.rs",
+    "conflicts": [
+      {
+        "start": 93,
+        "end": 97,
+        "context": [
+          "pub mod message;",
+          "mod message_intents;",
+          "mod metrics;"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "mod people_resolutions;"
+        ],
+        "theirs": [
+          "pub(in crate::adapters::persistence) mod native_mcp;"
+        ]
+      },
+      {
+        "start": 103,
+        "end": 109,
+        "context": [
+          "mod reads;",
+          "mod reply_waits;",
+          "mod resources;"
+        ],
+        "ours_lines": 3,
+        "theirs_lines": 1,
+        "ours": [
+          "mod reviewer_accounts;",
+          "pub(crate) mod role_binding;",
+          "mod role_views;"
+        ],
+        "theirs": [
+          "pub(in crate::adapters::persistence) mod row_locks;"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/application/use_cases/agent_tests.rs",
+    "conflicts": [
+      {
+        "start": 38,
+        "end": 42,
+        "context": [
+          "impl AgentPersistence for MockAgentPersistence {",
+          "    async fn create(&self, company_id: Uuid, write: AgentWrite) -> AppResult<Agent> {",
+          "        let agent = Agent {"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "            open_to_public: write.open_to_public,"
+        ],
+        "theirs": [
+          "            native_permissions: write.native_permissions,"
+        ]
+      },
+      {
+        "start": 692,
+        "end": 696,
+        "context": [
+          "",
+          "    // A library definition is one with no company of its own.",
+          "    let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "        open_to_public: false,"
+        ],
+        "theirs": [
+          "        native_permissions: Default::default(),"
+        ]
+      }
+    ]
+  },
+  {
+    "path": "src/application/workflow/mod.rs",
+    "conflicts": [
+      {
+        "start": 47,
+        "end": 51,
+        "context": [
+          "pub mod message;",
+          "pub mod message_admission;",
+          "pub mod metrics;"
+        ],
+        "ours_lines": 1,
+        "theirs_lines": 1,
+        "ours": [
+          "pub(crate) mod people_resolution;"
+        ],
+        "theirs": [
+          "pub mod native_mcp;"
+        ]
+      }
+    ]
+  }
+]

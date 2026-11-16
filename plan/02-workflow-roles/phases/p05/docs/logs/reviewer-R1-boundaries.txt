@@ -1,0 +1,31 @@
+Sat Nov 14 06:46:20 CET 2026
+rg: /private/tmp/claude-501/-Users-mac02--gui-cloudroom-plugins-environment-git-worktree-host-data-worktrees-thr-jt43h4qc8d-1-openbot/d139d6f0-976b-419b-b64a-47335b295a58/scratchpad/bin/rg ripgrep 14.1.1 (rev 0ae49f8b6e)
+== python3 scripts/tests/workflow-sample-boundary.py
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.072s
+
+OK
+EXIT 0
+== python3 scripts/workflow-sample-boundary.py
+workflow sample capability boundary passed
+EXIT 0
+== python3 scripts/tests/integration-boundary.py
+......................
+----------------------------------------------------------------------
+Ran 22 tests in 0.048s
+
+OK
+EXIT 0
+== python3 scripts/integration-boundary.py
+integration boundary: production custody, DTO dependencies, nonserializable private results PASS
+EXIT 0
+== python3 scripts/check-integration-docs.py
+integration docs: 3 link sets, 164 startup reset notices, configuration and CI inventory PASS
+EXIT 0
+== bash scripts/tests/transport-boundary.sh
+runtime boundary gate regression tests passed
+EXIT 0
+== bash scripts/transport-boundary-check.sh
+transport boundary check passed
+EXIT 0

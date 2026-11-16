@@ -1,0 +1,20 @@
+{
+  "reference_commit": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "comparison": "currentworkingtree",
+  "scopes": [
+    "src/adapters/http/routes/local_machine_connection",
+    "src/adapters/persistence/local_agents",
+    "src/application/local_agents",
+    "src/domain/local_agents",
+    "Cargo.toml",
+    "Cargo.lock",
+    "migrations",
+    ".sqlx",
+    ".cargo"
+  ],
+  "tracked_paths_in_scopes": 107,
+  "changed_paths": [],
+  "shared_test_support_delta": "diff --git a/src/adapters/persistence/test_support.rs b/src/adapters/persistence/test_support.rs\nindex 9f3b4fed..ec9c22ab 100644\n--- a/src/adapters/persistence/test_support.rs\n+++ b/src/adapters/persistence/test_support.rs\n@@ -107,7 +107,7 @@ fn permits_skipping(value: Option<&str>) -> bool {\n ///\n /// Panics when neither is set and [`ALLOW_MISSING_URL_VAR`] is absent \u2014 see the module docs for\n /// why an unset variable is a failure rather than a skip.\n-fn test_database_url() -> Option<String> {\n+pub(super) fn test_database_url() -> Option<String> {\n     let explicit = std::env::var(\"TEST_DATABASE_URL\")\n         .ok()\n         .filter(|url| !url.trim().is_empty());\n",
+  "failure_stage": "Peer.command drains RefreshCatalog observations before intended slow-consumer shutdown assertions",
+  "failure_reason_known": false
+}

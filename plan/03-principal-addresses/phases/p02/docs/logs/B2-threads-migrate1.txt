@@ -1,0 +1,1 @@
+error: while executing migration 20260817000000: error returned from database: there is no unique constraint matching given keys for referenced table "channel_bindings"

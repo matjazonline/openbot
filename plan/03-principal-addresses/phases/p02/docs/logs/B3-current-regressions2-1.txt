@@ -1,0 +1,10 @@
+
+running 5 tests
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_competing_activation_and_detachment_preserve_eligibility ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_blocks_both_detach_writers_until_deactivation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::bindings_tests::workflow_role_binding_activation_refusal_names_the_step_on_the_bindings_pane ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::workflow_role_binding_needs_a_department_only_while_active ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4573 filtered out; finished in 4.44s
+

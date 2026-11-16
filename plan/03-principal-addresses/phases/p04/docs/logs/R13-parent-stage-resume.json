@@ -1,0 +1,14 @@
+{
+  "parent_pid": 66037,
+  "previous_artifact": "9938338fb72334eb61bf07926c6747ab91f09c594dcd0660f9d836ac36fdf438",
+  "subsequent_artifact": "1d5990aa52b4c252bd8104b3a3e625fda073f77487e2f834709c474bf6b87022",
+  "candidate": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "reason": "StockPASS retained before Linux-only adoption; all Rust/Darwin paths unchanged. Resume held parent for unchanged lease gate. Code staged/frozen, mutable records excluded.",
+  "proof": [
+    "R13-stock-complete-before-adoption.txt",
+    "R13-adoption-equality.json",
+    "R13-runtime-projection.json",
+    "R13-final-material-equality.json",
+    "R13-local-focused.txt"
+  ]
+}

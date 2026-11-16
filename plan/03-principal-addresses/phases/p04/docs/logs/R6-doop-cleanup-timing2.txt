@@ -1,0 +1,82 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-precleanup-diag)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 43s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 1 test
+D2TIMING call McpToolName("get_profile") start
+D2TIMING call McpToolName("get_profile") registered 146.458µs
+D2TIMING call McpToolName("get_profile") response 1.703875ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 18.334µs
+D2TIMING close SDK 871.875µs
+D2TIMING close lifetime 987µs
+D2TIMING close cleanup 1.01375ms
+D2TIMING call McpToolName("create_canvas") start
+D2TIMING call McpToolName("create_canvas") registered 99.125µs
+D2TIMING call McpToolName("create_canvas") response 1.324125ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 19.458µs
+D2TIMING close SDK 511.75µs
+D2TIMING close lifetime 544.375µs
+D2TIMING close cleanup 568.666µs
+D2TIMING call McpToolName("get_canvas") start
+D2TIMING call McpToolName("get_canvas") registered 127.417µs
+D2TIMING call McpToolName("get_canvas") response 1.182709ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 12.959µs
+D2TIMING close SDK 397.542µs
+D2TIMING close lifetime 421.75µs
+D2TIMING close cleanup 441.584µs
+D2TIMING call McpToolName("get_canvas") start
+D2TIMING call McpToolName("get_canvas") registered 99.709µs
+D2TIMING call McpToolName("get_canvas") response 1.574375ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 31.25µs
+D2TIMING close SDK 916.042µs
+D2TIMING close lifetime 956.834µs
+D2TIMING close cleanup 979.625µs
+D2TIMING call McpToolName("create_frame") start
+D2TIMING call McpToolName("create_frame") registered 79.625µs
+D2TIMING call McpToolName("create_frame") response 1.291042ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 19.459µs
+D2TIMING close SDK 425.834µs
+D2TIMING close lifetime 454.459µs
+D2TIMING close cleanup 475.417µs
+D2TIMING call McpToolName("get_frame") start
+D2TIMING call McpToolName("get_frame") registered 103.334µs
+D2TIMING call McpToolName("get_frame") response 1.052667ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 11.25µs
+D2TIMING close SDK 397.375µs
+D2TIMING close lifetime 424.333µs
+D2TIMING close cleanup 444.583µs
+D2TIMING call McpToolName("get_canvas") start
+D2TIMING call McpToolName("get_canvas") registered 129.417µs
+D2TIMING call McpToolName("get_canvas") response 1.569125ms, ok=true
+D2TIMING close start
+D2TIMING close cancelled 15.542µs
+D2TIMING close SDK 405.333µs
+D2TIMING close lifetime 434.25µs
+D2TIMING close cleanup 454.25µs
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas has been running for over 60 seconds
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (20069594) panicked at src/adapters/persistence/workflow/doop_document_agent_tests.rs:96:35:
+called `Result::unwrap()` on an `Err` value: "scenario lifetime exceeded"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 64.71s
+
+error: test failed, to rerun pass `--lib`

@@ -1,13 +1,13 @@
 //! Validate the shared planner's effect against the exact frozen final artifact.
 use super::channel_reply_publish_read::PublicationArtifact;
 use super::*;
-use crate::application::ports::thread::{MessageAuthorWrite, MessageCorrelation};
+use crate::application::ports::thread::MessageCorrelation;
 use crate::application::workflow::DeliveryPolicy;
 use crate::application::workflow::message::{
     DestinationKind, MessagePlan, RouteCheck, RouteTarget,
 };
 use crate::entities::message::{
-    CanonicalMessageId, MessageAudience, MessageDirection, MessageRole, ThreadEntryKind,
+    CanonicalMessageId, MessageAudience, MessageDirection, ThreadEntryKind,
 };
 use crate::entities::transport::TransportKind;
 use crate::entities::value_objects::EmailAddress;
@@ -15,7 +15,7 @@ use crate::entities::value_objects::EmailAddress;
 struct FinalRoute<'a> {
     source: CanonicalMessageId,
     thread: Uuid,
-    channel: Uuid,
+    target: AddressTarget,
     recipient: Option<&'a EmailAddress>,
 }
 
@@ -30,7 +30,7 @@ pub(super) fn matches(artifact: &PublicationArtifact, plan: &MessagePlan) -> boo
     if destination.kind != DestinationKind::Reply
         || destination.destination_id != route.source.as_uuid()
         || route.source != artifact.draft.source
-        || destination.channel_id != route.channel
+        || destination.target != route.target
         || destination.thread_id != route.thread
         || destination.new_thread.is_some()
         || destination.principal_id.is_some()
@@ -40,12 +40,12 @@ pub(super) fn matches(artifact: &PublicationArtifact, plan: &MessagePlan) -> boo
         || message.clean_text_body != artifact.draft.content.body_text()
         || message.correlation_id != artifact.draft.routes.correlation_id
         || message.direction != MessageDirection::Outbound
-        || message.role != MessageRole::System
-        || !matches!(&message.author, MessageAuthorWrite::Platform)
+        || message.role != artifact.draft.routes.author.role()
+        || !artifact.draft.routes.author.matches_write(&message.author)
         || message.structured.is_some()
         || !message.attachments.is_empty()
-        || !matches!(&destination.check, RouteCheck::Source { source,thread,channel }
-            if *source==route.source && *thread==route.thread && *channel==route.channel)
+        || !matches!(&destination.check, RouteCheck::Source { source,thread,target }
+            if *source==route.source && *thread==route.thread && *target==route.target)
     {
         return false;
     }
@@ -77,7 +77,7 @@ pub(super) fn matches(artifact: &PublicationArtifact, plan: &MessagePlan) -> boo
         && !delivery.id.as_uuid().is_nil()
         && delivery.company_id == artifact.draft.scope.company.as_uuid()
         && delivery.message_id == message.id
-        && delivery.channel_id == route.channel
+        && delivery.target == route.target
         && delivery.correlation_id == message.correlation_id
         && delivery.source_binding_id == delivery.destination_binding_id
         && delivery.depends_on_delivery_id.is_none()
@@ -101,19 +101,19 @@ fn route(targets: &[RouteTarget]) -> Option<FinalRoute<'_>> {
         ] => Some(FinalRoute {
             source: *source,
             thread: *thread,
-            channel: sender.id,
+            target: sender.target,
             recipient: Some(recipient),
         }),
         [
             RouteTarget::ReplyInternal {
                 source,
                 thread,
-                channel,
+                target,
             },
         ] => Some(FinalRoute {
             source: *source,
             thread: *thread,
-            channel: *channel,
+            target: *target,
             recipient: None,
         }),
         _ => None,

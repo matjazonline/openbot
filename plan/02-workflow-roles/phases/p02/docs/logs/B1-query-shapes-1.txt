@@ -1,0 +1,9 @@
+$ cargo test --locked --offline --lib dump_run_list_query_shapes -- --ignored
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.21s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 1 test
+test adapters::persistence::workflow::reads::tests::dump_run_list_query_shapes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4199 filtered out; finished in 0.00s
+

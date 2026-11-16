@@ -1,0 +1,156 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 17s
+     Running unittests src/lib.rs (target/debug/deps/open_bots-c4f538027eed5c31)
+
+running 133 tests
+test adapters::persistence::delivery::cancellation::tests::every_reason_has_a_detail_the_sql_case_can_carry ... ok
+test adapters::http::pages::notifications::tests::notification_rows_render_only_safe_taxonomy_and_escaped_labels ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... FAILED
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization ... ok
+test adapters::persistence::delivery::tests::cancellation::a_begin_part_that_loses_the_parent_lock_starts_no_request ... ok
+test adapters::persistence::delivery::tests::cancellation::a_held_delivery_starts_no_further_part_once_cancelled ... ok
+test adapters::persistence::delivery::tests::cancellation::a_queued_delivery_is_superseded_and_keeps_its_partial_send ... ok
+test adapters::persistence::delivery::tests::cancellation::a_request_already_made_keeps_its_real_outcome ... ok
+test adapters::persistence::delivery::tests::cancellation::release_failure_and_the_lease_sweep_settle_rather_than_requeue ... ok
+test adapters::persistence::delivery::tests::cancellation::the_cancellation_reasons_match_their_database_constraint ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_part_company_must_match_its_delivery ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_member_removal_cancels_pending_notices ... ok
+test adapters::persistence::delivery::tests::competing_standalone_notification_enqueues_create_one_claimable_delivery ... ok
+test adapters::persistence::delivery::tests::tenant_tests::tenant_fk_small_notification_event_and_recipient_are_tenant_proven ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_company_deletion_removes_notices_and_parts ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_first_producer_finds_no_member ... ok
+test adapters::persistence::delivery::tests::tenant_tests::notification_delivery_tenant_removal_waits_for_a_producer_and_cancels_its_notice ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_name_representation_never_blocks_valid_long_names ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_rejects_corrupt_actual_source_and_rolls_back ... ok
+test adapters::persistence::notification::tests::notification_census_executes_against_postgres ... ok
+test adapters::persistence::department::tests::schema::retirement_audit::workflow_reviewer_follow_retirement_audit_requires_material_clear_only_in_its_creation_transaction ... ok
+test adapters::persistence::integrations::connect_tests::control_wire::integration_service_contract_control_cannot_decode_owner_deadline_or_cancellation_into_authority ... ok
+test adapters::persistence::integrations::connect_tests::provider::google_oauth_cancellation_reaches_active_request_and_never_writes_account ... ok
+test adapters::persistence::notification::tests::notification_stale_below_the_limit_returns_to_pending_with_backoff ... ok
+test adapters::persistence::notification::tests::notification_stale_last_attempt_is_dead_lettered ... ok
+test adapters::persistence::notification::tests::notification_stale_poison_batch_is_not_reclaimed_by_the_next_iteration ... ok
+test adapters::persistence::notification::tests::schema_constraint_notification_failure_requires_class_and_bounded_detail ... ok
+test adapters::persistence::onboarding::tests::onboarding_cancellation_drops_provider_and_releases_company_lock ... ok
+test adapters::persistence::user::tests::notification_preferences_default_and_round_trip_every_email_family ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::notification_delivery_tenant_company_deletion_removes_parked_decision_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_ordinary_oracle_discriminates_attempt_paths ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::provenance_tests::workflow_decision_notice_rejects_non_notification_independently ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::workflow_call_child_failure_and_cancellation_route_or_fail_never_succeed ... ok
+test adapters::persistence::workflow::tests::admission_tests::batch_tests::child_runtime_tests::channel_reply_terminal_child_tests::channel_reply_terminal_cancellation_competes_without_silent_failure ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_completion_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_ordinary_oracle_discriminates_attempt_paths ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_observed_result_token_settles_then_interrupts ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_completion_race_resolved_commit_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_receipt_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_without_cancel_commits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_oracle_discriminates_interruption_causes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_after_reservation_refuses_entry_zero_polls ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::receipt_tests::workflow_action_cancellation_receipt_race_late_release_fails_ordinary_oracle ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::completion_tests::workflow_action_cancellation_replay_contract_cannot_override_terminal ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_rollback_keeps_accepted_effect_settleable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_rollback_keeps_prepared_work_usable ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_oracle_rejects_deadline_only_interruption ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_after_entry_suppresses_first_poll ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_pending_provider_dropped_by_ownership_supervision ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_pending_drop_keeps_ownership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_prepared_and_protected_refuse_after_command ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_receipt_tests::cancellation_boundary_tests::workflow_action_cancellation_token_precancelled_never_reserves ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_cancel_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::control_serialization_tests::hung_reconciliation_tests::workflow_action_cancellation_applied_then_hung_history_reconciles_after_cancel ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_claim_first ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_aborted_task_usage_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_return_lost_owner_precedes_denied_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::abort_tests::cancellation_tests::workflow_action_reconciliation_claim_cancellation_dropped_usage_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_notification_commit_failure_rolls_back_pause ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::memory_steps_tests::memory_integration_run_cancellation_cancels_the_parked_intent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::integration_tests::workflow_poll_unchanged_page_and_notification_storm_preserve_delay ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_is_original_desk_not_chosen_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::context_tests::workflow_reviewer_follow_context_rejects_forged_missing_and_mutated_snapshot ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_competing_actual_workers_leave_one_hop_per_generation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_actual_worker_advances_empty_hops_once_and_captures_the_first_window ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::control_tests::acceptance_tests::revision_tests::workflow_control_forged_cancellation_retirement_fails_own_guard ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_case_write_failure_rolls_back_the_authoritative_outcome ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::controls::workflow_escalation_control_lost_lease_after_hop_writes_rolls_back_every_control_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_command_payload_conflicts_and_source_alias_replays ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_competing_real_admissions_commit_one_case_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::cancellation_order_tests::workflow_action_cancellation_company_before_run_all_callers ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_nearest_ineligible_role_shadows_populated_ancestor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_control_real_repair_seals_sixteen_maximum_escaped_labels ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::escalation_refusals::workflow_escalation_refusal_history_and_policy_are_immutable_and_no_policy_creates_no_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_role_writers_preserve_mixed_and_multiple_agent_holders ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::workflow_escalation_notification_actual_sixteen_holders_are_complete_and_seventeen_deliver_no_subset ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_account_retirement_clears_all_roles_and_preserves_snapshot_history ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_cancels_in_one_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_competing_allocators_commit_distinct_revisions ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_revision_exhaustion_is_a_named_refusal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_changing_zero ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::continuation_tests::workflow_action_approval_later_submission_competes_with_cancellation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::workflow_reviewer_follow_storage_refuses_missing_extra_and_foreign_members ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::failures::google_refresh_actual_cancellation_rolls_back_and_keeps_no_detached_renewal ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::renewal::strict::integration_renewal_strict_cancellation_keeps_durable_ambiguity_for_recovery ... ok
+test adapters::persistence::workflow::tests::http_tests::vault_tests::temporal::vault_dispatch_authority_cancellation_during_module_wait_denies ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::behavior::cloudroom_workflow_completion_racing_cancellation_retains_evidence_without_revival ... ok
+test adapters::persistence::workflow::tests::mcp_tests::agent_tests::isolation::authority::autonomous_agent_recovery_mcp_cancellation_closes_session_and_preserves_one_possible_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_cancellation_and_finalization_share_one_terminal_owner ... ok
+test adapters::persistence::workflow::tests::mcp_tests::support::renewal::gateway_tests::vault_workflow_mcp_cancellation_drops_actual_call_then_awaits_session_close ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::integrity::channel_reply_delivery_multipart_cancellation_preserves_accepted_piece ... ok
+test adapters::persistence::workflow::tests::mcp_tests::recovery_tests::workflow_mcp_cancellation_and_dropped_worker_cancel_and_close_without_second_call ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::history_hints::workflow_reviewer_follow_history_and_replays_do_not_require_unused_retired_reply_policy_accounts ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::question_tests::lifecycle::channel_reply_hitl_resume_response_racing_cancellation_cannot_reopen_the_run ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_delivery_views::knowledge_view_notification_email_and_in_app_projection_never_quote_classified_message ... ok
+test adapters::persistence::workflow::tests::message_tests::reconcile_tests::race_tests::workflow_message_race_settle_racing_workflow_cancellation_supersedes ... ok
+test adapters::protocols::email::egress::tests::notification_delivery_tenant_notice_uses_the_deployment_relay ... ok
+test adapters::workflow_http::tests::workflow_http_pending_actual_request_is_dropped_on_cancellation ... ok
+test adapters::workflow_jev::tests::jev_http_deadline_cancellation_and_capacity_release ... ok
+test application::knowledge::service::tests::knowledge_upload_cancellation_retains_actual_native_permit_and_bounded_shutdown_never_writes ... ok
+test application::knowledge::service::tests::queries::knowledge_search_cancellation_retains_the_actual_shared_native_slot ... ok
+test application::services::runtime_metrics::tests::active_execution_gauge_is_nested_and_cancellation_safe ... ok
+test application::workflow::agent_history::tests::agent_history_contract_accepted_null_is_distinct_from_failure_and_cancellation ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_ack_hours_has_a_real_default_and_closed_bounds ... ok
+test application::workflow::binding::escalation::tests::workflow_escalation_policy_rejects_unbounded_or_unknown_configuration ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_does_not_change_agent_or_people_modes ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor ... ok
+test application::workflow::escalation::tests::workflow_escalation_ladder_stops_after_its_configured_hops ... ok
+test application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_reject_partial_or_ambiguous_documents ... ok
+test application::workflow::people_resolution::tests::workflow_reviewer_follow_canonical_people_sets_are_stable_and_explicitly_empty ... ok
+test application::workflow::registry::decision_tests::workflow_reviewer_follow_flag_is_static_and_compiled ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_preserves_notice_history_and_rejects_future_proof ... ok
+test application::workflow::reviewer_assignment::tests::workflow_reviewer_follow_assignment_rejects_ambiguous_members_and_implicit_fields ... ok
+test application::workflow::tests::authorization_cases::cancellation::cancel_uses_stored_association_and_reader_errors_propagate ... ok
+test application::workflow::tests::cases::cancellation_checks_scope_and_expected_revision ... ok
+test application::workflow::tests::cases::cancellation_preserves_errors_and_invalidates_pending_job ... ok
+test application::workflow::tests::state_cases::cancellation_covers_nonterminal_and_preserves_all_terminal_states ... ok
+test domain::entities::notification::followed_notice_tests::workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference ... ok
+test domain::workflow::state::tests::terminal_states_are_immutable_and_cancellation_covers_nonterminal ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_roundtrip_update_and_both_detach_writers ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_sql_and_rust_policy_validation_agree ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::escalation::workflow_escalation_binding_requires_department_without_role_steps ... ok
+
+failures:
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (50442943) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+
+test result: FAILED. 132 passed; 1 failed; 0 ignored; 0 measured; 4140 filtered out; finished in 57.82s
+
+error: test failed, to rerun pass `--lib`

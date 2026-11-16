@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """Check suite registration and runner failures without launching real gates or databases."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import re
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import Mock, patch
@@ -140,6 +143,36 @@ class DoopRunnerTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
+    def test_command_stderr_is_preserved_and_failure_annotations_are_bounded(self):
+        module = self.module()
+        with tempfile.TemporaryDirectory() as temporary:
+            script = Path(temporary) / "probe.py"
+            script.write_text('import os, sys\nos.write(2, b"early marker" + b"x" * 32768 + '
+                              'b"final diagnostic %\\r\\n")\nprint("stdout marker")\nsys.exit(int(sys.argv[1]))\n')
+            for status in (0, 7):
+                with self.subTest(status=status):
+                    captured, errors = io.StringIO(), io.StringIO()
+                    with tempfile.TemporaryFile() as output, contextlib.redirect_stdout(captured), \
+                            contextlib.redirect_stderr(errors):
+                        if status:
+                            with self.assertRaises(subprocess.CalledProcessError) as failure:
+                                module.run(sys.executable, str(script), str(status), stdout=output, timeout=10)
+                            self.assertEqual(failure.exception.returncode, status)
+                        else:
+                            module.run(sys.executable, str(script), str(status), stdout=output, timeout=10)
+                        output.seek(0)
+                        self.assertEqual(output.read(), b"stdout marker\n")
+                    self.assertTrue(errors.getvalue().startswith("early marker"))
+                    self.assertTrue(errors.getvalue().endswith("final diagnostic %\r\n"))
+                    annotation = captured.getvalue()
+                    if status:
+                        self.assertTrue(annotation.startswith("::error::Doop gate failed:"))
+                        self.assertIn("final diagnostic %25%0D%0A", annotation)
+                        self.assertNotIn("early marker", annotation)
+                        self.assertLessEqual(len(annotation), 17_408)
+                    else:
+                        self.assertEqual(annotation, "")
+
     def test_service_gate_uses_clean_environment_and_stops_on_failure(self):
         module = self.module()
         with tempfile.TemporaryDirectory() as temporary:
@@ -152,13 +185,23 @@ class DoopRunnerTests(unittest.TestCase):
             def failing_run(*args, **kwargs):
                 calls.append((args, kwargs))
                 if "typecheck" in args:
+                    kwargs["stdout"].write(b"early diagnostic marker" + b"x" * 32_768
+                                           + b"final diagnostic %\r\n")
                     raise subprocess.CalledProcessError(1, args)
 
+            captured = io.StringIO()
             with patch.dict(os.environ, {"UNRELATED_PRIVATE_TOKEN": "must-not-reach-service"}), \
-                    patch.object(module, "run", side_effect=failing_run):
+                    patch.object(module, "run", side_effect=failing_run), \
+                    contextlib.redirect_stdout(captured):
                 with self.assertRaises(subprocess.CalledProcessError):
                     module.service_gate(runner, root / "setup", root, "/chrome", "postgres://fixture/owned")
             self.assertEqual(len(calls), 3)
+            annotations = [line for line in captured.getvalue().splitlines()
+                           if line.startswith("::error::")]
+            self.assertEqual(len(annotations), 1)
+            self.assertIn("final diagnostic %25%0D%0A", annotations[0])
+            self.assertNotIn("early diagnostic marker", annotations[0])
+            self.assertLessEqual(len(annotations[0]), 17_408)
             for _, arguments in calls:
                 self.assertNotIn("UNRELATED_PRIVATE_TOKEN", arguments["env"])
                 self.assertEqual(arguments["env"]["DOOP_TEST_DATABASE_URL"], "postgres://fixture/owned")
@@ -174,7 +217,7 @@ class DoopRunnerTests(unittest.TestCase):
                        "target": {"name": "open_bots", "kind": ["lib"]}, "profile": {"test": True}}
 
             def build(*args, **kwargs):
-                kwargs["stdout"].write(json.dumps(message) + "\n")
+                kwargs["stdout"].write((json.dumps(message) + "\n").encode())
 
             with patch.object(module, "run", side_effect=build), \
                     patch.object(module.subprocess, "check_output", return_value="unrelated: test\n"):

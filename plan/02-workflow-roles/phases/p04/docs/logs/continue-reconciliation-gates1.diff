@@ -1,0 +1,377 @@
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_claim_abort_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_claim_abort_tests.rs
+index 066908de..9a52dd31 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_claim_abort_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_claim_abort_tests.rs
+@@ -10,7 +10,7 @@ use probes::{ProbeKind, install_probe, remove_probe};
+ mod cancellation_tests;
+ 
+ use super::super::super::super::control_serialization_tests::contention::{
+-    try_wait_for_lock, wait_for_lock,
++    AUTHORITY_COMPANY_WAIT, LEASE_COMPANY_WAIT, try_wait_for_lock, wait_for_lock,
+ };
+ use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::resolution_gate::gated_policy;
+ 
+@@ -18,7 +18,6 @@ use crate::adapters::persistence::workflow::tests::admission_tests::lease_tests:
+ const HANG_GUARD: Duration = Duration::from_secs(10);
+ 
+ const USAGE_WAIT: &str = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
+-const RUN_WAIT: &str = "SELECT binding_id, max_context_bytes FROM workflow_runs";
+ 
+ async fn live_deadline(observer: &mut sqlx::PgConnection, s: &Scheduled) -> bool {
+     sqlx::query_scalar(
+@@ -99,7 +98,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
+     );
+     let second_pid = tokio::select! {
+         result = first.as_mut() => panic!("first claimant escaped usage wait: {result:?}"),
+-        pid = try_wait_for_lock(&mut observer, first_pid, RUN_WAIT, second.as_mut()) => pid,
++        pid = try_wait_for_lock(&mut observer, first_pid, LEASE_COMPANY_WAIT, second.as_mut()) => pid,
+     };
+     let second_pid = match second_pid {
+         Ok(pid) => pid,
+@@ -124,7 +123,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
+         "both genuine callers queued before expiry"
+     );
+     eprintln!(
+-        "live DB deadline: usage waiter {first_pid} blocked by {}, run waiter {second_pid} blocked by {first_pid}",
++        "live DB deadline: usage waiter {first_pid} blocked by {}, company waiter {second_pid} blocked by {first_pid}",
+         gate.pid
+     );
+     // Three quarters of the claimants' attempt bound: their server lock timeout is what
+@@ -159,7 +158,7 @@ async fn deadline_crossing(s: &Scheduled, attempt: usize) -> bool {
+     );
+     assert!(
+         second.unwrap().is_none(),
+-        "run-lock waiter sees expired deadline"
++        "company-lock waiter sees expired deadline"
+     );
+     assert_quiescent(&mut observer, &[first_pid, second_pid]).await;
+     drop(observer);
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_claim_cancellation_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_claim_cancellation_tests.rs
+index 69d84381..deee3db7 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_claim_cancellation_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_claim_cancellation_tests.rs
+@@ -3,7 +3,6 @@ use super::*;
+ use crate::application::workflow::{CancelCommand, CancelResult};
+ 
+ const EXECUTION_WAIT: &str = "SELECT id FROM workflow_executions";
+-const CANCEL_RUN_WAIT: &str = "SELECT run.company_id,run.id,run.workflow_id";
+ 
+ async fn cancel_command(s: &Scheduled, key: &str) -> CancelCommand {
+     let scope = s.request.fence.scope;
+@@ -144,7 +143,7 @@ async fn cancel_first(attempt: usize) -> bool {
+     let mut early = None;
+     let claim_pid = tokio::select! {
+         result = cancel.as_mut() => panic!("cancel escaped execution gate: {result:?}"),
+-        pid = try_wait_for_lock(&mut observer, cancel_pid, RUN_WAIT, claim.as_mut()) => match pid {
++        pid = try_wait_for_lock(&mut observer, cancel_pid, LEASE_COMPANY_WAIT, claim.as_mut()) => match pid {
+             Ok(pid) => Some(pid),
+             Err(output) if not_applied(&output) => {
+                 early = Some(output);
+@@ -241,7 +240,7 @@ async fn claim_first(attempt: usize) -> bool {
+             early = Some(result);
+             None
+         }
+-        pid = wait_for_lock(&mut observer, claim_pid, CANCEL_RUN_WAIT, cancel.as_mut()) => Some(pid),
++        pid = wait_for_lock(&mut observer, claim_pid, AUTHORITY_COMPANY_WAIT, cancel.as_mut()) => Some(pid),
+     };
+     assert_ne!(Some(claim_pid), cancel_pid);
+     gate.tx.rollback().await.unwrap();
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs b/src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs
+index 7a4767b4..7938a327 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_claim_race_tests.rs
+@@ -1,6 +1,10 @@
+ //! Actual reservation/claim competitors queued in both shared-usage lock orders.
+-use super::super::super::control_serialization_tests::contention::try_wait_for_lock;
++use super::super::super::control_serialization_tests::contention::{
++    LEASE_COMPANY_WAIT, try_wait_for_lock,
++};
+ use super::*;
++use crate::application::app_error::AppResult;
++use std::{future::Future, pin::Pin};
+ 
+ #[derive(Clone, Copy, Debug)]
+ enum UsageOrder {
+@@ -61,6 +65,123 @@ enum Contest {
+     Void,
+ }
+ 
++#[derive(Clone, Copy, Debug)]
++enum Contender {
++    Debit,
++    First,
++    Second,
++}
++impl Contender {
++    fn index(self) -> usize {
++        match self {
++            Self::Debit => 0,
++            Self::First => 1,
++            Self::Second => 2,
++        }
++    }
++}
++
++#[derive(Default)]
++struct EarlyResults {
++    debit: Option<AppResult<BudgetReservationResult>>,
++    first: Option<AppResult<Option<ClaimedWorkflow>>>,
++    second: Option<AppResult<Option<ClaimedWorkflow>>>,
++}
++
++enum EarlyResult {
++    Debit(Box<AppResult<BudgetReservationResult>>),
++    First(Box<AppResult<Option<ClaimedWorkflow>>>),
++    Second(Box<AppResult<Option<ClaimedWorkflow>>>),
++}
++impl EarlyResult {
++    fn contender(&self) -> Contender {
++        match self {
++            Self::Debit(_) => Contender::Debit,
++            Self::First(_) => Contender::First,
++            Self::Second(_) => Contender::Second,
++        }
++    }
++    fn into_results(self) -> EarlyResults {
++        match self {
++            Self::Debit(output) => EarlyResults {
++                debit: Some(*output),
++                ..Default::default()
++            },
++            Self::First(output) => EarlyResults {
++                first: Some(*output),
++                ..Default::default()
++            },
++            Self::Second(output) => EarlyResults {
++                second: Some(*output),
++                ..Default::default()
++            },
++        }
++    }
++}
++
++async fn observe_waits<D, F, S>(
++    observer: &mut sqlx::PgConnection,
++    gate_pid: i32,
++    order: UsageOrder,
++    mut debit: Pin<&mut D>,
++    mut first: Pin<&mut F>,
++    mut second: Pin<&mut S>,
++) -> Option<EarlyResult>
++where
++    D: Future<Output = AppResult<BudgetReservationResult>>,
++    F: Future<Output = AppResult<Option<ClaimedWorkflow>>>,
++    S: Future<Output = AppResult<Option<ClaimedWorkflow>>>,
++{
++    let claim_statement = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
++    let debit_statement = "INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)";
++    // The first owner reaches usage while holding company. The other two queue at the
++    // company prefix in the requested order, before they can take any run/root rows.
++    let queue_tail_pid =
++        match order {
++            UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
++                let debit_pid =
++                    match try_wait_for_lock(observer, gate_pid, debit_statement, debit.as_mut())
++                        .await
++                    {
++                        Ok(pid) => pid,
++                        Err(output) => return Some(EarlyResult::Debit(Box::new(output))),
++                    };
++                match try_wait_for_lock(observer, debit_pid, LEASE_COMPANY_WAIT, first.as_mut())
++                    .await
++                {
++                    Ok(pid) => pid,
++                    Err(output) => return Some(EarlyResult::First(Box::new(output))),
++                }
++            }
++            UsageOrder::ClaimFirst => {
++                let claim_pid =
++                    match try_wait_for_lock(observer, gate_pid, claim_statement, first.as_mut())
++                        .await
++                    {
++                        Ok(pid) => pid,
++                        Err(output) => return Some(EarlyResult::First(Box::new(output))),
++                    };
++                match try_wait_for_lock(observer, claim_pid, LEASE_COMPANY_WAIT, debit.as_mut())
++                    .await
++                {
++                    Ok(pid) => pid,
++                    Err(output) => return Some(EarlyResult::Debit(Box::new(output))),
++                }
++            }
++        };
++    match try_wait_for_lock(
++        observer,
++        queue_tail_pid,
++        LEASE_COMPANY_WAIT,
++        second.as_mut(),
++    )
++    .await
++    {
++        Ok(_) => None,
++        Err(output) => Some(EarlyResult::Second(Box::new(output))),
++    }
++}
++
+ async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Contest {
+     let f = &race.fixture;
+     let before = all_tables(f).await;
+@@ -89,73 +210,24 @@ async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Con
+         .persistence()
+         .claim_io(race.request.fence.scope, workers[1], policy());
+     tokio::pin!(debit, first, second);
+-    let claim_statement = "SELECT usage.root_run_id FROM workflow_root_budget_usage";
+-    let debit_statement = "INSERT INTO workflow_budget_receipts(company_id,run_id,execution_id,root_run_id,resource,reservation_key,quantity,disposition)";
+-    let (mut early_debit, mut early_first, mut early_second) = (None, None, None);
+-    let early: Option<&str> = 'observe: {
+-        let first_pid = match order {
+-            UsageOrder::DebitFirst | UsageOrder::DebitRollback => {
+-                let debit_pid = match try_wait_for_lock(
+-                    &mut observer,
+-                    gate_pid,
+-                    debit_statement,
+-                    debit.as_mut(),
+-                )
+-                .await
+-                {
+-                    Ok(pid) => pid,
+-                    Err(output) => {
+-                        early_debit = Some(output);
+-                        break 'observe Some("debit");
+-                    }
+-                };
+-                match try_wait_for_lock(&mut observer, debit_pid, claim_statement, first.as_mut())
+-                    .await
+-                {
+-                    Ok(pid) => pid,
+-                    Err(output) => {
+-                        early_first = Some(output);
+-                        break 'observe Some("first");
+-                    }
+-                }
+-            }
+-            UsageOrder::ClaimFirst => {
+-                let pid = match try_wait_for_lock(
+-                    &mut observer,
+-                    gate_pid,
+-                    claim_statement,
+-                    first.as_mut(),
+-                )
+-                .await
+-                {
+-                    Ok(pid) => pid,
+-                    Err(output) => {
+-                        early_first = Some(output);
+-                        break 'observe Some("first");
+-                    }
+-                };
+-                if let Err(output) =
+-                    try_wait_for_lock(&mut observer, pid, debit_statement, debit.as_mut()).await
+-                {
+-                    early_debit = Some(output);
+-                    break 'observe Some("debit");
+-                }
+-                pid
+-            }
+-        };
+-        if let Err(output) = try_wait_for_lock(
+-            &mut observer,
+-            first_pid,
+-            "SELECT binding_id, max_context_bytes FROM workflow_runs",
+-            second.as_mut(),
+-        )
+-        .await
+-        {
+-            early_second = Some(output);
+-            break 'observe Some("second");
+-        }
+-        None
+-    };
++    // Box the observation phase: all three real database futures stay in their owner frame.
++    let observation = Box::pin(observe_waits(
++        &mut observer,
++        gate_pid,
++        order,
++        debit.as_mut(),
++        first.as_mut(),
++        second.as_mut(),
++    ))
++    .await;
++    let early = observation.as_ref().map(EarlyResult::contender);
++    let EarlyResults {
++        debit: early_debit,
++        first: early_first,
++        second: early_second,
++    } = observation
++        .map(EarlyResult::into_results)
++        .unwrap_or_default();
+     drop(observer);
+     gate.rollback().await.unwrap();
+     let (debit, first, second) = tokio::join!(
+@@ -184,13 +256,10 @@ async fn compete(race: &ScheduledRace, order: UsageOrder, attempt: usize) -> Con
+         matches!(second, Err(AppError::DatabaseTimeout(_))),
+     ];
+     if let Some(racer) = early {
+-        let index = ["debit", "first", "second"]
+-            .iter()
+-            .position(|name| *name == racer)
+-            .unwrap();
++        let index = racer.index();
+         assert!(
+             not_applied[index],
+-            "{racer} completed before its observed lock wait: debit={debit:?} first={first:?} second={second:?}"
++            "{racer:?} completed before its observed lock wait: debit={debit:?} first={first:?} second={second:?}"
+         );
+     }
+     if not_applied.iter().any(|timed_out| *timed_out) {
+diff --git a/src/adapters/persistence/workflow/action_reconciliation_control_serialization_lock_support.rs b/src/adapters/persistence/workflow/action_reconciliation_control_serialization_lock_support.rs
+index a3b600c1..953f4acf 100644
+--- a/src/adapters/persistence/workflow/action_reconciliation_control_serialization_lock_support.rs
++++ b/src/adapters/persistence/workflow/action_reconciliation_control_serialization_lock_support.rs
+@@ -3,6 +3,11 @@ use super::*;
+ use sqlx::Connection;
+ use std::{cell::Cell, future::Future, pin::Pin, time::Instant};
+ 
++pub(in super::super) const LEASE_COMPANY_WAIT: &str =
++    "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE";
++pub(in super::super) const AUTHORITY_COMPANY_WAIT: &str =
++    "SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE";
++
+ #[derive(Debug, PartialEq, Eq)]
+ pub(in super::super) enum RunProbe {
+     Free,
+@@ -208,8 +213,6 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
+     release: &Notify,
+ ) -> OwnerPids {
+     let execution_wait = "SELECT id FROM workflow_executions";
+-    let company_wait = "SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE";
+-    let run_wait = "SELECT run.company_id,run.id,run.workflow_id";
+     let pids = match order.first {
+         First::Command => {
+             release.notify_one();
+@@ -222,8 +225,8 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
+             .await;
+             held_run(observer, backends, pid, command, reconcile.as_mut()).await;
+             let statement = match order.owner {
+-                Terminal::Cancel => company_wait,
+-                Terminal::Expire => "SELECT id FROM workflow_runs",
++                Terminal::Cancel => AUTHORITY_COMPANY_WAIT,
++                Terminal::Expire => LEASE_COMPANY_WAIT,
+             };
+             let second = tokio::select! {
+                 result = reconcile.as_mut() => panic!("settlement escaped execution gate: {result:?}"),
+@@ -241,13 +244,9 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
+             .await;
+             held_run(observer, backends, pid, command, terminal.as_mut()).await;
+             release.notify_one();
+-            let statement = match order.owner {
+-                Terminal::Cancel => company_wait,
+-                Terminal::Expire => run_wait,
+-            };
+             let second = tokio::select! {
+                 result = terminal.as_mut() => panic!("terminal owner escaped execution gate: {result:?}"),
+-                pid = wait_for_lock(observer, pid, statement, reconcile.as_mut()) => pid,
++                pid = wait_for_lock(observer, pid, AUTHORITY_COMPANY_WAIT, reconcile.as_mut()) => pid,
+             };
+             OwnerPids { first: pid, second }
+         }

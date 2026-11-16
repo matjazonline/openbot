@@ -1,0 +1,31 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0432]: unresolved imports `crate::application::workflow::BindingService`, `crate::application::workflow::BindingTarget`, `crate::application::workflow::ConfigureBinding`, `crate::application::workflow::VersionId`, `crate::application::workflow::WorkflowBindingId`
+   --> src/adapters/persistence/agent_direct_lifecycle_tests.rs:117:9
+    |
+117 |         BindingService, BindingTarget, ConfigureBinding, LifecycleAuthorizer, RelatedAssociation,
+    |         ^^^^^^^^^^^^^^  ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^ no `ConfigureBinding` in `application::workflow`
+    |         |               |
+    |         |               no `BindingTarget` in `application::workflow`
+    |         no `BindingService` in `application::workflow`
+118 |         VersionId, WorkflowBindingId,
+    |         ^^^^^^^^^  ^^^^^^^^^^^^^^^^^ no `WorkflowBindingId` in `application::workflow`
+    |         |
+    |         no `VersionId` in `application::workflow`
+    |
+    = help: consider importing this struct instead:
+            crate::application::workflow::lifecycle::BindingService
+    = help: consider importing one of these structs instead:
+            crate::application::workflow::lifecycle::BindingTarget
+            crate::use_cases::integration_binding::BindingTarget
+    = help: consider importing this struct through its public re-export instead:
+            crate::application::workflow::lifecycle::ConfigureBinding
+    = help: consider importing this struct through its public re-export instead:
+            crate::workflow::VersionId
+    = help: consider importing this struct through its public re-export instead:
+            crate::workflow::WorkflowBindingId
+help: a similar name exists in the module
+    |
+118 -         VersionId, WorkflowBindingId,
+118 +         VersionId, WorkflowBindings,
+    |
+

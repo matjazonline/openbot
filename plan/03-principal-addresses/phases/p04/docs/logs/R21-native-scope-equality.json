@@ -1,0 +1,13 @@
+{
+  "from": "0d3e4a43682241183a27e5ec1f35fd4e9027a8cd",
+  "to": "222b9aea996151748f7ba6d5a0c0ead7a913df0a",
+  "changed_files": [
+    ".github/workflows/ci.yml",
+    "scripts/check-doop.py",
+    "scripts/doop-test/browser-ipc-check.mjs",
+    "scripts/doop-test/browser-owner.mjs",
+    "scripts/tests/check-runner.py",
+    "scripts/tests/doop-probe.mjs"
+  ],
+  "claim": "NativeRust/Cargo/migrations/.sqlx/Memory production andtests unchanged; only privatebrowser/runnerdiagnostic/protocol support changes. Historical/currentgeneralCI evidence reused by exactscope; privatebrowser actualproof required."
+}

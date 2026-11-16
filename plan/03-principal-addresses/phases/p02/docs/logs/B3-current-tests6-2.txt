@@ -1,0 +1,8 @@
+
+running 1 test
+2026-11-15T06:36:06.073994Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(19883770-0eaf-45bc-acee-6f47cc40e398)
+2026-11-15T06:36:06.105734Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(19883770-0eaf-45bc-acee-6f47cc40e398)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4582 filtered out; finished in 3.26s
+

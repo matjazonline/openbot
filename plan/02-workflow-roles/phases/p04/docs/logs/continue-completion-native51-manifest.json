@@ -1,0 +1,96 @@
+{
+  "build": 51,
+  "executable": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+  "inventory": 4353,
+  "environment": "Owned PG52471 resume3 dev/test; stock2MiB native stack;2threads; serial with Cargo/SQLx",
+  "runs": [
+    {
+      "label": "continue-completion-applicability-after1",
+      "selected": 38,
+      "exit": 0,
+      "seconds": 22.67,
+      "stats": {
+        "passed": 38,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part1",
+      "selected": 180,
+      "exit": 101,
+      "seconds": 120.24,
+      "stats": {
+        "passed": 176,
+        "failed": 3,
+        "ignored": 1
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part2",
+      "selected": 180,
+      "exit": 0,
+      "seconds": 229.32,
+      "stats": {
+        "passed": 180,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part3",
+      "selected": 180,
+      "exit": 101,
+      "seconds": 250.61,
+      "stats": {
+        "passed": 179,
+        "failed": 1,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part4",
+      "selected": 180,
+      "exit": 0,
+      "seconds": 123.11,
+      "stats": {
+        "passed": 180,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part5",
+      "selected": 180,
+      "exit": 0,
+      "seconds": 195.43,
+      "stats": {
+        "passed": 180,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part6",
+      "selected": 180,
+      "exit": 0,
+      "seconds": 148.65,
+      "stats": {
+        "passed": 180,
+        "failed": 0,
+        "ignored": 0
+      }
+    },
+    {
+      "label": "continue-completion-affected51-part7",
+      "selected": 114,
+      "exit": 0,
+      "seconds": 0.66,
+      "stats": {
+        "passed": 114,
+        "failed": 0,
+        "ignored": 0
+      }
+    }
+  ]
+}

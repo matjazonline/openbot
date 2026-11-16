@@ -1,0 +1,9 @@
+{
+  "file": ".github/workflows/agent-history.yml",
+  "blobs": {
+    "origin/main": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6",
+    "HEAD": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6",
+    "3d186172a778602dd82d790eb2ef230c80cc045d": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6"
+  },
+  "disposition": "Identical inherited workflow outside changed source/required ci.yml gates; its pre-job validation failure is not a source regression"
+}

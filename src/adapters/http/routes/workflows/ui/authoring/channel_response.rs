@@ -58,7 +58,9 @@ pub(super) async fn card(
         .channel_replies()
         .channel_reply_settings(
             super::company(company),
-            RelatedChannelId::new(channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(channel)).as_uuid(),
+            ),
             ui.actor()?,
         )
         .await?;
@@ -95,7 +97,9 @@ pub(super) async fn save_response(
         .channel_replies()
         .channel_reply_settings(
             super::company(company),
-            RelatedChannelId::new(channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(channel)).as_uuid(),
+            ),
             ui.actor()?,
         )
         .await?;

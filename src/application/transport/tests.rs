@@ -41,7 +41,7 @@ fn binding(
     ChannelBinding {
         id: ChannelBindingId::random(),
         company_id: Uuid::new_v4(),
-        channel_id: Uuid::new_v4(),
+        target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         installation_id: transport
             .requires_installation()
             .then(InstallationId::random),
@@ -49,7 +49,7 @@ fn binding(
         namespace: EndpointNamespace::parse("namespace").unwrap(),
         external_endpoint_key: ExternalEndpointKey::parse("endpoint").unwrap(),
         display_label: "Support".into(),
-        access_policy: BindingAccessPolicy::ChannelAcl,
+        access_policy: BindingAccessPolicy::TargetAcl,
         delivery_policy,
         status,
         disabled_reason: None,
@@ -302,7 +302,7 @@ fn record(transport: TransportKind) -> DeliveryRecord {
         id: DeliveryId::random(),
         company_id: uuid::Uuid::new_v4(),
         attribution: Some(DeliveryAttribution {
-            channel_id: uuid::Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(uuid::Uuid::new_v4()),
             message_id,
             source_binding_id: ChannelBindingId::random(),
             destination_binding_id: ChannelBindingId::random(),
@@ -369,6 +369,15 @@ impl TransportRenderer for EchoRenderer {
             provider_key: None,
             extension: crate::application::ports::thread::ProtocolExtension::none(),
         })
+    }
+    fn application_address(
+        &self,
+        _company: &crate::entities::value_objects::CompanySlug,
+        _address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity> {
+        Err(crate::app_error::AppError::BadRequest(
+            "Fixture transport does not render application addresses".into(),
+        ))
     }
     fn application_message_key(
         &self,

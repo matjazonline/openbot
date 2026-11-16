@@ -36,6 +36,22 @@ pub struct PublishedBundle {
 }
 
 impl PublishedBundle {
+    /// Requirements in pinned children need the same intake department as the root.
+    pub fn first_role_reference(&self) -> Option<&RoleReference> {
+        let mut pending = vec![self];
+        let mut visited = std::collections::BTreeSet::new();
+        while let Some(bundle) = pending.pop() {
+            if !visited.insert(bundle.compiled.graph().definition().version_id) {
+                continue;
+            }
+            if let Some(reference) = bundle.compiled.role_references().first() {
+                return Some(reference);
+            }
+            pending.extend(bundle.children.values().map(AsRef::as_ref));
+        }
+        None
+    }
+
     pub fn company_id(&self) -> CompanyId {
         self.company_id
     }
@@ -89,6 +105,21 @@ impl PublishedBundle {
         let inputs = self.compiled.prepare_step_inputs(step, context)?;
         let definition = &self.compiled.graph().definition().steps[step];
         if registry::ModelStep::of(definition.step_type.as_str()).is_some() {
+            if let Some(reference) =
+                self.compiled.role_references().iter().find(|reference| {
+                    &reference.step == step && reference.mode.agent_mode().is_some()
+                })
+            {
+                if inputs.value()["role"].as_str() != Some(reference.role.as_str()) {
+                    return Err(validation::error(
+                        &self.compiled,
+                        &format!("/steps/{step}/with/role"),
+                        "publication.role",
+                        "Role selection does not match this frozen requirement",
+                    ));
+                }
+                return Ok(inputs);
+            }
             let selected = inputs.value()["agent"].as_str();
             if !self
                 .snapshots
@@ -190,6 +221,7 @@ fn manifest(
         "format":"workflow-publication-v2", "company_id":company_id,
         "version_id":version_id, "compiled_hash":compiled.content_hash(),
         "dependencies":dependencies, "dependency_hashes":dependency_hashes,
+        "roles":compiled.role_references(),
         "child_hashes":child_hashes,
         "resources":compiled.representation()["definition"]["resources"],
     });

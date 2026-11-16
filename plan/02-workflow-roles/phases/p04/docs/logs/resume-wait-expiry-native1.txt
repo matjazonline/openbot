@@ -1,0 +1,53 @@
+$ /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7 ::escalation_guards:: workflow_maintenance_ workflow_wait_ workflow_decision_timeout_ --test-threads=2 --nocapture
+RUST_MIN_STACK=2097152
+
+running 46 tests
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_error_route_successor_receives_null ... ok
+test adapters::persistence::workflow::tests::admission_tests::decision_tests::workflow_decision_timeout_without_error_route_fails_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::guard_tests::workflow_maintenance_wait_deadline_crossing_uses_run_expiry ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_commit_fault_rolls_back_every_fact ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_competes_with_expiry_completion_and_heartbeat ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_deadline_retirement_survives_lease_crossing_at_commit ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::guard_tests::workflow_maintenance_forged_retirement_is_rejected_and_rolled_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_full_pages_drain_without_time_advance ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_live_expired_and_spent_attempts_debit_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_preserves_existing_ambiguous_attempt_truth ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_discovers_all_active_states_and_future_jobs ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_scope_and_predeadline_refuse_without_writes ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::polling_tests::maintenance_worker_tests::workflow_maintenance_worker_drains_full_unsupported_pages_without_dispatch ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::maintenance_tests::workflow_maintenance_wait_sweeper_competes_and_preserves_notification ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_cancel_races_resume_under_run_lock ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_commit_crossing_deadline_rolls_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_due_timer_sweeps_once_and_future_timer_waits ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_same_thread_messages_remain_independent ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::deadline_tests::workflow_wait_expiry_and_cancellation_do_not_schedule ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_commit_guard_refuses_an_event_recorded_after_the_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_consumed_event_does_not_resume_new_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_bound_competing_producers ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_facts_faults_and_bounds_are_enforced ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_deadline_guard_is_independent_of_run_deadline ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_id_collision_across_competing_runs_is_conflict ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_scope_and_consumption_foreign_keys ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_event_stale_event_matches_only_its_correlation ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_poison_timer_does_not_block_valid_due_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_expiry_competes_with_resume ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::guard_tests::workflow_wait_sweep_selection_has_bounded_lock_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_competing_park_signal_resume_and_lost_ack ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_event_before_park_and_concurrent_arrival ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_refuses_scope_kind_and_invalid_events ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_competing_deadline_owners_create_one_terminal_source ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_case_failure_rolls_back_expiry_and_job ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_requires_actual_expiry_and_delivers_one_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_competing_decision_sweepers_commit_one_failure_case ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::wait_tests::workflow_wait_park_and_resume_write_failures_roll_back ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_deadline_fails_real_wait_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_authored_handler_suppresses_ladder_even_at_end ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_case_failure_rolls_back_run_and_wait ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::wait_deadlines::workflow_escalation_trigger_wait_deadline_preserves_real_source_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case ... ok
+
+test result: ok. 46 passed; 0 failed; 0 ignored; 0 measured; 4252 filtered out; finished in 49.23s
+

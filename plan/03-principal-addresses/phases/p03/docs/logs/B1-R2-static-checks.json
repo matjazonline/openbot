@@ -1,0 +1,50 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "B1-R2-format.txt"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "exit": 0,
+    "log": "B1-R2-whitespace.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "log": "B1-R2-transport-boundary.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "log": "B1-R2-transport-fixtures.txt"
+  },
+  {
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--offline",
+      "--all-targets",
+      "--message-format=json"
+    ],
+    "exit": 0,
+    "log": "B1-R2-clippy-diagnostic.txt"
+  }
+]

@@ -3,6 +3,11 @@ use super::*;
 use sqlx::Connection;
 use std::{cell::Cell, future::Future, pin::Pin, time::Instant};
 
+pub(in super::super) const LEASE_COMPANY_WAIT: &str =
+    "SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE";
+pub(in super::super) const AUTHORITY_COMPANY_WAIT: &str =
+    "SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE";
+
 #[derive(Debug, PartialEq, Eq)]
 pub(in super::super) enum RunProbe {
     Free,
@@ -208,8 +213,6 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
     release: &Notify,
 ) -> OwnerPids {
     let execution_wait = "SELECT id FROM workflow_executions";
-    let company_wait = "SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE";
-    let run_wait = "SELECT run.company_id,run.id,run.workflow_id";
     let pids = match order.first {
         First::Command => {
             release.notify_one();
@@ -222,8 +225,8 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
             .await;
             held_run(observer, backends, pid, command, reconcile.as_mut()).await;
             let statement = match order.owner {
-                Terminal::Cancel => company_wait,
-                Terminal::Expire => "SELECT id FROM workflow_runs",
+                Terminal::Cancel => AUTHORITY_COMPANY_WAIT,
+                Terminal::Expire => LEASE_COMPANY_WAIT,
             };
             let second = tokio::select! {
                 result = reconcile.as_mut() => panic!("settlement escaped execution gate: {result:?}"),
@@ -241,13 +244,9 @@ async fn observe_owners<R: std::fmt::Debug, T: std::fmt::Debug>(
             .await;
             held_run(observer, backends, pid, command, terminal.as_mut()).await;
             release.notify_one();
-            let statement = match order.owner {
-                Terminal::Cancel => company_wait,
-                Terminal::Expire => run_wait,
-            };
             let second = tokio::select! {
                 result = terminal.as_mut() => panic!("terminal owner escaped execution gate: {result:?}"),
-                pid = wait_for_lock(observer, pid, statement, reconcile.as_mut()) => pid,
+                pid = wait_for_lock(observer, pid, AUTHORITY_COMPANY_WAIT, reconcile.as_mut()) => pid,
             };
             OwnerPids { first: pid, second }
         }

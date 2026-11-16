@@ -1,0 +1,33 @@
+{
+  "build": 95,
+  "selected": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "--test-threads=2",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle"
+  ],
+  "exit": 101,
+  "seconds": 7.04,
+  "environment": {
+    "fixture": "owned resume8 test cluster",
+    "RUST_MIN_STACK": "2097152",
+    "test_threads": 2
+  }
+}

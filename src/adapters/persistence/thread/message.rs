@@ -7,6 +7,7 @@
 //! provider keys -- hangs off that payload in its own table, so storing a Slack post, a schedule's
 //! prompt or an agent's answer needs none of it.
 
+use crate::entities::address::AddressTarget;
 use std::str::FromStr;
 
 use chrono::{DateTime, Utc};
@@ -288,25 +289,23 @@ pub(super) struct ResolvedParticipant {
 #[derive(Clone, Copy)]
 pub(super) struct ThreadScope {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
 }
 
 pub(super) async fn thread_scope(
     connection: &mut sqlx::PgConnection,
     thread_id: Uuid,
 ) -> AppResult<ThreadScope> {
-    let scope: Option<(Uuid, Uuid)> =
-        sqlx::query_as("SELECT company_id, channel_id FROM threads WHERE id = $1")
+    let scope: Option<(Uuid, Option<Uuid>, Option<Uuid>)> =
+        sqlx::query_as("SELECT company_id,channel_id,principal_id FROM threads WHERE id=$1")
             .bind(thread_id)
             .fetch_optional(&mut *connection)
-            .await
-            .map_err(AppError::from)?;
-    scope
-        .map(|(company_id, channel_id)| ThreadScope {
-            company_id,
-            channel_id,
-        })
-        .ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))
+            .await?;
+    let (company_id, desk, principal) =
+        scope.ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))?;
+    let target = AddressTarget::from_parts(desk, principal.map(PrincipalId::new))
+        .ok_or_else(|| AppError::Internal("Invalid stored thread target".into()))?;
+    Ok(ThreadScope { company_id, target })
 }
 
 pub(super) async fn resolve_author(
@@ -579,17 +578,18 @@ pub(crate) async fn insert_message_on(
         sqlx::query(
             r#"INSERT INTO internal_notes (
                     id, company_id, channel_id, thread_id, message_id, command_id,
-                    command_fingerprint, author_principal_id, provenance
-               ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, 'email_quiet_ingress')
+                    command_fingerprint, author_principal_id, provenance, principal_id
+               ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, 'email_quiet_ingress', $8)
                ON CONFLICT (company_id, message_id) DO NOTHING"#,
         )
         .bind(Uuid::new_v4())
         .bind(scope.company_id)
-        .bind(scope.channel_id)
+        .bind(scope.target.desk_id())
         .bind(write.thread_id)
         .bind(canonical_id.as_uuid())
         .bind(fingerprint)
         .bind(author.principal_id.as_uuid())
+        .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
         .execute(&mut *connection)
         .await
         .map_err(AppError::from)?;
@@ -705,7 +705,7 @@ async fn store_email_correlated(
     metadata: &EmailMessageMetadata,
 ) -> AppResult<CanonicalMessageId> {
     let binding_id =
-        external::canonical_email_binding(connection, scope.company_id, scope.channel_id).await?;
+        external::canonical_email_binding(connection, scope.company_id, scope.target).await?;
     let message_key = bounded_message_key(metadata.rfc_message_id.as_str())?;
     let thread_key = bounded_thread_key(metadata.conversation_root_key().as_str())?;
 
@@ -759,7 +759,7 @@ async fn store_email_correlated(
         connection,
         external::ExternalThreadMapping {
             company_id: scope.company_id,
-            channel_id: scope.channel_id,
+            target: scope.target,
             binding_id,
             key: &thread_key,
             thread_id: payload.write.thread_id,
@@ -804,8 +804,16 @@ pub(super) async fn insert_canonical_message(
             &crate::adapters::response_schema::JsonResponseValidator,
         )?;
     }
+    let producer = match &stamp {
+        MessageStampSource::Public => None,
+        MessageStampSource::Workflow { run, .. } => Some(run.as_uuid()),
+    };
     let stamp = stamp.stamp_on(connection, company_id, write.role).await?;
     let id = write.id;
+    if let Some(producer) = producer {
+        sqlx::query("INSERT INTO workflow_message_producer_seals(company_id,message_id,producer_run_id) VALUES($1,$2,$3)")
+            .bind(company_id).bind(id.as_uuid()).bind(producer).execute(&mut *connection).await?;
+    }
     sqlx::query(
         r#"INSERT INTO messages (
                 id, company_id, author_principal_id, authored_identity_id, subject,
@@ -900,18 +908,19 @@ pub(super) async fn insert_thread_association(
 ) -> AppResult<Uuid> {
     let association_id: Option<Uuid> = sqlx::query_scalar(
         r#"INSERT INTO thread_messages (
-                id, company_id, channel_id, thread_id, message_id, created_at, entry_kind
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
-           ON CONFLICT (channel_id, message_id) DO NOTHING
+                id, company_id, channel_id, thread_id, message_id, created_at, entry_kind, principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+           ON CONFLICT DO NOTHING
            RETURNING id"#,
     )
     .bind(Uuid::new_v4())
     .bind(scope.company_id)
-    .bind(scope.channel_id)
+    .bind(scope.target.desk_id())
     .bind(write.thread_id)
     .bind(canonical_id.as_uuid())
     .bind(write.created_at)
     .bind(write.entry_kind.as_str())
+    .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
     .fetch_optional(&mut *connection)
     .await
     .map_err(AppError::from)?;
@@ -924,9 +933,11 @@ pub(super) async fn insert_thread_association(
     // the existing association names a *different* thread, which would mean one conversation had
     // been split in two for the same audience.
     let existing: Option<(Uuid, Uuid, String)> = sqlx::query_as(
-        "SELECT id, thread_id, entry_kind FROM thread_messages WHERE channel_id = $1 AND message_id = $2",
+        "SELECT id,thread_id,entry_kind FROM thread_messages WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2 AND principal_id IS NOT DISTINCT FROM $3 AND message_id=$4",
     )
-    .bind(scope.channel_id)
+    .bind(scope.company_id)
+    .bind(scope.target.desk_id())
+    .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
     .bind(canonical_id.as_uuid())
     .fetch_optional(&mut *connection)
     .await

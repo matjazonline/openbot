@@ -1,0 +1,6 @@
+{
+  "prior": "d8fdd990",
+  "current": "584d7d69c02569c6a1410b1b75a4d0ce2b3d3287",
+  "identical_tree": "c11161906e7b9764e6ee1429f4a5f0d54a1bc957",
+  "claim": "External fast-forward changed ancestry only; committed source tree is byte-identical, no test rerun needed solely for this change."
+}

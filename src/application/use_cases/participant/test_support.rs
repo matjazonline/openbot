@@ -146,8 +146,10 @@ pub trait TeamFixture: Send + Sync {
 
 #[derive(Default)]
 struct DirectoryState {
+    principals: HashMap<(Uuid, PrincipalId), Principal>,
     identities: HashMap<(Uuid, QualifiedIdentity), PrincipalIdentity>,
     users: HashMap<(Uuid, Uuid), (PrincipalId, bool)>,
+    direct_inboxes: HashMap<(Uuid, Uuid), Vec<crate::application::ports::participant::DirectInbox>>,
 }
 
 /// An `IdentityDirectory` + `PrincipalAccessPersistence` backed by a `HashMap`.
@@ -178,6 +180,31 @@ impl InMemoryParticipantDirectory {
     pub fn with_team(mut self, team: Arc<dyn TeamFixture>) -> Self {
         self.team = Some(team);
         self
+    }
+
+    /// State a loaded target independently of sender identity observations.
+    pub fn insert_principal(&self, principal: Principal) {
+        self.state
+            .lock()
+            .unwrap()
+            .principals
+            .insert((principal.company_id, principal.id), principal);
+    }
+
+    /// State an explicit viewer's listing response. Unconfigured listings remain errors, so
+    /// a fixture cannot silently claim to cover this port or invent a principal's address.
+    pub fn insert_direct_inbox(
+        &self,
+        viewer: Uuid,
+        inbox: crate::application::ports::participant::DirectInbox,
+    ) {
+        self.state
+            .lock()
+            .unwrap()
+            .direct_inboxes
+            .entry((inbox.principal.company_id, viewer))
+            .or_default()
+            .push(inbox);
     }
 
     /// Attach an account to its company principal, the way company/invite bootstrap does.
@@ -271,6 +298,9 @@ impl InMemoryParticipantDirectory {
             },
             user_id: None,
             agent_id: None,
+            open_to_public: false,
+            settings_revision: 1,
+            historical_person_user_id: None,
             display_label: identity
                 .display_label
                 .clone()
@@ -307,6 +337,53 @@ impl IdentityDirectory for InMemoryParticipantDirectory {
 
 #[async_trait]
 impl PrincipalAccessPersistence for InMemoryParticipantDirectory {
+    async fn direct_inboxes(
+        &self,
+        company: Uuid,
+        user: Uuid,
+        limit: usize,
+    ) -> AppResult<Vec<crate::application::ports::participant::DirectInbox>> {
+        self.state
+            .lock()
+            .unwrap()
+            .direct_inboxes
+            .get(&(company, user))
+            .map(|inboxes| inboxes.iter().take(limit.min(201)).cloned().collect())
+            .ok_or_else(|| {
+                AppError::Internal("direct inbox listing is outside this fixture".into())
+            })
+    }
+
+    async fn principal_by_id(
+        &self,
+        company: Uuid,
+        principal: PrincipalId,
+    ) -> AppResult<Option<Principal>> {
+        if let Some(stored) = self
+            .state
+            .lock()
+            .unwrap()
+            .principals
+            .get(&(company, principal))
+            .cloned()
+        {
+            return Ok(Some(stored));
+        }
+        let found = self
+            .state
+            .lock()
+            .unwrap()
+            .identities
+            .iter()
+            .find(|((scope, _), identity)| *scope == company && identity.principal_id == principal)
+            .map(|((_, qualified), identity)| (qualified.clone(), identity.clone()));
+        let Some((qualified, identity)) = found else {
+            return Ok(None);
+        };
+        let membership = self.membership_for_subject(company, &qualified).await?;
+        Ok(Some(self.principal_from(&identity, membership)))
+    }
+
     async fn access_context_for_identity(
         &self,
         company_id: Uuid,
@@ -393,6 +470,25 @@ impl IdentityDirectory for FailingParticipantDirectory {
 
 #[async_trait]
 impl PrincipalAccessPersistence for FailingParticipantDirectory {
+    async fn direct_inboxes(
+        &self,
+        _company: Uuid,
+        _user: Uuid,
+        _limit: usize,
+    ) -> AppResult<Vec<crate::application::ports::participant::DirectInbox>> {
+        Err(crate::app_error::AppError::Internal(
+            "direct inbox listing is outside this fixture".into(),
+        ))
+    }
+
+    async fn principal_by_id(
+        &self,
+        _company: Uuid,
+        _principal: PrincipalId,
+    ) -> AppResult<Option<Principal>> {
+        Err(outage())
+    }
+
     async fn access_context_for_identity(
         &self,
         _company_id: Uuid,

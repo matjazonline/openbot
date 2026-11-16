@@ -189,16 +189,21 @@ async fn deliveries_page(
     let view = workspace.view(&company);
     let filter = query.filter();
     let channels = view.channels().await?;
-    let (entries, has_next) = view.page(&filter).await?;
-
     // A delivery the filters exclude is still worth showing: the URL named it, and it may well be
     // on another page of this same list.
-    let selected = match query.entry_id {
-        Some(entry_id) => view.entry(entry_id).await?,
-        None => None,
-    };
+    record_pagination_observation(view.monitoring, "deliveries", filter.offset());
+    let loaded = view
+        .deliveries
+        .workspace(
+            view.read_scope()?,
+            &filter,
+            query.entry_id.map(DeliveryId::new),
+        )
+        .await?;
+    let (entries, has_next) = filter.split_probe(loaded.entries);
+    let selected = loaded.selected;
     let pane_html = match &selected {
-        Some(entry) => view.pane(entry, &channels).await?,
+        Some(entry) => view.pane(entry, &channels)?,
         None => pages::delivery_empty_pane(NO_SELECTION, pages::FragmentSwap::Inline),
     };
 
@@ -248,13 +253,12 @@ async fn delivery_pane(
 ) -> AppResult<Html<String>> {
     let company = workspace.scoped_company(query.company_id).await?;
     let view = workspace.view(&company);
+    let channels = view.channels().await?;
     let entry = view
         .entry(entry_id)
         .await?
         .ok_or_else(|| AppError::NotFound("Delivery not found".into()))?;
-    let channels = view.channels().await?;
-
-    Ok(Html(view.pane(&entry, &channels).await?))
+    Ok(Html(view.pane(&entry, &channels)?))
 }
 
 /// Everything the workspace renders from, so each handler names its data once.
@@ -324,10 +328,13 @@ impl DeliveriesView<'_> {
         )
     }
 
-    async fn pane(&self, entry: &DeliveryEntry, channels: &[Channel]) -> AppResult<String> {
-        let channel = channels
-            .iter()
-            .find(|channel| channel.id == entry.channel_id);
+    fn pane(&self, entry: &DeliveryEntry, channels: &[Channel]) -> AppResult<String> {
+        let channel = match entry.target {
+            crate::entities::address::AddressTarget::Desk(id) => {
+                channels.iter().find(|channel| channel.id == id)
+            }
+            crate::entities::address::AddressTarget::Principal(_) => None,
+        };
 
         Ok(pages::delivery_detail_pane(&pages::DeliveryDetailPane {
             company_id: self.company.id,

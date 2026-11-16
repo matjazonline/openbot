@@ -1,0 +1,13 @@
+{
+  "HEAD": "c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed",
+  "artifact": "d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb",
+  "native_delta_from_R19": [
+    "src/main.rs"
+  ],
+  "main_noninventory_bytes_identical": true,
+  "merge_files": 15,
+  "incoming_planning_files_byte_identical": 14,
+  "fix_doop_plan_unchanged_from_R16": true,
+  "coordination58_identical": true,
+  "R14_preflight_still_absent": true
+}

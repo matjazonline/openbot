@@ -1,0 +1,22 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin' (5560959) panicked at src/adapters/persistence/workflow/escalation_origin_relay_tests.rs:573:9:
+assertion `left == right` failed: error returned from database: duplicate key value violates unique constraint "workflow_message_intents_association_key"
+  left: Some("23505")
+ right: Some("23514")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_actual_email_relay_proves_its_part_and_inherits_exact_origin
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4469 filtered out; finished in 10.91s
+
+EXIT 101

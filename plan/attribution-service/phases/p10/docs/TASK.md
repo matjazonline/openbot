@@ -492,3 +492,64 @@ and all review evidence. Final main identity and authority transition recorded b
 
 
 Guarded integration completed: main digest55ecc5ea matches accepted source;23 owned files transferred; user test-fixcommit6e55258c unchanged. Canonicalp06–p10records moved to main, two older partial build-log copies archived,28historical manifests validated, diffcheck and main Trail refresh passed. Owned resources cleaned as logged. Final acceptance applies only to verified attribution scope, with VG1 and all recorded failed/unexercised repository checks preserved.
+
+
+## AS-P10-PUSH-R1 — integrate current main and publish
+
+Authorization: user requested "push to main" on2026-11-16. Current branch
+attribution-service; accepted source committed ase61d384e, parent6e55258c.
+Incoming origin/main8fdb892b was merged with --no-commit and no conflicts.
+Main/root remains record authority; coordination revision29, C001–C008/r1.
+Retained B handles independent integration review. No service or attribution
+owner implementation changed. Seven previously modified files also receive
+upstream changes: Cargo manifest/lock, root migration, persistence module,
+foundation/workers wiring and startup note list. User runner fixes remain in
+history and the incoming runner adds its own previously committed gates.
+
+| Criterion | Contract impact / proof | Check | Status |
+| --- | --- | --- | --- |
+| Accepted implementation preserved | Compare precommit snapshot55ecc5ea; no service/attribution owner delta after incoming merge | exact snapshot and git source comparison | PASS |
+| Combined build/wiring | New principal-address migration and spam-scanner wiring must compose with identity bridge | cargo fmt; cargo check --locked --offline --all-targets | fmt PASS; check pending |
+| Identity/migration/lifecycle | Real merged migration, code exchange, company roles, revoke and competing claimants retain behavior | cargo test --locked --offline --lib attribution_ -- --test-threads=4 | pending |
+| Actual sign-in consumer | Merged Openbot login handlers and accepted standalone service complete actual eight-check SSO browser | ignored attribution_sso_browser_ test | pending |
+| Integration review | Inspect merge vs both parents, inherited contract effects and focused proof | retained independent Astra/high | pending |
+
+Owned fresh native PostgreSQL18 fixture and port are recorded in
+logs/AS-P10-PUSH-R1-postgres.json. No other task fixture is touched. Existing
+service binary/dependency caches may be reused only while their service source
+remains identical. No full-suite rerun is claimed for the incoming upstream
+work; prior required final gate and all failed/unexercised results remain retained.
+
+Trail check ran before the implementation commit. Its two blocking prose matches
+against the grouped-shell-gate learning are explicitly disposed in that commit;
+staged scan was limited to400KB. Byte-pinned historical logs retain whitespace.
+
+PUSH-R1 update: formatting, offline all-target compilation, fresh PG18 migration,
+standalone service build and source-preservation checks PASS. Independent B saved
+AS-P10-PUSH-R1-N1 source review with no findings, pending runtime evidence. First
+root test harness build failed at linker write() errno28 before executing tests.
+Retained AS-P10-PUSH-R1-root-attribution.txt; cargo clean --package open_bots removed
+only this workspace's package artifacts (571files/8.5GiB). Retry uses
+CARGO_PROFILE_TEST_DEBUG=0 CARGO_INCREMENTAL=0 with the same code, debug assertions
+and test filters; no source/test/assertion change. Retry log
+AS-P10-PUSH-R1-root-attribution-retry.txt. SSO follows successful root tests.
+
+PUSH-R1 runtime update: identical-code debug0/incremental0 retry PASS25/0fail/1ignored,
+4692filtered,74.29s runtime. This includes all12 ordinary attribution tests and
+additional matching reconciliation/attribution cases. The one ignored test is
+the separately invoked actual Openbot/standalone-service SSO browser journey.
+The initial failure was a linker disk write (errno28), not a test assertion.
+
+## AS-P10-PUSH-ACCEPT-R1 — root publication integration acceptance
+
+Independent AS-P10-PUSH-R1-N1 PASS on frozen3688ab5d, basee61d384e + main8fdb892b.
+All current affected checks PASS: fmt, offline all-target compilation, fresh
+migration, accepted service build/identity,25focused root tests, actual browser
+SSO1test/8checks. Original harness linker failure is retained, corrected by
+debug0/incremental0 artifact settings without changing source or assertions.
+Manifest8PASS/1FAIL/1NOTEXERCISED validates; NOTEXERCISED is the broad repository
+rerun and does not claim prior VG1/global gaps resolved. Final merged Trail check
+returns0 with its500-file cap; initial prose matches remain explained in e61d384e.
+Owned PG18 fixture stopped/removed. Reviewer completed; no active checks remain.
+Coordination30 records status only; pinned29/C001–C008/r1 review inputs unchanged.
+User authorization covers merge commit and non-force publication to origin/main.

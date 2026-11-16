@@ -1,0 +1,425 @@
+diff --git a/scripts/tests/network-isolation-scope.py b/scripts/tests/network-isolation-scope.py
+index 16185364..fd464d87 100644
+--- a/scripts/tests/network-isolation-scope.py
++++ b/scripts/tests/network-isolation-scope.py
+@@ -150,29 +150,82 @@ def exercise(wrappers, directory, address, port, expect_control=True):
+ def sudo_shim(directory, mode, stage):
+     shim = directory / "shim"
+     shim.mkdir(exist_ok=True)
+-    # Run the actual privileged operation first for signal/deadline cases. The
+-    # signal handshake holds a successful creator before its shell can publish it.
+-    # The deadline case execs sudo, retaining the real production process tree.
+-    (shim / "sudo").write_text("#!" + sys.executable + "\n" +
+-        "import os, signal, subprocess, sys, time\nfrom pathlib import Path\n" +
+-        "mode, stage, real, gate = " + repr((mode, stage, shutil.which("sudo"), str(directory))) + "\n" +
+-        "args = sys.argv[1:]\n" +
+-        "target = stage in args and (stage != 'iptables' and stage != 'ip6tables' or '-N' in args)\n" +
+-        "if mode == 'failure' and target: raise SystemExit(73)\n" +
+-        "if mode == 'slow' and target:\n" +
+-        "    position = args.index('groupdel')\n" +
+-        "    group = args[position + 1]\n" +
+-        "    script = 'groupdel \"$1\"; echo \"$$\" > \"$2\"; sleep 30; touch \"$3\"'\n" +
+-        "    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group, str(Path(gate, 'privileged-pid')), str(Path(gate, 'late-effect'))]\n" +
+-        "    os.execv(real, [real, *args])\n" +
+-        "if not target: os.execv(real, [real, *args])\n" +
+-        "result = subprocess.run([real, *args]).returncode\n" +
+-        "if result == 0 and target and mode == 'signal':\n" +
+-        "    Path(gate, 'created').touch()\n" +
+-        "    deadline = time.monotonic() + 10\n" +
+-        "    while not Path(gate, 'return').exists():\n" +
+-        "        assert time.monotonic() < deadline\n        time.sleep(0.01)\n" +
+-        "raise SystemExit(result)\n")
++    # Only creator-acknowledgement fixtures keep a parent after the real operation.
++    # Deadline/ordinary paths exec sudo and preserve its production process tree.
++    source = "#!" + sys.executable + "\n" + (
++        "mode, stage, real, gate = " +
++        repr((mode, stage, shutil.which("sudo"), str(directory))) + "\n") + r"""
++import os, subprocess, sys, time
++from pathlib import Path
++args = sys.argv[1:]
++gate = Path(gate)
++if 'groupadd' in args:
++    (gate / 'planned-group').write_text(args[-1])
++if '-N' in args and any(fw in args for fw in ('iptables', 'ip6tables')):
++    (gate / 'planned-chain').write_text(args[args.index('-N') + 1])
++
++def fixture_admin(*command):
++    return subprocess.run([real, '-n', 'env', '--default-signal=INT,TERM', 'timeout',
++                           '--kill-after=1s', '3s', *command],
++                          capture_output=True, text=True, timeout=6, check=True)
++
++if mode == 'foreign-group' and 'getent' in args and not (gate / 'foreign-group').exists():
++    name = args[-1]
++    fixture_admin('groupadd', '--system', name)
++    (gate / 'foreign-group').write_text(name)
++    (gate / 'foreign-before').write_text(fixture_admin('getent', 'group', name).stdout)
++if mode in ('foreign-chain', 'foreign-probe-error') and 'iptables' in args and '-S' in args:
++    if not (gate / 'foreign-chain').exists():
++        group = (gate / 'planned-group').read_text()
++        chain = 'OB_TEST_' + group.removeprefix('obnet_')
++        fixture_admin('iptables', '-w', '1', '-N', chain)
++        fixture_admin('iptables', '-w', '1', '-A', chain, '-m', 'comment',
++                      '--comment', 'foreign-fixture', '-j', 'RETURN')
++        (gate / 'foreign-chain').write_text(chain)
++        (gate / 'foreign-before').write_text(fixture_admin('iptables', '-w', '1', '-S', chain).stdout)
++    if mode == 'foreign-probe-error':
++        raise SystemExit(73)
++if stage == 'hook':
++    target = 'iptables' in args and '-I' in args
++elif stage == 'probe':
++    target = 'iptables' in args and '-S' in args
++else:
++    target = stage in args and (stage not in ('iptables', 'ip6tables') or '-N' in args)
++if mode == 'failure' and target:
++    raise SystemExit(73)
++if mode == 'slow' and target:
++    position = args.index('groupdel')
++    group = args[position + 1]
++    script = 'groupdel "$1"; echo "$$" > "$2"; sleep 30; touch "$3"'
++    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group,
++                      str(gate / 'privileged-pid'), str(gate / 'late-effect')]
++    os.execv(real, [real, *args])
++if not target or mode in ('foreign-group', 'foreign-chain', 'foreign-probe-error'):
++    os.execv(real, [real, *args])
++result = subprocess.run([real, *args]).returncode
++if result == 0 and mode in ('post-error', 'post-timeout'):
++    if stage == 'groupadd':
++        fixture_admin('getent', 'group', args[-1])
++    elif stage in ('iptables', 'ip6tables'):
++        fixture_admin(stage, '-w', '1', '-S', args[args.index('-N') + 1])
++    else:
++        jump = args[args.index('-I') + 1:]
++        assert jump[1] == '1'
++        del jump[1]
++        fixture_admin('iptables', '-w', '1', '-C', *jump)
++    (gate / 'applied').touch()
++    if mode == 'post-error':
++        raise SystemExit(73)
++    time.sleep(30)
++if result == 0 and mode == 'signal':
++    (gate / 'created').touch()
++    deadline = time.monotonic() + 10
++    while not (gate / 'return').exists():
++        assert time.monotonic() < deadline
++        time.sleep(0.01)
++raise SystemExit(result)
++"""
++    (shim / "sudo").write_text(source)
+     (shim / "sudo").chmod(0o755)
+     return dict(os.environ, PATH=str(shim) + ":" + os.environ["PATH"])
+ 
+@@ -272,6 +325,121 @@ def cleanup_deadline(wrappers, directory):
+         print(f"PASS: cleanup deadline and visible failure for entrypoint{index} ({elapsed:.2f}s)", flush=True)
+ 
+ 
++def admin(*arguments, check=True):
++    return subprocess.run(["sudo", "-n", "env", "--default-signal=INT,TERM", "timeout",
++                           "--kill-after=1s", "3s", *arguments],
++                          capture_output=True, text=True, timeout=6, check=check)
++
++
++def remove_planned(directory):
++    # These exact names came from this fixture's own real creator calls. This is
++    # failure teardown, never prefix-wide cleanup or a source of production truth.
++    group_file = directory / "planned-group"
++    chain_file = directory / "planned-chain"
++    group = group_file.read_text() if group_file.exists() else None
++    chain = chain_file.read_text() if chain_file.exists() else None
++    if chain:
++        row = admin("getent", "group", group, check=False) if group else None
++        gid = row.stdout.split(":")[2] if row and row.returncode == 0 else None
++        for firewall in ("iptables", "ip6tables"):
++            if gid:
++                admin(firewall, "-w", "1", "-D", "OUTPUT", "-m", "owner",
++                      "--gid-owner", gid, "-j", chain, check=False)
++            admin(firewall, "-w", "1", "-F", chain, check=False)
++            admin(firewall, "-w", "1", "-X", chain, check=False)
++    if group:
++        admin("groupdel", group, check=False)
++
++
++def after_effect_case(wrapper, directory, mode, stage):
++    before = owned_resources()
++    marker = directory / "must-not-run"
++    environment = sudo_shim(directory, mode, stage)
++    try:
++        result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
++                                env=environment, capture_output=True, text=True, timeout=18)
++        assert (directory / "applied").exists(), result.stdout + result.stderr
++        expected = 73 if mode == "post-error" else 124
++        assert result.returncode == expected, result.stdout + result.stderr
++        assert not marker.exists(), "uncertain setup executed the target command"
++        assert owned_resources() == before, "post-mutation acquisition leaked resources"
++    finally:
++        remove_planned(directory)
++    assert owned_resources() == before, "fixture teardown left resources behind"
++
++
++def setup_after_effect(wrappers, directory):
++    baseline = owned_resources()
++    suffix = f"{os.getpid()}_{os.urandom(3).hex()}"
++    group = "obnet_f_" + suffix
++    chain = "OB_TEST_F_" + suffix
++    admin("groupadd", "--system", group)
++    try:
++        admin("iptables", "-w", "1", "-N", chain)
++        admin("iptables", "-w", "1", "-A", chain, "-m", "comment",
++              "--comment", "unrelated-fixture", "-j", "RETURN")
++        for index, wrapper in enumerate(wrappers):
++            for mode in ("post-error", "post-timeout"):
++                for stage in ("groupadd", "ip6tables", "hook"):
++                    case = directory / f"after-{index}-{mode}-{stage}"
++                    case.mkdir()
++                    after_effect_case(wrapper, case, mode, stage)
++        print("PASS: real group/chain/hook mutations followed by error/timeout clean both entrypoints and preserve unrelated objects", flush=True)
++    finally:
++        admin("iptables", "-w", "1", "-F", chain, check=False)
++        admin("iptables", "-w", "1", "-X", chain, check=False)
++        admin("groupdel", group, check=False)
++    assert owned_resources() == baseline
++
++
++def foreign_acquisitions(wrappers, directory):
++    baseline = owned_resources()
++    for index, wrapper in enumerate(wrappers):
++        for mode in ("foreign-group", "foreign-chain", "foreign-probe-error"):
++            case = directory / f"foreign-{index}-{mode}"
++            case.mkdir()
++            environment = sudo_shim(case, mode, "probe")
++            marker = case / "must-not-run"
++            try:
++                result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
++                                        env=environment, capture_output=True, text=True, timeout=18)
++                assert result.returncode != 0, result.stdout + result.stderr
++                assert not marker.exists()
++                if mode == "foreign-group":
++                    name = (case / "foreign-group").read_text()
++                    assert admin("getent", "group", name).stdout == (case / "foreign-before").read_text()
++                    assert not (case / "planned-group").exists(), "foreign group was acquired before checking absence"
++                else:
++                    name = (case / "foreign-chain").read_text()
++                    assert admin("iptables", "-w", "1", "-S", name).stdout == (case / "foreign-before").read_text()
++                    assert not (case / "planned-chain").exists(), "foreign/error lookup authorized a chain mutation"
++                    own_group = (case / "planned-group").read_text()
++                    assert admin("getent", "group", own_group, check=False).returncode == 2
++            finally:
++                remove_planned(case)
++                if (case / "foreign-group").exists():
++                    admin("groupdel", (case / "foreign-group").read_text(), check=False)
++                if (case / "foreign-chain").exists():
++                    name = (case / "foreign-chain").read_text()
++                    admin("iptables", "-w", "1", "-F", name, check=False)
++                    admin("iptables", "-w", "1", "-X", name, check=False)
++            assert owned_resources() == baseline
++        for stage in ("getent", "probe"):
++            case = directory / f"probe-error-{index}-{stage}"
++            case.mkdir()
++            environment = sudo_shim(case, "failure", stage)
++            marker = case / "must-not-run"
++            try:
++                result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
++                                        env=environment, capture_output=True, text=True, timeout=18)
++                assert result.returncode == 73, result.stdout + result.stderr
++                assert not marker.exists()
++                assert owned_resources() == baseline, "failed absence probe claimed resources"
++            finally:
++                remove_planned(case)
++    print("PASS: preexisting groups/chains survive and failed absence probes never authorize mutation", flush=True)
++
++
+ class Fixture(socketserver.TCPServer):
+     allow_reuse_address = True
+ 
+@@ -308,6 +476,8 @@ def main():
+             interrupted_creators(wrappers, directory)
+             print("PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints", flush=True)
+             cleanup_deadline(wrappers, directory)
++            setup_after_effect(wrappers, directory)
++            foreign_acquisitions(wrappers, directory)
+             setup_failures(wrappers, directory)
+             print("PASS: setup, partial firewall and guarded-preflight failures leave no command or resources", flush=True)
+         finally:
+diff --git a/services/memory/scripts/network-isolation-linux.sh b/services/memory/scripts/network-isolation-linux.sh
+index 40009729..dbe59e5d 100644
+--- a/services/memory/scripts/network-isolation-linux.sh
++++ b/services/memory/scripts/network-isolation-linux.sh
+@@ -7,10 +7,9 @@ preflight="$1"; shift
+ suffix="$$_$(od -An -N4 -tx4 /dev/urandom | tr -d ' ')"
+ chain="OB_TEST_$suffix"; test_group="obnet_$suffix"
+ test_uid="$(id -u)"; test_groups="$(id -G | tr ' ' ',')"
+-test_gid=""; created_firewalls=(); hooked_firewalls=()
+-group_created=false; pending_signal=0
+-# Bound sudo itself as well as xtables lock contention. Cleanup has at most
+-# seven calls, each with a five-second deadline plus one second to force exit.
++test_gid=""; owned_firewalls=(); hook_intents=()
++group_owned=false; pending_signal=0
++# Every cleanup probe/mutation is bounded; at most eleven native calls are needed.
+ # The owner ignores repeated signals during cleanup; its children must not.
+ privileged() {
+     # The inner timer has the same privilege as the operation it must terminate.
+@@ -24,20 +23,46 @@ cleanup_command() {
+     printf 'network isolation cleanup failed (%s): %s\n' "$result" "$*" >&2
+     return 1
+ }
++chain_in() {
++    # A successful full listing distinguishes absence from a failed named-chain lookup.
++    [[ $'\n'"$1"$'\n' == *$'\n-N '"$chain"$'\n'* ]]
++}
+ cleanup() {
+-    local command_status=$? cleanup_failed=0 firewall
++    local command_status=$? cleanup_failed=0 firewall result current_rules group_error
+     trap - EXIT
+     trap '' INT TERM
+-    for firewall in "${hooked_firewalls[@]}"; do
+-        cleanup_command "$firewall" -w 1 -D OUTPUT -m owner --gid-owner "$test_gid" -j "$chain" || cleanup_failed=1
++    for firewall in "${hook_intents[@]}"; do
++        if privileged "$firewall" -w 1 -C OUTPUT -m owner --gid-owner "$test_gid" -j "$chain" >/dev/null 2>&1; then
++            cleanup_command "$firewall" -w 1 -D OUTPUT -m owner --gid-owner "$test_gid" -j "$chain" || cleanup_failed=1
++        else
++            result=$?
++            if [[ "$result" != 1 ]]; then
++                echo "network isolation cannot inspect owned $firewall jump ($result)" >&2
++                cleanup_failed=1
++            fi
++        fi
+     done
+-    for firewall in "${created_firewalls[@]}"; do
+-        cleanup_command "$firewall" -w 1 -F "$chain" || cleanup_failed=1
+-        cleanup_command "$firewall" -w 1 -X "$chain" || cleanup_failed=1
++    for firewall in "${owned_firewalls[@]}"; do
++        if current_rules=$(privileged "$firewall" -w 1 -S); then
++            if chain_in "$current_rules"; then
++                cleanup_command "$firewall" -w 1 -F "$chain" || cleanup_failed=1
++                cleanup_command "$firewall" -w 1 -X "$chain" || cleanup_failed=1
++            fi
++        else
++            echo "network isolation cannot inspect owned $firewall chain $chain" >&2
++            cleanup_failed=1
++        fi
+     done
+-    if [[ "$group_created" == true ]]; then
++    if [[ "$group_owned" == true ]]; then
+         if [[ "$cleanup_failed" == 0 ]]; then
+-            cleanup_command groupdel "$test_group" || cleanup_failed=1
++            if group_error=$(privileged groupdel "$test_group" 2>&1); then :; else
++                result=$?
++                # groupdel status6 is documented absence, including acquisition that never applied.
++                if [[ "$result" != 6 ]]; then
++                    printf 'network isolation cleanup failed (%s): groupdel %s: %s\n' "$result" "$test_group" "$group_error" >&2
++                    cleanup_failed=1
++                fi
++            fi
+         else
+             echo "network isolation retained group $test_group: firewall cleanup incomplete" >&2
+         fi
+@@ -50,18 +75,32 @@ check_interruption() {
+     if [[ "$pending_signal" != 0 ]]; then exit "$pending_signal"; fi
+ }
+ trap cleanup EXIT
+-# Defer exit until successful creation has published ownership. Bash delivers a
+-# pending signal before the assignment following an external command can execute.
++# Each supported caller execs a helper with a distinct live PID.
++# Reject existing identities, then publish intent before an uncertain mutation.
+ trap 'pending_signal=130' INT
+ trap 'pending_signal=143' TERM
++if privileged getent group "$test_group" >/dev/null; then
++    echo "network isolation group identity already exists: $test_group" >&2
++    exit 1
++else
++    result=$?
++    [[ "$result" == 2 ]] || exit "$result"
++fi
++group_owned=true
++check_interruption
+ privileged groupadd --system "$test_group"
+-group_created=true
+ check_interruption
+-test_gid="$(getent group "$test_group" | cut -d: -f3)"
++test_gid="$(privileged getent group "$test_group" | cut -d: -f3)"
+ [[ "$test_gid" =~ ^[0-9]+$ ]] || { echo 'cannot resolve test group' >&2; exit 1; }
+ for firewall in iptables ip6tables; do
++    current_rules=$(privileged "$firewall" -w 1 -S)
++    if chain_in "$current_rules"; then
++        echo "network isolation chain identity already exists: $firewall $chain" >&2
++        exit 1
++    fi
++    owned_firewalls+=("$firewall")
++    check_interruption
+     privileged "$firewall" -w 1 -N "$chain"
+-    created_firewalls+=("$firewall")
+     check_interruption
+ done
+ privileged iptables -w 1 -A "$chain" -d 127.0.0.0/8 -j ACCEPT
+@@ -70,8 +109,9 @@ privileged iptables -w 1 -A "$chain" -p tcp -m conntrack --ctdir ORIGINAL \
+ privileged ip6tables -w 1 -A "$chain" -d ::1/128 -j ACCEPT
+ for firewall in iptables ip6tables; do
+     privileged "$firewall" -w 1 -A "$chain" -j REJECT
++    hook_intents+=("$firewall")
++    check_interruption
+     privileged "$firewall" -w 1 -I OUTPUT 1 -m owner --gid-owner "$test_gid" -j "$chain"
+-    hooked_firewalls+=("$firewall")
+     check_interruption
+ done
+ trap 'exit 130' INT
+diff --git a/src/adapters/persistence/test_support.rs b/src/adapters/persistence/test_support.rs
+index 9f3b4fed..ec9c22ab 100644
+--- a/src/adapters/persistence/test_support.rs
++++ b/src/adapters/persistence/test_support.rs
+@@ -107,7 +107,7 @@ fn permits_skipping(value: Option<&str>) -> bool {
+ ///
+ /// Panics when neither is set and [`ALLOW_MISSING_URL_VAR`] is absent — see the module docs for
+ /// why an unset variable is a failure rather than a skip.
+-fn test_database_url() -> Option<String> {
++pub(super) fn test_database_url() -> Option<String> {
+     let explicit = std::env::var("TEST_DATABASE_URL")
+         .ok()
+         .filter(|url| !url.trim().is_empty());
+diff --git a/src/adapters/persistence/workflow/agent_history_process_driver.rs b/src/adapters/persistence/workflow/agent_history_process_driver.rs
+index 40c14a69..ca7514a0 100644
+--- a/src/adapters/persistence/workflow/agent_history_process_driver.rs
++++ b/src/adapters/persistence/workflow/agent_history_process_driver.rs
+@@ -76,10 +76,12 @@ async fn history_crash_child_entry() {
+     )
+     .unwrap();
+     spec.validate_fixture();
+-    let options =
+-        sqlx::postgres::PgConnectOptions::from_str(&std::env::var("TEST_DATABASE_URL").unwrap())
+-            .unwrap()
+-            .database(&spec.database.0);
++    let options = sqlx::postgres::PgConnectOptions::from_str(
++        &crate::adapters::persistence::test_support::test_database_url()
++            .expect("parent-owned database configuration"),
++    )
++    .unwrap()
++    .database(&spec.database.0);
+     let pool = sqlx::postgres::PgPoolOptions::new()
+         .max_connections(2)
+         .connect_with(options)
+diff --git a/src/adapters/persistence/workflow/channel_reply_recovery_tests.rs b/src/adapters/persistence/workflow/channel_reply_recovery_tests.rs
+index 98a0a2d0..bdbbd3ef 100644
+--- a/src/adapters/persistence/workflow/channel_reply_recovery_tests.rs
++++ b/src/adapters/persistence/workflow/channel_reply_recovery_tests.rs
+@@ -7,10 +7,11 @@ struct ShortClaim {
+     lease_expires_at: chrono::DateTime<chrono::Utc>,
+ }
+ 
+-async fn unavailable_composer() -> crate::application::transport::DeliveryComposer {
++async fn unavailable_composer(
++    source: &sqlx::PgPool,
++) -> crate::application::transport::DeliveryComposer {
+     let pool = sqlx::postgres::PgPoolOptions::new()
+-        .connect_lazy(&std::env::var("TEST_DATABASE_URL").unwrap())
+-        .unwrap();
++        .connect_lazy_with(source.connect_options().as_ref().clone());
+     pool.close().await;
+     approval_test_support::composer(&PostgresPersistence::new(pool))
+ }
+@@ -38,7 +39,7 @@ async fn channel_reply_recovery_transient_composition_backs_off_and_spares_quiet
+     .unwrap();
+     let unavailable = ChannelReplyPublisher::new(
+         f.p.clone(),
+-        MessagePlanner::new(unavailable_composer().await, "agents.test".into()),
++        MessagePlanner::new(unavailable_composer(f.p.pool()).await, "agents.test".into()),
+     );
+     let before = outbound_count(&f).await;
+     let batch =

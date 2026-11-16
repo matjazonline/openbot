@@ -1,0 +1,77 @@
+[
+  {
+    "pattern": "memory_capture_agent_delete",
+    "exit": 0,
+    "log": "B1-regression-01.txt"
+  },
+  {
+    "pattern": "memory_scope_competing_agent_delete",
+    "exit": 0,
+    "log": "B1-regression-02.txt"
+  },
+  {
+    "pattern": "agent_retire_",
+    "exit": 0,
+    "log": "B1-regression-03.txt"
+  },
+  {
+    "pattern": "department_",
+    "exit": 101,
+    "log": "B1-regression-04.txt"
+  },
+  {
+    "pattern": "autonomous_agent_admission_",
+    "exit": 0,
+    "log": "B1-regression-05.txt"
+  },
+  {
+    "pattern": "workflow_agent_run_",
+    "exit": 0,
+    "log": "B1-regression-06.txt"
+  },
+  {
+    "pattern": "agent_history_identity_",
+    "exit": 0,
+    "log": "B1-regression-07.txt"
+  },
+  {
+    "pattern": "knowledge_checkpoint",
+    "exit": 0,
+    "log": "B1-regression-08.txt"
+  },
+  {
+    "pattern": "knowledge_view_",
+    "exit": 0,
+    "log": "B1-regression-09.txt"
+  },
+  {
+    "pattern": "schedule_",
+    "exit": 0,
+    "log": "B1-regression-10.txt"
+  },
+  {
+    "pattern": "message_intent_",
+    "exit": 0,
+    "log": "B1-regression-11.txt"
+  },
+  {
+    "pattern": "run_board_",
+    "exit": 101,
+    "log": "B1-regression-12.txt"
+  },
+  {
+    "pattern": "run_list_",
+    "exit": 0,
+    "log": "B1-regression-13.txt"
+  },
+  {
+    "pattern": "autonomous_agent_views_",
+    "exit": 0,
+    "log": "B1-regression-14.txt"
+  },
+  {
+    "pattern": "autonomous_agent_contract_",
+    "exit": 0,
+    "log": "B1-regression-15.txt"
+  }
+]

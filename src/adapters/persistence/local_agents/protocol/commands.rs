@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
 
 pub(super) async fn authorize_session(
     db: &mut Transaction<'_, Postgres>,
@@ -63,28 +62,14 @@ pub(super) async fn authorize_session_with_locks(
         if origin == OperationOrigin::Workflow {
             return Err(missing());
         }
-        let SessionAssociation::Conversation {
-            conversation_id: conversation,
-        } = stored.association
-        else {
+        let SessionAssociation::Conversation { conversation_id } = stored.association else {
             return Err(missing());
         };
-        let channel: Uuid = sqlx::query_scalar(
-            &locks.sql("SELECT channel_id FROM threads WHERE company_id=$1 AND id=$2 FOR SHARE"),
-        )
-        .bind(company)
-        .bind(conversation)
-        .fetch_optional(&mut **db)
-        .await?
-        .ok_or_else(missing)?;
-        super::super::super::workflow::association::authorize_association_with_locks(
+        super::super::super::workflow::association::authorize_thread_with_locks(
             db,
             CompanyId::new(company),
             WorkflowActor::authenticated(actor)?,
-            RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(channel),
-                thread_id: RelatedThreadId::new(conversation),
-            },
+            conversation_id,
             locks,
         )
         .await?;

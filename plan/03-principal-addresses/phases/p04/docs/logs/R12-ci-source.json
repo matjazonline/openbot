@@ -1,0 +1,77 @@
+{
+  "commit": "f1e8e081dcdaad893532642345a547c18690e3da",
+  "parent": "13d9009d5397f5ca20fa9986bf02a6ab139c46b9",
+  "tree": "e2bcee133015d6e50e3a0fe644a32a97d5145cf0",
+  "branch": "codex/plan03-p04-r12-f1e8e081",
+  "base_material_candidate": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "external_draft": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r9-net",
+  "overrides": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "blob": "c4bed3d56fcfd3b9ece71df0de3fd03dd0582660",
+      "sha256": "5cae73f957cf5751401def5896ec3db7353d036635f452ad8740b3bb2d6b6156"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "blob": "ca1b603750692d87cd591b04bdc8e157335cff43",
+      "sha256": "463fbcf9ceb461fe9a22ee37de46a313bc9a2bf05f84cdba4f291192f6481e62"
+    },
+    {
+      "path": "services/memory/scripts/network-isolation-linux.sh",
+      "blob": "b731224decb4c8247360da535f1028f4d0c4af45",
+      "sha256": "cab0228905e703dea260ecec9a3769809adc59e21482b3b3f9577c9bfc3605cb"
+    },
+    {
+      "path": "scripts/tests/network-isolation-scope.py",
+      "blob": "1b398e7efb1098b212417a4a6b50c8c12602a2e6",
+      "sha256": "6d6cbec00b4959f03686c4959a299f4fd260e799a74ad59adeb12ef449f3b381"
+    }
+  ],
+  "material_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    ".trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md",
+    ".trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md",
+    "scripts/check.sh",
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh",
+    "src/adapters/http/routes/agent_api_tests.rs",
+    "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+    "src/adapters/mcp/authentication_tests.rs",
+    "src/adapters/mcp/cleanup_tests.rs",
+    "src/adapters/mcp/connection.rs",
+    "src/adapters/mcp/doop_tests.rs",
+    "src/adapters/mcp/http.rs",
+    "src/adapters/mcp/mod.rs",
+    "src/adapters/mcp/registration_test_support.rs",
+    "src/adapters/mcp/tests.rs",
+    "src/adapters/persistence/legacy_runtime_schema_tests.rs",
+    "src/adapters/persistence/skill_tests.rs",
+    "src/adapters/persistence/workflow/action_account_hints.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/action_dispatch.rs",
+    "src/adapters/persistence/workflow/action_receipts.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/http.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/local_agents/resolution.rs",
+    "src/adapters/persistence/workflow/mcp.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+    "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "src/adapters/persistence/workflow/run_provenance/mod.rs",
+    "src/application/agent/contract_tests.rs",
+    "src/application/agent/definition.rs"
+  ],
+  "claim": "Both corrections: exec real sudo in deadline fixture AND native reset of inherited ignored signals before timeout/sudo. No limits raised. Root9938 remains frozen during Darwin stock/lease; actual Linux proof pending."
+}

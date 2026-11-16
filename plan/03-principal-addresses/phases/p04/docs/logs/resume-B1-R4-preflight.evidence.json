@@ -1,0 +1,90 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R4-preflight",
+  "artifact": "99ec987f83548485a18f8edc71e96192d48507b117257ae7d3b962fbf54ab820",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- adapters::mcp:: adapters::http::routes::agent::api_tests:: adapters::persistence::legacy_runtime_schema_tests:: capability_selection_is_scoped_and_updates_atomically workflow_mcp_ native_mcp_ autonomous_agent_recovery_mcp_cancellation --nocapture",
+      "fixture": "Owned PG51167 pa03_p04_test and isolated own_database fixtures; loopback scripted peers; libtest SHA7a6453a6a2d45b5a9fff9d87cc2a634935cd4e41e736caa2b398b3d7974128f0;115PASS/0FAIL/1existing ignore",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/resume-combined-focused1.txt",
+          "sha256": "a77ebf824c1f434d1be207349e344997ea6a79abc0690e13b47972f7380dacc1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "Owned PG51167 pa03_p04_dev; no schema change; offline cache unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/resume-cleanup-sqlx-prepare.txt",
+          "sha256": "e891af10fdd98b3a39b74da1220a67258a034c1eb6d5c551c3b8862bec90a648"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "trail build",
+      "fixture": "Current source graph refreshed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/resume-cleanup-trail-build.txt",
+          "sha256": "1f09dd1d3f3c5f5f76470c14ba9354f35c6e86526912dc1e885228f39de80bf4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "trail check",
+      "fixture": "Current branch and6learnings; no conflicts",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/resume-cleanup-trail-check.txt",
+          "sha256": "042a0f8d2e2e348db28402b6b4f1ca0ccfdeb483145e3287353a95d8fc180d42"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "current libtest --list; compare orca-prefix-inventory.txt",
+      "fixture": "4700->4703,3added/0removed; exact current binary hash",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/resume-cleanup-inventory-delta.json",
+          "sha256": "232243fed0927880da5386e89d4e05a446e84f1739bfea0c20115ccfaab6f2ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "bash scripts/check.sh and current-source CI extras/final independent review",
+      "fixture": "Owned local full gate and temporary CI candidate; final evidence not yet complete",
+      "status": "NOT EXERCISED",
+      "reason": "Full corrected local gate is running; exact-source CI and independent integration acceptance pending"
+    }
+  ]
+}

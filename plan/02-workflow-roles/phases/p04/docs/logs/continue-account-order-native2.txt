@@ -1,0 +1,15 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24', '::approval_tests::account_order_tests::', '::tokens::account_orders::', '--nocapture', '--test-threads=2']
+
+running 9 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_park_first_blocks_retirement_before_the_company ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_retirement_first_refuses_without_model_admission_or_notice ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_reviewer_account_precedes_company_ownership ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_settlement_retirement_keeps_received_truth_without_review_or_duplicate ... ok
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::account_orders::workflow_harness_token_under_allowance_and_recorded_reservation_ignore_retired_reviewers ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_park_first_serializes_retirement_and_cancels_the_retired_notice ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_recorded_approval_does_not_require_a_retired_reviewer_account ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_retirement_first_refuses_without_partial_park_or_deadlock ... ok
+test adapters::persistence::workflow::tests::http_tests::approval_tests::account_order_tests::workflow_action_approval_sixteen_reviewer_accounts_precede_company_ownership ... ok
+
+test result: ok. 9 passed; 0 failed; 0 ignored; 0 measured; 4317 filtered out; finished in 6.94s
+

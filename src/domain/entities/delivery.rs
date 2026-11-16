@@ -15,6 +15,7 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 use crate::entities::{
+    address::AddressTarget,
     correlation::CorrelationId,
     message::CanonicalMessageId,
     transport::{
@@ -31,9 +32,8 @@ use crate::entities::{
 pub struct DeliveryEntry {
     pub id: DeliveryId,
     pub company_id: Uuid,
-    /// The channel this goes out as. Still present after the channel is renamed; the delivery is
-    /// deleted with the channel, so this never dangles.
-    pub channel_id: Uuid,
+    /// The inbox this goes out as, pinned independently of its current address.
+    pub target: AddressTarget,
     pub message_id: CanonicalMessageId,
     pub correlation_id: CorrelationId,
     pub transport: TransportKind,
@@ -200,7 +200,7 @@ mod tests {
         DeliveryEntry {
             id: DeliveryId::random(),
             company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            target: AddressTarget::Desk(Uuid::new_v4()),
             message_id: CanonicalMessageId::random(),
             correlation_id: CorrelationId::new(),
             transport: TransportKind::Email,

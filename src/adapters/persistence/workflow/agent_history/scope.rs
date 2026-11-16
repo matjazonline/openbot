@@ -8,6 +8,7 @@ pub(super) struct Facts {
     pub inputs: serde_json::Value,
     pub parent: Option<Uuid>,
     pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
 }
 #[derive(sqlx::FromRow)]
@@ -19,6 +20,7 @@ struct FactsRow {
     frozen_inputs: serde_json::Value,
     parent_run_id: Option<Uuid>,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
 }
 
@@ -30,7 +32,7 @@ pub(super) async fn facts_on(
 ) -> AppResult<Facts> {
     let row = sqlx::query_as::<_, FactsRow>(
         "SELECT run.actor_id,stored.bundle,execution.step_id,execution.activation,execution.frozen_inputs, \
-         run.parent_run_id,run.channel_id,run.thread_id FROM workflow_runs AS run \
+         run.parent_run_id,run.channel_id,run.principal_id,run.thread_id FROM workflow_runs AS run \
          JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest \
          JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
          WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 \
@@ -61,6 +63,7 @@ pub(super) async fn facts_on(
         inputs: row.frozen_inputs,
         parent: row.parent_run_id,
         channel_id: row.channel_id,
+        principal_id: row.principal_id,
         thread_id: row.thread_id,
     })
 }
@@ -78,15 +81,21 @@ pub(super) async fn boundary_on(
         "SELECT session.id,mapping.thread_input_proven FROM workflow_agent_sessions AS mapping \
          JOIN agent_history_sessions AS session ON session.company_id=mapping.company_id AND session.id=mapping.session_id \
          WHERE mapping.company_id=$1 AND mapping.run_id=$2 AND session.creator_user_id=$3 \
-           AND session.channel_id IS NOT DISTINCT FROM $4::uuid AND session.thread_id IS NOT DISTINCT FROM $5::uuid",
+           AND session.channel_id IS NOT DISTINCT FROM $4::uuid AND session.thread_id IS NOT DISTINCT FROM $5::uuid \
+           AND session.principal_id IS NOT DISTINCT FROM $6::uuid",
     ).bind(action.company.as_uuid()).bind(action.run.as_uuid()).bind(actor.user_id())
-        .bind(facts.channel_id).bind(facts.thread_id).fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+        .bind(facts.channel_id).bind(facts.thread_id).bind(facts.principal_id).fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     if public_input && proven_on(db, action, facts).await? {
-        let (Some(channel), Some(thread)) = (facts.channel_id, facts.thread_id) else {
-            return Err(invalid());
-        };
+        let target = AddressTarget::from_parts(
+            facts.channel_id,
+            facts
+                .principal_id
+                .map(crate::entities::transport::PrincipalId::new),
+        )
+        .ok_or_else(invalid)?;
+        let thread = facts.thread_id.ok_or_else(invalid)?;
         return Ok(AgentConversationBoundary::Thread {
-            channel: RelatedChannelId::new(channel),
+            target,
             thread: RelatedThreadId::new(thread),
         });
     }

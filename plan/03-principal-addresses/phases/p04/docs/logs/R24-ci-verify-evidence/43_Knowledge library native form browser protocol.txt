@@ -1,0 +1,32 @@
+﻿2026-11-16T14:45:50.8019072Z ##[group]Run cargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored
+2026-11-16T14:45:50.8019839Z [36;1mcargo test --locked --offline --lib dump_knowledge_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:50.8020367Z [36;1mnode --test scripts/tests/knowledge-browser.mjs[0m
+2026-11-16T14:45:50.8046989Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:50.8047443Z env:
+2026-11-16T14:45:50.8047799Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:50.8048224Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:50.8048806Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:50.8049201Z   SQLX_OFFLINE: true
+2026-11-16T14:45:50.8049565Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:50.8049920Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:50.8050305Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:50.8050645Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:50.8051055Z   KNOWLEDGE_BROWSER_FIXTURES: /tmp/knowledge-browser
+2026-11-16T14:45:50.8051449Z ##[endgroup]
+2026-11-16T14:45:50.9957921Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:51.0134480Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:51.0196878Z 
+2026-11-16T14:45:51.0197490Z running 1 test
+2026-11-16T14:45:51.0220276Z test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... ok
+2026-11-16T14:45:51.0220699Z 
+2026-11-16T14:45:51.0221211Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.00s
+2026-11-16T14:45:51.0221604Z 
+2026-11-16T14:45:51.9588266Z ✔ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (666.021793ms)
+2026-11-16T14:45:51.9710308Z ℹ tests 1
+2026-11-16T14:45:51.9710774Z ℹ suites 0
+2026-11-16T14:45:51.9711118Z ℹ pass 1
+2026-11-16T14:45:51.9711562Z ℹ fail 0
+2026-11-16T14:45:51.9711915Z ℹ cancelled 0
+2026-11-16T14:45:51.9712302Z ℹ skipped 0
+2026-11-16T14:45:51.9712732Z ℹ todo 0
+2026-11-16T14:45:51.9713198Z ℹ duration_ms 916.206968

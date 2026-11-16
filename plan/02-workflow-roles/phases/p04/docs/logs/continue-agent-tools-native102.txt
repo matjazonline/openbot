@@ -1,0 +1,62 @@
+
+running 21 tests
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_ui_submits_reassignment_and_acknowledgement_on_the_same_decision_surface ... ok
+test adapters::http::routes::workflows::tests::escalation_tests::workflow_escalation_api_reads_current_authority_and_audits_exact_command_replay ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_database_refuses_an_unassigned_current_member_receipt ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::cancellation::workflow_escalation_decision_restricted_source_keeps_safe_history_and_denies_new_commands ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_assigned_member_acknowledges_once_and_conflicting_replay_has_no_effect ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_competing_current_operators_leave_exactly_one_settlement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_database_requires_command_receipts_and_keeps_them_immutable ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_manual_assignments_are_bounded_and_acknowledgement_still_works ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_reassignment_creates_one_manual_notice_and_replay_ignores_retired_target ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_receipt_failure_rolls_back_settlement_and_notice_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_terminal_cancel_is_audited_without_reviving_the_run ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::workflow_escalation_decision_visible_unassigned_member_and_foreign_actor_cannot_settle ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_capabilities_are_explicit_and_sql_aliases_cannot_forge_them ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts ... FAILED
+test application::workflow::escalation::tools::tests::workflow_escalation_tools_bound_revisions_and_reject_conditional_choice_forgery ... FAILED
+test application::workflow::escalation::tools::tests::workflow_escalation_tools_trust_only_exact_company_local_snapshots ... ok
+test application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified ... FAILED
+test application::workflow::exactness::tests::memory_access_level_human_decision_choice_is_exact_and_free_text_is_not ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts' (4716831) panicked at src/adapters/persistence/workflow/escalation_agent_tool_tests.rs:73:5:
+assertion `left == right` failed: {"actions":null,"cases":1,"commands":0,"events":["admitted","io_step_completed","attempt_failed:1","attempt_failed:2","attempt_failed:3"],"handler_state":"failed","hops":1,"progress":"waiting","runs":1}
+  left: String("failed")
+ right: "succeeded"
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- application::workflow::escalation::tools::tests::workflow_escalation_tools_bound_revisions_and_reject_conditional_choice_forgery stdout ----
+
+thread 'application::workflow::escalation::tools::tests::workflow_escalation_tools_bound_revisions_and_reject_conditional_choice_forgery' (4717051) panicked at src/application/workflow/escalation_tool_tests.rs:55:9:
+assertion failed: serde_json::from_value::<RespondInput>(json!({"decision_id":id,"choice":choice})).is_err()
+
+---- application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified stdout ----
+
+thread 'application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified' (4717053) panicked at src/application/workflow/exactness_tests.rs:159:5:
+assertion `left == right` failed: every AgentToolTarget variant has a sample
+  left: 12
+ right: 10
+
+---- adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal' (4716849) panicked at src/adapters/persistence/workflow/escalation_agent_tool_tests.rs:73:5:
+assertion `left == right` failed: {"actions":null,"cases":1,"commands":0,"events":["admitted","io_step_completed","attempt_failed:1","attempt_failed:2","attempt_failed:3"],"handler_state":"failed","hops":1,"progress":"waiting","runs":1}
+  left: String("failed")
+ right: "succeeded"
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_read_refusal_and_explicit_ack_use_real_fenced_action_receipts
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::tool_tests::workflow_escalation_agent_native_reassign_keeps_manual_target_and_replay_after_actual_member_removal
+    application::workflow::escalation::tools::tests::workflow_escalation_tools_bound_revisions_and_reject_conditional_choice_forgery
+    application::workflow::exactness::tests::memory_access_level_every_step_kind_and_tool_target_is_classified
+
+test result: FAILED. 17 passed; 4 failed; 0 ignored; 0 measured; 4432 filtered out; finished in 24.45s
+

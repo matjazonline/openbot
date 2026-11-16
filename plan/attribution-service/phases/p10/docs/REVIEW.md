@@ -62,3 +62,27 @@ stages remain explicit. This pass does not certify those existing workflow paths
 whole-repository verification, production deployment or native store/pilot support.
 See [N2 final assessment](agent-review-notes.md) for criterion coverage, dispositions
 and limits; [end identity](logs/AS-P10-B1-R2-reviewer-final-identity.json).
+
+## AS-P10-PUSH-R1 — current-main integration — PENDING
+
+AS-P10-PUSH-R1-N1: start digest3688ab5d matches; HEAD e61d384e, incoming8fdb892b,
+main coordination29. Accepted attribution source/SQL suffix preserved; shared
+identity/company lifecycle integration reviewed with no source finding so far.
+Await root focused test and actualSSO evidence, immutable manifest and end identity.
+Prior VG1/global limitations remain unchanged. No publication acceptance yet.
+
+### AS-P10-PUSH-R1 final — PASS
+
+**AS-P10-PUSH-R1-N1 PASS** for exact merged source
+`3688ab5d0c47cb02398dd3504190f7dfb7a25a8f2781a84d3c9a7d218823b26d`,
+HEAD e61d384e + incoming8fdb892b; exact11exclusions, main coordination29.
+Both-parent integration review and focused proof complete, no finding.
+Fmt/offlineall-target/migration/servicebuild pass; actual tests25PASS including
+all12ordinary attribution tests; separately invoked realSSO1PASS/8checks.
+Initial linker disk exhaustion retained; retry changed disposable build artifacts
+only. Manifest8PASS/1FAIL/1NOTEXERCISED independently validated; end digest matches.
+
+User-authorized merge/publication may proceed after root's final identity check.
+Prior VG1 and all failed/unexercised global gates remain unresolved as recorded.
+No whole-repository rerun, global-green status or production deployment accepted.
+[Notes](agent-review-notes.md), [end identity](logs/AS-P10-PUSH-R1-reviewer-end.snapshot.txt).

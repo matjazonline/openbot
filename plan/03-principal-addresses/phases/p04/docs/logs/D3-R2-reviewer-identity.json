@@ -1,0 +1,10 @@
+{
+  "decision_sha256": "8b3fab53aa5529387b29f61788a555d1b94be5ee4e83bd1a3c38b4f382a94e6b",
+  "coordination46_matches": true,
+  "snapshot": [
+    "base:   f059f49808777abf0367d3a7f82d11e14bbd4e20",
+    "digest: 1d5990aa52b4c252bd8104b3a3e625fda073f77487e2f834709c474bf6b87022"
+  ],
+  "head": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "runtime_checks": "NOT EXERCISED; architecture only"
+}

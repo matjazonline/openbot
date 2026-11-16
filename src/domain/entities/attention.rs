@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::{correlation::CorrelationId, transport::PrincipalId};
+use crate::entities::{address::AddressTarget, correlation::CorrelationId, transport::PrincipalId};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -65,6 +65,8 @@ impl fmt::Display for BusinessPriority {
 pub enum AttentionSourceKind {
     /// One open workflow decision, for its reviewers and the company's managers.
     Decision,
+    /// An open administrative escalation assignment, including the final owner handoff.
+    EscalationDecision,
     /// A run waiting on a check of whether an uncertain action took effect.
     RunReconciliation,
     /// A run that failed in the last 7 days and has not been rerun.
@@ -79,6 +81,7 @@ impl AttentionSourceKind {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Decision => "decision",
+            Self::EscalationDecision => "escalation_decision",
             Self::RunReconciliation => "run_reconciliation",
             Self::RunFailure => "run_failure",
             Self::BindingRefusal => "binding_refusal",
@@ -93,6 +96,7 @@ impl FromStr for AttentionSourceKind {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "decision" => Ok(Self::Decision),
+            "escalation_decision" => Ok(Self::EscalationDecision),
             "run_reconciliation" => Ok(Self::RunReconciliation),
             "run_failure" => Ok(Self::RunFailure),
             "binding_refusal" => Ok(Self::BindingRefusal),
@@ -123,8 +127,8 @@ pub struct AttentionItem {
     pub source_kind: AttentionSourceKind,
     pub source_id: Uuid,
     pub company_id: Uuid,
-    /// `None` for a company-associated run or binding, which only owners and admins see.
-    pub channel_id: Option<Uuid>,
+    /// `None` only for company-associated work, which owners and admins see.
+    pub target: Option<AddressTarget>,
     pub thread_id: Option<Uuid>,
     pub run_id: Option<Uuid>,
     pub correlation_id: Option<CorrelationId>,
@@ -252,6 +256,8 @@ pub struct AttentionQuery<'a> {
     /// Whether company-associated items (no channel) are listed: an owner's or admin's, as on
     /// the decision page, unless the list is narrowed to one department's desks.
     pub company_items: bool,
+    /// Direct inboxes are excluded from a view narrowed to one department's desks.
+    pub direct_items: bool,
     pub view: AttentionView,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: usize,
@@ -291,6 +297,7 @@ mod tests {
         // would silently truncate the cursor rather than fail to parse.
         for source_kind in [
             AttentionSourceKind::Decision,
+            AttentionSourceKind::EscalationDecision,
             AttentionSourceKind::RunReconciliation,
             AttentionSourceKind::RunFailure,
             AttentionSourceKind::BindingRefusal,

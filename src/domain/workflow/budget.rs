@@ -139,7 +139,7 @@ impl TokenAllowance {
         serde_json::json!({
             "max_tokens": self.max_tokens,
             "reviewers": self.reviewers.iter()
-                .map(|id| serde_json::json!({"kind":"user","id":id}))
+                .map(|id| serde_json::json!({"kind":"principal","id":id}))
                 .collect::<Vec<_>>()
         })
     }

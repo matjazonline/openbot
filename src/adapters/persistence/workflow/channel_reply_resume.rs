@@ -1,4 +1,5 @@
 use super::*;
+use crate::application::workflow::actions::ActionScope;
 use crate::application::workflow::{
     activation::*, batch::PureCompletion, channel_reply::*, completion::*, decisions::*,
 };
@@ -13,9 +14,16 @@ impl WorkflowFinalizations for PostgresPersistence {
         tokio::time::timeout(std::time::Duration::from_secs(2), async {
             let mut tx = self.pool().begin().await?;
             channel_reply_publication::bounds(&mut tx).await?;
-            let result = Box::pin(resume_on(&mut tx, scope, self.channel_reply_notices())).await?;
-            tx.commit().await?;
-            Ok(result)
+            match Box::pin(resume_on(&mut tx, scope, self.channel_reply_notices())).await {
+                Ok(result) => {
+                    tx.commit().await?;
+                    Ok(result)
+                }
+                Err(error) => {
+                    tx.rollback().await?;
+                    Err(error)
+                }
+            }
         })
         .await
         .map_err(|_| lease::timed_out())?
@@ -32,6 +40,109 @@ struct ResumeRun {
     completed: bool,
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ResumePurpose {
+    Replay,
+    Pending,
+    Refused,
+    Complete,
+}
+
+fn purpose(run: Option<&ResumeRun>) -> ResumePurpose {
+    let Some(run) = run else {
+        return ResumePurpose::Refused;
+    };
+    if run.completed {
+        return if run.state == "succeeded" {
+            ResumePurpose::Replay
+        } else {
+            ResumePurpose::Refused
+        };
+    }
+    if run.state == "waiting" {
+        return ResumePurpose::Pending;
+    }
+    if run.state == "running" && run.status == "pending" {
+        ResumePurpose::Complete
+    } else {
+        ResumePurpose::Refused
+    }
+}
+
+enum ResumeRead {
+    Observe,
+    Lock,
+}
+
+async fn read_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    read: ResumeRead,
+) -> AppResult<Option<ResumeRun>> {
+    const SELECT: &str = "SELECT run.binding_id,run.state,run.max_steps,job.continuation_count,job.status,(execution.completed_at IS NOT NULL) AS completed \
+        FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
+        JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
+        WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4";
+    let query = match read {
+        ResumeRead::Observe => SELECT.to_owned(),
+        ResumeRead::Lock => format!("{SELECT} FOR UPDATE OF run,execution,job"),
+    };
+    Ok(sqlx::query_as(&query)
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .bind(scope.execution.as_uuid())
+        .bind(scope.job.0)
+        .fetch_optional(db)
+        .await?)
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ResumeAccounts {
+    Company,
+    Reply,
+}
+
+async fn prelock_on(db: &mut PgConnection, scope: ActivationRequest) -> AppResult<ResumeAccounts> {
+    let observed = Box::pin(read_on(db, scope, ResumeRead::Observe)).await?;
+    let owned = if purpose(observed.as_ref()) == ResumePurpose::Complete {
+        let reply = action_authority::prelock_reply_on(
+            db,
+            ActionScope {
+                company: scope.company,
+                run: scope.run,
+                execution: scope.execution,
+            },
+            None,
+        )
+        .await;
+        match reply {
+            Ok(_) => ResumeAccounts::Reply,
+            Err(error) => {
+                let current = Box::pin(read_on(db, scope, ResumeRead::Observe)).await?;
+                if matches!(&error, AppError::NotFound(_))
+                    && purpose(current.as_ref()) != ResumePurpose::Complete
+                {
+                    ResumeAccounts::Company
+                } else {
+                    return Err(error);
+                }
+            }
+        }
+    } else {
+        ResumeAccounts::Company
+    };
+    lease::lock_lease_company_on(db, scope.company).await?;
+    let current = Box::pin(read_on(db, scope, ResumeRead::Observe)).await?;
+    if owned == ResumeAccounts::Company && purpose(current.as_ref()) == ResumePurpose::Complete {
+        return Err(changed());
+    }
+    Ok(owned)
+}
+
+fn changed() -> AppError {
+    AppError::Conflict("Workflow finalization purpose changed; retry".into())
+}
+
 pub(super) async fn resume_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
@@ -40,30 +151,24 @@ pub(super) async fn resume_on(
     let Some(saved) = channel_reply_proposals::existing_on(db, scope).await? else {
         return Ok(FinalizationProgress::Unstaged);
     };
-    channel_reply_completion::prelock_on(db, scope).await?;
-    let run: Option<ResumeRun>=sqlx::query_as("SELECT run.binding_id,run.state,run.max_steps,job.continuation_count,job.status,(execution.completed_at IS NOT NULL) AS completed \
-        FROM workflow_runs AS run JOIN workflow_executions AS execution ON execution.company_id=run.company_id AND execution.run_id=run.id \
-        JOIN background_tasks AS job ON job.company_id=execution.company_id AND job.workflow_execution_id=execution.id \
-        WHERE run.company_id=$1 AND run.id=$2 AND execution.id=$3 AND job.id=$4 FOR UPDATE OF run,execution,job")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0).fetch_optional(&mut *db).await?;
+    // Box preparation/row readers so observing a saved result adds no large parent frame.
+    let accounts = Box::pin(prelock_on(db, scope)).await?;
+    let run = Box::pin(read_on(db, scope, ResumeRead::Lock)).await?;
     let Some(run) = run else {
         return Ok(FinalizationProgress::Refused);
     };
-    if run.completed {
-        return if run.state == "succeeded" {
-            replay_on(db, scope).await
-        } else {
-            Ok(FinalizationProgress::Refused)
-        };
+    match purpose(Some(&run)) {
+        ResumePurpose::Replay => replay_on(db, scope).await,
+        ResumePurpose::Pending => Ok(FinalizationProgress::Pending),
+        ResumePurpose::Refused => Ok(FinalizationProgress::Refused),
+        ResumePurpose::Complete => {
+            if accounts != ResumeAccounts::Reply {
+                return Err(changed());
+            }
+            // The saved result, rather than a handler future, owns this continuation.
+            Box::pin(complete_saved_on(db, scope, run, saved, notices)).await
+        }
     }
-    if run.state == "waiting" {
-        return Ok(FinalizationProgress::Pending);
-    }
-    if run.state != "running" || run.status != "pending" {
-        return Ok(FinalizationProgress::Refused);
-    }
-    // The saved result, rather than a handler future, owns this continuation.
-    Box::pin(complete_saved_on(db, scope, run, saved, notices)).await
 }
 
 async fn complete_saved_on(

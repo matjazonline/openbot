@@ -1,0 +1,204 @@
+{
+ "version": 1,
+ "round": "02WR-P05-R1",
+ "artifact": "905f05c23d9b8b0894467a6601ddf89f81d36b06f8bef29b1973fa6236efb28f",
+ "checks": [
+  {
+   "criteria": [
+    "F8"
+   ],
+   "command": "open_bots lib (f8-1) role_tests:: workflow_action_approval -- 49 PASS incl. workflow_escalation_trigger_{rejected,expired}_action_approval_escalates_only_an_escalating_binding",
+   "fixture": "owned PG 127.0.0.1:52471, resume21 DBs, before the p05 corrections",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-f8-1.txt",
+     "sha256": "8ed40e2dd836516f4e452f19aeb58645b416ff633edfbf76aff930df35d007ae"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "scripts/check.sh run 1 on fresh openbot_roles_p05_gate1 (artifact 8866b830): 15 PASS, FAIL transport boundary (rg absent from bash), clippy, DB suite (13 fail), stack budget (18 fail); triaged in TASK",
+   "fixture": "DATABASE_URL openbot_roles_p05_gate1; TEST_DATABASE_URL per-run check DB",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/gate-check1.txt",
+     "sha256": "18f2ffb7b20690ca5ee1a078f277ba67bbc05b8347c1fc014c13ce321a92f048"
+    },
+    {
+     "path": "logs/gate-migrations1.txt",
+     "sha256": "b77af79ce4043e3397dbfbbec460213e8255ad34bbfea53552a5331fd74e5bbf"
+    },
+    {
+     "path": "logs/gate-sqlx-prepare1.txt",
+     "sha256": "2ce2569e8f47b352db68fa6dcb799a75228ca4c6f82c575e2a484aecc5a9f6a3"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C-AGENT-KEY",
+    "C-TEST-EMAIL"
+   ],
+   "command": "scripts/tests/transport-boundary.sh && scripts/transport-boundary-check.sh with rg on PATH: before fixes (2 plan02 violations) and after",
+   "fixture": "scratchpad/bin/rg -> Claude Code bundled ripgrep 14.1.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-transport-boundary2.txt",
+     "sha256": "839b3dac62b4c7cb6e980903ffa09e6bd09ca123f339b334fde84c55e5583bd2"
+    },
+    {
+     "path": "logs/gate-transport-boundary3.txt",
+     "sha256": "ea0730a748718849f06e906fd377021519a566458247a23bc210efe17335dbf4"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C-CLIPPY"
+   ],
+   "command": "cargo clippy --locked --offline --all-targets --keep-going -- -D warnings (7 remaining, all pre-plan02 lint drift); diagnostic run allowing exactly those 5 lint names: EXIT 0 (not a gate substitute)",
+   "fixture": "rustc/clippy 1.99.1",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/gate-clippy2.txt",
+     "sha256": "0ca148197c74ad90470e004fe3f98a188c79af6b35b1c044635090f1d0e322a3"
+    },
+    {
+     "path": "logs/gate-clippy3-diagnostic.txt",
+     "sha256": "b1b1128fd4fe95db3e98555a785f0bc4a4079c581134988e8c253de8b0c3b901"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C-AGENT-KEY",
+    "C-TEST-EMAIL",
+    "C-CLIPPY"
+   ],
+   "command": "open_bots lib (f2focus) escalation notification message_reply a_dead_workflow_delivery_notifies_its_run_actor_once -- 178 PASS, 1 ignored (manual browser journey)",
+   "fixture": "fresh openbot_roles_p05_focus2 migrated by test support (new receipt guard)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-f2focus.txt",
+     "sha256": "2fd88ebca0a036718ef66a0b886832cef3bcd84675ff04be6495fe620ab0a1c2"
+    },
+    {
+     "path": "logs/continue-build-f2focus.txt",
+     "sha256": "fdaf815d81a3e86ba307f0747aa88db444546ef563527ec8c90a8565afb22a5e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "REGRESSION"
+   ],
+   "command": "each run-1 failure alone, --exact --test-threads=1 under network isolation: 5 doop PASS, 7 FAIL (dispositions in TASK)",
+   "fixture": "openbot_roles_p05_focus2",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/gate-isolated-reruns1.txt",
+     "sha256": "261f7e6213351b9e9daf3ec177df1d92c7712909ac779381c2a2d6ac2d5802fa"
+    },
+    {
+     "path": "logs/base-103004a8-reruns1.txt",
+     "sha256": "1d5adf0efed12e7ebf3371b40adc1d0c7371d73c4f1b3de2f0e46aacdd716a4e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C-STALE-TESTS",
+    "REGRESSION"
+   ],
+   "command": "open_bots lib (f3fixes) routes::workflows::tests::decision_tests provisioning_runtime_tests database_snapshot_executes_or_reports_that_the_library_needs_preloading --test-threads=2 -- 13 PASS",
+   "fixture": "openbot_roles_p05_focus2 with ALTER DATABASE ... SET pg_stat_statements.track_utility=off (CI value)",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/continue-run-f3fixes.txt",
+     "sha256": "c193b1a3e82a162630ef1ef9f6719c3fc2166e12b8780f4e0200265a7bb6337e"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE",
+    "C-SAMPLE-BOUNDARY"
+   ],
+   "command": "scratch ci-extra.sh (CI-only verify steps in CI order): 16 PASS, FAIL package (Node pin v24.21.0 not installed), FAIL sample boundary (plan02)",
+   "fixture": "disposable openbot_roles_p05_ciextra, scratch fixture dirs, plugin npm ci (node_modules backed up)",
+   "status": "FAIL",
+   "files": [
+    {
+     "path": "logs/gate-ci-extra1.txt",
+     "sha256": "0bc292aee2bb91e20988ae285cfef40f22834e5d3d3f2173f573eda339d03313"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "C-SAMPLE-BOUNDARY"
+   ],
+   "command": "workflow-sample-boundary fixture tests + gate, integration-boundary fixture tests + gate, check-integration-docs after allowlisting roles::refuse_unresolved_sample_role",
+   "fixture": "python3, PYTHONDONTWRITEBYTECODE=1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-ci-boundaries2.txt",
+     "sha256": "8fd80c03a936993d853748cab6b789ae4b232b51b3edb86d1cceb39dd20cfd55"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "REGRESSION"
+   ],
+   "command": "6 cloudroom e2e tests alone after the plugin npm ci rebuilt native modules for the host Node 26",
+   "fixture": "openbot_roles_p05_focus2, node v26.13.1",
+   "status": "PASS",
+   "files": [
+    {
+     "path": "logs/gate-cloudroom-reruns1.txt",
+     "sha256": "15fcc9fa613cc189a40196634b09290e6f7336bdc2590a5729d181587d3dcbda"
+    }
+   ]
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "scripts/check.sh run 2 on fresh openbot_roles_p05_gate2 (with rg on PATH), after migrations and SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+   "fixture": "openbot_roles_p05_gate2",
+   "status": "NOT EXERCISED",
+   "reason": "running when this manifest was written; its result is reviewed in round 02WR-P05-R2"
+  },
+  {
+   "criteria": [
+    "GATE"
+   ],
+   "command": "Docker knowledge image; CI pg_stat_statements setup/probe; memory-integration job; doop-integration job; reproducible plugin package",
+   "fixture": "n/a",
+   "status": "NOT EXERCISED",
+   "reason": "unavailable here: no Docker; CI-server reconfiguration; model download/toolchain 1.95.0 (services/ unchanged); managed Doop and private images; Node v24.21.0 pin not installed (plugin unchanged)"
+  },
+  {
+   "criteria": [
+    "SOP",
+    "DOCS"
+   ],
+   "command": "doc claim -> code trace (TASK 'B1 implementation'); bash -n scripts/check.sh; git diff --check",
+   "fixture": "static",
+   "status": "NOT EXERCISED",
+   "reason": "static review evidence, no executable check; reviewer verifies against code"
+  }
+ ]
+}

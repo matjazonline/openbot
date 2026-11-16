@@ -1,0 +1,175 @@
+{
+  "before_count": 4589,
+  "after_count": 4603,
+  "all_removed_accounted_for": true,
+  "replacements": [
+    {
+      "before": "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments",
+      "replacement": "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_direct_address_and_departments",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk",
+      "replacement": "adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_lead_creation_takes_its_desk_gates_once",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow",
+      "collected": true,
+      "disposition": "Required changed behavior: unused owned publications must delete; retained external history/publication guards remain separately mandatory.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model",
+      "replacement": "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel",
+      "replacement": "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_creates_a_fresh_principal",
+      "collected": true,
+      "disposition": "Required changed behavior: transactional principal-address rename frees old slug; no default desk persists.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh",
+      "replacement": "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::thread::inbound_tests::direct_thread_platform_commit_does_not_lock_unobserved_author_or_recipient_identities",
+      "replacement": "adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship",
+      "collected": true,
+      "disposition": "Generic unchecked platform producer removed. Ordinary application identity/authorship regression replaces old branch; real authenticated notice no-observation positive remains mandatory and unexercised.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents",
+      "replacement": "application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents",
+      "collected": true,
+      "disposition": "Same entry point/behavior converted from automatic desk identity to principal address/binding; runtime results tracked separately.",
+      "behavioral_status": "See focused logs; collection alone is not acceptance."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_creation_refusals_are_tool_errors",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refusals_are_tool_errors",
+      "collected": true,
+      "disposition": "Preserves real keyed-model/address conflicts with atomic no-effect refusals.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_places_the_agent_in_a_department",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_places_the_agent_in_a_department",
+      "collected": true,
+      "disposition": "Preserves exact department/role placement and invalid/ambiguous placement checks.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_can_staff_a_separate_reviewed_desk",
+      "collected": true,
+      "disposition": "Agent creation and explicit shared-desk staffing are separate tools; both exercise real dispatch, retain direct binding and idempotent reviewed desk.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_refuses_other_settings_at_the_agents_slug",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_refuses_implicit_desk_configuration",
+      "collected": true,
+      "disposition": "Desk fields are no longer part of create_agent input; real action preparation refuses them with no durable action or creation effects.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_builder_returns_direct_binding_without_a_desk",
+      "collected": true,
+      "disposition": "Automatic desk behavior removed; real fenced creation asserts canonical principal binding and zero desks/agent commands.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_competing_builder_claimants_make_one_default_desk",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::builder::agent_address_create_competing_builder_claimants_make_one_direct_binding",
+      "collected": true,
+      "disposition": "Competing real action dispatchers converge to one receipt, agent and principal binding, with zero desks/agent commands.",
+      "behavioral_status": "Collection only; actual results retained in focused logs."
+    },
+    {
+      "before": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case",
+      "replacement": "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::runtime::workflow_escalation_origin_two_agent_cross_desk_exchange_ends_in_app_with_exact_origin_and_no_case",
+      "collected": true,
+      "disposition": "Moved intact to registered runtime sibling to keep relay test module navigable; behavioral assertions retained.",
+      "behavioral_status": "Runtime evidence is separate from collection."
+    },
+    {
+      "before": "application::use_cases::thread::tests::department_desk_relay::department_desk_relay_into_a_members_only_desk_stays_trusted",
+      "replacement": "application::use_cases::thread::tests::department_desk_relay::department_desk_relay_without_an_authenticated_agent_cannot_bypass_members_only_grants",
+      "collected": true,
+      "disposition": "The old internal-origin ACL bypass is intentionally removed; recording fixture now refuses unproved agents and retains cycle refusal. Three real relay_identity_ journeys prove actual granted/nonmember/spoof behavior.",
+      "behavioral_status": "Runtime evidence is separate from collection."
+    }
+  ]
+}

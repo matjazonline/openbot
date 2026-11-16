@@ -1,0 +1,38 @@
+﻿2026-11-16T14:38:30.7193332Z ##[group]Run container="$(docker ps --filter ancestor=postgres:18.6-bookworm --format '{{.ID}}' | head -n 1)"
+2026-11-16T14:38:30.7193889Z [36;1mcontainer="$(docker ps --filter ancestor=postgres:18.6-bookworm --format '{{.ID}}' | head -n 1)"[0m
+2026-11-16T14:38:30.7194240Z [36;1mtest -n "$container"[0m
+2026-11-16T14:38:30.7194535Z [36;1mdocker exec "$container" psql -U postgres -d open_bots_test -v ON_ERROR_STOP=1 \[0m
+2026-11-16T14:38:30.7194945Z [36;1m  -c "ALTER SYSTEM SET shared_preload_libraries = 'pg_stat_statements'" \[0m
+2026-11-16T14:38:30.7195273Z [36;1m  -c "ALTER SYSTEM SET compute_query_id = 'on'" \[0m
+2026-11-16T14:38:30.7195563Z [36;1m  -c "ALTER SYSTEM SET log_parameter_max_length = '0'" \[0m
+2026-11-16T14:38:30.7196071Z [36;1m  -c "ALTER SYSTEM SET log_parameter_max_length_on_error = '0'"[0m
+2026-11-16T14:38:30.7196356Z [36;1mdocker restart "$container"[0m
+2026-11-16T14:38:30.7196680Z [36;1muntil docker exec "$container" pg_isready -U postgres -d open_bots_test; do sleep 1; done[0m
+2026-11-16T14:38:30.7197154Z [36;1mdocker exec "$container" psql -U postgres -d open_bots_test -v ON_ERROR_STOP=1 \[0m
+2026-11-16T14:38:30.7197518Z [36;1m  -c "ALTER SYSTEM SET pg_stat_statements.track = 'top'" \[0m
+2026-11-16T14:38:30.7197839Z [36;1m  -c "ALTER SYSTEM SET pg_stat_statements.track_utility = 'off'" \[0m
+2026-11-16T14:38:30.7198113Z [36;1m  -c "SELECT pg_reload_conf()"[0m
+2026-11-16T14:38:30.7225194Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:38:30.7225401Z env:
+2026-11-16T14:38:30.7225567Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:38:30.7226362Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:38:30.7226745Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:38:30.7226965Z   SQLX_OFFLINE: true
+2026-11-16T14:38:30.7227142Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:38:30.7227334Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:38:30.7227506Z   CARGO_TERM_COLOR: always
+2026-11-16T14:38:30.7227681Z   CACHE_ON_FAILURE: false
+2026-11-16T14:38:30.7227867Z ##[endgroup]
+2026-11-16T14:38:30.7958893Z ALTER SYSTEM
+2026-11-16T14:38:30.7960968Z ALTER SYSTEM
+2026-11-16T14:38:30.7963957Z ALTER SYSTEM
+2026-11-16T14:38:30.7967746Z ALTER SYSTEM
+2026-11-16T14:38:30.9650570Z e2f1ea9684d1
+2026-11-16T14:38:31.0313563Z /var/run/postgresql:5432 - accepting connections
+2026-11-16T14:38:31.0876057Z ALTER SYSTEM
+2026-11-16T14:38:31.0879521Z ALTER SYSTEM
+2026-11-16T14:38:31.0886617Z  pg_reload_conf 
+2026-11-16T14:38:31.0886931Z ----------------
+2026-11-16T14:38:31.0887144Z  t
+2026-11-16T14:38:31.0887321Z (1 row)
+2026-11-16T14:38:31.0887424Z 

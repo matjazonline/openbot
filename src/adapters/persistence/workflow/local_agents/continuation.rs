@@ -14,13 +14,23 @@ pub(in crate::adapters::persistence::workflow) async fn prelock_on(
     Ok(())
 }
 
+/// The same recorded local-call readiness for observation and the actual owner.
+/// Return the query future directly so this reader adds no async forwarding frame.
+pub(in crate::adapters::persistence::workflow) fn due_on(
+    db: &mut PgConnection,
+    scope: ActivationRequest,
+    wait: Uuid,
+) -> impl std::future::Future<Output = Result<Option<bool>, sqlx::Error>> + '_ {
+    sqlx::query_scalar("SELECT call.ready_at IS NOT NULL OR operation.deadline<=clock_timestamp() FROM workflow_local_agent_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id WHERE call.company_id=$1 AND call.run_id=$2 AND call.execution_id=$3 AND call.wait_id=$4")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).fetch_optional(db)
+}
+
 pub(in crate::adapters::persistence::workflow) async fn resume_on(
     tx: &mut Transaction<'_, Postgres>,
     scope: ActivationRequest,
     wait: Uuid,
 ) -> AppResult<Option<WaitProgress>> {
-    let due: Option<bool> = sqlx::query_scalar("SELECT call.ready_at IS NOT NULL OR operation.deadline<=clock_timestamp() FROM workflow_local_agent_calls AS call JOIN local_agent_operations AS operation ON operation.company_id=call.company_id AND operation.id=call.operation_id WHERE call.company_id=$1 AND call.run_id=$2 AND call.execution_id=$3 AND call.wait_id=$4")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).fetch_optional(&mut **tx).await?;
+    let due = due_on(tx, scope, wait).await?;
     let Some(due) = due else {
         return Ok(None);
     };
@@ -88,8 +98,18 @@ async fn refused_on(
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(wait).execute(&mut *db).await?;
     sqlx::query("UPDATE workflow_runs SET state='running',waiting_reason=NULL WHERE company_id=$1 AND id=$2 AND state='waiting'")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut *db).await?;
-    recovery::route_parked_failure(db, scope, failure).await?;
+    let routed = recovery::route_parked_failure(db, scope, failure).await?;
     waits::audit_wait(db, scope, wait, "wait_completed").await?;
+    if !routed {
+        // The refusal's own typed audit is what the default ladder's case proves (D1.3).
+        waits::audit(db, scope, failure.code().as_str()).await?;
+        Box::pin(super::super::escalations::run_failed_on(
+            db,
+            scope,
+            failure.code(),
+        ))
+        .await?;
+    }
     wait_commit::saved(db, scope, CommitDisposition::Committed, true).await
 }
 

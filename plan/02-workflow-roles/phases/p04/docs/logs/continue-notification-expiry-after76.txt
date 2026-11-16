@@ -1,0 +1,10 @@
+
+running 5 tests
+test adapters::persistence::notification::tests::lease_tests::notification_failure_expired_execution_cannot_reschedule_before_reaping ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_replacement_owner_wins_over_expired_execution ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_rechecks_expiry_after_waiting_for_the_event_row ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_failure_two_expired_attempts_exhaust_without_stale_backoff_writes ... ok
+test adapters::persistence::notification::tests::lease_tests::notification_stale_release_expired_execution_preserves_reaper_ownership ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4405 filtered out; finished in 3.79s
+

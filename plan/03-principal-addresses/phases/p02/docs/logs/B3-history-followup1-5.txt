@@ -1,0 +1,7 @@
+
+running 1 test
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4577 filtered out; finished in 7.22s
+

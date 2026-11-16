@@ -1,0 +1,10 @@
+
+running 1 test
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4577 filtered out; finished in 27.29s
+

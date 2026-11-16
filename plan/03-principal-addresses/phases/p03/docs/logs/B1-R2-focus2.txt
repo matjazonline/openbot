@@ -1,0 +1,31 @@
+
+running 13 tests
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_retained_principal_delete_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_insert_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_update_cannot_commit ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication' (16924822) panicked at src/adapters/persistence/workflow/workflow_message_sender_tests.rs:78:35:
+called `Result::unwrap_err()` on an `Ok` value: ()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+2026-11-15T13:30:50.911747Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(c8d2701b-b59e-4278-875c-349f8b1930d6)
+2026-11-15T13:30:50.918288Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=573d19ad-3b34-46d5-a5d8-166c870ce0d7 correlation_id=5a99958f-47a9-46a1-a1f4-100dc486748d transport=email status=dead_letter
+test adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::system_relay::relay_identity_pure_workflow_system_reply_cannot_enter_a_team_only_desk ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::agent_address_create_actual_default_binding_answers_a_direct_message ... ok
+2026-11-15T13:30:54.702532Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(118cf376-e911-4b11-8c06-29b6b3a3063a)
+2026-11-15T13:30:54.709528Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=688e4626-eb11-46ef-abb5-32667ebf6235 correlation_id=c19a6bd6-58d5-44d0-b986-b28e5c9b84eb transport=email status=dead_letter
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_nonmember_agent_is_refused_without_a_canonical_hop_or_smtp ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_department_member_uses_its_agent_grant_and_keeps_its_author ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_running_agent_cannot_send_as_another_agents_address ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::direct_history_teardown::direct_company_teardown_removes_populated_agent_history_notes_and_transport ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_source_rename_after_observation_refuses_commit_and_redelivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_target_revocation_after_observation_refuses_commit_and_redelivery ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication
+
+test result: FAILED. 12 passed; 1 failed; 0 ignored; 0 measured; 4597 filtered out; finished in 22.31s
+

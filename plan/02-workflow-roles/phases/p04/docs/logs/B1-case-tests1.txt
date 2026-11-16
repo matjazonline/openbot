@@ -1,0 +1,24 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0004]: non-exhaustive patterns: `domain::entities::notification::NotificationActionKind::EscalationControl` not covered
+   --> src/domain/entities/notification.rs:348:42
+    |
+348 |                     let expected = match action {
+    |                                          ^^^^^^ pattern `domain::entities::notification::NotificationActionKind::EscalationControl` not covered
+    |
+note: `domain::entities::notification::NotificationActionKind` defined here
+   --> src/domain/entities/notification.rs:58:10
+    |
+ 58 | pub enum NotificationActionKind {
+    |          ^^^^^^^^^^^^^^^^^^^^^^
+...
+ 61 |     EscalationControl,
+    |     ----------------- not covered
+    = note: the matched value is of type `domain::entities::notification::NotificationActionKind`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+350 ~                         NotificationActionKind::DecisionReview => decision,
+351 ~                         domain::entities::notification::NotificationActionKind::EscalationControl => todo!(),
+    |
+
+For more information about this error, try `rustc --explain E0004`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

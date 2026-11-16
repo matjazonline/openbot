@@ -1,0 +1,37 @@
+{
+  "base": "3d186172a778602dd82d790eb2ef230c80cc045d",
+  "projected_mcp_source": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "scope": "D2 cleanup counterfactual only; diagnostic, not acceptance",
+  "files": [
+    {
+      "path": "src/adapters/mcp/authentication_tests.rs",
+      "sha256": "f30b7509953e9cf3a7b0a82fa0dd15bd6684386803f96be18fcaac2ee3bd0b55",
+      "blob": "3b46262899bb559bc1bbefcfa1b550934e2fe4a4"
+    },
+    {
+      "path": "src/adapters/mcp/connection.rs",
+      "sha256": "0abf2113e864461383e77cc40a2af1bf4c0aff94bcd953a0fc8620841c8e9d12",
+      "blob": "5d5113a7a1dbf0c15421cb6b88bd71183ff736b2"
+    },
+    {
+      "path": "src/adapters/mcp/doop_tests.rs",
+      "sha256": "835ca62fe645bf5b965d222ecdde5f897ebfe2cd0da0e6e9152eb6471554e338",
+      "blob": "2bab6af72c98ad2bdbfcd05fbe39ecac18e1e393"
+    },
+    {
+      "path": "src/adapters/mcp/http.rs",
+      "sha256": "78807726fd15984d141f64ecb01dc527df0c7530c8d59d8816409e89d6a1807c",
+      "blob": "349f5b79d4f09781662b97558e1c2770da635356"
+    },
+    {
+      "path": "src/adapters/mcp/mod.rs",
+      "sha256": "fd57579cc975753f9a0661138fe1a85cca8881f551a773779a8af3cd78178784",
+      "blob": "85a3edf5fd5c6c32cab59e80fdb71443e47fd104"
+    },
+    {
+      "path": "src/adapters/mcp/tests.rs",
+      "sha256": "b25f9e643c8c3e19cdff3e8bf97fca3e809f7b628823eb125b1ad6b7ff072cb0",
+      "blob": "f4aba91ab4d8edeb55f80050fccbb43cc2919ce1"
+    }
+  ]
+}

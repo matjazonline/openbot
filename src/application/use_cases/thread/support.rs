@@ -11,9 +11,14 @@ use uuid::Uuid;
 use crate::{
     app_error::AppResult,
     entities::{
-        channel::Channel, company::Company, message_view::AgentHistoryMessage,
-        participant::PrincipalAccessContext, quoted_text, transport::QualifiedIdentity,
-        value_objects::CompanySlug,
+        address::AddressTarget,
+        channel::Channel,
+        company::Company,
+        message_view::AgentHistoryMessage,
+        participant::PrincipalAccessContext,
+        quoted_text,
+        transport::QualifiedIdentity,
+        value_objects::{ChannelSlug, CompanySlug},
     },
     transport::InboundDraft,
 };
@@ -31,6 +36,8 @@ pub(crate) struct DirectoryCache<'a> {
     channels: HashMap<Uuid, Vec<Channel>>,
     departments: HashMap<Uuid, Vec<crate::entities::department::Department>>,
     access_contexts: HashMap<(Uuid, QualifiedIdentity), PrincipalAccessContext>,
+    /// What each addressed slug names, per company, keyed by the lowercased slug.
+    addresses: HashMap<Uuid, HashMap<String, AddressTarget>>,
 }
 
 impl<'a> DirectoryCache<'a> {
@@ -41,7 +48,40 @@ impl<'a> DirectoryCache<'a> {
             channels: HashMap::new(),
             departments: HashMap::new(),
             access_contexts: HashMap::new(),
+            addresses: HashMap::new(),
         }
+    }
+
+    /// Read what these slugs name in the company's address namespace, in one statement. Routing
+    /// calls it once per company with every slug the message names there, so all of them are
+    /// answered from one snapshot.
+    pub(crate) async fn load_addresses(
+        &mut self,
+        company_id: Uuid,
+        slugs: &[ChannelSlug],
+    ) -> AppResult<()> {
+        let resolved = self
+            .use_cases
+            .channel_persistence
+            .address_targets(company_id, slugs)
+            .await?;
+        let known = self.addresses.entry(company_id).or_default();
+        for address in resolved {
+            known.insert(address.slug.to_lowercase(), address.target);
+        }
+        Ok(())
+    }
+
+    /// What a loaded slug names, or `None` when it names nothing in the company.
+    pub(crate) fn address_target(
+        &self,
+        company_id: Uuid,
+        slug: &ChannelSlug,
+    ) -> Option<AddressTarget> {
+        self.addresses
+            .get(&company_id)
+            .and_then(|known| known.get(&slug.to_lowercase()))
+            .copied()
     }
 
     pub(crate) async fn company(&mut self, slug: &CompanySlug) -> AppResult<Option<Company>> {

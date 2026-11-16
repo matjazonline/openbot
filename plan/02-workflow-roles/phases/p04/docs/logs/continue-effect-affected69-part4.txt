@@ -1,0 +1,26 @@
+
+running 21 tests
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_cannot_enter_step_or_model_tool_preparation ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_is_restricted_to_the_trusted_company_reply_contract ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_roundtrip_and_integrity_are_strict ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_declares_a_human_result_separate_from_its_receipt ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_private_reply_event_cannot_be_declared_generically ... ok
+test application::workflow::registry::channel_question_tests::channel_reply_hitl_prompt_schema_is_literal_and_exact ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_accepts_schema_valid_empty_business_values ... ok
+test application::workflow::channel_reply::origin_tests::channel_reply_completion_origin_binds_immutable_proposal_to_effect_identity ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_rejects_nonterminal_and_choice_routes ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_retains_error_routing_and_typed_value ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_five_examples_compile_and_execute_without_production_effects ... ok
+test application::workflow::registry::channel_reply_terminal_contract_tests::channel_reply_terminal_contract_preflight_charges_all_schema_copies ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_child_suppression_does_not_suppress_the_root ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_invalid_mapping_is_refused_and_question_approval_is_distinct ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_native_review_reject_completes_suppressed_and_edit_is_the_response ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_missing_human_script_has_typed_wait_preview ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_seals_mapping_and_policy_and_previews_output ... ok
+test application::workflow::sample::tests::channel_reply_preview_tests::channel_reply_authoring_sample_suppression_skips_projection_for_valid_empty_values ... ok
+test application::workflow::supervise::tests::workflow_message_wait_supervisor_confirms_suspension_and_never_releases ... ok
+test application::workflow::sample::tests::channel_reply_terminal_tests::channel_reply_terminal_sample_returns_business_value_without_a_script ... ok
+test application::workflow::templates::agent_workflow::tests::channel_reply_authoring_custom_end_requires_terminal_no_reply ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 4371 filtered out; finished in 0.29s
+

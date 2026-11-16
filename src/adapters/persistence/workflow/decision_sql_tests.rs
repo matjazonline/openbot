@@ -20,7 +20,7 @@ async fn workflow_decision_comment_bounds_and_immutable_facts() {
         f.persistence().add_decision_comment(comment.clone()).await,
         Err(AppError::BadRequest(_))
     ));
-    sqlx::query("INSERT INTO workflow_decision_comments(company_id,decision_id,sequence,author_principal_id,command_key,body) SELECT $1,$2,sequence,(SELECT id FROM principals WHERE company_id=$1 AND user_id=$3),'seed-'||sequence,'seed' FROM generate_series(1,999) AS sequence")
+    sqlx::query("INSERT INTO workflow_decision_comments(company_id,decision_id,sequence,author_principal_id,command_key,body) SELECT $1,$2,sequence,$3,'seed-'||sequence,'seed' FROM generate_series(1,999) AS sequence")
         .bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(view.reviewers[0]).execute(f.persistence().pool()).await.unwrap();
     comment.body = "é".repeat(MAX_COMMENT_CHARS);
     assert_eq!(

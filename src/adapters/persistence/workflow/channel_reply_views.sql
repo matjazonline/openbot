@@ -1,6 +1,6 @@
 -- Only the actual admitted owner grants a response identity; passive snapshots are excluded.
 SELECT run.id AS run_id, run.state, review.run_id AS review_run,
-       context.message_id AS source_message, context.channel_id, context.thread_id,
+       context.message_id AS source_message, context.channel_id, context.principal_id, context.thread_id,
        decision.state AS publication_state, decision.message_id AS final_message,
        decision.delivery_id AS final_delivery, delivery.status AS final_delivery_state,
        prompt.run_id AS prompt_run, prompt.wait_id AS prompt_wait, prompt.message_id AS prompt_message,
@@ -19,7 +19,7 @@ LEFT JOIN LATERAL (
     JOIN workflow_runs AS candidate ON candidate.company_id=review_budget.company_id
         AND candidate.id=review_budget.run_id
     WHERE review_budget.company_id=run.company_id AND review_budget.root_run_id=budget.root_run_id
-        AND candidate.channel_id=context.channel_id AND candidate.thread_id=context.thread_id
+        AND candidate.channel_id IS NOT DISTINCT FROM context.channel_id AND candidate.principal_id IS NOT DISTINCT FROM context.principal_id AND candidate.thread_id=context.thread_id
         AND run.state='waiting' AND candidate.state='waiting' AND candidate.waiting_reason='decision'
     ORDER BY candidate.created_at DESC,candidate.id DESC LIMIT 1
 ) AS review ON true
@@ -35,7 +35,7 @@ LEFT JOIN LATERAL (
     JOIN workflow_waits AS wait ON wait.company_id=question.company_id AND wait.id=question.wait_id
     JOIN workflow_message_destinations AS destination ON destination.company_id=question.company_id
         AND destination.invocation_id=question.invocation_id AND destination.message_id=question.message_id
-        AND destination.channel_id=context.channel_id AND destination.thread_id=context.thread_id
+        AND destination.channel_id IS NOT DISTINCT FROM context.channel_id AND destination.target_principal_id IS NOT DISTINCT FROM context.principal_id AND destination.thread_id=context.thread_id
     LEFT JOIN message_deliveries AS prompt_delivery ON prompt_delivery.company_id=destination.company_id
         AND prompt_delivery.id=destination.delivery_id
     -- Later questions may target a previous human answer. Ownership and the exact

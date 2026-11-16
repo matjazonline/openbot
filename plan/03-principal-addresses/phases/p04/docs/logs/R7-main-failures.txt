@@ -1,0 +1,77 @@
+
+failures:
+
+---- adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard stdout ----
+
+thread 'adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard' (20492699) panicked at src/adapters/persistence/knowledge/search_quota_tests.rs:109:5:
+assertion failed: matches!(f.store.visible(query).await, Err(AppError::ServiceUnavailable(_)))
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses' (20603970) panicked at src/adapters/persistence/workflow/action_reconciliation_prior_bounds_support.rs:128:10:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lease retirement refused: run or lease window closed")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order stdout ----
+native_coherence state=23514 schema=public table=workflow_action_evidence constraint=workflow_action_evidence_check message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_evidence_check"
+native_diagnostic rollback_quiescent owner=71111 observer=71113 database=open_bots_own_79ccbbfa4196429f91839e1316888bbc
+native_coherence state=23514 schema=public table=workflow_action_evidence constraint=workflow_action_evidence_check message=new row for relation "workflow_action_evidence" violates check constraint "workflow_action_evidence_check"
+native_diagnostic rollback_quiescent owner=71325 observer=71326 database=open_bots_own_b747cc5aa2dd40cb9eb5f0e92de10954
+native_coherence positive shape=observed_equals_verified source=registered time_order=true presence=true grant_scope=true absent=0 substituted=false selected_flush=true all_flush=true ordinary_commit=true
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order' (20656368) panicked at src/adapters/persistence/workflow/action_reconciliation_receipt_tests.rs:197:5:
+assertion failed: f.persistence().settled().release_io(request.fence, policy(),
+            LeaseReleaseCause::LocalInterruption).await.unwrap()
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call' (20668091) panicked at src/adapters/persistence/workflow/action_reconciliation_proof_tests.rs:479:9:
+assertion `left == right` failed
+  left: 0
+ right: 1
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock' (20708222) panicked at src/adapters/persistence/workflow/harness_token_atomic_tests.rs:70:17:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow checkpoint.model.reserve not applied: persistence bound elapsed before commit")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal' (20712939) panicked at src/adapters/persistence/workflow/harness_token_refusal_tests.rs:21:10:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow checkpoint.model.reserve not applied: persistence bound elapsed before commit")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department' (20734608) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester' (20735270) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow action.local not applied: persistence bound elapsed before commit")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant' (20735269) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow action.local not applied: persistence bound elapsed before commit")
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing' (20737011) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:172:49:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow action.local not applied: persistence bound elapsed before commit")
+
+
+failures:
+    adapters::persistence::knowledge::tests::search_quota::knowledge_search_company_chunk_cap_competing_writes_override_delete_and_corruption_guard
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::bounds_tests::prior_bounds_tests::workflow_action_reconciliation_bounds_128_prior_consuming_129_total_then_lost_refuses
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::validation_tests::native_bounds_tests::native_evidence_tests::native_diagnostic_tests::native_object_tests::native_coherence_tests::workflow_action_reconciliation_native_coherence_time_order
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::workflow_action_reconciliation_proof_admin_cannot_authorize_revoked_original_new_call
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::atomic::workflow_harness_token_competing_reservation_replans_before_new_reviewer_lock
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::harness_owner_tests::model_owner_tests::store::tokens::refusal::workflow_harness_token_expiry_is_terminal_and_late_approval_cannot_clear_refusal
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_competing_claimants_create_one_assistant
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_in_a_child_run_acts_for_the_roots_requester
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::provisioning_stale_fences_write_nothing
+
+test result: FAILED. 4668 passed; 10 failed; 27 ignored; 0 measured; 0 filtered out; finished in 4979.29s
+
+error: test failed, to rerun pass `--lib`

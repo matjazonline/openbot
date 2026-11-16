@@ -1,0 +1,20 @@
+{
+  "before": 4283,
+  "after": 4296,
+  "removed": [],
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_competing_deadline_owners_create_one_terminal_source",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_case_failure_rolls_back_expiry_and_job",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::deadlines::workflow_escalation_trigger_deadline_requires_actual_expiry_and_delivers_one_notice",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_competing_decision_sweepers_commit_one_failure_case",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_authored_handler_suppresses_ladder_even_at_end",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::decision_deadlines::workflow_escalation_trigger_decision_deadline_fails_real_wait_and_delivers_once",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_competing_guard_owners_create_one_source_and_control",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_case_failure_rolls_back_terminal_retirement",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_commits_the_real_failed_run_and_delivers_once",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no_case",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::retirement::workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+    "adapters::persistence::workflow::tests::http_tests::approval_tests::sql_tests::workflow_action_approval_deferred_identity_rejects_mismatches_and_orphans_at_commit",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::reviewer_account_race_tests::workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action"
+  ]
+}

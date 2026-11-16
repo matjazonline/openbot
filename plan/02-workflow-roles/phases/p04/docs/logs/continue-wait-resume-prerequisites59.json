@@ -1,0 +1,32 @@
+{
+  "build": 59,
+  "selected": [
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once",
+    "application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text",
+    "application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority"
+  ],
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24",
+    "--exact",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_competing_workers_native_thread_followup_controls_and_company_fences",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_committed_delivery_marker_before_socket_never_blindly_dispatches",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_after_admission_before_peer_connect_dispatches_once",
+    "adapters::persistence::workflow::tests::local_agent_tests::e2e::early::cloudroom_e2e_crash_before_admission_commit_reconstructs_workers_server_and_peer",
+    "adapters::persistence::workflow::tests::local_agent_tests::retention::peer::cloudroom_lifecycle_real_server_plugin_retention_preserves_prepared_and_unseen_queued_work_once",
+    "application::local_agents::wire_tests::cloudroom_protocol_rust_node_command_hash_preserves_exact_deadline_and_text",
+    "application::local_agents::wire_tests::cloudroom_submission_rust_node_evidence_has_thread_without_turn_or_terminal_authority",
+    "--test-threads=2"
+  ],
+  "exit": 0,
+  "seconds": 43.85,
+  "node": "v24.22.3",
+  "stats": [
+    "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4363 filtered out; finished in 43.83s"
+  ]
+}

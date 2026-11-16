@@ -1,0 +1,9 @@
+
+running 4 tests
+test adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_full_mailbox_activity_refuses_cached_body ... ok
+test adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_exact_message_activity_refuses_cached_body ... ok
+test adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_post_reply_activity_refuses_cached_body ... ok
+test adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_actual_audit_payload_refuses_diagnostics ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4570 filtered out; finished in 6.11s
+

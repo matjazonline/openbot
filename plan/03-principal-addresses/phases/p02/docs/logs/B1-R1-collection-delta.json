@@ -1,0 +1,27 @@
+{
+  "before": 4504,
+  "after": 4521,
+  "removed": [
+    "adapters::persistence::department::tests::desks::department_desk_members_only_form_saves_keep_allowlist_and_refuse_public"
+  ],
+  "added": [
+    "adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_competing_draft_writers_change_policy_once",
+    "adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_form_saves_and_renders_the_current_principal_flag",
+    "adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_json_round_trips_and_preserves_desk_policy",
+    "adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_scanning_available_does_not_require_acknowledgement",
+    "adapters::http::routes::agent::api_tests::public_settings::direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk",
+    "adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target",
+    "adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint",
+    "adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system",
+    "adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse",
+    "adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets",
+    "adapters::persistence::department::tests::desks::department_desk_public_selection_clears_members_only_and_keeps_ownership",
+    "adapters::persistence::department::tests::desks::department_desk_raw_public_with_members_only_is_refused",
+    "application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only",
+    "application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting",
+    "application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag",
+    "domain::entities::participant::direct_tests::direct_thread_person_is_private_to_self_and_owner",
+    "domain::entities::participant::direct_tests::direct_thread_public_agent_admits_mail_without_granting_reads",
+    "domain::entities::participant::direct_tests::direct_thread_retired_person_keeps_only_owner_history_access"
+  ]
+}

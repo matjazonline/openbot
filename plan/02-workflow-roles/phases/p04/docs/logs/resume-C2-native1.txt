@@ -1,0 +1,33 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7', '::knowledge_message_tests::', 'workflow_message_delivery_begin_part_refuses_', '::visibility::accounts::', '--nocapture', '--test-threads=2']
+
+running 18 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_link_repairs_current_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_external_login_repairs_only_current_address_proof ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_actual_profile_address_change_refreshes_lost_verified_visibility ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_competing_provider_links_have_one_current_proof_and_assignment ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::escalations::visibility::accounts::workflow_reviewer_follow_provider_link_refresh_failure_rolls_back_method_proof_and_assignment ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_recipient_no_longer_a_member ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_revoked_actor ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::workflow_message_delivery_begin_part_refuses_a_run_past_its_deadline ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::account_orders::knowledge_run_level_confirmed_address_writer_first_refuses_the_real_prepared_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_internal_message_stamps_current_content_and_completed_replay_retains_stamp ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::account_orders::knowledge_run_level_publication_first_serializes_address_change_and_worker_refuses_retired_email' (417366) panicked at src/adapters/persistence/workflow/knowledge_account_race_support.rs:129:10:
+called `Result::unwrap()` on an `Err` value: Database("error returned from database: deadlock detected")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::account_orders::knowledge_run_level_publication_first_serializes_address_change_and_worker_refuses_retired_email ... FAILED
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_pending_public_intent_cannot_send_after_content_rises ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_race_verified_address_change_cannot_authorize_a_frozen_retired_recipient ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_refused_message_cannot_recover_into_success ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_tool_refusal_is_typed_and_contains_no_content ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_step_email_and_fanout_refuse_before_any_effect ... ok
+test adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::knowledge_run_level_verified_member_email_uses_current_member_level ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::knowledge_message_tests::account_orders::knowledge_run_level_publication_first_serializes_address_change_and_worker_refuses_retired_email
+
+test result: FAILED. 17 passed; 1 failed; 0 ignored; 0 measured; 4298 filtered out; finished in 12.86s
+

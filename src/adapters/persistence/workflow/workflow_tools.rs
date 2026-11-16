@@ -213,7 +213,7 @@ impl WorkflowTools for PostgresPersistence {
     ) -> AppResult<WorkflowToolRegistration> {
         if crate::application::workflow::provisioning::is_reserved_tool_name(write.name.as_str()) {
             return Err(refused(
-                "Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved",
+                "Built-in tool names (message.*, list_company_agents, create_agent) are reserved",
             ));
         }
         if !write.params.is_object()

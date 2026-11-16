@@ -1,0 +1,36 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_association_codec_preserves_every_scope_and_refuses_invalid_null_shapes ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins ... FAILED
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_competing_activation_and_roster_write_preserve_unambiguous_context ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation ... FAILED
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_role_activation_and_roster_mutations_require_exactly_one_department ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run ... FAILED
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins' (16487770) panicked at src/adapters/persistence/workflow/direct_workflow_tests.rs:67:27:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation' (16487771) panicked at src/adapters/persistence/workflow/direct_workflow_tests.rs:67:27:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+
+---- adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run stdout ----
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run' (16487769) panicked at src/adapters/persistence/workflow/direct_workflow_tests.rs:67:27:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run
+    adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins
+    adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation
+
+test result: FAILED. 4 passed; 3 failed; 0 ignored; 0 measured; 4586 filtered out; finished in 4.00s
+

@@ -388,6 +388,9 @@ pub(crate) async fn set_desk_ownership_on(
             .map_err(|error| AppError::Internal(error.to_string()))?
     };
     let mode = target.stored_mode(from_emails)?;
+    if target.department_id.is_none() {
+        super::workflow::role_binding::check_detach_on(tx, company, desk).await?;
+    }
     sqlx::query(
         "UPDATE channels SET department_id = $3, members_only = $4, access_mode = $5, \
                 settings_revision = settings_revision + 1 \
@@ -400,7 +403,8 @@ pub(crate) async fn set_desk_ownership_on(
     .bind(mode.as_str())
     .execute(&mut **tx)
     .await?;
-    sync_desk_grants_on(tx, company, desk).await
+    sync_desk_grants_on(tx, company, desk).await?;
+    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
 }
 
 #[cfg(test)]

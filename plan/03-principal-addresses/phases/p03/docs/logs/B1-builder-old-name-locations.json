@@ -1,0 +1,1245 @@
+{
+  "pattern": "CreateAgentChannel|CREATE_AGENT_CHANNEL|create_agent_channel",
+  "filesSearched": 2191,
+  "totalHits": 94,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder",
+        "name": "builder",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L18-L63"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 60,
+      "hits": [
+        {
+          "line": 35,
+          "text": "crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#claimed",
+        "name": "claimed",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L63-L108"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 14,
+      "hits": [
+        {
+          "line": 90,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/builtin_agent_library.rs#agent_builder_definition",
+        "name": "agent_builder_definition",
+        "kind": "function",
+        "path": "src/application/use_cases/builtin_agent_library.rs",
+        "span": "L63-L88"
+      },
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 74,
+          "text": "[LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#provisioning_tool_schemas",
+        "name": "provisioning_tool_schemas",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L107-L238"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 153,
+          "text": "ProvisioningKind::CreateAgentChannel => json!({"
+        },
+        {
+          "line": 181,
+          "text": "ProvisioningKind::CreateAgentChannel => json!({"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent_contract.rs#agent_action_target",
+        "name": "agent_action_target",
+        "kind": "function",
+        "path": "src/application/workflow/agent_contract.rs",
+        "span": "L48-L91"
+      },
+      "path": "src/application/workflow/agent_contract.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 71,
+          "text": "| crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/tools.rs#builtin",
+        "name": "builtin",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/tools.rs",
+        "span": "L183-L222"
+      },
+      "path": "src/adapters/persistence/agent_publication/tools.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 196,
+          "text": "AgentBuiltinTool::CreateAgentChannel => provisioning::builtin_provisioning_snapshot("
+        },
+        {
+          "line": 198,
+          "text": "provisioning::ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs#awaiting_review",
+        "name": "awaiting_review",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs",
+        "span": "L12-L55"
+      },
+      "path": "src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 14,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec(\"reviewed\", ReplyMode::Reviewed)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#create_agent_channel_on",
+        "name": "create_agent_channel_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L15-L56"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 15,
+          "text": "pub(super) async fn create_agent_channel_on("
+        },
+        {
+          "line": 20,
+          "text": "spec: &CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#builder_on",
+        "name": "builder_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L58-L132"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 63,
+          "text": "spec: &CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#answers_as_default_desk",
+        "name": "answers_as_default_desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L136-L143"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 136,
+          "text": "fn answers_as_default_desk(spec: &CreateAgentChannel, agent_name: &str) -> bool {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#placement_on",
+        "name": "placement_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L147-L212"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 151,
+          "text": "spec: &CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#taken_by_another",
+        "name": "taken_by_another",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L216-L241"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 219,
+          "text": "spec: &CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#provisioning_status",
+        "name": "provisioning_status",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L73-L85"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "supported_contracts: [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/agent.rs#builtin",
+        "name": "builtin",
+        "kind": "function",
+        "path": "src/application/workflow/agent.rs",
+        "span": "L84-L112"
+      },
+      "path": "src/application/workflow/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 94,
+          "text": "AgentBuiltinTool::ListCompanyAgents | AgentBuiltinTool::CreateAgentChannel => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/exactness_tests.rs#every_builtin",
+        "name": "every_builtin",
+        "kind": "function",
+        "path": "src/application/workflow/exactness_tests.rs",
+        "span": "L9-L39"
+      },
+      "path": "src/application/workflow/exactness_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 14,
+          "text": "AgentBuiltinTool::CreateAgentChannel,"
+        },
+        {
+          "line": 28,
+          "text": "| AgentBuiltinTool::CreateAgentChannel"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#name",
+        "name": "name",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L75-L80"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 78,
+          "text": "Self::CreateAgentChannel => CREATE_AGENT_CHANNEL,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#effect",
+        "name": "effect",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L81-L86"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 84,
+          "text": "Self::CreateAgentChannel => ActionEffect::Write,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#name",
+        "name": "name",
+        "kind": "function",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L92-L106"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 97,
+          "text": "Self::CreateAgentChannel => \"create_agent_channel\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent_api_tests.rs#library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "name": "library_builder_copy_keeps_its_grants_on_an_explicit_model",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent_api_tests.rs",
+        "span": "L176-L287"
+      },
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 181,
+          "text": "AssistantChannelRequest, AssistantChannels, CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS,"
+        },
+        {
+          "line": 242,
+          "text": "assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/assistant_channels.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "//! `create_agent_channel` tool. The caller is the requester and the binding's run-as."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_agents/authoring/catalog_tests.rs#autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots",
+        "name": "autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder_or_slots",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_agents/authoring/catalog_tests.rs",
+        "span": "L86-L152"
+      },
+      "path": "src/adapters/http/routes/ui_agents/authoring/catalog_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 122,
+          "text": "assert!(!output.contains(\"list_company_agents\") && !output.contains(\"create_agent_channel\"));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/agent_publication/tests/authoring.rs#autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope",
+        "name": "autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_and_foreign_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/agent_publication/tests/authoring.rs",
+        "span": "L190-L225"
+      },
+      "path": "src/adapters/persistence/agent_publication/tests/authoring.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 198,
+          "text": "\"create_agent_channel\","
+        },
+        {
+          "line": 199,
+          "text": "AgentBuiltinTool::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/channel_reply_native_tests.rs#channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource",
+        "name": "channel_reply_authoring_native_invalid_custom_end_rolls_back_every_resource",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+        "span": "L107-L128"
+      },
+      "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 113,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, invalid).await;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! The Agent Builder's `create_agent_channel` (01DEP-P03-D5): a company agent through the shared"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_competing_claimants_create_one_assistant",
+        "name": "provisioning_competing_claimants_create_one_assistant",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L235-L336"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 240,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_stale_fences_write_nothing",
+        "name": "provisioning_stale_fences_write_nothing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L341-L365"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 346,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_refusals_commit_a_receipt_and_no_effect",
+        "name": "provisioning_refusals_commit_a_receipt_and_no_effect",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L370-L413"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 386,
+          "text": "provisioning_tool[\"tools\"] = json!([CREATE_AGENT_CHANNEL]);"
+        },
+        {
+          "line": 402,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_transient_fault_leaves_no_marker_receipt_or_effect",
+        "name": "provisioning_transient_fault_leaves_no_marker_receipt_or_effect",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L418-L447"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 422,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, faulty).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_losing_an_address_race_is_a_conflict_refusal",
+        "name": "provisioning_losing_an_address_race_is_a_conflict_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L453-L513"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 458,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_in_a_child_run_acts_for_the_roots_requester",
+        "name": "provisioning_in_a_child_run_acts_for_the_roots_requester",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L517-L536"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 522,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#provisioning_agent_reference_keeps_its_own_published_binding",
+        "name": "provisioning_agent_reference_keeps_its_own_published_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L811-L908"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 830,
+          "text": "crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel,"
+        },
+        {
+          "line": 891,
+          "text": "tool: crate::entities::agent_capability::AgentBuiltinTool::CreateAgentChannel"
+        },
+        {
+          "line": 900,
+          "text": "builtin_provisioning_snapshot(company(&f), ProvisioningKind::CreateAgentChannel).unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug",
+        "name": "agent_default_desk_builder_reuses_the_default_desk_at_the_agents_slug",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L934-L948"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 940,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, named).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_builder_refuses_other_settings_at_the_agents_slug",
+        "name": "agent_default_desk_builder_refuses_other_settings_at_the_agents_slug",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L953-L982"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 965,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_builder_provisions_another_desk_beside_the_default",
+        "name": "agent_default_desk_builder_provisions_another_desk_beside_the_default",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L987-L1007"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 993,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, reviewed).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_builder_creation_refusals_are_tool_errors",
+        "name": "agent_default_desk_builder_creation_refusals_are_tool_errors",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L1012-L1069"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1033,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        },
+        {
+          "line": 1057,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_builder_places_the_agent_in_a_department",
+        "name": "agent_default_desk_builder_places_the_agent_in_a_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L1074-L1173"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1130,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        },
+        {
+          "line": 1140,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, lead).await;"
+        },
+        {
+          "line": 1149,
+          "text": "let request = call(&f, &claim, ProvisioningKind::CreateAgentChannel, arguments).await;"
+        },
+        {
+          "line": 1167,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs#agent_default_desk_competing_builder_claimants_make_one_default_desk",
+        "name": "agent_default_desk_competing_builder_claimants_make_one_default_desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+        "span": "L1178-L1201"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1183,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs#delegated_provisioning_locks_requester_before_company",
+        "name": "delegated_provisioning_locks_requester_before_company",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs",
+        "span": "L6-L66"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_requester_lock_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "CREATE_AGENT_CHANNEL,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_provisions_an_assistant_for_a_signed_in_admin",
+        "name": "builder_provisions_an_assistant_for_a_signed_in_admin",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L163-L258"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 166,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec(\"helper\", ReplyMode::Autonomous)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_adds_custom_steps_to_the_new_agents_workflow",
+        "name": "builder_adds_custom_steps_to_the_new_agents_workflow",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L323-L401"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 339,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#builder_refuses_members_and_emailed_requests",
+        "name": "builder_refuses_members_and_emailed_requests",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L470-L536"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 473,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec(\"helper\", ReplyMode::Autonomous)),"
+        },
+        {
+          "line": 475,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec(\"helper\", ReplyMode::Reviewed)),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#reviewed_assistants_park_their_answer_until_the_run_deadline",
+        "name": "reviewed_assistants_park_their_answer_until_the_run_deadline",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L541-L605"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 543,
+          "text": "LlmTurn::tool_call(CREATE_AGENT_CHANNEL, spec(\"reviewed\", ReplyMode::Reviewed)),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "//! and `provision_on`, the one-transaction assistant setup the `create_agent_channel` tool and"
+        },
+        {
+          "line": 15,
+          "text": "use builder::create_agent_channel_on;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#apply",
+        "name": "apply",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L199-L240"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 220,
+          "text": "ProvisioningKind::CreateAgentChannel => {"
+        },
+        {
+          "line": 221,
+          "text": "let spec = CreateAgentChannel::parse(&request.arguments)?;"
+        },
+        {
+          "line": 224,
+          "text": "match Box::pin(create_agent_channel_on("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning.rs#agent_write",
+        "name": "agent_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning.rs",
+        "span": "L598-L677"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 601,
+          "text": "spec: &CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs#workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "name": "workflow_tool_registration_commands_keep_revisions_authority_and_bounds",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+        "span": "L63-L268"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tool_registration_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 145,
+          "text": "\"create_agent_channel\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/workflow_tools.rs#register_workflow_tool",
+        "name": "register_workflow_tool",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+        "span": "L172-L245"
+      },
+      "path": "src/adapters/persistence/workflow/workflow_tools.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 180,
+          "text": "\"Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/contract_tests.rs#autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority",
+        "name": "autonomous_agent_contract_reserved_names_cannot_manufacture_builtin_authority",
+        "kind": "function",
+        "path": "src/application/agent/contract_tests.rs",
+        "span": "L94-L114"
+      },
+      "path": "src/application/agent/contract_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 98,
+          "text": "\"create_agent_channel\","
+        },
+        {
+          "line": 111,
+          "text": "AgentToolBinding::builtin(AgentBuiltinTool::CreateAgentChannel)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "application::workflow::provisioning::{CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/builtin_agent_library.rs#AGENT_BUILDER_PROMPT",
+        "name": "AGENT_BUILDER_PROMPT",
+        "kind": "constant",
+        "path": "src/application/use_cases/builtin_agent_library.rs",
+        "span": "L19-L41"
+      },
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "When the design is complete, show a compact final specification containing name, slug, description, provider and model, department and role, the second desk's a"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/builtin_agent_library.rs#agent_builder_is_granted_the_provisioning_tools_and_told_their_rules",
+        "name": "agent_builder_is_granted_the_provisioning_tools_and_told_their_rules",
+        "kind": "function",
+        "path": "src/application/use_cases/builtin_agent_library.rs",
+        "span": "L131-L157"
+      },
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 140,
+          "text": "assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]);"
+        },
+        {
+          "line": 152,
+          "text": "\"Only after the user explicitly confirms, call create_agent_channel once\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/builtin_agent_library.rs#desk_wording_agent_builder_prompt_says_desk",
+        "name": "desk_wording_agent_builder_prompt_says_desk",
+        "kind": "function",
+        "path": "src/application/use_cases/builtin_agent_library.rs",
+        "span": "L161-L179"
+      },
+      "path": "src/application/use_cases/builtin_agent_library.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": "let prose = prompt.replace(CREATE_AGENT_CHANNEL, \"\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/http.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/http.rs",
+        "span": "L78-L109"
+      },
+      "path": "src/application/workflow/http.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "\"Built-in tool names (message.*, list_company_agents, create_agent_channel) are reserved\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#only_the_exact_name_only_built_in_is_trusted",
+        "name": "only_the_exact_name_only_built_in_is_trusted",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L31-L61"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "ProvisioningKind::CreateAgentChannel,"
+        },
+        {
+          "line": 55,
+          "text": "builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgentChannel)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#every_built_in_name_is_reserved",
+        "name": "every_built_in_name_is_reserved",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L64-L75"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "CREATE_AGENT_CHANNEL,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#refusals_and_results_are_both_valid_receipts",
+        "name": "refusals_and_results_are_both_valid_receipts",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L80-L133"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "let (_, create) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#arguments_are_held_to_the_input_contract",
+        "name": "arguments_are_held_to_the_input_contract",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L136-L162"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);"
+        },
+        {
+          "line": 144,
+          "text": "let parsed = CreateAgentChannel::parse(&spec).unwrap();"
+        },
+        {
+          "line": 151,
+          "text": "assert!(CreateAgentChannel::parse(&unknown).is_err());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#custom_steps_are_held_to_the_builder_step_types",
+        "name": "custom_steps_are_held_to_the_builder_step_types",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L167-L199"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 168,
+          "text": "let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);"
+        },
+        {
+          "line": 179,
+          "text": "let parsed = CreateAgentChannel::parse(&spec(json!([step]))).unwrap();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_tests.rs#http_operations_cannot_take_a_built_in_name",
+        "name": "http_operations_cannot_take_a_built_in_name",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_tests.rs",
+        "span": "L203-L232"
+      },
+      "path": "src/application/workflow/provisioning_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 206,
+          "text": "builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgentChannel).unwrap(),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 1,
+          "text": "//! Built-in provisioning tools (p08 D2): `list_company_agents` and `create_agent_channel`, the"
+        },
+        {
+          "line": 305,
+          "text": "/// `create_agent_channel` arguments, already valid against the input schema."
+        },
+        {
+          "line": 335,
+          "text": "impl CreateAgentChannel {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#CREATE_AGENT_CHANNEL",
+        "name": "CREATE_AGENT_CHANNEL",
+        "kind": "constant",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L26-L26"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pub const CREATE_AGENT_CHANNEL: &str = \"create_agent_channel\";"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#ProvisioningKind",
+        "name": "ProvisioningKind",
+        "kind": "enum",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L63-L66"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#parse",
+        "name": "parse",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L68-L74"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 71,
+          "text": "CREATE_AGENT_CHANNEL => Some(Self::CreateAgentChannel),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning.rs#CreateAgentChannel",
+        "name": "CreateAgentChannel",
+        "kind": "struct",
+        "path": "src/application/workflow/provisioning.rs",
+        "span": "L308-L334"
+      },
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 308,
+          "text": "pub struct CreateAgentChannel {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/message_tests.rs#provisioning_names_are_not_step_tools",
+        "name": "provisioning_names_are_not_step_tools",
+        "kind": "function",
+        "path": "src/application/workflow/registry/message_tests.rs",
+        "span": "L145-L170"
+      },
+      "path": "src/application/workflow/registry/message_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 146,
+          "text": "use crate::application::workflow::provisioning::{CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS};"
+        },
+        {
+          "line": 163,
+          "text": "for name in [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL] {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#AgentBuiltinTool",
+        "name": "AgentBuiltinTool",
+        "kind": "enum",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L77-L90"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "CreateAgentChannel,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#parse~2",
+        "name": "parse~2",
+        "kind": "function",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L107-L122"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "\"create_agent_channel\" => Some(Self::CreateAgentChannel),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/agent_capability.rs#is_provisioning",
+        "name": "is_provisioning",
+        "kind": "function",
+        "path": "src/domain/entities/agent_capability.rs",
+        "span": "L123-L125"
+      },
+      "path": "src/domain/entities/agent_capability.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": "matches!(self, Self::ListCompanyAgents | Self::CreateAgentChannel)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 24,
+    "baselineChars": 316808
+  }
+}

@@ -1,0 +1,8 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error: couldn't create a temp dir: No space left on device (os error 28) at path "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/rmetaPFJj8i"
+
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: failed to write file /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/incremental/open_bots-0n1frkp36pgwo/s-ho7wcnpjpo-13f13pl-working/dep-graph.part.bin: No space left on device (os error 28)
+
+error: could not compile `open_bots` (lib test) due to 1 previous error

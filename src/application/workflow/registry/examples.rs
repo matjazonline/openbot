@@ -106,7 +106,7 @@ fn values(name: &str) -> Value {
         }
         "decision.rule" => json!({"data":"review","data_schema":schema}),
         "decision.human" => {
-            json!({"proposal":{"summary":"review"},"reviewers":[{"kind":"user","id":"00000000-0000-0000-0000-000000000006"}],"deadline":deadline,"data_schema":schema,"feedback_required":["revise"]})
+            json!({"proposal":{"summary":"review"},"reviewers":[{"kind":"principal","id":"00000000-0000-0000-0000-000000000006"}],"deadline":deadline,"data_schema":schema,"feedback_required":["revise"]})
         }
         "decision.agent" => {
             json!({"agent":"reviewer","context":{"message":"hello"},"data_schema":schema})

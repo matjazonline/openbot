@@ -1,0 +1,66 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.codex/worktrees/2050/openbot)
+error[E0425]: cannot find value `MAX_PENDING_FOLLOW_DECISIONS` in module `crate::application::workflow::escalation`
+  --> src/adapters/persistence/workflow/follow_reviewers/mod.rs:68:59
+   |
+68 |     if count >= crate::application::workflow::escalation::MAX_PENDING_FOLLOW_DECISIONS as i64 {
+   |                                                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: src/application/workflow/escalation.rs:20:1
+   |
+20 | pub const MAX_PARKED_FOLLOW_DECISIONS: usize = 256;
+   | --------------------------------------------------- similarly named constant `MAX_PARKED_FOLLOW_DECISIONS` defined here
+   |
+help: a constant with a similar name exists
+   |
+68 -     if count >= crate::application::workflow::escalation::MAX_PENDING_FOLLOW_DECISIONS as i64 {
+68 +     if count >= crate::application::workflow::escalation::MAX_PARKED_FOLLOW_DECISIONS as i64 {
+   |
+
+error[E0425]: cannot find value `MAX_PENDING_FOLLOW_DECISIONS` in module `crate::application::workflow::escalation`
+   --> src/adapters/persistence/workflow/follow_reviewers/mod.rs:103:68
+    |
+103 |     if decisions.len() > crate::application::workflow::escalation::MAX_PENDING_FOLLOW_DECISIONS {
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+   ::: src/application/workflow/escalation.rs:20:1
+    |
+ 20 | pub const MAX_PARKED_FOLLOW_DECISIONS: usize = 256;
+    | --------------------------------------------------- similarly named constant `MAX_PARKED_FOLLOW_DECISIONS` defined here
+    |
+help: a constant with a similar name exists
+    |
+103 -     if decisions.len() > crate::application::workflow::escalation::MAX_PENDING_FOLLOW_DECISIONS {
+103 +     if decisions.len() > crate::application::workflow::escalation::MAX_PARKED_FOLLOW_DECISIONS {
+    |
+
+warning: unused import: `DepartmentRole`
+ --> src/adapters/persistence/workflow/follow_reviewers/mod.rs:9:49
+  |
+9 | use crate::entities::department::{DepartmentId, DepartmentRole, RoleRefusalKind};
+  |                                                 ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/waits.rs:184:21
+    |
+184 |     let Some(run) = lock(db, scope).await? else {
+    |                     ^^^^----------- argument #3 of type `LockPurpose` is missing
+    |
+note: function defined here
+   --> src/adapters/persistence/workflow/waits.rs:107:21
+    |
+107 | pub(super) async fn lock(
+    |                     ^^^^
+...
+110 |     purpose: LockPurpose,
+    |     --------------------
+help: provide the argument
+    |
+184 |     let Some(run) = lock(db, scope, /* LockPurpose */).await? else {
+    |                                   +++++++++++++++++++
+
+Some errors have detailed explanations: E0061, E0425.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 3 previous errors; 1 warning emitted

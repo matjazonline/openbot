@@ -16,7 +16,7 @@ async fn filled(count: usize, approval: bool) -> Filled {
     let mut source: Value =
         serde_json::from_str(&registry::example("message.send").unwrap().source).unwrap();
     source["steps"]["start"]["with"] = json!({"destinations":{"literal":[{"kind":"channel","id":other}]},"content":{"literal":{"subject":"Explicit","body":"seed"}}});
-    let policy = approval.then(|| ReplyApprovalPolicy::new(vec![s.owner().user_id()], 60).unwrap());
+    let policy = approval.then(|| ReplyApprovalPolicy::new(vec![s.owner_principal()], 60).unwrap());
     let fixture = FinalFixture::from_case(
         s,
         FinalCase {

@@ -114,6 +114,7 @@ async fn bind(
     };
     let bindings = engine.services().bindings();
     let configured = bindings.configure(ConfigureBinding {
+        escalation: None,
         target: binding, expected: None, association: RelatedAssociation::Company, version,
         params: json!({"expected_bot_id":company.bot,"expected_workspace_id":company.workspace,"verification_canvas_id":company.verification_canvas}),
         resources: BTreeMap::from([(ResourceName::parse("service").unwrap(), RuntimeResourceId::new(connection))]),

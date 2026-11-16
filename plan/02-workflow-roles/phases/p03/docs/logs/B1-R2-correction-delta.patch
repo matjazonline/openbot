@@ -1,0 +1,245 @@
+--- B1-R1/src/adapters/persistence/workflow/decision_authority_tests.rs
++++ B1-R2/src/adapters/persistence/workflow/decision_authority_tests.rs
+@@ -1,4 +1,7 @@
+ use super::*;
++
++#[path = "decision_business_member_tests.rs"]
++mod business_member_tests;
+ use crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked;
+ use crate::application::ports::channel::ChannelPersistence;
+ use crate::application::ports::channel::ChannelWrite;
+--- B1-R1/src/adapters/persistence/workflow/decision_business_member_tests.rs
++++ B1-R2/src/adapters/persistence/workflow/decision_business_member_tests.rs
+@@ -0,0 +1,49 @@
++use super::*;
++
++#[tokio::test]
++async fn workflow_reviewer_principal_visible_ordinary_member_parks_and_submits_business_decision() {
++    // Keep the shared fixture's state machine off the stock test-thread stack.
++    let (f, _) = Box::pin(channel_fixture()).await;
++    let reviewer = f.users[0];
++    let owner = f.admission.binding.target.actor.user_id();
++    assert_ne!(reviewer, owner);
++    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
++        .bind(f.scope.company.as_uuid())
++        .bind(reviewer)
++        .execute(f.persistence().pool())
++        .await
++        .unwrap();
++    let role: String =
++        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
++            .bind(f.scope.company.as_uuid())
++            .bind(reviewer)
++            .fetch_one(f.persistence().pool())
++            .await
++            .unwrap();
++    assert_eq!(role, "member");
++    let view = f.park().await;
++    assert_eq!(
++        view.subject,
++        crate::application::workflow::decisions::DecisionSubject::Business
++    );
++    assert!(view.can_submit);
++    assert_eq!(
++        view.reviewers,
++        vec![f.admission.binding.fixture.principal(reviewer).await]
++    );
++    assert!(!view.reviewers.contains(&reviewer));
++    let submitted = f
++        .persistence()
++        .submit_decision(f.submit(&view, 0, "ordinary-business-vote"))
++        .await
++        .unwrap();
++    assert_eq!(submitted.disposition, DecisionDisposition::Applied);
++    assert!(submitted.successor.is_some());
++    let saved = f
++        .persistence()
++        .read_decision(f.scope.company, f.actor(0), view.decision)
++        .await
++        .unwrap();
++    assert_eq!(saved.state, "completed");
++    assert!(!saved.can_submit);
++}
+--- B1-R1/src/adapters/persistence/workflow/reviewer_account_race_tests.rs
++++ B1-R2/src/adapters/persistence/workflow/reviewer_account_race_tests.rs
+@@ -11,6 +11,64 @@
+ enum ReviewerOwnership {
+     RunCompany,
+     OtherCompany,
++}
++
++#[tokio::test]
++async fn workflow_reviewer_principal_final_publication_rechecks_approved_reviewer_privilege() {
++    let PreparedPublication {
++        fixture: f,
++        claim,
++        plan,
++        retiring_user: reviewer,
++        retiring_principal: principal,
++    } = Box::pin(prepared(ReviewerOwnership::OtherCompany)).await;
++    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
++        .bind(f.scope.company.as_uuid())
++        .bind(reviewer)
++        .execute(f.p.pool())
++        .await
++        .unwrap();
++    assert_send_and_clearance_remain_valid(&f, reviewer, principal).await;
++    assert_eq!(outbound_count(&f).await, 0);
++    assert_eq!(
++        f.p.commit_reply_publication(claim, &plan).await.unwrap(),
++        ReplyPublicationOutcome::Refused(ReplyPublicationFailure::AuthorityRevoked)
++    );
++    assert_eq!(outbound_count(&f).await, 0);
++    assert_eq!(f.state().await["run"], "succeeded");
++}
++
++async fn assert_send_and_clearance_remain_valid(
++    f: &FinalFixture,
++    reviewer: Uuid,
++    principal: PrincipalId,
++) {
++    let role: String =
++        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
++            .bind(f.scope.company.as_uuid())
++            .bind(reviewer)
++            .fetch_one(f.p.pool())
++            .await
++            .unwrap();
++    assert_eq!(role, "member");
++    let mut tx = f.p.pool().begin().await.unwrap();
++    let actor = crate::adapters::persistence::workflow::action_authority::prelock_on(
++        &mut tx,
++        crate::application::workflow::actions::ActionScope {
++            company: f.scope.company,
++            run: f.scope.run,
++            execution: f.scope.execution,
++        },
++    )
++    .await
++    .unwrap()
++    .expect("the run actor retains send authority");
++    assert_eq!(actor, f.s.owner());
++    assert_ne!(actor.user_id(), reviewer);
++    crate::adapters::persistence::workflow::channel_reply_approvals::require_principal_clearance_on(
++        &mut tx, f.scope, principal.as_uuid(),
++    ).await.unwrap();
++    tx.rollback().await.unwrap();
+ }
+ struct ReviewActors {
+     reviewer: Uuid,
+--- B1-R1/src/application/workflow/compiler/roles.rs
++++ B1-R2/src/application/workflow/compiler/roles.rs
+@@ -36,17 +36,36 @@
+         }
+         let reviewers = if definition.step_type.as_str() == "decision.human" {
+             definition.inputs.get("reviewers").cloned()
++        } else if let Some(approval) = definition.inputs.get("approval") {
++            if default_approval_contains_role(approval) {
++                return Err(error(
++                    parsed,
++                    step,
++                    "approval",
++                    "Role reviewers require an unconditional literal approval",
++                ));
++            }
++            approval_reviewers(approval)
+         } else {
+-            definition
+-                .inputs
+-                .get("approval")
+-                .and_then(approval_reviewers)
++            None
+         };
+         if let Some(reviewers) = reviewers {
+             collect_people(parsed, step, &reviewers, &mut roles)?;
+         }
+     }
+     Ok(roles)
++}
++
++fn default_approval_contains_role(binding: &Binding) -> bool {
++    match binding {
++        Binding::Default { fallback, .. } => {
++            approval_reviewers(fallback)
++                .as_ref()
++                .is_some_and(contains_role)
++                || default_approval_contains_role(fallback)
++        }
++        _ => false,
++    }
+ }
+ 
+ fn collect_people(
+--- B1-R1/src/application/workflow/publication/role_tests.rs
++++ B1-R2/src/application/workflow/publication/role_tests.rs
+@@ -177,3 +177,70 @@
+     value["steps"]["start"]["with"]["approval"]["literal"]["reviewers"] = json!(["lead"]);
+     assert_eq!(compile_source(&value).err().unwrap().code, "registry.role");
+ }
++
++fn approval_default_source(fallback: Value) -> Value {
++    let mut value = source("http.request");
++    value["parameter_schema"] = json!({"type":"object","properties":{
++        "approval":{"type":"object"},"backup":{"type":"object"}}});
++    value["steps"]["start"]["with"]["approval"] =
++        json!({"default":{"ref":"/params/approval","value":fallback}});
++    value
++}
++
++#[test]
++fn workflow_role_publication_rejects_whole_approval_role_defaults_including_nested_containers() {
++    let approval = json!({"reviewers":["reviewer"],"deadline":"2099-01-01T00:00:00Z"});
++    for fallback in [
++        json!({"literal":approval}),
++        json!({"object":{"reviewers":{"literal":["reviewer"]},
++            "deadline":{"literal":"2099-01-01T00:00:00Z"}}}),
++        json!({"default":{"ref":"/params/backup","value":{"literal":approval}}}),
++    ] {
++        let value = approval_default_source(fallback);
++        for diagnostic in [
++            compile_source(&value)
++                .err()
++                .expect("compiler must reject the hidden role"),
++            build(&value, DependencySnapshots::default())
++                .err()
++                .expect("publication must reject the hidden role"),
++        ] {
++            assert_eq!(diagnostic.code, "registry.role");
++            assert_eq!(diagnostic.field_path.as_ref(), "/steps/start/with/approval");
++            assert!(diagnostic.message.contains("unconditional literal"));
++        }
++    }
++}
++
++#[test]
++fn workflow_role_publication_preserves_whole_approval_pinned_principal_defaults_and_params() {
++    use crate::domain::workflow::{Context, RunId, RunMetadata};
++    let principal = Uuid::from_u128(6);
++    let approval = json!({"reviewers":[{"kind":"principal","id":principal}],
++        "deadline":"2099-01-01T00:00:00Z"});
++    let value = approval_default_source(json!({"literal":approval}));
++    let bundle = build(&value, DependencySnapshots::default()).unwrap();
++    assert!(bundle.compiled().role_references().is_empty());
++    let input = json!({});
++    let outputs = BTreeMap::new();
++    let mut override_approval = approval.clone();
++    override_approval["reviewers"][0]["id"] = json!(Uuid::from_u128(8));
++    for params in [json!({}), json!({"approval":override_approval})] {
++        let expected = params.get("approval").unwrap_or(&approval);
++        let context = Context {
++            input: &input,
++            params: &params,
++            step_outputs: &outputs,
++            run: RunMetadata {
++                run_id: RunId::new(Uuid::from_u128(7)),
++                parent_run_id: None,
++                deadline: None,
++            },
++        };
++        let inputs = bundle
++            .compiled()
++            .prepare_step_inputs(&StepId::parse("start").unwrap(), &context)
++            .unwrap();
++        assert_eq!(&inputs.value()["approval"], expected);
++    }
++}

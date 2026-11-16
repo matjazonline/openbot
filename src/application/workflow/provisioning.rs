@@ -1,4 +1,4 @@
-//! Built-in provisioning tools (p08 D2): `list_company_agents` and `create_agent_channel`, the
+//! Built-in provisioning tools (p08 D2): `list_company_agents` and `create_agent`, the
 //! agent tools through which the Agent Builder reads the company's agents and creates an agent
 //! with a team channel bound to a reply-mode workflow.
 //!
@@ -23,7 +23,8 @@ use serde::Deserialize;
 use serde_json::{Value, json};
 
 pub const LIST_COMPANY_AGENTS: &str = "list_company_agents";
-pub const CREATE_AGENT_CHANNEL: &str = "create_agent_channel";
+pub const CREATE_AGENT: &str = "create_agent";
+pub const CREATE_DESK_FOR_AGENT: &str = "create_desk_for_agent";
 /// The `ActionTarget::Local` resource kind of a provisioning call; its resource is the company.
 pub const PROVISIONING: &str = "provisioning";
 
@@ -57,31 +58,34 @@ pub const MAX_LISTING_BYTES: usize = 48 * 1024;
 const MAX_REFUSAL_MESSAGE: usize = 2000;
 
 /// What the model is told `list_company_agents` returns (01DEP-P03-D10).
-pub const LIST_COMPANY_AGENTS_DESCRIPTION: &str = "List the company's agents and the models a new agent may use. Each agent names the departments it belongs to, with the roles it holds there: a department's members are the agents that list it. Pass department (a slug) to list only its members and role holders. An agent's desk is the address its own replies come from; it is null when that desk was deleted.";
+pub const LIST_COMPANY_AGENTS_DESCRIPTION: &str = "List the company's agents and the models a new agent may use. Each agent names the departments it belongs to, with the roles it holds there: a department's members are the agents that list it. Pass department (a slug) to list only its members and role holders. An agent's address names its direct principal inbox; shared desks are created separately.";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ProvisioningKind {
     ListAgents,
-    CreateAgentChannel,
+    CreateAgent,
+    CreateDeskForAgent,
 }
 impl ProvisioningKind {
     pub fn parse(name: &str) -> Option<Self> {
         match name {
             LIST_COMPANY_AGENTS => Some(Self::ListAgents),
-            CREATE_AGENT_CHANNEL => Some(Self::CreateAgentChannel),
+            CREATE_AGENT => Some(Self::CreateAgent),
+            CREATE_DESK_FOR_AGENT => Some(Self::CreateDeskForAgent),
             _ => None,
         }
     }
     pub const fn name(self) -> &'static str {
         match self {
             Self::ListAgents => LIST_COMPANY_AGENTS,
-            Self::CreateAgentChannel => CREATE_AGENT_CHANNEL,
+            Self::CreateAgent => CREATE_AGENT,
+            Self::CreateDeskForAgent => CREATE_DESK_FOR_AGENT,
         }
     }
     const fn effect(self) -> ActionEffect {
         match self {
             Self::ListAgents => ActionEffect::Read,
-            Self::CreateAgentChannel => ActionEffect::Write,
+            Self::CreateAgent | Self::CreateDeskForAgent => ActionEffect::Write,
         }
     }
 }
@@ -98,143 +102,15 @@ pub fn is_reserved_tool_name(name: &str) -> bool {
         || is_builtin_provisioning_tool(name)
         || crate::application::workflow::knowledge::is_builtin_knowledge_tool(name)
         || crate::application::workflow::memory_tools::is_builtin_memory_tool(name)
+        || crate::application::workflow::escalation::tools::EscalationTool::parse(name).is_some()
         || name == crate::application::local_agents::workflow::KIND
 }
 
 /// The fixed argument and result contracts. Each result is the success shape or the typed error
 /// `tools::tool_error` returns, so a committed refusal is a valid receipt.
-pub fn provisioning_tool_schemas(kind: ProvisioningKind) -> (Value, Value) {
-    let success = match kind {
-        ProvisioningKind::ListAgents => json!({
-            "type": "object",
-            "properties": {
-                "agents": {"type": "array", "maxItems": MAX_LISTED_AGENTS, "items": {
-                    "type": "object",
-                    "properties": {
-                        "slug": {"type": "string"},
-                        "name": {"type": "string", "maxLength": MAX_LISTED_NAME_CHARS},
-                        "description": {"type": ["string", "null"],
-                            "maxLength": MAX_LISTED_DESCRIPTION_CHARS},
-                        "provider": {"type": ["string", "null"]},
-                        "model": {"type": ["string", "null"]},
-                        "departments": {"type": "array", "maxItems": MAX_LISTED_DEPARTMENTS,
-                            "items": {
-                                "type": "object",
-                                "properties": {
-                                    "slug": {"type": "string"},
-                                    "name": {"type": "string", "maxLength": MAX_LISTED_NAME_CHARS},
-                                    "roles": {"type": "array", "items": {"enum": DepartmentRole::ALL
-                                        .map(DepartmentRole::as_str)}}
-                                },
-                                "required": ["slug", "name", "roles"],
-                                "additionalProperties": false
-                            }},
-                        "desk": {"type": ["object", "null"],
-                            "properties": {"id": {"type": "string"}, "address": {"type": "string"}},
-                            "required": ["id", "address"], "additionalProperties": false}
-                    },
-                    "required": ["slug", "name", "description", "provider", "model", "departments",
-                        "desk"],
-                    "additionalProperties": false
-                }},
-                "models": {"type": "array", "maxItems": MAX_LISTED_MODELS, "items": {
-                    "type": "object",
-                    "properties": {"provider": {"type": "string"}, "model": {"type": "string"}},
-                    "required": ["provider", "model"],
-                    "additionalProperties": false
-                }},
-                // More agents or models exist than the listing holds.
-                "truncated": {"type": "boolean"}
-            },
-            "required": ["agents", "models", "truncated"],
-            "additionalProperties": false
-        }),
-        ProvisioningKind::CreateAgentChannel => json!({
-            "type": "object",
-            "properties": {
-                "agent": {"type": "object",
-                    "properties": {"id": {"type": "string"}, "slug": {"type": "string"}},
-                    "required": ["id", "slug"], "additionalProperties": false},
-                "channel": {"type": "object",
-                    "properties": {"id": {"type": "string"}, "slug": {"type": "string"},
-                        "address": {"type": "string"}},
-                    "required": ["id", "slug", "address"], "additionalProperties": false},
-                "workflow_id": {"type": "string"},
-                "version_id": {"type": "string"},
-                "binding_id": {"type": "string"},
-                "reply_mode": {"enum": ["autonomous", "reviewed"]}
-            },
-            "required": ["agent", "channel", "workflow_id", "version_id", "binding_id", "reply_mode"],
-            "additionalProperties": false
-        }),
-    };
-    let input = match kind {
-        ProvisioningKind::ListAgents => json!({
-            "type": "object",
-            "properties": {
-                "department": {"type": "string", "minLength": 1, "maxLength": 64,
-                    "description": "Slug of a department: only its members and role holders are listed."}
-            },
-            "additionalProperties": false
-        }),
-        ProvisioningKind::CreateAgentChannel => json!({
-            "type": "object",
-            "properties": {
-                "name": {"type": "string", "minLength": 1, "maxLength": 120},
-                "slug": {"type": "string", "minLength": 1, "maxLength": 64},
-                "description": {"type": "string", "maxLength": 500},
-                "system_prompt": {"type": "string", "minLength": 1, "maxLength": 32768},
-                "provider": {"type": "string", "minLength": 1, "maxLength": 64},
-                "model": {"type": "string", "minLength": 1, "maxLength": 128},
-                "reply_mode": {"enum": ["autonomous", "reviewed"]},
-                "channel_slug": {"type": "string", "minLength": 1, "maxLength": 64,
-                    "description": "The desk to answer. The agent always gets its own autonomous desk at its slug; name another address for a reviewed desk or one with steps."},
-                "channel_name": {"type": "string", "minLength": 1, "maxLength": 120},
-                "department": {"type": "string", "minLength": 1, "maxLength": 64,
-                    "description": "Slug of the department the agent joins as a member. Omitted, the agent joins your department when you belong to exactly one."},
-                "role": {"enum": ["lead"],
-                    "description": "A role the agent holds in that department; needs department."},
-                "tools": {"type": "array", "maxItems": 32,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 128}},
-                "skills": {"type": "array", "maxItems": 16,
-                    "items": {"type": "string", "minLength": 1, "maxLength": 128}},
-                "steps": {"type": "array", "maxItems": MAX_CUSTOM_STEPS,
-                    "description": "Optional workflow steps added to the base, which reads the thread history, runs the new agent and sends its reply. A before_draft step's output reaches the agent as untrusted_<id>. Routes name only $next or $end and default to {success: $next}.",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "id": {"type": "string", "minLength": 1, "maxLength": 64,
-                                "pattern": "^[A-Za-z_][A-Za-z0-9_-]*$"},
-                            "slot": {"enum": ["before_draft", "before_reply", "after_reply"]},
-                            "type": {"enum": BUILDER_STEP_TYPES},
-                            "with": {"type": "object"},
-                            "rule": {"type": "object"},
-                            "routes": {"type": "object"}
-                        },
-                        "required": ["id", "slot", "type", "with"],
-                        "additionalProperties": false
-                    }}
-            },
-            "required": ["name", "slug", "system_prompt", "provider", "model", "reply_mode"],
-            "additionalProperties": false
-        }),
-    };
-    let error = json!({
-        "type": "object",
-        "properties": {"error": {
-            "type": "object",
-            "properties": {
-                "code": {"enum": [PROVISIONING_FORBIDDEN, PROVISIONING_CONFLICT, PROVISIONING_INVALID]},
-                "message": {"type": "string", "maxLength": MAX_REFUSAL_MESSAGE}
-            },
-            "required": ["code", "message"],
-            "additionalProperties": false
-        }},
-        "required": ["error"],
-        "additionalProperties": false
-    });
-    (input, json!({"oneOf": [success, error]}))
-}
+#[path = "provisioning_schemas.rs"]
+mod schemas;
+pub use schemas::provisioning_tool_schemas;
 
 /// The trusted built-in snapshot for one provisioning kind: fixed schemas, no connection slot,
 /// reconcile recovery and never an approval. Publication and dispatch verify snapshots against
@@ -301,10 +177,10 @@ impl ReplyMode {
     }
 }
 
-/// `create_agent_channel` arguments, already valid against the input schema.
+/// `create_agent` arguments, already valid against the input schema.
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct CreateAgentChannel {
+pub struct CreateAgent {
     pub name: String,
     pub slug: String,
     #[serde(default)]
@@ -312,11 +188,6 @@ pub struct CreateAgentChannel {
     pub system_prompt: String,
     pub provider: String,
     pub model: String,
-    pub reply_mode: ReplyMode,
-    #[serde(default)]
-    pub channel_slug: Option<String>,
-    #[serde(default)]
-    pub channel_name: Option<String>,
     /// The slug of the department the agent joins (plan 01-departments 03C item 0).
     #[serde(default)]
     pub department: Option<String>,
@@ -327,11 +198,25 @@ pub struct CreateAgentChannel {
     pub tools: Vec<String>,
     #[serde(default)]
     pub skills: Vec<String>,
-    /// Added to the reply mode's workflow, in their slots.
+}
+impl CreateAgent {
+    pub fn parse(arguments: &Value) -> AppResult<Self> {
+        serde_json::from_value(arguments.clone()).map_err(|_| invalid())
+    }
+}
+
+/// An explicitly named shared intake desk for an existing agent.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct CreateDeskForAgent {
+    pub agent_slug: String,
+    pub channel_slug: String,
+    pub channel_name: String,
+    pub reply_mode: ReplyMode,
     #[serde(default)]
     pub steps: Vec<CustomStep>,
 }
-impl CreateAgentChannel {
+impl CreateDeskForAgent {
     pub fn parse(arguments: &Value) -> AppResult<Self> {
         serde_json::from_value(arguments.clone()).map_err(|_| invalid())
     }

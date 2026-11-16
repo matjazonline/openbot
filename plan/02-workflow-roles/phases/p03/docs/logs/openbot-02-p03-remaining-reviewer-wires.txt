@@ -1,0 +1,2 @@
+src/application/workflow/compiler/role_selection_tests.rs:79:    assert_eq!(parse_reviewers(&json!([{"kind":"principal","id":principal.as_uuid()},{"kind":"principal","id":principal.as_uuid()},"reviewer","reviewer"])).unwrap().len(),2);
+src/application/workflow/compiler/role_selection_tests.rs:80:    assert!(parse_reviewers(&json!([{"kind":"user","id":principal.as_uuid()}])).is_err());

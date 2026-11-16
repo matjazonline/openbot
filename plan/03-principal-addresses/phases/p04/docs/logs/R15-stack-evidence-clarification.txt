@@ -1,0 +1,6 @@
+R15 focused launch retained six PASS, original command and database environment identities,
+but did not retain RUST_MIN_STACK. Withdraw the claim that this focused run establishes the
+default 2MiB stack. Its thread stack environment is unrecorded. No actual failure or source
+change is implied. Historical full stock-stack proof remains valid only for the unchanged
+production Rust/Cargo/migrations/Darwin projection; current fixture-only corrections retain
+their six-case normal-behavior proof. The original preflight is preserved as historical evidence.

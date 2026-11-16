@@ -1,4 +1,7 @@
 use super::*;
+
+#[path = "decision_business_member_tests.rs"]
+mod business_member_tests;
 use crate::adapters::persistence::test_support::wait_until_a_backend_is_blocked;
 use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
@@ -340,7 +343,7 @@ async fn workflow_decision_submission_blocks_actual_removal_until_commit() {
     );
     removal.await.unwrap().unwrap();
     let read = history(&f, &view).await;
-    assert_eq!(read.reviewers, f.users);
+    assert_eq!(read.reviewers, f.principals);
     assert!(read.submission.is_some());
 }
 
@@ -369,7 +372,7 @@ async fn workflow_decision_principal_conversion_before_submit_refuses() {
     );
     assert!(matches!(result, Err(AppError::NotFound(_))));
     hidden(&f, &view, f.actor(0)).await;
-    assert_eq!(history(&f, &view).await.reviewers, f.users);
+    assert_eq!(history(&f, &view).await.reviewers, f.principals);
 }
 
 #[tokio::test]
@@ -408,7 +411,7 @@ async fn workflow_decision_park_blocks_actual_removal_until_notice_commit() {
         )
         .await
         .unwrap();
-    assert_eq!(read.reviewers, f.users);
+    assert_eq!(read.reviewers, f.principals);
 }
 
 #[tokio::test]

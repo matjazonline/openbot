@@ -39,68 +39,13 @@ pub(super) fn prelock_on(
     prelock_accounts_on(db, scope, None)
 }
 
-pub(super) async fn prelock_accounts_on(
-    tx: &mut PgConnection,
-    scope: ActionScope,
-    reviewer: Option<WorkflowActor>,
-) -> AppResult<Option<WorkflowActor>> {
-    prelock_accounts_with_locks_on(tx, scope, reviewer, super::row_locks::RowLocks::Wait).await
-}
-
-pub(super) async fn prelock_accounts_with_locks_on(
-    tx: &mut PgConnection,
-    scope: ActionScope,
-    reviewer: Option<WorkflowActor>,
-    locks: super::row_locks::RowLocks,
-) -> AppResult<Option<WorkflowActor>> {
-    let actor: Option<Uuid> =
-        sqlx::query_scalar("SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2")
-            .bind(scope.company.as_uuid())
-            .bind(scope.run.as_uuid())
-            .fetch_optional(&mut *tx)
-            .await?;
-    let Some(actor) = actor else { return Ok(None) };
-    // Provisioning may act for a signed-in message author instead of the run owner.
-    // Both accounts precede the company lock; this hint never authorizes the effect.
-    let requester = super::provisioning::requester_on(tx, scope).await?;
-    let mut accounts = vec![actor];
-    if let Some(requester) = requester {
-        accounts.push(requester.user_id());
-    }
-    if let Some(reviewer) = reviewer {
-        accounts.push(reviewer.user_id());
-    }
-    let policy: Option<Value> = sqlx::query_scalar("SELECT context.approval_policy FROM channel_reply_runs AS owned \
-        JOIN channel_reply_contexts AS context USING(company_id,intent_id) WHERE owned.company_id=$1 AND owned.run_id=$2 AND context.approval_policy IS NOT NULL")
-        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_optional(&mut *tx).await?;
-    if let Some(policy) = policy {
-        let policy: crate::application::workflow::channel_reply::ReplyApprovalPolicy =
-            serde_json::from_value(policy).map_err(|_| invalid())?;
-        accounts.extend_from_slice(policy.reviewers());
-    }
-    accounts.sort_unstable();
-    accounts.dedup();
-    let locked: Vec<Uuid> = sqlx::query_scalar(
-        &locks.sql("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE"),
-    )
-    .bind(&accounts)
-    .fetch_all(&mut *tx)
-    .await?;
-    if !locked.contains(&actor) {
-        return Err(missing());
-    }
-    let actor = WorkflowActor::authenticated(actor)?;
-    match authority::authorize_company_with_locks(tx, scope.company, actor, locks).await {
-        Ok(_) => {
-            if super::provisioning::requester_on(tx, scope).await? != requester {
-                return Err(conflict());
-            }
-            Ok(Some(actor))
-        }
-        Err(AppError::NotFound(_)) => Ok(None),
-        Err(error) => Err(error),
-    }
-}
+#[path = "action_account_hints.rs"]
+mod account_hints;
+pub(super) use account_hints::{
+    AccountPrefix, ActorAccountHints, actor_hints_on, prelock_accounts_on,
+    prelock_accounts_with_locks_on, prelock_dispatch_on, prelock_live_on, prelock_message_on,
+    prelock_native_on, prelock_reply_on,
+};
 
 pub(super) enum RunPhase {
     Claimed,

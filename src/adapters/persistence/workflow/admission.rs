@@ -44,6 +44,9 @@ impl WorkflowAdmission for PostgresPersistence {
             return Ok(AdmissionResult::Stale);
         }
         let source = SourceKey::from_trigger(command.trigger());
+        if let Some(replay) = admission_refusal::resolve_on(&mut tx, command, &source).await? {
+            return finish_refusal_replay(tx, command, replay).await;
+        }
         if let Some(result) = admission_replay::resolve(&mut tx, command, &source).await? {
             if let AdmissionResult::Replayed(run) = result
                 && !settle_claim(&mut tx, command, run).await?
@@ -61,7 +64,16 @@ impl WorkflowAdmission for PostgresPersistence {
         }
         authorize_token_reviewers(&mut tx, command).await?;
         resources::check_readiness(&mut tx, command.binding().as_ref().into()).await?;
-        admission_write::create(&mut tx, command, &source).await?;
+        if let Err(error) = admission_write::create(&mut tx, command, &source).await {
+            if let AppError::WorkflowRole(refusal) = &error {
+                if !admission_refusal::record_on(&mut tx, command, &source, refusal).await? {
+                    tx.rollback().await?;
+                    return Ok(AdmissionResult::Stale);
+                }
+                tx.commit().await?;
+            }
+            return Err(error);
+        }
         if !settle_claim(&mut tx, command, command.proposed_run_id()).await? {
             tx.rollback().await?;
             return Ok(AdmissionResult::Stale);
@@ -72,7 +84,7 @@ impl WorkflowAdmission for PostgresPersistence {
     }
 }
 
-async fn claim_holds(
+pub(super) async fn claim_holds(
     tx: &mut Transaction<'_, Postgres>,
     command: &PreparedAdmission,
 ) -> AppResult<bool> {
@@ -89,17 +101,14 @@ async fn claim_holds(
             let TriggerSource::Message { message_id } = command.trigger().source() else {
                 return Ok(false);
             };
-            let RelatedAssociation::Thread {
-                channel_id,
-                thread_id,
-            } = command.association()
-            else {
+            let RelatedAssociation::Thread { target, thread_id } = command.association() else {
                 return Ok(false);
             };
             Ok(sqlx::query_scalar::<_, Uuid>(
                 "SELECT id FROM workflow_message_intents WHERE company_id=$1 AND id=$2 \
                  AND state='claimed' AND worker_id=$3 AND claim_generation=$4 \
-                 AND message_id=$5 AND channel_id=$6 AND thread_id=$7 \
+                 AND message_id=$5 AND channel_id IS NOT DISTINCT FROM $6::uuid AND thread_id=$7 \
+                 AND principal_id IS NOT DISTINCT FROM $8::uuid \
                  AND lease_expires_at > clock_timestamp() FOR UPDATE",
             )
             .bind(claim.company.as_uuid())
@@ -107,8 +116,9 @@ async fn claim_holds(
             .bind(claim.worker.0)
             .bind(claim.generation)
             .bind(message_id.as_uuid())
-            .bind(channel_id.as_uuid())
+            .bind(target.desk_id())
             .bind(thread_id.as_uuid())
+            .bind(target.principal_id().map(|id| id.as_uuid()))
             .fetch_optional(&mut **tx)
             .await?
             .is_some())
@@ -125,6 +135,24 @@ async fn claim_holds(
                  AND materialization_generation=$4 AND materialization_lock_expires_at > clock_timestamp() FOR UPDATE",
             ).bind(claim.company.as_uuid()).bind(claim.occurrence).bind(claim.worker.0)
                 .bind(claim.generation).fetch_optional(&mut **tx).await?.is_some())
+        }
+    }
+}
+
+async fn finish_refusal_replay(
+    mut tx: Transaction<'_, Postgres>,
+    command: &PreparedAdmission,
+    replay: admission_refusal::RefusalReplay,
+) -> AppResult<AdmissionResult> {
+    match replay {
+        admission_refusal::RefusalReplay::Conflict => Ok(AdmissionResult::Conflict),
+        admission_refusal::RefusalReplay::Refused { refusal, revision } => {
+            if !admission_refusal::settle_replay_on(&mut tx, command, &refusal, revision).await? {
+                tx.rollback().await?;
+                return Ok(AdmissionResult::Stale);
+            }
+            tx.commit().await?;
+            Err(AppError::WorkflowRole(refusal))
         }
     }
 }
@@ -187,7 +215,15 @@ async fn authorize_token_reviewers(
     db: &mut PgConnection,
     command: &PreparedAdmission,
 ) -> AppResult<()> {
-    for user in token_reviewers(command) {
+    for principal in token_reviewers(command) {
+        let user: Uuid = sqlx::query_scalar(
+            "SELECT user_id FROM principals WHERE company_id=$1 AND id=$2 AND kind='person'",
+        )
+        .bind(command.company_id().as_uuid())
+        .bind(principal)
+        .fetch_optional(&mut *db)
+        .await?
+        .ok_or_else(missing)?;
         let actor = WorkflowActor::authenticated(user).map_err(|_| invalid())?;
         let reviewer = authority::authorize_reviewer_on(db, command.company_id(), actor).await?;
         if !reviewer.privileged {
@@ -219,6 +255,9 @@ async fn verify_current(
     tx: &mut Transaction<'_, Postgres>,
     command: &PreparedAdmission,
 ) -> AppResult<bool> {
+    if !super::escalation_handling::binding_matches_on(tx, command).await? {
+        return Ok(false);
+    }
     // The company lock serializes lifecycle edits; the row lock additionally
     // closes direct head deletion/update races until this admission commits.
     let exists = sqlx::query_scalar::<_, Uuid>(
@@ -257,6 +296,7 @@ async fn verify_current(
         || current.configuration.resources() != selected.resources()
         || current.configuration.run_as() != selected.run_as()
         || current.configuration.message_trigger() != selected.message_trigger()
+        || current.configuration.escalation() != selected.escalation()
         || store_bundle(current.configuration.bundle())? != store_bundle(selected.bundle())?
     {
         return Ok(false);
@@ -266,15 +306,7 @@ async fn verify_current(
 }
 
 fn within_association(binding: RelatedAssociation, run: RelatedAssociation) -> bool {
-    match (binding, run) {
-        (RelatedAssociation::Company, _) => true,
-        (RelatedAssociation::Channel(expected), RelatedAssociation::Channel(actual))
-        | (
-            RelatedAssociation::Channel(expected),
-            RelatedAssociation::Thread {
-                channel_id: actual, ..
-            },
-        ) => expected == actual,
-        (expected, actual) => expected == actual,
-    }
+    binding == RelatedAssociation::Company
+        || binding == run
+        || (binding.thread_id().is_none() && binding.target() == run.target())
 }

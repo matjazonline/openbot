@@ -1,0 +1,7 @@
+{
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_actual_source_retention_closes_pending_and_claimed_private_intents_without_fanout",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::workflow_escalation_origin_former_root_retention_keeps_the_one_root_seal"
+  ],
+  "removed": []
+}

@@ -1,0 +1,527 @@
+721:        company_id, source_kind, source_id, action_kind, source_generation, actor_principal_id
+828:         WHERE company_id = OLD.company_id AND channel_id IS NOT DISTINCT FROM OLD.channel_id AND principal_id IS NOT DISTINCT FROM OLD.principal_id AND id = OLD.thread_id
+849:    IF COALESCE(NEW.channel_id, OLD.channel_id) IS NULL
+850:        AND COALESCE(NEW.principal_id, OLD.principal_id) IS NULL THEN
+894:    channel_id uuid NOT NULL,
+895:    principal_id uuid NOT NULL,
+990:                  AND permission.channel_id=checked_channel AND permission.principal_id=checked_principal AND permission.capability='view')))))
+1005:        (row_data->>'channel_id')::UUID,
+1036:           notification.recipient_principal_id IS NULL
+1039:               notification.channel_id, notification.principal_id,
+1040:               notification.recipient_principal_id
+1043:               notification.company_id,notification.source_id,notification.recipient_principal_id))
+1061:     WHERE company_id = OLD.company_id AND recipient_principal_id = OLD.id
+1100:    channel UUID := NULLIF(row_data->>'channel_id', '')::UUID;
+1101:    principal UUID := NULLIF(row_data->>'principal_id', '')::UUID;
+1152:        note_channel := NEW.channel_id;
+1153:        note_principal := NEW.principal_id;
+1156:        SELECT thread_id, channel_id, company_id, principal_id
+1183:            'target', CASE WHEN NEW.channel_id IS NOT NULL
+1184:                THEN json_build_object('kind','desk','id',NEW.channel_id)
+1185:                ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
+1206:            'target', CASE WHEN NEW.channel_id IS NOT NULL
+1207:                THEN json_build_object('kind','desk','id',NEW.channel_id)
+1208:                ELSE json_build_object('kind','principal','id',NEW.principal_id) END,
+1502:    IF (NEW.company_id, NEW.id, NEW.channel_id, NEW.principal_id, NEW.thread_id) IS DISTINCT FROM
+1503:       (OLD.company_id, OLD.id, OLD.channel_id, OLD.principal_id, OLD.thread_id) THEN
+1587:    IF NEW.channel_id IS DISTINCT FROM OLD.channel_id THEN
+1711:        SELECT schedule.company_id, schedule.channel_id, schedule.binding_id
+1717:           OR (NEW.channel_id IS NOT NULL AND NEW.channel_id <> owner_channel)
+1723:        NEW.channel_id := owner_channel;
+1726:        IF (NEW.company_id, NEW.channel_id, NEW.binding_id, NEW.schedule_id,
+1729:           (OLD.company_id, OLD.channel_id, OLD.binding_id, OLD.schedule_id,
+1747:          AND run.trigger_id = NEW.id AND run.channel_id = NEW.channel_id AND run.thread_id IS NULL
+1870:    SELECT run.channel_id, run.principal_id, run.thread_id INTO run_channel, run_principal, run_thread
+1886:    IF NEW.channel_id IS DISTINCT FROM run_channel OR NEW.principal_id IS DISTINCT FROM run_principal OR NEW.thread_id IS DISTINCT FROM run_thread THEN
+1927:       AND notification.channel_id = changed_channel
+1930:           notification.recipient_principal_id IS NULL
+1933:               notification.channel_id,
+1934:               notification.recipient_principal_id
+3069:CREATE FUNCTION public.workflow_decision_person_snapshot(company uuid, principal_id uuid) RETURNS uuid
+3075:        WHERE principal.company_id=company AND principal.id=principal_id AND principal.kind='person'
+3087:    PERFORM workflow_decision_person_snapshot(NEW.company_id, NEW.author_principal_id);
+3108:    snapshot_user := workflow_decision_person_snapshot(NEW.company_id, NEW.principal_id);
+3111:        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id;
+3121:            AND delivery.purpose='notification' AND delivery.company_id=NEW.company_id AND delivery.channel_id IS NULL
+3125:                || ':principal:' || NEW.principal_id || ':')) THEN
+3579:    channel_id uuid,
+3580:    principal_id uuid,
+3596:    CONSTRAINT background_tasks_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+3639:    channel_id uuid,
+3640:    principal_id uuid,
+3654:    CONSTRAINT channel_bindings_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+3656:        principal_id IS NULL OR (transport = 'email' AND installation_id IS NULL AND access_policy = 'target_acl')
+3679:    channel_id uuid NOT NULL,
+3682:    binding_channel_id uuid,
+3683:    binding_company_wide boolean GENERATED ALWAYS AS ((binding_channel_id IS NULL)) STORED NOT NULL,
+3694:    CONSTRAINT channel_schedules_binding_channel_check CHECK (((binding_channel_id IS NULL) OR (binding_channel_id = channel_id))),
+3712:    channel_id uuid,
+3713:    principal_id uuid,
+3718:    CONSTRAINT addresses_target_check CHECK ((((target_kind = 'desk'::text) AND (channel_id IS NOT NULL) AND (principal_id IS NULL)) OR ((target_kind = 'principal'::text) AND (principal_id IS NOT NULL) AND (channel_id IS NULL) AND is_primary)))
+3891:    channel_id uuid,
+3892:    principal_id uuid,
+3898:    CONSTRAINT external_threads_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+4003:    actor_principal_id uuid NOT NULL,
+4015:    channel_id uuid,
+4016:    principal_id uuid,
+4022:    author_principal_id uuid NOT NULL,
+4026:    CONSTRAINT internal_notes_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+4040:    channel_id uuid,
+4041:    principal_id uuid,
+4069:    CONSTRAINT message_deliveries_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+4071:    CONSTRAINT message_deliveries_attribution_check CHECK ((((num_nonnulls(channel_id, principal_id) = 1) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((num_nonnulls(channel_id, principal_id) = 0) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text)))),
+4146:    author_principal_id uuid NOT NULL,
+4185:    actor_principal_id uuid,
+4225:    recipient_principal_id uuid,
+4231:    channel_id uuid,
+4232:    principal_id uuid,
+4239:    CONSTRAINT notifications_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+4254:    principal_id uuid NOT NULL,
+4387:    channel_id uuid NOT NULL,
+4528:    channel_id uuid,
+4529:    principal_id uuid,
+4534:    CONSTRAINT thread_messages_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+4545:    channel_id uuid,
+4546:    target_principal_id uuid,
+4548:    principal_id uuid NOT NULL,
+4551:    CONSTRAINT thread_principals_address_target_check CHECK (num_nonnulls(channel_id, target_principal_id) = 1),
+4563:    channel_id uuid,
+4564:    principal_id uuid,
+4568:    CONSTRAINT threads_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
+5140:    channel_id uuid,
+5141:    principal_id uuid,
+5144:    company_wide boolean GENERATED ALWAYS AS ((channel_id IS NULL AND principal_id IS NULL)) STORED NOT NULL,
+5145:    CONSTRAINT workflow_bindings_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+5147:    CONSTRAINT workflow_bindings_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
+5233:    author_principal_id uuid NOT NULL,
+5252:    principal_id uuid NOT NULL,
+5434:    channel_id uuid,
+5435:    principal_id uuid,
+5439:    CONSTRAINT workflow_history_members_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+5598:    destination_channel_id uuid,
+5601:    destination_id uuid GENERATED ALWAYS AS (COALESCE(destination_channel_id, destination_user_id, replied_message_id)) STORED NOT NULL,
+5602:    channel_id uuid,
+5603:    target_principal_id uuid,
+5607:    principal_id uuid,
+5611:    CONSTRAINT workflow_message_destinations_address_target_check CHECK (num_nonnulls(channel_id, target_principal_id) = 1),
+5612:    CONSTRAINT workflow_message_destinations_check CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (principal_id IS NOT NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))))),
+5615:    CONSTRAINT workflow_message_destinations_target_check CHECK ((((kind = 'channel'::text) AND (destination_channel_id = channel_id) AND (destination_user_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'user'::text) AND (destination_user_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'reply'::text) AND (replied_message_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (destination_user_id IS NULL)))),
+5671:    channel_id uuid,
+5672:    principal_id uuid,
+5680:    responder_principal_id uuid,
+5695:    CONSTRAINT workflow_message_intents_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1),
+5929:    channel_id uuid,
+5930:    principal_id uuid,
+5953:    CONSTRAINT workflow_runs_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+5964:    CONSTRAINT workflow_runs_check CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL))),
+6152:    ADD CONSTRAINT channel_bindings_channel_transport_key UNIQUE (company_id, channel_id, id, transport);
+6159:    ADD CONSTRAINT channel_bindings_channel_key UNIQUE (company_id, channel_id, id);
+6175:    ADD CONSTRAINT channel_principal_grants_pkey PRIMARY KEY (company_id, channel_id, principal_id, capability, provenance);
+6666:-- Name: participant_identities participant_identities_company_principal_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+6670:    ADD CONSTRAINT participant_identities_company_principal_id_key UNIQUE (company_id, principal_id, id);
+6821:    ADD CONSTRAINT thread_messages_channel_message_key UNIQUE (channel_id, message_id);
+6853:    ADD CONSTRAINT thread_messages_workflow_history_key UNIQUE (company_id, channel_id, thread_id, message_id);
+6861:    ADD CONSTRAINT thread_principals_pkey PRIMARY KEY (company_id, channel_id, thread_id, principal_id, role);
+6865:-- Name: threads threads_channel_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+6869:    ADD CONSTRAINT threads_channel_id_key UNIQUE (channel_id, id);
+6873:-- Name: threads threads_company_channel_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+6877:    ADD CONSTRAINT threads_company_channel_id_key UNIQUE (company_id, channel_id, id);
+7276:    ADD CONSTRAINT workflow_bindings_channel_key UNIQUE (company_id, channel_id, id);
+7315:    ADD CONSTRAINT workflow_decision_comment_command UNIQUE (company_id, decision_id, author_principal_id, command_key);
+7347:    ADD CONSTRAINT workflow_decision_reviewers_pkey PRIMARY KEY (company_id, decision_id, principal_id);
+7600:    ADD CONSTRAINT workflow_message_intents_association_key UNIQUE (company_id, message_id, channel_id);
+7724:-- Name: workflow_runs workflow_runs_company_id_id_channel_id_thread_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+7728:    ADD CONSTRAINT workflow_runs_company_id_id_channel_id_thread_id_key UNIQUE (company_id, id, channel_id, thread_id);
+7758:CREATE INDEX workflow_runs_open_by_channel ON public.workflow_runs(company_id, channel_id, state) WHERE state IN ('queued', 'running', 'waiting');
+7880:CREATE INDEX background_tasks_company_channel_created_idx ON public.background_tasks USING btree (company_id, channel_id, created_at DESC, id DESC);
+7936:CREATE UNIQUE INDEX channel_bindings_canonical_deployment_idx ON public.channel_bindings USING btree (company_id, channel_id, transport) WHERE ((installation_id IS NULL) AND (status = ANY (ARRAY['active'::text, 'paused'::text])));
+7940:-- Name: channel_bindings_channel_idx; Type: INDEX; Schema: public; Owner: -
+7943:CREATE INDEX channel_bindings_channel_idx ON public.channel_bindings USING btree (company_id, channel_id, transport, status);
+7968:-- Name: channel_principal_grants_principal_idx; Type: INDEX; Schema: public; Owner: -
+7971:CREATE INDEX channel_principal_grants_principal_idx ON public.channel_principal_grants USING btree (company_id, principal_id, channel_id, capability);
+7975:-- Name: channel_schedules_channel_idx; Type: INDEX; Schema: public; Owner: -
+7978:CREATE INDEX channel_schedules_channel_idx ON public.channel_schedules USING btree (channel_id, created_at DESC, id DESC);
+8006:CREATE UNIQUE INDEX addresses_desk_primary_idx ON public.addresses USING btree (company_id, channel_id) WHERE (is_primary AND (channel_id IS NOT NULL));
+8010:-- Name: addresses_channel_idx; Type: INDEX; Schema: public; Owner: -
+8013:CREATE INDEX addresses_channel_idx ON public.addresses USING btree (company_id, channel_id) WHERE (channel_id IS NOT NULL);
+8020:CREATE UNIQUE INDEX addresses_principal_key ON public.addresses USING btree (company_id, principal_id) WHERE (principal_id IS NOT NULL);
+8160:CREATE INDEX message_deliveries_company_channel_created_idx ON public.message_deliveries USING btree (company_id, channel_id, created_at DESC, id DESC);
+8251:CREATE INDEX messages_author_idx ON public.messages USING btree (company_id, author_principal_id);
+8304:-- Name: participant_identities_principal_idx; Type: INDEX; Schema: public; Owner: -
+8307:CREATE INDEX participant_identities_principal_idx ON public.participant_identities USING btree (company_id, principal_id, created_at, id);
+8396:-- Name: thread_principals_principal_idx; Type: INDEX; Schema: public; Owner: -
+8399:CREATE INDEX thread_principals_principal_idx ON public.thread_principals USING btree (company_id, principal_id, thread_id, role);
+8406:CREATE INDEX threads_channel_updated_idx ON public.threads USING btree (channel_id, updated_at DESC, id DESC);
+8531:CREATE TRIGGER background_tasks_validate_workflow_association BEFORE INSERT OR UPDATE OF company_id, channel_id, principal_id, thread_id, workflow_execution_id ON public.background_tasks FOR EACH ROW EXECUTE FUNCTION public.validate_workflow_job_association();
+8684:CREATE TRIGGER schedule_channel_immutable BEFORE UPDATE OF channel_id ON public.channel_schedules FOR EACH ROW EXECUTE FUNCTION public.require_immutable_schedule_channel();
+9389:CREATE TRIGGER workflow_runs_preserve_association BEFORE UPDATE OF company_id, id, channel_id, principal_id, thread_id ON public.workflow_runs FOR EACH ROW EXECUTE FUNCTION public.preserve_workflow_run_association();
+9401:            'target', public.address_target_json(NEW.channel_id,NEW.principal_id),
+9528:    ADD CONSTRAINT background_tasks_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9544:    ADD CONSTRAINT background_tasks_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id);
+9568:    ADD CONSTRAINT channel_bindings_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9584:    ADD CONSTRAINT channel_principal_grants_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9592:    ADD CONSTRAINT channel_principal_grants_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9600:    ADD CONSTRAINT channel_schedules_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9623:    ADD CONSTRAINT channel_schedules_binding_channel_fk FOREIGN KEY (company_id, binding_channel_id, binding_id) REFERENCES public.workflow_bindings(company_id, channel_id, id) ON DELETE CASCADE;
+9631:    ADD CONSTRAINT addresses_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9639:    ADD CONSTRAINT addresses_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+9761:    ADD CONSTRAINT external_threads_binding_fk FOREIGN KEY (company_id, channel_id, binding_id) REFERENCES public.channel_bindings(company_id, channel_id, id) ON DELETE CASCADE;
+9769:    ADD CONSTRAINT external_threads_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+9809:    ADD CONSTRAINT internal_note_tombstones_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+9825:    ADD CONSTRAINT internal_notes_author_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+9849:    ADD CONSTRAINT internal_notes_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+9856:    ADD CONSTRAINT internal_notes_thread_message_fk FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+9864:    ADD CONSTRAINT message_deliveries_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+9888:    ADD CONSTRAINT message_deliveries_destination_binding_fk FOREIGN KEY (company_id, channel_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, channel_id, id, transport) ON DELETE CASCADE;
+9920:    ADD CONSTRAINT message_deliveries_source_binding_fk FOREIGN KEY (company_id, channel_id, source_binding_id) REFERENCES public.channel_bindings(company_id, channel_id, id) ON DELETE CASCADE;
+9968:    ADD CONSTRAINT messages_author_principal_fk FOREIGN KEY (company_id, author_principal_id) REFERENCES public.principals(company_id, id);
+9976:    ADD CONSTRAINT messages_authored_identity_author_fk FOREIGN KEY (company_id, author_principal_id, authored_identity_id) REFERENCES public.participant_identities(company_id, principal_id, id) ON DELETE SET NULL (authored_identity_id);
+10000:    ADD CONSTRAINT notification_events_actor_fk FOREIGN KEY (company_id, actor_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (actor_principal_id);
+10016:    ADD CONSTRAINT notifications_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+10049:    ADD CONSTRAINT notifications_recipient_fk FOREIGN KEY (company_id, recipient_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (recipient_principal_id);
+10068:    ADD CONSTRAINT participant_identities_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+10112:    ADD CONSTRAINT schedule_runs_channel_scope_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+10192:    ADD CONSTRAINT thread_messages_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+10200:    ADD CONSTRAINT thread_principals_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+10208:    ADD CONSTRAINT thread_principals_thread_fk FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id) ON DELETE CASCADE;
+10216:    ADD CONSTRAINT threads_channel_fk FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id) ON DELETE CASCADE;
+10728:-- Name: workflow_bindings workflow_bindings_company_id_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10732:    ADD CONSTRAINT workflow_bindings_company_id_channel_id_fkey FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id);
+10736:-- Name: workflow_bindings workflow_bindings_company_id_channel_id_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10740:    ADD CONSTRAINT workflow_bindings_company_id_channel_id_thread_id_fkey FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id);
+10873:-- Name: workflow_history_members workflow_history_members_company_id_channel_id_thread_id_m_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10877:    ADD CONSTRAINT workflow_history_members_company_id_channel_id_thread_id_m_fkey FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+10881:-- Name: workflow_history_members workflow_history_members_company_id_run_id_channel_id_thre_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+10885:    ADD CONSTRAINT workflow_history_members_company_id_run_id_channel_id_thre_fkey FOREIGN KEY (company_id, run_id, channel_id, thread_id) REFERENCES public.workflow_runs(company_id, id, channel_id, thread_id) ON DELETE CASCADE;
+10990:    ADD CONSTRAINT workflow_message_destination_message FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+11038:    ADD CONSTRAINT workflow_message_intent_association FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id) ON DELETE CASCADE;
+11054:    ADD CONSTRAINT workflow_message_intent_responder FOREIGN KEY (company_id, responder_principal_id) REFERENCES public.principals(company_id, id) ON DELETE SET NULL (responder_principal_id);
+11070:    ADD CONSTRAINT workflow_message_destination_principal FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+11078:    ADD CONSTRAINT workflow_message_destination_channel FOREIGN KEY (company_id, destination_channel_id) REFERENCES public.channels(company_id, id) DEFERRABLE INITIALLY DEFERRED;
+11092:    ADD CONSTRAINT workflow_message_destination_replied FOREIGN KEY (company_id, channel_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, channel_id, thread_id, message_id);
+11263:-- Name: workflow_runs workflow_runs_company_id_channel_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+11267:    ADD CONSTRAINT workflow_runs_company_id_channel_id_fkey FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id, id);
+11271:-- Name: workflow_runs workflow_runs_company_id_channel_id_thread_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+11275:    ADD CONSTRAINT workflow_runs_company_id_channel_id_thread_id_fkey FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES public.threads(company_id, channel_id, id);
+11836:    binding_revision, workflow_id, version_id, channel_id, principal_id, thread_id, actor_id, trigger_id,
+12839:    channel_id uuid,
+12840:    principal_id uuid,
+12846:    PRIMARY KEY (company_id, channel_id),
+12847:    FOREIGN KEY (company_id, channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE,
+12848:    FOREIGN KEY (company_id, channel_id, binding_id)
+12849:        REFERENCES public.workflow_bindings(company_id,channel_id,id) DEFERRABLE INITIALLY DEFERRED,
+12855:    CONSTRAINT channel_reply_settings_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
+12862:    channel_id uuid,
+12863:    principal_id uuid,
+12865:    responder_principal_id uuid,
+12879:    FOREIGN KEY (company_id,channel_id,thread_id,message_id)
+12880:        REFERENCES public.thread_messages(company_id,channel_id,thread_id,message_id) DEFERRABLE INITIALLY DEFERRED,
+12881:    FOREIGN KEY (company_id,responder_principal_id) REFERENCES public.principals(company_id,id)
+12885:    CONSTRAINT channel_reply_contexts_address_target_check CHECK (num_nonnulls(channel_id, principal_id) = 1)
+12909:        IF (EXISTS (SELECT 1 FROM public.channels WHERE company_id=OLD.company_id AND id=OLD.channel_id)
+12910:            OR EXISTS (SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.principal_id))
+12917:    IF TG_OP='UPDATE' AND ((NEW.company_id,NEW.channel_id,NEW.principal_id) IS DISTINCT FROM (OLD.company_id,OLD.channel_id,OLD.principal_id)
+12926:            AND binding.channel_id IS NOT DISTINCT FROM NEW.channel_id
+12927:            AND binding.principal_id IS NOT DISTINCT FROM NEW.principal_id AND binding.thread_id IS NULL AND binding.active
+12948:        WHERE channel.company_id=NEW.company_id AND channel.id=NEW.channel_id FOR SHARE;
+12950:        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id FOR SHARE;
+12953:            (company_id,intent_id,message_id,channel_id,thread_id,responder_principal_id,
+12954:             actor_id,delivery_policy,binding_id,binding_revision,settings_revision,contract,approval_policy,source,principal_id)
+12955:        SELECT NEW.company_id,NEW.id,NEW.message_id,NEW.channel_id,NEW.thread_id,NEW.responder_principal_id,
+12957:            settings.revision,settings.contract,settings.approval_policy,public.channel_reply_source(NEW),NEW.principal_id
+12960:            AND binding.id=settings.binding_id AND binding.channel_id IS NOT DISTINCT FROM settings.channel_id
+12961:            AND binding.principal_id IS NOT DISTINCT FROM settings.principal_id
+12964:        WHERE settings.company_id=NEW.company_id AND settings.channel_id IS NOT DISTINCT FROM NEW.channel_id
+12965:            AND settings.principal_id IS NOT DISTINCT FROM NEW.principal_id
+12993:            AND settings.channel_id IS NOT DISTINCT FROM intent.channel_id
+12994:            AND settings.principal_id IS NOT DISTINCT FROM intent.principal_id
+12998:            AND (intent.message_id,intent.channel_id,intent.principal_id,intent.thread_id,intent.delivery_policy)
+12999:                IS NOT DISTINCT FROM (NEW.message_id,NEW.channel_id,NEW.principal_id,NEW.thread_id,NEW.delivery_policy)
+13000:            AND intent.responder_principal_id IS NOT DISTINCT FROM NEW.responder_principal_id
+13054:            AND (run.binding_id,run.binding_revision,run.channel_id,run.principal_id,run.thread_id,run.trigger_id,run.actor_id,run.delivery_policy)
+13055:                IS NOT DISTINCT FROM (context.binding_id,context.binding_revision,context.channel_id,context.principal_id,context.thread_id,
+13380:            AND NEW.integrity_document->'target'=public.address_target_json(context.channel_id,context.principal_id)
+13388:                    AND NEW.route_snapshot->'targets'->0->'target'=public.address_target_json(context.channel_id,context.principal_id))
+13390:                    AND NEW.route_snapshot->'targets'->0->'sender'->'target'=public.address_target_json(context.channel_id,context.principal_id)
+13391:                    AND EXISTS(SELECT 1 FROM public.addresses AS alias WHERE alias.company_id=context.company_id AND alias.channel_id IS NOT DISTINCT FROM context.channel_id
+13392:                        AND alias.principal_id IS NOT DISTINCT FROM context.principal_id AND alias.is_primary
+13463:            AND filed.channel_id IS NOT DISTINCT FROM context.channel_id AND filed.principal_id IS NOT DISTINCT FROM context.principal_id AND filed.thread_id=context.thread_id
+13475:                    AND delivery.message_id=message.id AND delivery.channel_id IS NOT DISTINCT FROM context.channel_id AND delivery.principal_id IS NOT DISTINCT FROM context.principal_id
+13693:            AND source.author_principal_id=NEW.respondent_id
+13735:            AND question.message_id::text=NEW.correlation AND author.author_principal_id=question.respondent_id
+14183:        SELECT run.company_id,run.id,run.channel_id,run.principal_id,run.thread_id,run.state,run.waiting_reason
+14191:            'company_id',related.company_id,'target',public.address_target_json(related.channel_id,related.principal_id),'thread_id',related.thread_id,
+14195:                'company_id',related.company_id,'target',public.address_target_json(related.channel_id,related.principal_id),'thread_id',related.thread_id)::text);
+14256:    creator_principal_id uuid NOT NULL,
+14257:    live_creator_principal_id uuid,
+14259:    channel_id uuid,
+14260:    principal_id uuid,
+14264:    CONSTRAINT agent_history_sessions_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1),
+14266:        FOREIGN KEY (company_id,live_creator_principal_id) REFERENCES public.principals(company_id,id)
+14267:        ON DELETE SET NULL (live_creator_principal_id) DEFERRABLE INITIALLY DEFERRED,
+14268:    FOREIGN KEY (company_id,channel_id) REFERENCES public.channels(company_id,id),
+14269:    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+14270:    CHECK (thread_id IS NULL OR channel_id IS NOT NULL)
+14288:    channel_id uuid,
+14289:    principal_id uuid,
+14301:    FOREIGN KEY (company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+14304:    CHECK ((scope_kind='thread' AND channel_id IS NOT NULL AND thread_id IS NOT NULL
+14307:            AND channel_id IS NULL AND thread_id IS NULL AND child_run_id IS NULL)
+14309:            AND channel_id IS NULL AND thread_id IS NULL AND session_id IS NULL)),
+14310:    CONSTRAINT agent_history_conversations_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1)
+14313:    (company_id,agent_id,channel_id,thread_id) WHERE scope_kind='thread';
+14324:        IF OLD.live_creator_principal_id IS NOT NULL AND NEW.live_creator_principal_id IS NULL
+14325:            AND (to_jsonb(NEW)-'live_creator_principal_id') IS NOT DISTINCT FROM
+14326:                (to_jsonb(OLD)-'live_creator_principal_id')
+14328:                WHERE creator.company_id=OLD.company_id AND creator.id=OLD.live_creator_principal_id)
+14340:            AND creator.id=NEW.creator_principal_id AND creator.id=NEW.live_creator_principal_id
+14344:            AND NEW.channel_id IS NOT DISTINCT FROM run.channel_id
+14345:            AND NEW.principal_id IS NOT DISTINCT FROM run.principal_id
+14374:            AND session.channel_id IS NOT DISTINCT FROM run.channel_id
+14375:            AND session.principal_id IS NOT DISTINCT FROM run.principal_id
+14387:            AND intent.id=run.trigger_id AND intent.channel_id IS NOT DISTINCT FROM run.channel_id AND intent.principal_id IS NOT DISTINCT FROM run.principal_id AND intent.thread_id=run.thread_id
+14530:          OR (conversation.scope_kind='thread' AND run.channel_id IS NOT DISTINCT FROM conversation.channel_id AND run.principal_id IS NOT DISTINCT FROM conversation.principal_id AND run.thread_id=conversation.thread_id)
+14692:                    AND conversation.channel_id IS NOT DISTINCT FROM run.channel_id AND conversation.principal_id IS NOT DISTINCT FROM run.principal_id AND conversation.thread_id=run.thread_id
+15563:    principal_id uuid NOT NULL,
+15565:    CONSTRAINT department_members_pkey PRIMARY KEY (department_id, principal_id),
+15568:    CONSTRAINT department_members_principal_fk FOREIGN KEY (company_id, principal_id)
+15571:CREATE INDEX department_members_principal_idx ON public.department_members USING btree (company_id, principal_id);
+15577:    principal_id uuid NOT NULL,
+15579:    CONSTRAINT department_roles_pkey PRIMARY KEY (department_id, role, principal_id),
+15584:    CONSTRAINT department_roles_principal_fk FOREIGN KEY (company_id, principal_id)
+15590:CREATE INDEX department_roles_principal_idx ON public.department_roles USING btree (company_id, principal_id);
+15657:     WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id
+15660:        RAISE EXCEPTION 'principal % cannot belong to or hold a role in a department', NEW.principal_id
+15676:    IF NEW.principal_id IS NOT NULL THEN
+15678:         WHERE principal.company_id = NEW.company_id AND principal.id = NEW.principal_id
+15681:            RAISE EXCEPTION 'principal % cannot have an address', NEW.principal_id
+15687:CREATE TRIGGER guard_address_principal BEFORE INSERT OR UPDATE OF target_kind, channel_id, principal_id
+15696:         WHERE company_id = NEW.company_id AND principal_id = NEW.id;
+15709:     WHERE member.company_id = NEW.company_id AND member.principal_id = NEW.id;
+15711:     WHERE holder.company_id = NEW.company_id AND holder.principal_id = NEW.id;
+15717:         WHERE derived.company_id = NEW.company_id AND derived.principal_id = NEW.id
+15719:        RETURNING derived.channel_id
+15722:     WHERE channel.company_id = NEW.company_id AND channel.id IN (SELECT channel_id FROM removed);
+15942:    principal_id uuid NOT NULL,
+15946:    PRIMARY KEY (company_id,run_id,version_id,step,role,resolution_revision,principal_id),
+15971:COMMENT ON COLUMN public.workflow_run_role_bindings.principal_id IS
+15999:        IF canonical IS NULL OR NOT(canonical->'principals' @> jsonb_build_array(NEW.principal_id))
+16010:        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id FOR KEY SHARE;
+16098:        'department_id',resolution.item->'department_id','principal_id',holder.item->'principal_id',
+16100:        ORDER BY resolution.item->>'version_id',resolution.item->>'step',resolution.item->>'role',holder.item->>'principal_id'),'[]')
+16105:        'principal_id',principal_id,'agent_id',agent_id,'revision_id',agent_revision_id)
+16106:        ORDER BY version_id,step,role,principal_id),'[]') INTO actual
+16234:            JOIN public.principals AS principal ON principal.company_id=member.company_id AND principal.id=member.principal_id AND principal.kind='agent'
+16235:            WHERE member.company_id=tenant AND member.principal_id=target AND desk IS NULL
+16238:            JOIN public.principals AS principal ON principal.company_id=role.company_id AND principal.id=role.principal_id AND principal.kind='agent'
+16239:            WHERE role.company_id=tenant AND role.principal_id=target AND desk IS NULL
+16261:        CROSS JOIN LATERAL public.workflow_target_departments(run.company_id,run.channel_id,run.principal_id) AS department(id)
+16384:    SELECT coalesce(jsonb_agg(member.principal_id ORDER BY member.principal_id),'[]') INTO actual
+16474:    principal_id uuid NOT NULL,
+16480:    UNIQUE(company_id,decision_id,principal_id,assignment_revision),
+16481:    UNIQUE(company_id,decision_id,principal_id,assignment_revision,event_id),
+16496:    ADD CONSTRAINT workflow_reviewer_pending_notice FOREIGN KEY(company_id,decision_id,principal_id,notice_assignment_revision,notice_event_id)
+16497:        REFERENCES public.workflow_reviewer_notices(company_id,decision_id,principal_id,assignment_revision,event_id)
+16520:        LEFT JOIN public.channels AS channel ON channel.company_id=run.company_id AND channel.id=run.channel_id
+16522:          AND ((run.principal_id IS NOT NULL AND public.principal_direct_can_view(company,run.principal_id,principal.id))
+16523:            OR (run.principal_id IS NULL AND (tenant.user_id=principal.user_id OR (run.channel_id IS NULL AND run.principal_id IS NULL AND member.role IN ('owner','admin'))
+16524:            OR (run.channel_id IS NOT NULL AND (channel.access_mode IN ('team','public')
+16526:                AND access_grant.channel_id=run.channel_id AND access_grant.principal_id=principal.id
+16529:            AND thread.channel_id IS NOT DISTINCT FROM run.channel_id AND thread.principal_id IS NOT DISTINCT FROM run.principal_id AND thread.id=run.thread_id)))
+16605:            SELECT jsonb_build_object('principals',jsonb_agg(holder.principal_id ORDER BY holder.principal_id),'refusal',NULL) INTO captured
+16664:        person:=(member->>'principal_id')::uuid; ordinal:=(member->>'ordinal')::smallint;
+16666:        IF member IS DISTINCT FROM jsonb_build_object('principal_id',person,'ordinal',ordinal,'notice_event_id',event,
+16723:    SELECT coalesce(jsonb_agg(jsonb_build_object('principal_id',principal_id,'ordinal',ordinal,'reviewer_label',reviewer_label,
+16747:        AND event.source_generation=NEW.assignment_revision AND event.actor_principal_id IS NULL) OR NOT EXISTS (
+16751:          AND member.value->>'principal_id'=NEW.principal_id::text AND member.value->>'notice_event_id'=NEW.event_id::text
+16772:          AND original.value->>'principal_id'=member.principal_id::text;
+16776:        OR NOT public.workflow_follow_reviewer_eligible(member.company_id,run_identity,member.principal_id)
+16814:    ALTER COLUMN channel_id DROP NOT NULL,
+16831:    IF NEW.actor_principal_id IS DISTINCT FROM OLD.actor_principal_id AND NOT (
+16832:        NEW.actor_principal_id IS NULL AND OLD.actor_principal_id IS NOT NULL AND NOT EXISTS (
+16833:            SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.actor_principal_id)) THEN
+16862:    SELECT company_id,id,decision_id,principal_id,assignment_revision,event_id,source_kind,action_kind INTO source
+16868:        AND reviewer.decision_id=NEW.decision_id AND reviewer.principal_id=source.principal_id AND reviewer.notice_event_id=NEW.event_id) INTO is_current;
+16869:    SELECT public.workflow_follow_reviewer_eligible(NEW.company_id,decision.run_id,source.principal_id) INTO eligible
+16873:            AND event.status IN ('processing','projected') AND event.actor_principal_id IS NULL)
+16875:            SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND kind='person' AND user_id=viewer)))
+16885:              AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+16911:    principal_id uuid NOT NULL,
+16921:    UNIQUE(company_id,operation_id,principal_id,department_id,role)
+16929:        JOIN public.principals AS principal ON principal.company_id=holder.company_id AND principal.id=holder.principal_id
+16931:          AND holder.principal_id=NEW.principal_id AND holder.role=NEW.role
+16953:          AND principal_id=NEW.principal_id AND role=NEW.role) THEN
+16967:    INSERT INTO public.department_administration_events(company_id,operation_id,principal_id,principal_kind,principal_label,
+16973:        WHERE holder.company_id=previous.company_id AND holder.principal_id=previous.id;
+16991:    channel_id uuid,
+16992:    principal_id uuid,
+16999:    CHECK (thread_id IS NULL OR channel_id IS NOT NULL),
+17002:    FOREIGN KEY(company_id,channel_id) REFERENCES public.channels(company_id,id),
+17003:    FOREIGN KEY(company_id,channel_id,thread_id) REFERENCES public.threads(company_id,channel_id,id),
+17004:    CONSTRAINT workflow_admission_refusals_address_target_check CHECK (num_nonnulls(channel_id, principal_id) <= 1)
+17164:             FROM public.workflow_target_departments(refusal.company_id,refusal.channel_id,refusal.principal_id) AS department(id)) AS department_id,
+17261:    manual_principal_id uuid,
+17273:        AND manual_ordinal IS NULL AND manual_principal_id IS NULL AND manual_principal_kind IS NULL
+17276:        AND assignment_ordinal=manual_ordinal+2 AND manual_principal_id IS NOT NULL
+17352:    SELECT coalesce(jsonb_agg(jsonb_build_object('principal',selected.principal_id,'kind',selected.kind,'label',selected.label)
+17353:        ORDER BY selected.principal_id),'[]'::jsonb) INTO selected FROM (
+17354:        SELECT holder.principal_id,principal.kind,principal.display_label AS label
+17356:            ON principal.company_id=holder.company_id AND principal.id=holder.principal_id
+17358:        ORDER BY holder.principal_id LIMIT 17
+17474:    principal_id uuid NOT NULL,
+17483:    UNIQUE(company_id,decision_id,principal_id),
+17507:    SELECT assignment_kind,manual_principal_id,manual_principal_kind,manual_principal_label INTO assignment
+17511:        IF NEW.principal_id IS DISTINCT FROM assignment.manual_principal_id OR NEW.principal_kind IS DISTINCT FROM assignment.manual_principal_kind
+17518:        IF facts IS NULL OR NOT facts @> jsonb_build_array(jsonb_build_object('principal',NEW.principal_id,'kind',NEW.principal_kind,'label',NEW.principal_label)) THEN
+17617:        JOIN public.principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id
+17625:          AND public.notification_target_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),COALESCE(run.principal_id,refusal.principal_id),principal.id)
+17635:        IF (NEW.company_id,NEW.id,NEW.recipient_user_id,NEW.event_id,NEW.source_kind,NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id,NEW.principal_id)
+17636:            IS DISTINCT FROM (OLD.company_id,OLD.id,OLD.recipient_user_id,OLD.event_id,OLD.source_kind,OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id,OLD.principal_id)
+17637:            OR (NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+17638:                NEW.recipient_principal_id IS NULL AND NOT EXISTS (SELECT 1 FROM public.principals
+17639:                    WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id))) THEN
+17646:    SELECT notice.principal_id,notice.principal_kind,notice.event_id,COALESCE(run.channel_id,refusal.channel_id) AS channel_id,COALESCE(run.principal_id,refusal.principal_id) AS target_principal_id
+17653:        OR source.channel_id IS DISTINCT FROM NEW.channel_id OR source.target_principal_id IS DISTINCT FROM NEW.principal_id OR NEW.action_kind<>'escalation_review' OR NEW.source_generation<>1
+17654:        OR (NEW.recipient_principal_id IS NOT NULL AND source.principal_id IS DISTINCT FROM NEW.recipient_principal_id)
+17655:        OR (NEW.state='active' AND (NEW.recipient_principal_id IS NULL
+17660:                AND id=source.principal_id AND kind='person' AND user_id=NEW.recipient_user_id))) THEN
+17685:    SELECT company_id,id,case_id,decision_id,principal_id,principal_kind,principal_label,event_id,source_kind,action_kind,source_generation,created_at
+17687:    SELECT notification.id,notification.recipient_user_id,notification.recipient_principal_id,
+17689:        INTO projected.id,projected.recipient_user_id,projected.recipient_principal_id,
+17693:    SELECT actor_principal_id INTO actor FROM public.notification_events WHERE company_id=NEW.company_id AND id=NEW.event_id AND status IN ('processing','projected');
+17702:        OR projected.recipient_principal_id IS DISTINCT FROM source.principal_id OR projected.state<>'active'
+17703:        OR NOT EXISTS (SELECT 1 FROM public.principals WHERE company_id=NEW.company_id AND id=source.principal_id AND user_id=projected.recipient_user_id)
+17711:    IF NEW.outcome='email_queued' AND (actor IS NOT DISTINCT FROM source.principal_id
+17715:            AND delivery.purpose='notification' AND delivery.channel_id IS NULL AND delivery.message_id IS NULL
+17720:    ELSIF NEW.outcome='opted_out' AND (projected.email_delivery_id IS NOT NULL OR actor IS NOT DISTINCT FROM source.principal_id
+17724:    ELSIF NEW.outcome='self_suppressed' AND (projected.email_delivery_id IS NOT NULL OR actor IS DISTINCT FROM source.principal_id) THEN
+17794:    JOIN public.workflow_bindings AS binding ON binding.company_id=desk.company_id AND binding.channel_id=desk.id
+17799:    JOIN public.channel_bindings AS endpoint ON endpoint.company_id=desk.company_id AND endpoint.channel_id=desk.id
+17808:        CROSS JOIN LATERAL public.workflow_escalation_agent_route(notice.company_id,notice.principal_id) AS route
+17817:          AND public.notification_target_can_view(checked_company,COALESCE(run.channel_id,refusal.channel_id),COALESCE(run.principal_id,refusal.principal_id),actor.id)
+17823:ALTER TABLE public.workflow_escalation_notices ADD UNIQUE(company_id,id,event_id,principal_id,principal_kind);
+17824:ALTER TABLE public.workflow_message_intents ADD UNIQUE(company_id,id,message_id,channel_id);
+17829:    principal_id uuid NOT NULL,
+17841:    FOREIGN KEY(company_id,notice_id,event_id,principal_id,principal_kind)
+17842:        REFERENCES public.workflow_escalation_notices(company_id,id,event_id,principal_id,principal_kind) ON DELETE CASCADE,
+17844:        REFERENCES public.workflow_message_intents(company_id,id,message_id,channel_id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+17852:    SELECT EXISTS(SELECT 1 FROM public.workflow_escalation_agent_route(receipt.company_id,receipt.principal_id) AS route
+17866:            JOIN public.principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id
+17869:                AND intent.channel_id=NEW.desk_id AND intent.origin='application' AND intent.delivery_policy='in_app_only'
+17925:    principal_id uuid NOT NULL,
+18037:            WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
+18039:                  (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
+18061:        WHERE (receipt.company_id,receipt.notice_id,receipt.message_id,receipt.intent_id,receipt.principal_id,
+18063:              (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
+18108:        principal_id,agent_id,desk_id,binding_id,binding_revision)
+18110:               NEW.principal_id,NEW.agent_id,NEW.desk_id,NEW.binding_id,NEW.binding_revision);
+18124:        WHERE (target.company_id,target.notice_id,target.message_id,target.intent_id,target.principal_id,
+18126:              (NEW.company_id,NEW.notice_id,NEW.message_id,NEW.intent_id,NEW.principal_id,
+18209:          AND run.channel_id IS NOT DISTINCT FROM intent.channel_id AND run.principal_id IS NOT DISTINCT FROM intent.principal_id AND run.thread_id=intent.thread_id AND intent.message_id=NEW.message_id
+18386:    source_channel_id uuid NOT NULL,
+18392:    FOREIGN KEY(company_id,source_channel_id) REFERENCES public.channels(company_id,id) ON DELETE CASCADE
+18409:          AND delivery.transport='email' AND delivery.channel_id=NEW.source_channel_id AND delivery.message_id IS NOT NULL
+18411:          AND part.payload->'body'->'relay'->'source_target'=public.address_target_json(NEW.source_channel_id,NULL)
+18520:    actor_principal_id uuid NOT NULL,
+18549:        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.actor_principal_id
+18557:            AND decision_id=NEW.decision_id AND principal_id=NEW.actor_principal_id AND principal_kind='person') THEN
+18580:        SELECT manual_principal_id,manual_principal_kind,manual_principal_label INTO next_assignment
+18583:        IF NOT FOUND OR next_assignment.manual_principal_id::text IS DISTINCT FROM NEW.choice->>'principal'
+18585:                AND id=next_assignment.manual_principal_id AND kind=next_assignment.manual_principal_kind
+18669:        IF (NEW.company_id, NEW.slug, NEW.principal_id, NEW.channel_id, NEW.is_primary)
+18670:            IS NOT DISTINCT FROM (OLD.company_id, OLD.slug, OLD.principal_id, OLD.channel_id, OLD.is_primary) THEN
+18674:        targets := ARRAY[OLD.principal_id, NEW.principal_id];
+18676:        tenants := ARRAY[NEW.company_id]; targets := ARRAY[NEW.principal_id];
+18677:    ELSE tenants := ARRAY[OLD.company_id]; targets := ARRAY[OLD.principal_id]; END IF;
+18694:    ADD CONSTRAINT channel_bindings_principal_fk FOREIGN KEY (company_id, principal_id)
+18696:    ADD CONSTRAINT channel_bindings_principal_key UNIQUE (company_id, principal_id),
+18697:    ADD CONSTRAINT channel_bindings_company_principal_id_key UNIQUE (company_id, principal_id, id),
+18698:    ADD CONSTRAINT channel_bindings_principal_transport_key UNIQUE (company_id, principal_id, id, transport);
+18702:    IF TG_OP = 'UPDATE' AND (OLD.principal_id IS NOT NULL OR NEW.principal_id IS NOT NULL)
+18703:        AND (NEW.company_id, NEW.channel_id, NEW.principal_id, NEW.transport, NEW.namespace, NEW.installation_id)
+18705:            (OLD.company_id, OLD.channel_id, OLD.principal_id, OLD.transport, OLD.namespace, OLD.installation_id) THEN
+18709:    IF NEW.principal_id IS NULL THEN RETURN NEW; END IF;
+18711:        AND principal.id = NEW.principal_id AND principal.kind IN ('person', 'agent')) THEN
+18729:        WHERE company_id = NEW.company_id AND principal_id = NEW.id
+18748:ALTER TABLE public.threads ADD CONSTRAINT threads_company_principal_id_key UNIQUE (company_id, principal_id, id);
+18749:ALTER TABLE public.threads ADD CONSTRAINT threads_principal_id_key UNIQUE (principal_id, id);
+18750:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_principal_message_key UNIQUE (principal_id, message_id);
+18751:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_principal_history_key UNIQUE (company_id, principal_id, thread_id, message_id);
+18752:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_principal_message_key UNIQUE (company_id, message_id, principal_id);
+18753:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_principal_receipt_key UNIQUE (company_id, id, message_id, principal_id);
+18754:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_principal_key UNIQUE (company_id, principal_id, id);
+18755:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_principal_thread_key UNIQUE (company_id, id, principal_id, thread_id);
+18757:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+18759:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+18761:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+18763:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+18764:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_thread_target_check CHECK (thread_id IS NULL OR num_nonnulls(channel_id, principal_id) = 1);
+18766:ALTER TABLE public.thread_principals ALTER COLUMN channel_id DROP NOT NULL;
+18767:ALTER TABLE public.thread_principals ADD PRIMARY KEY (company_id, thread_id, principal_id, role);
+18769:ALTER TABLE public.channel_reply_settings ALTER COLUMN channel_id DROP NOT NULL;
+18770:ALTER TABLE public.channel_reply_settings ADD UNIQUE (company_id, channel_id), ADD UNIQUE (company_id, principal_id);
+18771:CREATE INDEX threads_principal_updated_idx ON public.threads(principal_id, updated_at, id);
+18773:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_check2 CHECK ((scope_kind='thread' AND num_nonnulls(channel_id,principal_id)=1 AND thread_id IS NOT NULL AND session_id IS NULL AND child_run_id IS NULL) OR (scope_kind='private_session' AND session_id IS NOT NULL AND num_nonnulls(channel_id,principal_id)=0 AND thread_id IS NULL AND child_run_id IS NULL) OR (scope_kind='child_branch' AND child_run_id IS NOT NULL AND num_nonnulls(channel_id,principal_id)=0 AND thread_id IS NULL AND session_id IS NULL));
+18774:CREATE UNIQUE INDEX agent_history_conversations_principal_thread_idx ON public.agent_history_conversations(company_id, agent_id, principal_id, thread_id) WHERE scope_kind='thread';
+18775:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18776:ALTER TABLE public.agent_history_conversations ADD CONSTRAINT agent_history_conversations_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18777:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18778:ALTER TABLE public.agent_history_sessions ADD CONSTRAINT agent_history_sessions_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18779:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE SET NULL (thread_id);
+18780:ALTER TABLE public.background_tasks ADD CONSTRAINT background_tasks_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18781:ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+18782:ALTER TABLE public.channel_reply_contexts ADD CONSTRAINT channel_reply_contexts_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18783:ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_company_id_channel_id_principal_fk FOREIGN KEY (company_id, principal_id, binding_id) REFERENCES public.workflow_bindings(company_id, principal_id, id) DEFERRABLE INITIALLY DEFERRED;
+18784:ALTER TABLE public.channel_reply_settings ADD CONSTRAINT channel_reply_settings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18785:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, binding_id) REFERENCES public.channel_bindings(company_id, principal_id, id) ON DELETE CASCADE;
+18786:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18787:ALTER TABLE public.external_threads ADD CONSTRAINT external_threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18788:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18789:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_thread_message_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED;
+18790:ALTER TABLE public.internal_notes ADD CONSTRAINT internal_notes_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18791:ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_destination_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, destination_binding_id, transport) REFERENCES public.channel_bindings(company_id, principal_id, id, transport) ON DELETE CASCADE;
+18792:ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_source_binding_fk_principal_fk FOREIGN KEY (company_id, principal_id, source_binding_id) REFERENCES public.channel_bindings(company_id, principal_id, id) ON DELETE CASCADE;
+18793:ALTER TABLE public.message_deliveries ADD CONSTRAINT message_deliveries_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18794:ALTER TABLE public.notifications ADD CONSTRAINT notifications_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18795:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_thread_fk_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18796:ALTER TABLE public.thread_messages ADD CONSTRAINT thread_messages_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18797:ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_thread_fk_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id) ON DELETE CASCADE;
+18798:ALTER TABLE public.thread_principals ADD CONSTRAINT thread_principals_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id);
+18799:ALTER TABLE public.threads ADD CONSTRAINT threads_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18800:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_company_id_chann_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18801:ALTER TABLE public.workflow_admission_refusals ADD CONSTRAINT workflow_admission_refusals_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18802:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_company_id_channel_id_thre_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18803:ALTER TABLE public.workflow_bindings ADD CONSTRAINT workflow_bindings_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id) ON DELETE CASCADE;
+18804:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_channel__principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18805:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_company_id_run_id_c_principal_fk FOREIGN KEY (company_id, run_id, principal_id, thread_id) REFERENCES public.workflow_runs(company_id, id, principal_id, thread_id) ON DELETE CASCADE;
+18806:ALTER TABLE public.workflow_history_members ADD CONSTRAINT workflow_history_members_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18807:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_message_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18808:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destination_replied_principal_fk FOREIGN KEY (company_id, target_principal_id, thread_id, replied_message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id);
+18809:ALTER TABLE public.workflow_message_destinations ADD CONSTRAINT workflow_message_destinations_target_principal_fk FOREIGN KEY (company_id, target_principal_id) REFERENCES public.principals(company_id, id);
+18810:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intent_association_principal_fk FOREIGN KEY (company_id, principal_id, thread_id, message_id) REFERENCES public.thread_messages(company_id, principal_id, thread_id, message_id) ON DELETE CASCADE;
+18811:ALTER TABLE public.workflow_message_intents ADD CONSTRAINT workflow_message_intents_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18812:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_company_id_channel_id_thread_i_principal_fk FOREIGN KEY (company_id, principal_id, thread_id) REFERENCES public.threads(company_id, principal_id, id);
+18813:ALTER TABLE public.workflow_runs ADD CONSTRAINT workflow_runs_target_principal_fk FOREIGN KEY (company_id, principal_id) REFERENCES public.principals(company_id, id);
+18818:    GENERATED ALWAYS AS (CASE WHEN principal_id IS NOT NULL THEN 'agent'::text END) STORED;
+18820:    FOREIGN KEY (company_id, principal_id, target_principal_kind)
+18825:    IF NEW.principal_id IS NOT NULL AND NOT EXISTS (
+18827:        WHERE principal.company_id=NEW.company_id AND principal.id=NEW.principal_id AND principal.kind='agent'
+18842:        WHERE company_id=NEW.company_id AND id=NEW.principal_id;
+18846:    FOR EACH ROW WHEN (NEW.principal_id IS NOT NULL AND NEW.status IS DISTINCT FROM OLD.status)
+18860:        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+18876:        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+18882:            AND NEW.actor_principal_id IS NOT DISTINCT FROM message.author_principal_id
+18895:        actor_principal_id,direct_membership_id)
+18896:    SELECT NEW.company_id,'direct_message',NEW.id,'direct_message_received',1,message.author_principal_id,membership.id
+18898:    JOIN public.principals AS target ON target.company_id=message.company_id AND target.id=NEW.principal_id
+18907:    FOR EACH ROW WHEN (NEW.principal_id IS NOT NULL) EXECUTE FUNCTION public.notification_from_direct_message();
+18913:         NEW.source_id,NEW.action_kind,NEW.source_generation,NEW.channel_id,NEW.principal_id)
+18916:         OLD.source_id,OLD.action_kind,OLD.source_generation,OLD.channel_id,OLD.principal_id) THEN
+18921:        AND NEW.recipient_principal_id IS DISTINCT FROM OLD.recipient_principal_id AND NOT (
+18922:            NEW.recipient_principal_id IS NULL AND OLD.recipient_principal_id IS NOT NULL AND NOT EXISTS (
+18923:                SELECT 1 FROM public.principals WHERE company_id=OLD.company_id AND id=OLD.recipient_principal_id)) THEN
+18929:        JOIN public.principals AS target ON target.company_id=association.company_id AND target.id=association.principal_id
+18931:            AND NEW.channel_id IS NULL AND NEW.principal_id=target.id AND NEW.recipient_principal_id=target.id
+18948:        AND (notification.principal_id=COALESCE(NEW.id,OLD.id) OR notification.recipient_principal_id=COALESCE(NEW.id,OLD.id))
+18949:        AND NOT public.direct_message_notification_can_view(tenant,notification.source_id,notification.recipient_principal_id);
+18962:    FOR EACH ROW WHEN (OLD.principal_id IS NOT NULL) EXECUTE FUNCTION public.resolve_deleted_direct_message_notifications();

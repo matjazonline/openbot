@@ -1,0 +1,238 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R17-final-core",
+  "artifact": "d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb",
+  "checks": [
+    {
+      "criteria": [
+        "core-affected-scope",
+        "stock-current-corrections"
+      ],
+      "command": "Darwinguard exactnativebinary67selectedcases --exact --nocapture, RUST_MIN_STACK2097152 RUST_TEST_THREADS4",
+      "fixture": "67PASS includesall66R18cases+Cloudroom; ownedPG51167/TEST_DATABASE_URLunset; exact549a01e6binary/currentRustlibraryprojection",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R24-stock-focused.txt",
+          "sha256": "0c876d861b564e63697c1181ad9d0eb52baec0a6305766e49c1eb716217d664d"
+        },
+        {
+          "path": "logs/R24-stock-case-selection.json",
+          "sha256": "852f274afa129fd29cc6e8b7b9a0277c3997d2a265779effab4bfb6ee033c390"
+        },
+        {
+          "path": "logs/R24-core-scope-assessment.json",
+          "sha256": "b3a5b43c7af9520db154cb2187d658235c90ad0bbf044b3a83dcb4c638cef48f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "retained-full-native-command-result"
+      ],
+      "command": "CI43883869265 Database-backed test suite (isolated network)",
+      "fixture": "4677PASS/1unchangedCloudroomFAIL/27IGNORE; independentR16N1outsideaffectedPlan03. KeepfullFAIL.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R24-core-50_Database-backed test suite (isolated network).txt",
+          "sha256": "2a9a21d7378902d838f8d1b0072a078e0db706fd204fb07d07a8ede280d60470"
+        },
+        {
+          "path": "logs/R24-core-log-download.json",
+          "sha256": "750635bc26ced733a660ea7e8b84a8452aa64b4f805522e13e45cd86b4dc4c1a"
+        },
+        {
+          "path": "logs/R24-core-scope-assessment.json",
+          "sha256": "b3a5b43c7af9520db154cb2187d658235c90ad0bbf044b3a83dcb4c638cef48f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "format",
+        "offline-all-targets",
+        "clippy",
+        "docs-inventory"
+      ],
+      "command": "cargo fmt --all -- --check; CARGO_INCREMENTAL=0 cargo check --locked --offline --all-targets; cargo clippy --locked --offline --all-targets -- -D warnings; python3 scripts/check-integration-docs.py",
+      "fixture": "Currentpremergecode thenplanning-onlymerge; mainwarninginventoryonly. Runtime/libraryunchanged; no Rust/DBtestrerunforincomingplanning.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R24-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/R24-offline-all-targets2.txt",
+          "sha256": "6fdf662d014b8f505a496a17b35794271fe826004c8f9bbe7f49617b1c214337"
+        },
+        {
+          "path": "logs/R24-clippy.txt",
+          "sha256": "7985f89097865acf6135d1cc234310f3587d60d059e3cfd6ff8d261cf7db663d"
+        },
+        {
+          "path": "logs/R24-integration-docs.txt",
+          "sha256": "e7844e377a71e54d62044de6daf2b9efdd6b1ea2674948bffdbcde8fea5852ee"
+        },
+        {
+          "path": "logs/R24-post-merge-docs.txt",
+          "sha256": "343d6a63877af585156726a735f57e3f8fe6fab25c0474f934715501d500d189"
+        },
+        {
+          "path": "logs/R24-integration-identity.json",
+          "sha256": "4b5501bdea64ce1f9b8b7196c0658a5082812b8415b13d696d688eb11e04f4f7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "retained-resource-failure"
+      ],
+      "command": "InitialR24 cargo check --locked --offline --all-targets",
+      "fixture": "ENOSPC retained; onlytaskowned56GiBincrementalcachedeleted; identical-sourceofflinecorrectionPASS.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R24-offline-all-targets.txt",
+          "sha256": "ebf3aa70e93f45d3880af842315d4dc2608855401f3b7b0e7a75cdf17c3e17f3"
+        },
+        {
+          "path": "logs/R24-final-static-results.json",
+          "sha256": "9afd187dec539809d1a019ec25aca16a153d1e35935ef3ca304df213d5d54d4e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "historical-full-stock",
+        "historical-lease-budget"
+      ],
+      "command": "HistoricalR8 networkguard stack-budget.sh --offline and lease-budget.sh --offline",
+      "fixture": "Historical4678stockPASS/139leasePASS, notnewmeasurements. R16N2approvedunchangedprotocolprojection+current67bridgesR18catalog.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R8-final-check5.txt",
+          "sha256": "2d9ce11e8d42861a3ca815313c1cbf7ca8ef35ed717f1a259f8dde62f04ba412"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "native-history-browser"
+      ],
+      "command": "Currentnativefixture1case thenNode24actualhistorydark/light2cases",
+      "fixture": "FreshnativeHTMLretained, currentRustlibraryunchanged.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R20-history-browser.evidence.json",
+          "sha256": "26c61c97c9479838db1d73687bc966e9c5d99a4b18478aab4dc7917e337b3756"
+        },
+        {
+          "path": "logs/R20-history-fixture.txt",
+          "sha256": "145879963157ab073ae83839a3eb374ee77b8125f56334524ffa18b71c810834"
+        },
+        {
+          "path": "logs/R20-history-browser.txt",
+          "sha256": "f14503481faafad13a31140a7ea6663ec028c9ccaad0943669d8b3521064a10b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "diagnostic-browser-protocols"
+      ],
+      "command": "Node24 node --test scripts/tests/doop-probe.mjs; PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "26Node+10PythonPASS afterremovedunsupportedpreflight; currentimplementationunchanged.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R22-doop-probe.txt",
+          "sha256": "9ac3495e6cc47cf940d50a677fad8d57df86af78ccf5ed5e694cb9ff89f21a5c"
+        },
+        {
+          "path": "logs/R22-check-runner.txt",
+          "sha256": "210291689cf9c05b65fdc4be1664c228e107c93d620e03c4dec3742aadee11ce"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "user-deferred-doop-private-acceptance"
+      ],
+      "command": "ActualprivateCI43893046978 pinnedimage/compilednativehelper",
+      "fixture": "Firstprofile80secondfailure; explicituserfollow-up/C008r1, notblockingcoreacceptance. No privatePASSclaim.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R21-acceptance-acceptance.json.txt",
+          "sha256": "8a9cbc890cb0a6a1028e8d3a722fa07820b32b30ce07d7a0b19b257eac6116e6"
+        },
+        {
+          "path": "logs/R21-acceptance-all-disk-report.json.txt",
+          "sha256": "9233d9cbcf030fb775fada18af11930bbff78366bbaa6475ba926d9e9ae54b6d"
+        },
+        {
+          "path": "logs/R21-acceptance-all-disk-lifecycle-record-helper-failure.txt.txt",
+          "sha256": "7f5bb27b982b9b49c81675cbf083ad65b76d5ad05b25fd3747b06a424a33073e"
+        },
+        {
+          "path": "logs/R22-private-download-identity.json",
+          "sha256": "c0bb8b57740ce6145df757dd48e65ff676b34ed21e41308ac42844f41211fbd0"
+        },
+        {
+          "path": "logs/R24-coordination58.md",
+          "sha256": "2aa8c404bfd3de379ec540f1f22b497c645b70431a00a4b2ee8c813dafee320b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "remaining-private-profiles"
+      ],
+      "command": "Privateall-bucket/e2e-disk/e2e-bucket aftercurrentcorrection",
+      "fixture": "Notreachedafterfirstprofilefailed; trackedplan/fix-doop.md.",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/R21-acceptance-acceptance.json.txt",
+          "sha256": "8a9cbc890cb0a6a1028e8d3a722fa07820b32b30ce07d7a0b19b257eac6116e6"
+        },
+        {
+          "path": "logs/R24-coordination58.md",
+          "sha256": "2aa8c404bfd3de379ec540f1f22b497c645b70431a00a4b2ee8c813dafee320b"
+        }
+      ],
+      "reason": "UserseparatedDoopworkfromcorepublication/Plan04; no runnerskip orassertionweakening."
+    },
+    {
+      "criteria": [
+        "source-identity",
+        "retained-evidence"
+      ],
+      "command": "Integratedsnapshot original7exclusions; manifestvalidators; stagedpatchwhitespace",
+      "fixture": "Mergedc1cc/d275; immutablelogs retainedthroughnarrowattributes; sourcewhitespacecheckingunchanged.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R24-integrated.snapshot.txt",
+          "sha256": "7d4eae165b64513c31a0c54005f67bdde8c761bbcc59707f27855af0e40ab6de"
+        },
+        {
+          "path": "logs/R24-tracked-evidence-validation.txt",
+          "sha256": "345b5c564d2364a915cfc2fb5787b25dfc073d0d73099de812323f0d4b235b5a"
+        },
+        {
+          "path": "logs/R24-staged-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/R24-integration-identity.json",
+          "sha256": "4b5501bdea64ce1f9b8b7196c0658a5082812b8415b13d696d688eb11e04f4f7"
+        }
+      ]
+    }
+  ]
+}

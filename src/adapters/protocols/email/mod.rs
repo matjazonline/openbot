@@ -30,7 +30,7 @@ pub use mail::{
     MailMessage, MailSendOutcome, MailTransport, SmtpConfirmationSender,
 };
 pub use selector::{
-    EmailChannelSelection, EmailChannelSelectorParser, EmailDeliveryHints, EmailDeliveryMode,
+    EmailAddressParser, EmailAddressSelection, EmailDeliveryHints, EmailDeliveryMode,
     EmailRecipientDestination,
 };
 pub use types::{

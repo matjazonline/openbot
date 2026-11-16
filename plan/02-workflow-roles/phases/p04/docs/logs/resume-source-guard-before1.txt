@@ -1,0 +1,16 @@
+['/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-a41f621c4726ebe7', 'workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution', '--nocapture', '--test-threads=1']
+
+running 1 test
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution ... 
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution' (235172) panicked at src/adapters/persistence/workflow/role_reviewer_tests.rs:142:40:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "binding.type", message: "Literal does not match destination schema", field_path: "/steps/start/with/value", span: SourceSpan { start: 295, end: 296, line: 1, column: 296 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::source_guards::workflow_escalation_source_rejects_a_forged_cause_step_or_terminal_execution
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4298 filtered out; finished in 1.48s
+

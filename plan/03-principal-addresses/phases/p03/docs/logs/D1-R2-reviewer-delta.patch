@@ -1,0 +1,76 @@
+--- D1/r1
++++ D1/r2
+@@ -1,9 +1,9 @@
+-# 03PA-P03 D1/r1 — Production principal provisioning and authenticated relay
++# 03PA-P03 D1/r2 — Production principal provisioning and authenticated relay
+ 
+ > No backward compatibility. Edit init schema and reset owned disposable databases.
+ 
+ Original criteria and contract/verification mapping are in ../TASK.md. This is a combined
+-pre-implementation gate; source remains the accepted p02 artifact. All decisions below are proposed.
++pre-implementation gate; source remains the accepted p02 artifact. This revision corrects R1/F1 and F2 together; unchanged decisions retain R1 review coverage. All runtime proof remains pending.
+ 
+ ## 1. One company-agent creation transaction, no automatic desk
+ 
+@@ -12,7 +12,7 @@
+ insert the agent/principal, register exactly `agent.slug` in `addresses`, apply direct settings,
+ publish the agent revision, compose/publish an autonomous workflow and bind/select it on
+ `AddressTarget::Principal(principal)`. Place in department/role last, preserving sorted desk gates.
+-The address's existing native trigger provisions the principal's lifetime canonical email binding.
++After inserting the address, explicitly call the existing `integration::email_binding::sync_principal_email_binding_on` on this transaction. That helper reads the registered slug and calls `write_canonical_email_binding`, owning insertion/update and binding audit. Existing native address triggers only guard kind, advance settings revision and retire addresses; they do not provision transport bindings.
+ Any collision, missing keyed model, publication or placement failure rolls back every resource.
+ There is no automatic channel, `agent:{id}` command row, alternate address or forwarding path.
+ Library definitions alone remain unaddressed and unbound.
+@@ -23,12 +23,13 @@
+ engines. `CreatedAgent` returns the agent and its typed principal id; internal creation may also
+ return typed workflow/version/binding identities. No desk id is synthesized for API/onboarding.
+ 
+-Agent slug and principal address stay equal. Native address validation refuses a mismatched agent
+-slug; native agent-slug update synchronizes its existing address in the same transaction, so a
+-taken slug aborts the entire rename. Keep principal settings revision fencing and canonical-binding
+-endpoint synchronization. A rename neither changes the lifetime principal/binding nor retargets history.
+-Test raw SQL as well as application writes; fixtures with deliberately noncanonical agent slugs
+-must use production provisioning or be explicitly updated to the new native invariant.
++Agent slug and principal address stay equal. Add native deferred equality guards on agent/address mutations: an agent address cannot disagree with the same-tenant agent slug at commit. A lone raw agent/address rename that leaves them inconsistent is refused; this is a new guard, not an existing automatic writer. Keep the low-level fixture distinction explicit: the guard validates an agent address when present; production's one creation primitive guarantees its existence and published binding.
++
++The production rename transaction owns the full write: existing authorized account/company→agent prefix, lock the agent principal, apply direct settings, update the agent and its existing address, then call `sync_principal_email_binding_on` before commit. Creation similarly holds/creates the principal before address and transport binding, then publishes/binds and places last. Never acquire the binding before its principal gate. The helper preserves the same lifetime binding id/namespace and updates the canonical endpoint plus audit; a taken address/endpoint or later failure rolls back agent, address, revision, binding and audit together. A rename does not retarget historical threads. Reuse p02's actual helper rather than add a second SQL/Rust binding producer.
++
++Canonical endpoint keys are scoped local parts, not full mailboxes. `channel_bindings.external_endpoint_key` stays opaque/local; do not feed it directly to `qualified_email_identity`. Extend the existing transport renderer with application-address rendering from typed company/address slugs. The existing notification projection supplies the current optional route address reference (typed company/principal slugs); the worker renders a real recipient identity alongside its already minted notice Message-ID and passes that runtime value into projection commit. The commit revalidates the current expected projection and exact route before using it as DTO addressing, without treating that identity as authorization. Missing route remains the existing recipient failure, not a synthetic address. No application/persistence literal domain or `.invalid` mailbox, protocol-key parsing, new credential or per-agent transport configuration.
++
++Production creation/rename tests assert the actual active lifetime email binding, coherent endpoint and audit, stable binding id across rename, collision rollback and both-order rename/ingress fencing. Raw SQL tests assert the equality guards. Replace noncanonical agent-address fixtures with production-created agents or canonical explicit native fixtures.
+ 
+ ## 2. Persistent ownership and safe unused deletion
+ 
+@@ -145,7 +146,31 @@
+ Re-inventory actual role-refusal producers per C004; samples remain authoring/scripted validation.
+ D2/r2 personal source membership-instance and recipient-key semantics are unchanged.
+ 
+-## 6. Verification and failure behavior
++## 6. Authenticated private-notice participation (R1/F2 correction)
++
++Ordinary `principal_direct_can_participate` remains unchanged. A private system notice is not a team actor, even though it is a valid platform producer. Its exact purpose-specific authority is explicit at both storage and asynchronous admission:
++
++### 6.1 Claimed projector to canonical direct commit
++
++Replace the generic private platform-writer entry point with a purpose-specific agent-notice entry point, taking a crate-private authority record containing the exact notification event/execution/worker lease fence, notice id and expected principal/transport binding/workflow binding/configuration/settings revisions. The existing notification projector creates this record only after the hint→principal/accounts/company→source/event locks and complete current projection revalidation. No HTTP, external transport, ordinary application, or ordinary internal relay path can choose this authority branch. The wire/DTO author identity does not authenticate it.
++
++Before provider keys, thread resolution or canonical writes, the principal gate validates that authority against native rows under the held locks: the exact event is still processing under the live execution/worker fence; it names this active agent notice/source/principal; the original case/source remains eligible; its current intended route, run-as account/current content authority and all expected binding/configuration/settings/transport identities still match. The candidate is exactly one To/mentioned application-origin notice intent and association at that principal, with no replied message, no attachment/outbound delivery, in-app-only policy, and its notice-derived transport Message-ID. Only this fully proven request bypasses the ordinary participant test. A typed Platform/Application/System label alone never does. A missing/changed proof returns the existing stale/lease/route outcome with whole-transaction rollback.
++
++The canonical author stays the real company system principal, audience internal_only, with no fabricated person/agent identity or observed account authority. The native receipt guard and deferred completeness checks independently bind that exact private message/intent/notice/event/principal/binding/revision and key; no bypassed request can commit without its matching authenticated receipt and normal fenced event completion. Lease loss at final completion rolls back the entire canonical effect. Retain prefix/order/NOWAIT semantics from §5; no locks survive the separate queue backoff.
++
++### 6.2 Sealed notice to exact targeted admission
++
++At `admission_source::message`, after exact tenant/target/thread/message membership load, allow either ordinary direct participation OR an exact authenticated notice branch. The notice branch requires a non-null current admission claim on that message intent, proves its live execution/worker/generation fence, and matches all message/intent/principal/agent/binding/configuration fields through the immutable receipt and notice-target seal. It also checks the source/notice is still active, the intended route/actor/current content authority remains eligible and the captured binding/revision is still selected. Reuse existing native notice-source-live/route-match/eligibility predicates, consolidated in one purpose-specific predicate shared with native admission/handling-root guards. This is not a public flag on the source DTO.
++
++Keep existing `claim_holds`, current binding checks, replay/source reauthorization, origin adoption, atomic run/job/handling-root creation and final claim settlement. The exception cannot enable a manual/message-trigger start without the exact targeted claim, another binding at the same principal, another revision, another message, or a withdrawn/stale notice. A native direct run insert must still satisfy the same exact authenticated targeted source/handling-root constraints. Missing proof never falls back to a random binding or an ordinary system participant. An already retired source follows existing targeted source-retired/failure semantics; it does not create a new case.
++
++### 6.3 Required discriminating proof
++
++Exercise the actual projector on a production-created default-private agent, then its real message-intent/admission worker: assert one system-authored internal_only direct message and intent at the actual principal binding, exactly one accountable handling root with its captured binding/revision/origin, and no outbound delivery. Message/receipt existence alone does not satisfy this criterion.
++
++Add application and native negatives for ordinary system/application/internal-relay traffic, claimed origin/header only, absent or foreign event/receipt/claim, mismatched principal/message/intent/binding/revision, expired/lost fence, withdrawn or retired source. Deterministic barriers revoke the source/route both before canonical commit and before actual admission; assert zero unauthorized effect and original-case handling failure/terminal state as applicable. Include competing projectors/admissions and both-order lock/race cases from §5. Authenticated ordinary-agent ingress separately uses its proven canonical principal for direct policy and later admission; the observed wire From never substitutes for that principal.
++
++## 7. Verification and failure behavior
+ 
+ TASK's AC1–AC6 mapping is binding. Tests use production-created agents, real native constraints,
+ actual queue/projector/admission/relay commits and competing claimants. External recording

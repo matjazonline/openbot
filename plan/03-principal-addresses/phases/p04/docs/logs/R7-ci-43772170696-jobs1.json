@@ -1,0 +1,237 @@
+{
+  "total_count": 2,
+  "jobs": [
+    {
+      "id": 132990285781,
+      "run_id": 43772170696,
+      "workflow_name": "Memory service",
+      "head_branch": "codex/plan03-p04-r7-957de863",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43772170696",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9ta31Q",
+      "head_sha": "957de863ede7b0c8bb432937287842865ec862c3",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132990285781",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43772170696/job/132990285781",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-15T22:57:56Z",
+      "started_at": "2026-11-15T22:57:58Z",
+      "completed_at": "2026-11-15T23:11:51Z",
+      "name": "verify",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T22:57:59Z",
+          "completed_at": "2026-11-15T22:58:00Z"
+        },
+        {
+          "name": "Initialize containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T22:58:00Z",
+          "completed_at": "2026-11-15T22:58:14Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T22:58:14Z",
+          "completed_at": "2026-11-15T22:58:23Z"
+        },
+        {
+          "name": "Run dtolnay/rust-toolchain@1.95.0",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T22:58:23Z",
+          "completed_at": "2026-11-15T22:58:33Z"
+        },
+        {
+          "name": "Install sqlx-cli 0.8.6",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T22:58:33Z",
+          "completed_at": "2026-11-15T22:59:38Z"
+        },
+        {
+          "name": "Fetch locked dependencies (before network isolation)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T22:59:38Z",
+          "completed_at": "2026-11-15T22:59:41Z"
+        },
+        {
+          "name": "Cache model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-11-15T22:59:41Z",
+          "completed_at": "2026-11-15T22:59:43Z"
+        },
+        {
+          "name": "Prepare and verify the pinned model (build network only)",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T22:59:43Z",
+          "completed_at": "2026-11-15T22:59:45Z"
+        },
+        {
+          "name": "Extracted-copy full gate",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-15T22:59:45Z",
+          "completed_at": "2026-11-15T23:06:53Z"
+        },
+        {
+          "name": "Install the PostgreSQL 18 client",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-15T23:06:53Z",
+          "completed_at": "2026-11-15T23:07:07Z"
+        },
+        {
+          "name": "Backup and restore check",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-15T23:07:07Z",
+          "completed_at": "2026-11-15T23:09:21Z"
+        },
+        {
+          "name": "Standalone journey",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-15T23:09:21Z",
+          "completed_at": "2026-11-15T23:11:48Z"
+        },
+        {
+          "name": "Post Cache model artifacts",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 22,
+          "started_at": "2026-11-15T23:11:48Z",
+          "completed_at": "2026-11-15T23:11:48Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 23,
+          "started_at": "2026-11-15T23:11:48Z",
+          "completed_at": "2026-11-15T23:11:48Z"
+        },
+        {
+          "name": "Stop containers",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 24,
+          "started_at": "2026-11-15T23:11:48Z",
+          "completed_at": "2026-11-15T23:11:49Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 25,
+          "started_at": "2026-11-15T23:11:49Z",
+          "completed_at": "2026-11-15T23:11:49Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132990285781",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001166,
+      "runner_name": "GitHub Actions 1000001166",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 132990285940,
+      "run_id": 43772170696,
+      "workflow_name": "Memory service",
+      "head_branch": "codex/plan03-p04-r7-957de863",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43772170696",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9ta4dA",
+      "head_sha": "957de863ede7b0c8bb432937287842865ec862c3",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132990285940",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43772170696/job/132990285940",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-15T22:57:56Z",
+      "started_at": "2026-11-15T22:57:58Z",
+      "completed_at": "2026-11-15T23:02:39Z",
+      "name": "image",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T22:57:59Z",
+          "completed_at": "2026-11-15T22:58:00Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T22:58:00Z",
+          "completed_at": "2026-11-15T22:58:08Z"
+        },
+        {
+          "name": "Build the service image from its own directory",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T22:58:08Z",
+          "completed_at": "2026-11-15T23:02:31Z"
+        },
+        {
+          "name": "Non-root, network-denied, read-only startup",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T23:02:31Z",
+          "completed_at": "2026-11-15T23:02:36Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 8,
+          "started_at": "2026-11-15T23:02:36Z",
+          "completed_at": "2026-11-15T23:02:36Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 9,
+          "started_at": "2026-11-15T23:02:36Z",
+          "completed_at": "2026-11-15T23:02:36Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132990285940",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001167,
+      "runner_name": "GitHub Actions 1000001167",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

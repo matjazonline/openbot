@@ -1,0 +1,280 @@
+{
+  "version": 1,
+  "round": "03PA-P03-B1-R2",
+  "artifact": "3247c1f394f32bb86dea1a31f3f1856c0f805ed0c68329149217f9c72fa9230d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "F1",
+        "F2"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda agent_address_ agent_direct_address_ relay_identity_ workflow_escalation_agent_ workflow_escalation_origin_ public_desk_private_agent_ provisioning_dispatch_tests direct_company_lifecycle direct_target_native_ direct_company_teardown_removes_populated_ --nocapture",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-production-command.json",
+          "sha256": "3e0ee7476b5d3c5b228b36e35e5ce1cd04f0d5fe9ac9b88859ed9523016a1ece"
+        },
+        {
+          "path": "logs/B1-R2-production-tests.txt",
+          "sha256": "4d122d7ff67203a2f5015d0f4457d014eddcf4071fdac664806e166002f0b34c"
+        }
+      ],
+      "reason": "100PASS; following focused3 reruns exercise the only subsequent change, restoring the shared fixture run-immutability guard. Production code unchanged."
+    },
+    {
+      "criteria": [
+        "F1",
+        "F2",
+        "AC1",
+        "AC2",
+        "AC4"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda relay_identity_native_forged_workflow_agent_author_rolls_back_publication agent_address_create_actual_default_binding_answers_a_direct_message direct_company_teardown_removes_populated_agent_history_notes_and_transport --nocapture",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-build5.txt",
+          "sha256": "a76bc25539fcf93cfd58d84764d0340fdfef625e263920c941371fef1d030246"
+        },
+        {
+          "path": "logs/B1-R2-full-native-guard-tests.txt",
+          "sha256": "20d2e2fc4d72229ddf0af278e5983e0a6e09db7e79f3cd24a53bc92fe7a2127c"
+        }
+      ],
+      "reason": "3PASS with production run guard explicitly enabled; exact native author guard, real direct answer, two comparably populated tenant lifecycle."
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo sqlx prepare -- --all-targets",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-sqlx-prepare.txt",
+          "sha256": "039055e4e401b249e9628c5c577d982f2912dd2e9e62e283b5a9001b7e9682f1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-offline-all-targets.txt",
+          "sha256": "5604fc8f0c276397a55db4bd7008236712075c0ad37d3b3a0f1fe362b1b85a36"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-modules.txt",
+          "sha256": "859709c958e27e2b3871ca6c85e7d38fdae0ad5c05808b2f6365a89ba2e8d8f8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "git diff --check",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-transport-boundary.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-final-transport-fixtures.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "trail build",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-build.txt",
+          "sha256": "4e3b7e8a8d74a8e143c88456d9f5fa97168e561938a5cc40f8877c2322a52a0c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6-collection"
+      ],
+      "command": "current libtest --list; map accepted4589 to current4610; account for intermediate native test module move",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-before-lib-tests.txt",
+          "sha256": "1f2bc6a98617afd53d752f343e83ca7e3d53e94bc3bc0d98215c0401de2bd341"
+        },
+        {
+          "path": "logs/B1-R2-before-native-move-tests.txt",
+          "sha256": "766d0245e027a1050133aa2fc543aaa2900feceeff41ba9c7677956555f9fbca"
+        },
+        {
+          "path": "logs/B1-R2-final-lib-tests.txt",
+          "sha256": "81029a356f797f7f9660aa1aefd94f345dec130734b99922c45f24c044cd3d75"
+        },
+        {
+          "path": "logs/B1-R2-test-removal-map.json",
+          "sha256": "3c083b8168c373ef38ef8673af9759599780feae04b1de08f04ba15c27a64267"
+        },
+        {
+          "path": "logs/B1-R2-intermediate-test-move.json",
+          "sha256": "7fab53ab2c56568cf99270699558518256e9fa8016a4cd676fb6148ba4fc5805"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6-schema"
+      ],
+      "command": "compare unchanged init SHA384 and retained fresh migration/native ownership inspection",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-schema-identity.json",
+          "sha256": "53992024ddab405d0f8611dc90a7d1281b56dbdd23ed8f6b80b231b1cb033562"
+        },
+        {
+          "path": "logs/B1-resume-schema-proof1.json",
+          "sha256": "1a015936f1da74ca04ec4ceefe98f98e2b02281a73063e6a4aa6997f0073c35b"
+        },
+        {
+          "path": "logs/B1-resume-migrate1.txt",
+          "sha256": "60df1deda2d5e78329010536f5b361e45d4e8811aacabcb6f83fea58519093d8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6-diagnostic-lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets --message-format=json",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-clippy-diagnostic.txt",
+          "sha256": "321123395ae4fd4a55ed08d7e29711212e09711cd7ac155f87f5ae2073f015a2"
+        },
+        {
+          "path": "logs/B1-R2-clippy-diagnostics.json",
+          "sha256": "f60ecaa2f9d4f470bb20d9321652ec44d17491cfab657306b4b8f6f2adafd353"
+        }
+      ],
+      "reason": "Diagnostic run enumerates all cfg(test) warnings: only7 unchanged inherited warnings. Before two guard-enabling SQL statements; build5/current checks cover those statements. This does not claim strict CI lint passes."
+    },
+    {
+      "criteria": [
+        "AC6-inherited-strict-lint"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-resume-clippy2.txt",
+          "sha256": "84527bd549039cc9c80e2f4796e29054bfa1004a3a6d0995ee718ab489721014"
+        },
+        {
+          "path": "logs/B1-resume-clippy-baseline-disposition1.json",
+          "sha256": "681e46b1cdef0bd9ac2bb58ebdd97930afc19341230c6d77565aa7702c1873d7"
+        }
+      ],
+      "reason": "7 unchanged inherited findings; integratedp04 obligation. Diagnostic all-target run adds no warnings from the correction; no full-plan green claim."
+    },
+    {
+      "criteria": [
+        "diagnostic-history-F1-F2"
+      ],
+      "command": "initial13-case correction runs; retained fixture failures superseded by100PASS and current3PASS",
+      "fixture": "PostgreSQL127.0.0.1:52471 / pa03_codex_resume1_20261115; test-owned isolated DBs where required; RUST_MIN_STACK16777216",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-focus1.txt",
+          "sha256": "b6b2f54a2ad2536ece8bacd8503c32a1a3f4d10c50023761f6e317c69ac81621"
+        },
+        {
+          "path": "logs/B1-R2-focus2.txt",
+          "sha256": "9077d0655d6a16569fbf9a6c93b76f3972b55de722211f192804c63a64ead238"
+        },
+        {
+          "path": "logs/B1-R2-initial-native-forgery-fixture.rs.txt",
+          "sha256": "e1445c09f46d74ad13a00a80b1ae757470eb69abcd6c9a3af0ebf7183523b1af"
+        }
+      ],
+      "reason": "Initial UPDATE hit membership FK; publication mutation hit linkage guard; private query typo; later SQL clone lacked explicit producer reservation. No source guard weakened; final checks prove each intended boundary."
+    }
+  ]
+}

@@ -32,6 +32,7 @@ fn view() -> DecisionView {
         proposal: json!({"body":"Initial draft"}),
         deadline: chrono::Utc::now() + chrono::Duration::hours(1),
         state: "waiting".into(),
+        reviewer_labels: Vec::new(),
         reviewers: vec![],
         choices: vec!["accept".into(), "revise".into()],
         submission: None,

@@ -11,6 +11,7 @@ pub(super) struct DecisionFixture {
     pub(super) admission: AdmissionFixture,
     pub(super) scope: ActivationRequest,
     pub(super) users: Vec<Uuid>,
+    pub(super) principals: Vec<Uuid>,
     pub(super) notices: DecisionNotices,
 }
 impl DecisionFixture {
@@ -30,9 +31,13 @@ impl DecisionFixture {
         for _ in 0..count {
             users.push(member(&fixture, "admin").await);
         }
+        let mut principals = Vec::new();
+        for user in &users {
+            principals.push(fixture.principal(*user).await);
+        }
         let mut source: Value =
             serde_json::from_str(&registry::example("decision.human").unwrap().source).unwrap();
-        source["steps"]["start"]["with"]["reviewers"] = json!({"literal":users.iter().map(|id| json!({"kind":"user","id":id})).collect::<Vec<_>>()});
+        source["steps"]["start"]["with"]["reviewers"] = json!({"literal":principals.iter().map(|id| json!({"kind":"principal","id":id})).collect::<Vec<_>>()});
         source["steps"]["start"]["with"]["deadline"] =
             json!({"literal":(chrono::Utc::now()+chrono::Duration::minutes(20)).to_rfc3339()});
         source["steps"]["start"]["with"]["data_schema"] =
@@ -74,6 +79,7 @@ impl DecisionFixture {
             admission,
             scope,
             users,
+            principals,
             notices,
         }
     }
@@ -492,11 +498,15 @@ mod boundary_tests;
 #[path = "decision_provenance_tests.rs"]
 mod provenance_tests;
 
-async fn reviewer_rows(
-    f: &DecisionFixture,
-    decision: DecisionId,
-) -> Vec<(Uuid, Option<Uuid>, bool)> {
-    sqlx::query_as("SELECT user_id, notice_delivery_id, notice_opted_out FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
+#[derive(Debug, PartialEq, Eq, sqlx::FromRow)]
+struct ReviewerNoticeRow {
+    principal_id: Uuid,
+    notice_delivery_id: Option<Uuid>,
+    notice_opted_out: bool,
+}
+
+async fn reviewer_rows(f: &DecisionFixture, decision: DecisionId) -> Vec<ReviewerNoticeRow> {
+    sqlx::query_as("SELECT principal_id, notice_delivery_id, notice_opted_out FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordinal")
         .bind(f.scope.company.as_uuid()).bind(decision.0).fetch_all(f.persistence().pool()).await.unwrap()
 }
 
@@ -525,14 +535,14 @@ async fn workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews()
     let view = f.park().await;
     assert_eq!(view.reviewers.len(), 2);
     let rows = reviewer_rows(&f, view.decision).await;
-    assert_eq!(rows[0].0, f.users[0]);
+    assert_eq!(rows[0].principal_id, f.principals[0]);
     assert!(
-        rows[0].1.is_some() && !rows[0].2,
+        rows[0].notice_delivery_id.is_some() && !rows[0].notice_opted_out,
         "the opted-in reviewer is noticed"
     );
-    assert_eq!(rows[1].0, f.users[1]);
+    assert_eq!(rows[1].principal_id, f.principals[1]);
     assert!(
-        rows[1].1.is_none() && rows[1].2,
+        rows[1].notice_delivery_id.is_none() && rows[1].notice_opted_out,
         "the opted-out reviewer is recorded as such"
     );
     assert_eq!(f.counts().await["deliveries"], 1);
@@ -611,7 +621,7 @@ async fn workflow_decision_park_waits_for_a_preference_toggle_in_flight() {
     .unwrap();
     let rows = reviewer_rows(&f, DecisionId(decision)).await;
     assert!(
-        rows[0].1.is_some() && !rows[0].2,
+        rows[0].notice_delivery_id.is_some() && !rows[0].notice_opted_out,
         "the park saw the committed opt-in and sent the notice"
     );
 }
@@ -641,3 +651,6 @@ async fn memory_access_level_decision_choice_stays_exact_and_feedback_lowers() {
         );
     }
 }
+
+#[path = "reviewer_principal_tests.rs"]
+mod principal_tests;

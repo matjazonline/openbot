@@ -1,0 +1,45 @@
+﻿2026-11-16T14:45:44.0402391Z ##[group]Run cargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata
+2026-11-16T14:45:44.0403295Z [36;1mcargo test --locked --offline --lib vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata[0m
+2026-11-16T14:45:44.0403988Z [36;1mcargo test --locked --offline --lib vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup[0m
+2026-11-16T14:45:44.0404588Z [36;1mnode --test scripts/tests/vault-authoring-browser.mjs[0m
+2026-11-16T14:45:44.0433010Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:44.0433413Z env:
+2026-11-16T14:45:44.0433747Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:44.0434143Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:44.0434771Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:44.0435179Z   SQLX_OFFLINE: true
+2026-11-16T14:45:44.0435591Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:44.0436112Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:44.0436456Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:44.0436980Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:44.0437457Z   TEST_DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:44.0437994Z   VAULT_AUTHORING_BROWSER_FIXTURES: /tmp/vault-authoring-browser
+2026-11-16T14:45:44.0438430Z ##[endgroup]
+2026-11-16T14:45:44.2380431Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:44.2561732Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:44.2633627Z 
+2026-11-16T14:45:44.2634470Z running 1 test
+2026-11-16T14:45:45.1857579Z test adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata ... ok
+2026-11-16T14:45:45.1858189Z 
+2026-11-16T14:45:45.1858604Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.92s
+2026-11-16T14:45:45.1859158Z 
+2026-11-16T14:45:45.3843680Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:45.4021598Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:45.4098299Z 
+2026-11-16T14:45:45.4098725Z running 1 test
+2026-11-16T14:45:46.7890391Z test adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup ... ok
+2026-11-16T14:45:46.7891075Z 
+2026-11-16T14:45:46.7891579Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 1.38s
+2026-11-16T14:45:46.7891944Z 
+2026-11-16T14:45:47.9499351Z ✔ vault dark: native picker progress, escaped private metadata and recoverable consent (743.361295ms)
+2026-11-16T14:45:48.5364547Z ✔ vault light: native picker progress, escaped private metadata and recoverable consent (588.24999ms)
+2026-11-16T14:45:48.9458392Z ✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (409.70363ms)
+2026-11-16T14:45:49.3918490Z ✔ vault light: owner secrets start blank and reconnect failures remain recoverable (446.207279ms)
+2026-11-16T14:45:49.4095073Z ℹ tests 4
+2026-11-16T14:45:49.4095579Z ℹ suites 0
+2026-11-16T14:45:49.4096249Z ℹ pass 4
+2026-11-16T14:45:49.4096598Z ℹ fail 0
+2026-11-16T14:45:49.4096971Z ℹ cancelled 0
+2026-11-16T14:45:49.4097421Z ℹ skipped 0
+2026-11-16T14:45:49.4097747Z ℹ todo 0
+2026-11-16T14:45:49.4098130Z ℹ duration_ms 2513.009194

@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant' (23023275) panicked at src/adapters/persistence/workflow/channel_reply_recovery_tests.rs:12:59:
+called `Result::unwrap()` on an `Err` value: NotPresent
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 1.96s
+
