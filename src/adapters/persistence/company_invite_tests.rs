@@ -271,7 +271,7 @@ async fn security_email_identity_concurrent_address_change_defeats_stale_invite_
         "pending"
     );
     let membership: i64 = sqlx::query_scalar(
-        "SELECT COUNT(*) FROM company_members WHERE company_id = $1 AND user_id = $2",
+        "SELECT COUNT(*) FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
     )
     .bind(fixture.invite.company_id)
     .bind(fixture.claimant.id)
@@ -411,7 +411,12 @@ async fn postgres_company_invite_and_member_persistence_works() {
     assert_eq!(members[0].role, CompanyAccessRole::Admin);
 
     let changed = persistence
-        .update_member_role(company.id, member.id, CompanyAccessRole::Member)
+        .update_member_role(crate::use_cases::company_invite::MemberRoleChange {
+            actor_id: owner.id,
+            company_id: company.id,
+            member_user_id: member.id,
+            role: CompanyAccessRole::Member,
+        })
         .await
         .unwrap()
         .unwrap();
@@ -433,7 +438,11 @@ async fn postgres_company_invite_and_member_persistence_works() {
     .await
     .unwrap();
     persistence
-        .remove_member(company.id, member.id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: owner.id,
+            company_id: company.id,
+            member_user_id: member.id,
+        })
         .await
         .unwrap();
     let members_after = persistence
@@ -452,10 +461,16 @@ async fn postgres_company_invite_and_member_persistence_works() {
 
     // The owner's own member row is the anchor of their person principal, so it is not the
     // team-management surface's to remove.
-    persistence
-        .remove_member(company.id, owner.id)
-        .await
-        .unwrap();
+    assert!(matches!(
+        persistence
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: owner.id,
+                company_id: company.id,
+                member_user_id: owner.id,
+            })
+            .await,
+        Err(AppError::BadRequest(_))
+    ));
     let owner_kind: String = sqlx::query_scalar!(
         "SELECT kind FROM principals WHERE company_id = $1 AND user_id = $2",
         company.id,
@@ -549,13 +564,23 @@ async fn removing_a_member_demotes_their_principal_and_spares_the_owner() {
             .unwrap();
 
     persistence
-        .remove_member(company.id, member.id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: owner.id,
+            company_id: company.id,
+            member_user_id: member.id,
+        })
         .await
         .unwrap();
-    persistence
-        .remove_member(company.id, owner.id)
-        .await
-        .unwrap();
+    assert!(matches!(
+        persistence
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: owner.id,
+                company_id: company.id,
+                member_user_id: owner.id,
+            })
+            .await,
+        Err(AppError::BadRequest(_))
+    ));
 
     let (kind, user_id): (String, Option<Uuid>) =
         sqlx::query_as("SELECT kind, user_id FROM principals WHERE id = $1")

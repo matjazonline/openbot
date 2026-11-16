@@ -8,7 +8,6 @@ struct NoticeAssignment {
 
 async fn foreign_company(f: &DecisionFixture) -> (Uuid, Uuid) {
     let company = Uuid::new_v4();
-    let principal = Uuid::new_v4();
     crate::adapters::persistence::test_support::insert_company_with_owner(
         f.persistence().pool(),
         company,
@@ -17,15 +16,16 @@ async fn foreign_company(f: &DecisionFixture) -> (Uuid, Uuid) {
         f.admission.binding.target.actor.user_id(),
     )
     .await;
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
-        .bind(Uuid::new_v4())
-        .bind(company)
-        .bind(f.users[0])
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'Foreign')")
-        .bind(principal).bind(company).bind(f.users[0]).execute(f.persistence().pool()).await.unwrap();
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        f.persistence().pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        f.users[0],
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await
+    .as_uuid();
+
     (company, principal)
 }
 

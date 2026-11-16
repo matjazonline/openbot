@@ -64,7 +64,7 @@ impl OnboardingPersistence for PostgresOnboarding {
                 .await?
                 .ok_or_else(company_not_found)?;
         let role: String = sqlx::query_scalar(
-            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2 FOR SHARE",
+            "SELECT facts.role FROM department_members AS member JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id WHERE member.company_id = $1 AND member.root_user_id = $2 FOR SHARE OF member",
         )
         .bind(company_id)
         .bind(user_id)

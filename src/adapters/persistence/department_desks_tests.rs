@@ -143,16 +143,14 @@ async fn teammate_with_address(f: &Departments, label: &str) -> (Uuid, Principal
         .fetch_one(f.pool())
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role, access_level) \
-         VALUES ($1, $2, $3, 'member', 0)",
+    crate::adapters::persistence::test_support::insert_root_member(
+        f.pool(),
+        crate::domain::workflow::CompanyId::new(f.company),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.company)
-    .bind(user)
-    .execute(f.pool())
-    .await
-    .unwrap();
+    .await;
     let mut connection = f.pool().acquire().await.unwrap();
     let principal = crate::adapters::persistence::participant::create_person_principal_on(
         &mut connection,
@@ -614,9 +612,16 @@ async fn department_desk_members_only_removing_a_teammate_drops_only_derived_gra
     .await
     .unwrap();
     let before = reload(&f, room.id).await.settings_revision;
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, user)
-        .await
-        .unwrap();
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: user,
+        },
+    )
+    .await
+    .unwrap();
     let after = reload(&f, room.id).await;
     assert!(
         !derived(&after)

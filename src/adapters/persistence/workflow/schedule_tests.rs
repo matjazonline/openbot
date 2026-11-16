@@ -288,16 +288,15 @@ async fn member(fixture: &Fixture, role: &str) -> Uuid {
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-        .bind(Uuid::new_v4())
-        .bind(company)
-        .bind(user)
-        .bind(role)
-        .execute(pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'member')")
-        .bind(Uuid::new_v4()).bind(company).bind(user).execute(pool).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
+
     user
 }
 

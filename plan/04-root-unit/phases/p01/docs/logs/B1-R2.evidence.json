@@ -1,0 +1,241 @@
+{
+  "version": 1,
+  "round": "04RU-P01-B1-R2",
+  "artifact": "2a5714f52927de4b4b7d261ba970d95d2ed526d768f80ced4009c8b2dd7ab793",
+  "checks": [
+    {
+      "criteria": [
+        "R1",
+        "R2",
+        "R3",
+        "R4",
+        "R5",
+        "R6"
+      ],
+      "command": "bash scripts/test-network-isolation.sh cargo test --locked --offline --lib -- root_department_ root_membership_ root_competing_ provisioning_dispatch_tests native_mcp_actual_unknown_all_historical_proofs cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_without_immutable_guard --nocapture",
+      "fixture": "Task-owned PostgreSQL18 schema5/core5_test unless explicitly retained core4 history; task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-root-fifth-tests.txt",
+          "sha256": "4b6028ac7c5b0fb606867d3640011e94885b9432d8511873a3c43ccdc25376d7"
+        }
+      ],
+      "source_artifact": "e7f60808ad0ddd95d12c8e85cc5accb306030037e80dfd8b754425b793654247",
+      "reuse_reason": "Root/lifecycle and inherited production paths unchanged by F1 browser renderer/parser correction. Current affected browser/escalation/HTTP paths checked separately below."
+    },
+    {
+      "criteria": [
+        "R7"
+      ],
+      "command": "Schema5 corrected libtest binary with654 retained selectors under scripts/test-network-isolation.sh; exact baseline21HTTP-name comparison",
+      "fixture": "Task-owned PostgreSQL18 schema5/core5_test, task Cargo target",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-affected-fourth-tests.txt",
+          "sha256": "95f478e7c9e5f23d558146c002970d94e960e798312500524b85a85b9c8b87df"
+        },
+        {
+          "path": "logs/B1-affected-fourth-selectors.txt",
+          "sha256": "d6d5cb32af1ac87dde65a10cf508dee2ef8750b8463a1851239e010cb73e919d"
+        },
+        {
+          "path": "logs/B1-fourth-http-authorization-selection-result.json",
+          "sha256": "4980ffb2a2c9bd52fd4acea14fc9aec5681c417c094cbb6b70d243ca174c0839"
+        }
+      ],
+      "disposition": "652PASS/0FAIL/2ignored in328.47s. All21required HTTP authorization cases pass. Ignored external journeys are separately NOT EXERCISED.",
+      "source_artifact": "e7f60808ad0ddd95d12c8e85cc5accb306030037e80dfd8b754425b793654247",
+      "reuse_reason": "Root/lifecycle and inherited production paths unchanged by F1 browser renderer/parser correction. Current affected browser/escalation/HTTP paths checked separately below."
+    },
+    {
+      "criteria": [
+        "R4",
+        "R7",
+        "04RU-P01-B1-R1/F1"
+      ],
+      "command": "bash scripts/test-network-isolation.sh cargo test --locked --offline --lib -- root_membership_ authoring::tests::bindings_tests escalation_ authorization_tests --nocapture; select4decisive F1 regressions",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused-tests.txt",
+          "sha256": "2d44619df5ca817c7101aa381734a98b394d37e954dfbcd31d6ec27581f86104"
+        },
+        {
+          "path": "logs/B1-R2-F1-selection-result.json",
+          "sha256": "b3d1c09152cd298218f8e98ea13b375a78e33ca13f0cdf73d9e68cf3424d2831"
+        }
+      ],
+      "disposition": "All3new tests and widened Rust/SQL matrix PASS. Other exercised escalation consumers174PASS; sole old fixture assertion failure separately superseded by corrected exact test. New UI/worker source unchanged after this run; only existing raw-retirement test helper corrected."
+    },
+    {
+      "criteria": [
+        "R7"
+      ],
+      "command": "Exact21HTTP baseline-name comparison against current correction runner",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-http-authorization-selection-result.json",
+          "sha256": "4980ffb2a2c9bd52fd4acea14fc9aec5681c417c094cbb6b70d243ca174c0839"
+        },
+        {
+          "path": "logs/B1-R2-focused-tests.txt",
+          "sha256": "2d44619df5ca817c7101aa381734a98b394d37e954dfbcd31d6ec27581f86104"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "R5",
+        "R7"
+      ],
+      "command": "bash scripts/test-network-isolation.sh cargo test --locked --offline --lib workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history -- --nocapture",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2b-retirement-test.txt",
+          "sha256": "875b658321d957f4d8fa04d0f3d07401dfa41194d065f34c0e25d0b680755012"
+        }
+      ],
+      "disposition": "Exact current fixture proof retains external lifetime identity/historical actor, removes all memberships/roles/live access, preserves command/role history and denies retired actor reads.1PASS in2.67s."
+    },
+    {
+      "criteria": [
+        "R8"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --locked --offline --all-targets",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2b-sqlx-prepare.txt",
+          "sha256": "3cbf43a3f5df6877d2d35312a5c1d92a6382fc36530742079cd1f04214cfb137"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "R8"
+      ],
+      "command": "Unchanged retained source_modules harness --nocapture against new module tree; current libtest --list versus R1 and correction inventory",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2-source-reachability.txt",
+          "sha256": "57707e2c5108bd1121826907ebe61eac0bce505e09872c29326b8f51b8c288a9"
+        },
+        {
+          "path": "logs/B1-R2-test-inventory-delta.txt",
+          "sha256": "226a47c541d5cd423a52a642a479808d6c839941a01383fb022dd058aa9a4ce4"
+        },
+        {
+          "path": "logs/B1-R2b-test-inventory.txt",
+          "sha256": "dc567ecdd6c4b63ffd5d70702ca1c6e7603cfec0fe1b941dc6ace4859a49164c"
+        }
+      ],
+      "disposition": "8PASS; runner4724,3added/0removed since R1. Final raw-retirement helper adds no module or test name; current inventory byte-matches prior4724 inventory."
+    },
+    {
+      "criteria": [
+        "R8"
+      ],
+      "command": "cargo fmt --all -- --check; git diff --check; trail build; trail check",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R2b-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-R2b-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/B1-R2b-trail-build.txt",
+          "sha256": "17166bea24bcc15930b9d85a9104820c5e5ef060859f26dcdc4c0c71e636f7fd"
+        },
+        {
+          "path": "logs/B1-R2b-trail-check.txt",
+          "sha256": "31a2444d6542b7cdfb736a67d5599f99044a77600f9d0ba54a2a660f83269149"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "HISTORICAL-R5"
+      ],
+      "command": "Core4 root/provisioning/native focused tests",
+      "fixture": "Task-owned PostgreSQL18 schema5/core5_test unless explicitly retained core4 history; task Cargo target",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-root-fourth-tests.txt",
+          "sha256": "fcefcd2bc548a8e372f7cfb4ffdd645e72f87ca15c68eb2a4104d1c0bbbac553"
+        }
+      ],
+      "disposition": "Retained42/43 defect reproduction; superseded by fresh schema5 44/44 after independently accepted D1/r7 correction."
+    },
+    {
+      "criteria": [
+        "HISTORICAL-R7"
+      ],
+      "command": "Core3 affected654 diagnostic",
+      "fixture": "Task-owned PostgreSQL18 schema5/core5_test unless explicitly retained core4 history; task Cargo target",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-affected-third-tests.txt",
+          "sha256": "578608a8bdca9184d795118600f7633cb37951b29018f030313cde5e0329dbdd"
+        },
+        {
+          "path": "logs/B1-third-isolated-retries.txt",
+          "sha256": "091bcbf9fca3b591e227099404af36bc69923d091111e2c030f87513679e745a"
+        }
+      ],
+      "disposition": "Retains prior five failures and two ignored prerequisites. Four known failed fixtures/paths now pass schema5 focused44; broader corrected run is still required, no unrelated waiver."
+    },
+    {
+      "criteria": [
+        "HISTORICAL-R7-R2"
+      ],
+      "command": "Correction176 selector run before raw-retirement assertion correction",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused-tests.txt",
+          "sha256": "2d44619df5ca817c7101aa381734a98b394d37e954dfbcd31d6ec27581f86104"
+        }
+      ],
+      "disposition": "174PASS/1FAIL/1IGNORED. The only failure was the obsolete deletion assertion, superseded by current corrected2.67s PASS. Production code/new F1 proofs unchanged. No unresolved affected failure remains."
+    },
+    {
+      "criteria": [
+        "EXTERNAL-NATIVE-CLI",
+        "EXTERNAL-MEMORY-JOURNEY",
+        "MANUAL-BROWSER-JOURNEY"
+      ],
+      "command": "Default runner keeps explicitly ignored separate external/manual journeys unexecuted",
+      "fixture": "Task PostgreSQL18 schema5/core5_test, task Cargo target; own databases per isolated test",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/B1-affected-fourth-tests.txt",
+          "sha256": "95f478e7c9e5f23d558146c002970d94e960e798312500524b85a85b9c8b87df"
+        },
+        {
+          "path": "logs/B1-R2-focused-tests.txt",
+          "sha256": "2d44619df5ca817c7101aa381734a98b394d37e954dfbcd31d6ec27581f86104"
+        }
+      ],
+      "reason": "Native CLI/plugin checkout, live memory service and manual browser fixture journey require their separate harnesses. Current form regression invokes real GET/render and POST/save handlers with real persistence; no Chromium/manual-journey execution is claimed. Plan04 final gate remains pending."
+    }
+  ]
+}

@@ -35,3 +35,18 @@ pub struct InviteLevelChange {
     pub invite_id: Uuid,
     pub access_level: AccessLevel,
 }
+
+#[derive(Debug, Clone, Copy)]
+pub struct MemberRoleChange {
+    pub actor_id: Uuid,
+    pub company_id: Uuid,
+    pub member_user_id: Uuid,
+    pub role: CompanyAccessRole,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct RemoveCompanyMember {
+    pub actor_id: Uuid,
+    pub company_id: Uuid,
+    pub member_user_id: Uuid,
+}

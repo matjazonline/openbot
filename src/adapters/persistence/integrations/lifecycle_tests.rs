@@ -180,10 +180,21 @@ async fn vault_storage_host_company_membership_and_user_deletion_preserve_other_
         other,
     )
     .await;
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',0)").bind(Uuid::new_v4()).bind(company).bind(user).execute(f.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        f.pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     f.vault
         .persistence
-        .remove_member(company, user)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: other,
+            company_id: company,
+            member_user_id: user,
+        })
         .await
         .unwrap();
     assert!(f.vault.read_usable(&f.owner, account.id).await.is_ok());

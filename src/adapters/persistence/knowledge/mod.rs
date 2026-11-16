@@ -52,7 +52,7 @@ impl KnowledgeDocuments for PostgresPersistence {
     async fn access(&self, scope: KnowledgeScope) -> AppResult<LevelActor> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
-            let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = authorize(&mut tx, scope).await;
             tx.rollback().await.map_err(authority::database)?;
             result
@@ -62,7 +62,7 @@ impl KnowledgeDocuments for PostgresPersistence {
     async fn list(&self, scope: KnowledgeScope) -> AppResult<KnowledgeLibraryView> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
-            let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
                 let actor = authorize(&mut tx, scope).await?;
                 let layers = rows::visible(&mut tx, scope, actor.access_level).await?;
@@ -81,7 +81,7 @@ impl KnowledgeDocuments for PostgresPersistence {
     ) -> AppResult<()> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
-            let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
                 let actor = authorize(&mut tx, scope).await?;
                 authorize_layers(actor, layers)?;
@@ -100,7 +100,7 @@ impl KnowledgeDocuments for PostgresPersistence {
     ) -> AppResult<Vec<KnowledgeDocumentLayer>> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
-            let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+            let mut tx = authority::start(self.pool(), team_scope(scope), None).await?;
             let result = async {
                 let actor = authorize(&mut tx, scope).await?;
                 let layers: Vec<_> = documents
@@ -125,7 +125,7 @@ impl KnowledgeDocuments for PostgresPersistence {
     async fn delete(&self, command: DeleteKnowledgeLayer) -> AppResult<()> {
         let sent = AtomicBool::new(false);
         bounded(&sent, async {
-            let mut tx = authority::start(self.pool(), team_scope(command.scope)).await?;
+            let mut tx = authority::start(self.pool(), team_scope(command.scope), None).await?;
             let result = async {
                 let actor = authorize(&mut tx, command.scope).await?;
                 let layer = rows::one_visible(&mut tx, command, actor.access_level).await?;

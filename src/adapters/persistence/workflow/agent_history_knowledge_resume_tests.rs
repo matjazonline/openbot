@@ -110,7 +110,7 @@ fn knowledge_turn() -> LlmTurn {
 async fn agent_history_level_later_real_knowledge_then_human_wait_refuses_downgraded_resume_before_provider()
  {
     let mut case = Box::pin(WaitingKnowledge::new(vec![knowledge_turn()])).await;
-    assert_eq!(sqlx::query("UPDATE company_members AS member SET access_level=0 FROM workflow_runs AS run WHERE member.company_id=run.company_id AND member.user_id=run.actor_id AND run.company_id=$1 AND run.id=$2")
+    assert_eq!(sqlx::query("UPDATE department_members AS member SET access_level=0 FROM workflow_runs AS run WHERE member.company_id=run.company_id AND member.root_user_id=run.actor_id AND run.company_id=$1 AND run.id=$2")
         .bind(case.f.claim.fence.scope.company.as_uuid()).bind(case.f.claim.fence.scope.run.as_uuid()).execute(case.f.p().pool()).await.unwrap().rows_affected(),1);
     approve(&mut case.f).await;
     let result = Box::pin(

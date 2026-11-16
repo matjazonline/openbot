@@ -111,12 +111,14 @@ async fn knowledge_run_level_tool_refusal_is_typed_and_contains_no_content() {
 async fn knowledge_run_level_verified_member_email_uses_current_member_level() {
     let setup = Box::pin(send(&[To::User])).await;
     let company = setup.scope().company.as_uuid();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(setup.user)
-        .execute(setup.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(setup.user)
+    .execute(setup.pool())
+    .await
+    .unwrap();
     sqlx::query("UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1")
         .bind(setup.user)
         .execute(setup.pool())
@@ -172,12 +174,14 @@ async fn knowledge_run_level_sql_freeze_constraint_matches_pure_release_matrix()
 async fn verified_route_recipient(setup: &Setup) -> String {
     let company = setup.scope().company.as_uuid();
     let mut tx = setup.pool().begin().await.unwrap();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(setup.user)
-        .execute(&mut *tx)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(setup.user)
+    .execute(&mut *tx)
+    .await
+    .unwrap();
     let email: String = sqlx::query_scalar(
         "UPDATE users SET email_verified_at=clock_timestamp() WHERE id=$1 RETURNING email::text",
     )
@@ -208,7 +212,7 @@ async fn verified_route_recipient(setup: &Setup) -> String {
 async fn member_route_wait(observer: &mut PgConnection, blocker: i32) {
     tokio::time::timeout(std::time::Duration::from_secs(2),async{
         loop {
-            let waiting:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE $1=ANY(pg_blocking_pids(activity.pid)) AND activity.wait_event_type='Lock' AND activity.query LIKE 'SELECT principal.id, account.email FROM company_members%')")
+            let waiting:bool=sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity AS activity WHERE $1=ANY(pg_blocking_pids(activity.pid)) AND activity.wait_event_type='Lock' AND activity.query LIKE 'SELECT principal.id, account.email FROM department_members%')")
                 .bind(blocker).fetch_one(&mut *observer).await.unwrap();
             if waiting{return;}
             tokio::time::sleep(std::time::Duration::from_millis(5)).await;

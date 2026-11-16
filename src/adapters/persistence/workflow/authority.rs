@@ -19,10 +19,11 @@ pub(super) async fn authorize_reviewer_on(
         .await?
         .ok_or_else(missing)?;
     let (principal, role): (Uuid, String) = sqlx::query_as(
-        "SELECT principal.id, member.role FROM company_members AS member \
+        "SELECT principal.id, facts.role FROM department_members AS member \
+         JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id \
          JOIN principals AS principal ON principal.company_id = member.company_id \
-           AND principal.user_id = member.user_id AND principal.kind = 'person' \
-         WHERE member.company_id = $1 AND member.user_id = $2 \
+           AND principal.user_id = member.root_user_id AND principal.kind = 'person' \
+         WHERE member.company_id = $1 AND member.root_user_id = $2 \
          ORDER BY principal.id LIMIT 1 \
          FOR SHARE OF member, principal",
     )
@@ -71,9 +72,10 @@ pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
         access_level: i16,
     }
     let facts=sqlx::query_as::<_,MemberAuthority>(
-        &locks.sql("SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
-         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
-         WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' \
+        &locks.sql("SELECT facts.role, facts.access_level::smallint AS access_level FROM department_members AS member \
+         JOIN LATERAL membership_of(member.root_user_id, member.company_id) AS facts ON facts.id = member.id \
+         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id \
+         WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' \
          FOR SHARE OF member,principal"))
         .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
     let membership = membership_from_db(Some(&facts.role))?;

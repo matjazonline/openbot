@@ -68,7 +68,11 @@ async fn workflow_reviewer_principal_retirement_cancels_pending_and_inflight_not
         match retirement {
             Retirement::Membership => f
                 .persistence()
-                .remove_member(f.scope.company.as_uuid(), f.users[0])
+                .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                    actor_id: f.admission.binding.target.actor.user_id(),
+                    company_id: f.scope.company.as_uuid(),
+                    member_user_id: f.users[0],
+                })
                 .await
                 .unwrap(),
             Retirement::Account => f

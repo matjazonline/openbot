@@ -144,7 +144,7 @@ async fn knowledge_run_level_publication_first_serializes_address_change_and_wor
     let publisher: i32 = sqlx::query_scalar(
         "SELECT activity.pid FROM pg_stat_activity AS activity \
         WHERE $1=ANY(pg_blocking_pids(activity.pid)) AND activity.wait_event_type='Lock' \
-          AND activity.query LIKE 'SELECT principal.id, account.email FROM company_members%'",
+          AND activity.query LIKE 'SELECT principal.id, account.email FROM department_members%'",
     )
     .bind(gate.backend)
     .fetch_one(&mut *observer)

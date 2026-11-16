@@ -125,7 +125,7 @@ async fn workflow_decision_nonmember_and_removed_membership_are_hidden() {
         WorkflowActor::authenticated(outsider.id).unwrap(),
     )
     .await;
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(f.users[0])
         .execute(f.persistence().pool())
@@ -142,7 +142,7 @@ enum Revocation {
 async fn revoke(tx: &mut Transaction<'_, Postgres>, f: &DecisionFixture, kind: Revocation) {
     match kind {
         Revocation::Membership => {
-            sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+            sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
                 .bind(f.scope.company.as_uuid())
                 .bind(f.users[0])
                 .execute(&mut **tx)
@@ -285,7 +285,11 @@ async fn workflow_decision_production_removal_preserves_open_and_settled_history
         }
         let before = history(&f, &view).await;
         f.persistence()
-            .remove_member(f.scope.company.as_uuid(), f.users[0])
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.admission.binding.target.actor.user_id(),
+                company_id: f.scope.company.as_uuid(),
+                member_user_id: f.users[0],
+            })
             .await
             .unwrap();
         assert_eq!(history(&f, &view).await, before);
@@ -334,7 +338,15 @@ async fn workflow_decision_submission_blocks_actual_removal_until_commit() {
         f.scope.company.as_uuid(),
         f.users[0],
     );
-    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    let removing_owner = f.admission.binding.target.actor.user_id();
+    let removal = tokio::spawn(async move {
+        p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: removing_owner,
+            company_id: company,
+            member_user_id: user,
+        })
+        .await
+    });
     await_blocked_removal(f.persistence().pool()).await;
     blocker.commit().await.unwrap();
     assert_eq!(
@@ -392,7 +404,15 @@ async fn workflow_decision_park_blocks_actual_removal_until_notice_commit() {
         f.scope.company.as_uuid(),
         f.users[0],
     );
-    let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    let removing_owner = f.admission.binding.target.actor.user_id();
+    let removal = tokio::spawn(async move {
+        p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: removing_owner,
+            company_id: company,
+            member_user_id: user,
+        })
+        .await
+    });
     await_blocked_removal(f.persistence().pool()).await;
     blocker.commit().await.unwrap();
     assert!(park.await.unwrap().unwrap().is_some());
@@ -419,7 +439,11 @@ async fn workflow_decision_removal_before_park_settles_unavailable() {
     use crate::use_cases::company_invite::CompanyInvitePersistence;
     let f = Box::pin(DecisionFixture::new(1, None)).await;
     f.persistence()
-        .remove_member(f.scope.company.as_uuid(), f.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: f.users[0],
+        })
         .await
         .unwrap();
     assert!(

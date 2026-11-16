@@ -27,6 +27,9 @@ fn create_payload(name: &str) -> DepartmentCreatePayload {
     }
 }
 
+#[path = "root_department_route_tests.rs"]
+mod root;
+
 #[tokio::test]
 async fn department_routes_hide_foreign_companies_and_refuse_members_and_strangers() {
     let Some(f) = Fixture::new().await else {
@@ -179,7 +182,11 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
     let body = axum::body::to_bytes(listed.into_body(), 65536)
         .await
         .unwrap();
-    assert_eq!(body.as_ref(), b"[]");
+    let listed: Vec<serde_json::Value> = serde_json::from_slice(&body).unwrap();
+    assert_eq!(listed.len(), 1);
+    assert_eq!(listed[0]["is_root"], true);
+    assert_eq!(listed[0]["company_id"], serde_json::json!(f.company.id));
+    assert_eq!(listed[0]["slug"], serde_json::json!(f.company.slug));
     // And the department survived every refused write.
     assert_eq!(
         departments

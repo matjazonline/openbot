@@ -65,7 +65,11 @@ impl AuditFixture {
     async fn demote(&self) {
         self.departments
             .persistence
-            .remove_member(self.departments.company, self.departments.member)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: self.departments.owner,
+                company_id: self.departments.company,
+                member_user_id: self.departments.member,
+            })
             .await
             .unwrap();
     }
@@ -174,6 +178,17 @@ async fn workflow_reviewer_follow_retirement_audit_history_survives_principal_de
         .execute(&mut *tx)
         .await
         .unwrap();
+    crate::adapters::persistence::company::join_root_on(
+        &mut tx,
+        crate::adapters::persistence::company::RootJoin {
+            company: CompanyId::new(f.departments.company),
+            user: f.departments.member,
+            role: crate::entities::company_member::CompanyAccessRole::Member,
+            access_level: crate::entities::access_level::AccessLevel::PUBLIC,
+        },
+    )
+    .await
+    .unwrap();
     tx.commit().await.unwrap();
     f.departments
         .use_cases
@@ -298,7 +313,11 @@ async fn workflow_reviewer_follow_retirement_audit_rejects_corrupt_actual_source
         let error = f
             .departments
             .persistence
-            .remove_member(f.departments.company, f.departments.member)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.departments.owner,
+                company_id: f.departments.company,
+                member_user_id: f.departments.member,
+            })
             .await
             .unwrap_err();
         assert!(

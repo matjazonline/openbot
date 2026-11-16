@@ -94,8 +94,18 @@ fn start_action(set: &mut JoinSet<Outcome>, f: &Fixture, user: Uuid, target: Uui
 fn start_retirement(set: &mut JoinSet<Outcome>, f: &Fixture, user: Uuid) {
     let store = f.persistence.clone();
     let company = f.company.id;
-    let work: Pin<Box<dyn Future<Output = Outcome> + Send>> =
-        Box::pin(async move { Outcome::Retirement(store.remove_member(company, user).await) });
+    let removing_owner = f.owner;
+    let work: Pin<Box<dyn Future<Output = Outcome> + Send>> = Box::pin(async move {
+        Outcome::Retirement(
+            store
+                .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                    actor_id: removing_owner,
+                    company_id: company,
+                    member_user_id: user,
+                })
+                .await,
+        )
+    });
     set.spawn(work);
 }
 

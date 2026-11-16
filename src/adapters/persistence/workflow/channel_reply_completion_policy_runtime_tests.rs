@@ -26,7 +26,7 @@ async fn channel_reply_completion_revoked_send_role_still_permits_suppression() 
             },
         )
         .await;
-        sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
             .bind(f.scope.company.as_uuid())
             .bind(admin)
             .execute(f.p.pool())
@@ -163,12 +163,14 @@ async fn channel_reply_completion_private_result_cannot_cross_public_reply_clear
     .execute(f.p.pool())
     .await
     .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.scope.company.as_uuid())
-        .bind(recipient)
-        .execute(f.p.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(recipient)
+    .execute(f.p.pool())
+    .await
+    .unwrap();
     assert_eq!(f.advance().await.disposition, BatchDisposition::Failed);
     assert_eq!(f.state().await["proposals"], 0);
     assert_eq!(f.state().await["decision"], Value::Null);
@@ -195,8 +197,14 @@ pub(super) async fn verified_recipient(s: &Intents) -> Uuid {
         .execute(s.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',5)")
-        .bind(Uuid::new_v4()).bind(s.fixture.target.company.as_uuid()).bind(account.id).execute(s.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        s.pool(),
+        crate::domain::workflow::CompanyId::new(s.fixture.target.company.as_uuid()),
+        account.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
+    )
+    .await;
     sqlx::query("UPDATE principals SET kind='person',user_id=$3 WHERE company_id=$1 AND id=$2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(sender.principal_id)
@@ -215,7 +223,7 @@ async fn channel_reply_completion_privileged_reviewers_still_require_payload_cle
         let s = Intents::new().await;
         verified_recipient(&s).await;
         let reviewer = member(&s.fixture, "admin").await;
-        sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("UPDATE department_members SET access_level=$3::smallint WHERE company_id=$1 AND root_user_id=$2")
             .bind(s.fixture.target.company.as_uuid()).bind(reviewer).bind(initial_level as i16).execute(s.pool()).await.unwrap();
         let policy =
             ReplyApprovalPolicy::new(vec![s.fixture.principal(reviewer).await], 60).unwrap();
@@ -246,12 +254,14 @@ async fn channel_reply_completion_privileged_reviewers_still_require_payload_cle
         assert_eq!(result.disposition, BatchDisposition::Deferred);
         let mut command = f.command("approve").await;
         command.actor = WorkflowActor::authenticated(reviewer).unwrap();
-        sqlx::query("UPDATE company_members SET access_level=1 WHERE company_id=$1 AND user_id=$2")
-            .bind(f.scope.company.as_uuid())
-            .bind(reviewer)
-            .execute(f.p.pool())
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE department_members SET access_level=1 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(f.scope.company.as_uuid())
+        .bind(reviewer)
+        .execute(f.p.pool())
+        .await
+        .unwrap();
         let view =
             f.p.read_decision(f.scope.company, command.actor, command.decision)
                 .await
@@ -346,12 +356,14 @@ async fn channel_reply_completion_release_revocation_and_finalization_do_not_dea
             .execute(&mut *tx)
             .await
             .unwrap();
-        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-            .bind(f.scope.company.as_uuid())
-            .bind(recipient)
-            .execute(&mut *tx)
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(f.scope.company.as_uuid())
+        .bind(recipient)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
         tx.commit().await.unwrap();
     };
     let (complete, ()) = tokio::time::timeout(Duration::from_secs(5), async {

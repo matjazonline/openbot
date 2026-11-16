@@ -71,21 +71,14 @@ impl Fixture {
     /// then the person principal (and with it, the address).
     async fn join(&self, user: Uuid, username: &str) -> Uuid {
         let mut transaction = self.pool().begin().await.unwrap();
-        sqlx::query(
-            "INSERT INTO company_members (id, company_id, user_id, role, access_level) \
-             VALUES ($1, $2, $3, 'member', 1)",
-        )
-        .bind(Uuid::new_v4())
-        .bind(self.company.id)
-        .bind(user)
-        .execute(&mut *transaction)
-        .await
-        .unwrap();
         let email = email_of(self.pool(), user).await;
         let principal =
             create_person_principal_on(&mut transaction, self.company.id, user, username, &email)
                 .await
                 .unwrap();
+        root_membership_on(&mut transaction, self.company.id, principal)
+            .await
+            .unwrap();
         transaction.commit().await.unwrap();
         principal.as_uuid()
     }
@@ -147,6 +140,22 @@ async fn company(persistence: &PostgresPersistence, owner: Uuid) -> Company {
     )
     .await
     .unwrap()
+}
+
+// The resolver's fixture transaction adds its mandatory root membership after creating or
+// restoring the person. Keeping this separate leaves address collision/restoration under test.
+async fn root_membership_on(
+    db: &mut sqlx::PgConnection,
+    company: Uuid,
+    principal: crate::entities::transport::PrincipalId,
+) -> crate::app_error::AppResult<()> {
+    sqlx::query(
+        "INSERT INTO department_members (company_id, department_id, principal_id, access_level) \
+         SELECT $1, root.id, $2, 1 FROM departments AS root WHERE root.company_id = $1 AND root.is_root \
+         ON CONFLICT (department_id, principal_id) DO NOTHING",
+    )
+    .bind(company).bind(principal.as_uuid()).execute(db).await?;
+    Ok(())
 }
 
 async fn email_of(pool: &PgPool, user: Uuid) -> String {
@@ -461,7 +470,11 @@ async fn address_namespace_person_paths_leave_exactly_one_address() {
 
     // Removal demotes and frees the slug; rejoining derives a fresh one.
     f.persistence
-        .remove_member(f.company.id, erin)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: erin,
+        })
         .await
         .unwrap();
     assert!(
@@ -556,19 +569,14 @@ async fn address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner()
         let name = gale_name.clone();
         tokio::spawn(async move {
             let mut transaction = pool.begin().await.unwrap();
-            sqlx::query(
-                "INSERT INTO company_members (id, company_id, user_id, role, access_level) \
-                 VALUES ($1, $2, $3, 'member', 1)",
-            )
-            .bind(Uuid::new_v4())
-            .bind(company)
-            .bind(gale)
-            .execute(&mut *transaction)
-            .await
-            .unwrap();
             let email = format!("{name}@example.test");
             let principal =
                 create_person_principal_on(&mut transaction, company, gale, &name, &email).await;
+            if let Ok(id) = principal.as_ref() {
+                root_membership_on(&mut transaction, company, *id)
+                    .await
+                    .unwrap();
+            }
             transaction.commit().await.map(|()| principal)
         })
     };
@@ -734,7 +742,16 @@ async fn address_namespace_competing_held_edit_then_removal_leave_no_address_on_
     let removing = {
         let persistence = PostgresPersistence::new(f.pool().clone());
         let company = f.company.id;
-        tokio::spawn(async move { persistence.remove_member(company, kai).await })
+        let removing_owner = f.owner;
+        tokio::spawn(async move {
+            persistence
+                .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                    actor_id: removing_owner,
+                    company_id: company,
+                    member_user_id: kai,
+                })
+                .await
+        })
     };
     wait_until_a_backend_is_blocked(f.pool()).await;
     edit.commit().await.unwrap();

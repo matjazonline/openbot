@@ -1,0 +1,28 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+CREATE FUNCTION
+CREATE TRIGGER
+CREATE FUNCTION
+CREATE TRIGGER
+INSERT 0 1
+INSERT 0 1
+INSERT 0 1
+INSERT 0 3
+INSERT 0 1
+INSERT 0 1
+DO
+DELETE 1
+SET CONSTRAINTS
+DO
+                                                                       result                                                                       
+----------------------------------------------------------------------------------------------------------------------------------------------------
+ PASS: parent-absence immutability, tenant cascades before transition-table statement cleanup, channel->department->principal, deferred FKs checked
+(1 row)
+
+ROLLBACK

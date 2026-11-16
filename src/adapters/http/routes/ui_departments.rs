@@ -131,7 +131,7 @@ pub(super) async fn department_section(
             detail,
             choices: &choices,
             choices_cut,
-            editable,
+            membership: access.membership,
             error,
             notice,
         },

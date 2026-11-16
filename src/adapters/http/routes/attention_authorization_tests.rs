@@ -193,7 +193,7 @@ async fn department_views_attention_reads_only_the_departments_desks() {
     .id;
     let sales = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, created_by) VALUES ($1, $2, 'Sales', \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), 'Sales', \
          'sales', '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(sales)

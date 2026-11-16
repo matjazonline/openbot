@@ -1,0 +1,88 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 182 changed files against 16 learnings and 4 skills
+
+● migrations/20260817000000_init_schema.sql:648
+  brings back company ownership owner, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/company_invite.rs:496
+  brings back company owner account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/company_owner_tests.rs:227
+  brings back take company ownership, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/local_agents/native_mcp_workflow_test_support.rs:68
+  brings back company owner account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/test_support.rs:522
+  brings back company owner account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/test_support.rs:544
+  brings back grant exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● src/adapters/persistence/workflow/authority.rs:75
+  brings back fact company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/escalation_refusal_tests.rs:234
+  brings back company owner account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● src/adapters/persistence/workflow/knowledge_message_tests.rs:215
+  brings back wait account lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/local_agent_mcp_history_tests.rs:174
+  brings back native account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/persistence/workflow/message.rs:413
+  brings back account company lock, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Preserve the single pending-ID owner, fixed cancellation message, current-source
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Keep userDataDir, HOME, sandbox, TLS and process receipts under
+✓ src/adapters/http/pages/company_departments.rs
+  follows skill implement-opus-reviewed-2_3: After resolving root's role, spawn B and, only if
+✓ src/adapters/http/pages/company_departments.rs
+  follows skill implement-opus-reviewed-2_4: After resolving root's role, spawn B and, only if
+✓ src/adapters/http/routes/ui_conversation_stream_tests.rs
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ src/adapters/http/routes/ui_direct_revocation_tests.rs
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ src/adapters/http/routes/ui_direct_tests.rs
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ src/adapters/http/routes/ui_message_tests.rs
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+
+· no conflicts · 11 worth a look

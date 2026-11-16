@@ -14,8 +14,8 @@ async fn owned(f: &HistoryThread, claim: &ClaimedWorkflow, charter: &str) -> Uui
             .unwrap();
     let department = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, charter, created_by) \
-         VALUES ($1, $2, 'Sales', 'sales', $3, \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, charter, created_by) \
+         VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), 'Sales', 'sales', $3, \
            '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(department)
@@ -97,8 +97,8 @@ async fn department_views_runs_narrow_to_the_departments_desks() {
     let sales = DepartmentId::new(owned(&f, &claim, "Sell.").await);
     let other = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, created_by) \
-         VALUES ($1, $2, 'Other', 'other', \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) \
+         VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), 'Other', 'other', \
            '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(other)

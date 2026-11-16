@@ -94,7 +94,7 @@ pub(super) async fn member_on(
     company: Uuid,
     user: Uuid,
 ) -> AppResult<()> {
-    let person:Option<Uuid>=sqlx::query_scalar("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
+    let person:Option<Uuid>=sqlx::query_scalar("SELECT member.root_user_id FROM department_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id WHERE member.company_id=$1 AND member.root_user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
         .bind(company).bind(user).fetch_optional(&mut **tx).await?;
     person.map(|_| ()).ok_or_else(denied)
 }

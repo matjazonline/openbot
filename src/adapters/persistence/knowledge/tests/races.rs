@@ -47,12 +47,14 @@ async fn knowledge_upload_demotion_after_preflight_or_before_a_waiting_write_ref
         .execute(&mut *demotion)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.member.company.as_uuid())
-        .bind(f.member.actor_id)
-        .execute(&mut *demotion)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.member.company.as_uuid())
+    .bind(f.member.actor_id)
+    .execute(&mut *demotion)
+    .await
+    .unwrap();
     let store = f.store.clone();
     let scope = f.member;
     let writer = tokio::spawn(async move { store.replace(scope, &documents).await });

@@ -102,7 +102,7 @@ async fn retire_original(s: &Setup, response: &NativeMcpResponse) {
         .unwrap();
     sqlx::query("DELETE FROM principals WHERE company_id=$1 AND user_id=(SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2)")
         .bind(s.scope.company.as_uuid()).bind(response.run_id.as_uuid()).execute(p.pool()).await.unwrap();
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=(SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2)")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=(SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2)")
         .bind(s.scope.company.as_uuid()).bind(response.run_id.as_uuid()).execute(p.pool()).await.unwrap();
     sqlx::query("UPDATE agent_binding_grants SET revoked_at=clock_timestamp() WHERE company_id=$1")
         .bind(s.scope.company.as_uuid())
@@ -168,4 +168,49 @@ async fn native_mcp_workflow_unknown_history_survives_real_parent_cancel_machine
             .await
             .unwrap();
     assert_eq!(state, "cancelled");
+}
+
+#[tokio::test]
+async fn root_department_company_and_account_teardown_remove_tree_documents_and_native_history() {
+    use crate::adapters::persistence::test_support::root_teardown::{Teardown, tree_and_document};
+    for operation in [Teardown::Company, Teardown::Account] {
+        let (s, _native, _response, remote) = Box::pin(unknown()).await;
+        let p = &s.fixture.persistence;
+        let owner = s.fixture.target.actor.user_id();
+        let foreign =
+            crate::adapters::persistence::test_support::root_teardown::native::assert_relationships(
+                p,
+                s.scope.company,
+                owner,
+            )
+            .await;
+        crate::adapters::persistence::test_support::root_teardown::dispatch::assert_relationship(
+            p,
+            s.scope.company,
+            foreign,
+        )
+        .await;
+        Box::pin(tree_and_document(p, s.scope.company, owner)).await;
+        let history: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM native_mcp_calls WHERE company_id=$1")
+                .bind(s.scope.company.as_uuid())
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        assert!(
+            history > 0,
+            "actual native calls were persisted before teardown"
+        );
+        let refused = sqlx::query("DELETE FROM native_mcp_calls WHERE company_id=$1")
+            .bind(s.scope.company.as_uuid())
+            .execute(p.pool())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            refused.as_database_error().unwrap().code().as_deref(),
+            Some("23514")
+        );
+        Box::pin(operation.remove(p, s.scope.company, owner)).await;
+        assert_eq!(remote.calls(), 1);
+    }
 }

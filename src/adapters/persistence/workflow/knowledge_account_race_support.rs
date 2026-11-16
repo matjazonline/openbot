@@ -57,12 +57,14 @@ pub(super) async fn member_gate(setup: &Setup) -> MemberGate {
         .fetch_one(&mut *transaction)
         .await
         .unwrap();
-    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
-        .bind(setup.scope().company.as_uuid())
-        .bind(setup.user)
-        .execute(&mut *transaction)
-        .await
-        .unwrap();
+    sqlx::query(
+        "SELECT id FROM department_members WHERE company_id=$1 AND root_user_id=$2 FOR UPDATE",
+    )
+    .bind(setup.scope().company.as_uuid())
+    .bind(setup.user)
+    .execute(&mut *transaction)
+    .await
+    .unwrap();
     MemberGate {
         transaction,
         backend,

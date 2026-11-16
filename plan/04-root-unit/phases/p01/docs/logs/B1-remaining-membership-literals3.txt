@@ -1,0 +1,17 @@
+src/infra/config.rs:110:    /// Deliberately deploy-controlled rather than a database role: `company_members.role` grants
+src/adapters/persistence/company_tests.rs:12:/// whether its `is_owner` projection and its `company_members` join do what they claim.
+src/adapters/persistence/participant.rs:741:        // at `company_members`, where that pair does not exist.
+src/adapters/persistence/address_tests/notifications.rs:77:         FROM notification_events AS event JOIN company_members AS membership \
+src/adapters/persistence/local_agents/native_mcp_workflow_test_support.rs:68:        'actor_live',EXISTS(SELECT 1 FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id JOIN users AS account ON account.id=member.user_id WHERE member.company_id=call.company_id AND member.user_id=call.actor_id AND member.role IN ('owner','admin') AND principal.kind='person'),
+src/adapters/persistence/company_access_level_race_tests.rs:97:        "UPDATE company_members SET role='owner',access_level=9 WHERE company_id=$1 AND user_id=$2",
+src/adapters/persistence/delivery/tenant_tests.rs:302:    sqlx::query("SELECT 1 FROM principals AS principal JOIN company_members AS member ON member.company_id = principal.company_id AND member.user_id = principal.user_id WHERE principal.company_id = $1 AND principal.id = $2 FOR SHARE OF principal, member")
+src/adapters/persistence/delivery/tenant_tests.rs:364:               JOIN company_members AS member \
+src/adapters/persistence/company_owner_tests.rs:3://! `companies.user_id` and the owner's `company_members` row are checked against each other at
+src/adapters/persistence/company_owner_tests.rs:177:            "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/company_owner_tests.rs:200:            "DELETE FROM company_members WHERE company_id = $1 AND user_id = $2",
+src/adapters/persistence/agent_retire_tests.rs:265:        "company_members",
+src/application/use_cases/participant/test_support.rs:126:/// Production answers this by joining a principal to its `company_members` row, inside the same
+src/application/use_cases/company_invite_tests.rs:524:    // The two doubles stand for one `company_members` table: acceptance wrote the row the
+src/adapters/persistence/workflow/message_authority_tests.rs:80:        "UPDATE company_members SET role='member' WHERE company_id='{company}' AND user_id='{owner}'; \
+src/adapters/persistence/workflow/message_authority_tests.rs:81:         UPDATE company_members SET role='owner', access_level=9 WHERE company_id='{company}' AND user_id='{user}'; \
+src/adapters/persistence/workflow/control_acceptance_tests.rs:358:    for table in ["principals", "company_members"] {

@@ -488,7 +488,7 @@ async fn message_intent_refused_run_as_is_visible_and_spares_its_sibling() {
     let admin = member(&s.fixture, "admin").await;
     let removed = s.binding(MessageTrigger::Any, Some(admin)).await;
     let sibling = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())
@@ -1325,7 +1325,7 @@ async fn attention_groups_a_bindings_refusals_into_one_team_work_row() {
     let admin = member(&s.fixture, "admin").await;
     let removed = s.binding(MessageTrigger::Any, Some(admin)).await;
     let sibling = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())
@@ -1440,7 +1440,7 @@ async fn message_outcomes_lookup_and_activity_read_every_binding_of_a_message() 
     let refused = s.binding(MessageTrigger::Any, Some(admin)).await;
     let first = s.binding(MessageTrigger::Any, None).await;
     let second = s.binding(MessageTrigger::Any, None).await;
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id = $1 AND user_id = $2")
         .bind(s.fixture.target.company.as_uuid())
         .bind(admin)
         .execute(s.pool())

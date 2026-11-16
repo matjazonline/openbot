@@ -58,7 +58,7 @@ async fn builder(d: &Deployment) -> Uuid {
 /// A verified company member with `role`, whose address is theirs.
 async fn person(d: &Deployment, role: &str) -> (Uuid, String) {
     let (user, email) = verified_member(&d.fixture).await;
-    sqlx::query("UPDATE company_members SET role = $2 WHERE user_id = $1")
+    sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.root_user_id = $1 AND $2::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.root_user_id = $1 AND $2::text='admin' ON CONFLICT DO NOTHING")
         .bind(user)
         .bind(role)
         .execute(d.p().pool())
@@ -888,6 +888,7 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
          You answer as this department's lead.\n\
          Desks around this department:\n\
          - This department's desk: {}\n\
+         - Parent department Workflow tests (workflow-tests): no address\n\
          - Agent helper (helper): {}\n\
          - Agent ops-lead (ops-lead, lead): {}\n\n",
         d.address("ops"),

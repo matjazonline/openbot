@@ -50,8 +50,7 @@ pub(super) async fn run_levels_on<'e>(
         FROM workflow_runs AS run
         JOIN companies AS company ON company.id = run.company_id
         JOIN users AS account ON account.id = $3
-        LEFT JOIN company_members AS member
-          ON (member.company_id, member.user_id) = (run.company_id, account.id)
+        LEFT JOIN LATERAL membership_of(account.id, run.company_id) AS member ON true
         WHERE run.company_id = $1 AND run.id = ANY($2)
     "#,
     )
@@ -78,8 +77,7 @@ pub(super) async fn message_levels_on<'e>(
         FROM messages AS message
         JOIN companies AS company ON company.id = message.company_id
         JOIN users AS account ON account.id = $3
-        LEFT JOIN company_members AS member
-          ON (member.company_id, member.user_id) = (message.company_id, account.id)
+        LEFT JOIN LATERAL membership_of(account.id, message.company_id) AS member ON true
         WHERE message.company_id = $1 AND message.id = ANY($2)
     "#,
     )
@@ -106,7 +104,7 @@ pub(super) async fn delivery_levels_on<'e>(
            JOIN messages AS message ON (message.company_id,message.id)=(delivery.company_id,delivery.message_id)
            JOIN companies AS company ON company.id=delivery.company_id
            JOIN users AS account ON account.id=$3
-           LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(delivery.company_id,account.id)
+           LEFT JOIN LATERAL membership_of(account.id, delivery.company_id) AS member ON true
            LEFT JOIN principals AS principal ON principal.company_id=delivery.company_id
                AND principal.user_id=account.id AND principal.kind='person'
            WHERE delivery.company_id=$1 AND delivery.id=ANY($2)

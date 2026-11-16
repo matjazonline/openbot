@@ -48,7 +48,7 @@ pub(super) fn reviewers() -> Value {
     array(
         json!({"anyOf":[
             object(json!({"kind":{"const":"principal"},"id":uuid()}), &["kind","id"]),
-            {"enum":["lead","reviewer"]}
+            {"enum":crate::entities::department::DepartmentRole::ALL.map(|role| role.as_str())}
         ]}),
         1,
         super::super::reviewers::MAX_REVIEWER_SELECTORS,

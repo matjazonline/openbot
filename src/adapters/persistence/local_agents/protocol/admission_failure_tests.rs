@@ -63,7 +63,7 @@ async fn cloudroom_commands_live_actor_withdrawal_races_first_dispatch_without_f
     };
     let withdrawal = async {
         barrier.wait().await;
-        sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
             .bind(c.f.company)
             .bind(c.f.admin)
             .execute(&c.f.database.pool)

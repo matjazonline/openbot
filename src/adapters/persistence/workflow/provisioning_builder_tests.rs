@@ -149,8 +149,8 @@ async fn agent_address_create_builder_places_the_agent_in_a_department() {
     let department = |slug: &'static str| async move {
         let id = Uuid::new_v4();
         sqlx::query(
-            "INSERT INTO departments (id, company_id, name, slug, created_by) \
-             VALUES ($1, $2, $3, $3, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
+            "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) \
+             VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), $3, $3, '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
         )
         .bind(id)
         .bind(company_id)
@@ -254,4 +254,38 @@ async fn agent_address_create_competing_builder_claimants_make_one_direct_bindin
         grew(&before, &written(&f).await),
         serde_json::from_str::<Value>(ONE_ASSISTANT).unwrap()
     );
+}
+
+#[tokio::test]
+async fn root_membership_builder_infers_no_working_department_but_accepts_an_explicit_root() {
+    let (f, claim) = claimed(false).await;
+    let pool = f.persistence().pool();
+    let tenant = company(&f).as_uuid();
+    let (root, slug): (Uuid, String) =
+        sqlx::query_as("SELECT id,slug::text FROM departments WHERE company_id=$1 AND is_root")
+            .bind(tenant)
+            .fetch_one(pool)
+            .await
+            .unwrap();
+    let implicit = call(
+        &f,
+        &claim,
+        ProvisioningKind::CreateAgent,
+        spec("implicit-root"),
+    )
+    .await;
+    let receipt = committed(&dispatch(&f), &implicit).await;
+    assert_eq!(receipt["agent"]["slug"], "implicit-root");
+    let mut specification = spec("explicit-root");
+    specification["department"] = json!(slug);
+    let explicit = call(&f, &claim, ProvisioningKind::CreateAgent, specification).await;
+    let receipt = committed(&dispatch(&f), &explicit).await;
+    assert_eq!(receipt["agent"]["slug"], "explicit-root");
+    let placed: Vec<(String, Uuid)> = sqlx::query_as(
+        "SELECT agent.slug::text,member.department_id FROM agents AS agent \
+         JOIN principals AS principal ON principal.company_id=agent.company_id AND principal.agent_id=agent.id \
+         JOIN department_members AS member ON member.company_id=principal.company_id AND member.principal_id=principal.id \
+         WHERE agent.company_id=$1 AND agent.slug IN ('implicit-root','explicit-root') ORDER BY agent.slug,member.department_id",
+    ).bind(tenant).fetch_all(pool).await.unwrap();
+    assert_eq!(placed, [("explicit-root".to_owned(), root)]);
 }

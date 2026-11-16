@@ -193,7 +193,7 @@ WITH params AS (
       ON escalation.company_id=progress.company_id AND escalation.id=progress.case_id
     JOIN companies AS company ON company.id=progress.company_id
     JOIN principals AS viewer ON viewer.company_id=company.id AND viewer.id=$3 AND viewer.kind='person'
-    JOIN company_members AS member ON member.company_id=viewer.company_id AND member.user_id=viewer.user_id
+    JOIN LATERAL membership_of(viewer.user_id, viewer.company_id) AS member ON true
     LEFT JOIN workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id
     LEFT JOIN workflow_admission_refusals AS refusal
       ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id
@@ -250,8 +250,7 @@ WITH params AS (
     LEFT JOIN principals AS actor
       ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
      AND actor.kind = 'person'
-     AND EXISTS (SELECT 1 FROM company_members AS member
-                 WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
+     AND EXISTS (SELECT 1 FROM membership_of(run.actor_id, run.company_id) AS member WHERE true)
     -- Only the newest attempt of this exact terminal execution can describe its refusal.
     LEFT JOIN LATERAL (
         SELECT attempt.workflow_failure_code, attempt.knowledge_content_level,
@@ -343,8 +342,7 @@ WITH params AS (
     LEFT JOIN principals AS actor
       ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
      AND actor.kind = 'person'
-     AND EXISTS (SELECT 1 FROM company_members AS member
-                 WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
+     AND EXISTS (SELECT 1 FROM membership_of(run.actor_id, run.company_id) AS member WHERE true)
     WHERE delivery.company_id = $1 AND (delivery.channel_id = ANY($2)
       OR ($15 AND principal_direct_can_view(delivery.company_id,delivery.principal_id,$3)))
       AND delivery.status IN ('outcome_unknown', 'dead_letter')

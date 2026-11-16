@@ -1,0 +1,26 @@
+Raw staged whitespace diagnostic (retained log formatting only):
+plan/04-root-unit/phases/p01/docs/logs/B1-R2-source-reachability.txt:13: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-R2-trail-build.txt:1: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/B1-R2b-retirement-test.txt:15: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-R2b-trail-build.txt:1: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/B1-affected-fourth-tests.txt:680: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-affected-third-tests.txt:708: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-department-http-second-tests.txt:204: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-department-http-third-tests.txt:190: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-inherited-first-tests.txt:538: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-initial-department-tests.txt:289: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-initial-http-authorization-tests.txt:41: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-root-fifth-tests.txt:60: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-source-reachability-first.txt:14: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-source-reachability-second.txt:14: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-source-reachability-third.txt:13: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-third-isolated-retries.txt:59: new blank line at EOF.
+plan/04-root-unit/phases/p01/docs/logs/B1-trail-build-first.txt:1: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/D1-R1-company-members-inventory.txt:79: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/D1-R1-company-members-inventory.txt:208: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/D1-R3-workflow-native-inventory.txt:21: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/D1-r2-teardown-probe.txt:23: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/pre-b1-complete-membership-occurrences.txt:79: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/pre-b1-complete-membership-occurrences.txt:208: trailing whitespace.
+plan/04-root-unit/phases/p01/docs/logs/pre-b1-membership-occurrences.txt:63: trailing whitespace.
+Reviewed implementation staged whitespace: PASS

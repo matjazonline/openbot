@@ -204,7 +204,7 @@ impl AuthoringReads for PostgresPersistence {
         company: CompanyId,
         principal: crate::entities::transport::PrincipalId,
     ) -> AppResult<Option<ReviewerChoice>> {
-        let label: Option<String> = sqlx::query_scalar("SELECT principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person'")
+        let label: Option<String> = sqlx::query_scalar("SELECT principal.display_label FROM principals AS principal JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person'")
             .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_optional(self.pool()).await?;
         Ok(label.map(|label| ReviewerChoice { principal, label }))
     }
@@ -214,7 +214,7 @@ impl AuthoringReads for PostgresPersistence {
         company: CompanyId,
         after: Option<crate::entities::transport::PrincipalId>,
     ) -> AppResult<ReviewerChoices> {
-        let mut rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT principal.id,principal.display_label FROM principals AS principal JOIN company_members AS member ON member.company_id=principal.company_id AND member.user_id=principal.user_id WHERE principal.company_id=$1 AND principal.kind='person' AND ($2::uuid IS NULL OR principal.id>$2) ORDER BY principal.id LIMIT 51")
+        let mut rows: Vec<(Uuid, String)> = sqlx::query_as("SELECT principal.id,principal.display_label FROM principals AS principal JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true WHERE principal.company_id=$1 AND principal.kind='person' AND ($2::uuid IS NULL OR principal.id>$2) ORDER BY principal.id LIMIT 51")
             .bind(company.as_uuid()).bind(after.map(|id| id.as_uuid())).fetch_all(self.pool()).await?;
         let next =
             (rows.len() > 50).then(|| crate::entities::transport::PrincipalId::new(rows[49].0));
@@ -398,9 +398,10 @@ impl AuthoringReads for PostgresPersistence {
         let (people, people_cut) = choices(
             read(
                 "SELECT member.user_id, account.username::text, true, member.role \
-                   FROM company_members AS member \
+                   FROM principals AS person \
+                   JOIN LATERAL membership_of(person.user_id, person.company_id) AS member ON true \
                    JOIN users AS account ON account.id = member.user_id \
-                  WHERE member.company_id = $1 \
+                  WHERE person.company_id = $1 \
                   ORDER BY member.role = 'member', account.username, member.user_id LIMIT $2",
             )
             .await?,

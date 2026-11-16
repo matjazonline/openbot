@@ -1,0 +1,1221 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error: expected type, found keyword `false`
+  --> src/adapters/http/routes/ui_departments.rs:83:18
+   |
+82 |     Department {
+   |     ---------- while parsing this struct
+83 |         is_root: false,
+   |                  ^^^^^ expected type
+
+warning: unused import: `crate::adapters::persistence::participant::create_person_principal_on`
+ --> src/adapters/persistence/company_tests.rs:2:5
+  |
+2 | use crate::adapters::persistence::participant::create_person_principal_on;
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/http/routes/ui_direct_revocation_tests.rs:221:10
+    |
+221 |         .remove_member(s.h.company_id, s.actor.user_id)
+    |          ^^^^^^^^^^^^^ --------------  --------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+221 -         .remove_member(s.h.company_id, s.actor.user_id)
+221 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/department_retirement_audit_tests.rs:68:14
+    |
+ 68 |             .remove_member(self.departments.company, self.departments.member)
+    |              ^^^^^^^^^^^^^ ------------------------  ----------------------- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 68 -             .remove_member(self.departments.company, self.departments.member)
+ 68 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/vault_tests/native_journeys.rs:299:15
+    |
+299 |             p.remove_member(company.as_uuid(), actor.user_id())
+    |               ^^^^^^^^^^^^^ -----------------  --------------- unexpected argument #2 of type `uuid::Uuid`
+    |                             |
+    |                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+299 -             p.remove_member(company.as_uuid(), actor.user_id())
+299 +             p.remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs:231:14
+    |
+231 |             .remove_member(f.s.fixture.target.company.as_uuid(), state.recipient)
+    |              ^^^^^^^^^^^^^ ------------------------------------  --------------- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+231 -             .remove_member(f.s.fixture.target.company.as_uuid(), state.recipient)
+231 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/rejoin.rs:41:14
+    |
+ 41 |             .remove_member(fixture.company.id, user)
+    |              ^^^^^^^^^^^^^ ------------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 41 -             .remove_member(fixture.company.id, user)
+ 41 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/http/routes/ui_direct_tests.rs:276:10
+    |
+276 |         .remove_member(h.company_id, actor.user_id)
+    |          ^^^^^^^^^^^^^ ------------  ------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+276 -         .remove_member(h.company_id, actor.user_id)
+276 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/http/routes/ui_direct_tests.rs:355:10
+    |
+355 |         .remove_member(h.company_id, actor.user_id)
+    |          ^^^^^^^^^^^^^ ------------  ------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+355 -         .remove_member(h.company_id, actor.user_id)
+355 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/http/routes/ui_direct_tests.rs:495:10
+    |
+495 |         .remove_member(h.company_id, actor.user_id)
+    |          ^^^^^^^^^^^^^ ------------  ------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+495 -         .remove_member(h.company_id, actor.user_id)
+495 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 3 arguments were supplied
+   --> src/adapters/http/routes/workflows/ui/authoring/sample_tests.rs:426:11
+    |
+426 |         p.update_member_role(
+    |           ^^^^^^^^^^^^^^^^^^
+427 |             company,
+    |             ------- expected `MemberRoleChange`, found `Uuid`
+428 |             admin,
+    |             ----- unexpected argument #2 of type `uuid::Uuid`
+429 |             crate::entities::company_member::CompanyAccessRole::Member,
+    |             ---------------------------------------------------------- unexpected argument #3 of type `company_member::CompanyAccessRole`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:97:14
+    |
+ 97 |     async fn update_member_role(
+    |              ^^^^^^^^^^^^^^^^^^
+ 98 |         &self,
+ 99 |         change: MemberRoleChange,
+    |         ------
+help: remove the extra arguments
+    |
+427 -             company,
+428 -             admin,
+429 -             crate::entities::company_member::CompanyAccessRole::Member,
+427 +             /* MemberRoleChange */,
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_tests.rs:164:17
+    |
+164 |     persistence.remove_member(company.id, member.0).await.ok();
+    |                 ^^^^^^^^^^^^^ ----------  -------- unexpected argument #2 of type `uuid::Uuid`
+    |                               |
+    |                               expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+164 -     persistence.remove_member(company.id, member.0).await.ok();
+164 +     persistence.remove_member(/* RemoveCompanyMember */).await.ok();
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_tests.rs:165:17
+    |
+165 |     persistence.remove_member(company.id, admin.0).await.ok();
+    |                 ^^^^^^^^^^^^^ ----------  ------- unexpected argument #2 of type `uuid::Uuid`
+    |                               |
+    |                               expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+165 -     persistence.remove_member(company.id, admin.0).await.ok();
+165 +     persistence.remove_member(/* RemoveCompanyMember */).await.ok();
+    |
+
+error[E0061]: this method takes 1 argument but 3 arguments were supplied
+   --> src/adapters/persistence/company_invite_tests.rs:414:10
+    |
+414 |         .update_member_role(company.id, member.id, CompanyAccessRole::Member)
+    |          ^^^^^^^^^^^^^^^^^^ ----------  ---------  ------------------------- unexpected argument #3 of type `company_member::CompanyAccessRole`
+    |                             |           |
+    |                             |           unexpected argument #2 of type `uuid::Uuid`
+    |                             expected `MemberRoleChange`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:97:14
+    |
+ 97 |     async fn update_member_role(
+    |              ^^^^^^^^^^^^^^^^^^
+ 98 |         &self,
+ 99 |         change: MemberRoleChange,
+    |         ------
+help: remove the extra arguments
+    |
+414 -         .update_member_role(company.id, member.id, CompanyAccessRole::Member)
+414 +         .update_member_role(/* MemberRoleChange */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_invite_tests.rs:436:10
+    |
+436 |         .remove_member(company.id, member.id)
+    |          ^^^^^^^^^^^^^ ----------  --------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+436 -         .remove_member(company.id, member.id)
+436 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_invite_tests.rs:456:10
+    |
+456 |         .remove_member(company.id, owner.id)
+    |          ^^^^^^^^^^^^^ ----------  -------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+456 -         .remove_member(company.id, owner.id)
+456 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_invite_tests.rs:552:10
+    |
+552 |         .remove_member(company.id, member.id)
+    |          ^^^^^^^^^^^^^ ----------  --------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+552 -         .remove_member(company.id, member.id)
+552 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_invite_tests.rs:556:10
+    |
+556 |         .remove_member(company.id, owner.id)
+    |          ^^^^^^^^^^^^^ ----------  -------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+556 -         .remove_member(company.id, owner.id)
+556 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/company_access_level_tests.rs:269:7
+    |
+269 |     p.remove_member(f.company_id, f.admin.id).await.unwrap();
+    |       ^^^^^^^^^^^^^ ------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                     |
+    |                     expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+269 -     p.remove_member(f.company_id, f.admin.id).await.unwrap();
+269 +     p.remove_member(/* RemoveCompanyMember */).await.unwrap();
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/delivery/tenant_tests.rs:233:10
+    |
+233 |         .remove_member(scope.company.id, leaving.user_id)
+    |          ^^^^^^^^^^^^^ ----------------  --------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+233 -         .remove_member(scope.company.id, leaving.user_id)
+233 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/delivery/tenant_tests.rs:286:10
+    |
+286 |         .remove_member(scope.company.id, owner.user_id)
+    |          ^^^^^^^^^^^^^ ----------------  ------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+286 -         .remove_member(scope.company.id, owner.user_id)
+286 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/delivery/tenant_tests.rs:320:53
+    |
+320 |     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    |                                                     ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                                   |
+    |                                                                   expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+320 -     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+320 +     let removal = tokio::spawn(async move { remover.remove_member(/* RemoveCompanyMember */).await });
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/delivery/tenant_tests.rs:360:53
+    |
+360 |     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    |                                                     ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                                   |
+    |                                                                   expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+360 -     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+360 +     let removal = tokio::spawn(async move { remover.remove_member(/* RemoveCompanyMember */).await });
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+    --> src/adapters/persistence/department_tests.rs:1004:5
+     |
+1004 |     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ---------  -------- unexpected argument #3 of type `uuid::Uuid`
+     |                                                             |
+     |                                                             expected `RemoveCompanyMember`, found `Uuid`
+     |
+note: method defined here
+    --> src/application/use_cases/company_invite.rs:101:14
+     |
+ 101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+     |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+     |
+1004 -     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+1004 +     CompanyInvitePersistence::remove_member(&f.persistence, /* RemoveCompanyMember */)
+     |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/department_retirement_audit_tests.rs:301:14
+    |
+301 |             .remove_member(f.departments.company, f.departments.member)
+    |              ^^^^^^^^^^^^^ ---------------------  -------------------- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+301 -             .remove_member(f.departments.company, f.departments.member)
+301 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/department_desks_tests.rs:617:5
+    |
+617 |     CompanyInvitePersistence::remove_member(&f.persistence, f.company, user)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ---------  ---- unexpected argument #3 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+617 -     CompanyInvitePersistence::remove_member(&f.persistence, f.company, user)
+617 +     CompanyInvitePersistence::remove_member(&f.persistence, /* RemoveCompanyMember */)
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/department_lead_desk_tests.rs:527:5
+    |
+527 |     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.admin)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ---------  ------- unexpected argument #3 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+527 -     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.admin)
+527 +     CompanyInvitePersistence::remove_member(&f.persistence, /* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/integrations/lifecycle_tests.rs:186:10
+    |
+186 |         .remove_member(company, user)
+    |          ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+186 -         .remove_member(company, user)
+186 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/memory/tests.rs:424:5
+    |
+424 |     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ---------  -------- unexpected argument #3 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+424 -     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+424 +     CompanyInvitePersistence::remove_member(&f.persistence, /* RemoveCompanyMember */)
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/memory/tests.rs:724:9
+    |
+724 |         CompanyInvitePersistence::remove_member(&persistence, company, member).await
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^               -------  ------ unexpected argument #3 of type `uuid::Uuid`
+    |                                                               |
+    |                                                               expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+724 -         CompanyInvitePersistence::remove_member(&persistence, company, member).await
+724 +         CompanyInvitePersistence::remove_member(&persistence, /* RemoveCompanyMember */).await
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/memory/tests.rs:745:9
+    |
+745 |         CompanyInvitePersistence::remove_member(&persistence, company, admin).await
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^               -------  ----- unexpected argument #3 of type `uuid::Uuid`
+    |                                                               |
+    |                                                               expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+745 -         CompanyInvitePersistence::remove_member(&persistence, company, admin).await
+745 +         CompanyInvitePersistence::remove_member(&persistence, /* RemoveCompanyMember */).await
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/memory/tests.rs:963:5
+    |
+963 |     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ---------  -------- unexpected argument #3 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+963 -     CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
+963 +     CompanyInvitePersistence::remove_member(&f.persistence, /* RemoveCompanyMember */)
+    |
+
+error: could not compile `open_bots` (lib) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/decision_authority_tests.rs:288:14
+    |
+288 |             .remove_member(f.scope.company.as_uuid(), f.users[0])
+    |              ^^^^^^^^^^^^^ -------------------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+288 -             .remove_member(f.scope.company.as_uuid(), f.users[0])
+288 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/decision_authority_tests.rs:337:47
+    |
+337 |     let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    |                                               ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+337 -     let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+337 +     let removal = tokio::spawn(async move { p.remove_member(/* RemoveCompanyMember */).await });
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/decision_authority_tests.rs:395:47
+    |
+395 |     let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+    |                                               ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+395 -     let removal = tokio::spawn(async move { p.remove_member(company, user).await });
+395 +     let removal = tokio::spawn(async move { p.remove_member(/* RemoveCompanyMember */).await });
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/decision_authority_tests.rs:422:10
+    |
+422 |         .remove_member(f.scope.company.as_uuid(), f.users[0])
+    |          ^^^^^^^^^^^^^ -------------------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+422 -         .remove_member(f.scope.company.as_uuid(), f.users[0])
+422 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/reviewer_principal_tests.rs:71:18
+    |
+ 71 |                 .remove_member(f.scope.company.as_uuid(), f.users[0])
+    |                  ^^^^^^^^^^^^^ -------------------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                                |
+    |                                expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 71 -                 .remove_member(f.scope.company.as_uuid(), f.users[0])
+ 71 +                 .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_attention_tests.rs:152:14
+    |
+152 |             .remove_member(f.scope.company.as_uuid(), *user)
+    |              ^^^^^^^^^^^^^ -------------------------  ----- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+152 -             .remove_member(f.scope.company.as_uuid(), *user)
+152 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_command_tests.rs:108:10
+    |
+108 |         .update_member_role(f.scope.company.as_uuid(), actor, CompanyAccessRole::Member)
+    |          ^^^^^^^^^^^^^^^^^^ -------------------------  -----  ------------------------- unexpected argument #3 of type `company_member::CompanyAccessRole`
+    |                             |                          |
+    |                             |                          unexpected argument #2 of type `uuid::Uuid`
+    |                             expected `MemberRoleChange`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:97:14
+    |
+ 97 |     async fn update_member_role(
+    |              ^^^^^^^^^^^^^^^^^^
+ 98 |         &self,
+ 99 |         change: MemberRoleChange,
+    |         ------
+help: remove the extra arguments
+    |
+108 -         .update_member_role(f.scope.company.as_uuid(), actor, CompanyAccessRole::Member)
+108 +         .update_member_role(/* MemberRoleChange */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_command_tests.rs:162:10
+    |
+162 |         .remove_member(f.scope.company.as_uuid(), actor)
+    |          ^^^^^^^^^^^^^ -------------------------  ----- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+162 -         .remove_member(f.scope.company.as_uuid(), actor)
+162 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_command_tests.rs:209:10
+    |
+209 |         .remove_member(f.scope.company.as_uuid(), target_user)
+    |          ^^^^^^^^^^^^^ -------------------------  ----------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+209 -         .remove_member(f.scope.company.as_uuid(), target_user)
+209 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_person_tests.rs:166:10
+    |
+166 |         .remove_member(f.role.company().as_uuid(), f.users[0])
+    |          ^^^^^^^^^^^^^ --------------------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+166 -         .remove_member(f.role.company().as_uuid(), f.users[0])
+166 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_person_tests.rs:192:14
+    |
+192 |             .remove_member(f.role.company().as_uuid(), *user)
+    |              ^^^^^^^^^^^^^ --------------------------  ----- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+192 -             .remove_member(f.role.company().as_uuid(), *user)
+192 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_person_tests.rs:270:10
+    |
+270 |         .remove_member(f.role.company().as_uuid(), f.users[0])
+    |          ^^^^^^^^^^^^^ --------------------------  ---------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+270 -         .remove_member(f.role.company().as_uuid(), f.users[0])
+270 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_agent_tool_tests.rs:197:5
+    |
+197 |     crate::use_cases::company_invite::CompanyInvitePersistence::remove_member(
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+198 |         p,
+199 |         company.as_uuid(),
+    |         ----------------- expected `RemoveCompanyMember`, found `Uuid`
+200 |         f.people.users[0],
+    |         ----------------- unexpected argument #3 of type `uuid::Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+199 -         company.as_uuid(),
+200 -         f.people.users[0],
+199 +         /* RemoveCompanyMember */,
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/role_reviewer_tests.rs:442:14
+    |
+442 |             .remove_member(f.role.company().as_uuid(), user)
+    |              ^^^^^^^^^^^^^ --------------------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                            |
+    |                            expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+442 -             .remove_member(f.role.company().as_uuid(), user)
+442 +             .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/follow_retirement_tests.rs:93:10
+    |
+ 93 |         .remove_member(f.scope.company.as_uuid(), f.people.users[0])
+    |          ^^^^^^^^^^^^^ -------------------------  ----------------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 93 -         .remove_member(f.scope.company.as_uuid(), f.people.users[0])
+ 93 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/direct_workflow_read_tests.rs:100:7
+    |
+100 |     p.remove_member(private.company(), private.user)
+    |       ^^^^^^^^^^^^^ -----------------  ------------ unexpected argument #2 of type `uuid::Uuid`
+    |                     |
+    |                     expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+100 -     p.remove_member(private.company(), private.user)
+100 +     p.remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/vault_tests/bindings.rs:284:7
+    |
+284 |     p.remove_member(company, user).await.unwrap();
+    |       ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                     |
+    |                     expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+284 -     p.remove_member(company, user).await.unwrap();
+284 +     p.remove_member(/* RemoveCompanyMember */).await.unwrap();
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/vault_tests/bindings.rs:302:7
+    |
+302 |     p.remove_member(company, user).await.unwrap();
+    |       ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                     |
+    |                     expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+302 -     p.remove_member(company, user).await.unwrap();
+302 +     p.remove_member(/* RemoveCompanyMember */).await.unwrap();
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/vault_tests/membership_race.rs:78:53
+    |
+ 78 |     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    |                                                     ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                                   |
+    |                                                                   expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 78 -     let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+ 78 +     let removal = tokio::spawn(async move { remover.remove_member(/* RemoveCompanyMember */).await });
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:76:11
+    |
+ 76 |         p.remove_member(f.command.company.as_uuid(), f.former)
+    |           ^^^^^^^^^^^^^ ---------------------------  -------- unexpected argument #2 of type `uuid::Uuid`
+    |                         |
+    |                         expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 76 -         p.remove_member(f.command.company.as_uuid(), f.former)
+ 76 +         p.remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/reviewer_control_hint_tests.rs:155:10
+    |
+155 |         .remove_member(f.fixture.scope.company.as_uuid(), f.former)
+    |          ^^^^^^^^^^^^^ ---------------------------------  -------- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+155 -         .remove_member(f.fixture.scope.company.as_uuid(), f.former)
+155 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests.rs:464:10
+    |
+464 |         .remove_member(f.company.id, erin)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+464 -         .remove_member(f.company.id, erin)
+464 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests.rs:737:47
+    |
+737 |         tokio::spawn(async move { persistence.remove_member(company, kai).await })
+    |                                               ^^^^^^^^^^^^^ -------  --- unexpected argument #2 of type `uuid::Uuid`
+    |                                                             |
+    |                                                             expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+737 -         tokio::spawn(async move { persistence.remove_member(company, kai).await })
+737 +         tokio::spawn(async move { persistence.remove_member(/* RemoveCompanyMember */).await })
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/bindings.rs:83:10
+    |
+ 83 |         .remove_member(f.company.id, user)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 83 -         .remove_member(f.company.id, user)
+ 83 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/validation.rs:165:10
+    |
+165 |         .remove_member(f.company.id, other)
+    |          ^^^^^^^^^^^^^ ------------  ----- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+165 -         .remove_member(f.company.id, other)
+165 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/identity_races.rs:170:22
+    |
+170 |                     .remove_member(company, user)
+    |                      ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                    |
+    |                                    expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+170 -                     .remove_member(company, user)
+170 +                     .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/notifications.rs:158:10
+    |
+158 |         .remove_member(f.company.id, user)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+158 -         .remove_member(f.company.id, user)
+158 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/notifications.rs:215:10
+    |
+215 |         .remove_member(f.company.id, user)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+215 -         .remove_member(f.company.id, user)
+215 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/notification_race_tests.rs:98:57
+    |
+ 98 |         Box::pin(async move { Outcome::Retirement(store.remove_member(company, user).await) });
+    |                                                         ^^^^^^^^^^^^^ -------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                                                                       |
+    |                                                                       expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 98 -         Box::pin(async move { Outcome::Retirement(store.remove_member(company, user).await) });
+ 98 +         Box::pin(async move { Outcome::Retirement(store.remove_member(/* RemoveCompanyMember */).await) });
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/direct.rs:88:18
+    |
+ 88 |                 .remove_member(f.company.id, member)
+    |                  ^^^^^^^^^^^^^ ------------  ------ unexpected argument #2 of type `uuid::Uuid`
+    |                                |
+    |                                expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+ 88 -                 .remove_member(f.company.id, member)
+ 88 +                 .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/direct.rs:141:10
+    |
+141 |         .remove_member(f.company.id, user)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+141 -         .remove_member(f.company.id, user)
+141 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+error[E0061]: this method takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/address_tests/direct.rs:302:10
+    |
+302 |         .remove_member(f.company.id, user)
+    |          ^^^^^^^^^^^^^ ------------  ---- unexpected argument #2 of type `uuid::Uuid`
+    |                        |
+    |                        expected `RemoveCompanyMember`, found `Uuid`
+    |
+note: method defined here
+   --> src/application/use_cases/company_invite.rs:101:14
+    |
+101 |     async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
+    |              ^^^^^^^^^^^^^        -------
+help: remove the extra argument
+    |
+302 -         .remove_member(f.company.id, user)
+302 +         .remove_member(/* RemoveCompanyMember */)
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 63 previous errors; 1 warning emitted

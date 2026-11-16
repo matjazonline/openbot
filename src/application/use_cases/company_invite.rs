@@ -96,11 +96,9 @@ pub trait CompanyInvitePersistence: Send + Sync {
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>>;
     async fn update_member_role(
         &self,
-        company_id: Uuid,
-        user_id: Uuid,
-        role: CompanyAccessRole,
+        change: MemberRoleChange,
     ) -> AppResult<Option<CompanyMember>>;
-    async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()>;
+    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()>;
 }
 
 #[derive(Clone)]
@@ -334,7 +332,11 @@ impl CompanyInviteUseCases {
             member_user_id, company_id
         );
         self.invite_persistence
-            .remove_member(company_id, member_user_id)
+            .remove_member(RemoveCompanyMember {
+                actor_id: user_id,
+                company_id,
+                member_user_id,
+            })
             .await
     }
 
@@ -359,7 +361,12 @@ impl CompanyInviteUseCases {
             member_user_id, role, company_id
         );
         self.invite_persistence
-            .update_member_role(company_id, member_user_id, role)
+            .update_member_role(MemberRoleChange {
+                actor_id: user_id,
+                company_id,
+                member_user_id,
+                role,
+            })
             .await?
             .ok_or_else(|| AppError::NotFound("Team member not found".into()))
     }

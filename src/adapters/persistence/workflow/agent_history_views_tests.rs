@@ -49,13 +49,15 @@ async fn admin(f: &ManualHistory, level: i16) -> WorkflowActor {
         "admin",
     )
     .await;
-    sqlx::query("UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.f.s.fixture.target.company.as_uuid())
-        .bind(user)
-        .bind(level)
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=$3 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.f.s.fixture.target.company.as_uuid())
+    .bind(user)
+    .bind(level)
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     WorkflowActor::authenticated(user).unwrap()
 }
 

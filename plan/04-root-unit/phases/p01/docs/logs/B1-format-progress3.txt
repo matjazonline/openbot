@@ -1,0 +1,9 @@
+error: expected type, found keyword `false`
+  --> /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/http/routes/ui_departments.rs:83:18
+   |
+82 |     Department {
+   |     ---------- while parsing this struct
+83 |         is_root: false,
+   |                  ^^^^^ expected type
+
+Error writing files: failed to resolve mod `ui_departments`: cannot parse /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/http/routes/ui_departments.rs

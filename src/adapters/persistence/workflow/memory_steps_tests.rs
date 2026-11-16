@@ -968,8 +968,14 @@ async fn thread_reader(
             let email = format!("{}@example.test", user.simple());
             sqlx::query("INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'test')")
                 .bind(user).bind(user.simple().to_string()).bind(&email).execute(pool).await.unwrap();
-            sqlx::query("INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, 'member', $4)")
-                .bind(Uuid::new_v4()).bind(company).bind(user).bind(level.as_i16()).execute(pool).await.unwrap();
+            crate::adapters::persistence::test_support::insert_root_member(
+                pool,
+                crate::domain::workflow::CompanyId::new(company),
+                user,
+                crate::entities::company_member::CompanyAccessRole::Member,
+                crate::entities::access_level::AccessLevel::try_from(level.as_i16()).unwrap(),
+            )
+            .await;
             let mut connection = pool.acquire().await.unwrap();
             crate::adapters::persistence::participant::create_person_principal_on(
                 &mut connection,

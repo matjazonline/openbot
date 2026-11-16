@@ -421,9 +421,16 @@ async fn memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecy
         f.lifecycle(Some(agent_namespace)).await,
         Some(("absent".into(), "pending".into(), 2))
     );
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
-        .await
-        .unwrap();
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: f.member,
+        },
+    )
+    .await
+    .unwrap();
     assert_eq!(
         f.namespaces("user").await,
         [(user_namespace, "removing".into())]
@@ -720,8 +727,17 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
         .unwrap();
     let persistence = f.persistence.clone();
     let (company, member) = (f.company, f.member);
+    let removing_owner = f.owner;
     let removal = tokio::spawn(async move {
-        CompanyInvitePersistence::remove_member(&persistence, company, member).await
+        CompanyInvitePersistence::remove_member(
+            &persistence,
+            crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: removing_owner,
+                company_id: company,
+                member_user_id: member,
+            },
+        )
+        .await
     });
     blocked_by(f.pool(), pid).await;
     provision.commit().await.unwrap();
@@ -742,7 +758,15 @@ async fn memory_scope_competing_member_removal_and_provisioning_serialize_in_bot
         .unwrap();
     let persistence = f.persistence.clone();
     let removal = tokio::spawn(async move {
-        CompanyInvitePersistence::remove_member(&persistence, company, admin).await
+        CompanyInvitePersistence::remove_member(
+            &persistence,
+            crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: removing_owner,
+                company_id: company,
+                member_user_id: admin,
+            },
+        )
+        .await
     });
     blocked_by(f.pool(), pid).await;
     let persistence = f.persistence.clone();
@@ -960,9 +984,16 @@ async fn memory_scope_returning_member_gets_a_new_namespace_id() {
     f.enable().await.unwrap();
     f.ensure(NamespaceOwner::User(f.member)).await;
     let (old, _) = f.namespaces("user").await[0].clone();
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.member)
-        .await
-        .unwrap();
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: f.member,
+        },
+    )
+    .await
+    .unwrap();
     let email: String = sqlx::query_scalar("SELECT email::text FROM users WHERE id = $1")
         .bind(f.member)
         .fetch_one(f.pool())

@@ -374,7 +374,7 @@ async fn cloudroom_native_bundle_refuses_a_valid_foreign_machine_and_revoked_ori
         )
         .await;
     assert_eq!(response.status(), StatusCode::NOT_FOUND);
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(f.company)
         .bind(f.admin)
         .execute(&f.database.pool)

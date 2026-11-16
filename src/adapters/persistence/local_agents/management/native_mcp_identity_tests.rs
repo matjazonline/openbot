@@ -3,6 +3,26 @@ use super::live_tests::{claim, lease};
 use super::*;
 use crate::application::workflow::lease::WorkflowLeases;
 
+async fn replace_owner_principal(f: &McpSetup, previous: Uuid) -> Uuid {
+    let p = f.s.f.persistence.as_ref();
+    let replacement = Uuid::new_v4();
+    let mut tx = p.pool().begin().await.unwrap();
+    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND id=$2")
+        .bind(f.s.f.company)
+        .bind(previous)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'New incarnation')")
+        .bind(replacement).bind(f.s.f.company).bind(f.s.f.owner).execute(&mut *tx).await.unwrap();
+    sqlx::query("INSERT INTO department_members(company_id,department_id,principal_id,access_level) SELECT $1,id,$2,9 FROM departments WHERE company_id=$1 AND is_root")
+        .bind(f.s.f.company).bind(replacement).execute(&mut *tx).await.unwrap();
+    sqlx::query("INSERT INTO department_roles(company_id,department_id,principal_id,role) SELECT $1,id,$2,'owner' FROM departments WHERE company_id=$1 AND is_root")
+        .bind(f.s.f.company).bind(replacement).execute(&mut *tx).await.unwrap();
+    tx.commit().await.unwrap();
+    replacement
+}
+
 #[tokio::test]
 async fn native_mcp_broker_rejects_foreign_or_wrong_account_principal_and_identity_updates() {
     let f = Box::pin(McpSetup::new()).await;
@@ -79,15 +99,7 @@ async fn native_mcp_new_person_incarnation_gets_new_broker_without_reviving_old_
             .fetch_one(p.pool())
             .await
             .unwrap();
-    sqlx::query("DELETE FROM principals WHERE company_id=$1 AND id=$2")
-        .bind(f.s.f.company)
-        .bind(previous)
-        .execute(p.pool())
-        .await
-        .unwrap();
-    let replacement = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'New incarnation')")
-        .bind(replacement).bind(f.s.f.company).bind(f.s.f.owner).execute(p.pool()).await.unwrap();
+    let replacement = replace_owner_principal(&f, previous).await;
     assert!(!p.validate_io(claim.fence, lease()).await.unwrap());
     // A read of the old immutable invocation keeps its run rather than selecting a new broker.
     assert_eq!(

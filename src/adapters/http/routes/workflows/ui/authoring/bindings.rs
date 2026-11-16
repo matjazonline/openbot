@@ -115,14 +115,16 @@ fn escalation_of(
     value: &str,
 ) -> Result<Option<crate::application::workflow::binding::EscalationPolicy>, String> {
     use crate::application::workflow::binding::{EscalationHops, EscalationPolicy};
-    use crate::entities::department::DepartmentRole;
-    let (notify, hops) = match value {
-        "" => return Ok(None),
-        "lead:1" => (DepartmentRole::Lead, 1),
-        "lead:2" => (DepartmentRole::Lead, 2),
-        "reviewer:1" => (DepartmentRole::Reviewer, 1),
-        "reviewer:2" => (DepartmentRole::Reviewer, 2),
-        _ => return Err("Choose a role and one or two escalation hops.".into()),
+    let refused = || "Choose a role and one or two escalation hops.".to_owned();
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let (role, hops) = value.split_once(':').ok_or_else(refused)?;
+    let notify = role.parse().map_err(|_| refused())?;
+    let hops = match hops {
+        "1" => 1,
+        "2" => 2,
+        _ => return Err(refused()),
     };
     Ok(Some(EscalationPolicy {
         notify,

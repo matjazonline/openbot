@@ -281,14 +281,28 @@ async fn vault_binding_member_removal_readdition_repeated_teardown_and_owner_unb
     let (invocation, context) = prepared(&setup).await;
     let p = &setup.fixture.persistence;
     let company = setup.fixture.target.company.as_uuid();
-    p.remove_member(company, user).await.unwrap();
+    let removing_owner = setup.fixture.target.actor.user_id();
+    p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+        actor_id: removing_owner,
+        company_id: company,
+        member_user_id: user,
+    })
+    .await
+    .unwrap();
     assert!(
         vault
             .final_dispatch_guard(&invocation, &context)
             .await
             .is_err()
     );
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',0)").bind(Uuid::new_v4()).bind(company).bind(user).execute(p.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     restore_principal(p, company, user).await;
     assert!(
         vault
@@ -299,7 +313,13 @@ async fn vault_binding_member_removal_readdition_repeated_teardown_and_owner_unb
     vault.drain(16, &CancellationToken::new()).await.unwrap();
     assert!(!vault.grant_metadata(grant.id).await.unwrap().enabled);
     let current = attach(&setup, &vault, &account).await;
-    p.remove_member(company, user).await.unwrap();
+    p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+        actor_id: removing_owner,
+        company_id: company,
+        member_user_id: user,
+    })
+    .await
+    .unwrap();
     vault
         .revoke(&account.owner, current.id, current.revision)
         .await

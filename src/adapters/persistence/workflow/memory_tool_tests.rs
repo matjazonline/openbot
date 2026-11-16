@@ -433,12 +433,14 @@ async fn memory_access_level_agent_memory_search_is_ceilinged_recorded_once_and_
     assert_eq!(t.service_calls("observations/search"), 1);
     assert_eq!(t.committed().await.consumptions.len(), 1);
     // The actor's grant drops below what the call exposed: the replay refuses.
-    sqlx::query("UPDATE company_members SET access_level=3 WHERE company_id=$1 AND user_id=$2")
-        .bind(t.company().as_uuid())
-        .bind(t.actor().await)
-        .execute(t.p().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=3 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(t.company().as_uuid())
+    .bind(t.actor().await)
+    .execute(t.p().pool())
+    .await
+    .unwrap();
     let refused = t
         .runtime()
         .call_memory_tool(t.s.claim.fence, copy(&call))

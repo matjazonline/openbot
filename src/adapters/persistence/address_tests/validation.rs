@@ -162,7 +162,11 @@ async fn address_resolution_directory_lists_only_currently_writable_people_and_a
             .is_empty()
     );
     f.persistence
-        .remove_member(f.company.id, other)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.company.user_id,
+            company_id: f.company.id,
+            member_user_id: other,
+        })
         .await
         .unwrap();
     let owner = threads(&f)

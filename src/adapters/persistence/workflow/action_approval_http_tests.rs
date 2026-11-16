@@ -385,7 +385,7 @@ async fn workflow_action_approval_admin_demotion_refuses_park_and_submission() {
         let setup = Box::pin(protected_reviewers("http://127.0.0.1:1", Entrance::Http, 2)).await;
         let p = &setup.fixture.persistence;
         let admin: Uuid = sqlx::query_scalar(
-            "SELECT user_id FROM company_members WHERE company_id=$1 AND user_id<>$2",
+            "SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1 AND member.user_id<>$2",
         )
         .bind(setup.fixture.target.company.as_uuid())
         .bind(setup.fixture.target.actor.user_id())
@@ -398,7 +398,7 @@ async fn workflow_action_approval_admin_demotion_refuses_park_and_submission() {
         } else {
             None
         };
-        sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
             .bind(setup.fixture.target.company.as_uuid())
             .bind(admin)
             .execute(p.pool())

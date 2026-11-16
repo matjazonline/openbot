@@ -7,19 +7,20 @@ async fn workflow_reviewer_principal_visible_ordinary_member_parks_and_submits_b
     let reviewer = f.users[0];
     let owner = f.admission.binding.target.actor.user_id();
     assert_ne!(reviewer, owner);
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(f.scope.company.as_uuid())
         .bind(reviewer)
         .execute(f.persistence().pool())
         .await
         .unwrap();
-    let role: String =
-        sqlx::query_scalar("SELECT role FROM company_members WHERE company_id=$1 AND user_id=$2")
-            .bind(f.scope.company.as_uuid())
-            .bind(reviewer)
-            .fetch_one(f.persistence().pool())
-            .await
-            .unwrap();
+    let role: String = sqlx::query_scalar(
+        "SELECT role FROM membership_of($2, $1) WHERE company_id=$1 AND user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(reviewer)
+    .fetch_one(f.persistence().pool())
+    .await
+    .unwrap();
     assert_eq!(role, "member");
     let view = f.park().await;
     assert_eq!(

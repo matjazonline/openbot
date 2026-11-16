@@ -20,8 +20,7 @@ pub(super) async fn target_on(
         LEFT JOIN LATERAL workflow_escalation_agent_route(principal.company_id,principal.id) AS route \
           ON principal.kind='agent' \
         WHERE principal.company_id=$1 AND principal.id=$2 AND ( \
-          (principal.kind='person' AND principal.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM company_members AS member \
-            WHERE member.company_id=principal.company_id AND member.user_id=principal.user_id)) \
+          (principal.kind='person' AND principal.user_id IS NOT NULL AND EXISTS (SELECT 1 FROM membership_of(principal.user_id, principal.company_id) AS member WHERE true)) \
           OR (principal.kind='agent' AND route.run_as_user_id IS NOT NULL))")
         .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_optional(db).await?)
 }

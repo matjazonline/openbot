@@ -48,9 +48,11 @@ use crate::use_cases::company::company_not_found;
 use crate::use_cases::department::department_not_found;
 
 mod lifecycle;
+mod root;
 pub(crate) use lifecycle::{
     create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
 };
+use root::root_role_authority_on;
 
 /// A principal named as the department pages show it: an agent by its current name and handle, a
 /// person by their account's username and email (not `display_label`, which a rename leaves).
@@ -81,7 +83,7 @@ fn principal_choices(
 
 const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
      department.slug::text AS slug, department.description, department.charter, \
-     department.parent_id, department.created_by, department.created_at";
+     department.parent_id, department.is_root, department.created_by, department.created_at";
 
 #[derive(sqlx::FromRow)]
 struct DepartmentDb {
@@ -92,6 +94,7 @@ struct DepartmentDb {
     description: Option<String>,
     charter: Option<String>,
     parent_id: Option<Uuid>,
+    is_root: bool,
     created_by: serde_json::Value,
     created_at: DateTime<Utc>,
 }
@@ -114,6 +117,7 @@ impl TryFrom<DepartmentDb> for Department {
             description: db.description,
             charter: db.charter,
             parent_id: db.parent_id.map(DepartmentId::new),
+            is_root: db.is_root,
             created_at: db.created_at,
         })
     }
@@ -314,6 +318,7 @@ pub(crate) async fn assign_department_role_on(
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
+    root_role_authority_on(tx, company, actor, department, role).await?;
     write_placement_on(tx, company, department, principal, false, Some(role)).await?;
     follow_lead_on(
         tx,
@@ -342,6 +347,9 @@ pub(crate) async fn place_in_department_on(
     principal: PrincipalId,
     role: Option<DepartmentRole>,
 ) -> AppResult<()> {
+    if let Some(role) = role {
+        root_role_authority_on(tx, company, actor, department, role).await?;
+    }
     write_placement_on(tx, company, department, principal, true, role).await?;
     if let Some(role) = role {
         follow_lead_on(
@@ -382,6 +390,25 @@ async fn follow_lead_on(
 /// Membership and role rows for one principal, under the department row and the principals the
 /// write touches (sorted), then one sync of the derived grants: the department's for membership,
 /// the role's reach for a role.
+fn department_member_insert(
+    company: CompanyId,
+    department: DepartmentId,
+    principal: PrincipalId,
+) -> sqlx::query::Query<'static, Postgres, sqlx::postgres::PgArguments> {
+    sqlx::query(
+            "INSERT INTO department_members (company_id, department_id, principal_id, access_level) \
+             SELECT $1, $2, $3, CASE WHEN department.is_root THEN \
+               CASE WHEN company.user_id = principal.user_id THEN 9 ELSE 0 END END \
+             FROM departments AS department JOIN companies AS company ON company.id = department.company_id \
+             JOIN principals AS principal ON principal.company_id = company.id AND principal.id = $3 \
+             WHERE department.company_id = $1 AND department.id = $2 \
+             ON CONFLICT (department_id, principal_id) DO NOTHING",
+        )
+        .bind(company.as_uuid())
+        .bind(department.as_uuid())
+        .bind(principal.as_uuid())
+}
+
 async fn write_placement_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -412,15 +439,9 @@ async fn write_placement_on(
     lock_principals_on(tx, company, &involved).await?;
     check_principal_on(tx, company, principal).await?;
     if member {
-        sqlx::query(
-            "INSERT INTO department_members (company_id, department_id, principal_id) \
-             VALUES ($1, $2, $3) ON CONFLICT (department_id, principal_id) DO NOTHING",
-        )
-        .bind(company.as_uuid())
-        .bind(department.as_uuid())
-        .bind(principal.as_uuid())
-        .execute(&mut **tx)
-        .await?;
+        department_member_insert(company, department, principal)
+            .execute(&mut **tx)
+            .await?;
     }
     let Some(role) = role else {
         super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
@@ -465,6 +486,7 @@ pub(crate) async fn clear_department_role_on(
     role: DepartmentRole,
     principal: PrincipalId,
 ) -> AppResult<()> {
+    root_role_authority_on(tx, company, actor, department, role).await?;
     lock_department_on(tx, company, department).await?;
     lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
     let cleared = sqlx::query(
@@ -690,6 +712,15 @@ impl DepartmentPersistence for PostgresDepartments {
         department: DepartmentId,
         principal: PrincipalId,
     ) -> AppResult<()> {
+        let root: Option<bool> =
+            sqlx::query_scalar("SELECT is_root FROM departments WHERE company_id = $1 AND id = $2")
+                .bind(scope.company.as_uuid())
+                .bind(department.as_uuid())
+                .fetch_optional(&self.persistence.pool)
+                .await?;
+        if root == Some(true) {
+            return root::remove_root_member(&self.persistence, scope, department, principal).await;
+        }
         let mut tx = begin_department_write(&self.persistence, scope).await?;
         remove_department_member_on(&mut tx, scope.company, department, principal).await?;
         tx.commit().await?;
@@ -751,10 +782,11 @@ impl DepartmentPersistence for PostgresDepartments {
         let rows: Vec<(Uuid, DateTime<Utc>)> = sqlx::query_as(
             "SELECT member.principal_id, member.created_at FROM department_members AS member \
              WHERE member.company_id = $1 AND member.department_id = $2 \
-             ORDER BY member.created_at, member.principal_id",
+             ORDER BY member.created_at, member.principal_id LIMIT $3",
         )
         .bind(company.as_uuid())
         .bind(department.as_uuid())
+        .bind((crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES + 1) as i64)
         .fetch_all(&self.persistence.pool)
         .await?;
         Ok(rows
@@ -774,10 +806,12 @@ impl DepartmentPersistence for PostgresDepartments {
         let rows: Vec<(String, Uuid)> = sqlx::query_as(
             "SELECT holder.role, holder.principal_id FROM department_roles AS holder \
              WHERE holder.company_id = $1 AND holder.department_id = $2 \
-             ORDER BY holder.role, holder.created_at, holder.principal_id",
+             ORDER BY CASE holder.role WHEN 'owner' THEN 0 WHEN 'lead' THEN 1 ELSE 2 END, \
+                      holder.role, holder.created_at, holder.principal_id LIMIT $3",
         )
         .bind(company.as_uuid())
         .bind(department.as_uuid())
+        .bind((crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES + 1) as i64)
         .fetch_all(&self.persistence.pool)
         .await?;
         rows.into_iter()

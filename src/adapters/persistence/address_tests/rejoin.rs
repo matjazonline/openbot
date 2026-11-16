@@ -38,7 +38,11 @@ impl RejoinCase {
         let original = PrincipalId::new(fixture.principal_of(user).await);
         fixture
             .persistence
-            .remove_member(fixture.company.id, user)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: fixture.owner,
+                company_id: fixture.company.id,
+                member_user_id: user,
+            })
             .await
             .unwrap();
         let email = EmailAddress::from(format!("changed-{}@example.test", Uuid::new_v4().simple()));

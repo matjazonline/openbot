@@ -1,0 +1,15 @@
+{
+  "round": "04RU-P01-D1-R2",
+  "decision": "04RU-P01-D1/r2",
+  "decision_sha256": "50a70e404c18b6bdf7af95740bd1bfb8e2c19f94e106b94d2e5d079039c011f2",
+  "head": "8fdb892b6e279ed0c09150e2336bbdc7462f877d",
+  "artifact": "4d0aeba871fb23224b32d167e1a2461e7128084a12f548bb3d631627537b3110",
+  "coordination_revision": 1,
+  "exclusions": [
+    "plan/04-root-unit/phases/p01/docs",
+    "plan/04-root-unit/COORDINATION.md"
+  ],
+  "reviewer_runtime_executed": false,
+  "author_probe_sha256": "5b972950372a73a3aa53ae03d5af650c1460512f344c364f5b182d8836279117",
+  "author_probe_output_sha256": "6508628be47eb495c6348558bc534c87db5cbe554244b44a65d1bd0f6fc1c960"
+}

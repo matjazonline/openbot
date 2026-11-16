@@ -1,0 +1,1 @@
+PASS: sourced-environment entry/final snapshots byte-identical; branch feature/plan03_04, exact HEAD8fdb892b6e279ed0c09150e2336bbdc7462f877d, artifactd31771d65f656072835280d4c7612bc1cf21df692abc92207719a58af5f0b947, decision8ec33f0a479882b3b3c67dc8ed8dde80be34228a68a27548246bf611254bb1a9 and coordination1 pins match. No reviewer runtime or whitespace check claimed.

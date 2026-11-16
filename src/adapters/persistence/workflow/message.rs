@@ -410,10 +410,10 @@ pub(super) async fn member_on(
         ""
     };
     let row: Option<(Uuid, String)> = sqlx::query_as(&format!(
-        "SELECT principal.id, account.email FROM company_members AS member \
-         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
-         JOIN users AS account ON account.id=member.user_id \
-         WHERE member.company_id=$1 AND member.user_id=$2{lock}"
+        "SELECT principal.id, account.email FROM department_members AS member \
+         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.root_user_id \
+         JOIN users AS account ON account.id=member.root_user_id \
+         WHERE member.company_id=$1 AND member.root_user_id=$2{lock}"
     ))
     .bind(company.as_uuid())
     .bind(user)

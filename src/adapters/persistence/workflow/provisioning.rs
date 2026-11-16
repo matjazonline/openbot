@@ -857,8 +857,7 @@ impl AssistantChannels for AssistantChannelService {
             "SELECT command.result FROM workflow_provisioning_commands AS command \
              JOIN companies AS company ON company.id = command.company_id \
              WHERE command.company_id = $1 AND command.command_key = $2 \
-               AND (company.user_id = $3 OR EXISTS (SELECT 1 FROM company_members AS member \
-                    WHERE member.company_id = $1 AND member.user_id = $3 \
+               AND (company.user_id = $3 OR EXISTS (SELECT 1 FROM membership_of($3, $1) AS member WHERE true \
                       AND member.role = 'admin'))",
         )
         .bind(company.as_uuid())

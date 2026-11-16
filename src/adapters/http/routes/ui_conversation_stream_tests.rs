@@ -76,13 +76,14 @@ async fn conversation_reads_refuse_foreign_scope_and_private_channels() {
         .execute(h.persistence.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
-        .bind(Uuid::new_v4())
-        .bind(h.company_id)
-        .bind(other.owner.user_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        h.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(h.company_id),
+        other.owner.user_id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     for (viewer, company_id) in [
         (h.owner.clone(), other.company_id),
         (other.owner.clone(), h.company_id),

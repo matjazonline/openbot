@@ -1,0 +1,126 @@
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: unused import: `root_on`
+  --> src/adapters/persistence/company.rs:23:64
+   |
+23 |     RootJoin, bootstrap_root_on, join_root_on, root_member_on, root_on, set_admin_on,
+   |                                                                ^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/company/member_retirement.rs:62:9
+   |
+61 |     super::super::integrations::lifecycle::revoke_membership_on(
+   |     ----------------------------------------------------------- arguments to this function are incorrect
+62 |         &mut **tx,
+   |         ^^^^^^^^^ expected `&mut Transaction<'_, Postgres>`, found `&mut PgConnection`
+   |
+   = note: expected mutable reference `&mut sqlx::Transaction<'_, sqlx::Postgres>`
+              found mutable reference `&mut sqlx::PgConnection`
+note: function defined here
+  --> src/adapters/persistence/integrations/lifecycle.rs:38:21
+   |
+38 | pub(crate) async fn revoke_membership_on(
+   |                     ^^^^^^^^^^^^^^^^^^^^
+39 |     tx: &mut Transaction<'_, Postgres>,
+   |     ----------------------------------
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/knowledge/mod.rs:55:26
+   |
+55 |             let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+   |                          ^^^^^^^^^^^^^^^^-------------------------------- argument #3 of type `std::option::Option<uuid::Uuid>` is missing
+   |
+note: function defined here
+  --> src/adapters/persistence/company_level_authority.rs:71:47
+   |
+71 | pub(in crate::adapters::persistence) async fn start(
+   |                                               ^^^^^
+...
+74 |     target: Option<Uuid>,
+   |     --------------------
+help: provide the argument
+   |
+55 |             let mut tx = authority::start(self.pool(), team_scope(scope), /* Option<Uuid> */).await?;
+   |                                                                         ++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/knowledge/mod.rs:65:26
+   |
+65 |             let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+   |                          ^^^^^^^^^^^^^^^^-------------------------------- argument #3 of type `std::option::Option<uuid::Uuid>` is missing
+   |
+note: function defined here
+  --> src/adapters/persistence/company_level_authority.rs:71:47
+   |
+71 | pub(in crate::adapters::persistence) async fn start(
+   |                                               ^^^^^
+...
+74 |     target: Option<Uuid>,
+   |     --------------------
+help: provide the argument
+   |
+65 |             let mut tx = authority::start(self.pool(), team_scope(scope), /* Option<Uuid> */).await?;
+   |                                                                         ++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/knowledge/mod.rs:84:26
+   |
+84 |             let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+   |                          ^^^^^^^^^^^^^^^^-------------------------------- argument #3 of type `std::option::Option<uuid::Uuid>` is missing
+   |
+note: function defined here
+  --> src/adapters/persistence/company_level_authority.rs:71:47
+   |
+71 | pub(in crate::adapters::persistence) async fn start(
+   |                                               ^^^^^
+...
+74 |     target: Option<Uuid>,
+   |     --------------------
+help: provide the argument
+   |
+84 |             let mut tx = authority::start(self.pool(), team_scope(scope), /* Option<Uuid> */).await?;
+   |                                                                         ++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/knowledge/mod.rs:103:26
+    |
+103 |             let mut tx = authority::start(self.pool(), team_scope(scope)).await?;
+    |                          ^^^^^^^^^^^^^^^^-------------------------------- argument #3 of type `std::option::Option<uuid::Uuid>` is missing
+    |
+note: function defined here
+   --> src/adapters/persistence/company_level_authority.rs:71:47
+    |
+ 71 | pub(in crate::adapters::persistence) async fn start(
+    |                                               ^^^^^
+...
+ 74 |     target: Option<Uuid>,
+    |     --------------------
+help: provide the argument
+    |
+103 |             let mut tx = authority::start(self.pool(), team_scope(scope), /* Option<Uuid> */).await?;
+    |                                                                         ++++++++++++++++++++
+
+error[E0061]: this function takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/knowledge/mod.rs:128:26
+    |
+128 |             let mut tx = authority::start(self.pool(), team_scope(command.scope)).await?;
+    |                          ^^^^^^^^^^^^^^^^---------------------------------------- argument #3 of type `std::option::Option<uuid::Uuid>` is missing
+    |
+note: function defined here
+   --> src/adapters/persistence/company_level_authority.rs:71:47
+    |
+ 71 | pub(in crate::adapters::persistence) async fn start(
+    |                                               ^^^^^
+...
+ 74 |     target: Option<Uuid>,
+    |     --------------------
+help: provide the argument
+    |
+128 |             let mut tx = authority::start(self.pool(), team_scope(command.scope), /* Option<Uuid> */).await?;
+    |                                                                                 ++++++++++++++++++++
+
+Some errors have detailed explanations: E0061, E0308.
+For more information about an error, try `rustc --explain E0061`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 6 previous errors; 1 warning emitted

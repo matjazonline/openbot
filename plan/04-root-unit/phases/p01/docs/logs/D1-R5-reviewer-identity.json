@@ -1,0 +1,8 @@
+{
+  "round": "04RU-P01-D1-R5",
+  "HEAD": "8fdb892b6e279ed0c09150e2336bbdc7462f877d",
+  "artifact": "686872f7713869716cf5e387417dd23d7ad643011dd869689ee3583860becf24",
+  "decision_sha256": "d8be7fd9748e0db617ea9f8f23f86daf5a68cf42e22811a5e952e7068c0bc93d",
+  "coordination_revision": 1,
+  "reviewer_runtime": false
+}

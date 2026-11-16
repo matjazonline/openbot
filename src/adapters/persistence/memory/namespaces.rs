@@ -68,8 +68,8 @@ async fn lock_owner(
         NamespaceOwner::Company => Some(company),
         NamespaceOwner::User(user) => {
             sqlx::query_scalar(
-                "SELECT member.id FROM company_members AS member \
-                 WHERE member.company_id = $1 AND member.user_id = $2 FOR SHARE",
+                "SELECT member.id FROM department_members AS member \
+                 WHERE member.company_id = $1 AND member.root_user_id = $2 FOR SHARE",
             )
             .bind(company)
             .bind(user)

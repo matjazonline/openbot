@@ -24,7 +24,7 @@ async fn workflow_admit_token_reviewers_current_authority_and_saved_replay() {
         AdmissionResult::Created(command.proposed_run_id())
     );
     let next = f.prepare(f.request("next", f.manual())).await;
-    sqlx::query("UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2")
         .bind(command.company_id().as_uuid())
         .bind(reviewer)
         .execute(f.persistence().pool())
@@ -60,7 +60,7 @@ async fn workflow_admit_token_reviewer_removal_competes_before_commit() {
     let (f, reviewer) = configured().await;
     let command = f.prepare(f.request("removed", f.manual())).await;
     let mut revoked = f.persistence().pool().begin().await.unwrap();
-    sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
         .bind(command.company_id().as_uuid())
         .bind(reviewer)
         .execute(&mut *revoked)

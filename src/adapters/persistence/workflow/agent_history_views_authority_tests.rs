@@ -228,12 +228,14 @@ async fn agent_history_views_private_admin_positive_restricted_member_customer_f
         json!("CLASSIFIED-INPUT"),
         "another currently authorized admin may inspect the private run"
     );
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.f.s.fixture.target.company.as_uuid())
-        .bind(manager.user_id())
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.f.s.fixture.target.company.as_uuid())
+    .bind(manager.user_id())
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     assert_restricted_view(&f, &claim, manager).await;
     assert_members_denied(&f, &claim).await;
     Box::pin(assert_isolated_stream(&mut f, &claim)).await;
@@ -269,12 +271,14 @@ async fn agent_history_level_history_reader_rechecks_demotion_and_inflight_raise
     tokio::time::timeout(Duration::from_secs(3), pause.fetched.notified())
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(read_scope.company.as_uuid())
-        .bind(manager.user_id())
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(read_scope.company.as_uuid())
+    .bind(manager.user_id())
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     pause.resume.notify_one();
     let result = read.await.unwrap().unwrap().unwrap();
     assert_eq!(result.entry.payload, HistoryPayloadState::Restricted);

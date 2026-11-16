@@ -74,6 +74,9 @@ const TEST_DB_SUFFIX: &str = "_test";
 mod native_agent;
 pub(crate) use native_agent::{register_native_agent_address, rename_native_agent};
 
+#[path = "root_teardown_test_support.rs"]
+pub(crate) mod root_teardown;
+
 /// Migrations run once per test binary, not once per test.
 static MIGRATED: OnceCell<()> = OnceCell::const_new();
 
@@ -512,127 +515,202 @@ pub async fn insert_company_with_owner(
     owner: Uuid,
 ) {
     let mut transaction = pool.begin().await.expect("a transaction");
-    sqlx::query("INSERT INTO companies (id, name, slug, user_id) VALUES ($1, $2, $3, $4)")
-        .bind(company_id)
-        .bind(name)
-        .bind(slug)
+    sqlx::query("SELECT id FROM users WHERE id = $1 FOR UPDATE")
         .bind(owner)
-        .execute(&mut *transaction)
+        .fetch_one(&mut *transaction)
         .await
-        .expect("the company row");
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, 'owner', 9)",
+        .expect("owner account");
+    let row = sqlx::query_as::<_, super::company::CompanyDb>(
+        "INSERT INTO companies (id, name, slug, user_id) VALUES ($1, $2, $3, $4) \
+         RETURNING id, user_id, name, slug::text, default_add_3rd_party, avatar_url, created_at",
     )
-    .bind(Uuid::new_v4())
     .bind(company_id)
+    .bind(name)
+    .bind(slug)
     .bind(owner)
-    .execute(&mut *transaction)
+    .fetch_one(&mut *transaction)
     .await
-    .expect("the owner's member row");
+    .expect("company row");
+    super::company::bootstrap_root_on(&mut transaction, &row.into())
+        .await
+        .expect("root, owner principal, membership and role");
     transaction
         .commit()
         .await
-        .expect("a company with its owner row commits");
+        .expect("complete company bootstrap commits");
 }
 
-/// Hand a company to `new_owner` the one way the schema allows: in one transaction, the previous
-/// owner's member row becomes `previous_owner_role`, the new owner gets the owner row (created if
-/// they were not a member yet), and `companies.user_id` follows.
-///
-/// `companies.user_id` and the owner member row are one fact, checked at commit
-/// (`companies_owner_member_fk`, `companies_owner_member_agreement`), so a fixture that changes
-/// either alone -- or in separate autocommit statements -- describes a state the database refuses.
+/// Seed current membership using the real principal/root write path. The row gets its own
+/// incarnation, and calling this for an existing member preserves that incarnation and level.
+pub async fn insert_root_member(
+    pool: &PgPool,
+    company: crate::domain::workflow::CompanyId,
+    user: Uuid,
+    role: crate::entities::company_member::CompanyAccessRole,
+    level: crate::entities::access_level::AccessLevel,
+) -> crate::entities::transport::PrincipalId {
+    let mut tx = pool.begin().await.expect("member transaction");
+    sqlx::query("SELECT id FROM users WHERE id = $1 FOR SHARE")
+        .bind(user)
+        .fetch_one(&mut *tx)
+        .await
+        .expect("member account");
+    sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+        .bind(company.as_uuid())
+        .fetch_one(&mut *tx)
+        .await
+        .expect("member company");
+    let joined = super::company::join_root_on(
+        &mut tx,
+        super::company::RootJoin {
+            company,
+            user,
+            role,
+            access_level: level,
+        },
+    )
+    .await
+    .expect("root membership");
+    super::department_desks::sync_department_grants_on(&mut tx, company, &[joined.department])
+        .await
+        .expect("department grants");
+    tx.commit().await.expect("root membership commits");
+    joined.principal
+}
+
+/// Ownership is changed through companies; its trigger moves the owner mirror. An existing
+/// root membership keeps its incarnation, and the previous owner's requested admin role follows.
 pub async fn transfer_company_ownership(
     pool: &PgPool,
     company_id: Uuid,
     new_owner: Uuid,
     previous_owner_role: crate::entities::company_member::CompanyAccessRole,
 ) {
-    let mut transaction = pool.begin().await.expect("a transaction");
-    let previous_owner: Uuid =
-        sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR UPDATE")
-            .bind(company_id)
-            .fetch_one(&mut *transaction)
-            .await
-            .expect("the company exists");
-    sqlx::query("UPDATE company_members SET role = $3 WHERE company_id = $1 AND user_id = $2")
+    use crate::{domain::workflow::CompanyId, entities::access_level::AccessLevel};
+    let mut tx = pool.begin().await.expect("ownership transaction");
+    let previous_owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1")
         .bind(company_id)
-        .bind(previous_owner)
-        .bind(previous_owner_role.as_str())
-        .execute(&mut *transaction)
+        .fetch_one(&mut *tx)
         .await
-        .expect("the previous owner is demoted");
-    sqlx::query(
-        r#"INSERT INTO company_members (id, company_id, user_id, role, access_level)
-           VALUES ($1, $2, $3, 'owner', 9)
-           ON CONFLICT (company_id, user_id) DO UPDATE SET role = 'owner', access_level = 9"#,
-    )
-    .bind(Uuid::new_v4())
-    .bind(company_id)
-    .bind(new_owner)
-    .execute(&mut *transaction)
-    .await
-    .expect("the new owner holds the owner row");
+        .expect("company exists");
+    sqlx::query("SELECT id FROM users WHERE id = ANY($1) ORDER BY id FOR SHARE")
+        .bind(vec![previous_owner, new_owner])
+        .fetch_all(&mut *tx)
+        .await
+        .expect("owner accounts");
+    sqlx::query("SELECT id FROM companies WHERE id = $1 FOR UPDATE")
+        .bind(company_id)
+        .fetch_one(&mut *tx)
+        .await
+        .expect("company lock");
+    let company = CompanyId::new(company_id);
+    if super::company::root_member_on(&mut tx, company, new_owner)
+        .await
+        .unwrap()
+        .is_none()
+    {
+        super::company::join_root_on(
+            &mut tx,
+            super::company::RootJoin {
+                company,
+                user: new_owner,
+                role: crate::entities::company_member::CompanyAccessRole::Member,
+                access_level: AccessLevel::MAX,
+            },
+        )
+        .await
+        .expect("new owner joins root");
+    }
     sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
         .bind(company_id)
         .bind(new_owner)
-        .execute(&mut *transaction)
+        .execute(&mut *tx)
         .await
-        .expect("the company names its new owner");
-    transaction
-        .commit()
-        .await
-        .expect("a complete ownership transfer commits");
+        .expect("owner mirror follows");
+    if previous_owner != new_owner {
+        let previous = super::company::root_member_on(&mut tx, company, previous_owner)
+            .await
+            .unwrap()
+            .expect("previous owner stays a member");
+        super::company::set_admin_on(&mut tx, company, &previous, previous_owner_role)
+            .await
+            .expect("previous owner role");
+    }
+    tx.commit().await.expect("ownership transfer commits");
 }
 
-/// Take `user_id` off the company inside the caller's transaction, as fixtures modelling "the actor
-/// lost every authority" need.
-///
-/// The member row goes first, so a competitor holding a lock on it still makes this wait exactly
-/// where a bare `DELETE` would. When the user is the owner, a fresh replacement account then takes
-/// the company in the same transaction: the owner row cannot simply disappear, because
-/// `companies.user_id` and the owner member row are one fact checked at commit.
+/// Direct authority mutation for race fixtures. Production removal additionally cancels deliveries
+/// and revokes remote resources through company::retire_member_on. Demotion here still records
+/// authenticated held-role retirement facts before its trigger clears root and other membership.
 pub async fn revoke_membership(connection: &mut PgConnection, company_id: Uuid, user_id: Uuid) {
-    let owner: Uuid = sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1")
-        .bind(company_id)
-        .fetch_one(&mut *connection)
+    use crate::{
+        domain::workflow::CompanyId,
+        entities::{access_level::AccessLevel, company_member::CompanyAccessRole},
+    };
+    sqlx::query("SELECT id FROM users WHERE id = $1 FOR SHARE")
+        .bind(user_id)
+        .fetch_optional(&mut *connection)
         .await
-        .expect("the company exists");
-    sqlx::query("DELETE FROM company_members WHERE company_id = $1 AND user_id = $2")
+        .unwrap();
+    let owner: Uuid =
+        sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+            .bind(company_id)
+            .fetch_one(&mut *connection)
+            .await
+            .expect("company exists");
+    if owner == user_id {
+        let replacement = Uuid::new_v4();
+        let name = format!("replacement_{}", replacement.simple());
+        sqlx::query(
+            "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')",
+        )
+        .bind(replacement)
+        .bind(&name)
+        .bind(format!("{name}@example.test"))
+        .execute(&mut *connection)
+        .await
+        .expect("replacement account");
+        super::company::join_root_on(
+            connection,
+            super::company::RootJoin {
+                company: CompanyId::new(company_id),
+                user: replacement,
+                role: CompanyAccessRole::Member,
+                access_level: AccessLevel::MAX,
+            },
+        )
+        .await
+        .expect("replacement root member");
+        sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
+            .bind(company_id)
+            .bind(replacement)
+            .execute(&mut *connection)
+            .await
+            .expect("replacement owner");
+    }
+    sqlx::query("SELECT id FROM principals WHERE company_id = $1 AND user_id = $2 FOR UPDATE")
         .bind(company_id)
         .bind(user_id)
-        .execute(&mut *connection)
+        .fetch_optional(&mut *connection)
         .await
-        .expect("the member row is deleted");
-    if owner != user_id {
-        return;
-    }
-    let replacement = Uuid::new_v4();
-    let name = format!("replacement_{}", replacement.simple());
+        .unwrap();
     sqlx::query(
-        "INSERT INTO users (id, username, email, password_hash) VALUES ($1, $2, $3, 'hash')",
+        "SELECT id FROM department_members WHERE company_id = $1 AND root_user_id = $2 FOR UPDATE",
     )
-    .bind(replacement)
-    .bind(&name)
-    .bind(format!("{name}@example.test"))
-    .execute(&mut *connection)
-    .await
-    .expect("a replacement owner account");
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, 'owner', 9)",
-    )
-    .bind(Uuid::new_v4())
     .bind(company_id)
-    .bind(replacement)
-    .execute(&mut *connection)
+    .bind(user_id)
+    .fetch_optional(&mut *connection)
     .await
-    .expect("the replacement holds the owner row");
-    sqlx::query("UPDATE companies SET user_id = $2 WHERE id = $1")
-        .bind(company_id)
-        .bind(replacement)
-        .execute(&mut *connection)
-        .await
-        .expect("the company names its replacement owner");
+    .unwrap();
+    sqlx::query(
+        "UPDATE principals SET kind = 'external', user_id = NULL, updated_at = clock_timestamp() \
+                 WHERE company_id = $1 AND user_id = $2",
+    )
+    .bind(company_id)
+    .bind(user_id)
+    .execute(connection)
+    .await
+    .expect("principal retires root membership");
 }
 
 /// [`revoke_membership`] committed on its own.

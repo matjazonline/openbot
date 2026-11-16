@@ -283,19 +283,15 @@ async fn address_namespace_a_department_desk_cannot_take_a_persons_address() {
     let Some(f) = Departments::new().await else {
         return;
     };
-    // The fixture writes its principals directly, so give its member person the address that
-    // joining would have given them.
+    // Joining already gave the person an address; choose the colliding slug on that row.
     let person = "dept-person";
-    sqlx::query(
-        "INSERT INTO addresses (company_id, slug, target_kind, principal_id, is_primary) \
-         VALUES ($1, $2, 'principal', $3, true)",
-    )
-    .bind(f.company)
-    .bind(person)
-    .bind(f.member_principal.as_uuid())
-    .execute(f.pool())
-    .await
-    .unwrap();
+    sqlx::query("UPDATE addresses SET slug=$2 WHERE company_id=$1 AND principal_id=$3")
+        .bind(f.company)
+        .bind(person)
+        .bind(f.member_principal.as_uuid())
+        .execute(f.pool())
+        .await
+        .unwrap();
     let departments = || async {
         sqlx::query_scalar::<_, i64>("SELECT count(*) FROM departments WHERE company_id = $1")
             .bind(f.company)
@@ -524,9 +520,16 @@ async fn department_lead_desk_run_as_moves_to_the_admin_who_changes_the_lead() {
     lead(&f, f.admin, department.id, f.owner_principal)
         .await
         .unwrap();
-    CompanyInvitePersistence::remove_member(&f.persistence, f.company, f.admin)
-        .await
-        .unwrap();
+    CompanyInvitePersistence::remove_member(
+        &f.persistence,
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.owner,
+            company_id: f.company,
+            member_user_id: f.admin,
+        },
+    )
+    .await
+    .unwrap();
     lead(&f, second_admin, department.id, f.agent_principal)
         .await
         .unwrap();

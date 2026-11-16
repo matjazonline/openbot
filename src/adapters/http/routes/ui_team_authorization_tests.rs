@@ -92,7 +92,7 @@ async fn team_mutations_refuse_members_admins_foreign_and_unknown_company_scopes
         return;
     };
     for role in ["member", "admin"] {
-        sqlx::query("UPDATE company_members SET role=$3 WHERE company_id=$1 AND user_id=$2")
+        sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2 AND $3::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id=$1 AND member.root_user_id=$2 AND $3::text='admin' ON CONFLICT DO NOTHING")
             .bind(f.company.id)
             .bind(f.member.id)
             .bind(role)
@@ -234,7 +234,7 @@ async fn access_level_browser_self_demotion_refreshes_caps_and_foreign_targets_a
         return;
     };
     sqlx::query(
-        "UPDATE company_members SET role='admin',access_level=4 WHERE company_id=$1 AND user_id=$2",
+        "WITH updated AS (UPDATE department_members AS member SET access_level=4 WHERE member.company_id=$1 AND member.root_user_id=$2 RETURNING member.company_id, member.department_id, member.principal_id) INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT company_id, department_id, principal_id, 'admin' FROM updated ON CONFLICT DO NOTHING",
     )
     .bind(f.company.id)
     .bind(f.member.id)

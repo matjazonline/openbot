@@ -608,7 +608,7 @@ impl PrincipalAccessPersistence for PostgresPersistence {
                FROM participant_identities AS identity
                JOIN principals AS principal ON (principal.company_id, principal.id) = (identity.company_id, identity.principal_id)
                JOIN companies AS company ON company.id = principal.company_id
-               LEFT JOIN company_members AS member ON (member.company_id, member.user_id) = (principal.company_id, principal.user_id)
+               LEFT JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true
                WHERE identity.company_id=$1 AND identity.transport=$2 AND identity.namespace=$3 AND identity.subject=$4"#)
             .bind(company_id).bind(identity.transport().as_str()).bind(identity.namespace().as_str())
             .bind(identity.subject().as_str()).fetch_optional(&self.pool).await?;
@@ -648,7 +648,7 @@ impl PrincipalAccessPersistence for PostgresPersistence {
                FROM principals AS principal
                JOIN users AS account ON account.id=principal.user_id
                JOIN companies AS company ON company.id=principal.company_id
-               JOIN company_members AS member ON (member.company_id,member.user_id)=(principal.company_id,principal.user_id)
+               JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true
                WHERE principal.company_id=$1 AND principal.user_id=$2"#)
             .bind(company_id).bind(user_id).fetch_optional(&self.pool).await?;
         row.map(|row| {
@@ -738,7 +738,7 @@ mod tests {
             .unwrap();
 
         // A person principal in company B cannot name company A's owner: the composite key points
-        // at `company_members`, where that pair does not exist.
+        // at root membership, where that pair does not exist.
         let cross_tenant_person = sqlx::query(
             r#"INSERT INTO principals (id, company_id, kind, user_id, display_label)
                VALUES ($1, $2, 'person', $3, 'Impostor')"#,

@@ -1,0 +1,1 @@
+PASS: entry/final snapshots byte-identical; HEAD/source digest/decision SHA/coordination1 pins match; git diff --check passed. No runtime tests performed.

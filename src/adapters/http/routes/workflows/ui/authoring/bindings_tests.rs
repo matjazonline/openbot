@@ -5,6 +5,9 @@
 use super::*;
 use crate::application::workflow::reads::BindingUse;
 
+#[path = "root_escalation_tests.rs"]
+mod root_escalation_tests;
+
 /// A source whose parameters the form shows as fields.
 fn with_params(workflow: Uuid, extra: serde_json::Value) -> String {
     let mut source = example("data.map", workflow);

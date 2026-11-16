@@ -1,0 +1,15 @@
+{
+  "round": "04RU-P01-D1-R6",
+  "reviewer": "/root/p04_reviewer",
+  "requested_model": "Astra/high",
+  "actual_settings": "unexposed",
+  "HEAD": "8fdb892b6e279ed0c09150e2336bbdc7462f877d",
+  "artifact": "4ac1d9d0fcc475a8acff950a3d2a6f8c6558fcbf6c66b18cdeee45937f3cec4e",
+  "decision_sha256": "49bbf4167eb083a476c2d556c205e17b7710452cb02ee50d2e36ffc69f6cde9b",
+  "coordination_revision": 1,
+  "snapshot_exclusions": [
+    "plan/04-root-unit/phases/p01/docs",
+    "plan/04-root-unit/COORDINATION.md"
+  ],
+  "reviewer_runtime": false
+}

@@ -5,7 +5,7 @@ use std::str::FromStr;
 use uuid::Uuid;
 
 use crate::{
-    adapters::persistence::{PostgresPersistence, participant::create_person_principal_on},
+    adapters::persistence::PostgresPersistence,
     app_error::{AppError, AppResult},
     entities::{
         company_invite::CompanyInvite,
@@ -14,7 +14,7 @@ use crate::{
     },
     use_cases::company_invite::{
         CompanyInvitePersistence, CreateCompanyInvite, InviteLevelChange, MemberLevelChange,
-        UpdateCompanyInvite, invite_address,
+        MemberRoleChange, RemoveCompanyMember, UpdateCompanyInvite, invite_address,
     },
 };
 
@@ -120,7 +120,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             actor_id: command.actor_id,
             company_id: command.company_id,
         };
-        let mut tx = authority::start(&self.pool, scope).await?;
+        let mut tx = authority::start(&self.pool, scope, None).await?;
         let previous =
             authority::lock_invite(&mut tx, scope.company_id, InviteTarget::Email(&email)).await?;
         let team = authority::lock_team(&mut tx, scope, None).await?;
@@ -204,7 +204,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             actor_id: command.actor_id,
             company_id: command.company_id,
         };
-        let mut tx = authority::start(&self.pool, scope).await?;
+        let mut tx = authority::start(&self.pool, scope, None).await?;
         let Some(previous) = authority::lock_invite(
             &mut tx,
             scope.company_id,
@@ -258,7 +258,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             actor_id: change.actor_id,
             company_id: change.company_id,
         };
-        let mut tx = authority::start(&self.pool, scope).await?;
+        let mut tx = authority::start(&self.pool, scope, Some(change.member_user_id)).await?;
         let team = authority::lock_team(&mut tx, scope, Some(change.member_user_id)).await?;
         let Some(target) = team.member(change.member_user_id) else {
             return Ok(None);
@@ -269,7 +269,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             LevelTarget::Assignable(target.actor()?.access_level)
         };
         team.assign(current, change.access_level)?;
-        sqlx::query("UPDATE company_members SET access_level=$3::smallint WHERE company_id=$1 AND user_id=$2 AND role<>'owner'")
+        sqlx::query("UPDATE department_members AS member SET access_level=$3::smallint WHERE member.company_id=$1 AND member.root_user_id=$2 AND NOT EXISTS (SELECT 1 FROM companies AS company WHERE company.id=$1 AND company.user_id=$2)")
             .bind(scope.company_id).bind(change.member_user_id).bind(change.access_level.as_i16())
             .execute(&mut *tx).await.map_err(authority::database)?;
         let row = sqlx::query_as::<_, CompanyMemberDb>(authority::MEMBER_SELECT)
@@ -296,7 +296,7 @@ impl CompanyInvitePersistence for PostgresPersistence {
             actor_id: change.actor_id,
             company_id: change.company_id,
         };
-        let mut tx = authority::start(&self.pool, scope).await?;
+        let mut tx = authority::start(&self.pool, scope, None).await?;
         let Some(previous) = authority::lock_invite(
             &mut tx,
             scope.company_id,
@@ -361,58 +361,62 @@ impl CompanyInvitePersistence for PostgresPersistence {
         user_id: Uuid,
         user_email: &str,
     ) -> AppResult<Option<CompanyInvite>> {
-        let member_id = Uuid::new_v4();
         let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
         if !lock_verified_account_email(&mut transaction, user_id, user_email).await? {
             return Ok(None);
         }
-        let db = sqlx::query_as::<_, CompanyInviteDb>(
-            r#"
-            WITH accepted AS (
-                UPDATE company_invites
-                SET status = 'accepted'
-                WHERE id = $1 AND status = 'pending' AND email = $2
-                RETURNING id, company_id, email, role, access_level::smallint AS access_level, status, created_at
-            ), membership AS (
-                -- An invite never rewrites the owner's row: accepting one addressed to the owner
-                -- leaves them the owner (the database also refuses an owner row that disagrees
-                -- with companies.user_id). A data-modifying CTE runs whether or not it is read, so
-                -- the invite still reads back accepted when this writes nothing.
-                INSERT INTO company_members (id, company_id, user_id, role, access_level)
-                SELECT $3, company_id, $4, role, access_level
-                FROM accepted
-                ON CONFLICT (company_id, user_id)
-                DO UPDATE SET role = EXCLUDED.role WHERE company_members.role <> 'owner'
-                RETURNING company_id
-            )
-            SELECT accepted.id, accepted.company_id, company.name AS company_name, accepted.email,
-                   accepted.role, accepted.access_level::smallint AS access_level, accepted.status, accepted.created_at
-            FROM accepted
-            JOIN companies AS company ON company.id = accepted.company_id
-            "#,
+        let company_id: Option<Uuid> = sqlx::query_scalar(
+            "SELECT company_id FROM company_invites WHERE id = $1 AND email = $2",
         )
         .bind(invite_id)
         .bind(user_email)
-        .bind(member_id)
-        .bind(user_id)
         .fetch_optional(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-
+        .await?;
+        let Some(company_id) = company_id else {
+            return Ok(None);
+        };
+        sqlx::query("SELECT id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
+            .bind(company_id)
+            .fetch_optional(&mut *transaction)
+            .await?;
+        let db = sqlx::query_as::<_, CompanyInviteDb>(
+            r#"WITH accepted AS (
+                UPDATE company_invites SET status = 'accepted'
+                WHERE id = $1 AND status = 'pending' AND email = $2
+                RETURNING id, company_id, email, role, access_level, status, created_at
+            ) SELECT accepted.id, accepted.company_id, company.name AS company_name,
+                     accepted.email, accepted.role, accepted.access_level::smallint AS access_level,
+                     accepted.status, accepted.created_at
+              FROM accepted JOIN companies AS company ON company.id = accepted.company_id"#,
+        )
+        .bind(invite_id)
+        .bind(user_email)
+        .fetch_optional(&mut *transaction)
+        .await?;
         if let Some(invite) = &db {
-            let username: String =
-                sqlx::query_scalar("SELECT username::text FROM users WHERE id = $1")
-                    .bind(user_id)
-                    .fetch_one(&mut *transaction)
-                    .await
-                    .map_err(AppError::from)?;
-            create_person_principal_on(
+            let joined = super::company::join_root_on(
                 &mut transaction,
-                invite.company_id,
-                user_id,
-                &username,
-                user_email,
+                super::company::RootJoin {
+                    company: crate::domain::workflow::CompanyId::new(invite.company_id),
+                    user: user_id,
+                    role: CompanyAccessRole::from_str(&invite.role).map_err(AppError::Internal)?,
+                    access_level: crate::entities::access_level::AccessLevel::try_from(
+                        invite.access_level,
+                    )
+                    .map_err(|error| AppError::Internal(error.to_string()))?,
+                },
             )
+            .await?;
+            super::department_desks::sync_department_grants_on(
+                &mut transaction,
+                crate::domain::workflow::CompanyId::new(invite.company_id),
+                &[joined.department],
+            )
+            .await?;
+            Box::pin(super::workflow::refresh_member_dependents_on(
+                &mut transaction,
+                crate::domain::workflow::CompanyId::new(invite.company_id),
+            ))
             .await?;
         }
         let result = if db.is_some() {
@@ -487,174 +491,77 @@ impl CompanyInvitePersistence for PostgresPersistence {
 
     /// The people invited into this company.
     ///
-    /// The owner also holds a `company_members` row -- it is the relational fact a person
-    /// principal's foreign key needs -- but `owner` is not an invitation role, so this surface
-    /// and the two writes below leave that row alone.
+    /// Team rows are current root person memberships; ownership stays on companies.
     async fn list_members_by_company(&self, company_id: Uuid) -> AppResult<Vec<CompanyMember>> {
-        let db_list = sqlx::query_as!(
-            CompanyMemberDb,
-            r#"SELECT member.id, member.company_id, member.user_id,
-                      account.username AS "username?", account.email AS "email?", account.avatar_url,
-                      member.role, member.access_level::smallint AS "access_level!: i16", member.created_at AS "created_at!"
-               FROM company_members AS member
-               JOIN users AS account ON account.id = member.user_id
-               WHERE member.company_id = $1 AND member.role <> 'owner'
-               ORDER BY member.created_at ASC, member.id ASC LIMIT 200"#,
-            company_id
-        )
-        .fetch_all(&self.pool)
-        .await
-        .map_err(AppError::from)?;
-
-        db_list.into_iter().map(TryInto::try_into).collect()
+        let rows = sqlx::query_as::<_, CompanyMemberDb>(
+            "SELECT member.id, member.company_id, member.user_id, account.username::text AS username, \
+                    account.email::text AS email, account.avatar_url, member.role, \
+                    member.access_level::smallint AS access_level, member.created_at \
+             FROM principals AS principal \
+             JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true \
+             JOIN users AS account ON account.id = principal.user_id \
+             WHERE principal.company_id = $1 AND member.role <> 'owner' \
+             ORDER BY member.created_at, member.id LIMIT 200",
+        ).bind(company_id).fetch_all(&self.pool).await?;
+        rows.into_iter().map(TryInto::try_into).collect()
     }
 
     async fn update_member_role(
         &self,
-        company_id: Uuid,
-        user_id: Uuid,
-        role: CompanyAccessRole,
+        change: MemberRoleChange,
     ) -> AppResult<Option<CompanyMember>> {
-        let mut tx = self.pool.begin().await?;
-        sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
-            .bind(user_id)
-            .execute(&mut *tx)
-            .await?;
-        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
-            .bind(company_id)
-            .execute(&mut *tx)
-            .await?;
-        let db = sqlx::query_as!(
-            CompanyMemberDb,
-            r#"WITH updated AS (
-                   UPDATE company_members
-                   SET role = $3
-                   WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
-                   RETURNING id, company_id, user_id, role, access_level, created_at
-               )
-               SELECT updated.id, updated.company_id, updated.user_id,
-                      account.username AS "username?", account.email AS "email?", account.avatar_url,
-                      updated.role, updated.access_level::smallint AS "access_level!: i16", updated.created_at AS "created_at!"
-               FROM updated
-               JOIN users AS account ON account.id = updated.user_id"#,
-            company_id,
-            user_id,
-            role.as_str(),
-        )
-        .fetch_optional(&mut *tx)
-        .await
-        .map_err(AppError::from)?;
-
-        if db.is_some() {
-            Box::pin(super::workflow::refresh_member_dependents_on(
-                &mut tx,
-                crate::domain::workflow::CompanyId::new(company_id),
-            ))
-            .await?;
+        let scope = TeamScope {
+            actor_id: change.actor_id,
+            company_id: change.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope, Some(change.member_user_id)).await?;
+        let team = authority::lock_team(&mut tx, scope, Some(change.member_user_id)).await?;
+        team.require_owner()?;
+        if change.member_user_id == team.owner_id {
+            return Err(AppError::BadRequest(
+                "The company owner's access role cannot be changed.".into(),
+            ));
         }
-        tx.commit().await?;
-        db.map(TryInto::try_into).transpose()
-    }
-
-    /// Take somebody off the team without erasing what they were party to.
-    ///
-    /// Their principal is demoted to an external actor first. The member row is what a person
-    /// principal's foreign key hangs on, so deleting it alone would cascade the principal away and
-    /// take its identities, grants and thread participation with it -- a former colleague would
-    /// vanish from every thread they ever wrote in.
-    ///
-    /// Lock order is principal, then member, then the member's notices -- the order the notice
-    /// producers take them (the notification projection locks `principal, member` `FOR SHARE`; the
-    /// decision-reviewer guard locks the principal). A producer already holding them commits its
-    /// notice before this transaction proceeds, so the cancellation below sees it; one arriving
-    /// later finds an external principal and no member, and composes nothing.
-    async fn remove_member(&self, company_id: Uuid, user_id: Uuid) -> AppResult<()> {
-        let mut transaction = self.pool.begin().await.map_err(AppError::from)?;
-        // Match dispatch and consent: account, then company, then membership and
-        // principal. Never acquire a principal before a competing host owner.
-        sqlx::query("SET LOCAL lock_timeout='5s'")
-            .execute(&mut *transaction)
-            .await?;
-        sqlx::query("SELECT id FROM users WHERE id=$1 FOR SHARE")
-            .bind(user_id)
-            .fetch_optional(&mut *transaction)
-            .await?;
-        sqlx::query("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE")
-            .bind(company_id)
-            .fetch_optional(&mut *transaction)
-            .await?;
-        let notice_recipient = super::delivery::cancellation::member_notice_recipient_on(
-            &mut transaction,
-            company_id,
-            user_id,
-        )
-        .await?;
-        sqlx::query!(
-            r#"UPDATE principals
-               SET kind = 'external', user_id = NULL, updated_at = CURRENT_TIMESTAMP
-               WHERE company_id = $1 AND user_id = $2
-                 AND EXISTS (
-                     SELECT 1 FROM company_members AS member
-                     WHERE member.company_id = $1 AND member.user_id = $2
-                       AND member.role <> 'owner'
-                 )"#,
-            company_id,
-            user_id
-        )
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        let removable = sqlx::query_scalar!(
-            "SELECT id FROM company_members
-             WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'
-             FOR UPDATE",
-            company_id,
-            user_id
-        )
-        .fetch_optional(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
-        if removable.is_none() {
-            // An owner, or nobody: removal is a no-op, and so was the demotion above.
-            transaction.commit().await.map_err(AppError::from)?;
-            return Ok(());
-        }
-        super::delivery::cancellation::cancel_member_notices_on(
-            &mut transaction,
-            company_id,
-            notice_recipient,
-        )
-        .await?;
-        // After the membership lock (memory E9): the user's namespace in this company goes.
-        super::memory::retire_namespaces_on(
-            &mut transaction,
-            company_id,
-            crate::application::memory::NamespaceOwner::User(user_id),
-        )
-        .await?;
-        super::integrations::lifecycle::revoke_membership_on(
-            &mut transaction,
-            &crate::adapters::integrations::owner::owner_for_user(user_id),
-            &crate::adapters::integrations::owner::company_binding(company_id),
-        )
-        .await
-        .map_err(AppError::from)?;
-        sqlx::query!(
-            "DELETE FROM company_members
-             WHERE company_id = $1 AND user_id = $2 AND role <> 'owner'",
-            company_id,
-            user_id
-        )
-        .execute(&mut *transaction)
-        .await
-        .map_err(AppError::from)?;
+        let company = crate::domain::workflow::CompanyId::new(change.company_id);
+        let Some(member) =
+            super::company::root_member_on(&mut tx, company, change.member_user_id).await?
+        else {
+            return Ok(None);
+        };
+        super::company::set_admin_on(&mut tx, company, &member, change.role).await?;
         Box::pin(super::workflow::refresh_member_dependents_on(
-            &mut transaction,
-            crate::domain::workflow::CompanyId::new(company_id),
+            &mut tx, company,
         ))
         .await?;
-        transaction.commit().await.map_err(AppError::from)?;
+        let row = sqlx::query_as::<_, CompanyMemberDb>(authority::MEMBER_SELECT)
+            .bind(change.company_id)
+            .bind(change.member_user_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+        tx.commit().await.map_err(authority::database)?;
+        row.map(TryInto::try_into).transpose()
+    }
 
+    async fn remove_member(&self, command: RemoveCompanyMember) -> AppResult<()> {
+        let scope = TeamScope {
+            actor_id: command.actor_id,
+            company_id: command.company_id,
+        };
+        let mut tx = authority::start(&self.pool, scope, Some(command.member_user_id)).await?;
+        let team = authority::lock_team(&mut tx, scope, Some(command.member_user_id)).await?;
+        team.require_owner()?;
+        if command.member_user_id == team.owner_id {
+            return Err(AppError::BadRequest(
+                "Cannot remove company owner from the team.".into(),
+            ));
+        }
+        super::company::retire_member_on(
+            &mut tx,
+            crate::domain::workflow::CompanyId::new(command.company_id),
+            command.member_user_id,
+        )
+        .await?;
+        tx.commit().await.map_err(authority::database)?;
         Ok(())
     }
 }

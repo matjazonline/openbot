@@ -15,6 +15,7 @@ use crate::use_cases::department::{DepartmentDetail, DepartmentView};
 
 fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Department>) -> Department {
     Department {
+        is_root: false,
         id: DepartmentId::new(Uuid::new_v4()),
         company_id,
         name: name.into(),
@@ -86,7 +87,11 @@ fn section<'a>(
         detail,
         choices,
         choices_cut: false,
-        editable,
+        membership: if editable {
+            crate::entities::company_member::CompanyMembership::Owner
+        } else {
+            crate::entities::company_member::CompanyMembership::Member
+        },
         error,
         notice: None,
     })
@@ -130,6 +135,8 @@ fn department_ui_pane_indents_the_tree_and_shows_the_selected_department() {
     };
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: Department {
                 charter: Some("Win and <keep> customers.".into()),
                 description: Some("Closes <new> business.".into()),
@@ -239,6 +246,8 @@ fn department_ui_member_sees_their_departments_without_forms() {
     let mine = vec![tree.inside.clone()];
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: tree.inside.clone(),
             members: Vec::new(),
             roles: Vec::new(),
@@ -338,7 +347,7 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
         detail: DepartmentDetailPane::Create(&draft),
         choices: &choices,
         choices_cut: true,
-        editable: true,
+        membership: crate::entities::company_member::CompanyMembership::Owner,
         error: None,
         notice: None,
     });
@@ -347,6 +356,8 @@ fn department_ui_refusal_renders_on_the_form_that_made_it() {
     // A refused lead change shows on the lead card, not on the edit form.
     let view = DepartmentView {
         detail: DepartmentDetail {
+            members_truncated: false,
+            roles_truncated: false,
             department: tree.sales.clone(),
             members: Vec::new(),
             roles: Vec::new(),

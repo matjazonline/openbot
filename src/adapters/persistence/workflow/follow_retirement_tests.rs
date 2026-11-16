@@ -1,5 +1,29 @@
 use super::*;
 
+fn reviewer_audit(audits: &[Value]) -> &Value {
+    assert_eq!(
+        audits.len(),
+        2,
+        "root Admin and subdepartment Reviewer both retire"
+    );
+    let mut roles: Vec<_> = audits
+        .iter()
+        .map(|audit| audit["role"].as_str().unwrap())
+        .collect();
+    roles.sort();
+    assert_eq!(roles, ["admin", "reviewer"]);
+    let admin = audits
+        .iter()
+        .find(|audit| audit["role"] == "admin")
+        .unwrap();
+    let reviewer = audits
+        .iter()
+        .find(|audit| audit["role"] == "reviewer")
+        .unwrap();
+    assert_ne!(admin["department_id"], reviewer["department_id"]);
+    reviewer
+}
+
 #[tokio::test]
 async fn workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision() {
     use crate::application::ports::account_deletion::HostAccountDeletion;
@@ -90,7 +114,11 @@ async fn workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_
     f.people
         .role
         .p()
-        .remove_member(f.scope.company.as_uuid(), f.people.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.people.role.admission.binding.target.actor.user_id(),
+            company_id: f.scope.company.as_uuid(),
+            member_user_id: f.people.users[0],
+        })
         .await
         .unwrap();
     let current = f.assignment().await;
@@ -107,15 +135,15 @@ async fn workflow_reviewer_follow_member_retirement_clears_audits_refreshes_and_
     );
     let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
         .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(f.people.role.p().pool()).await.unwrap();
-    assert_eq!(audits.len(), 1);
-    assert_eq!(audits[0]["department_id"], json!(f.people.role.department));
+    let reviewer = reviewer_audit(&audits);
+    assert_eq!(reviewer["department_id"], json!(f.people.role.department));
     assert_eq!(
-        audits[0]["department_label"],
+        reviewer["department_label"],
         json!({"prefix":"Team","truncated":false})
     );
-    assert_eq!(audits[0]["principal_kind"], "person");
-    assert_eq!(audits[0]["transition_kind"], "demoted");
-    assert_eq!(audits[0]["actor_kind"], "system");
+    assert_eq!(reviewer["principal_kind"], "person");
+    assert_eq!(reviewer["transition_kind"], "demoted");
+    assert_eq!(reviewer["actor_kind"], "system");
     let leaked:i64=sqlx::query_scalar("SELECT count(*) FROM notifications AS notice JOIN message_deliveries AS delivery ON delivery.company_id=notice.company_id AND delivery.id=notice.email_delivery_id \
         WHERE notice.company_id=$1 AND notice.recipient_principal_id=$2 AND delivery.cancellation_requested_at IS NULL")
         .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_one(f.people.role.p().pool()).await.unwrap();
@@ -144,9 +172,9 @@ async fn workflow_reviewer_follow_account_retirement_clears_all_roles_and_preser
     assert!(empty.reviewers.is_empty());
     assert!(empty.refusal.is_some());
     assert_eq!(f.proposal().await, proposal);
-    let audits:i64=sqlx::query_scalar("SELECT count(*) FROM department_administration_events WHERE company_id=$1 AND principal_id=$2")
-        .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_one(f.people.role.p().pool()).await.unwrap();
-    assert_eq!(audits, 1);
+    let audits:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
+        .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(f.people.role.p().pool()).await.unwrap();
+    reviewer_audit(&audits);
     let roles: i64 = sqlx::query_scalar(
         "SELECT count(*) FROM department_roles WHERE company_id=$1 AND principal_id=$2",
     )
@@ -198,12 +226,9 @@ async fn workflow_reviewer_follow_failed_final_statement_rolls_back_actual_accou
     )
     .await
     .unwrap();
-    let audit:i64=sqlx::query_scalar("SELECT count(*) FROM department_administration_events WHERE company_id=$1 AND principal_id=$2")
-        .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_one(&mut *tx).await.unwrap();
-    assert_eq!(
-        audit, 1,
-        "actual retirement created the audit before rollback"
-    );
+    let audit:Vec<Value>=sqlx::query_scalar("SELECT to_jsonb(event) FROM department_administration_events AS event WHERE company_id=$1 AND principal_id=$2")
+        .bind(f.scope.company.as_uuid()).bind(f.people.principals[0].as_uuid()).fetch_all(&mut *tx).await.unwrap();
+    reviewer_audit(&audit);
     let revision:i64=sqlx::query_scalar("SELECT assignment_revision FROM workflow_follow_decisions WHERE company_id=$1 AND decision_id=$2")
         .bind(f.scope.company.as_uuid()).bind(f.decision.0).fetch_one(&mut *tx).await.unwrap();
     assert_eq!(

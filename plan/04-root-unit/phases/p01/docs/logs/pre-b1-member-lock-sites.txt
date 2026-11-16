@@ -1,0 +1,159 @@
+src/adapters/persistence/company_level_authority.rs-102-    if let Some(target) = target {
+src/adapters/persistence/company_level_authority.rs-103-        users.push(target);
+src/adapters/persistence/company_level_authority.rs-104-    }
+src/adapters/persistence/company_level_authority.rs-105-    let members = sqlx::query_as::<_, LockedMember>(
+src/adapters/persistence/company_level_authority.rs:106:        "SELECT user_id,role,access_level::smallint AS access_level FROM company_members WHERE company_id=$1 AND user_id=ANY($2) ORDER BY user_id FOR UPDATE")
+src/adapters/persistence/company_level_authority.rs-107-        .bind(scope.company_id).bind(users).fetch_all(&mut **tx).await.map_err(database)?;
+src/adapters/persistence/company_level_authority.rs-108-    let actor = members
+src/adapters/persistence/company_level_authority.rs-109-        .iter()
+src/adapters/persistence/company_level_authority.rs-110-        .find(|member| member.user_id == scope.actor_id)
+--
+src/adapters/persistence/user_lifecycle.rs-23-    memberships: Vec<Uuid>,
+src/adapters/persistence/user_lifecycle.rs-24-}
+src/adapters/persistence/user_lifecycle.rs-25-
+src/adapters/persistence/user_lifecycle.rs-26-/// The account first (serializing against membership and ownership writes), then every company it
+src/adapters/persistence/user_lifecycle.rs:27:/// touches in one id-ordered pass: owned ones `FOR UPDATE` (they are deleted), member companies
+src/adapters/persistence/user_lifecycle.rs-28-/// `FOR NO KEY UPDATE`. Only then the membership rows. Taking the member companies first orders this
+src/adapters/persistence/user_lifecycle.rs-29-/// against a concurrent company delete (`FOR UPDATE`, then the memory rows, then the cascade to
+src/adapters/persistence/user_lifecycle.rs-30-/// members), which otherwise deadlocks with the memory hook below (review p7b r1 M4).
+src/adapters/persistence/user_lifecycle.rs-31-pub(in crate::adapters::persistence) async fn lock_account_on(
+--
+src/adapters/persistence/user_lifecycle.rs-63-        if is_owner && locked.is_some() {
+src/adapters/persistence/user_lifecycle.rs-64-            owned.push(company);
+src/adapters/persistence/user_lifecycle.rs-65-        }
+src/adapters/persistence/user_lifecycle.rs-66-    }
+src/adapters/persistence/user_lifecycle.rs:67:    let memberships = sqlx::query_scalar::<_,Uuid>("SELECT company_id FROM company_members WHERE user_id=$1 AND role<>'owner' ORDER BY company_id FOR UPDATE")
+src/adapters/persistence/user_lifecycle.rs-68-        .bind(user).fetch_all(&mut **tx).await.map_err(AppError::from)?;
+src/adapters/persistence/user_lifecycle.rs-69-    Ok(AccountLocks { owned, memberships })
+src/adapters/persistence/user_lifecycle.rs-70-}
+src/adapters/persistence/user_lifecycle.rs-71-
+--
+src/adapters/persistence/integration_bindings.rs-93-    tx: &mut Transaction<'_, Postgres>,
+src/adapters/persistence/integration_bindings.rs-94-    company: Uuid,
+src/adapters/persistence/integration_bindings.rs-95-    user: Uuid,
+src/adapters/persistence/integration_bindings.rs-96-) -> AppResult<()> {
+src/adapters/persistence/integration_bindings.rs:97:    let person:Option<Uuid>=sqlx::query_scalar("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
+src/adapters/persistence/integration_bindings.rs-98-        .bind(company).bind(user).fetch_optional(&mut **tx).await?;
+src/adapters/persistence/integration_bindings.rs-99-    person.map(|_| ()).ok_or_else(denied)
+src/adapters/persistence/integration_bindings.rs-100-}
+src/adapters/persistence/integration_bindings.rs-101-pub(super) async fn users_on(
+--
+src/adapters/persistence/onboarding.rs-63-                .fetch_optional(&mut *tx)
+src/adapters/persistence/onboarding.rs-64-                .await?
+src/adapters/persistence/onboarding.rs-65-                .ok_or_else(company_not_found)?;
+src/adapters/persistence/onboarding.rs-66-        let role: String = sqlx::query_scalar(
+src/adapters/persistence/onboarding.rs:67:            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2 FOR SHARE",
+src/adapters/persistence/onboarding.rs-68-        )
+src/adapters/persistence/onboarding.rs-69-        .bind(company_id)
+src/adapters/persistence/onboarding.rs-70-        .bind(user_id)
+src/adapters/persistence/onboarding.rs-71-        .fetch_optional(&mut *tx)
+--
+src/adapters/persistence/delivery/tenant_tests.rs-305-    let scope = scope(&persistence).await;
+src/adapters/persistence/delivery/tenant_tests.rs-306-    let leaving = member(&persistence, scope.company.id, "member").await;
+src/adapters/persistence/delivery/tenant_tests.rs-307-
+src/adapters/persistence/delivery/tenant_tests.rs-308-    let mut producer = persistence.pool.begin().await.unwrap();
+src/adapters/persistence/delivery/tenant_tests.rs:309:    sqlx::query("SELECT 1 FROM principals AS principal JOIN company_members AS member ON member.company_id = principal.company_id AND member.user_id = principal.user_id WHERE principal.company_id = $1 AND principal.id = $2 FOR SHARE OF principal, member")
+src/adapters/persistence/delivery/tenant_tests.rs-310-        .bind(scope.company.id)
+src/adapters/persistence/delivery/tenant_tests.rs-311-        .bind(leaving.principal_id)
+src/adapters/persistence/delivery/tenant_tests.rs-312-        .fetch_one(&mut *producer)
+src/adapters/persistence/delivery/tenant_tests.rs-313-        .await
+--
+src/adapters/persistence/delivery/tenant_tests.rs-368-            "SELECT principal.id FROM principals AS principal \
+src/adapters/persistence/delivery/tenant_tests.rs-369-               JOIN company_members AS member \
+src/adapters/persistence/delivery/tenant_tests.rs-370-                 ON member.company_id = principal.company_id AND member.user_id = principal.user_id \
+src/adapters/persistence/delivery/tenant_tests.rs-371-              WHERE principal.company_id = $1 AND principal.id = $2 \
+src/adapters/persistence/delivery/tenant_tests.rs:372:                FOR SHARE OF principal, member",
+src/adapters/persistence/delivery/tenant_tests.rs-373-        )
+src/adapters/persistence/delivery/tenant_tests.rs-374-        .bind(company)
+src/adapters/persistence/delivery/tenant_tests.rs-375-        .bind(principal)
+src/adapters/persistence/delivery/tenant_tests.rs-376-        .fetch_optional(&mut *tx)
+--
+src/adapters/persistence/workflow/integration_authority.rs-200-        };
+src/adapters/persistence/workflow/integration_authority.rs-201-        if !permitted {
+src/adapters/persistence/workflow/integration_authority.rs-202-            return Err(missing());
+src/adapters/persistence/workflow/integration_authority.rs-203-        }
+src/adapters/persistence/workflow/integration_authority.rs:204:        let member:Option<Uuid>=sqlx::query_scalar(&prefix.locks.sql("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal"))
+src/adapters/persistence/workflow/integration_authority.rs-205-            .bind(self.request.scope().company.as_uuid()).bind(self.owner).fetch_optional(&mut **tx).await
+src/adapters/persistence/workflow/integration_authority.rs-206-            .map_err(|error| prefix.error(error.into()))?;
+src/adapters/persistence/workflow/integration_authority.rs-207-        if member.is_none() {
+src/adapters/persistence/workflow/integration_authority.rs-208-            return Err(missing());
+--
+src/adapters/persistence/workflow/message.rs-404-    user: Uuid,
+src/adapters/persistence/workflow/message.rs-405-    lock: bool,
+src/adapters/persistence/workflow/message.rs-406-) -> AppResult<Option<MemberRoute>> {
+src/adapters/persistence/workflow/message.rs-407-    let lock = if lock {
+src/adapters/persistence/workflow/message.rs:408:        " FOR SHARE OF member, principal"
+src/adapters/persistence/workflow/message.rs-409-    } else {
+src/adapters/persistence/workflow/message.rs-410-        ""
+src/adapters/persistence/workflow/message.rs-411-    };
+src/adapters/persistence/workflow/message.rs-412-    let row: Option<(Uuid, String)> = sqlx::query_as(&format!(
+--
+src/adapters/persistence/workflow/jev_assets.rs-94-            "SELECT attachment.value FROM thread_messages AS membership \
+src/adapters/persistence/workflow/jev_assets.rs-95-             JOIN messages AS message ON message.company_id=membership.company_id AND message.id=membership.message_id \
+src/adapters/persistence/workflow/jev_assets.rs-96-             CROSS JOIN LATERAL jsonb_array_elements(message.attachments->'items') AS attachment(value) \
+src/adapters/persistence/workflow/jev_assets.rs-97-             WHERE membership.company_id=$1 AND membership.channel_id=$2 AND membership.thread_id=$3 \
+src/adapters/persistence/workflow/jev_assets.rs:98:               AND attachment.value->>'sha256_hash'=$4 LIMIT 1 FOR SHARE OF membership, message"
+src/adapters/persistence/workflow/jev_assets.rs-99-        ).bind(company.as_uuid()).bind(reference.channel_id.as_uuid()).bind(reference.thread_id.as_uuid()).bind(reference.sha256.as_str()).fetch_optional(&mut **tx).await?;
+src/adapters/persistence/workflow/jev_assets.rs-100-        let metadata: AttachmentMetadata =
+src/adapters/persistence/workflow/jev_assets.rs-101-            serde_json::from_value(metadata.ok_or_else(missing)?).map_err(|_| invalid())?;
+src/adapters/persistence/workflow/jev_assets.rs-102-        let key = metadata.storage_key.ok_or_else(missing)?;
+--
+src/adapters/persistence/workflow/decisions.rs-386-/// Park-time assignment check, configuration validation without locks (05-D2 §9.3): a company
+src/adapters/persistence/workflow/decisions.rs-387-/// member's person principal who can see the run's association; owner or admin on a
+src/adapters/persistence/workflow/decisions.rs-388-/// channel-less run. Submission rechecks the same rules under the §8 locks.
+src/adapters/persistence/workflow/decisions.rs-389-///
+src/adapters/persistence/workflow/decisions.rs:390:/// The reviewer's decision-email preference is read `FOR SHARE` after the member and principal
+src/adapters/persistence/workflow/decisions.rs-391-/// (P08-Q8): an opt-out recorded on the reviewer row stays true until the park commits. No row
+src/adapters/persistence/workflow/decisions.rs-392-/// is the default, email on.
+src/adapters/persistence/workflow/decisions.rs-393-async fn eligible_reviewer(
+src/adapters/persistence/workflow/decisions.rs-394-    db: &mut PgConnection,
+--
+src/adapters/persistence/workflow/decisions.rs-418-        JOIN companies AS company ON company.id=principal.company_id \
+src/adapters/persistence/workflow/decisions.rs-419-        JOIN workflow_runs AS run ON run.company_id=principal.company_id AND run.id=$3 \
+src/adapters/persistence/workflow/decisions.rs-420-        WHERE principal.company_id=$1 AND principal.id=$2 AND principal.kind='person' \
+src/adapters/persistence/workflow/decisions.rs-421-          AND workflow_follow_reviewer_eligible($1,$3,$2) \
+src/adapters/persistence/workflow/decisions.rs:422:        ORDER BY principal.id LIMIT 1 FOR SHARE OF member, principal, account")
+src/adapters/persistence/workflow/decisions.rs-423-        .bind(scope.company.as_uuid()).bind(principal).bind(scope.run.as_uuid()).fetch_optional(db).await?)
+src/adapters/persistence/workflow/decisions.rs-424-}
+src/adapters/persistence/workflow/decisions.rs-425-
+src/adapters/persistence/workflow/decisions.rs-426-#[derive(sqlx::FromRow)]
+--
+src/adapters/persistence/workflow/admission_source.rs-82-           ON membership.company_id = message.company_id AND membership.message_id = message.id \
+src/adapters/persistence/workflow/admission_source.rs-83-         WHERE message.company_id = $1 AND message.id = $2 \
+src/adapters/persistence/workflow/admission_source.rs-84-           AND membership.channel_id IS NOT DISTINCT FROM $3::uuid AND membership.thread_id = $4 \
+src/adapters/persistence/workflow/admission_source.rs-85-           AND membership.principal_id IS NOT DISTINCT FROM $5::uuid \
+src/adapters/persistence/workflow/admission_source.rs:86:         FOR SHARE OF message, membership",
+src/adapters/persistence/workflow/admission_source.rs-87-    )
+src/adapters/persistence/workflow/admission_source.rs-88-    .bind(command.company_id().as_uuid())
+src/adapters/persistence/workflow/admission_source.rs-89-    .bind(message)
+src/adapters/persistence/workflow/admission_source.rs-90-    .bind(target.desk_id())
+--
+src/adapters/persistence/workflow/authority.rs-23-         JOIN principals AS principal ON principal.company_id = member.company_id \
+src/adapters/persistence/workflow/authority.rs-24-           AND principal.user_id = member.user_id AND principal.kind = 'person' \
+src/adapters/persistence/workflow/authority.rs-25-         WHERE member.company_id = $1 AND member.user_id = $2 \
+src/adapters/persistence/workflow/authority.rs-26-         ORDER BY principal.id LIMIT 1 \
+src/adapters/persistence/workflow/authority.rs:27:         FOR SHARE OF member, principal",
+src/adapters/persistence/workflow/authority.rs-28-    )
+src/adapters/persistence/workflow/authority.rs-29-    .bind(company.as_uuid())
+src/adapters/persistence/workflow/authority.rs-30-    .bind(actor.user_id())
+src/adapters/persistence/workflow/authority.rs-31-    .fetch_optional(&mut *db)
+--
+src/adapters/persistence/workflow/authority.rs-73-    let facts=sqlx::query_as::<_,MemberAuthority>(
+src/adapters/persistence/workflow/authority.rs-74-        &locks.sql("SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
+src/adapters/persistence/workflow/authority.rs-75-         JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
+src/adapters/persistence/workflow/authority.rs-76-         WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' \
+src/adapters/persistence/workflow/authority.rs:77:         FOR SHARE OF member,principal"))
+src/adapters/persistence/workflow/authority.rs-78-        .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
+src/adapters/persistence/workflow/authority.rs-79-    let membership = membership_from_db(Some(&facts.role))?;
+src/adapters/persistence/workflow/authority.rs-80-    if membership.is_owner() != (owner == actor.user_id()) {
+src/adapters/persistence/workflow/authority.rs-81-        return Err(invalid());
+--
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-56-    let backend = sqlx::query_scalar("SELECT pg_backend_pid()")
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-57-        .fetch_one(&mut *transaction)
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-58-        .await
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-59-        .unwrap();
+src/adapters/persistence/workflow/knowledge_account_race_support.rs:60:    sqlx::query("SELECT id FROM company_members WHERE company_id=$1 AND user_id=$2 FOR UPDATE")
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-61-        .bind(setup.scope().company.as_uuid())
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-62-        .bind(setup.user)
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-63-        .execute(&mut *transaction)
+src/adapters/persistence/workflow/knowledge_account_race_support.rs-64-        .await

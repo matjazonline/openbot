@@ -83,7 +83,7 @@ impl SalesJourney {
             .await
             .unwrap();
         sqlx::query(
-            "UPDATE company_members SET access_level=$3 WHERE company_id=$1 AND user_id=$2",
+            "UPDATE department_members SET access_level=$3 WHERE company_id=$1 AND root_user_id=$2",
         )
         .bind(self.d.fixture.target.company.as_uuid())
         .bind(user)

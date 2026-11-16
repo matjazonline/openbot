@@ -75,11 +75,20 @@ async fn vault_binding_membership_revocation_covers_consent_created_while_delete
     let consent = tokio::spawn(async move { BindingAuthority::confirm(&host, c, &writer).await });
     ready.notified().await;
     let remover = p.clone();
-    let removal = tokio::spawn(async move { remover.remove_member(company, user).await });
+    let removing_owner = setup.fixture.target.actor.user_id();
+    let removal = tokio::spawn(async move {
+        remover
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: removing_owner,
+                company_id: company,
+                member_user_id: user,
+            })
+            .await
+    });
     let observed=tokio::time::timeout(Duration::from_secs(3),async {
         loop {
             let start:Option<chrono::DateTime<Utc>>=sqlx::query_scalar("SELECT xact_start FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query=$1 LIMIT 1")
-                .bind("SELECT id FROM companies WHERE id=$1 FOR NO KEY UPDATE").fetch_optional(p.pool()).await.unwrap();
+                .bind("SELECT user_id FROM companies WHERE id=$1 FOR NO KEY UPDATE").fetch_optional(p.pool()).await.unwrap();
             if let Some(start)=start {break start;}
             tokio::task::yield_now().await;
         }
@@ -99,7 +108,14 @@ async fn vault_binding_membership_revocation_covers_consent_created_while_delete
         cutoff >= confirmed,
         "a later committed revocation must retire this consent"
     );
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'member',0)").bind(Uuid::new_v4()).bind(company).bind(user).execute(p.pool()).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(company),
+        user,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     restore_principal(p, company, user).await;
     vault.drain(16, &CancellationToken::new()).await.unwrap();
     assert!(!vault.grant_metadata(grant.id).await.unwrap().enabled);

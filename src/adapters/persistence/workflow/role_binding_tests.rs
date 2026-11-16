@@ -223,18 +223,16 @@ async fn workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders(
         .create_user("second", "second@example.test", "hash")
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id,company_id,user_id,role) VALUES ($1,$2,$3,'member')",
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(f.target.company.as_uuid()),
+        other.id,
+        crate::entities::company_member::CompanyAccessRole::Member,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.target.company.as_uuid())
-    .bind(other.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    let principal = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id,company_id,kind,user_id,display_label) VALUES ($1,$2,'person',$3,'Second')")
-        .bind(principal).bind(f.target.company.as_uuid()).bind(other.id).execute(p.pool()).await.unwrap();
+    .as_uuid();
+
     let use_cases = crate::adapters::persistence::test_support::department_use_cases(p);
     for holder in [owner, principal] {
         use_cases

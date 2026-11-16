@@ -6,6 +6,7 @@
 //! and the tree always shows what was just saved.
 
 use super::*;
+use crate::entities::company_member::CompanyMembership;
 use crate::entities::department::{
     Department, DepartmentDesk, DepartmentId, DepartmentPrincipal, DepartmentRole, department_tree,
 };
@@ -64,17 +65,20 @@ pub struct DepartmentSection<'a> {
     /// The departments the viewer may see: all of them for an owner or admin, otherwise their own.
     pub departments: &'a [Department],
     pub detail: DepartmentDetailPane<'a>,
-    /// The people and agents the forms offer; empty unless `editable`.
+    /// The people and agents the forms offer; empty unless the viewer manages the company.
     pub choices: &'a [DepartmentPrincipal],
     /// The company has more people and agents than `choices` lists.
     pub choices_cut: bool,
-    /// The viewer manages the company (owner or admin).
-    pub editable: bool,
+    pub membership: CompanyMembership,
     pub error: Option<(DepartmentForm, &'a str)>,
     pub notice: Option<&'a str>,
 }
 
 impl DepartmentSection<'_> {
+    fn editable(&self) -> bool {
+        self.membership.manages_company_operations()
+    }
+
     fn error_for(&self, form: DepartmentForm) -> String {
         form_error_banner(
             self.error
@@ -107,7 +111,7 @@ fn section_endpoint(company_id: Uuid, rest: &str) -> String {
 
 pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
     let company_id = section.company.id;
-    let new_button = if section.editable {
+    let new_button = if section.editable() {
         format!(
             r##"<button type="button" class="btn btn-primary btn-sm"
                 hx-get="{new_endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -119,7 +123,7 @@ pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
     } else {
         String::new()
     };
-    let intro = if section.editable {
+    let intro = if section.editable() {
         "Departments group desks and the people and agents who work them."
     } else {
         "The departments you belong to or lead."
@@ -153,7 +157,7 @@ pub fn company_departments_section(section: &DepartmentSection<'_>) -> String {
 /// The tree, as nested menus: a child department sits indented under its parent.
 fn department_tree_list(section: &DepartmentSection<'_>) -> String {
     if section.departments.is_empty() {
-        let message = if section.editable {
+        let message = if section.editable() {
             "No departments yet."
         } else {
             "You are not in any department."
@@ -247,14 +251,14 @@ fn create_form(section: &DepartmentSection<'_>, draft: &DepartmentDraft) -> Stri
 
 /// Name, address slug, description, charter and parent: what both the create and the edit form
 /// set. `editing` is the department being edited, which cannot be its own parent.
-fn department_fields(
+fn parent_options(
     section: &DepartmentSection<'_>,
     draft: &DepartmentDraft,
     editing: Option<DepartmentId>,
 ) -> String {
-    let parents: String = department_tree(section.departments)
+    department_tree(section.departments)
         .into_iter()
-        .filter(|(_, department)| Some(department.id) != editing)
+        .filter(|(_, department)| Some(department.id) != editing && !department.is_root)
         .map(|(depth, department)| {
             let id = department.id.as_uuid();
             format!(
@@ -268,13 +272,24 @@ fn department_fields(
                 name = escape_html_text(&department.name),
             )
         })
-        .collect();
+        .collect()
+}
+
+fn department_fields(
+    section: &DepartmentSection<'_>,
+    draft: &DepartmentDraft,
+    editing: Option<DepartmentId>,
+) -> String {
+    let is_root = editing
+        .and_then(|id| section.departments.iter().find(|entry| entry.id == id))
+        .is_some_and(|entry| entry.is_root);
+    let parents = parent_options(section, draft, editing);
     format!(
         r##"<div class="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <label class="form-control"><span class="label text-xs opacity-70">Name</span>
-                    <input class="input w-full" name="name" required maxlength="120" value="{name}"{slugify}></label>
+                    <input class="input w-full" name="name" required maxlength="120" value="{name}"{slugify}{readonly}></label>
                 <label class="form-control"><span class="label text-xs opacity-70">Slug</span>
-                    <input class="input w-full font-mono" name="slug" maxlength="64" value="{slug}" placeholder="sales"></label>
+                    <input class="input w-full font-mono" name="slug" maxlength="64" value="{slug}" placeholder="sales"{readonly}></label>
             </div>
             <p class="text-xs opacity-60">{slug_help}</p>
             <label class="form-control"><span class="label text-xs opacity-70">Description</span>
@@ -282,8 +297,7 @@ fn department_fields(
             <label class="form-control"><span class="label text-xs opacity-70">Charter</span>
                 <textarea class="textarea min-h-32 w-full" name="charter" maxlength="{max_charter}">{charter}</textarea>
                 <span class="label text-xs opacity-60">What the department is for. Its agents read it when they answer on its desks. At most {max_charter} bytes.</span></label>
-            <label class="form-control"><span class="label text-xs opacity-70">Parent department</span>
-                <select class="select w-full" name="parent_id"><option value="">None (top level)</option>{parents}</select></label>"##,
+            {parent_field}"##,
         // The new department's desk is created at its slug. Editing the slug later does not move
         // the desk (01DEP-P03-D8), so the edit form says where its address is changed instead.
         slug_help = match editing {
@@ -299,6 +313,12 @@ fn department_fields(
             r#" data-input="slugify""#
         } else {
             ""
+        },
+        readonly = if is_root { " readonly" } else { "" },
+        parent_field = if is_root {
+            r#"<input type="hidden" name="parent_id" value=""><p class="text-xs opacity-60">The company is the root department. Its name and slug follow company settings.</p>"#.to_owned()
+        } else {
+            format!(r#"<label class="form-control"><span class="label text-xs opacity-70">Parent department</span><select class="select w-full" name="parent_id"><option value="">Company root</option>{parents}</select></label>"#)
         },
         name = escape_html_attr(&draft.name),
         slug = escape_html_attr(&draft.slug),
@@ -360,11 +380,7 @@ fn named_principal(view: &DepartmentView, id: crate::entities::transport::Princi
     }
 }
 
-fn department_detail(
-    section: &DepartmentSection<'_>,
-    view: &DepartmentView,
-    draft: Option<&DepartmentDraft>,
-) -> String {
+fn department_header(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
     let department = &view.detail.department;
     let parent = department
         .parent_id
@@ -409,7 +425,35 @@ fn department_detail(
         None => r#"<p id="department-address" class="text-xs opacity-60">No department desk.</p>"#
             .to_owned(),
     };
-    let edit = if section.editable {
+    format!(
+        r#"            <div class="rounded-box border border-base-300 bg-base-200 p-4">
+                <h3 class="text-lg font-semibold">{name}</h3>{root_badge}
+                {address}
+                <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+                    <dt class="opacity-60">Slug</dt><dd class="font-mono">{slug}</dd>
+                    <dt class="opacity-60">Parent</dt><dd>{parent}</dd>
+                </dl>
+                {description}
+                <h4 class="mt-4 text-xs font-semibold uppercase tracking-wider opacity-60">Charter</h4>
+                {charter}
+            </div>"#,
+        name = escape_html_text(&department.name),
+        slug = escape_html_text(department.slug.as_str()),
+        root_badge = if department.is_root {
+            r#"<span class="badge badge-ghost badge-sm">Company root</span>"#
+        } else {
+            ""
+        },
+    )
+}
+
+fn department_detail(
+    section: &DepartmentSection<'_>,
+    view: &DepartmentView,
+    draft: Option<&DepartmentDraft>,
+) -> String {
+    let department = &view.detail.department;
+    let edit = if section.editable() {
         edit_form(
             section,
             department.id,
@@ -422,26 +466,21 @@ fn department_detail(
     };
     format!(
         r##"<div id="department-detail" class="space-y-5" data-department-id="{id}">
-            <div class="rounded-box border border-base-300 bg-base-200 p-4">
-                <h3 class="text-lg font-semibold">{name}</h3>
-                {address}
-                <dl class="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-                    <dt class="opacity-60">Slug</dt><dd class="font-mono">{slug}</dd>
-                    <dt class="opacity-60">Parent</dt><dd>{parent}</dd>
-                </dl>
-                {description}
-                <h4 class="mt-4 text-xs font-semibold uppercase tracking-wider opacity-60">Charter</h4>
-                {charter}
-            </div>
+            {header}
             {lead}
+            {roles_cut}
             {members}
             {desks}
             {edit}
         </div>"##,
         id = department.id,
-        name = escape_html_text(&department.name),
-        slug = escape_html_text(department.slug.as_str()),
+        header = department_header(section, view),
         lead = lead_card(section, view),
+        roles_cut = if view.detail.department.is_root && view.detail.roles_truncated {
+            "<p class=\"text-xs opacity-60\">Some role badges are omitted.</p>"
+        } else {
+            ""
+        },
         members = members_card(section, view),
         desks = desks_card(section, &view.desks),
     )
@@ -457,7 +496,7 @@ fn lead_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
         .find(|holder| holder.role == DepartmentRole::Lead);
     let current = match holder {
         Some(holder) => {
-            let clear = if section.editable {
+            let clear = if section.editable() {
                 format!(
                     r##"<button type="button" class="btn btn-ghost btn-xs"
                         hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -477,7 +516,7 @@ fn lead_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
         }
         None => r#"<p id="department-lead" class="text-sm opacity-60">No lead.</p>"#.to_string(),
     };
-    let form = if section.editable {
+    let form = if section.editable() {
         format!(
             r##"<form class="mt-3 flex flex-wrap items-end gap-2"
                 hx-put="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -511,6 +550,58 @@ fn lead_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
     )
 }
 
+fn removable_member(
+    section: &DepartmentSection<'_>,
+    view: &DepartmentView,
+    principal: crate::entities::transport::PrincipalId,
+) -> bool {
+    if !section.editable() {
+        return false;
+    }
+    if !view.detail.department.is_root {
+        return true;
+    }
+    if view
+        .detail
+        .roles
+        .iter()
+        .any(|holder| holder.role == DepartmentRole::Owner && holder.principal_id == principal)
+    {
+        return false;
+    }
+    match view.principal(principal).map(|entry| entry.kind) {
+        Some(PrincipalKind::Person) => section.membership.is_owner(),
+        Some(PrincipalKind::Agent) => true,
+        _ => false,
+    }
+}
+
+fn root_authority_badge(
+    view: &DepartmentView,
+    principal: crate::entities::transport::PrincipalId,
+) -> &'static str {
+    if !view.detail.department.is_root {
+        return "";
+    }
+    if view
+        .detail
+        .roles
+        .iter()
+        .any(|holder| holder.principal_id == principal && holder.role == DepartmentRole::Owner)
+    {
+        return r#"<span class="badge badge-ghost badge-sm">Owner</span>"#;
+    }
+    if view
+        .detail
+        .roles
+        .iter()
+        .any(|holder| holder.principal_id == principal && holder.role == DepartmentRole::Admin)
+    {
+        return r#"<span class="badge badge-ghost badge-sm">Admin</span>"#;
+    }
+    ""
+}
+
 fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> String {
     let company_id = section.company.id;
     let department = view.detail.department.id;
@@ -519,11 +610,14 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
         .members
         .iter()
         .map(|member| {
-            let remove = if section.editable {
+            let remove = if removable_member(section, view, member.principal_id) {
                 format!(
                     r##"<button type="button" class="btn btn-ghost btn-xs"
                         hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
-                        hx-confirm="Remove this member from the department?" hx-disabled-elt="this">Remove</button>"##,
+                        hx-confirm="{confirmation}" hx-disabled-elt="this">Remove</button>"##,
+                    confirmation = if view.detail.department.is_root && view.principal(member.principal_id).is_some_and(|entry| entry.kind == PrincipalKind::Person) {
+                        "Remove this person from the company?"
+                    } else { "Remove this member from the department?" },
                     endpoint = section_endpoint(
                         company_id,
                         &format!("/{department}/members/{}", member.principal_id)
@@ -533,8 +627,9 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
                 String::new()
             };
             format!(
-                r#"<li class="flex flex-wrap items-center justify-between gap-2 py-1"><div class="flex flex-wrap items-center gap-1">{}</div>{remove}</li>"#,
-                named_principal(view, member.principal_id)
+                r#"<li class="flex flex-wrap items-center justify-between gap-2 py-1"><div class="flex flex-wrap items-center gap-1">{} {authority}</div>{remove}</li>"#,
+                named_principal(view, member.principal_id),
+                authority = root_authority_badge(view, member.principal_id),
             )
         })
         .collect();
@@ -543,16 +638,17 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
     } else {
         format!(r#"<ul id="department-members" class="divide-y divide-base-300">{rows}</ul>"#)
     };
-    let form = if section.editable {
+    let form = if section.editable() {
         let candidates: Vec<DepartmentPrincipal> = section
             .choices
             .iter()
             .filter(|choice| {
-                !view
-                    .detail
-                    .members
-                    .iter()
-                    .any(|member| member.principal_id == choice.principal_id)
+                (!view.detail.department.is_root || choice.kind == PrincipalKind::Agent)
+                    && !view
+                        .detail
+                        .members
+                        .iter()
+                        .any(|member| member.principal_id == choice.principal_id)
             })
             .cloned()
             .collect();
@@ -574,9 +670,17 @@ fn members_card(section: &DepartmentSection<'_>, view: &DepartmentView) -> Strin
     format!(
         r#"<div class="rounded-box border border-base-300 p-4">
             <h4 class="mb-2 text-xs font-semibold uppercase tracking-wider opacity-60">Members</h4>
-            {error}{list}{form}
+            {error}{list}{cut}{form}
         </div>"#,
         error = section.error_for(DepartmentForm::Members),
+        cut = if view.detail.members_truncated {
+            format!(
+                "<p class=\"mt-2 text-xs opacity-60\">Showing the first {} members.</p>",
+                crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES
+            )
+        } else {
+            String::new()
+        },
     )
 }
 
@@ -587,7 +691,7 @@ fn desks_card(section: &DepartmentSection<'_>, desks: &[DepartmentDesk]) -> Stri
         .map(|desk| {
             let name = escape_html_text(&desk.name);
             // Desk settings are for owners and admins; a member reads the address only.
-            let name = if section.editable {
+            let name = if section.editable() {
                 format!(
                     r#"<a class="link-hover" href="/ui/channels?company_id={company_id}&amp;channel_id={id}">{name}</a>"#,
                     id = desk.id,
@@ -641,6 +745,26 @@ fn edit_form(
 ) -> String {
     let company_id = section.company.id;
     let endpoint = section_endpoint(company_id, &format!("/{department}"));
+    let delete = if section
+        .departments
+        .iter()
+        .any(|entry| entry.id == department && entry.is_root)
+    {
+        String::new()
+    } else {
+        format!(
+            r##"<div id="department-delete" class="rounded-box border border-error/40 p-4">
+            {error}<div class="flex flex-wrap items-center justify-between gap-3">
+                <p class="text-sm opacity-70">A department is deleted only when it owns no desks and has no child departments.</p>
+                <button type="button" class="btn btn-error btn-outline btn-sm"
+                    hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
+                    hx-confirm="Delete department '{name}'? Its members and roles go with it."
+                    hx-disabled-elt="this">Delete department</button>
+            </div></div>"##,
+            error = section.error_for(DepartmentForm::Delete),
+            name = escape_html_attr(&draft.name)
+        )
+    };
     format!(
         r##"<form id="department-edit" class="space-y-4 rounded-box border border-base-300 bg-base-200 p-4"
             hx-put="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
@@ -652,20 +776,9 @@ fn edit_form(
                 {submit}
             </div>
         </form>
-        <div id="department-delete" class="rounded-box border border-error/40 p-4">
-            {delete_error}
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <p class="text-sm opacity-70">A department is deleted only when it owns no desks and has no child departments.</p>
-                <button type="button" class="btn btn-error btn-outline btn-sm"
-                    hx-delete="{endpoint}" hx-target="#department-section" hx-swap="outerHTML"
-                    hx-confirm="Delete department '{name}'? Its members and roles go with it."
-                    hx-disabled-elt="this">Delete department</button>
-            </div>
-        </div>"##,
+        {delete}"##,
         error = section.error_for(DepartmentForm::Edit),
         fields = department_fields(section, &draft, Some(department)),
         submit = busy_submit_button("Save department"),
-        delete_error = section.error_for(DepartmentForm::Delete),
-        name = escape_html_attr(&draft.name),
     )
 }

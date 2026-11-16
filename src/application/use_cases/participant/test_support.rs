@@ -123,7 +123,7 @@ pub fn email_allowlist_grants(company_id: Uuid, addresses: &[&str]) -> Vec<Chann
 
 /// How a test states who is on a company's team.
 ///
-/// Production answers this by joining a principal to its `company_members` row, inside the same
+/// Production answers this by reading the principal's root membership, inside the same
 /// query that resolves the identity. An in-memory directory has no join to make, so the scenario's
 /// own company double answers instead — which keeps the team stated once, where the test already
 /// listed it. It is deliberately test-only: nothing in production decides anything from an address.

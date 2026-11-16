@@ -34,7 +34,11 @@ pub(crate) async fn create_department_with_id_on(
     write: &DepartmentWrite,
     lead: Option<PrincipalId>,
 ) -> AppResult<Department> {
-    if let Some(parent) = write.parent_id {
+    let parent_id = Some(match write.parent_id {
+        Some(parent) => parent,
+        None => super::super::company::root_on(tx, company).await?,
+    });
+    if let Some(parent) = parent_id {
         let parent = lock_parent_on(tx, company, parent).await?;
         check_shape_on(tx, company, id, &write.name, &parent).await?;
     }
@@ -56,7 +60,7 @@ pub(crate) async fn create_department_with_id_on(
     .bind(&write.slug)
     .bind(&write.description)
     .bind(&write.charter)
-    .bind(write.parent_id.map(DepartmentId::as_uuid))
+    .bind(parent_id.map(DepartmentId::as_uuid))
     .bind(created_by)
     .fetch_one(&mut **tx)
     .await
@@ -108,7 +112,22 @@ pub(crate) async fn update_department_on(
         .charter
         .clone()
         .unwrap_or_else(|| current.charter.clone());
-    let parent_id = edit.parent_id.unwrap_or(current.parent_id);
+    if current.is_root
+        && (edit.parent_id.unwrap_or(current.parent_id) != current.parent_id
+            || slug != current.slug.as_str())
+    {
+        return Err(AppError::BadRequest(
+            "The company root cannot be reparented or renamed independently.".into(),
+        ));
+    }
+    let parent_id = if current.is_root {
+        None
+    } else {
+        Some(match edit.parent_id.unwrap_or(current.parent_id) {
+            Some(parent) => parent,
+            None => super::super::company::root_on(tx, company).await?,
+        })
+    };
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
     {
@@ -154,6 +173,11 @@ async fn guard_department_delete_on(
     company: CompanyId,
     current: &Department,
 ) -> AppResult<()> {
+    if current.is_root {
+        return Err(AppError::BadRequest(
+            "The company root cannot be deleted.".into(),
+        ));
+    }
     let department = current.id;
     let has_children: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM departments AS child \

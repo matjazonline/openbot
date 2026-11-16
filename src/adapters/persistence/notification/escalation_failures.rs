@@ -15,7 +15,7 @@ pub(crate) async fn refresh_person_escalations_on(
         JOIN workflow_escalation_notices AS notice ON notice.company_id=progress.company_id AND notice.decision_id=progress.current_decision_id \
         LEFT JOIN principals AS principal ON principal.company_id=notice.company_id AND principal.id=notice.principal_id \
         LEFT JOIN users AS account ON account.id=principal.user_id \
-        LEFT JOIN company_members AS member ON member.company_id=notice.company_id AND member.user_id=account.id \
+        LEFT JOIN LATERAL membership_of(account.id, notice.company_id) AS member ON true \
         WHERE progress.company_id=$1 AND progress.state IN ('waiting','owner_waiting','manual') AND notice.principal_kind='person' \
           AND workflow_escalation_notice_active(notice.company_id,notice.id) \
           AND NOT workflow_escalation_person_eligible(notice.company_id,notice.id) \

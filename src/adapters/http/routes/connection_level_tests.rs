@@ -170,8 +170,15 @@ impl Fixture {
             .create_user(&key, &format!("{key}@example.test"), "hash")
             .await
             .unwrap();
-        sqlx::query("INSERT INTO company_members(id,company_id,user_id,role,access_level) VALUES($1,$2,$3,'admin',$4::smallint)").bind(Uuid::new_v4()).bind(self.company).bind(user.id).bind(level).execute(self.p.pool()).await.unwrap();
-        sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'admin')").bind(Uuid::new_v4()).bind(self.company).bind(user.id).execute(self.p.pool()).await.unwrap();
+        crate::adapters::persistence::test_support::insert_root_member(
+            self.p.pool(),
+            crate::domain::workflow::CompanyId::new(self.company),
+            user.id,
+            crate::entities::company_member::CompanyAccessRole::Admin,
+            crate::entities::access_level::AccessLevel::try_from(level).unwrap(),
+        )
+        .await;
+
         user.id
     }
 }
@@ -451,12 +458,14 @@ async fn knowledge_run_level_race_live_admin_demotion_precedes_connection_level_
         .execute(&mut *demotion)
         .await
         .unwrap();
-    sqlx::query("UPDATE company_members SET access_level=1 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.company)
-        .bind(admin)
-        .execute(&mut *demotion)
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=1 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.company)
+    .bind(admin)
+    .execute(&mut *demotion)
+    .await
+    .unwrap();
     let command = draft(1, 3).command(admin, f.company, f.http.id).unwrap();
     let p = f.p.clone();
     let writer = tokio::spawn(async move { p.set_http_level(command).await });

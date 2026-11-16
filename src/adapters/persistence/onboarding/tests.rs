@@ -532,16 +532,14 @@ async fn onboarding_denials_and_invalid_selection_have_no_provider_effects() {
             .unwrap()
             .id;
         if role != "outsider" {
-            sqlx::query(
-                "INSERT INTO company_members (company_id, user_id, role, id) VALUES ($1, $2, $3, $4)",
+            crate::adapters::persistence::test_support::insert_root_member(
+                &f.db.pool,
+                crate::domain::workflow::CompanyId::new(f.company),
+                user,
+                (role).parse().expect("fixture role"),
+                crate::entities::access_level::AccessLevel::PUBLIC,
             )
-            .bind(f.company)
-            .bind(user)
-            .bind(role)
-            .bind(Uuid::new_v4())
-            .execute(&f.db.pool)
-            .await
-            .unwrap();
+            .await;
         }
         let result = f
             .service
@@ -792,7 +790,7 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
              FROM departments AS department \
              JOIN department_members AS member ON member.department_id = department.id \
              JOIN principals AS principal ON principal.id = member.principal_id \
-             WHERE department.company_id = $1",
+             WHERE department.company_id = $1 AND principal.kind='agent'",
         )
         .bind(f.company)
         .fetch_all(&f.db.pool)
@@ -824,7 +822,10 @@ async fn agent_default_desk_onboarding_creates_and_replays_the_first_department(
             .fetch_one(&f.db.pool)
             .await
             .unwrap();
-    assert_eq!(departments, 1);
+    assert_eq!(
+        departments, 2,
+        "the company root plus the onboarded department"
+    );
 
     // A department whose address another department already holds refuses the submission.
     let taken = completed(
@@ -908,7 +909,7 @@ async fn agent_default_desk_onboarding_names_the_department_on_a_resubmission() 
         "SELECT department.slug::text, principal.agent_id FROM departments AS department \
          JOIN department_members AS member ON member.department_id = department.id \
          JOIN principals AS principal ON principal.id = member.principal_id \
-         WHERE department.company_id = $1",
+         WHERE department.company_id = $1 AND principal.kind='agent'",
     )
     .bind(f.company)
     .fetch_all(&f.db.pool)

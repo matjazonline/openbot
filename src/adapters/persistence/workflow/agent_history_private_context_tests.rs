@@ -325,12 +325,14 @@ async fn agent_history_level_private_thread_anchor_checks_current_acting_member_
         "admin",
     )
     .await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.f.s.fixture.target.company.as_uuid())
-        .bind(actor)
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.f.s.fixture.target.company.as_uuid())
+    .bind(actor)
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     f.actor = WorkflowActor::authenticated(actor).unwrap();
     let llm = scripted_llm(vec![]).await;
     register_scripted_agent_base_url(f.f.agent, &llm.base_url);
@@ -353,13 +355,15 @@ async fn agent_history_level_private_thread_anchor_checks_current_acting_member_
     .unwrap();
     assert_eq!(kind, "private_session");
     assert_eq!(
-        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-            .bind(claim.fence.scope.company.as_uuid())
-            .bind(actor)
-            .execute(f.f.s.pool())
-            .await
-            .unwrap()
-            .rows_affected(),
+        sqlx::query(
+            "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2"
+        )
+        .bind(claim.fence.scope.company.as_uuid())
+        .bind(actor)
+        .execute(f.f.s.pool())
+        .await
+        .unwrap()
+        .rows_affected(),
         1
     );
     let mut llm = llm;
@@ -399,12 +403,14 @@ async fn agent_history_level_private_thread_anchor_keeps_authorized_member_above
         "admin",
     )
     .await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.f.s.fixture.target.company.as_uuid())
-        .bind(actor)
-        .execute(f.f.s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.f.s.fixture.target.company.as_uuid())
+    .bind(actor)
+    .execute(f.f.s.pool())
+    .await
+    .unwrap();
     f.actor = WorkflowActor::authenticated(actor).unwrap();
     let llm = scripted_llm(vec![LlmTurn::text("\"private answer\"")]).await;
     register_scripted_agent_base_url(f.f.agent, &llm.base_url);

@@ -227,12 +227,14 @@ async fn knowledge_run_level_manual_uses_actual_admin_starter_and_keeps_member_r
     let f = AdmissionFixture::new().await;
     for role in ["admin", "member"] {
         let actor = super::super::message_tests::support::member(&f.binding.fixture, role).await;
-        sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-            .bind(f.binding.target.company.as_uuid())
-            .bind(actor)
-            .execute(f.persistence().pool())
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(f.binding.target.company.as_uuid())
+        .bind(actor)
+        .execute(f.persistence().pool())
+        .await
+        .unwrap();
         let mut request = f.request(role, f.manual());
         request.actor = WorkflowActor::authenticated(actor).unwrap();
         let command = f.prepare(request).await;

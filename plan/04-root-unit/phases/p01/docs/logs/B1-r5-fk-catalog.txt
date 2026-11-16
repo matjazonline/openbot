@@ -1,0 +1,7 @@
+conname|pg_get_constraintdef
+local_agent_operations_company_id_machine_id_installation_fkey1|FOREIGN KEY (company_id, machine_id, installation_id, session_id) REFERENCES local_agent_sessions(company_id, machine_id, installation_id, id) DEFERRABLE INITIALLY DEFERRED
+local_agent_sessions_company_id_conversation_id_fkey|FOREIGN KEY (company_id, conversation_id) REFERENCES threads(company_id, id) DEFERRABLE INITIALLY DEFERRED
+local_agent_sessions_company_id_profile_id_fkey|FOREIGN KEY (company_id, profile_id) REFERENCES local_agent_profiles(company_id, id) DEFERRABLE INITIALLY DEFERRED
+local_agent_sessions_company_id_workflow_run_id_fkey|FOREIGN KEY (company_id, workflow_run_id) REFERENCES workflow_runs(company_id, id) DEFERRABLE INITIALLY DEFERRED
+message_participants_identity_fk|FOREIGN KEY (company_id, participant_identity_id) REFERENCES participant_identities(company_id, id) DEFERRABLE INITIALLY DEFERRED
+(5 rows)

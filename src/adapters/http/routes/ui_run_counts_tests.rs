@@ -485,7 +485,7 @@ async fn permissions_are_shared_rechecked_and_scoped_to_the_managed_company() {
     assert!(cleared.contains("No open runs"));
     assert!(!cleared.contains("channel:"));
     sqlx::query(
-        "UPDATE company_members SET role = 'member' WHERE company_id = $1 AND user_id = $2",
+        "DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2",
     )
     .bind(f.company_id)
     .bind(viewer.user_id)

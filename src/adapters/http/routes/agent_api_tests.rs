@@ -324,8 +324,8 @@ async fn agent_default_desk_json_create_places_the_agent() {
     };
     let department = Uuid::new_v4();
     sqlx::query(
-        "INSERT INTO departments (id, company_id, name, slug, created_by) \
-         VALUES ($1, $2, 'Support', 'support', \
+        "INSERT INTO departments (id, company_id, parent_id, name, slug, created_by) \
+         VALUES ($1, $2, (SELECT id FROM departments WHERE company_id=$2 AND is_root), 'Support', 'support', \
                  '{\"actor_type\":\"system\",\"actor_id\":null,\"actor_name\":\"Test\"}')",
     )
     .bind(department)

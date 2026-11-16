@@ -1,0 +1,9 @@
+entry/final snapshot bytes identical: PASS
+root entry snapshot identical: PASS
+HEAD matches: PASS
+branch matches: PASS
+D1/r7 SHA matches: PASS
+coordination pin matches: PASS
+working-tree whitespace: PASS
+staged whitespace: FAIL
+Staged whitespace failure disposition: all diagnostics confined to excluded immutable retained logs; reviewed implementation staged whitespace PASS. See B1-R2-reviewer-whitespace-scope.txt.

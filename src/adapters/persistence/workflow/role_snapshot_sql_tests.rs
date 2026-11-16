@@ -41,7 +41,7 @@ async fn workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_eve
                 json!({"step":""}),
                 json!({"step":"x".repeat(129)}),
                 json!({"kind":"unknown"}),
-                json!({"role":"owner"}),
+                json!({"role":"unknown"}),
                 json!({"principals":[Uuid::new_v4()]}),
             ] {
                 let mut invalid = payload.clone();

@@ -36,7 +36,14 @@ impl Fixture {
         )
         .await
         .unwrap();
-        sqlx::query("INSERT INTO company_members (id,company_id,user_id,role,access_level) VALUES ($1,$2,$3,'member',5)").bind(Uuid::new_v4()).bind(company.id).bind(member.id).execute(&pool).await.unwrap();
+        crate::adapters::persistence::test_support::insert_root_member(
+            &pool,
+            crate::domain::workflow::CompanyId::new(company.id),
+            member.id,
+            crate::entities::company_member::CompanyAccessRole::Member,
+            crate::entities::access_level::AccessLevel::try_from(5_i16).unwrap(),
+        )
+        .await;
         Self {
             pool,
             store,

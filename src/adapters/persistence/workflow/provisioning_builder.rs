@@ -176,6 +176,8 @@ async fn placement_on(
                        SELECT company_id, department_id, principal_id FROM department_roles) \
                    AS placed ON placed.company_id = principal.company_id \
                   AND placed.principal_id = principal.id \
+                 JOIN departments AS department ON department.company_id = placed.company_id \
+                   AND department.id = placed.department_id AND NOT department.is_root \
                  WHERE principal.company_id = $1 AND principal.user_id = $2 \
                    AND principal.kind = 'person' \
                  GROUP BY placed.department_id LIMIT 2",

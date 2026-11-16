@@ -176,7 +176,7 @@ async fn cloudroom_workflow_continuation_refuses_other_profile_and_other_origina
 
 async fn admin(s: &Setup) -> WorkflowActor {
     let user: Uuid = sqlx::query_scalar(
-        "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin'",
+        "SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1 AND role='admin'",
     )
     .bind(s.scope.company.as_uuid())
     .fetch_one(s.fixture.persistence.pool())
@@ -288,7 +288,7 @@ async fn cloudroom_workflow_first_delivery_role_withdrawal_race_refuses_new_and_
         let withdraw = async {
             wait_for_lock(&s).await;
             sqlx::query(
-                "UPDATE company_members SET role='member' WHERE company_id=$1 AND user_id=$2",
+                "DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id=$1 AND member.root_user_id=$2",
             )
             .bind(s.scope.company.as_uuid())
             .bind(actor.user_id())
@@ -335,17 +335,26 @@ async fn cloudroom_workflow_call_origin_foreign_key_refuses_direct_link_even_wit
     .execute(&mut *tx)
     .await
     .unwrap();
-    let error =
-        sqlx::query("UPDATE local_agent_operations SET origin='direct' WHERE origin='workflow'")
-            .execute(&mut *tx)
-            .await
-            .unwrap_err();
+    sqlx::query("UPDATE local_agent_operations SET origin='direct' WHERE origin='workflow'")
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    let error = sqlx::query(
+        "SET CONSTRAINTS workflow_local_agent_calls_company_id_machine_id_installat_fkey IMMEDIATE",
+    )
+    .execute(&mut *tx)
+    .await
+    .unwrap_err();
     assert!(
         error
             .as_database_error()
             .unwrap()
             .is_foreign_key_violation(),
         "the composite call FK independently prevents cross-origin linkage"
+    );
+    assert_eq!(
+        error.as_database_error().unwrap().constraint(),
+        Some("workflow_local_agent_calls_company_id_machine_id_installat_fkey")
     );
     tx.rollback().await.unwrap();
 }

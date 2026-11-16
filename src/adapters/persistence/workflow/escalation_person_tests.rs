@@ -163,7 +163,11 @@ async fn workflow_escalation_person_one_retired_recipient_preserves_the_capable_
     let f = Box::pin(pending(2)).await;
     f.role
         .p()
-        .remove_member(f.role.company().as_uuid(), f.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.role.admission.binding.target.actor.user_id(),
+            company_id: f.role.company().as_uuid(),
+            member_user_id: f.users[0],
+        })
         .await
         .unwrap();
     assert_eq!(worker(&f).drain_once().await.unwrap(), 2);
@@ -189,7 +193,11 @@ async fn workflow_escalation_person_all_retired_recipients_expedite_the_existing
     for user in &f.users {
         f.role
             .p()
-            .remove_member(f.role.company().as_uuid(), *user)
+            .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+                actor_id: f.role.admission.binding.target.actor.user_id(),
+                company_id: f.role.company().as_uuid(),
+                member_user_id: *user,
+            })
             .await
             .unwrap();
     }
@@ -267,7 +275,11 @@ async fn workflow_escalation_person_post_projection_retirement_cancels_email_and
     assert_eq!(worker(&f).drain_once().await.unwrap(), 1);
     f.role
         .p()
-        .remove_member(f.role.company().as_uuid(), f.users[0])
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.role.admission.binding.target.actor.user_id(),
+            company_id: f.role.company().as_uuid(),
+            member_user_id: f.users[0],
+        })
         .await
         .unwrap();
     let cancelled: bool = sqlx::query_scalar("SELECT bool_and(cancellation_reason='recipient_revoked' AND cancellation_requested_at IS NOT NULL) \

@@ -343,7 +343,7 @@ async fn doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create
         tokio::time::timeout(Duration::from_secs(45), d.server.state.arrived.notified())
             .await
             .expect("the real final authenticated read must enter before recipient removal");
-        let removed = sqlx::query("DELETE FROM company_members WHERE company_id=$1 AND user_id=$2")
+        let removed = sqlx::query("UPDATE principals SET kind='external', user_id=NULL, updated_at=clock_timestamp() WHERE company_id=$1 AND user_id=$2")
             .bind(scope.company.as_uuid())
             .bind(recipient)
             .execute(d.f.persistence.pool())

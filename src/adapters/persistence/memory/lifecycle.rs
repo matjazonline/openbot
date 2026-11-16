@@ -81,7 +81,7 @@ async fn owner_live(db: &mut PgConnection, row: &ClaimRow) -> AppResult<bool> {
                     "SELECT 1 FROM agents AS agent WHERE agent.id = $3 AND agent.company_id = $1"
                 }
                 "user" => {
-                    "SELECT 1 FROM company_members AS member \
+                    "SELECT 1 FROM membership_of($3, $1) AS member \
                      WHERE member.company_id = $1 AND member.user_id = $3"
                 }
                 _ => return Err(invalid()),

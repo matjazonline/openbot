@@ -10,12 +10,14 @@ async fn knowledge_run_level_history_filters_before_count_and_raises_returned_co
     let member =
         super::super::super::message_tests::support::member(&f.binding.fixture, "admin").await;
     let company = f.binding.target.company.as_uuid();
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(company)
-        .bind(member)
-        .execute(f.persistence().pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(company)
+    .bind(member)
+    .execute(f.persistence().pool())
+    .await
+    .unwrap();
     sqlx::query("INSERT INTO thread_principals(company_id,channel_id,thread_id,principal_id,role) SELECT $1,$2,$3,id,'participant' FROM principals WHERE company_id=$1 AND user_id=$4")
         .bind(company).bind(c.channel).bind(c.thread).bind(member).execute(f.persistence().pool()).await.unwrap();
     let visible = super::super::knowledge_admission_tests::stamped(&f, &c, AccessLevel::L5).await;

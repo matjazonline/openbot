@@ -63,9 +63,9 @@ impl FromStr for CompanyAccessRole {
 pub enum CompanyMembership {
     /// The account named by `companies.user_id`.
     Owner,
-    /// A `company_members` row whose access role is `admin`.
+    /// The root department's `admin` role.
     Admin,
-    /// A `company_members` row whose access role is `member`.
+    /// Membership in the root department.
     Member,
     /// Neither: as far as this company is concerned, a stranger.
     None,

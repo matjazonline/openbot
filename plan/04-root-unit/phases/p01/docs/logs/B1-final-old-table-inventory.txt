@@ -1,0 +1,3 @@
+Exhaustive exact-word old-table inventory after Trail substring inventory.
+command: rg -n \bcompany_members\b src migrations .sqlx
+exit: 1

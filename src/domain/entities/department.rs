@@ -36,26 +36,30 @@ pub struct Department {
     /// What the department is for, shown to its members and leads so they share one framing.
     pub charter: Option<String>,
     pub parent_id: Option<DepartmentId>,
+    pub is_root: bool,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
 }
 
-/// A role a principal holds in a department. `Lead` has exactly one holder; later plans add
-/// roles that may have several.
+/// A role a principal holds in a department. Owner and admin are confined to the company root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepartmentRole {
     Lead,
     Reviewer,
+    Owner,
+    Admin,
 }
 
 impl DepartmentRole {
-    pub const ALL: [Self; 2] = [Self::Lead, Self::Reviewer];
+    pub const ALL: [Self; 4] = [Self::Lead, Self::Reviewer, Self::Owner, Self::Admin];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Lead => "lead",
             Self::Reviewer => "reviewer",
+            Self::Owner => "owner",
+            Self::Admin => "admin",
         }
     }
 
@@ -63,8 +67,8 @@ impl DepartmentRole {
     /// role replaces its current holder rather than adding a second.
     pub const fn is_single_holder(self) -> bool {
         match self {
-            Self::Lead => true,
-            Self::Reviewer => false,
+            Self::Lead | Self::Owner => true,
+            Self::Reviewer | Self::Admin => false,
         }
     }
 }
@@ -93,6 +97,8 @@ impl FromStr for DepartmentRole {
         match value {
             "lead" => Ok(Self::Lead),
             "reviewer" => Ok(Self::Reviewer),
+            "owner" => Ok(Self::Owner),
+            "admin" => Ok(Self::Admin),
             _ => Err(InvalidDepartmentRole(value.to_string())),
         }
     }

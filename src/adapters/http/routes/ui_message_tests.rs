@@ -9,23 +9,16 @@ async fn invite_journey_member(h: &Harness) -> crate::entities::user::User {
         .create_user(&format!("journey_{suffix}"), &email, "hash")
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    let principal_id = crate::adapters::persistence::test_support::insert_root_member(
+        h.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(h.company_id),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(h.company_id)
-    .bind(user.id)
-    .execute(h.persistence.pool())
     .await
-    .unwrap();
-    let principal_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Journey member')")
-        .bind(principal_id)
-        .bind(h.company_id)
-        .bind(user.id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    .as_uuid();
+
     sqlx::query("UPDATE channels SET access_mode = 'allowlist' WHERE id = $1")
         .bind(h.channel_id)
         .execute(h.persistence.pool())
@@ -202,23 +195,15 @@ async fn unverified_team_viewers(h: &Harness) -> [Viewer; 2] {
         .create_user(&format!("team_{suffix}"), &member_email, "hash")
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    crate::adapters::persistence::test_support::insert_root_member(
+        h.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(h.company_id),
+        member.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(h.company_id)
-    .bind(member.id)
-    .execute(h.persistence.pool())
-    .await
-    .unwrap();
-    let member_principal = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Team member')")
-        .bind(member_principal)
-        .bind(h.company_id)
-        .bind(member.id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    .await;
+
     sqlx::query("UPDATE users SET email_verified_at = NULL WHERE id = ANY($1)")
         .bind([h.owner.user_id, member.id])
         .execute(h.persistence.pool())
@@ -444,13 +429,14 @@ async fn refuses_other_scopes(h: &Harness, other: &Harness, query: MessageQuery)
         .execute(h.persistence.pool())
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,'admin')")
-        .bind(Uuid::new_v4())
-        .bind(h.company_id)
-        .bind(other.owner.user_id)
-        .execute(h.persistence.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        h.persistence.pool(),
+        crate::domain::workflow::CompanyId::new(h.company_id),
+        other.owner.user_id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
     assert!(matches!(
         source(h, other.owner.clone(), query).await,
         Err(AppError::NotFound(_))

@@ -131,12 +131,14 @@ async fn channel_reply_publication_release_rechecked_after_success_and_before_pr
         } else {
             None
         };
-        sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-            .bind(f.scope.company.as_uuid())
-            .bind(recipient)
-            .execute(f.p.pool())
-            .await
-            .unwrap();
+        sqlx::query(
+            "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+        )
+        .bind(f.scope.company.as_uuid())
+        .bind(recipient)
+        .execute(f.p.pool())
+        .await
+        .unwrap();
         if let Some(receipt) = receipt {
             let current = super::delivery::claim_delivery(&f, receipt).await;
             assert!(matches!(
@@ -287,12 +289,14 @@ async fn channel_reply_publication_approved_reviewer_must_retain_payload_clearan
     super::super::policy_runtime_tests::verified_recipient(&s).await;
     let reviewer = member(&s.fixture, "admin").await;
     let reviewer_principal = s.fixture.principal(reviewer).await;
-    sqlx::query("UPDATE company_members SET access_level=5 WHERE company_id=$1 AND user_id=$2")
-        .bind(s.fixture.target.company.as_uuid())
-        .bind(reviewer)
-        .execute(s.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=5 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(s.fixture.target.company.as_uuid())
+    .bind(reviewer)
+    .execute(s.pool())
+    .await
+    .unwrap();
     let f = FinalFixture::from_case(
         s,
         FinalCase {
@@ -319,12 +323,14 @@ async fn channel_reply_publication_approved_reviewer_must_retain_payload_clearan
         f.p.resume_finalization(f.scope).await.unwrap(),
         FinalizationProgress::Completed(_)
     ));
-    sqlx::query("UPDATE company_members SET access_level=0 WHERE company_id=$1 AND user_id=$2")
-        .bind(f.scope.company.as_uuid())
-        .bind(reviewer)
-        .execute(f.p.pool())
-        .await
-        .unwrap();
+    sqlx::query(
+        "UPDATE department_members SET access_level=0 WHERE company_id=$1 AND root_user_id=$2",
+    )
+    .bind(f.scope.company.as_uuid())
+    .bind(reviewer)
+    .execute(f.p.pool())
+    .await
+    .unwrap();
     let before = outbound_count(&f).await;
     assert_eq!(
         publisher(&f).publish_claim(claim(&f).await).await.unwrap(),

@@ -93,17 +93,14 @@ pub(super) async fn principal(f: &AdmissionFixture, role: Option<&str>) -> Workf
         .await
         .unwrap();
     if let Some(role) = role {
-        sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-            .bind(Uuid::new_v4())
-            .bind(f.binding.target.company.as_uuid())
-            .bind(user)
-            .bind(role)
-            .execute(f.persistence().pool())
-            .await
-            .unwrap();
-        sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'matrix')")
-            .bind(Uuid::new_v4()).bind(f.binding.target.company.as_uuid()).bind(user)
-            .execute(f.persistence().pool()).await.unwrap();
+        crate::adapters::persistence::test_support::insert_root_member(
+            f.persistence().pool(),
+            crate::domain::workflow::CompanyId::new(f.binding.target.company.as_uuid()),
+            user,
+            (role).parse().expect("fixture role"),
+            crate::entities::access_level::AccessLevel::PUBLIC,
+        )
+        .await;
     }
     let actor = WorkflowActor::authenticated(user).unwrap();
     grant(f, actor, true).await;
@@ -258,7 +255,7 @@ pub(super) async fn successful_replay(
     assert!(execute(f, c, verifier.clone()).await.is_err());
     assert_eq!(durable(f).await, before);
     grant(f, c.actor, true).await;
-    sqlx::query("UPDATE company_members SET role='member' WHERE user_id=$1")
+    sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.root_user_id=$1")
         .bind(c.actor.user_id())
         .execute(f.persistence().pool())
         .await
@@ -268,7 +265,7 @@ pub(super) async fn successful_replay(
         Err(AppError::NotFound(_))
     ));
     assert_eq!(durable(f).await, before);
-    sqlx::query("UPDATE company_members SET role='admin' WHERE user_id=$1")
+    sqlx::query("INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.root_user_id=$1 ON CONFLICT DO NOTHING")
         .bind(c.actor.user_id())
         .execute(f.persistence().pool())
         .await
@@ -293,7 +290,7 @@ pub(super) async fn mutate_authority(f: &AdmissionFixture, admin: WorkflowActor,
                 .unwrap();
         }
         "principal" => {
-            sqlx::query("UPDATE company_members SET role='member' WHERE user_id=$1")
+            sqlx::query("DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.root_user_id=$1")
                 .bind(admin.user_id())
                 .execute(&mut *tx)
                 .await

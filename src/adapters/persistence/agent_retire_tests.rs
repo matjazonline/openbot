@@ -262,7 +262,9 @@ async fn agent_retire_company_delete_still_removes_everything() {
     }
     for table in [
         "companies",
-        "company_members",
+        "departments",
+        "department_members",
+        "department_roles",
         "agents",
         "principals",
         "participant_identities",

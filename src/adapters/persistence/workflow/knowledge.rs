@@ -62,7 +62,7 @@ pub(super) async fn thread_audience_on(
          FROM thread_principals AS party JOIN principals AS principal \
            ON (principal.company_id,principal.id)=(party.company_id,party.principal_id) \
          JOIN companies AS company ON company.id=party.company_id \
-         LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(principal.company_id,principal.user_id) \
+         LEFT JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true \
          WHERE party.company_id=$1 AND party.channel_id IS NOT DISTINCT FROM $2::uuid AND party.thread_id=$3 \
            AND party.target_principal_id IS NOT DISTINCT FROM $5::uuid LIMIT $4")
         .bind(company.as_uuid()).bind(target.desk_id()).bind(thread_id.as_uuid()).bind((MAX_READER_FACTS+1) as i64).bind(target.principal_id().map(|id| id.as_uuid()))
@@ -80,7 +80,7 @@ pub(super) async fn actor_level_on(
     let fact=sqlx::query_as::<_,ReaderFact>(
         "SELECT principal.kind,member.role AS membership,member.access_level::smallint AS access_level, \
             company.user_id=member.user_id AS is_owner \
-         FROM company_members AS member JOIN companies AS company ON company.id=member.company_id \
+         FROM membership_of($2, $1) AS member JOIN companies AS company ON company.id=member.company_id \
          JOIN principals AS principal ON (principal.company_id,principal.user_id)=(member.company_id,member.user_id) \
          WHERE member.company_id=$1 AND member.user_id=$2")
         .bind(company.as_uuid()).bind(actor).fetch_optional(db).await?;

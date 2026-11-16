@@ -116,7 +116,7 @@ pub(in crate::adapters::persistence::workflow) async fn approvers(
         let Some(reviewer) = eligible_reviewer(db, scope, *principal).await? else {
             return Ok(None);
         };
-        let privileged: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM company_members AS member JOIN companies AS company ON company.id=member.company_id JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND principal.id=$2 AND principal.kind='person' AND (member.role IN ('admin','owner') OR company.user_id=member.user_id))")
+        let privileged: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM principals AS principal JOIN LATERAL membership_of(principal.user_id, principal.company_id) AS member ON true JOIN companies AS company ON company.id=member.company_id WHERE member.company_id=$1 AND principal.id=$2 AND principal.kind='person' AND (member.role IN ('admin','owner') OR company.user_id=member.user_id))")
             .bind(scope.company.as_uuid()).bind(principal).fetch_one(&mut *db).await?;
         if !privileged {
             return Ok(None);

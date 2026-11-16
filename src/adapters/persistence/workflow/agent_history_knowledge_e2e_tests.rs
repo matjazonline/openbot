@@ -159,7 +159,7 @@ async fn agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_r
     let mut j = Box::pin(SalesJourney::new(scripted, Audience::Team)).await;
     let member = j.member(AccessLevel::L5).await;
     let lower = j.member(AccessLevel::PUBLIC).await;
-    sqlx::query("UPDATE company_members SET role='admin' WHERE company_id=$1 AND user_id=$2")
+    sqlx::query("INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id=$1 AND member.root_user_id=$2 ON CONFLICT DO NOTHING")
         .bind(j.d.fixture.target.company.as_uuid())
         .bind(lower.user_id)
         .execute(j.d.p().pool())

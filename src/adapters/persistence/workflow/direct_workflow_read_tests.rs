@@ -97,9 +97,13 @@ async fn direct_workflow_attention_summary_and_counts_never_treat_personal_work_
     department.direct_items = false;
     assert!(p.list_attention(department).await.unwrap().items.is_empty());
 
-    p.remove_member(private.company(), private.user)
-        .await
-        .unwrap();
+    p.remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+        actor_id: private.f.binding.target.actor.user_id(),
+        company_id: private.company(),
+        member_user_id: private.user,
+    })
+    .await
+    .unwrap();
     private.assert_attention(owner, 1).await;
     // Removal retires the same historical principal; it grants no current reader authority.
     let former = AttentionQuery {

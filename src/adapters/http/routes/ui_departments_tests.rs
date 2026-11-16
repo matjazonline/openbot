@@ -150,7 +150,7 @@ async fn department_ui_writes_answer_404_to_members_strangers_and_foreign_compan
             .await
             .unwrap()
             .len(),
-        1
+        2
     );
 }
 
@@ -301,7 +301,15 @@ async fn department_ui_owner_writes_render_and_refusals_land_on_their_form() {
         .visible_department(f.owner.id, company, sales.id)
         .await
         .unwrap();
-    assert_eq!(stored.department.parent_id, None);
+    let root = f
+        .departments()
+        .list_departments(f.owner.id, company)
+        .await
+        .unwrap()
+        .into_iter()
+        .find(|department| department.is_root)
+        .unwrap();
+    assert_eq!(stored.department.parent_id, Some(root.id));
 
     // A slug edit does not move the department's desk: the header keeps the desk's address (F1).
     let (_, _, html) = body(

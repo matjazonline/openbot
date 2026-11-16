@@ -59,30 +59,18 @@ async fn enable_model(f: &AdmissionFixture) {
     .unwrap();
 }
 
-/// A claimed job of a manual root (or of its child), in a company with a usable model.
-async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
-    let (f, scope) = if child {
-        child_fixture().await
-    } else {
-        fixture().await
-    };
-    let claim = f
-        .persistence()
-        .settled()
-        .claim_io(scope, worker(), policy())
-        .await
-        .unwrap()
-        .unwrap();
+/// Freeze built-ins and model configuration before starting a worker lease.
+async fn prepare_provisioning(f: &AdmissionFixture, scope: ActivationRequest) {
     // The run's frozen bundle carries the trusted built-ins, as a Builder's publication would.
     let bundle: Vec<u8> = sqlx::query_scalar("SELECT (SELECT stored.bundle FROM workflow_bundles stored WHERE stored.company_id=workflow_runs.company_id AND stored.digest=workflow_runs.bundle_digest) AS bundle FROM workflow_runs WHERE id = $1")
-        .bind(claim.fence.scope.run.as_uuid())
+        .bind(scope.run.as_uuid())
         .fetch_one(f.persistence().pool())
         .await
         .unwrap();
     let bundle = publication::restore_bundle(&bundle, &WorkflowSourceDecoder).unwrap();
     let frozen = publication::freeze(
         crate::adapters::workflow_source::decode(bundle.compiled().source()).unwrap(),
-        company(&f),
+        company(f),
         bundle.compiled().graph().definition().version_id,
         DependencySnapshots {
             tools: [
@@ -91,7 +79,7 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
                 ProvisioningKind::CreateDeskForAgent,
             ]
             .into_iter()
-            .map(|kind| builtin_provisioning_snapshot(company(&f), kind).unwrap())
+            .map(|kind| builtin_provisioning_snapshot(company(f), kind).unwrap())
             .collect(),
             ..Default::default()
         },
@@ -100,11 +88,33 @@ async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
     .unwrap();
     replace_run_bundle(
         f.persistence().pool(),
-        claim.fence.scope.run.as_uuid(),
+        scope.run.as_uuid(),
         &store_bundle(&frozen).unwrap(),
     )
     .await;
-    enable_model(&f).await;
+    enable_model(f).await;
+}
+
+async fn provisioning_fixture() -> (AdmissionFixture, ActivationRequest) {
+    let (f, scope) = fixture().await;
+    prepare_provisioning(&f, scope).await;
+    (f, scope)
+}
+
+async fn claimed(child: bool) -> (AdmissionFixture, ClaimedWorkflow) {
+    let (f, scope) = if child {
+        child_fixture().await
+    } else {
+        fixture().await
+    };
+    prepare_provisioning(&f, scope).await;
+    let claim = f
+        .persistence()
+        .settled()
+        .claim_io(scope, worker(), policy())
+        .await
+        .unwrap()
+        .unwrap();
     (f, claim)
 }
 
@@ -223,16 +233,15 @@ async fn person(f: &AdmissionFixture, role: &str) -> WorkflowActor {
         .execute(pool)
         .await
         .unwrap();
-    sqlx::query("INSERT INTO company_members(id,company_id,user_id,role) VALUES($1,$2,$3,$4)")
-        .bind(Uuid::new_v4())
-        .bind(company(f).as_uuid())
-        .bind(user)
-        .bind(role)
-        .execute(pool)
-        .await
-        .unwrap();
-    sqlx::query("INSERT INTO principals(id,company_id,kind,user_id,display_label) VALUES($1,$2,'person',$3,'member')")
-        .bind(Uuid::new_v4()).bind(company(f).as_uuid()).bind(user).execute(pool).await.unwrap();
+    crate::adapters::persistence::test_support::insert_root_member(
+        pool,
+        crate::domain::workflow::CompanyId::new(company(f).as_uuid()),
+        user,
+        (role).parse().expect("fixture role"),
+        crate::entities::access_level::AccessLevel::PUBLIC,
+    )
+    .await;
+
     WorkflowActor::authenticated(user).unwrap()
 }
 

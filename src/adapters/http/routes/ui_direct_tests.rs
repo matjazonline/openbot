@@ -273,7 +273,11 @@ async fn direct_thread_ui_private_reads_and_retirement_do_not_expose_a_target_to
         Err(AppError::NotFound(_))
     ));
     h.persistence
-        .remove_member(h.company_id, actor.user_id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: h.owner.user_id,
+            company_id: h.company_id,
+            member_user_id: actor.user_id,
+        })
         .await
         .unwrap();
     assert!(matches!(
@@ -352,7 +356,11 @@ async fn direct_thread_ui_live_streams_reconcile_then_close_before_revoked_activ
             .contains("Private direct body")
     );
     h.persistence
-        .remove_member(h.company_id, actor.user_id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: h.owner.user_id,
+            company_id: h.company_id,
+            member_user_id: actor.user_id,
+        })
         .await
         .unwrap();
     h.set_activity(thread.id, Some(ThreadActivity::AwaitingReview));
@@ -492,7 +500,11 @@ async fn direct_thread_ui_notes_preserve_target_pin_and_recheck_lifecycle_even_o
         .unwrap();
     assert!(removed.tombstoned_at.is_some());
     h.persistence
-        .remove_member(h.company_id, actor.user_id)
+        .remove_member(crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: h.owner.user_id,
+            company_id: h.company_id,
+            member_user_id: actor.user_id,
+        })
         .await
         .unwrap();
     assert!(matches!(

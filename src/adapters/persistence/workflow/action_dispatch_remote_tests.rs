@@ -77,7 +77,7 @@ const REVOKE_ALL_MEMBERSHIPS: &str = "revoke every membership";
 async fn revoke_all_memberships(pool: &sqlx::PgPool, company: Uuid) {
     let mut tx = pool.begin().await.unwrap();
     let members: Vec<Uuid> =
-        sqlx::query_scalar("SELECT user_id FROM company_members WHERE company_id=$1")
+        sqlx::query_scalar("SELECT member.user_id FROM principals AS member_principal JOIN LATERAL membership_of(member_principal.user_id, member_principal.company_id) AS member ON true WHERE member_principal.company_id=$1")
             .bind(company)
             .fetch_all(&mut *tx)
             .await

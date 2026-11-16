@@ -229,3 +229,27 @@ async fn workflow_escalation_refusal_history_and_policy_are_immutable_and_no_pol
     assert_eq!(count(&unconfigured, "workflow_escalation_cases").await, 0);
     assert_eq!(count(&unconfigured, "notification_events").await, 0);
 }
+
+#[tokio::test]
+async fn root_department_company_and_account_teardown_remove_tree_documents_and_refusal_history() {
+    use crate::adapters::persistence::test_support::root_teardown::{Teardown, tree_and_document};
+    for operation in [Teardown::Company, Teardown::Account] {
+        let f = Box::pin(fixture()).await;
+        let owner = f.admission.binding.target.actor.user_id();
+        Box::pin(tree_and_document(f.p(), f.company(), owner)).await;
+        let command = f.prepared("teardown-refusal").await;
+        clear(&f).await;
+        assert_refused(f.p().admit(&command).await);
+        assert_eq!(count(&f, "workflow_admission_refusals").await, 1);
+        let refused = sqlx::query("DELETE FROM workflow_admission_refusals WHERE company_id=$1")
+            .bind(f.company().as_uuid())
+            .execute(f.p().pool())
+            .await
+            .unwrap_err();
+        assert_eq!(
+            refused.as_database_error().unwrap().code().as_deref(),
+            Some("23514")
+        );
+        Box::pin(operation.remove(f.p(), f.company(), owner)).await;
+    }
+}

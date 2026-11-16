@@ -196,8 +196,11 @@ async fn workflow_escalation_agent_native_reassign_keeps_manual_target_and_repla
     assert_eq!(view.recipients[0].principal, target);
     crate::use_cases::company_invite::CompanyInvitePersistence::remove_member(
         p,
-        company.as_uuid(),
-        f.people.users[0],
+        crate::use_cases::company_invite::RemoveCompanyMember {
+            actor_id: f.people.role.admission.binding.target.actor.user_id(),
+            company_id: company.as_uuid(),
+            member_user_id: f.people.users[0],
+        },
     )
     .await
     .unwrap();

@@ -120,7 +120,9 @@ pub struct DepartmentDetail {
     #[serde(flatten)]
     pub department: Department,
     pub members: Vec<DepartmentMember>,
+    pub members_truncated: bool,
     pub roles: Vec<DepartmentRoleHolder>,
+    pub roles_truncated: bool,
 }
 
 /// One department as the Departments tab shows it: its detail, the people and agents that detail
@@ -322,10 +324,19 @@ impl DepartmentUseCases {
                 .find(|candidate| candidate.id == department)
         };
         let department = found.ok_or_else(department_not_found)?;
+        use crate::application::ports::department::MAX_DEPARTMENT_ROSTER_ENTRIES;
+        let mut members = self.departments.members(company, department.id).await?;
+        let mut roles = self.departments.roles(company, department.id).await?;
+        let members_truncated = members.len() > MAX_DEPARTMENT_ROSTER_ENTRIES;
+        let roles_truncated = roles.len() > MAX_DEPARTMENT_ROSTER_ENTRIES;
+        members.truncate(MAX_DEPARTMENT_ROSTER_ENTRIES);
+        roles.truncate(MAX_DEPARTMENT_ROSTER_ENTRIES);
         Ok(DepartmentDetail {
-            members: self.departments.members(company, department.id).await?,
-            roles: self.departments.roles(company, department.id).await?,
             department,
+            members,
+            members_truncated,
+            roles,
+            roles_truncated,
         })
     }
 

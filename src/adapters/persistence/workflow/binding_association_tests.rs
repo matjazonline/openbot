@@ -20,19 +20,16 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
         )
         .await
         .unwrap();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    let principal_id = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(company.as_uuid()),
+        admin.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(company.as_uuid())
-    .bind(admin.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    let principal_id = Uuid::new_v4();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Admin')")
-        .bind(principal_id).bind(company.as_uuid()).bind(admin.id)
-        .execute(p.pool()).await.unwrap();
+    .as_uuid();
+
     let channel = ChannelPersistence::create(
         p,
         company.as_uuid(),
@@ -150,18 +147,16 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
         .execute(p.pool())
         .await
         .unwrap();
-    let principal = Uuid::new_v4();
-    sqlx::query(
-        "INSERT INTO company_members (id, company_id, user_id, role) VALUES ($1, $2, $3, 'admin')",
+    let principal = crate::adapters::persistence::test_support::insert_root_member(
+        p.pool(),
+        crate::domain::workflow::CompanyId::new(f.target.company.as_uuid()),
+        user.id,
+        crate::entities::company_member::CompanyAccessRole::Admin,
+        crate::entities::access_level::AccessLevel::PUBLIC,
     )
-    .bind(Uuid::new_v4())
-    .bind(f.target.company.as_uuid())
-    .bind(user.id)
-    .execute(p.pool())
     .await
-    .unwrap();
-    sqlx::query("INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ($1, $2, 'person', $3, 'Admin')")
-        .bind(principal).bind(f.target.company.as_uuid()).bind(user.id).execute(p.pool()).await.unwrap();
+    .as_uuid();
+
     let channel = ChannelPersistence::create(
         p,
         f.target.company.as_uuid(),
@@ -175,7 +170,7 @@ async fn workflow_binding_sql_association_matches_domain_visibility_and_manageme
     .unwrap();
     let association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
     for role in ["admin", "member"] {
-        sqlx::query("UPDATE company_members SET role = $3 WHERE company_id = $1 AND user_id = $2")
+        sqlx::query("WITH cleared AS (DELETE FROM department_roles AS holder USING department_members AS member WHERE holder.company_id=member.company_id AND holder.department_id=member.department_id AND holder.principal_id=member.principal_id AND holder.role='admin' AND member.company_id = $1 AND member.root_user_id = $2 AND $3::text='member') INSERT INTO department_roles (company_id, department_id, principal_id, role) SELECT member.company_id, member.department_id, member.principal_id, 'admin' FROM department_members AS member WHERE member.company_id = $1 AND member.root_user_id = $2 AND $3::text='admin' ON CONFLICT DO NOTHING")
             .bind(f.target.company.as_uuid())
             .bind(user.id)
             .bind(role)
