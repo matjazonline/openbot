@@ -237,8 +237,13 @@ def cleanup_deadline(wrappers, directory):
         # fixture deliberately leaves no system resource behind.
         environment = sudo_shim(gate, "slow", "groupdel")
         started = time.monotonic()
-        result = subprocess.run(["bash", str(wrapper), "true"], env=environment,
-                                capture_output=True, text=True, timeout=15)
+        try:
+            result = subprocess.run(["bash", str(wrapper), "true"], env=environment,
+                                    capture_output=True, text=True, timeout=15)
+        except subprocess.TimeoutExpired as error:
+            output = (error.stdout or b"").decode(errors="replace") if isinstance(error.stdout, bytes) else error.stdout
+            errors = (error.stderr or b"").decode(errors="replace") if isinstance(error.stderr, bytes) else error.stderr
+            raise AssertionError(f"privileged cleanup exceeded15s; stdout={output!r}; stderr={errors!r}") from error
         elapsed = time.monotonic() - started
         assert result.returncode != 0, "successful command hid cleanup timeout"
         assert "network isolation cleanup failed" in result.stderr, result.stderr

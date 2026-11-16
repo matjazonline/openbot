@@ -12,7 +12,12 @@ group_created=false; pending_signal=0
 # Bound sudo itself as well as xtables lock contention. Cleanup has at most
 # seven calls, each with a five-second deadline plus one second to force exit.
 # The owner ignores repeated signals during cleanup; its children must not.
-privileged() { env --default-signal=INT,TERM timeout --kill-after=1s 5s sudo -n "$@"; }
+privileged() {
+    # The inner timer has the same privilege as the operation it must terminate.
+    # The outer timer also bounds noninteractive sudo; existing5s+1s stays unchanged.
+    env --default-signal=INT,TERM timeout --kill-after=1s 5s \
+        sudo -n env --default-signal=INT,TERM timeout --kill-after=1s 3s "$@"
+}
 cleanup_command() {
     local result
     if privileged "$@"; then return 0; else result=$?; fi
