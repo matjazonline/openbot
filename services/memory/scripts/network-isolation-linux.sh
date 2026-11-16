@@ -11,7 +11,8 @@ test_gid=""; created_firewalls=(); hooked_firewalls=()
 group_created=false; pending_signal=0
 # Bound sudo itself as well as xtables lock contention. Cleanup has at most
 # seven calls, each with a five-second deadline plus one second to force exit.
-privileged() { timeout --kill-after=1s 5s sudo -n "$@"; }
+# The owner ignores repeated signals during cleanup; its children must not.
+privileged() { env --default-signal=INT,TERM timeout --kill-after=1s 5s sudo -n "$@"; }
 cleanup_command() {
     local result
     if privileged "$@"; then return 0; else result=$?; fi
