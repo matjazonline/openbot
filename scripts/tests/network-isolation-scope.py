@@ -157,13 +157,17 @@ def sudo_shim(directory, mode, stage):
         "args = sys.argv[1:]\n" +
         "target = stage in args and (stage != 'iptables' and stage != 'ip6tables' or '-N' in args)\n" +
         "if mode == 'failure' and target: raise SystemExit(73)\n" +
+        "if mode == 'slow' and target:\n" +
+        "    position = args.index('groupdel')\n" +
+        "    group = args[position + 1]\n" +
+        "    script = 'groupdel \"$1\"; echo \"$$\" > \"$2\"; sleep 30; touch \"$3\"'\n" +
+        "    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group, str(Path(gate, 'privileged-pid')), str(Path(gate, 'late-effect'))]\n" +
         "result = subprocess.run([real, *args]).returncode\n" +
         "if result == 0 and target and mode == 'signal':\n" +
         "    Path(gate, 'created').touch()\n" +
         "    deadline = time.monotonic() + 10\n" +
         "    while not Path(gate, 'return').exists():\n" +
         "        assert time.monotonic() < deadline\n        time.sleep(0.01)\n" +
-        "if result == 0 and target and mode == 'slow': time.sleep(30)\n" +
         "raise SystemExit(result)\n")
     (shim / "sudo").chmod(0o755)
     return dict(os.environ, PATH=str(shim) + ":" + os.environ["PATH"])
@@ -224,7 +228,7 @@ def cleanup_deadline(wrappers, directory):
     for index, wrapper in enumerate(wrappers):
         gate = directory / f"deadline-{index}"
         gate.mkdir()
-        # Real group deletion completes, then its command stops responding. The
+        # Real group deletion completes, then a privileged child stops responding. The
         # native wrapper deadline must fire and report failure, even though the
         # fixture deliberately leaves no system resource behind.
         environment = sudo_shim(gate, "slow", "groupdel")
@@ -236,6 +240,16 @@ def cleanup_deadline(wrappers, directory):
         assert "network isolation cleanup failed" in result.stderr, result.stderr
         assert elapsed < 12, f"cleanup did not honor its own deadline: {elapsed}"
         assert owned_resources() == before
+        child_pid = int((gate / "privileged-pid").read_text())
+        deadline = time.monotonic() + 2
+        while True:
+            state = subprocess.run(["ps", "-p", str(child_pid), "-o", "stat="],
+                                   capture_output=True, text=True, timeout=3).stdout.strip()
+            if not state or state.startswith("Z"):
+                break
+            assert time.monotonic() < deadline, "privileged cleanup child survived the wrapper deadline"
+            time.sleep(0.02)
+        assert not (gate / "late-effect").exists(), "cleanup continued after its deadline"
         print(f"PASS: cleanup deadline and visible failure for entrypoint{index} ({elapsed:.2f}s)", flush=True)
 
 
