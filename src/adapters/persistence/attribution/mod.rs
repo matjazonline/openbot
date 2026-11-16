@@ -51,7 +51,10 @@ async fn lock_session(
 const LIVE_GRANT: &str = "grant_row.verifier = $1 AND grant_row.client_id = 'attribution' AND grant_row.revoked_at IS NULL AND grant_row.expires_at > clock_timestamp() AND session.revoked_at IS NULL AND session.expires_at > clock_timestamp() AND account.auth_revision = grant_row.auth_revision";
 const GRANT_JOIN: &str = "attribution_identity_grants AS grant_row JOIN user_sessions AS session ON (session.id, session.user_id, session.auth_revision) = (grant_row.session_id, grant_row.user_id, grant_row.auth_revision) JOIN users AS account ON account.id = grant_row.user_id";
 const COMPANY_COLUMNS: &str = "company.id AS company_id, left(company.name,120) AS name, member.role, lifecycle.version, lifecycle.state, lifecycle.changed_at";
-const COMPANY_JOIN: &str = "JOIN company_members AS member ON member.user_id = grant_row.user_id JOIN companies AS company ON company.id = member.company_id JOIN attribution_company_lifecycles AS lifecycle ON lifecycle.company_id = company.id";
+const COMPANY_JOIN: &str = "JOIN principals AS principal ON principal.user_id = grant_row.user_id \
+    JOIN companies AS company ON company.id = principal.company_id \
+    JOIN LATERAL membership_of(grant_row.user_id, company.id) AS member ON true \
+    JOIN attribution_company_lifecycles AS lifecycle ON lifecycle.company_id = company.id";
 fn status(row: &sqlx::postgres::PgRow) -> IdentityResult<CompanyStatus> {
     Ok(CompanyStatus {
         company_id: row.try_get("company_id").map_err(database)?,
@@ -196,7 +199,10 @@ impl AttributionIdentity for PostgresPersistence {
             return Err(IdentityError::NotFound);
         }
         let role: String = sqlx::query_scalar(
-            "SELECT role FROM company_members WHERE company_id = $1 AND user_id = $2 FOR UPDATE",
+            "SELECT membership.role FROM department_members AS member \
+             CROSS JOIN LATERAL membership_of($2, $1) AS membership \
+             WHERE member.company_id = $1 AND member.root_user_id = $2 \
+             FOR UPDATE OF member",
         )
         .bind(change.company_id)
         .bind(change.actor.user_id)

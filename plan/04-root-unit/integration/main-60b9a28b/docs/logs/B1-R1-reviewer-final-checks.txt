@@ -1,0 +1,7 @@
+entry/final snapshot bytes identical: PASS
+expected artifact: PASS
+HEAD/base matches: PASS
+branch matches: PASS
+coordination2/notice1 matches: PASS
+staged implementation whitespace: PASS
+working-tree implementation whitespace: PASS

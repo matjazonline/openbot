@@ -1,0 +1,8 @@
+base:   60b9a28b9f5b39981d804d0fdaeab5c75916c65d
+digest: 09f2972f563e400b3553eb64d1a834d9cf942ab944d130180463f2410d22c4a8
+files:
+  plan/04-root-unit/phases/p01/docs/HANDOFF.md
+  src/adapters/persistence/attribution/access_tests.rs
+  src/adapters/persistence/attribution/mod.rs
+  src/adapters/persistence/root_attribution_tombstone_test_support.rs
+  src/adapters/persistence/root_teardown_test_support.rs

@@ -1,0 +1,118 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 391 changed files against 26 learnings and 4 skills
+
+✗ migrations/20260817000000_init_schema.sql:14090
+  brings back separate local key, which Mac02's learning ruled out
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● migrations/20260817000000_init_schema.sql:648
+  brings back four call one, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Treating all four local-call native peers as one
+  cross-owner group then passed both actual teardown paths.
+● migrations/20260817000000_init_schema.sql:648
+  brings back company ownership owner, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:9
+  brings back original company per, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: The original 64 KiB cap rejected a schema-valid
+  100-company page with 120 four-byte Unicode characters per name: the
+  reviewer measured 73,530 serialized bytes before adding a cursor.
+● plan/04-root-unit/COORDINATION.md:11
+  brings back service exact artifact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● plan/04-root-unit/COORDINATION.md:12
+  brings back compet focused case, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/04-root-unit/COORDINATION.md:16
+  brings back complete check pass, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Replacing that wrapping label with an explicit
+  association made the complete eight-check journey pass, without
+  loosening the locator or bypassing the form.
+● plan/04-root-unit/COORDINATION.md:16
+  brings back complete authorization company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:21
+  brings back cross owner teardown, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Treating all four local-call native peers as one
+  cross-owner group then passed both actual teardown paths.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:5
+  brings back local test full, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:6
+  brings back real http call, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: A synchronous per-connection pause with a held real
+  HTTP call and actual SDK deletion entry now forces that interval;
+  removing only the registration lock makes the real wire-order
+  assertion fail.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:10
+  brings back fail command gate, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A failing build can then be followed by a successful
+  command and the gate is reported as passing.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:10
+  brings back explicit complete check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Replacing that wrapping label with an explicit
+  association made the complete eight-check journey pass, without
+  loosening the locator or bypassing the form.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:11
+  brings back channel department root, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:11
+  brings back native source shared, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:20
+  brings back actual attribution openbot, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: actual attribution-to-Openbot callback failed with
+  HTTP 503.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:20
+  brings back actual failed socket, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: An isolated actual Ubuntu counterexample failed with
+  Chrome FATAL Socket path too long under the shared runner's nested
+  clean TMPDIR, and passed with a short temporary base.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:28
+  brings back control json utf, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Escaped control characters can consume six JSON bytes
+  per character, so four-byte UTF-8 alone is not the worst case.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:34
+  brings back real local fixture, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A real non-loopback local TCP fixture demonstrates
+  this: the supervisor can connect during group isolation, and
+  changing only the selector back to UID blocks it.
+● plan/04-root-unit/phases/p01/docs/HANDOFF.md:37
+  brings back real deletion without, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Timing out an unprivileged shim after real deletion
+  passed without proving that privileged work stopped.
+
+· 1 conflict · fix it, or say why in the commit message or PR description

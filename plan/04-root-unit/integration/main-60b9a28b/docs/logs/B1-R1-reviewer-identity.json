@@ -1,0 +1,19 @@
+{
+  "round": "04RU-MAIN-B1-R1",
+  "phase": "integration-main",
+  "reviewer": "/root/p04_reviewer",
+  "requested_model": "Astra/high",
+  "actual_settings": "unexposed",
+  "HEAD": "60b9a28b9f5b39981d804d0fdaeab5c75916c65d",
+  "review_base": "60b9a28b9f5b39981d804d0fdaeab5c75916c65d",
+  "artifact": "09f2972f563e400b3553eb64d1a834d9cf942ab944d130180463f2410d22c4a8",
+  "coordination_revision": 2,
+  "active_notice": "04RU-C001/r1",
+  "coordination_sha256": "8b4543e946d6969ecfec900a9c0526a0dec43bb9767ff01bd42a3d09028d139a",
+  "snapshot_exclusions": [
+    "plan/04-root-unit/integration/main-60b9a28b/docs",
+    "plan/04-root-unit/COORDINATION.md"
+  ],
+  "reviewer_runtime": false,
+  "outcome": "PASS"
+}

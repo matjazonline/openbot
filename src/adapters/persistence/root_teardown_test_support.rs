@@ -15,6 +15,8 @@ use uuid::Uuid;
 #[path = "root_identity_fk_test_support.rs"]
 pub(crate) mod identities;
 
+#[path = "root_attribution_tombstone_test_support.rs"]
+mod attribution;
 #[path = "root_dispatch_fk_test_support.rs"]
 pub(crate) mod dispatch;
 #[path = "root_native_fk_test_support.rs"]
@@ -199,7 +201,8 @@ async fn no_live_rows(p: &PostgresPersistence, company: CompanyId) {
         "SELECT columns.table_name FROM information_schema.columns AS columns \
          JOIN information_schema.tables AS tables USING(table_catalog,table_schema,table_name) \
          WHERE columns.table_schema='public' AND columns.column_name='company_id' \
-           AND tables.table_type='BASE TABLE' AND columns.table_name <> 'local_installations' \
+           AND tables.table_type='BASE TABLE' \
+           AND columns.table_name NOT IN ('local_installations', 'attribution_company_lifecycles', 'attribution_lifecycle_outbox') \
          ORDER BY columns.table_name LIMIT 501",
     )
     .fetch_all(p.pool())
@@ -221,6 +224,7 @@ async fn no_live_rows(p: &PostgresPersistence, company: CompanyId) {
 impl Teardown {
     pub(crate) async fn remove(self, p: &PostgresPersistence, company: CompanyId, owner: Uuid) {
         let reservations = installations(p, company).await;
+        let attribution = attribution::Snapshot::capture(p, company).await;
         match self {
             Self::Company => CompanyPersistence::delete_for_user(p, owner, company.as_uuid())
                 .await
@@ -245,6 +249,7 @@ impl Teardown {
             reservations,
             "global installation reservations retain exact identities and immutable content"
         );
+        attribution.assert_deleted(p, company).await;
         no_live_rows(p, company).await;
     }
 }

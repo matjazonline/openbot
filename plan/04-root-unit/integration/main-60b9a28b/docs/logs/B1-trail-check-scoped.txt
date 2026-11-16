@@ -1,0 +1,119 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 21 changed files against 26 learnings and 4 skills
+
+● plan/04-root-unit/COORDINATION.md:30
+  brings back complete authorization company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An early complete source authorization would take
+  company ownership before an integration credential owner's account
+  and violate the single sorted union.
+● plan/04-root-unit/COORDINATION.md:32
+  brings back review real read, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:4
+  brings back source earlier account, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:4
+  brings back isolated clean base, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: An isolated actual Ubuntu counterexample failed with
+  Chrome FATAL Socket path too long under the shared runner's nested
+  clean TMPDIR, and passed with a short temporary base.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:5
+  brings back pass protocol doop, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A six-file MCP cleanup counterfactual passing did not
+  establish a cleanup protocol cause for a Doop provider-lifetime
+  failure.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:8
+  brings back explicit journey pass, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Replacing that wrapping label with an explicit
+  association made the complete eight-check journey pass, without
+  loosening the locator or bypassing the form.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:14
+  brings back compet test focused, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:14
+  brings back focused test suite, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A focused shell probe and a regression test reproduce
+  that failure without running application suites.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:14
+  brings back local test full, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Separate localStorage keys per click and a sequential
+  two-tab test both looked sufficient and passed the full merchant
+  journey.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:17
+  brings back local real profile, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Keeping local-call native peers immediate after fixing
+  only the dispatch edge still failed on the real profile FK.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:17
+  brings back real local fixture, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A real non-loopback local TCP fixture demonstrates
+  this: the supervisor can connect during group isolation, and
+  changing only the selector back to UID blocks it.
+● plan/04-root-unit/integration/main-60b9a28b/docs/HANDOFF.md:20
+  brings back real deletion stopped, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Timing out an unprivileged shim after real deletion
+  passed without proving that privileged work stopped.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:3
+  brings back order department principal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Ordering channels, departments and principals is
+  necessary for the root tree but does not order every native and
+  workflow cascade.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:4
+  brings back actual compet test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:4
+  brings back isolated actual failed, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: An isolated actual Ubuntu counterexample failed with
+  Chrome FATAL Socket path too long under the shared runner's nested
+  clean TMPDIR, and passed with a short temporary base.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:4
+  brings back independent review one, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Independent review paused one real Chromium tab
+  between reading candidates and cleanup, let another tab persist a
+  new click, then resumed cleanup: the newer click was deleted.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:6
+  brings back openbot test build, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: A default Openbot test build reached linking and
+  failed with write() errno28 while the shared volume was full.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:7
+  brings back native source earlier, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:8
+  brings back direct service exact, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Direct LaunchServices navigation downloaded the exact
+  artifact successfully within seconds.
+● plan/04-root-unit/integration/main-60b9a28b/docs/TASK.md:14
+  brings back conflict already accepted, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: Reducing the public page size would conflict with the
+  already accepted limit of 100.
+
+· no conflicts · 20 worth a look

@@ -14,8 +14,8 @@ HEAD/start/review-base8fdb892b6e279ed0c09150e2336bbdc7462f877d, accepted D1/r7
 SHA8ec33f0a479882b3b3c67dc8ed8dde80be34228a68a27548246bf611254bb1a9 and
 coordination1 SHA2c7fd7132813c4a9b026818abdfa2b99d369fd92c860675a0fcd29e82140428b.
 Exact exclusions: this p01/docs directory and exact Plan04 COORDINATION.md.
-Source is staged and ready for authorized reviewed commit; no source mutations
-since PASS. TASK retains complete criteria/mapping/history; REVIEW/notes/findings
+Reviewed source was committed in d4bbde66 and main merged60b9a28b.
+No Plan04 push yet; current continuation is the integration handoff below. TASK retains complete criteria/mapping/history; REVIEW/notes/findings
 are B-owned with R1 whole review and R2 correction verdict. Manifests R1-initial,
 R1 and R2 plus all failed/positive evidence are immutable. Retain raw tool output;
 implementation whitespace passes, raw diagnostic log whitespace is not rewritten.
@@ -52,8 +52,8 @@ Current source does not require repeating unchanged affected checks.
 
 ## Next
 
-1. Final stage p01 records, validate --tracked-manifests --require-tracked, trail check,
-   implementation staged whitespace, then commit reviewed p01. Do not call full
+1. Completed p01 commitd4bbde66 after tracked-evidence124manifest validation, Trail
+   and implementation-whitespace checks. Do not call full
    Plan04 complete or claim entire CI green. Learning l-3837ec57 is staged with code.
 2. Fetch/merge newer main (last03f0bda2) into feature branch, preserve both appended
    migration blocks. Only migration overlapped current local paths; main has947
@@ -84,3 +84,11 @@ Do not stop them. Task-owned Colima openbot-plan04 running4CPU/8GiB/32GiB sparse
 Docker29.5.2. Source external pa04-docker-env.sh for explicit owned socket; default
 Docker context unchanged and preexisting as-attribution-integration untouched.
 Retain task VM for later final gates; stop only this owned profile at task completion.
+
+## Post-acceptance continuation
+
+Accepted source was committed as d4bbde66; newer main03f0bda2 merged60b9a28b.
+Current continuation is integration/main-60b9a28b/docs/HANDOFF.md under coordination2,
+notice04RU-C001/r1. Adapt imported attribution readers of the removed table and
+preserve new terminal lifecycle evidence before p02. Historical p01 acceptance
+remains retained; combined integration is not yet accepted and Plan04 not pushed.

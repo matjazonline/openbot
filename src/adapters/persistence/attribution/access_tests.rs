@@ -1,7 +1,7 @@
 use super::*;
 use crate::{
     application::use_cases::company_invite::CompanyInviteUseCases,
-    entities::company_member::CompanyAccessRole,
+    entities::{access_level::AccessLevel, company_member::CompanyAccessRole},
 };
 
 struct MembershipFixture {
@@ -37,9 +37,18 @@ impl MembershipFixture {
             )
             .await;
         }
-        for (company, role) in [(admin, "admin"), (member, "member")] {
-            sqlx::query("INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES ($1, $2, $3, $4, 0)")
-                .bind(Uuid::new_v4()).bind(company).bind(http.f.user).bind(role).execute(&http.f.store.pool).await.unwrap();
+        for (company, role) in [
+            (admin, CompanyAccessRole::Admin),
+            (member, CompanyAccessRole::Member),
+        ] {
+            crate::adapters::persistence::test_support::insert_root_member(
+                &http.f.store.pool,
+                crate::domain::workflow::CompanyId::new(company),
+                http.f.user,
+                role,
+                AccessLevel::PUBLIC,
+            )
+            .await;
         }
         let code = http.code().await;
         let response = http.redeem(&code, &http.verifier).await;
@@ -168,4 +177,16 @@ async fn attribution_company_access_real_multi_company_pagination_tracks_members
     expected.retain(|id| *id != f.admin);
     assert_eq!(f.company_ids().await, expected);
     assert!(!expected.contains(&f.foreign));
+}
+
+#[tokio::test]
+async fn attribution_company_access_competing_root_admin_status_writes_have_one_winner() {
+    let f = MembershipFixture::new().await;
+    let (first, second) = tokio::join!(f.suspend(f.admin, 1), f.suspend(f.admin, 1));
+    let mut outcomes = [first, second];
+    outcomes.sort_unstable_by_key(|status| status.as_u16());
+    assert_eq!(outcomes, [StatusCode::OK, StatusCode::CONFLICT]);
+    let status = f.http.f.store.status(f.admin).await.unwrap();
+    assert_eq!(status.state, CompanyState::Suspended);
+    assert_eq!(status.version, 2);
 }
