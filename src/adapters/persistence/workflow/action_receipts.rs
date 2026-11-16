@@ -344,8 +344,9 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
                 let mut tx = bound.begin(&mut conn).await?;
                 let window = async {
                     // Company/principal before run, including this ownership-only precheck.
-                    let actor =
-                        action_authority::prelock_on(&mut tx, entry.request.scope()).await?;
+                    let prefix =
+                        action_authority::prelock_live_on(&mut tx, entry.request.scope(), None)
+                            .await?;
                     // Known ownership loss suppresses output; operational failures remain errors.
                     if !lease::lock_fence(&mut tx, entry.request.fence, bound.server_timeout())
                         .await?
@@ -360,7 +361,7 @@ impl<A: SqlActionAuthority, L: SqlLocalAction> PostgresActionDispatch<A, L> {
                             &mut tx,
                             &entry.request,
                             bound.server_timeout(),
-                            actor,
+                            prefix,
                         )
                         .await?;
                     if authorized.approval_required
