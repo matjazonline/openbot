@@ -1,0 +1,22 @@
+{
+  "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs": {
+    "sha256": "536de0562bf569abfa6bb3727459e58b42367aa89efed177b1f79c4e4a5b4a4d",
+    "matches_HEAD": true
+  },
+  "src/adapters/persistence/workflow/provisioning_directory_tests.rs": {
+    "sha256": "c82b3169d5c1339560314fc4d16e6dfa4f0faa25efcb737d647b766903c3f008",
+    "matches_HEAD": true
+  },
+  "src/adapters/persistence/workflow/lease_tests.rs": {
+    "sha256": "b8847025084c0019b41a29c36011c4a26608432c838157b493e9ce7b168f6cd0",
+    "matches_HEAD": true
+  },
+  "src/adapters/persistence/workflow/agent_history_process_fixture.rs": {
+    "sha256": "5965477ec4d9fc0022b2c6e70f36e74de74cee0241b9686ac101af49b37b44e2",
+    "matches_HEAD": true
+  },
+  "src/adapters/persistence/workflow/agent_history_e2e_tests.rs": {
+    "sha256": "2bb662aac9954f85a0f120061aa1389e947ff7003092ba647d005a2d04a0a508",
+    "matches_HEAD": true
+  }
+}

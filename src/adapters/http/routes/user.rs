@@ -69,11 +69,16 @@ pub fn protected_router() -> Router<AppState> {
 }
 
 async fn index(
+    State(attribution): State<Option<Arc<crate::adapters::http::attribution::Bridge>>>,
+    headers: axum::http::HeaderMap,
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(invite_use_cases): State<Arc<CompanyInviteUseCases>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
 ) -> AppResult<Redirect> {
+    if attribution.is_some() && crate::adapters::http::attribution::pending(&headers).is_some() {
+        return Ok(Redirect::temporary("/api/attribution/v1/resume"));
+    }
     let account = user_use_cases
         .get_user_by_id(user.id)
         .await?
@@ -721,3 +726,7 @@ async fn login_json(
 #[cfg(test)]
 #[path = "user_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "user_attribution_tests.rs"]
+mod attribution_browser_tests;

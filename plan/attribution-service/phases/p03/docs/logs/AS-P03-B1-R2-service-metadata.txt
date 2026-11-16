@@ -1,0 +1,6 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (11.354083ms)
++ cargo sqlx prepare -- --locked --offline --all-targets
+    Checking attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 1.97s
+query data written to .sqlx in the current directory; please check this into version control

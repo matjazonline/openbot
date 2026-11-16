@@ -1,0 +1,7 @@
+Decision AS-P05-D1/r1 SHA256: c65c8f5653783df03d83a871adaf8ecb163e1f44fd1a07880df93523b49529b5
+Source start/end: a5e729a610b120f50fb43acddf1c3bd7cda8c7b8a3cc5ae8d394e971607c7275
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+Branch: attribution-service
+Coordination revision9 pinned byte equality: PASS
+AS-C001/r1, AS-C002/r1, AS-C003/r1 acknowledged; proposed AS-C004/r1 included in architecture review
+git diff --check: PASS

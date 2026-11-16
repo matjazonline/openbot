@@ -1,0 +1,7 @@
+AS-P09-G1.snapshot.txt 99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e PASS
+AS-P09-G1-reviewer-start.snapshot.txt 99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e PASS
+AS-P09-G1-reviewer-end.snapshot.txt 99d5627b7bc25cb34d828005e9539a07cf5e40eb76c35fb7b1276feeddaa225e PASS
+Decision281e4b7c SHA256 and TASK text PASS
+Main coordination25 pin equals 183279e84944c3391917cff785bad9d86cd383185279c29825bb8e142e70fead
+HEAD/start/base 6e55258cbbdc7633940805f366fb17fe240f02aa
+git diff --check PASS

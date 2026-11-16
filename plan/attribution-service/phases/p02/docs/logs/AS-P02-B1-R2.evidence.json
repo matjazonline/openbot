@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "round": "AS-P02-B1-R2",
+  "artifact": "f4421ac9eb35f50acf92d710948bf4e3ca777104821000a4c0e296d1ac53c10d",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC5"
+      ],
+      "command": "scripts/verify.py foundation (unchanged runtime input evidence retained from R1)",
+      "fixture": "owned PostgreSQL fixtures on local 18.7; source-only copy and isolated cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-foundation-r1.txt",
+          "sha256": "69c63c2759b1a08a2edddf472e2574f51f54adb21e3cc55a0e07013fbaeda807"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "scripts/extracted-build.py foundation (unchanged runtime input evidence retained from R1)",
+      "fixture": "owned PostgreSQL fixtures on local 18.7; source-only copy and isolated cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-extracted-r1.txt",
+          "sha256": "5ecb537b57457409024f99caa580fef75fefee414327a45cbd0d2011cae4e4cb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4",
+        "AC5"
+      ],
+      "command": "fresh venv pip install --require-hashes -r contract/requirements.lock; check-contracts.sh",
+      "fixture": "fresh /tmp/as-p02-contract-clean Python3.13 venv; unchanged 19 versions, published release hashes",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-clean-bootstrap-r2.txt",
+          "sha256": "f5730afb4de0ca152395af38a538c1a751ca19481e04c593e0dffabd75abbf58"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC4"
+      ],
+      "command": "service-only copy: test_boundary.py; boundary.py; check-contracts.sh",
+      "fixture": "owned PostgreSQL fixtures on local 18.7; source-only copy and isolated cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-boundary-extracted-r2.txt",
+          "sha256": "277315cc4ee5c3dddcd15c412409f5c37d1c94f2a4714187c24fc55c092f83bc"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "docker build --tag attribution-service-ci services/attribution",
+      "fixture": "owned Colima VZ as-attribution-p02; arm64; runtime inputs unchanged throughout correction",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-image-build-r1.txt",
+          "sha256": "77b3c30052f6689149e6da2a80a4ee92b2b3b2160fc3a1a8ed1133776e4a6b9c"
+        },
+        {
+          "path": "logs/AS-P02-runtime-inputs.json",
+          "sha256": "10fb19ec2833f4574d3f06847e6640cb4f1cfd6f483e633cfd6e2ef44b5ce374"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "python3 scripts/container-smoke.py (initial PostgreSQL bootstrap)",
+      "fixture": "owned UUID Docker resources, cleaned in finally",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P02-container-smoke-r1.txt",
+          "sha256": "eee674d804998a297da53fa1394a272df007f7116b8dd0dfaeca9c4d46bb4288"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "python3 scripts/container-smoke.py (diagnostic rerun before TCP readiness correction)",
+      "fixture": "owned UUID Docker resources, cleaned in finally",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-container-smoke-diagnostic.txt",
+          "sha256": "b05ff87b3ab96adbc907d7af71e307940e1f63bfd784f4dd0eee6a659d8b854c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3"
+      ],
+      "command": "python3 scripts/container-smoke.py (final TCP readiness, two independent runs); docker image inspect",
+      "fixture": "colima-as-attribution-p02; image sha256:ff8df74f600c431b8234111731d3985f49caa50c3bd5b7f00b1cdce7f4554a5c; dedicated PostgreSQL 18.3 containers",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-container-smoke-r2.txt",
+          "sha256": "95e230a0bb04849324f8a306d58ffb484fd3eba3685836945283578ffcb35169"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings (unchanged Rust evidence)",
+      "fixture": "owned PostgreSQL fixtures on local 18.7; source-only copy and isolated cargo cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P02-clippy.txt",
+          "sha256": "45e48caf0a871e6d51c5c79a3f721b7db718da056b2f157c21282df04077e503"
+        }
+      ]
+    }
+  ]
+}

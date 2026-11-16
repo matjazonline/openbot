@@ -630,3 +630,4 @@ pub(crate) mod integration_bindings;
 pub(crate) mod integration_connect_authority;
 
 pub(crate) use mcp::discovery::PostgresMcpDiscovery;
+mod attribution;

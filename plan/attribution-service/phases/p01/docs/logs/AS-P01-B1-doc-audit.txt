@@ -1,0 +1,1 @@
+PASS: ten phase policy/startup registrations; 37 local links; canonical identity copy equal; whitespace clean

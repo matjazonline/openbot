@@ -1,0 +1,1279 @@
+Exact original commit 6e55258cbbdc7633940805f366fb17fe240f02aa; selected17 named deadline failures.
+   Compiling subtle v2.6.1
+   Compiling url v2.5.8
+   Compiling digest v0.10.7
+   Compiling rustls v0.23.31
+   Compiling hmac v0.12.1
+   Compiling sha2 v0.10.9
+   Compiling sha1 v0.10.6
+   Compiling ff v0.13.1
+   Compiling sec1 v0.7.3
+   Compiling group v0.13.0
+   Compiling tower-http v0.6.11
+   Compiling crypto-bigint v0.5.5
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.9
+   Compiling rustls-platform-verifier v0.7.0
+   Compiling reqwest v0.13.4
+   Compiling elliptic-curve v0.13.8
+   Compiling tungstenite v0.26.2
+   Compiling sqlx-core v0.8.6
+   Compiling hickory-proto v0.24.4
+   Compiling tokio-tungstenite v0.26.2
+   Compiling hkdf v0.12.4
+   Compiling rfc6979 v0.4.0
+   Compiling pbkdf2 v0.12.2
+   Compiling signature v2.2.0
+   Compiling md-5 v0.10.6
+   Compiling zip v2.4.2
+   Compiling hickory-resolver v0.24.4
+   Compiling axum v0.8.4
+   Compiling rig-core v0.42.0
+   Compiling sqlx-postgres v0.8.6
+   Compiling ecdsa v0.16.9
+   Compiling primeorder v0.13.6
+   Compiling password-hash v0.5.0
+   Compiling blake2 v0.10.6
+   Compiling lettre v0.11.23
+   Compiling ammonia v4.1.4
+   Compiling mail-auth v0.6.1
+   Compiling argon2 v0.5.3
+   Compiling rig-agent v0.42.0
+   Compiling axum-extra v0.10.1
+   Compiling rmcp v1.8.0
+   Compiling p256 v0.13.2
+   Compiling sqlx v0.8.6
+   Compiling open_bots v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-baseline-ul2e7k57/source)
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:181:78
+    |
+181 |     if slots >= i64::try_from(MAX_MESSAGE_ACTIONS_PER_EXECUTION).map_err(|_| invalid())? {
+    |                                                                              ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:209:67
+    |
+209 |         serde_json::from_value(root.contract.clone()).map_err(|_| invalid())?;
+    |                                                                   ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:230:67
+    |
+230 |     let route_snapshot = serde_json::to_value(&route).map_err(|_| invalid())?;
+    |                                                                   ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:231:69
+    |
+231 |     let address = match route.targets.into_iter().next().ok_or_else(invalid)? {
+    |                                                                     ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:234:25
+    |
+234 |         _ => return Err(invalid()),
+    |                         ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:270:22
+    |
+270 |         .map_err(|_| invalid())?;
+    |                      ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:340:39
+    |
+340 |     row.digest.try_into().map_err(|_| invalid())
+    |                                       ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:352:69
+    |
+352 |         operation_key: TypeName::parse("message.reply").map_err(|_| invalid())?,
+    |                                                                     ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:355:69
+    |
+355 |             resource_kind: TypeName::parse("messaging").map_err(|_| invalid())?,
+    |                                                                     ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:362:83
+    |
+362 |             capability_ceiling: vec![TypeName::parse("message.reply").map_err(|_| invalid())?],
+    |                                                                                   ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:385:45
+    |
+385 |         PreparedFinal::Parked => return Err(invalid()),
+    |                                             ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_reply_completion.rs:5:5
+    |
+  5 |     actions::*, activation::*, batch::PureCompletion, channel_reply::*, decisions::DecisionNotices,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/knowledge_release.rs:113:25
+    |
+113 |             .ok_or_else(invalid),
+    |                         ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:4:5
+    |
+  4 |     actions::*,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/knowledge_release.rs:115:18
+    |
+115 |         _ => Err(invalid()),
+    |                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:4:5
+    |
+  4 |     actions::*,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/knowledge_release.rs:141:20
+    |
+141 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:4:5
+    |
+  4 |     actions::*,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/knowledge_release.rs:167:74
+    |
+167 |     let content = AccessLevel::try_from(facts.content_level).map_err(|_| invalid())?;
+    |                                                                          ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:4:5
+    |
+  4 |     actions::*,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/knowledge_release.rs:192:54
+    |
+192 |             AccessLevel::try_from(level).map_err(|_| invalid())?
+    |                                                      ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/knowledge_release.rs:4:5
+    |
+  4 |     actions::*,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/admission.rs:56:26
+   |
+56 |             .map_err(|_| invalid())?;
+   |                          ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/admission.rs:119:50
+    |
+119 |         OperationId::new(invocation).map_err(|_| invalid())?,
+    |                                                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/admission.rs:162:52
+    |
+162 |         id: SessionId::new(invocation).map_err(|_| invalid())?,
+    |                                                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/admission.rs:165:72
+    |
+165 |         installation_id: InstallationId::new(installation).map_err(|_| invalid())?,
+    |                                                                        ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:32:21
+   |
+32 |         .ok_or_else(invalid)?;
+   |                     ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:49:71
+   |
+49 |                 FailureCode::parse("local_agent.refused").map_err(|_| invalid())?,
+   |                                                                       ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/continuation.rs:52:26
+   |
+52 |             .map_err(|_| invalid())?;
+   |                          ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/continuation.rs:134:82
+    |
+134 |         serde_json::from_value(json!(result.workflow_outcome.as_ref().ok_or_else(invalid)?))
+    |                                                                                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/continuation.rs:135:26
+    |
+135 |             .map_err(|_| invalid())?;
+    |                          ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/continuation.rs:140:90
+    |
+140 |         .bind(request.subject.argument_digest.as_str()).bind(call.dispatch_id.ok_or_else(invalid)?).bind(&result).execute(db).await?;
+    |                                                                                          ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/continuation.rs:160:78
+    |
+160 |                 serde_json::from_value(result["status"].clone()).map_err(|_| invalid())?;
+    |                                                                              ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/continuation.rs:178:82
+    |
+178 |         let _: MeasuredUsage = serde_json::from_value(usage.clone()).map_err(|_| invalid())?;
+    |                                                                                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/delivery.rs:121:34
+    |
+121 |                     .map_err(|_| invalid())?,
+    |                                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:21:24
+   |
+21 |             return Err(invalid());
+   |                        ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:55:81
+   |
+55 |             resource_kind: TypeName::parse(contract::RESOURCE_KIND).map_err(|_| invalid())?,
+   |                                                                                 ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:58:61
+   |
+58 |         arguments: serde_json::to_value(frozen).map_err(|_| invalid())?,
+   |                                                             ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/local_agents/preparation.rs:66:43
+   |
+66 |     saved_on(tx, scope).await?.ok_or_else(invalid)
+   |                                           ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+   |
+ 2 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+   |
+ 8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+   |                                    ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:176:25
+    |
+176 |         _ => return Err(invalid()),
+    |                         ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:204:80
+    |
+204 |         serde_json::from_value(action.request().arguments.clone()).map_err(|_| invalid())?;
+    |                                                                                ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:240:72
+    |
+240 |             kind: TypeName::parse(contract::RESOURCE_KIND).map_err(|_| invalid())?,
+    |                                                                        ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:242:61
+    |
+242 |                 TypeName::parse(contract::KIND).map_err(|_| invalid())?
+    |                                                             ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:2:5
+    |
+  2 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/local_agents/mod.rs:8:36
+    |
+  8 | use crate::application::workflow::{actions::*, lease::*, polling::WorkflowStepKind};
+    |                                    ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/message_publish.rs:84:42
+   |
+84 |     Ok(usize::try_from(held).map_err(|_| invalid())? >= MAX_MESSAGE_ACTIONS_PER_EXECUTION)
+   |                                          ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:6:5
+   |
+ 6 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:7:5
+   |
+ 7 | use crate::application::workflow::actions::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message_publish.rs:152:50
+    |
+152 |         .bind(i16::try_from(ordinal).map_err(|_| invalid())?)
+    |                                                  ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message_publish.rs:190:51
+    |
+190 |     .bind(i16::try_from(destinations).map_err(|_| invalid())?)
+    |                                                   ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message_publish.rs:409:40
+    |
+409 |             let wait = wait.ok_or_else(invalid)?;
+    |                                        ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/channel_questions.rs:67:62
+   |
+67 |     let step = StepId::parse(&execution.step_id).map_err(|_| invalid())?;
+   |                                                              ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+   |
+ 4 | use super::super::*;
+   |     ^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+   |
+ 7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+   |     ^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_questions.rs:106:20
+    |
+106 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+    |
+  4 | use super::super::*;
+    |     ^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+    |
+  7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_questions.rs:115:20
+    |
+115 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+    |
+  4 | use super::super::*;
+    |     ^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+    |
+  7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_questions.rs:128:21
+    |
+128 |         .ok_or_else(invalid)?
+    |                     ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+    |
+  4 | use super::super::*;
+    |     ^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+    |
+  7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_questions.rs:131:20
+    |
+131 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+    |
+  4 | use super::super::*;
+    |     ^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+    |
+  7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/channel_questions.rs:258:20
+    |
+258 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:4:5
+    |
+  4 | use super::super::*;
+    |     ^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/channel_questions.rs:7:5
+    |
+  7 |     actions::*, message::*, triggers::CHANNEL_QUESTION_REPLY_EVENT,
+    |     ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message_receipts.rs:314:20
+    |
+314 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message_receipts.rs:322:75
+    |
+322 |     let code = FailureCode::parse("action.evidence_conflict").map_err(|_| invalid())?;
+    |                                                                           ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/message.rs:92:54
+   |
+92 |         kind: TypeName::parse(MESSAGING).map_err(|_| invalid())?,
+   |                                                      ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:6:5
+   |
+ 6 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:7:5
+   |
+ 7 | use crate::application::workflow::actions::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/message.rs:95:66
+   |
+95 |             .map(|kind| TypeName::parse(kind.name()).map_err(|_| invalid()))
+   |                                                                  ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:6:5
+   |
+ 6 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/message.rs:7:5
+   |
+ 7 | use crate::application::workflow::actions::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message.rs:137:67
+    |
+137 |             resource_kind: TypeName::parse(MESSAGING).map_err(|_| invalid())?,
+    |                                                                   ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/message.rs:165:25
+    |
+165 |             .ok_or_else(invalid)?
+    |                         ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:6:5
+    |
+  6 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/message.rs:7:5
+    |
+  7 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/provisioning.rs:76:57
+   |
+76 |         kind: TypeName::parse(PROVISIONING).map_err(|_| invalid())?,
+   |                                                         ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/provisioning.rs:27:5
+   |
+27 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/provisioning.rs:33:5
+   |
+33 | use crate::application::workflow::actions::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+  --> src/adapters/persistence/workflow/provisioning.rs:79:59
+   |
+79 |             .map(|name| TypeName::parse(name).map_err(|_| invalid()))
+   |                                                           ^^^^^^^ ambiguous name
+   |
+   = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+  --> src/adapters/persistence/workflow/provisioning.rs:27:5
+   |
+27 | use super::*;
+   |     ^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+  --> src/adapters/persistence/workflow/provisioning.rs:33:5
+   |
+33 | use crate::application::workflow::actions::*;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/provisioning.rs:149:74
+    |
+149 |                 resource_kind: TypeName::parse(PROVISIONING).map_err(|_| invalid())?,
+    |                                                                          ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/provisioning.rs:27:5
+    |
+ 27 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/provisioning.rs:33:5
+    |
+ 33 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/integration_authority.rs:186:52
+    |
+186 |         let step = StepId::parse(step).map_err(|_| invalid())?;
+    |                                                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:5:5
+    |
+  5 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:6:5
+    |
+  6 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/integration_authority.rs:280:20
+    |
+280 |         return Err(invalid());
+    |                    ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:5:5
+    |
+  5 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:6:5
+    |
+  6 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/adapters/persistence/workflow/integration_authority.rs:284:86
+    |
+284 |         *byte = u8::from_str_radix(&value[index * 2..index * 2 + 2], 16).map_err(|_| invalid())?;
+    |                                                                                      ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:5:5
+    |
+  5 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/adapters/persistence/workflow/integration_authority.rs:6:5
+    |
+  6 | use crate::application::workflow::actions::*;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/application/workflow/mcp_runtime.rs:375:22
+    |
+375 |         .map_err(|_| invalid())?;
+    |                      ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/application/workflow/mcp_runtime.rs:4:16
+    |
+  4 |     workflow::{actions::*, lease::*, polling::WorkflowStepKind, worker::WorkflowHandler},
+    |                ^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/application/workflow/mcp_runtime.rs:1:5
+    |
+  1 | use super::*;
+    |     ^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+error[E0659]: `invalid` is ambiguous
+   --> src/application/workflow/mcp_runtime.rs:375:22
+    |
+375 |         .map_err(|_| invalid())?;
+    |                      ^^^^^^^ ambiguous name
+    |
+    = note: ambiguous because of multiple glob imports of a name in the same module
+note: `invalid` could refer to the function imported here
+   --> src/application/workflow/actions/mod.rs:25:9
+    |
+ 25 | pub use reconciliation::*;
+    |         ^^^^^^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+note: `invalid` could also refer to the function imported here
+   --> src/application/workflow/actions/mod.rs:14:9
+    |
+ 14 | pub use contracts::*;
+    |         ^^^^^^^^^^^^
+    = help: consider adding an explicit import of `invalid` to disambiguate
+
+warning: unused import: `super::support::*`
+ --> src/adapters/persistence/workflow/reconciliation_fixture.rs:7:5
+  |
+7 | use super::support::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0659`.
+warning: `open_bots` (lib test) generated 1 warning
+error: could not compile `open_bots` (lib test) due to 61 previous errors; 1 warning emitted
+
+Exit: 101

@@ -1,0 +1,9 @@
+{
+  "installation_id": "dddddddd-dddd-4ddd-8ddd-dddddddddddd",
+  "event_id": "eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee",
+  "kind": "landing_page_load",
+  "click_id": "cccccccc-cccc-4ccc-8ccc-ccccccccccc2",
+  "link_id": null,
+  "observed_at": "2026-11-15T11:00:01Z",
+  "consent": true
+}

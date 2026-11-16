@@ -1,0 +1,26 @@
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+       Fixed src/adapters/identity/http.rs (1 fix)
+       Fixed src/adapters/setup/admission.rs (1 fix)
+       Fixed src/adapters/website/http.rs (3 fixes)
+       Fixed src/adapters/website/postgres.rs (1 fix)
+       Fixed src/application/freshness.rs (1 fix)
+       Fixed src/infra/identity.rs (1 fix)
+warning: digits grouped inconsistently by underscores
+   --> src/adapters/identity/../commerce/ledger_tests.rs:139:19
+    |
+139 |         (0, -30 * 86400_000_000i64, false, true, "attributed"),
+    |                   ^^^^^^^^^^^^^^^^ help: consider: `86_400_000_000_i64`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#inconsistent_digit_grouping
+    = note: `#[warn(clippy::inconsistent_digit_grouping)]` on by default
+
+warning: digits grouped inconsistently by underscores
+   --> src/adapters/identity/../commerce/ledger_tests.rs:140:19
+    |
+140 |         (1, -30 * 86400_000_000 - 1, false, true, "expired"),
+    |                   ^^^^^^^^^^^^^ help: consider: `86_400_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#inconsistent_digit_grouping
+
+warning: `attribution_service` (lib test) generated 2 warnings
+    Finished `dev` profile [unoptimized] target(s) in 30.52s

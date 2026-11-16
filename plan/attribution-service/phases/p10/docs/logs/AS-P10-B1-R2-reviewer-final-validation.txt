@@ -1,0 +1,19 @@
+$ python3 /Users/mac02/orca/workspaces/openbot/attribution-service/.agents/skills/implement-astra-reviewed-2-3/scripts/check-evidence.py plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2.evidence.json --expect-artifact 55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2.evidence.json: retained evidence valid {"FAIL": 6, "NOT EXERCISED": 1, "PASS": 11}
+1 evidence manifest(s) validated; declared results are not acceptance
+exit 0
+
+$ python3 /Users/mac02/orca/workspaces/openbot/attribution-service/.agents/skills/implement-astra-reviewed-2-3/scripts/check-evidence.py plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-controls.evidence.json --expect-artifact 55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-controls.evidence.json: retained evidence valid {"FAIL": 1, "NOT EXERCISED": 0, "PASS": 2}
+1 evidence manifest(s) validated; declared results are not acceptance
+exit 0
+
+$ python3 /Users/mac02/orca/workspaces/openbot/attribution-service/.agents/skills/implement-astra-reviewed-2-3/scripts/check-evidence.py plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-doop.evidence.json --expect-artifact 55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-doop.evidence.json: retained evidence valid {"FAIL": 2, "NOT EXERCISED": 1, "PASS": 0}
+1 evidence manifest(s) validated; declared results are not acceptance
+exit 0
+
+$ python3 /Users/mac02/orca/workspaces/openbot/attribution-service/.agents/skills/implement-astra-reviewed-2-3/scripts/check-evidence.py plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-final.evidence.json --expect-artifact 55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97
+plan/attribution-service/phases/p10/docs/logs/AS-P10-B1-R2-final.evidence.json: retained evidence valid {"FAIL": 8, "NOT EXERCISED": 1, "PASS": 9}
+1 evidence manifest(s) validated; declared results are not acceptance
+exit 0

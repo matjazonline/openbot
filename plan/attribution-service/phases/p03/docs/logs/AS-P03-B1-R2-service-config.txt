@@ -1,0 +1,8 @@
+    Finished `test` profile [unoptimized] target(s) in 0.51s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 1 test
+test infra::identity::tests::attribution_session_configuration_rejects_incomplete_and_cross_class_credentials ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 35 filtered out; finished in 0.01s
+

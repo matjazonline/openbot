@@ -1,0 +1,75 @@
+checking 23 changed files against 8 learnings and 2 skills
+
+● plan/attribution-service/01-application-boundaries-and-contracts.md:114
+  brings back native account company, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r9b-draft-60341d25, not merged yet
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:165
+  brings back first test case, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r9b-draft-60341d25, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/attribution-service/01-application-boundaries-and-contracts.md:166
+  brings back check exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:93
+  brings back first actual test, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r9b-draft-60341d25, not merged yet
+  Mac02 · Nov 15: The first actual competing drop/shutdown tests and 115
+  focused cases passed while leaving the enqueue/publication interval
+  uncontrolled.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:98
+  brings back openbot persistence boundary, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 14: A literal like `<escalation-{id}@openbot.invalid>`
+  built in persistence breaks the transport boundary in two ways: it
+  is a synthetic `.invalid` identity, and it is an RFC id made outside
+  the email adapter.
+● plan/attribution-service/03-single-sign-on-and-company-access.md:100
+  brings back source helper company, which Mac02's learning ruled out
+  worth a look, can't fail the check: on codex/plan03-p04-r9b-draft-60341d25, not merged yet
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/main.rs:383
+  brings back http push, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 14: An HTTPS push: there are no credentials in the agent
+  shell (`could not read Username ... terminal prompts disabled`).
+  `gh` is not installed, and the keychain has no github.com entry.
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: The authority client's response cap must accommodate a complete
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ migrations/20260817000000_init_schema.sql
+  follows skill implement-opus-reviewed-2_4: must change or an assumption it relied on is
+✓ migrations/20260817000000_init_schema.sql
+  follows skill implement-opus-2_4-system-improvement: phases only when requested, and keep evidence identities and
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows Mac02's learning: The authority client's response cap must accommodate a complete
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows Mac02's learning: scripts/transport-boundary-check.sh (`rg --files`, `scan_production`)
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows Mac02's learning: The worktree always carries the user's own uncommitted edits,
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows skill implement-opus-reviewed-2_4: Do not run unrelated tests or a full suite
+✓ plan/attribution-service/01-application-boundaries-and-contracts.md
+  follows skill implement-opus-2_4-system-improvement: phases only when requested, and keep evidence identities and
+✓ plan/attribution-service/03-single-sign-on-and-company-access.md
+  follows Mac02's learning: The authority client's response cap must accommodate a complete
+✓ plan/attribution-service/03-single-sign-on-and-company-access.md
+  follows Mac02's learning: Treat a 0 s pass or failure of this
+✓ plan/attribution-service/03-single-sign-on-and-company-access.md
+  follows Mac02's learning: The full check suite runs against the local Homebrew
+✓ plan/attribution-service/03-single-sign-on-and-company-access.md
+  follows skill implement-opus-reviewed-2_4: Keep and record root's actual settings; never infer them
+
+· no conflicts · 7 worth a look
+
+🔀 trail · Cloudroom's branch codex/plan03-p04-ci-f059f498-20261115 also changes Cargo.lock, Cargo.toml and 1 more (pushed Nov 15)
+🔀 trail · Matjazonline's branch anthropic-latest-models also changes src/main.rs (pushed Nov 6)

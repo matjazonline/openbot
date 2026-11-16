@@ -1,0 +1,14 @@
+time="2026-11-16T00:32:53+01:00" level=info msg="deleting colima [profile=as-attribution-p02]"
+time="2026-11-16T00:32:54+01:00" level=info msg="deleting ..." context=docker
+colima-as-attribution-p02
+time="2026-11-16T00:32:54+01:00" level=info msg="Sending SIGKILL to the vz driver process 58399"
+time="2026-11-16T00:32:54+01:00" level=info msg="Sending SIGKILL to the host agent process 58399"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing *.pid *.sock *.tmp under `/Users/mac02/.colima/_lima/colima-as-attribution-p02`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing `/Users/mac02/.colima/_lima/colima-as-attribution-p02/boot-session.tmp`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing `/Users/mac02/.colima/_lima/colima-as-attribution-p02/ha.pid`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing `/Users/mac02/.colima/_lima/colima-as-attribution-p02/ha.sock`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing `/Users/mac02/.colima/_lima/colima-as-attribution-p02/ssh.sock`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Removing `/Users/mac02/.colima/_lima/colima-as-attribution-p02/vz.pid`"
+time="2026-11-16T00:32:54+01:00" level=info msg="Deleted `colima-as-attribution-p02` (`/Users/mac02/.colima/_lima/colima-as-attribution-p02`)"
+time="2026-11-16T00:32:55+01:00" level=info msg="deleting container data"
+time="2026-11-16T00:32:55+01:00" level=info msg=done

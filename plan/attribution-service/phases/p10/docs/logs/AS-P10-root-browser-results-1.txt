@@ -1,0 +1,34 @@
+==> Browser protocols using native markup
+✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (3065.591875ms)
+✔ actual history HTML: dark keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (2243.787583ms)
+✔ actual history HTML: light keyboard pagination reaches last exchange, detail is escaped, reads replace and failures recover (1107.865792ms)
+✔ form feedback and another member’s team autocomplete stay text under production CSP (2017.011208ms)
+✖ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (217784.479792ms)
+✔ local profile and session forms escape native output and acknowledge accepted writes (2195.710042ms)
+✔ an Auto agent on an Auto-only provider saves the unchanged unsupported fallback and clearing the agent restores validation (511.258333ms)
+✔ capture forms are labelled, refuse a blank reason, post the policy and swap in the saved section (2008.092042ms)
+✔ failed password change preserves the browser; a committed change clears its cookie and navigates to login (1955.532291ms)
+✔ skill ZIP uploads retain multipart bytes and show progress, success and failure in both themes (2043.883916ms)
+✔ served team autocomplete renders account strings as text and keeps selection working (1904.162791ms)
+✔ vault dark: native picker progress, escaped private metadata and recoverable consent (1959.08925ms)
+✔ vault light: native picker progress, escaped private metadata and recoverable consent (545.914375ms)
+✔ vault dark: owner secrets start blank and reconnect failures remain recoverable (630.396583ms)
+✔ vault light: owner secrets start blank and reconnect failures remain recoverable (522.311833ms)
+✔ workflow agent choices preserve source and ignore transformations after editing or navigation (2411.377334ms)
+✔ comment preserves the unfinished exact decision; queued submission settles without stale replacement (1702.893541ms)
+ℹ tests 17
+ℹ suites 0
+ℹ pass 16
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 218260.5865
+
+✖ failing tests:
+
+test at scripts/tests/knowledge-browser.mjs:13:1
+✖ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (217784.479792ms)
+  page.evaluate: Target page, context or browser has been closed
+      at TestContext.<anonymous> (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/tests/knowledge-browser.mjs:78:16)
+

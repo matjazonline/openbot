@@ -37,6 +37,9 @@ pub fn create_app(app_state: AppState) -> Router {
     let security_config = app_state.config.clone();
     Router::new()
         .merge(adapters::http::routes::router(app_state.sessions.clone()))
+        .merge(adapters::http::attribution::router(
+            app_state.attribution.clone(),
+        ))
         .with_state(app_state)
         .layer(middleware::from_fn_with_state(
             auth_admission,

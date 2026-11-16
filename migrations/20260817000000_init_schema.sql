@@ -16220,3 +16220,131 @@ BEGIN
                         AND public.native_mcp_parent_agent_live(tenant,intent.agent_revision_id)))))
     );
 END $$;
+
+-- Attribution identity bridge. No backward compatibility; reset the database.
+ALTER TABLE public.user_sessions ADD CONSTRAINT user_sessions_identity_key
+    UNIQUE (id, user_id, auth_revision);
+CREATE TABLE public.attribution_login_continuations (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    state text NOT NULL CHECK (state ~ '^[A-Za-z0-9_-]{43,128}$'),
+    challenge text NOT NULL CHECK (challenge ~ '^[A-Za-z0-9_-]{43}$'),
+    callback text NOT NULL CHECK (length(callback) BETWEEN 1 AND 2048),
+    expires_at timestamptz NOT NULL DEFAULT (clock_timestamp() + interval '10 minutes')
+);
+CREATE INDEX attribution_continuation_expiry ON public.attribution_login_continuations (expires_at);
+CREATE TABLE public.attribution_identity_codes (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    user_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    auth_revision bigint NOT NULL,
+    client_id text NOT NULL CHECK (client_id = 'attribution'),
+    callback text NOT NULL CHECK (length(callback) BETWEEN 1 AND 2048),
+    challenge text NOT NULL CHECK (challenge ~ '^[A-Za-z0-9_-]{43}$'),
+    expires_at timestamptz NOT NULL,
+    consumed_at timestamptz,
+    FOREIGN KEY (session_id, user_id, auth_revision)
+        REFERENCES public.user_sessions (id, user_id, auth_revision) ON DELETE CASCADE
+);
+CREATE INDEX attribution_code_expiry ON public.attribution_identity_codes (expires_at);
+CREATE TABLE public.attribution_identity_grants (
+    verifier bytea PRIMARY KEY CHECK (octet_length(verifier) = 32),
+    user_id uuid NOT NULL,
+    session_id uuid NOT NULL,
+    auth_revision bigint NOT NULL,
+    client_id text NOT NULL CHECK (client_id = 'attribution'),
+    expires_at timestamptz NOT NULL,
+    revoked_at timestamptz,
+    FOREIGN KEY (session_id, user_id, auth_revision)
+        REFERENCES public.user_sessions (id, user_id, auth_revision) ON DELETE CASCADE
+);
+CREATE INDEX attribution_grant_expiry ON public.attribution_identity_grants (expires_at);
+
+-- No company FK: terminal evidence must survive either owning deletion path.
+CREATE TABLE public.attribution_company_lifecycles (
+    company_id uuid PRIMARY KEY,
+    version bigint NOT NULL CHECK (version > 0),
+    state text NOT NULL CHECK (state IN ('active', 'suspended', 'deleted')),
+    changed_at timestamptz NOT NULL
+);
+CREATE TABLE public.attribution_lifecycle_outbox (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    company_id uuid NOT NULL REFERENCES public.attribution_company_lifecycles (company_id),
+    version bigint NOT NULL CHECK (version > 0),
+    state text NOT NULL CHECK (state IN ('active', 'suspended', 'deleted')),
+    changed_at timestamptz NOT NULL,
+    delivery_state text NOT NULL DEFAULT 'pending'
+        CHECK (delivery_state IN ('pending', 'delivering', 'delivered', 'failed')),
+    attempts integer NOT NULL DEFAULT 0 CHECK (attempts BETWEEN 0 AND 12),
+    available_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    execution_id uuid,
+    lease_until timestamptz,
+    completed_at timestamptz,
+    last_failure text CHECK (last_failure IN ('unavailable', 'rejected', 'lease_expired')),
+    UNIQUE (company_id, version),
+    CHECK ((delivery_state = 'delivering' AND execution_id IS NOT NULL AND lease_until IS NOT NULL)
+        OR (delivery_state <> 'delivering' AND execution_id IS NULL AND lease_until IS NULL)),
+    CHECK ((delivery_state IN ('delivered', 'failed')) = (completed_at IS NOT NULL))
+);
+CREATE INDEX attribution_outbox_due ON public.attribution_lifecycle_outbox (available_at, id)
+    WHERE delivery_state = 'pending';
+CREATE INDEX attribution_outbox_leases ON public.attribution_lifecycle_outbox (lease_until, id)
+    WHERE delivery_state = 'delivering';
+CREATE FUNCTION public.guard_attribution_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        IF NEW.state <> 'active' THEN
+            RAISE EXCEPTION 'Attribution lifecycle must begin active' USING ERRCODE = '23514';
+        END IF;
+        NEW.version := 1;
+    ELSE
+        IF NEW.company_id <> OLD.company_id OR NEW.version <> OLD.version
+            OR NEW.changed_at <> OLD.changed_at THEN
+            RAISE EXCEPTION 'Attribution lifecycle identity/version are generated' USING ERRCODE = '23514';
+        END IF;
+        IF NEW.state = OLD.state THEN RETURN OLD; END IF;
+        IF OLD.state = 'deleted' THEN
+            RAISE EXCEPTION 'Attribution deletion is terminal' USING ERRCODE = '23514';
+        END IF;
+        NEW.version := OLD.version + 1;
+    END IF;
+    NEW.changed_at := clock_timestamp();
+    RETURN NEW;
+END $$;
+CREATE TRIGGER attribution_lifecycle_guard BEFORE INSERT OR UPDATE
+    ON public.attribution_company_lifecycles FOR EACH ROW
+    EXECUTE FUNCTION public.guard_attribution_lifecycle();
+CREATE FUNCTION public.enqueue_attribution_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' OR NEW.version <> OLD.version THEN
+        INSERT INTO public.attribution_lifecycle_outbox (company_id, version, state, changed_at)
+            VALUES (NEW.company_id, NEW.version, NEW.state, NEW.changed_at);
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER attribution_lifecycle_enqueue AFTER INSERT OR UPDATE
+    ON public.attribution_company_lifecycles FOR EACH ROW
+    EXECUTE FUNCTION public.enqueue_attribution_lifecycle();
+CREATE FUNCTION public.record_attribution_company_lifecycle() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP = 'INSERT' THEN
+        INSERT INTO public.attribution_company_lifecycles (company_id, state, version, changed_at)
+            VALUES (NEW.id, 'active', 1, clock_timestamp());
+    ELSE
+        UPDATE public.attribution_company_lifecycles SET state = 'deleted' WHERE company_id = OLD.id;
+    END IF;
+    RETURN NULL;
+END $$;
+CREATE TRIGGER companies_attribution_created AFTER INSERT ON public.companies
+    FOR EACH ROW EXECUTE FUNCTION public.record_attribution_company_lifecycle();
+CREATE TRIGGER companies_attribution_deleted AFTER DELETE ON public.companies
+    FOR EACH ROW EXECUTE FUNCTION public.record_attribution_company_lifecycle();
+CREATE FUNCTION public.guard_attribution_outbox_payload() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF (NEW.id, NEW.company_id, NEW.version, NEW.state, NEW.changed_at)
+        IS DISTINCT FROM (OLD.id, OLD.company_id, OLD.version, OLD.state, OLD.changed_at) THEN
+        RAISE EXCEPTION 'Attribution notification payload is immutable' USING ERRCODE = '23514';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER attribution_outbox_immutable BEFORE UPDATE ON public.attribution_lifecycle_outbox
+    FOR EACH ROW EXECUTE FUNCTION public.guard_attribution_outbox_payload();

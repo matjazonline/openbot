@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/Users/mac02/as-p10-knowledge-pnc6k864/scripts/check-knowledge-image.py", line 101, in <module>
+    main()
+  File "/Users/mac02/as-p10-knowledge-pnc6k864/scripts/check-knowledge-image.py", line 97, in main
+    print(json.dumps(check(args.image), indent=2))
+  File "/Users/mac02/as-p10-knowledge-pnc6k864/scripts/check-knowledge-image.py", line 88, in check
+    failed_startup(image, empty, MODEL)
+  File "/Users/mac02/as-p10-knowledge-pnc6k864/scripts/check-knowledge-image.py", line 44, in failed_startup
+    raise RuntimeError("Missing/tampered artifact did not fail at the model boundary: " + output[-4096:])
+RuntimeError: Missing/tampered artifact did not fail at the model boundary: docker: Error response from daemon: invalid mount config for type "bind": bind source path does not exist: /Users/mac02/as-p10-knowledge-pnc6k864/target/knowledge-image-d8rh0of7/empty
+
+Run 'docker run --help' for more information
+
+
+Exit: 1

@@ -1,0 +1,32 @@
+current frozen binary 7e438d1774a4aebcc0a9d240cca78332edbad0c85c34f9429189c2ab704fe684; stock 2 MiB stack; 4 test threads; focused five cases; owned PG18.
+Applied 20260817000000/migrate init schema (1.16917375s)
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 5 tests
+AH-P07 genuine_process_crash point=Acquisition durable_identity=true exact_context=true provider_calls=2
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department' (25882452) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:162:49:
+called `Result::unwrap()` on an `Err` value: Conflict("Workflow lifecycle revision or command conflict")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department ... FAILED
+AH-P07 genuine_process_crash point=Frozen durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=BeforeWake polled=true successor_owned=true provider_calls=3
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor ... ok
+AH-P07 genuine_process_crash point=ModelSettled durable_identity=true exact_context=true provider_calls=2
+AH-P07 genuine_process_crash point=FinalCheckpoint durable_identity=true exact_context=true provider_calls=2
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls ... ok
+Doop step notify failed: message.rejected
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create ... ok
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::create_tests::doop_create_bad_receipt_or_read_identity_never_invokes_the_agent has been running for over 60 seconds
+Doop step create failed: mcp.tool_error
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::create_tests::doop_create_bad_receipt_or_read_identity_never_invokes_the_agent ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::directory::department_directory_filters_by_one_department
+
+test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured; 4252 filtered out; finished in 119.69s
+
+
+Exit: 101

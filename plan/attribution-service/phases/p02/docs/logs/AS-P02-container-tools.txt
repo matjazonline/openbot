@@ -1,0 +1,29 @@
+==> Downloading bottle manifests
+✔︎ Bottle Manifest docker (29.9.3)
+✔︎ Bottle Manifest colima (0.10.3)
+==> Would install 2 formulae:
+colima  0.10.3
+docker  29.9.3
+==> Would install 1 dependency for colima:
+lima 2.3.0
+==> Fetching downloads for: colima and docker
+✔︎ Bottle Manifest lima (2.3.0)
+✔︎ Bottle colima (0.10.3)
+✔︎ Bottle docker (29.9.3)
+✔︎ Bottle lima (2.3.0)
+==> Installing colima dependency: lima (2.3.0)
+==> Pouring lima--2.3.0.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/lima/2.3.0: 157 files, 113MB
+==> Installing colima
+==> Pouring colima--0.10.3.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/colima/0.10.3: 12 files, 11.2MB
+==> Pouring docker--29.9.3.arm64_golden_gate.bottle.tar.gz
+🍺  /opt/homebrew/Cellar/docker/29.9.3: 17 files, 29.2MB
+==> Caveats
+zsh completions have been installed to:
+  /opt/homebrew/share/zsh/site-functions
+==> colima
+To start colima now and restart at login:
+  brew services start colima
+Or, if you don't want/need a background service you can just run:
+  /opt/homebrew/opt/colima/bin/colima start -f

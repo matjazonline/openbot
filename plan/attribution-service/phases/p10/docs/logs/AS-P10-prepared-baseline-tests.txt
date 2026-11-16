@@ -1,0 +1,158 @@
+Prepared pre-attribution source 6e55258cbbdc7633940805f366fb17fe240f02aa; only matching visibility prerequisite. Selected17fullrun deadline cases.
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+warning: unused import: `super::support::*`
+ --> src/adapters/persistence/workflow/reconciliation_fixture.rs:7:5
+  |
+7 | use super::support::*;
+  |     ^^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 2 warnings (run `cargo fix --lib -p open_bots --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 1.44s
+     Running unittests src/lib.rs (/tmp/as-openbot-target/debug/deps/open_bots-e7729d368c3ead4e)
+
+running 17 tests
+test adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create has been running for over 60 seconds
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create ... FAILED
+test adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default stdout ----
+
+thread 'adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default' (25584245) panicked at src/adapters/persistence/workflow/provisioning_dispatch_tests.rs:162:49:
+called `Result::unwrap()` on an `Err` value: DatabaseTimeout("Workflow action.local not applied: persistence bound elapsed before commit")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown' (25584256) panicked at src/adapters/persistence/workflow/doop_document_recovery_tests.rs:120:18:
+the intended remote boundary must be reached: Elapsed(())
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete' (25584252) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication' (25584248) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit' (25584250) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write' (25584255) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion' (25584247) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success' (25584246) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (25584251) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model' (25584249) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas' (25584253) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation' (25584254) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver' (25585109) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level' (25585336) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["read_final", "verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers' (25587004) panicked at src/adapters/persistence/workflow/doop_setup_tests.rs:266:16:
+verification run must terminate: Elapsed(())
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create' (25586785) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("waiting", Some("effect"), ["notify", "verify_final_canvas", "final_canvas", "read_final", "verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas", "get_canvas"]
+
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::lease_tests::provisioning_dispatch_tests::agent_default_desk_builder_provisions_another_desk_beside_the_default
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers
+
+test result: FAILED. 1 passed; 16 failed; 0 ignored; 0 measured; 4227 filtered out; finished in 131.49s
+
+error: test failed, to rerun pass `--lib`
+
+Exit: 101

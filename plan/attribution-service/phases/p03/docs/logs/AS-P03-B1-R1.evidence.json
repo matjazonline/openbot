@@ -1,0 +1,304 @@
+{
+  "version": 1,
+  "round": "AS-P03-B1-R1",
+  "artifact": "45fc0ad49012ab1f6f58a619c06508430011b0c3a127683196c79ea906c71897",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6"
+      ],
+      "command": "(services/attribution) cargo test --locked --offline --lib attribution_",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-focused-5.txt",
+          "sha256": "339eb9cea382010ff5a0395ebf6d01e8187f606cdf9d9ed0eb960a4a410b2e57"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::persistence::attribution::",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-identity-3.txt",
+          "sha256": "89c9c8d047d2b7b7ad9999ff7c44e870c53c223db6c15d1c1e1c52afd8896d15"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_session_registration_",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-configuration-1.txt",
+          "sha256": "741396f999cae3b6ddbc9ef1edc198f21521059c0a51845716aa44e07c549de2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib security_session_",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-session-regressions-1.txt",
+          "sha256": "da31a358f7b424d8a26f5031d71bb9ff50eb62788835f6bc91d084d3053ef772"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC3",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib company_access_",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-company-regressions-1.txt",
+          "sha256": "896c554a3585541447f5c9dfe9b182df4385d44f1e03d6e2ec73438b5b375de7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib vault_storage_host_company_membership_and_user_deletion_preserve_other_accounts",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-vault-regressions-1.txt",
+          "sha256": "a6da664c3b3264e933e70c6cfb2a738ef6824d431221ded8295622b1255a310b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib memory_scope_competing_account_deletion_and_company_delete_never_deadlock",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-memory-regressions-1.txt",
+          "sha256": "c21df37b9966c34e0d2b9911fb35caa42c4e1c1b52104b9e0c907dd3aaaa7c7a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib workflow_action_reconciliation_attribution_",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-helper-regressions-1.txt",
+          "sha256": "796c478c939096334c96435b9fb94815a7ddb8c24df4311e3328ae8110dd046f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC6"
+      ],
+      "command": "/tmp/as-openbot-target/debug/deps/open_bots-fda01552d3c282dd attribution_sso_browser_ --ignored --nocapture",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-browser-2.txt",
+          "sha256": "655bec0f24f3ecb4f1f80d368a365b2a06d1ba43d27d7ec983649e3e0f055c1b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "(services/attribution) cargo build --locked --offline --bin attribution-service",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-binary-2.txt",
+          "sha256": "b8d7ff477760c328a58794ddf2d0abd70fb2c4ed1a37a760c47542aba6c794b5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "(services/attribution) python3.13 scripts/extracted-build.py foundation",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-extracted-2.txt",
+          "sha256": "b2e9b3cfd5ba9f2306e9ee5294a590d1fe203c7e4a4951214400bda5eae086b1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-source-modules-1.txt",
+          "sha256": "afb29498f5e8eae7353e670a29ffdcd7ff86b9f10e3b0f027c436991924dd405"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-check-3.txt",
+          "sha256": "008bcb5b9b15fe9810cb0f49914db4cf5129257cb6bf4c651e587f30187c43ff"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --locked --offline --all-targets",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-metadata-1.txt",
+          "sha256": "b28c3b57c648ef1ed0d2ea516df7093fed481960c8de03d15813f0e5c836ef68"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-format-1.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo check --locked --offline --all-targets",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-baseline-check.txt",
+          "sha256": "2c62e404b6db00000459f005f47672acf3c6e42f650e3c6c20df5ae0aa0c795d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::persistence::attribution::",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P03-root-http-1.txt",
+          "sha256": "f2800f98617ecd63adf447275444f95e49e4a452cea5e566c2781abc6671c6f2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "(services/attribution) cargo test --locked --offline --lib adapters::identity::",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-focused-4.txt",
+          "sha256": "8ed4f38ca05c483bb07a66bbb6824f793e9fabd211d6d2655124c5bbc2b819aa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "(services/attribution) python3.13 scripts/extracted-build.py foundation",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-extracted-1.txt",
+          "sha256": "edea6b8397938423a0d59dc841ffab9db00794ed1b42934c65ee412d083e4d20"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6"
+      ],
+      "command": "(services/attribution) python3 scripts/verify.py foundation",
+      "fixture": "Owned root as_p03_* and per-test open_bots_own_* or service as_test_*/as_verify_* PostgreSQL fixtures; see TASK/resources.json",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P03-service-gate-1.txt",
+          "sha256": "4410ed160022230582bddc06fc420ec7f197eed94fa0dce4c42451c5f0751c54"
+        }
+      ]
+    }
+  ]
+}

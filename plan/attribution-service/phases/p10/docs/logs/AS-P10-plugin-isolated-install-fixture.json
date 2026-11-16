@@ -1,0 +1,7 @@
+{
+  "directory": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-plugin-install-v105yul8",
+  "artifact_sha256": "5cdb500a915d6c36a6c51791816f6553e00e80faf4eb71b9b74dc436c36ac10d",
+  "node": "24.21.0",
+  "npm": "11.19.0",
+  "purpose": "Exact packaged artifact runtime install outside tool-preparation ancestor"
+}

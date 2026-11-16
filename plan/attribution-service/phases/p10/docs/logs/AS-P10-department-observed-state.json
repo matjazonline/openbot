@@ -1,0 +1,304 @@
+{
+  "command": [
+    "bash",
+    "scripts/test-network-isolation.sh",
+    "/tmp/as-openbot-target/debug/deps/open_bots-fda01552d3c282dd",
+    "department_directory_filters_by_one_department",
+    "--nocapture"
+  ],
+  "binary_sha256": "7e438d1774a4aebcc0a9d240cca78332edbad0c85c34f9429189c2ab704fe684",
+  "source_unchanged": true,
+  "observation": "Read-only pg_stat_activity and background_tasks snapshots; only application_name added to fixture URL; no lease changes or delay injection",
+  "database": "as_p10_observe_b74218d972a34641b9e77de85ad19622",
+  "observed_database": "open_bots_own_4560b54832ff4f19b43e707ba25a15a8",
+  "exit": 0,
+  "samples": [
+    {
+      "elapsed": 2.1653,
+      "state": {
+        "clock": "2026-11-16T20:03:16.071462+01:00",
+        "agent_count": 0,
+        "jobs": []
+      }
+    },
+    {
+      "elapsed": 2.3332,
+      "state": {
+        "clock": "2026-11-16T20:03:16.24291+01:00",
+        "agent_count": 0,
+        "jobs": []
+      }
+    },
+    {
+      "elapsed": 2.5054,
+      "state": {
+        "clock": "2026-11-16T20:03:16.414522+01:00",
+        "agent_count": 0,
+        "jobs": []
+      }
+    },
+    {
+      "elapsed": 2.6655,
+      "state": {
+        "clock": "2026-11-16T20:03:16.574756+01:00",
+        "agent_count": 0,
+        "jobs": []
+      }
+    },
+    {
+      "elapsed": 2.8166,
+      "state": {
+        "clock": "2026-11-16T20:03:16.72639+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 2.9884,
+      "state": {
+        "clock": "2026-11-16T20:03:16.898246+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.1465,
+      "state": {
+        "clock": "2026-11-16T20:03:17.055763+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.3064,
+      "state": {
+        "clock": "2026-11-16T20:03:17.215769+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.4657,
+      "state": {
+        "clock": "2026-11-16T20:03:17.375029+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.6329,
+      "state": {
+        "clock": "2026-11-16T20:03:17.54178+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.7909,
+      "state": {
+        "clock": "2026-11-16T20:03:17.699611+01:00",
+        "agent_count": 0,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 3.9481,
+      "state": {
+        "clock": "2026-11-16T20:03:17.857925+01:00",
+        "agent_count": 1,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.1009,
+      "state": {
+        "clock": "2026-11-16T20:03:18.010827+01:00",
+        "agent_count": 1,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.2547,
+      "state": {
+        "clock": "2026-11-16T20:03:18.164213+01:00",
+        "agent_count": 2,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.4246,
+      "state": {
+        "clock": "2026-11-16T20:03:18.333691+01:00",
+        "agent_count": 2,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.5998,
+      "state": {
+        "clock": "2026-11-16T20:03:18.509316+01:00",
+        "agent_count": 3,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.7529,
+      "state": {
+        "clock": "2026-11-16T20:03:18.662582+01:00",
+        "agent_count": 3,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 4.9054,
+      "state": {
+        "clock": "2026-11-16T20:03:18.814616+01:00",
+        "agent_count": 4,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 5.0621,
+      "state": {
+        "clock": "2026-11-16T20:03:18.97133+01:00",
+        "agent_count": 4,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 5.2186,
+      "state": {
+        "clock": "2026-11-16T20:03:19.128414+01:00",
+        "agent_count": 4,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    },
+    {
+      "elapsed": 5.3814,
+      "state": {
+        "clock": "2026-11-16T20:03:19.290175+01:00",
+        "agent_count": 4,
+        "jobs": [
+          {
+            "id": "d5b4ffe5-9ab6-4fce-a466-07b408aba744",
+            "status": "processing",
+            "expires": "2026-11-16T20:03:19.619974+01:00",
+            "expired": false
+          }
+        ]
+      }
+    }
+  ]
+}

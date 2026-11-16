@@ -6,16 +6,15 @@
 
 ## Outcome and dependency
 
-Depends on [06](06-website-tracking-and-checkout-handoff.md) and the selected checkout platform.
+Depends on [06](06-website-tracking-and-checkout-handoff.md) and the selected store-neutral merchant API contract.
 Verified paid orders produce stable ad/product attribution; retries, cancellation, refunds, and
 out-of-order delivery cannot duplicate revenue or silently change the chosen click.
 
 ## Batch 07A — Authenticate and durably deduplicate merchant events
 
-1. Implement `POST /v1/conversions` for scoped merchant credentials and the selected platform's
-   native callback adapter. Verify its actual signature over the raw bounded body, timestamp and
-   replay contract before parsing trusted order data. Capture click evidence in that platform's
-   server-controlled checkout metadata as proved in phase 06.
+1. Implement `POST /v1/conversions` for scoped merchant credentials. Authenticate the bounded
+   request before parsing trusted order data. Use the server-controlled checkout association
+   proved in phase 06. Native platform callbacks and their signature verification are later work.
 2. Normalize to paid-order, refund and cancellation events with store/external event ID, external
    order ID, order-created/paid/event timestamps, click evidence, currency and actual line items.
    Each line includes stable line/product IDs, quantity, discounted merchandise amount, and
@@ -28,10 +27,10 @@ out-of-order delivery cannot duplicate revenue or silently change the chosen cli
    Commit accepted event storage and any immediate order mutation in one transaction. A successful
    response implies durable storage; 202 may mean durably pending reconciliation, not a paid sale.
 5. Rate-limit and bound ingestion; use retryable failures for temporary storage/admission problems.
-   Ensure provider response semantics cause the expected retries. No browser endpoint can invoke
+   Document response semantics so merchant API clients perform safe retries. No browser endpoint can invoke
    this trusted path and no API-supplied tenant field overrides the authenticated store.
 
-Focused checks: `attribution_merchant_ingress_` for real provider signature fixtures, malformed totals,
+Focused checks: `attribution_merchant_ingress_` for merchant API authentication fixtures, malformed totals,
 foreign store/click, identical/conflicting retries, and multiple simultaneous deliveries of one
 event. Inject transaction failure and commit-acknowledgment loss; retries must leave one durable event.
 
@@ -55,7 +54,7 @@ event. Inject transaction failure and commit-acknowledgment loss; retries must l
    paid orders; refund and returned-unit counts are distinct metrics.
 5. A cancellation before payment creates no sale. Cancelling a paid order alone does not reverse
    revenue; a verified refund does. A valid out-of-order payment/refund/cancellation sequence must
-   converge on the same facts as ordered delivery, using provider facts rather than arrival order.
+   converge on the same facts as ordered delivery, using immutable merchant facts rather than arrival order.
 6. Durably retain events whose prerequisite paid fact has not arrived. Use a bounded supervised
    reconciliation loop in the same application, with database claims, attempt/deadline policy and
    observable unresolved state. Retry safely after crashes and lease loss; an early refund cannot
@@ -69,6 +68,6 @@ payment, cancel/payment reordering, missing prerequisite, worker recovery, lease
 versus reconciliation. Test the exact 30-day boundary, future clicks, multiple currencies and
 multi-product orders. Every concurrency protocol needs actual competing claimants.
 
-Completion: a real selected-store test purchase travels from tracking link to paid order and refund,
+Completion: a representative merchant fixture travels from tracking link to paid order and refund,
 and replay preserves exact amounts and attribution. Record batch commands/counts/results and any
-unavailable provider sandbox checks. Full-suite gate: [10](10-integration-verification-and-pilot.md).
+deferred native-provider sandbox checks. Full-suite gate: [10](10-integration-verification-and-pilot.md).

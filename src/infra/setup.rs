@@ -158,6 +158,7 @@ struct HttpComponents {
 fn http_state(f: foundation::Foundation, c: HttpComponents) -> anyhow::Result<AppState> {
     let p = f.persistence;
     Ok(AppState {
+        attribution: f.attribution,
         local_machine_connections: Arc::new(
             crate::adapters::http::routes::local_machine_connection::LocalMachineConnections::new(
                 p.clone(),

@@ -1,0 +1,26 @@
+Flag --keep-storage has been deprecated, keep-storage flag has been changed to reserved-space
+ID						RECLAIMABLE	SIZE		LAST ACCESSED
+0w7jc05e72k8xsdf5yq8pbpwt*              	true 		188MB     	41 minutes ago
+g5jh3xkxx5vfuzpqbmr81crc4*              	true 	1.188GB   	31 minutes ago
+bijuhswotjsa9foanqy3gid9i               	true 	1.626MB   	31 minutes ago
+5tqb4y6wxfed3yjxrh6tovt5o               	true 	383.2kB   	16 minutes ago
+w3wl60fhaif3wl2tbc3izkczf               	true 	37.97kB   	16 minutes ago
+dhnn5suukvcbiwicsh9yp076g               	true 	383.2kB   	16 minutes ago
+x0hfkgk4b5gheewyg01cmnies               	true 	37.97kB   	16 minutes ago
+l3tqm9u0woctnuxcqoz03l4nv               	true 	383.2kB   	16 minutes ago
+siw5uv67ncmm8aioq665hv0w5               	true 	37.97kB   	16 minutes ago
+2wuvl95i71kzzwz10iwke60qg               	true 	383.2kB   	16 minutes ago
+1a01czv2c3lnp5lvb2025fu6t*              	true 	8.192kB   	41 minutes ago
+gn281dlgp4n9v4vgvparlh8cm               	true 	37.97kB   	16 minutes ago
+9apyrnixxnh82fhy7czquzxuy*              	true 	25.89MB   	41 minutes ago
+nl2aq75twkape4ofig9ke7bck               	true 	383.2kB   	13 minutes ago
+ldgvcbu945al3pgk4lv3so2nw               	true 	37.96kB   	13 minutes ago
+k02m8h3rapbf11xek1jo3jt3x               	true 	24.4MB    	41 minutes ago
+pniil0udg9bgj2n6w70lbretg               	true 	352.3kB   	54 minutes ago
+pjxb5j07yc1nuw8yavqq3ok06               	true 	880.6kB   	54 minutes ago
+uk0yzjrcgyblosacuhzp4ztu1               	true 	127kB     	54 minutes ago
+po1sc1fqko82e5t2mrt2t7x8u               	true 	155.6kB   	54 minutes ago
+9min56qk4cipz4gqut1zmced9               	true 	383.2kB   	13 minutes ago
+vc3su6keyqaq8vrymag20v4t0*              	true 	8.192kB   	41 minutes ago
+msf411lw00epnh390wrs4rnuz*              	true 	506.6MB   	41 minutes ago
+Total:	1.938GB

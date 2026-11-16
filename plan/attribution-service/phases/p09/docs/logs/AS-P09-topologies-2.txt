@@ -1,0 +1,13 @@
+{"application": "ob", "base_image": "sha256:23fd1df4f0edbfe3a8205513523d466605ac0da2dc474844f254a2522ab46b4e", "trusted_image": "sha256:fc522c9a08feb6f4ab39ddcd3a96730544cde483a825584cfa3ea9bf882034c8"}
+{"application": "as", "base_image": "sha256:76154a6f0260239afe4e2b987d8f83f4b0ab1d9b3310258bd1a7fd1605557d29", "trusted_image": "sha256:ddf80793e7a4013082e23a03d0aaf86bb1edf3ed2efa273e01df8c215cb72e3b"}
+Topology: containers
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 294, in <module>
+    main()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 285, in main
+    f.start(); f.boundaries(); f.browser()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 153, in start
+    self.wait_http(self.openbot.removeprefix("https://"), "/login")
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 102, in wait_http
+    raise RuntimeError("readiness deadline: " + self.stage)
+RuntimeError: readiness deadline: actual applications and TLS readiness

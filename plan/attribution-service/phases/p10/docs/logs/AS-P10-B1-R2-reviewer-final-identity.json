@@ -1,0 +1,24 @@
+{
+  "artifact": "55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97",
+  "head_start_base": "6e55258cbbdc7633940805f366fb17fe240f02aa",
+  "exclusions": [
+    "plan/attribution-service/phases/p01/docs",
+    "plan/attribution-service/phases/p02/docs",
+    "plan/attribution-service/phases/p03/docs",
+    "plan/attribution-service/phases/p04/docs",
+    "plan/attribution-service/phases/p05/docs",
+    "plan/attribution-service/phases/p06/docs",
+    "plan/attribution-service/phases/p07/docs",
+    "plan/attribution-service/phases/p08/docs",
+    "plan/attribution-service/phases/p09/docs",
+    "plan/attribution-service/phases/p10/docs",
+    "plan/attribution-service/COORDINATION.md"
+  ],
+  "coordination_authority": "/Users/mac02/orca/workspaces/openbot/attribution-service/plan/attribution-service/COORDINATION.md",
+  "coordination_revision": 27,
+  "coordination_pin_equal": true,
+  "coordination_sha256": "30df3e1513a49734053d1d1b3c97ce0d22bc736db24e02bb6cc892d5ce6e7025",
+  "diff_check_exit": 0,
+  "source_edits_by_reviewer": false,
+  "additional_full_suites_by_reviewer": false
+}

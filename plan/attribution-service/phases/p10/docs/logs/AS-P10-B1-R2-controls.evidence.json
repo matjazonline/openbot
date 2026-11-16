@@ -1,0 +1,69 @@
+{
+  "version": 1,
+  "round": "AS-P10-B1-R2-controls",
+  "artifact": "55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97",
+  "checks": [
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Compile and run original-code focused baseline control",
+      "status": "FAIL",
+      "fixture": "6e55258c plus compile-only visibility repair; 1 pass / 16 failures; 15 Doop and provisioning reproduce",
+      "files": [
+        {
+          "path": "logs/AS-P10-baseline-control-build.txt",
+          "sha256": "be5e6f4e88d6aa580fd09e75e13469d5427e627972d38428605929a7b3f67aa9"
+        },
+        {
+          "path": "logs/AS-P10-prepared-baseline-control.json",
+          "sha256": "f5fdf9373921aab24f49b58b7d04062ef4784052c11acde4dd76faf8ea548a91"
+        },
+        {
+          "path": "logs/AS-P10-prepared-baseline-build.txt",
+          "sha256": "72882147e2cfd2d83cf88478e384cac58c4f82dfd53bc400656b3f3a6260bd82"
+        },
+        {
+          "path": "logs/AS-P10-prepared-baseline-tests.txt",
+          "sha256": "b4657d74f63cf9dac3ec7fdd9f633952b98988e07c9c04bac805063cff503882"
+        },
+        {
+          "path": "logs/AS-P10-baseline-control-disposition.json",
+          "sha256": "7dd9b1b053b42c3e7ab36ce28856ea81da31c6b7b37099260f8ee9c8bad809ad"
+        },
+        {
+          "path": "logs/AS-P10-baseline-dependency-features.json",
+          "sha256": "ec3eb7471232d85e364998f2c7a4c6203b22c9128808dcc769c72dabb5512845"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Run original knowledge fixture producer and compare actual browser inputs",
+      "status": "PASS",
+      "fixture": "All seven compared inputs byte-identical to current full-run fixture",
+      "files": [
+        {
+          "path": "logs/AS-P10-knowledge-baseline-compare.txt",
+          "sha256": "c120cfbcfa121316f6fbcb85049362a0a08c62bfa0f2db22df40167478da8cce"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Compare runner-discovered root test inventories",
+      "status": "PASS",
+      "fixture": "4244 original / 4257 current; 12 new ordinary and one new ignored browser; zero removals",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-test-inventory-delta.json",
+          "sha256": "b94c3d248df3395d30c51edbdd4e99bc794586d425d86cd04dbbbeba3f7fbb6d"
+        }
+      ]
+    }
+  ]
+}

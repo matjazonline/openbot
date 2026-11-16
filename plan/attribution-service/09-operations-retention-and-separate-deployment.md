@@ -16,7 +16,8 @@ the same API and identity contracts.
    lag, duplicate/conflicting events, unattributed reasons, pending reconciliation age, report
    latency, rate limits, identity failures and lifecycle freshness. Carry safe correlation IDs;
    never log tokens, full request bodies, authorization headers or PII-bearing URLs.
-2. Enforce the consent/retention policy from phase 01. Define separate lifetimes for raw clicks,
+2. Enforce the confirmed consent policy and explicit retention configuration. Production retention
+   and region remain deployment decisions; use documented fixture values for verification. Define separate lifetimes for raw clicks,
    observations, order/refund financial facts, event deduplication records, audit records, and
    tombstones. Retain the evidence needed for the attribution window and merchant retry/refund
    horizon; deleting deduplication rows must not make old deliveries count again.
@@ -34,7 +35,7 @@ the same API and identity contracts.
 
 Focused checks: `attribution_retention_`, `attribution_recovery_` and `attribution_limits_` with real
 database races, expiry boundaries, replay after pruning, process interruption and backup restore.
-Use representative load to measure the agreed targets. A raised resource limit must have a
+Use representative load to measure documented test targets; do not call them approved production SLOs. A raised resource limit must have a
 documented CI tripwire before the new limit is reached; do not weaken existing stack/lease budgets.
 
 ## Batch 09B — Prove the deployment and source boundaries

@@ -1,0 +1,27 @@
+[
+  {
+    "path": "src/adapters/persistence/workflow/doop_document_result_tests.rs",
+    "unchanged": true,
+    "sha256": "a31d90553475390af0c1d2d8efd2a816b409a2d57ed429e1f493276af4aaf958"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/doop_setup_tests.rs",
+    "unchanged": true,
+    "sha256": "8a7e6e4323b84ac3cf746ece4d5f4efa3fa92c18ca15224d0a5a778fbc659cfb"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+    "unchanged": true,
+    "sha256": "536de0562bf569abfa6bb3727459e58b42367aa89efed177b1f79c4e4a5b4a4d"
+  },
+  {
+    "path": "src/adapters/persistence/thread/test_support.rs",
+    "unchanged": true,
+    "sha256": "afe35192df27635b6c3f2b340c15791a974eaeb11d9b58ae8fe7c60a8bf50fa0"
+  },
+  {
+    "path": "src/adapters/persistence/inbound_event/mod.rs",
+    "unchanged": true,
+    "sha256": "a937b89811ce9291715ff0d509e7385f8a44ec3c76d7614bd9ff8d3d9007f884"
+  }
+]

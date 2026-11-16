@@ -1,0 +1,34 @@
+Decision r1 SHA256: 62324766f8ea1a6140bc8b448e510b5f75d57a414b859963124e34a3db9f8364
+Decision r2 SHA256: 4dbef90e5d7e2534198e4cb61d2f8b4f8f2f2e18f9d3433c460bad28f689492a
+Coordination revision14 pin equals authority: True
+Branch: attribution-service
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+--- D1/r1
++++ D1/r2
+@@ -1,9 +1,10 @@
+-## AS-P06-D1 / r1 — proposed architecture
++## AS-P06-D1 / r2 — proposed architecture
+ 
+ 1. Add local observations and checkouts to the reset-only initial schema. Observations
+    have installation+opaque event ID uniqueness, scoped company/store, received DB
+    time, claimed observed time, enum kind, related IDs, normalized fingerprint and
+-   immutable scoped dimensions. No visitor/customer identity, IP, URL, UA/referrer or
++   immutable scoped dimensions. The accepted frozen link destination may remain in
++   click dimensions; it is not a collected visitor page URL. No visitor/customer identity, IP, browser page URL, UA/referrer or
+    merchant key payload. Click and link references are checked under the accepted
+    tenant lock. Both present must identify the same link. Click observations reuse
+    its frozen dimensions; link-only observations snapshot current scoped dimensions.
+@@ -67,7 +68,9 @@
+    observeVisible(element,link_id). Construction captures/validates ob_click only in
+    memory and removes that parameter via URL/history while preserving others/fragment.
+    It reads/writes no optional persistent storage and sends no observation until
+-   explicit consent. Granted consent records one landing event, merges at most32
++   explicit consent. Granted consent records one landing event only when a captured or consented
++   retained click supplies the required scoped reference; otherwise it sends no
++   landing observation. It merges at most32
+    candidate IDs using installation-scoped per-click localStorage keys, expires local
+    evidence30 days after capture, and exposes only consent/candidate IDs to the shop.
+    Per-click keys avoid lost updates between tabs; re-read on handoff. Storage failures
+git diff --check exit: 0
+
+

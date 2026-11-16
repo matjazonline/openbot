@@ -1,0 +1,7 @@
+Decision SHA256: ab5267ed4b857447ccae0fdf1a6b83dffa0fce2ffd646dd44790cdea01b89d85
+Source snapshot digest: fd40f4807955c2e19c00ab9d864c2a0ce84566088e99743b84f9338a7ce7d30c
+HEAD: 2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+Branch: attribution-service
+Coordination pinned revision5 byte comparison: PASS
+Applicable notices: AS-C001/r1, AS-C002/r1
+git diff --check: PASS

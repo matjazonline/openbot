@@ -1,0 +1,45 @@
+
+running 1 test
+test adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4243 filtered out; finished in 0.01s
+
+
+Prepared baseline vs current actual knowledge browser inputs:
+[
+  {
+    "path": "knowledge.html",
+    "identical": true,
+    "sha256": "0e20fd80237a8a02118a0fb544bdac9925af009af442a86e01f7ab33b1ee0a6a"
+  },
+  {
+    "path": "app.js",
+    "identical": true,
+    "sha256": "216060c18b6d652c6a45804cbbdf742658edc4337af05daec10c325a3b66f8b2"
+  },
+  {
+    "path": "theme-init.js",
+    "identical": true,
+    "sha256": "b23ad4c72d7f288bfa1df3666ae18c4087fb8f6118f6b4187b3173bd4705c0c6"
+  },
+  {
+    "path": "scripts/tests/knowledge-browser.mjs",
+    "identical": true,
+    "sha256": "070c3bfb597932b7df852e0be275fdc1453c544bc69f6cec045f7552065da99a"
+  },
+  {
+    "path": "assets/app.css",
+    "identical": true,
+    "sha256": "ea364305220d7577c7ae85c09003651144303d372aa9e9fdaee02ad13857b53c"
+  },
+  {
+    "path": "assets/htmx-2.0.4.min.js",
+    "identical": true,
+    "sha256": "e209dda5c8235479f3166defc7750e1dbcd5a5c1808b7792fc2e6733768fb447"
+  },
+  {
+    "path": "assets/htmx-ext-sse-2.2.3.js",
+    "identical": true,
+    "sha256": "83eca6fa0611fe2b0bf1700b424b88b5eced38ef448ef9760a2ea08fbc875611"
+  }
+]

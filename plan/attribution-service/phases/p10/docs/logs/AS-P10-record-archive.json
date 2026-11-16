@@ -1,0 +1,14 @@
+[
+  {
+    "path": "plan/attribution-service/phases/p08/docs/logs/AS-P08-openbot-image-preparation-2.txt",
+    "old_sha256": "932a174f143bd20fb504e2b58f9f387378ee02f3cd2773a610d24474ed13e2ad",
+    "authoritative_sha256": "d62dd6d6f7299014f0e15e390dc11aaae3c77726c7713d0e8ee4019bdb1ee788",
+    "archive": "logs/AS-P10-pretransfer-record-archive/p08/logs/AS-P08-openbot-image-preparation-2.txt"
+  },
+  {
+    "path": "plan/attribution-service/phases/p09/docs/logs/AS-P09-openbot-production-12g.txt",
+    "old_sha256": "a80e72e8bd2dc34abe552e82a02f584834742516506010fd40d8f5e8861d4f79",
+    "authoritative_sha256": "e4d9e5ab9533aa4cf31387a7458aba27d215a30a5987458d73d2cb3dbe2d1e1d",
+    "archive": "logs/AS-P10-pretransfer-record-archive/p09/logs/AS-P09-openbot-production-12g.txt"
+  }
+]

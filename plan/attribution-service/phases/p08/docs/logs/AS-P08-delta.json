@@ -1,0 +1,177 @@
+[
+  {
+    "path": ".github/workflows/attribution-service.yml",
+    "before": "c6871b68ebdb1a219b6241d0b9d3e2df6740ce2678acc07bc798a2c8487cbcff",
+    "after": "c6ff6364f7da67d37e1c6d10bb79c333f1c7d145a5df52cf7c283416fe55e4de"
+  },
+  {
+    "path": ".trail/learnings/2026-11-16-aggregate-report-measures-before-joining-nullable-mac02.md",
+    "before": null,
+    "after": "6ccde0a21f42141b401f2b8c6cd8cb5bafed6c854ff78b1667189c63bcd6e99c"
+  },
+  {
+    "path": "services/attribution/README.md",
+    "before": "6890d97b712b37384feeb29b38972c4d51c5ebe417e436a02875768fa811e9b6",
+    "after": "aaa45f7117f0ef9a90dabb63dbff3ec5f81f10734620ba3c5e411e1b33203ad5"
+  },
+  {
+    "path": "services/attribution/REPORTING.md",
+    "before": null,
+    "after": "a6ff1739944c925fe6eaca4c35be71bb49bee70a456a9455c0be541d17ccffcc"
+  },
+  {
+    "path": "services/attribution/assets/reports.css",
+    "before": null,
+    "after": "bfc4c73a8a1c77531b6f68dc2e58f22f18041302a8d5618fb55d7ac9c9d53082"
+  },
+  {
+    "path": "services/attribution/assets/reports.js",
+    "before": null,
+    "after": "3a5d7dcf95525a8e79b8d35b803f327de157977803c525ada9dc8c666bd60099"
+  },
+  {
+    "path": "services/attribution/browser/reports.mjs",
+    "before": null,
+    "after": "25b5a59bf330dfe253ee9d1d731b77f65fc168ddad829ab1a24a0d0a17ee718e"
+  },
+  {
+    "path": "services/attribution/contract/README.md",
+    "before": "84e61bd3817857c0cf283335b564ca847e4c421b1df401536ace19959b45ed34",
+    "after": "465668368336906220976e7418414acaa17dfcda3e9fcb820c4451f04fdff63c"
+  },
+  {
+    "path": "services/attribution/contract/attribution.openapi.json",
+    "before": "f0146e5a5a72c9191ed83b7ad2af3a50aa93ce00022c534bbef54ff01499ed5b",
+    "after": "133d0022a1d837121776fcde26eea885c80b3980a7227009278853352300c755"
+  },
+  {
+    "path": "services/attribution/scripts/boundary.py",
+    "before": "d6a5a84c067a617288e9bd6b740db1db08bcd2bc98ae70a7dd46043f82b19710",
+    "after": "10a7c963ae69eceb4a79640d5611c11d35d1e9d67e34ae0c04a43865183b22b7"
+  },
+  {
+    "path": "services/attribution/scripts/test_boundary.py",
+    "before": "8d8eefadc3778a0ca3df99121987e40355facffd202112443f33e3fd0c80961f",
+    "after": "565220e3d40f22baf93b5aa5ba07dcc81cd0eb843caf0ff4dcb4db4acc50ca92"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/bounds_tests.rs",
+    "before": null,
+    "after": "4edb3a72d83929c0050a21f33981feb15b30740a001c6494326650f788777f39"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/browser_tests.rs",
+    "before": null,
+    "after": "f2f37749e801aa82522a9c06c20108e55f4a7db0049619599cce0fbdc79470fe"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/dashboard.rs",
+    "before": null,
+    "after": "520c3ee4ea599377713b039dfc5a85fd927ee7621e890fc9979254a3c2e22309"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/export.rs",
+    "before": null,
+    "after": "85cbf2b4534e2d15bbfafd9bd3d31562ff6436aba1f0cac68b304024bd86e801"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/http.rs",
+    "before": null,
+    "after": "b5b4ebd926dccc4fbaf01a7718f4d5a784a7d6b4483c06981e0f04c01a6d7819"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/http_tests.rs",
+    "before": null,
+    "after": "26c12d2bb407e4f5203d675b5341533715ab2575b9b06635aa3ef363d03c9a97"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/mod.rs",
+    "before": null,
+    "after": "4674681ecc24f288b946cec91410328bab45a170bd1c8650d9f373b9fce67958"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/postgres.rs",
+    "before": null,
+    "after": "9ea622ae6cbd9d68d7ba61efa6eb168babbe841769eda12d0a6d73bac13e25d4"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/query.rs",
+    "before": null,
+    "after": "02883a950007a6859878f26b2bb29393416e719ae825396c6bff2c86bb282297"
+  },
+  {
+    "path": "services/attribution/src/adapters/analytics/views.rs",
+    "before": null,
+    "after": "a21d112572c1420cd902f4cde3f10618f3d3e5178a29d876c6ac1c1b702bbc60"
+  },
+  {
+    "path": "services/attribution/src/adapters/catalog/http.rs",
+    "before": "e32b5be385be8ce6a357ce7b0b5d967f70a3e15af677a03fe7342cea09364ed9",
+    "after": "a180120c739ae3411dbd1f94c5327b6fa5f688ee98e69680eb6f0646e764ee49"
+  },
+  {
+    "path": "services/attribution/src/adapters/catalog/http_tests.rs",
+    "before": "47b7cf9d283b3e2167580c25e9c86a12ceebcc8cf45dfaaf74e84800cbdce934",
+    "after": "2805266c89ba658a81197ac5559158b987f20392003f33af5b634649b109de66"
+  },
+  {
+    "path": "services/attribution/src/adapters/catalog/postgres.rs",
+    "before": "9a531797c82d359b8e58bbbb0d92a8480dce46892a0d524b7c8a45098a8755b0",
+    "after": "fb3fbeac2099dded6213b4bca972324ca97907db48b7cb3e3b6924e198a011aa"
+  },
+  {
+    "path": "services/attribution/src/adapters/commerce/http_tests.rs",
+    "before": "a554beca0469938d330ea82d103176b673c70a410102d6e27d3f9e0317092e6a",
+    "after": "8c42471dd7c50dbee42b62e0e0a0e6574057e76aff78b83afe1cb601f7566667"
+  },
+  {
+    "path": "services/attribution/src/adapters/commerce/mod.rs",
+    "before": "6c7566a59b7a7885253592744290bf226d8f0dfef4470b8e659baae2dd51220d",
+    "after": "bd446ab17942b76b6a346790893bdde3846c394350ebebcfb6324d739be5b936"
+  },
+  {
+    "path": "services/attribution/src/adapters/commerce/reads.rs",
+    "before": "01feeab5383c95e22e40eb27e539c5c3b85d4589b7fbe4d01be71eff3a5023ba",
+    "after": "a7f5c58041f24f39f0e8ab089bd61517919cbc499a33e507ef546139d083061e"
+  },
+  {
+    "path": "services/attribution/src/adapters/html.rs",
+    "before": null,
+    "after": "9daa03fc75c6d3fc1c5bdfdec27037f70827f26b0a2d31ae1ad7dc1b713fb79f"
+  },
+  {
+    "path": "services/attribution/src/adapters/http.rs",
+    "before": "a9651b5f00a4e1bae6d5701f597fece370f50b9597bc48b3c6672ee4033b20b0",
+    "after": "6ed31ec739376af91f7ed768b43b448b5d5e0daa808eb3b447173c00f722dcaa"
+  },
+  {
+    "path": "services/attribution/src/adapters/http_tests.rs",
+    "before": "02416538de02eee2c5b8e5fe132cc075b13e9479bac2488d64679dbd11cb1762",
+    "after": "951bd27b604f513019652ef0e3f8dde6b1b0fcecc75872fd4690cc94038d945c"
+  },
+  {
+    "path": "services/attribution/src/adapters/identity/http.rs",
+    "before": "81cc8fe6399d1cfc3145ce23995a058460c35991181f2eef37be96759f180067",
+    "after": "8f15174e3e430a0b81d2c6dde18c02b3516f8194ec9713abc16df39f2bda98f7"
+  },
+  {
+    "path": "services/attribution/src/adapters/management.rs",
+    "before": "f145e9f6486124abbd9ed062b8367766be98a59fb78c893fe609def306713c33",
+    "after": "b54e27d339646a29388fb98643fdeffa81c00891f4d06a523600ad35ad78f4c4"
+  },
+  {
+    "path": "services/attribution/src/adapters/mod.rs",
+    "before": "4270c7ba9665f8f69cd97598887fbd524f13285870b4f0f69d2470ed67f8a85c",
+    "after": "4844ebef9acde313d7f4dae98d64ec695b7bba83f01fe99cf0abb3d1481f059b"
+  },
+  {
+    "path": "services/attribution/src/application/analytics.rs",
+    "before": null,
+    "after": "953094e527f5ce588347d67f76c70846e74826be6107f897a1e431ebb6c0bf5b"
+  },
+  {
+    "path": "services/attribution/src/application/mod.rs",
+    "before": "15ac38e0256e6a9721b055fc6faea141452c2e5cc7bd0aea2e0d47c1db4c1a9d",
+    "after": "ff09327d8028c533dc1e42ff42c11c511ead23cfa68c412bfd4b39fdbe9ff681"
+  }
+]

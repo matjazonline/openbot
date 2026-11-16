@@ -1,0 +1,4 @@
+Start/end source 868a58789f2d34aa43c62256bd6a480c8096613ba7f2dd70b496b6d2561d2339: PASS
+HEAD/start/base 6e55258cbbdc7633940805f366fb17fe240f02aa: PASS
+Main coordination26 byte-equal pinned C001-C008/r1: PASS SHA256 f3216cec0da45c2afbece6b6498fce3a2a0b6c0fbd0fe7d6638983847559101d
+git diff --check PASS

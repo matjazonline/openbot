@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "round": "AS-P09-B1-R2",
+  "artifact": "542b32ae822314eb5a16050b153fa4e7a625cfc7380d2b66a9298d79fbdb5d9d",
+  "checks": [
+    {
+      "criteria": [
+        "AC6",
+        "AC7",
+        "AS-P09-B1-F1",
+        "AS-P09-B1-F2"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "UUID containers, ephemeral CA, actual Openbot debug/attribution release images, both layouts; task-owned Colima12GiB",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P09-topologies-12.txt",
+          "sha256": "3998435e61e42dcac24960165eafb4c209e6aeda92ff1eafd44839c722c69573"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC7",
+        "AS-P09-B1-F1",
+        "AS-P09-B1-F2"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "UUID containers, ephemeral CA, actual Openbot debug/attribution release images, both layouts; task-owned Colima12GiB",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P09-topologies-13.txt",
+          "sha256": "d3786507c1886cbb0901724154f4eb6d768c7d6ce92fd952b957ebef5835e6c0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC6",
+        "AC7",
+        "AS-P09-B1-F1",
+        "AS-P09-B1-F2"
+      ],
+      "command": "python3 scripts/attribution/topology.py",
+      "fixture": "UUID containers, ephemeral CA, actual Openbot debug/attribution release images, both layouts; task-owned Colima12GiB",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P09-topologies-14.txt",
+          "sha256": "555edd2afa33d14812cb0def752e73d83aa631e1b9d7d4bbec38beb3bcae5526"
+        }
+      ]
+    }
+  ]
+}

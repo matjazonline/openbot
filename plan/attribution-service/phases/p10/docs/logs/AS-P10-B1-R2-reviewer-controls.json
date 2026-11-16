@@ -1,0 +1,20 @@
+{
+  "files_checked": 16689,
+  "differences": [
+    "src/application/workflow/actions/reconciliation/contracts.rs"
+  ],
+  "missing": [],
+  "preparation": {
+    "path": "src/application/workflow/actions/reconciliation/contracts.rs",
+    "change": "pub(crate) to pub(super) on reconciliation invalid helper only; exact same previously accepted compilation prerequisite as implementation",
+    "original_sha256": "5eed33855045b87e908f7153140070c2fab8c8087b818310621eb3ef2432e558",
+    "prepared_sha256": "fbe5aabe822831bad8e6115e28897e4fa6e4a311ced034ca624fdf6f8db67629",
+    "runtime_bodies_changed": false
+  },
+  "knowledge_seven_inputs_independently_equal": true,
+  "coordination_r27_pin_equal": true,
+  "original_sha256": "5eed33855045b87e908f7153140070c2fab8c8087b818310621eb3ef2432e558",
+  "prepared_sha256": "fbe5aabe822831bad8e6115e28897e4fa6e4a311ced034ca624fdf6f8db67629",
+  "prepared_same_as_current": true,
+  "diff": "--- \n+++ \n@@ -304,7 +304,7 @@\n     pub replayed: bool,\n }\n \n-pub(crate) fn invalid() -> AppError {\n+pub(super) fn invalid() -> AppError {\n     AppError::BadRequest(\"Invalid workflow reconciliation evidence\".into())\n }\n pub(crate) fn hash(value: &Value) -> AppResult<String> {\n"
+}

@@ -1,0 +1,33 @@
+==> Doop runner boundaries
+...................Managed package ready: 8d2a2391003c10df795e60d553b68731883341e6752ee432f8b0a3d7a92414d2
+...Managed source ready: 2268f287dc2c7eca8c864cd6301f3fd5eb213c1f5ca2d2320544bcb2e174fded
+.....E..................
+======================================================================
+ERROR: test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes (__main__.ImageAndPackageTests.test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/tests/doop-test.py", line 597, in test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes
+    with tls.client.wrap_socket(raw, server_hostname="localhost") as secure:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 469, in wrap_socket
+    return self.sslsocket_class._create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<5 lines>...
+        session=session
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1087, in _create
+    self.do_handshake()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1383, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Missing Authority Key Identifier (_ssl.c:1035)
+
+----------------------------------------------------------------------
+Ran 46 tests in 6.245s
+
+FAILED (errors=1)

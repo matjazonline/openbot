@@ -1,0 +1,15 @@
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/verify.py", line 51, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/verify.py", line 26, in main
+    with database() as url:
+         ~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/contextlib.py", line 141, in __enter__
+    return next(self.gen)
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/fixture.py", line 37, in database
+    sql(admin, f"CREATE ROLE {name} LOGIN PASSWORD '{secret}' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;")
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution/scripts/fixture.py", line 17, in sql
+    raise RuntimeError("owned fixture SQL failed; check maintenance access")
+RuntimeError: owned fixture SQL failed; check maintenance access

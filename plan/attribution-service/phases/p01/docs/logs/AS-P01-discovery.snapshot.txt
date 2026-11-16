@@ -1,0 +1,4 @@
+base:   2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+digest: 0a3f44130cada7b6467926621da786841d0af591c1d52fd94ffdfb946080305f
+files:
+  plan/attribution-service/01-application-boundaries-and-contracts.md

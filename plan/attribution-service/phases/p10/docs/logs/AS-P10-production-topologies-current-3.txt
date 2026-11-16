@@ -1,0 +1,8 @@
+{"application": "ob", "base_image": "sha256:3878bace5965db7bac94bda67d8b02a9a254472445c594da7643fbcf5f63a4e0", "trusted_image": "sha256:0d01ff32fa081780cdc6eb66a9a49342320a4e4c608695d0300a34e3ae5b7669"}
+{"application": "as", "base_image": "sha256:5930cc9c26d6352632305eb09f2c59400fcfc521a465b78a320d6e8e1b060d8b", "trusted_image": "sha256:577328131b704a2493a634334826ae325fb3092ba94679da3ad95f02511adf2d"}
+Topology: containers
+PASS network namespaces: private database ports denied; no filesystem mounts; untrusted TLS denied
+PASS actual HTTPS Openbot SSO, independent cookies, scoped merchant setup, durable redirect, consent checkout, purchase replay, refund, API/dashboard ledger, warm outage, forced durable freshness expiry, cold restart, reconciled recovery
+Topology: separate-networks
+PASS network namespaces: private database ports denied; no filesystem mounts; untrusted TLS denied; cross-application plaintext ports and non-bridge HTTPS paths denied
+PASS actual HTTPS Openbot SSO, independent cookies, scoped merchant setup, durable redirect, consent checkout, purchase replay, refund, API/dashboard ledger, warm outage, forced durable freshness expiry, cold restart, reconciled recovery

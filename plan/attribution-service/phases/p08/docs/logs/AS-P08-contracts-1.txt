@@ -1,0 +1,20 @@
+test_attribution_contract_ad_product_update_preserves_absent_and_clear (__main__.AttributionContracts.test_attribution_contract_ad_product_update_preserves_absent_and_clear) ... ok
+test_attribution_contract_both_openapi_documents_validate (__main__.AttributionContracts.test_attribution_contract_both_openapi_documents_validate) ... ok
+test_attribution_contract_bounds_and_errors_are_declared_for_all_routes (__main__.AttributionContracts.test_attribution_contract_bounds_and_errors_are_declared_for_all_routes) ... ok
+test_attribution_contract_every_management_mutation_has_a_retry_identity (__main__.AttributionContracts.test_attribution_contract_every_management_mutation_has_a_retry_identity) ... ok
+test_attribution_contract_examples_match_wire_schemas (__main__.AttributionContracts.test_attribution_contract_examples_match_wire_schemas) ... ok
+test_attribution_contract_identity_pkce_and_credential_classes (__main__.AttributionContracts.test_attribution_contract_identity_pkce_and_credential_classes) ... ok
+test_attribution_contract_lost_key_response_replays_metadata_without_secret (__main__.AttributionContracts.test_attribution_contract_lost_key_response_replays_metadata_without_secret) ... ok
+test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant (__main__.AttributionContracts.test_attribution_contract_merchant_payloads_cannot_select_actor_or_tenant) ... ok
+test_attribution_contract_money_currency_and_collection_bounds (__main__.AttributionContracts.test_attribution_contract_money_currency_and_collection_bounds) ... ok
+test_attribution_contract_pixel_retry_clock_and_explicit_head (__main__.AttributionContracts.test_attribution_contract_pixel_retry_clock_and_explicit_head) ... ok
+test_attribution_contract_public_observations_cannot_describe_sales (__main__.AttributionContracts.test_attribution_contract_public_observations_cannot_describe_sales) ... ok
+test_attribution_contract_refund_business_identity_example_is_discriminating (__main__.AttributionContracts.test_attribution_contract_refund_business_identity_example_is_discriminating) ... ok
+test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds (__main__.AttributionContracts.test_attribution_contract_reports_distinguish_reasons_and_monetary_refunds) ... ok
+test_attribution_contract_sdk_integrity_matches_pinned_asset (__main__.AttributionContracts.test_attribution_contract_sdk_integrity_matches_pinned_asset) ... ok
+test_attribution_contract_two_ad_product_refund_ledger_reconciles (__main__.AttributionContracts.test_attribution_contract_two_ad_product_refund_ledger_reconciles) ... ok
+
+----------------------------------------------------------------------
+Ran 15 tests in 0.447s
+
+OK

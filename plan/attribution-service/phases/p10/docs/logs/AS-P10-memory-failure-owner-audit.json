@@ -1,0 +1,18 @@
+{
+  "services/memory/Cargo.toml": {
+    "sha256": "ad40c351977470ef58564bf870201e846e17a1165ae4c7b6850852e41b351bc5",
+    "matches_HEAD": true
+  },
+  "services/memory/Cargo.lock": {
+    "sha256": "5eaa4904c2fbd95a48647fb6f7fca9526acc90f444e8696c76bdd0821e684b7e",
+    "matches_HEAD": true
+  },
+  "services/memory/src/adapters/postgres/search_tests.rs": {
+    "sha256": "8693840c166b2f9cd5f6a7dffb796aa1d2510fb87a300e08880ae8fc43f3aa66",
+    "matches_HEAD": true
+  },
+  "services/memory/src/adapters/postgres/search.rs": {
+    "sha256": "0e31b56586b0453b32c4f9abdd88ccaaee14a19241a75950e78cf53e4b699fe8",
+    "matches_HEAD": true
+  }
+}

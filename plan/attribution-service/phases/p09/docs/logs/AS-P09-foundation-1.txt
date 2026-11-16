@@ -1,0 +1,64 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (59.25275ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.47.0
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.17
+   Compiling aws-lc-rs v1.19.0
+   Compiling sqlx-core v0.8.6
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+    Checking sqlx v0.8.6
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 23.54s
++ cargo fmt --all -- --check
+Diff in /private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/src/adapters/identity/../commerce/../retention/tests.rs:268:
+     // Tracing callsite interest is process-global. A separate test process makes
+     // capture independent of other tests registering callsites with no subscriber.
+     if std::env::var_os("ATTRIBUTION_LOG_FIXTURE_CHILD").is_some() {
+-        tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap()
++        tokio::runtime::Builder::new_current_thread()
++            .enable_all()
++            .build()
++            .unwrap()
+             .block_on(operational_signals());
+     } else {
+-        let module=module_path!().split_once("::").unwrap().1;
+-        let test=format!("{module}::attribution_limits_operational_signals_never_capture_request_secrets");
+-        let output=std::process::Command::new(std::env::current_exe().unwrap())
+-            .args(["--exact",&test,"--nocapture"]).env("ATTRIBUTION_LOG_FIXTURE_CHILD","1").output().unwrap();
+-        assert!(output.status.success(),"{}\n{}",String::from_utf8_lossy(&output.stdout),String::from_utf8_lossy(&output.stderr));
++        let module = module_path!().split_once("::").unwrap().1;
++        let test = format!(
++            "{module}::attribution_limits_operational_signals_never_capture_request_secrets"
++        );
++        let output = std::process::Command::new(std::env::current_exe().unwrap())
++            .args(["--exact", &test, "--nocapture"])
++            .env("ATTRIBUTION_LOG_FIXTURE_CHILD", "1")
++            .output()
++            .unwrap();
++        assert!(
++            output.status.success(),
++            "{}\n{}",
++            String::from_utf8_lossy(&output.stdout),
++            String::from_utf8_lossy(&output.stderr)
++        );
+         assert!(String::from_utf8_lossy(&output.stdout).contains("1 passed"));
+     }
+ }
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 51, in <module>
+    main()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 35, in main
+    run("cargo", "fmt", "--all", "--", "--check", env=offline)
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 15, in run
+    result = subprocess.run(args, cwd=ROOT, env=env, check=True, text=True,
+  File "/Library/Developer/CommandLineTools/Library/Frameworks/Python3.framework/Versions/3.9/lib/python3.9/subprocess.py", line 528, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('cargo', 'fmt', '--all', '--', '--check')' returned non-zero exit status 1.

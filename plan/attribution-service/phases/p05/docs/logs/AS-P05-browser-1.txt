@@ -1,0 +1,25 @@
+    Finished `test` profile [unoptimized] target(s) in 0.15s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+
+
+thread 'adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres' (22841845) panicked at src/adapters/identity/../setup/http_tests.rs:1242:5:
+FAIL: setup browser stage catalog edits and tracked browser navigation: TimeoutError: page.waitForURL: Timeout 30000ms exceeded.
+=========================== logs ===========================
+waiting for navigation to "https://shop.merchant.com/**" until "load"
+============================================================
+Setup status: Saved.
+Setup error: The response could not be confirmed. Retry the same request if offered; otherwise refresh the current setup.
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 65 filtered out; finished in 32.09s
+
+error: test failed, to rerun pass `--lib`

@@ -1,0 +1,21 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 3.59s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 1 test
+
+
+thread 'adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres' (22538334) panicked at src/adapters/identity/../setup/http_tests.rs:1242:5:
+FAIL: setup browser stage public installation without server credentials: TimeoutError
+
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres ... FAILED
+
+failures:
+
+failures:
+    adapters::identity::http_tests::setup_tests::attribution_setup_browser_real_forms_and_postgres
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 50 filtered out; finished in 31.26s
+
+error: test failed, to rerun pass `--lib`

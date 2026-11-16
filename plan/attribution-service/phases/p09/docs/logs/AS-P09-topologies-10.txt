@@ -1,0 +1,77 @@
+{"application": "ob", "base_image": "sha256:23fd1df4f0edbfe3a8205513523d466605ac0da2dc474844f254a2522ab46b4e", "trusted_image": "sha256:75e76026a3357efe3a3e4be4139cbcb78f6ff473e343ec95a4b0d8110697410d"}
+{"application": "as", "base_image": "sha256:f4471b5d97c52e317347a25761aa4a76c4da3e27ca27550dc6f236a0a0ce4544", "trusted_image": "sha256:be8bb471e5b122c9bc1e7416afebbb08f8f5b1cc5b83e2c4706b9b7470758c58"}
+Topology: containers
+PASS network namespaces: private database ports denied; no filesystem mounts; untrusted TLS denied
+Fixture diagnostic obdb: 2026-11-16 16:11:03.056 UTC [65] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 16:11:03.154 UTC [1] LOG:  starting PostgreSQL 18.3 (Debian 18.3-1.pgdg12+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-11-16 16:11:03.154 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 16:11:03.154 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 16:11:03.155 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 16:11:03.162 UTC [91] LOG:  database system was shut down at 2026-11-16 16:11:03 UTC
+2026-11-16 16:11:03.164 UTC [1] LOG:  database system is ready to accept connections
+
+Fixture diagnostic asdb: 2026-11-16 16:11:04.107 UTC [64] LOG:  database system is shut down
+ done
+server stopped
+
+PostgreSQL init process complete; ready for start up.
+
+2026-11-16 16:11:04.211 UTC [1] LOG:  starting PostgreSQL 18.3 (Debian 18.3-1.pgdg12+1) on aarch64-unknown-linux-gnu, compiled by gcc (Debian 12.2.0-14+deb12u1) 12.2.0, 64-bit
+2026-11-16 16:11:04.211 UTC [1] LOG:  listening on IPv4 address "0.0.0.0", port 5432
+2026-11-16 16:11:04.211 UTC [1] LOG:  listening on IPv6 address "::", port 5432
+2026-11-16 16:11:04.212 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
+2026-11-16 16:11:04.217 UTC [90] LOG:  database system was shut down at 2026-11-16 16:11:04 UTC
+2026-11-16 16:11:04.220 UTC [1] LOG:  database system is ready to accept connections
+
+Fixture diagnostic gateway: 2026/11/16 16:11:21 [error] 17#17: *133 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:21 [error] 17#17: *135 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:21 [error] 17#17: *137 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:22 [error] 17#17: *139 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:22 [error] 17#17: *141 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:22 [error] 17#17: *143 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:22 [error] 17#17: *145 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:23 [error] 17#17: *147 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:23 [error] 17#17: *149 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:23 [error] 17#17: *151 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:23 [error] 17#17: *153 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+2026/11/16 16:11:23 [error] 17#17: *155 connect() failed (111: Connection refused) while connecting to upstream, client: 172.19.0.1, server: openbot.fixture.test, request: "GET /login HTTP/1.1", upstream: "[url] host: "[redacted]"
+
+Fixture diagnostic ob:   [2m2026-11-16T16:11:31.054628Z[0m [32m INFO[0m  [32mActionable notification projector shutting down[0m
+    [2;3mat[0m src/application/services/notification_worker.rs:70
+
+  [2m2026-11-16T16:11:31.054757Z[0m [32m INFO[0m  [32mThread message listener shutting down[0m
+    [2;3mat[0m src/infra/events.rs:221
+
+  [2m2026-11-16T16:11:31.054835Z[0m [32m INFO[0m  [32mRuntime metric sampler stopped, [1;32mbuffered_samples[0m[32m: 0[0m
+    [2;3mat[0m src/application/services/runtime_metrics.rs:175
+
+  [2m2026-11-16T16:11:31.054878Z[0m [32m INFO[0m  [32mShutdown signal received. Stopping the delivery worker...[0m
+    [2;3mat[0m src/application/services/delivery_worker.rs:133
+
+
+Fixture diagnostic as: {"timestamp":"2026-11-16T16:11:31.006031Z","level":"INFO","fields":{"message":"request completed","operation":"report","request_id":"8fd4db3b-3320-413d-b66c-a8b365a2db59","status":200,"elapsed_ms":"8"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:31.010436Z","level":"INFO","fields":{"message":"request completed","operation":"management","request_id":"ca856050-d6ea-4aa3-810f-e78a98683864","status":200,"elapsed_ms":"0"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:31.010545Z","level":"INFO","fields":{"message":"request completed","operation":"management","request_id":"369600b2-1298-493c-b61e-626f12312c31","status":200,"elapsed_ms":"0"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:31.011260Z","level":"INFO","fields":{"message":"request completed","operation":"management","request_id":"1dee54bd-c852-4059-87b7-f9eaee3f333b","status":200,"elapsed_ms":"0"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:33.368190Z","level":"INFO","fields":{"message":"request completed","operation":"identity","request_id":"fb8a9a47-4dd8-4511-8851-2947ea44e0ad","status":503,"elapsed_ms":"2003"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:33.371865Z","level":"INFO","fields":{"message":"request completed","operation":"checkout","request_id":"82aa7f9f-d882-4d51-ad6b-eda1e07f35a8","status":200,"elapsed_ms":"1"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:33.427300Z","level":"INFO","fields":{"message":"request completed","operation":"checkout","request_id":"92cd038a-caae-46a4-a752-ff62d08d4012","status":503,"elapsed_ms":"0"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:33.428632Z","level":"INFO","fields":{"message":"request completed","operation":"redirect","request_id":"1f3915e2-0081-4976-8a17-8b6f59ba8b59","status":503,"elapsed_ms":"0"},"target":"attribution_service::adapters::http"}
+{"timestamp":"2026-11-16T16:11:33.622160Z","level":"WARN","fields":{"message":"No backward compatibility: incompatible schemas require an operator-managed database reset"},"target":"attribution_service"}
+{"timestamp":"2026-11-16T16:11:33.636059Z","level":"INFO","fields":{"message":"attribution listener ready","address":"0.0.0.0:8091"},"target":"attribution_service::infra::startup"}
+{"timestamp":"2026-11-16T16:11:33.637902Z","level":"WARN","fields":{"message":"company status requires attention","component":"attribution_company_status_health","available":true,"expired":true,"reconciliation_failed":false},"target":"attribution_service::adapters::identity::worker"}
+{"timestamp":"2026-11-16T16:11:33.642884Z","level":"INFO","fields":{"operation":"merchant_backlog","pending":0,"unresolved":0,"oldest_seconds":0},"target":"attribution_service::adapters::commerce::worker"}
+
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 316, in <module>
+    main()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 304, in main
+    f.start(); f.boundaries(); f.browser()
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/scripts/attribution/topology.py", line 256, in browser
+    raise RuntimeError(result.stderr.strip())
+RuntimeError: Topology browser failed at fixed stage: cold restart remains unavailable until authority reconciliation error=AssertionError path=/reports

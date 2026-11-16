@@ -1,0 +1,3 @@
+Confirmed unchanged from accepted main p06 mirror: services/attribution/src/adapters/identity/tests.rs SHA256 bcc008c23e0cf06c890be187aad3b8bf221fcadac5eb113dfdad36696ea54363
+Existing schema prefix byte-equal excluding trailing whitespace and new commerce comment.
+Fixture updates absolute_expires_at and idle_expires_at with separate volatile clock_timestamp() calls; inherited-1 records idle 1 microsecond later than absolute, violating CHECK idle<=absolute before production session lookup. No p07 code executes in this fixture. Leave unchanged in p07 per skill; owning final integration p10 will use one statement_timestamp() for both.

@@ -1,0 +1,43 @@
++ cargo sqlx migrate run
+Applied 202611150001/migrate foundation (56.077292ms)
++ cargo sqlx prepare --check -- --locked --offline --all-targets
+   Compiling ring v0.17.14
+   Compiling aws-lc-sys v0.47.0
+   Compiling rustls v0.23.46
+   Compiling rustls-webpki v0.103.17
+   Compiling aws-lc-rs v1.19.0
+   Compiling sqlx-core v0.8.6
+   Compiling sqlx-postgres v0.8.6
+    Checking tokio-rustls v0.26.6
+    Checking rustls-platform-verifier v0.7.1
+    Checking hyper-rustls v0.27.10
+    Checking reqwest v0.13.4
+   Compiling sqlx-macros-core v0.8.6
+   Compiling sqlx-macros v0.8.6
+    Checking sqlx v0.8.6
+    Checking attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+    Finished `dev` profile [unoptimized] target(s) in 14.62s
++ cargo fmt --all -- --check
++ cargo check --locked --offline --all-targets
+    Finished `dev` profile [unoptimized] target(s) in 0.15s
++ /private/tmp/as-p02-contract-clean/bin/python scripts/boundary.py
+SQL table outside owned migrations/catalog: clock_timestamp in src/adapters/commerce/worker.rs
+SQL table outside owned migrations/catalog: generate_series in src/adapters/retention/tests.rs
+SQL table outside owned migrations/catalog: pg_stat_activity in src/adapters/retention/tests.rs
+SQL table outside owned migrations/catalog: generate_series in src/adapters/retention/tests.rs
+SQL table outside owned migrations/catalog: information_schema.columns in src/adapters/retention/tests.rs
+SQL table outside owned migrations/catalog: pg_stat_activity in src/adapters/retention/tests.rs
+Traceback (most recent call last):
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 51, in <module>
+    main()
+    ~~~~^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 37, in main
+    run(sys.executable, "scripts/boundary.py", env=offline)
+    ~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution/scripts/verify.py", line 15, in run
+    result = subprocess.run(args, cwd=ROOT, env=env, check=True, text=True,
+                            stdout=subprocess.PIPE if capture else None)
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/subprocess.py", line 578, in run
+    raise CalledProcessError(retcode, process.args,
+                             output=stdout, stderr=stderr)
+subprocess.CalledProcessError: Command '('/private/tmp/as-p02-contract-clean/bin/python', 'scripts/boundary.py')' returned non-zero exit status 1.

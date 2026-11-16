@@ -1,0 +1,11 @@
+.report-scroll { overflow-x: auto; max-width: 100%; margin-block: 1rem; }
+.report-table { border-collapse: collapse; min-width: 100%; }
+.report-table th, .report-table td { text-align: start; padding: .6rem; border-bottom: 1px solid #888; white-space: nowrap; }
+.report-table caption { text-align: start; padding-block: .5rem; }
+.report-group { margin-block: 2rem; }
+.report-group dl { display: grid; grid-template-columns: minmax(10rem, 1fr) 1fr; gap: .5rem; }
+.report-group dd { margin: 0; }
+fieldset { display: flex; flex-wrap: wrap; gap: .8rem; }
+fieldset label { display: flex; flex-direction: column; }
+:focus-visible { outline: 3px solid #3478b8; outline-offset: 3px; }
+@media (max-width: 600px) { fieldset label { width: 100%; } .report-group dl { grid-template-columns: 1fr 1fr; } }

@@ -1,0 +1,391 @@
+{
+  "version": 1,
+  "round": "AS-P10-ACCEPT-R1",
+  "artifact": "55ecc5eabdcb9493aa9c5ecead843cb075554aa686be101994280bb1b38efb97",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC6",
+        "AC7"
+      ],
+      "command": "Standalone full gate and both production topologies",
+      "fixture": "Frozen source;120 service tests,3 browser journeys,15 contracts,11 boundary cases; actual production images and strict TLS",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-extracted-full-1.txt",
+          "sha256": "81f1ac8f5f7806ddc25a8b507e1c5d586bce192036a829c3bf5dda4723c0f00b"
+        },
+        {
+          "path": "logs/AS-P10-production-topologies-current-3.txt",
+          "sha256": "a23b376e286cee167ae5bcc2670977a963c788f0cc6047eaeeee8818161d32df"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/check.sh",
+      "fixture": "Complete original runner; required families attempted, failures preserved in summary; whole repository is not green",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-full-1.txt",
+          "sha256": "d1d4f736cb739c4463d99247824ba357d37539be65ac80c2de1a36862fddbfc3"
+        },
+        {
+          "path": "logs/AS-P10-root-full-summary-1.txt",
+          "sha256": "23c2c90904ad6b1d39bb782d4f5b48fe5eab3928f4d0d6afe55d4d05ce1a14e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC2",
+        "AC6"
+      ],
+      "command": "Root attribution extracted full service and browser gates",
+      "fixture": "120 ordinary service tests,3 separate browser tests; actual Openbot SSO8 checks; current frozen source",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-attribution-full-results-1.txt",
+          "sha256": "fe5187278f61f896b08e3fec2375dd0b85d2f93e328f8ce7ee179948c96df906"
+        },
+        {
+          "path": "logs/AS-P10-root-attribution-browser-results-1.txt",
+          "sha256": "d109f77d4c0b3c4e592c5be661264d17d454c8706f3e83fdd1bac8318c09bbc6"
+        },
+        {
+          "path": "logs/AS-P10-new-root-test-outcomes.json",
+          "sha256": "a6f5effbeea76f2f283abd9691baeea6a578c1fc98d1e80543e3116557c25212"
+        },
+        {
+          "path": "logs/AS-P10-new-root-stock-outcomes.json",
+          "sha256": "7b741e54bb58c52f0a5198253309f0f19289cffdadb34ab208733bc975e02121"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/stack-budget.sh --offline",
+      "fixture": "Stock2MiB;4207pass/23fail/27ignored; no stack overflow; all12 new ordinary tests pass",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-stock-stack-results-1.txt",
+          "sha256": "c78eba25ade0b12135f1104db408a48c2f2ffeb84c20fe0491a98cc1f98ef2e4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "scripts/lease-budget.sh --offline",
+      "fixture": "134 actual lease tests passed",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-root-lease-results-1.txt",
+          "sha256": "c486a75ca3884f58f52563cd603b03dcd458675783ca23800c579a8dc5398856"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Prepared original binary five-case stock-failure control",
+      "fixture": "Original6e55258c plus compile-only visibility repair;5pass, original schema/features,4threads,2MiB",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-stock-baseline-diagnostic-1.txt",
+          "sha256": "e545a16983713ad9e6d045eb477328c97bd1154d8a215f855c0ebf620d7a8e5d"
+        },
+        {
+          "path": "logs/AS-P10-stock-diagnostic-fixtures.json",
+          "sha256": "6757801809a6e651bfbe7c4c115c648dcbce7f727e2c974342d33eab47130e5e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Current binary five-case stock-failure control",
+      "fixture": "4pass/1department lifecycle Conflict; fixture owners unchanged; original full ordinary run passed department case",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-stock-current-diagnostic-1.txt",
+          "sha256": "dab5eac3e3a4910d02eb3c697db138cfd568da2191381eb0c1751f0f094a6e17"
+        },
+        {
+          "path": "logs/AS-P10-stock-additional-owner-audit.json",
+          "sha256": "f16aaecf17ad155bf7b376084d070586091beddd595c222a88246b5982ae7e8d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Current exact department case with read-only lease observation",
+      "fixture": "1pass,21 snapshots, min0.329799s lease remaining, no expiry observed; does NOT diagnose original Conflict",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-department-observed-1.txt",
+          "sha256": "02ca95f62b37aea593660ae2f672d2d4edcebdb6797146c6326f77814ba06b4a"
+        },
+        {
+          "path": "logs/AS-P10-department-observed-state.json",
+          "sha256": "3b9cac50efe50ef4db3266cc2ff2ee6b8569cd400b33a3a1e2775ee6a37a9a29"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Byte-identical knowledge image checker in owned host path, before task VM mount configured",
+      "fixture": "Original assumption that /Users was shared was false; task VM exposed no host mounts",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-knowledge-shared-image-1.txt",
+          "sha256": "4b1d43d1d685e899f87ba2dc2a1399f2e554f9580212ee231dd4c69597db2136"
+        },
+        {
+          "path": "logs/AS-P10-knowledge-shared-fixture.json",
+          "sha256": "24e374e6bc258082b3318176ac4a8154d59837b837864daa38d8ccf704691183"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Byte-identical knowledge image checker after mounting only its owned fixture directory",
+      "fixture": "Current production image3878bace; actual model/RSS/relevance and missing/tampered startup refusals",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-knowledge-owned-mount-preparation.txt",
+          "sha256": "d855c7f41c440458444dec4862f99165148a40846582d2cb5ef7cb8aa0a2bc1d"
+        },
+        {
+          "path": "logs/AS-P10-knowledge-shared-image-2.txt",
+          "sha256": "d0a5da0ea10d42c7db65827fc4c917abb67515048f5c6af5e7f7ee21f0f8a847"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "services/memory/scripts/extracted-build.sh after cargo fetch --locked",
+      "fixture": "174pass/1fail/2ignored; unmodified independent crate; failed HNSW index setup due PostgreSQL53100 /dev/shm capacity",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-memory-dependency-preparation.txt",
+          "sha256": "b1badd6ef0c1b417b008a7ab0833f539b44e8e50c1e34d64da690b746c1c9b07"
+        },
+        {
+          "path": "logs/AS-P10-memory-extracted-2.txt",
+          "sha256": "7a68c9ea33f9b5f463008e95ea3b91c817efd240892f04f66a2d385003a57b51"
+        },
+        {
+          "path": "logs/AS-P10-memory-search-failure.txt",
+          "sha256": "14d933fc00e8c96b901c2db7f64df9da1d52e8048348bc9cfe30e25f3ddcec5f"
+        },
+        {
+          "path": "logs/AS-P10-memory-failure-owner-audit.json",
+          "sha256": "abb7a1d35e077a4c0a7ca55464b4b651cdc5f69967a660d1fcf1ee44e0a3a9f2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Memory backup, standalone journey and Openbot integration after environment preparation",
+      "fixture": "Backup1pass; journey13steps; integration6pass with both URL fixtures on same owned vectorPG18 server",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-memory-backup-2.txt",
+          "sha256": "c12d66f7fdae2c7794a94ad2a4455cc4caeec4f1ca901eeb888e97730a28df5d"
+        },
+        {
+          "path": "logs/AS-P10-memory-journey-2.txt",
+          "sha256": "0295fe660d9e7965c859ee411462f48b06cfbc96dc59c8676434fef71ba14a64"
+        },
+        {
+          "path": "logs/AS-P10-memory-integration-2.txt",
+          "sha256": "f3d742ea9aa6399a49d5e338ecb351891bb9bdb3b020f48508d066609dce488d"
+        },
+        {
+          "path": "logs/AS-P10-memory-corrected-results.json",
+          "sha256": "570f08ceeb0b924a075869c7fea2fa1c0745f1dbb676a929c375b58ffc097064"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Local-agent plugin tests and guards after native Node ABI rebuild",
+      "fixture": "Existing plugin source; retained corrected test/guard result",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-plugin-tests-3.txt",
+          "sha256": "9d06fa9006d86333e414c69485b203e10873b98fab59b152a48b5baf40033c6e"
+        },
+        {
+          "path": "logs/AS-P10-plugin-node-rebuild-all.txt",
+          "sha256": "5fea06889844726ffbf8e27f38feb7a12898a3d5a295ed2d1284ad720672f18e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "check_plugin_package using exact Node24.21.0/npm11.19.0; independent fresh artifact runtime install",
+      "fixture": "Reproducible archive asserted; npmci fails lock synchronization in two extraction directories; source unchanged",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-plugin-pinned-node-preparation.txt",
+          "sha256": "60a6af411c3cc87655d61ac591202cf69e9796a82a6e6d1d14e16fe306e781ea"
+        },
+        {
+          "path": "logs/AS-P10-plugin-pinned-npm-preparation.txt",
+          "sha256": "110743fe665dd372451a9faaf492bfb4cd52282eaacc64c260b646bba3f91c9f"
+        },
+        {
+          "path": "logs/AS-P10-plugin-package-2.txt",
+          "sha256": "9ad4a3168dd6fe14b0a5510a46e6f913e649d4334ee92f11f848a528ebc87569"
+        },
+        {
+          "path": "logs/AS-P10-plugin-isolated-install-3.txt",
+          "sha256": "07ca86a55a6597099a29f20c0af522b3dca898b8c8c8dd4c5fc75f70ae2e1295"
+        },
+        {
+          "path": "logs/AS-P10-plugin-isolated-install-fixture.json",
+          "sha256": "303531b1889f774da9ac04d6a0f6f5b8d756fb022edcff0160cf51d68aea4eab"
+        },
+        {
+          "path": "logs/AS-P10-plugin-package-owner-audit.json",
+          "sha256": "435c266d7df8acb640fe6b9330c40ec87525ffd340699f38710d55c641ece3ad"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Corrected-Chrome managed Doop gate and actual clean-environment Docker probe",
+      "fixture": "2701testspass; private S3 fixture setup fails because sanitized environment drops task Docker endpoint; downstream stages unexercised",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-doop-complete-gate-1.txt",
+          "sha256": "c38846299dc04ef584f827ca2567309a69c284fa336d259c0c1357ccf6d42852"
+        },
+        {
+          "path": "logs/AS-P10-doop-clean-environment-diagnostic.json",
+          "sha256": "8cd3a2da9718d8fd761f251932663e730fd4155c0337c81a492b7420027c4ae4"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "Dependent managed Doop build/image/private acceptance",
+      "fixture": "Unchanged pinned managed service and existing runner",
+      "status": "NOT EXERCISED",
+      "reason": "Required upstream private S3 tests fail under sanitized environment lacking the task Docker connection; preserved as final whole-repository gap."
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail build and final source snapshot",
+      "fixture": "Graph refreshed; exact original exclusions,6e55258c,55ecc5ea",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-trail-final-build.txt",
+          "sha256": "23962aa928aaeaedd6072a1000d3b2020b7a88f339600a71e71f33e856d0f730"
+        },
+        {
+          "path": "logs/AS-P10-final-snapshot.txt",
+          "sha256": "7641da8079fae5d762578951d9b2887608360093dfef3aa46f2821031e881c44"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5"
+      ],
+      "command": "trail check",
+      "fixture": "Two lexical false positives in p01 freshness prose and p03 historical verification prose; test runner identical user commit; no source changes to suppress them",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/AS-P10-trail-final-1.txt",
+          "sha256": "2d9be1fbc7523cef70420d661d7ec77a579f07d1eda6a26f2647bc53ea47c489"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC7"
+      ],
+      "command": "Guarded transfer, exact source identity, retained evidence validation, diffcheck, Trail refresh and owned cleanup",
+      "fixture": "Main delivery on user commit6e55258c; identical independently reviewed55ecc5ea; scope limitations unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P10-main-transfer.json",
+          "sha256": "f38fbd1399400edfc41010f6a3df21e8a990673326aa76e7215f73884552705e"
+        },
+        {
+          "path": "logs/AS-P10-main-final-snapshot.txt",
+          "sha256": "7641da8079fae5d762578951d9b2887608360093dfef3aa46f2821031e881c44"
+        },
+        {
+          "path": "logs/AS-P10-main-retained-evidence-validation.txt",
+          "sha256": "77227e7479de193da005f7981b8b96a85d6a26f4fc47bdad75bd7d6094e00b05"
+        },
+        {
+          "path": "logs/AS-P10-main-diffcheck.txt",
+          "sha256": "75ebccfc18cc5b1a8b32589edccfa2e9f53d9f4dcde857010b3235519655e37f"
+        },
+        {
+          "path": "logs/AS-P10-main-trail-build.txt",
+          "sha256": "ff8ce439493ec4727df435c51cdcb15694d7ef2c869388b4041244e58bad7a35"
+        },
+        {
+          "path": "logs/AS-P10-owned-resource-cleanup.json",
+          "sha256": "cb19a0954fa3d072c7e0f1851f62356406a98bb9df1836a1d6897b715e4b8b8a"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,79 @@
+   Compiling typenum v1.20.1
+   Compiling serde v1.0.229
+   Compiling subtle v2.6.1
+   Compiling tokio v1.54.1
+   Compiling rand_core v0.10.1
+   Compiling futures-util v0.3.34
+   Compiling aws-lc-sys v0.47.0
+   Compiling tracing v0.1.44
+   Compiling cmov v0.5.4
+   Compiling rand v0.8.8
+   Compiling thiserror v1.0.69
+   Compiling getrandom v0.4.3
+   Compiling uuid v1.29.2
+   Compiling ctutils v0.4.8
+   Compiling aws-lc-rs v1.19.0
+   Compiling smallvec v1.16.5
+   Compiling chrono v0.4.45
+   Compiling either v1.19.0
+   Compiling serde_urlencoded v0.7.1
+   Compiling tracing-serde v0.2.0
+   Compiling tracing-subscriber v0.3.23
+   Compiling icu_normalizer v2.4.0
+   Compiling parking_lot_core v0.9.12
+   Compiling parking_lot v0.12.5
+   Compiling generic-array v0.14.7
+   Compiling hybrid-array v0.4.15
+   Compiling futures-intrusive v0.5.0
+   Compiling idna_adapter v1.2.2
+   Compiling idna v1.1.0
+   Compiling url v2.5.8
+   Compiling block-buffer v0.10.4
+   Compiling crypto-common v0.1.7
+   Compiling crypto-common v0.2.2
+   Compiling inout v0.2.6
+   Compiling block-buffer v0.12.1
+   Compiling digest v0.10.7
+   Compiling sha2 v0.10.9
+   Compiling hmac v0.12.1
+   Compiling md-5 v0.10.6
+   Compiling hkdf v0.12.4
+   Compiling rustls-webpki v0.103.17
+   Compiling oauth2 v5.0.0
+   Compiling universal-hash v0.6.1
+   Compiling cipher v0.5.2
+   Compiling aead v0.6.1
+   Compiling poly1305 v0.9.1
+   Compiling rustls v0.23.46
+   Compiling chacha20 v0.10.2
+   Compiling chacha20poly1305 v0.11.0
+   Compiling hyper v1.12.0
+   Compiling tokio-stream v0.1.19
+   Compiling tower v0.5.3
+   Compiling tokio-util v0.7.20
+   Compiling tower-http v0.6.11
+   Compiling hyper-util v0.1.21
+   Compiling sqlx-core v0.8.6
+   Compiling tokio-rustls v0.26.6
+   Compiling rustls-platform-verifier v0.7.1
+   Compiling hyper-rustls v0.27.10
+   Compiling axum v0.8.9
+   Compiling reqwest v0.13.4
+   Compiling sqlx-postgres v0.8.6
+   Compiling sqlx v0.8.6
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 26.50s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 8 tests
+test adapters::identity::tests::attribution_session_encryption_rotation_and_return_paths ... ok
+test adapters::identity::tests::attribution_session_rotation_revocation_and_expiry_are_persisted ... ok
+test adapters::identity::tests::attribution_company_lifecycle_freshness_rejects_clock_rollback_and_cold_process ... ok
+test adapters::identity::tests::attribution_sso_login_binding_and_competing_consumers ... ok
+test adapters::identity::tests::attribution_company_lifecycle_reconciliation_fences_and_poison_backoff ... ok
+test adapters::identity::tests::attribution_company_lifecycle_stale_observations_and_deliveries_cannot_refresh ... ok
+test adapters::identity::tests::attribution_company_lifecycle_competing_delivery_and_provision_never_revive_delete ... ok
+test adapters::identity::tests::attribution_company_lifecycle_equal_version_competitors_conflict ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 2.07s
+

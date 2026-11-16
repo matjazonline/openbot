@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "round": "AS-P06-B1-R3",
+  "artifact": "fd2a235453db086980456eaf541657997df46111ddd476632bba09c8cd3a2991",
+  "checks": [
+    {
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5"
+      ],
+      "command": "cargo test --locked --offline --lib website_tests -- --nocapture",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-website-tests-7.txt",
+          "sha256": "ccb32b8f2c1b57fff36112e58e266a76a91e3ff4ae2434e351cc29e28d72ceaa"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC5",
+        "AC6",
+        "AC7"
+      ],
+      "command": "cargo test --locked --offline --lib attribution_checkout_handoff_browser_ -- --ignored --nocapture",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-browser-6.txt",
+          "sha256": "bbc34406ddad5088685819344aa15ec3f7313fbfd766351a6fc319fc05aaefa0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib catalog -- --nocapture",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-shared-catalog-1.txt",
+          "sha256": "16ecbedef4b21c374340bb2653ec9c8f72e011f8207ba2cf0ecd40f078135e2b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo test --locked --offline --lib adapters::identity:: -- --skip catalog_tests --skip website_tests --nocapture",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-shared-identity-setup-1.txt",
+          "sha256": "0fe05c52bb703216dcf9523c80a6928f92f851394af82bfe9138efa29a95c5b6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "PYTHON=python3.13 scripts/verify.sh foundation",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-foundation-1.txt",
+          "sha256": "001ff7ef64508632488431958867f3cac773cabcc94ece50ff0c241044ffcbe2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC1",
+        "AC6",
+        "AC8"
+      ],
+      "command": "/tmp/as-p02-contract-clean/bin/python services/attribution/contract/test_contracts.py",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-contract-3.txt",
+          "sha256": "05f0cb73720b9adcdb1f2578841c39202c1719404253eeddc84b83c107e8a765"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "node --check services/attribution/assets/sdk-1.0.0.js && node --check services/attribution/browser/website.mjs && git diff --check",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-static-3.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "trail check",
+      "fixture": "Rust1.95; invocation-owned UUID PostgreSQL/HTTP/DNS fixtures; browser local HTTPS merchant and simulated identity authority; stock2MiB stacks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-trail-check-3.txt",
+          "sha256": "8b20616199388ba3cb6cc72409932d23f96c47b14188e35c3d75ff0e2eba9782"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "AC8"
+      ],
+      "command": "cargo fmt --all -- --check && cargo check --locked --offline --all-targets",
+      "fixture": "isolated p06 author worktree, Rust1.95, same service cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/AS-P06-check-2.txt",
+          "sha256": "6a54a577dbbba5dd39a31e22d1fe4f7fce080a5fac6e505ff53b81f51a792d63"
+        }
+      ]
+    }
+  ]
+}

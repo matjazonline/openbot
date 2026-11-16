@@ -1,0 +1,14 @@
+{
+  "integrations/cloudroom-plugin/package.json": {
+    "sha256": "296519b947bbda6bd9c5e717e0f591908ed7d3a71c96102db53487b8ae44660b",
+    "matches_HEAD": true
+  },
+  "integrations/cloudroom-plugin/npm-shrinkwrap.json": {
+    "sha256": "984daecb7147d847c91091cc1b1b3f4e428c615de6637fff5e8c27feca822a84",
+    "matches_HEAD": true
+  },
+  "integrations/cloudroom-plugin/scripts/package.mjs": {
+    "sha256": "c1a6e0ac932fb1c8a840f50d9780499c42d187b858385916a67e95e845ef488b",
+    "matches_HEAD": true
+  }
+}

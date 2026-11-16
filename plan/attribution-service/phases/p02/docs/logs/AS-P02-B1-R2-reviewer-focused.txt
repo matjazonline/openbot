@@ -1,0 +1,33 @@
+PASS: all 22 runtime input hashes match current artifact
+COMMAND: /opt/homebrew/bin/python3.13 scripts/test_boundary.py
+EXIT: 0
+
+test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source (__main__.BoundaryTests.test_attribution_boundary_actual_openbot_package_is_rejected_even_with_pinned_source) ... ok
+test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected (__main__.BoundaryTests.test_attribution_boundary_custom_targets_outside_scanned_source_are_rejected) ... ok
+test_attribution_boundary_foreign_sql_is_rejected (__main__.BoundaryTests.test_attribution_boundary_foreign_sql_is_rejected) ... ok
+test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout (__main__.BoundaryTests.test_attribution_boundary_in_service_wrappers_cannot_escape_the_scanned_layout) ... ok
+test_attribution_boundary_local_source_and_owned_sql_pass (__main__.BoundaryTests.test_attribution_boundary_local_source_and_owned_sql_pass) ... ok
+test_attribution_boundary_private_import_and_parent_asset_are_rejected (__main__.BoundaryTests.test_attribution_boundary_private_import_and_parent_asset_are_rejected) ... ok
+test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers (__main__.BoundaryTests.test_attribution_boundary_raw_sql_preserves_quoted_and_qualified_identifiers) ... ok
+test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency (__main__.BoundaryTests.test_attribution_boundary_transitive_wrapper_cannot_hide_parent_dependency) ... ok
+test_attribution_boundary_unpinned_git_is_rejected (__main__.BoundaryTests.test_attribution_boundary_unpinned_git_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 9 tests in 0.127s
+
+OK
+
+COMMAND: /opt/homebrew/bin/python3.13 scripts/boundary.py
+EXIT: 0
+attribution boundary passed: resolved dependencies, source/assets/config, owned SQL
+
+
+COMMAND: docker image inspect attribution-service-ci --format {{.Id}} {{.Architecture}} {{.Config.User}}
+EXIT: 0
+sha256:ff8df74f600c431b8234111731d3985f49caa50c3bd5b7f00b1cdce7f4554a5c arm64 attribution:attribution
+
+
+COMMAND: docker run --rm --read-only --network none --entrypoint id attribution-service-ci -u
+EXIT: 0
+10001
+

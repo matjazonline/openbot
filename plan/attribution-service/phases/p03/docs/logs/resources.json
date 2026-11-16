@@ -1,0 +1,6 @@
+{
+  "database": "as_p03_8625cf99e0dd454499450f495df033f8_test",
+  "maintenance_host": "localhost:5432",
+  "owner": "phase p03 root",
+  "purpose": "isolated root metadata/focused tests; reset only this named DB when init schema changes"
+}

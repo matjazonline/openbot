@@ -1,0 +1,11 @@
+base:   2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+digest: 8e9c4d5b9f3e5904144472410e2a7d338a02f5d2fe68167eaa7730952338f4ed
+files:
+  plan/attribution-service/01-application-boundaries-and-contracts.md
+  plan/attribution-service/03-single-sign-on-and-company-access.md
+  plan/attribution-service/04-merchant-setup-and-api-credentials.md
+  plan/attribution-service/06-website-tracking-and-checkout-handoff.md
+  plan/attribution-service/07-orders-refunds-and-attribution.md
+  plan/attribution-service/09-operations-retention-and-separate-deployment.md
+  plan/attribution-service/10-integration-verification-and-pilot.md
+  services/attribution/contract/README.md

@@ -1,0 +1,40 @@
+   Compiling attribution_service v0.1.0 (/Users/mac02/orca/workspaces/openbot/attribution-service/services/attribution)
+    Finished `test` profile [unoptimized] target(s) in 8.53s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-6f69d32390f0c31b)
+
+running 3 tests
+test adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids ... FAILED
+test adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation ... FAILED
+test adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout ... FAILED
+
+failures:
+
+---- adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids stdout ----
+
+thread 'adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids' (20795829) panicked at src/adapters/identity/http_tests.rs:249:5:
+assertion `left == right` failed
+  left: 200
+ right: 404
+
+---- adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation stdout ----
+
+thread 'adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation' (20795830) panicked at src/adapters/identity/http_tests.rs:339:5:
+assertion failed: html.contains("User &lt;script&gt;") && !html.contains("User <script>")
+
+---- adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout stdout ----
+
+thread 'adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout' (20795831) panicked at src/adapters/identity/http_tests.rs:278:5:
+assertion `left == right` failed
+  left: 401
+ right: 503
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::identity::http_tests::attribution_company_access_live_roles_membership_and_foreign_ids
+    adapters::identity::http_tests::attribution_session_cookie_classes_headers_and_escaped_navigation
+    adapters::identity::http_tests::attribution_session_revocation_outage_csrf_and_local_logout
+
+test result: FAILED. 0 passed; 3 failed; 0 ignored; 0 measured; 22 filtered out; finished in 0.78s
+
+error: test failed, to rerun pass `--lib`

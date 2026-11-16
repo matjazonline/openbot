@@ -1,0 +1,159 @@
+name: Attribution service
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.3-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      ATTRIBUTION_TEST_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      CARGO_TARGET_DIR: /tmp/as-attribution-target
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+      - name: Install service verification tools
+        run: |
+          cargo install sqlx-cli --version 0.8.6 --no-default-features --features rustls,postgres --locked
+          python3 -m venv /tmp/as-contract-env
+          /tmp/as-contract-env/bin/pip install --require-hashes -r services/attribution/contract/requirements.lock
+          echo "ATTRIBUTION_CONTRACT_PYTHON=/tmp/as-contract-env/bin/python" >> "$GITHUB_ENV"
+      - name: Install matching PostgreSQL backup tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-18
+          echo "/usr/lib/postgresql/18/bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: services/attribution/browser/package-lock.json
+      - name: Install standalone browser tooling
+        run: |
+          npm ci --prefix services/attribution/browser
+          services/attribution/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Fetch service dependencies
+        working-directory: services/attribution
+        run: cargo fetch --locked
+      - name: Extracted service formatting, offline compilation, migrations, metadata, boundaries and database tests
+        working-directory: services/attribution
+        run: python3 scripts/extracted-build.py
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build from the service directory only
+        run: docker build --tag attribution-service-ci services/attribution
+      - name: Non-root container with real PostgreSQL
+        run: python3 services/attribution/scripts/container-smoke.py
+
+  openbot-login:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_bots_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d open_bots_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SQLX_OFFLINE: "true"
+      TEST_DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_test
+      ATTRIBUTION_TEST_ADMIN_URL: postgres://postgres:postgres@localhost:5432/postgres
+      ATTRIBUTION_TEST_BINARY: /tmp/as-attribution-target/debug/attribution-service
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Install independent attribution toolchain
+        run: rustup toolchain install 1.95.0 --profile minimal --component rustfmt,clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            . -> target
+            services/attribution -> /tmp/as-attribution-target
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: npm
+          cache-dependency-path: services/attribution/browser/package-lock.json
+      - name: Install pinned browser tooling
+        run: |
+          npm ci --prefix services/attribution/browser
+          services/attribution/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Fetch locked application dependencies
+        run: |
+          cargo fetch --locked
+          cd services/attribution
+          cargo fetch --locked
+      - name: Build standalone attribution binary offline
+        working-directory: services/attribution
+        env:
+          CARGO_TARGET_DIR: /tmp/as-attribution-target
+        run: cargo build --locked --offline --bin attribution-service
+      - name: Identity and lifecycle database-backed tests
+        run: cargo test --locked --offline --lib adapters::persistence::attribution::
+      - name: Real Openbot login across two browser origins
+        run: cargo test --locked --offline --lib attribution_sso_browser_ -- --ignored --nocapture
+      - name: Merchant setup browser journey against PostgreSQL and DNS fixtures
+        working-directory: services/attribution
+        env:
+          CARGO_TARGET_DIR: /tmp/as-attribution-target
+        run: cargo test --locked --offline --lib attribution_setup_browser_ -- --ignored --nocapture
+      - name: Website SDK syntax and merchant checkout browser journey
+        working-directory: services/attribution
+        env:
+          CARGO_TARGET_DIR: /tmp/as-attribution-target
+        run: |
+          node --check assets/sdk-1.0.0.js
+          node --check browser/website.mjs
+          cargo test --locked --offline --lib attribution_checkout_handoff_browser_ -- --ignored --nocapture
+      - name: Independent dashboard browser journey
+        working-directory: services/attribution
+        env:
+          CARGO_TARGET_DIR: /tmp/as-attribution-target
+        run: cargo test --locked --offline --lib attribution_dashboard_browser_ -- --ignored --nocapture
+
+  deployment-boundaries:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - name: Install pinned browser tooling
+        run: |
+          npm ci --prefix services/attribution/browser
+          services/attribution/browser/node_modules/.bin/playwright install --with-deps chromium
+      - name: Build production attribution and actual Openbot integration artifacts
+        run: |
+          docker build --tag as-attribution-production:local services/attribution
+          docker build --file scripts/attribution/Openbot.fixture.Dockerfile --tag as-openbot-integration:local .
+      - name: HTTPS identity, merchant journey, outage and separate network boundaries
+        run: python3 scripts/attribution/topology.py

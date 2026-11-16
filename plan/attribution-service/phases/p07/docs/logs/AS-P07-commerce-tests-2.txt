@@ -1,0 +1,27 @@
+   Compiling attribution_service v0.1.0 (/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-attribution-author-7fo_yda4/worktree/services/attribution)
+warning: unused imports: `rebuild` and `wire_proxy`
+ --> src/adapters/identity/../commerce/http_tests.rs:2:44
+  |
+2 |     catalog_tests::{Catalog, change, path, rebuild, wire_proxy},
+  |                                            ^^^^^^^  ^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `sqlx::Row`
+ --> src/adapters/identity/../commerce/http_tests.rs:9:5
+  |
+9 | use sqlx::Row;
+  |     ^^^^^^^^^
+
+warning: `attribution_service` (lib test) generated 2 warnings (run `cargo fix --lib -p attribution_service --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized] target(s) in 6.08s
+     Running unittests src/lib.rs (/tmp/as-attribution-target/debug/deps/attribution_service-24e48f1414edb70b)
+
+running 4 tests
+test adapters::identity::http_tests::commerce_tests::attribution_merchant_ingress_competing_event_retries_and_conflicting_envelopes ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_order_paid_business_identity_immutable_lines_and_checkout ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_reconciliation_refund_before_paid_and_cancellation_converge ... ok
+test adapters::identity::http_tests::commerce_tests::attribution_refund_independent_business_identity_and_exact_balances ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 82 filtered out; finished in 1.09s
+

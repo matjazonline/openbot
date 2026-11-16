@@ -1,0 +1,39 @@
+[
+  {
+    "resource": "native task PG18",
+    "status": "stopped; owned cluster removed",
+    "path": "/private/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-final-native-pg-cpupakyr"
+  },
+  {
+    "resource": "as-final-postgres-fb07042291b6444983511ac71f79fe92",
+    "status": "owned container and anonymous volumes removed"
+  },
+  {
+    "resource": "as-attribution-integration Colima",
+    "status": "stopped; image/build cache and required tiny mount fixture retained"
+  },
+  {
+    "resource": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-baseline-ul2e7k57",
+    "status": "owned temporary fixture removed",
+    "owned_processes": []
+  },
+  {
+    "resource": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-doop-2ta28kun",
+    "status": "owned temporary fixture removed",
+    "owned_processes": []
+  },
+  {
+    "resource": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-node-_xpbitvm",
+    "status": "owned temporary fixture removed",
+    "owned_processes": []
+  },
+  {
+    "resource": "/var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/as-p10-plugin-install-v105yul8",
+    "status": "owned temporary fixture removed",
+    "owned_processes": []
+  },
+  {
+    "resource": "isolated author worktree, canonical main records, Rust/dependency caches",
+    "status": "preserved"
+  }
+]

@@ -1,0 +1,40 @@
+Source plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B3-R3-reviewer-gate-gap.json
+Source SHA256 7dada4ba62167ed0af3cad68c0f936f612847829db4d84972953351f5d4b7dd9
+
+failures:
+
+---- adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript stdout ----
+
+thread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (49129379) panicked at src/adapters/http/pages/tests.rs:4665:5:
+inline JavaScript is blocked by the page CSP and will never run:
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup stdout ----
+
+thread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (49133233) panicked at src/adapters/mcp/tests.rs:417:5:
+assertion `left == right` failed
+  left: Err("unused required exchanges: completed 3 of 4")
+ right: Ok(4)
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model' (49191340) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:343:23:
+document timed out: Some(("running", None, ["notify", "verify_final_canvas", "final_canvas", "read_final", "verify_editor", "edit", "verify_created_canvas", "created_canvas", "read_created", "verify_created_workspace", "created", "create", "verify_workspace", "verify_bot", "profile", "canonical"])); calls=["get_profile", "create_canvas", "get_canvas", "get_canvas", "get_frame", "edit_frame_html", "get_canvas"]
+
+---- adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas stdout ----
+
+thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (49191425) panicked at src/adapters/persistence/workflow/doop_document_agent_tests.rs:96:35:
+called `Result::unwrap()` on an `Err` value: "scenario lifetime exceeded"
+
+
+failures:
+    adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript
+    adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model
+    adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas
+
+test result: FAILED. 4075 passed; 4 failed; 26 ignored; 0 measured; 0 filtered out; finished in 1312.44s
+
+error: test failed, to rerun pass `--lib`
+

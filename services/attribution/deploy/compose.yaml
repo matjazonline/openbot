@@ -1,0 +1,56 @@
+# Run from this directory after provisioning the documented secrets and service.env.
+services:
+  database:
+    image: postgres:18.3-bookworm@sha256:80630f83606d8db77d30b3851b16a9f78be2d0d4dda6f7b82a1fdca5ebe3acba
+    environment:
+      POSTGRES_PASSWORD_FILE: /run/secrets/database_admin
+    secrets: [database_admin, database_application]
+    volumes:
+      - database:/var/lib/postgresql
+      - ./init-database.sh:/docker-entrypoint-initdb.d/10-attribution.sh:ro
+    networks: [database]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -h 127.0.0.1 -U postgres]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+  application:
+    image: ${ATTRIBUTION_IMAGE:?set an immutable attribution image digest}
+    env_file: service.env
+    environment:
+      ATTRIBUTION_BIND_ADDR: 0.0.0.0:8091
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    networks: [database, ingress]
+    depends_on:
+      database:
+        condition: service_healthy
+  ingress:
+    image: nginxinc/nginx-unprivileged:1.28.0-bookworm@sha256:cd33960e98e93d4d63385790ff7f8f5bf2ca95184c581b7f42ae8aea1139fbfc
+    entrypoint: [nginx, -g, "daemon off;"]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    tmpfs: [/tmp:size=64m,noexec,nosuid]
+    ports: ["443:8443"]
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    secrets: [tls_certificate, tls_private_key]
+    networks: [ingress]
+    depends_on: [application]
+networks:
+  database:
+    internal: true
+  ingress: {}
+volumes:
+  database: {}
+secrets:
+  database_admin:
+    file: ./secrets/database-admin
+  database_application:
+    file: ./secrets/database-application
+  tls_certificate:
+    file: ./secrets/tls-certificate.pem
+  tls_private_key:
+    file: ./secrets/tls-private-key.pem

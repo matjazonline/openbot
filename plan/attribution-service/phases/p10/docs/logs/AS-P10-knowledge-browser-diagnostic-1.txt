@@ -1,0 +1,115 @@
+2026-11-16T17:40:55.668Z pw:api => browserType.launch started
+2026-11-16T17:40:55.832Z pw:api <= browserType.launch succeeded
+2026-11-16T17:40:55.832Z pw:api => browser.newPage started
+2026-11-16T17:40:55.894Z pw:api <= browser.newPage succeeded
+2026-11-16T17:40:55.894Z pw:api => page.exposeFunction started
+2026-11-16T17:40:55.901Z pw:api <= page.exposeFunction succeeded
+2026-11-16T17:40:55.901Z pw:api => page.goto started
+2026-11-16T17:40:55.902Z pw:api navigating to "http://127.0.0.1:64632/ui/knowledge", waiting until "load"
+2026-11-16T17:40:55.911Z pw:api   "commit" event fired
+2026-11-16T17:40:55.911Z pw:api   navigated to "http://127.0.0.1:64632/ui/knowledge"
+2026-11-16T17:40:55.922Z pw:api   "domcontentloaded" event fired
+2026-11-16T17:40:55.945Z pw:api   "load" event fired
+2026-11-16T17:40:55.945Z pw:api <= page.goto succeeded
+2026-11-16T17:40:55.947Z pw:api => locator._expect started
+2026-11-16T17:40:55.948Z pw:api Expect "to.have.text" with timeout 5000ms
+2026-11-16T17:40:55.951Z pw:api waiting for locator('main h2')
+2026-11-16T17:40:55.970Z pw:api   locator resolved to <h2 class="font-semibold break-words"><img onerror=alert(1)>.md</h2>
+2026-11-16T17:40:55.970Z pw:api <= locator._expect succeeded
+2026-11-16T17:40:55.971Z pw:api => locator.count started
+2026-11-16T17:40:55.972Z pw:api <= locator.count succeeded
+2026-11-16T17:40:55.972Z pw:api => page.evaluate started
+2026-11-16T17:40:55.974Z pw:api <= page.evaluate succeeded
+2026-11-16T17:40:55.974Z pw:api => locator.click started
+2026-11-16T17:40:55.975Z pw:api waiting for locator('form[enctype="multipart/form-data"]').getByRole('button', { name: 'Upload and index' })
+2026-11-16T17:40:55.978Z pw:api   locator resolved to <button type="submit" class="btn btn-primary">…</button>
+2026-11-16T17:40:55.980Z pw:api attempting click action
+2026-11-16T17:40:55.980Z pw:api   waiting for element to be visible, enabled and stable
+2026-11-16T17:40:56.008Z pw:api   element is visible, enabled and stable
+2026-11-16T17:40:56.008Z pw:api   scrolling into view if needed
+2026-11-16T17:40:56.009Z pw:api   done scrolling
+2026-11-16T17:40:56.013Z pw:api   performing click action
+2026-11-16T17:40:56.050Z pw:api   click action done
+2026-11-16T17:40:56.051Z pw:api   waiting for scheduled navigations to finish
+2026-11-16T17:40:56.052Z pw:api   navigations have finished
+2026-11-16T17:40:56.052Z pw:api <= locator.click succeeded
+2026-11-16T17:40:56.053Z pw:api => locator.getAttribute started
+2026-11-16T17:40:56.054Z pw:api waiting for locator('form[enctype="multipart/form-data"]')
+2026-11-16T17:40:56.056Z pw:api   locator resolved to <form method="post" data-submit="busy-once" enctype="multipart/form-data" data-pending-label="Indexing…" class="card bg-base-200 p-4 space-y-3" action="/ui/knowledge/upload?company_id=00000000-0000-0000-0000-000000000002">…</form>
+2026-11-16T17:40:56.056Z pw:api <= locator.getAttribute succeeded
+2026-11-16T17:40:56.057Z pw:api => page.evaluate started
+2026-11-16T17:40:56.060Z pw:api <= page.evaluate succeeded
+2026-11-16T17:40:56.060Z pw:api => locator.evaluate started
+2026-11-16T17:40:56.062Z pw:api waiting for locator('#knowledge-files')
+2026-11-16T17:40:56.066Z pw:api   locator resolved to visible <input multiple type="file" required="" name="files" id="knowledge-files" class="file-input w-full" aria-describedby="knowledge-help" accept=".txt,.md,text/plain,text/markdown"/>
+2026-11-16T17:40:56.080Z pw:api <= locator.evaluate succeeded
+2026-11-16T17:40:56.080Z pw:api => page.evaluate started
+2026-11-16T17:40:56.081Z pw:api <= page.evaluate succeeded
+2026-11-16T17:40:56.081Z pw:api => locator.evaluate started
+2026-11-16T17:40:56.082Z pw:api waiting for locator('#knowledge-files')
+2026-11-16T17:40:56.086Z pw:api   locator resolved to visible <input multiple type="file" required="" name="files" id="knowledge-files" class="file-input w-full" aria-describedby="knowledge-help" accept=".txt,.md,text/plain,text/markdown"/>
+2026-11-16T17:40:56.090Z pw:api <= locator.evaluate succeeded
+2026-11-16T17:40:56.091Z pw:api => locator.setInputFiles started
+2026-11-16T17:40:56.092Z pw:api waiting for locator('#knowledge-files')
+2026-11-16T17:40:56.096Z pw:api   locator resolved to <input multiple type="file" required="" name="files" id="knowledge-files" class="file-input w-full" aria-describedby="knowledge-help" accept=".txt,.md,text/plain,text/markdown"/>
+2026-11-16T17:40:56.103Z pw:api <= locator.setInputFiles succeeded
+2026-11-16T17:40:56.105Z pw:api => page.waitForNavigation started
+2026-11-16T17:40:56.106Z pw:api => locator.click started
+2026-11-16T17:40:56.106Z pw:api waiting for locator('form[enctype="multipart/form-data"]').getByRole('button', { name: 'Upload and index' })
+2026-11-16T17:40:56.109Z pw:api   locator resolved to <button type="submit" class="btn btn-primary">…</button>
+2026-11-16T17:40:56.110Z pw:api attempting click action
+2026-11-16T17:40:56.110Z pw:api   waiting for element to be visible, enabled and stable
+2026-11-16T17:40:56.142Z pw:api   element is visible, enabled and stable
+2026-11-16T17:40:56.142Z pw:api   scrolling into view if needed
+2026-11-16T17:40:56.142Z pw:api   done scrolling
+2026-11-16T17:40:56.144Z pw:api   performing click action
+2026-11-16T17:40:56.150Z pw:api   click action done
+2026-11-16T17:40:56.150Z pw:api   waiting for scheduled navigations to finish
+2026-11-16T17:40:56.151Z pw:api   navigations have finished
+2026-11-16T17:40:56.151Z pw:api <= locator.click succeeded
+2026-11-16T17:40:56.153Z pw:api => page.evaluate started
+2026-11-16T17:40:56.154Z pw:api <= page.evaluate succeeded
+2026-11-16T17:40:56.263Z pw:api   "commit" event fired
+2026-11-16T17:40:56.263Z pw:api   navigated to "http://127.0.0.1:64632/ui/knowledge/upload?company_id=00000000-0000-0000-0000-000000000002"
+2026-11-16T17:40:56.271Z pw:api   "domcontentloaded" event fired
+2026-11-16T17:40:56.276Z pw:api   "load" event fired
+2026-11-16T17:40:56.278Z pw:api <= page.waitForNavigation succeeded
+2026-11-16T17:40:56.283Z pw:api => locator._expect started
+2026-11-16T17:40:56.284Z pw:api Expect "to.have.attribute.value" with timeout 5000ms
+2026-11-16T17:40:56.284Z pw:api waiting for locator('form[enctype="multipart/form-data"]')
+2026-11-16T17:40:56.296Z pw:api   locator resolved to <form method="post" data-submit="busy-once" enctype="multipart/form-data" data-pending-label="Indexing…" class="card bg-base-200 p-4 space-y-3" action="/ui/knowledge/upload?company_id=00000000-0000-0000-0000-000000000002">…</form>
+2026-11-16T17:40:56.297Z pw:api <= locator._expect succeeded
+2026-11-16T17:40:56.297Z pw:api => page.evaluate started
+2026-11-16T17:40:56.298Z pw:api <= page.evaluate succeeded
+2026-11-16T17:40:56.298Z pw:api => page.waitForNavigation started
+2026-11-16T17:40:56.299Z pw:api => locator.click started
+2026-11-16T17:40:56.300Z pw:api waiting for locator('form[action*="/delete"]').getByRole('button', { name: /Delete/ })
+2026-11-16T17:40:56.302Z pw:api   locator resolved to <button type="submit" class="btn btn-ghost btn-sm">…</button>
+2026-11-16T17:40:56.303Z pw:api attempting click action
+2026-11-16T17:40:56.303Z pw:api   waiting for element to be visible, enabled and stable
+2026-11-16T17:40:56.325Z pw:api   element is visible, enabled and stable
+2026-11-16T17:40:56.325Z pw:api   scrolling into view if needed
+2026-11-16T17:40:56.326Z pw:api   done scrolling
+2026-11-16T17:40:56.331Z pw:api   performing click action
+2026-11-16T17:40:56.337Z pw:api   click action done
+2026-11-16T17:40:56.337Z pw:api   waiting for scheduled navigations to finish
+2026-11-16T17:40:56.337Z pw:api   navigations have finished
+2026-11-16T17:40:56.338Z pw:api <= locator.click succeeded
+2026-11-16T17:40:56.506Z pw:api   "commit" event fired
+2026-11-16T17:40:56.506Z pw:api   navigated to "http://127.0.0.1:64632/ui/knowledge/00000000-0000-0000-0000-000000000003/delete?company_id=00000000-0000-0000-0000-000000000002"
+2026-11-16T17:40:56.520Z pw:api   "domcontentloaded" event fired
+2026-11-16T17:40:56.521Z pw:api   "load" event fired
+2026-11-16T17:40:56.522Z pw:api <= page.waitForNavigation succeeded
+2026-11-16T17:40:56.522Z pw:api => browser.close started
+2026-11-16T17:40:56.553Z pw:api <= browser.close succeeded
+✔ library native forms validate before showing progress, prevent duplicate writes, and keep both themes readable (892.441083ms)
+ℹ tests 1
+ℹ suites 0
+ℹ pass 1
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1247.302458
+
+Exit: 0
