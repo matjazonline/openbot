@@ -3,17 +3,44 @@
 import argparse
 import hashlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
+import tempfile
 
 ROOT = Path(__file__).resolve().parent.parent
+FAILURE_TAIL_BYTES = 16_384
+
+
+def report_failure(command, log):
+    log.flush()
+    log.seek(0, os.SEEK_END)
+    log.seek(max(0, log.tell() - FAILURE_TAIL_BYTES))
+    tail = log.read(FAILURE_TAIL_BYTES).decode(errors="replace")
+    message = "Doop gate failed: " + " ".join(command) + "\n" + tail
+    message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+    print("::error::" + message, flush=True)
 
 
 def run(*args, **kwargs):
-    subprocess.run(args, cwd=kwargs.pop("cwd", ROOT), check=True, **kwargs)
+    cwd = kwargs.pop("cwd", ROOT)
+    if "stderr" in kwargs:
+        subprocess.run(args, cwd=cwd, check=True, **kwargs)
+        return
+    with tempfile.TemporaryFile() as errors:
+        try:
+            subprocess.run(args, cwd=cwd, check=True, stderr=errors, **kwargs)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            report_failure(args, errors)
+            raise
+        finally:
+            errors.seek(0)
+            for chunk in iter(lambda: errors.read(64 * 1024), b""):
+                sys.stderr.write(chunk.decode(errors="replace"))
 
 
 def service_gate(runner, setup, output, chrome, database):
@@ -28,17 +55,30 @@ def service_gate(runner, setup, output, chrome, database):
     commands = [[bun, "install", "--frozen-lockfile", "--ignore-scripts"]]
     commands += [[bun, "run", name] + (["--", "--maxWorkers=2"] if name == "test" else [])
                  for name in ("format:check", "typecheck", "lint", "doc-lint", "test", "build")]
-    for command in commands:
+    for index, command in enumerate(commands):
         print("Doop gate:", " ".join(command), flush=True)
-        run(*command, cwd=source, env=environment, timeout=1200)
+        log_path = output / f"service-gate-{index}.log"
+        with log_path.open("wb") as log:
+            try:
+                run(*command, cwd=source, env=environment, timeout=1200,
+                    stdout=log, stderr=subprocess.STDOUT)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                with log_path.open("rb") as failure:
+                    log.flush()
+                    report_failure(command, failure)
+                raise
     runner.reviewed_source(source, identity["fingerprint"], manifest)
 
 
 def compile_helper(output):
     messages_file = output / "libtest-build.jsonl"
-    with messages_file.open("w") as messages:
-        run("cargo", "test", "--locked", "--offline", "--lib", "--no-run",
-            "--message-format=json", stdout=messages)
+    with messages_file.open("w+b") as messages:
+        try:
+            run("cargo", "test", "--locked", "--offline", "--lib", "--no-run",
+                "--message-format=json", stdout=messages)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            report_failure(["OpenBot libtest compilation"], messages)
+            raise
     messages = [json.loads(line) for line in messages_file.read_text().splitlines()]
     binaries = [message["executable"] for message in messages
                 if message.get("reason") == "compiler-artifact" and message.get("executable")
@@ -86,12 +126,23 @@ def main():
         "dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5",
     ):
         run("docker", "pull", image)
-    run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
-        "--output", str(output / "image"))
+    try:
+        run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
+            "--output", str(output / "image"))
+    except subprocess.CalledProcessError:
+        for name in ("build.log", "load.log"):
+            log = output / "image" / name
+            if log.is_file():
+                print(log.read_text(errors="replace"), flush=True)
+        raise
     run("python3", "scripts/doop-test.py", "acceptance", "--directory", str(setup),
         "--image", str(output / "image/image.json"), "--output", str(output / "acceptance"),
         "--openbot-test-binary", str(helper), "--openbot-test-database", database, "--ui-chrome", chrome)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        report_failure([Path(__file__).name], io.BytesIO(str(error).encode()))
+        raise

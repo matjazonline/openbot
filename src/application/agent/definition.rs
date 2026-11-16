@@ -85,6 +85,13 @@ impl ResolvedAgentDefinition {
         Ok(definition)
     }
 
+    /// Decode immutable content and its canonical digest with one full validation pass.
+    pub fn decode_and_hash(bytes: &[u8]) -> AppResult<(Self, [u8; 32])> {
+        let definition = Self::decode(bytes)?;
+        let digest = Sha256::digest(definition.encode_canonical()?).into();
+        Ok((definition, digest))
+    }
+
     pub fn validate(&self) -> AppResult<()> {
         if self.agent_id.as_uuid().is_nil()
             || self.instructions.len() > MAX_AGENT_TEXT_BYTES
@@ -166,6 +173,10 @@ impl ResolvedAgentDefinition {
     /// Object keys are sorted by serde_json's Map; ordered bindings/skills retain their order.
     pub fn canonical_content(&self) -> AppResult<Vec<u8>> {
         self.validate()?;
+        self.encode_canonical()
+    }
+
+    fn encode_canonical(&self) -> AppResult<Vec<u8>> {
         let value = serde_json::to_value(self).map_err(|_| invalid("Invalid agent definition"))?;
         serde_json::to_vec(&value).map_err(|_| invalid("Invalid agent definition"))
     }

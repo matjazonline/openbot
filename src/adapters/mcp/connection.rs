@@ -55,6 +55,10 @@ impl HttpMcpClient {
             endpoint: endpoint.as_str().to_owned(),
             token: token.clone(),
             session: Default::default(),
+            pending_call: Default::default(),
+            gate: Default::default(),
+            #[cfg(test)]
+            registration_probe: self.registration_probe.clone(),
         };
         let transport = StreamableHttpClientTransport::with_client(
             http::BoundedHttp {
@@ -122,7 +126,7 @@ async fn initialize(
                 _endpoint_permit: endpoint_permit,
                 token,
                 remaining,
-                pending_call: Default::default(),
+                pending_call: cleanup.pending_call.clone(),
                 stop: control.stop.clone(),
                 finished: Some(finished),
                 cleanup,
