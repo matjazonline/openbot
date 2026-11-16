@@ -145,3 +145,10 @@ Exact proposed D4/r1 SHA984eaf24…aea26 is a routine child-only OS temporary-ba
 ## 03PA-P04-B1-R16 — Cloudroom/Doop scope audit; final acceptance not issued
 
 [R16/N1](agent-review-notes.md) assesses actualR19library4677PASS/1FAIL/27IGNORE. SoleCloudroom failure occurs in unchanged RefreshCatalog acknowledgement setup before shutdown assertions;107relevant paths match prior passingR8. Evidence supports an unrelated-to-Plan03 source-scope disposition, with server-close cause unresolved and full-run failure retained. New user-authorized plan/fix-doop.md preserves outstanding Doop issues and gates; no plan finding. Final scope/coordination/artifact/evidence and root acceptance remain pending.
+
+
+## 03PA-P04-B1-R17 — Final combined Plan03 core: PASS under C008/r1
+
+[03PA-P04-B1-R17/N1](agent-review-notes.md), retained independent B, **PASS** for artifact **`d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb`**, HEAD `c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed`, full review base3fceb7d, coordination58/original seven exclusions. Combined source, planning-only merge, reset inventory, final evidence and user-authorized Doop deferral reviewed; no new findings, prior source findings resolved. Current affected stock67PASS plus unchanged-projection historical full-stock/lease proof, actual R19 completed core/Memory/migration/browser gates and final static checks support core acceptance. [Author manifest](logs/B1-R17-final-core.evidence.json), [reviewer supplement](logs/B1-R17-reviewer.evidence.json).
+
+**Limits:** actual general library4677PASS/1FAIL/27IGNORE retains the independently scoped unchanged Cloudroom setup failure; whole CI is not green. Doop private/service failures and three unexecuted profiles remain user-deferred to `plan/fix-doop.md` under C008/r1, without skipped assertions or raised limits. Root owns final matching checks, normal publication and subsequent Plan04 execution; record-only commits require retained material-source equivalence. This is Plan03 core acceptance eligibility, not private Doop completion or Plan04 acceptance.

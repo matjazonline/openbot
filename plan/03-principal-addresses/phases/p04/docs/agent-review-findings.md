@@ -209,3 +209,8 @@ No new actionable findings or optional suggestions for frozen artifact **e074382
 ### 03PA-P04-B1-R14/F1 resolution — 2026-11-16, B1-R15/N1
 
 **RESOLVED by removal of the unsupported new consumer** on frozen **dc5b28cd2cee6eb9281ef6ed583d20682bfc9ecacd0afe597e4aa4a83f726c14**, HEAD584/coord56. browser-ipc-check.mjs, shared-runner invocation and artifact entry are removed; test fake call count returns to3. No replacement unowned browser process, new recovery protocol or raised deadline is introduced. Existing private/e2e consumers retain Python supervision/recovery and the exact child TMPDIR fix. R14's failed-path counterexamples remain retained historical evidence; no need to run a deleted program or reproduce the removed failure path. Actual long-path/four-profile private evidence remains required for the retained TMPDIR correction, separately from resolution of this standalone-preflight defect. [R15/N1](agent-review-notes.md).
+
+
+### 03PA-P04-B1-R17 final disposition — 2026-11-16
+
+No new actionable findings or optional suggestions for final artifact **`d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb`**, HEADc1cc, coordination58/C008r1. Prior source findings remain reviewer-resolved, including R14/F1 by removal. [R17/N1](agent-review-notes.md) passes combined Plan03 core. Actual unchanged Cloudroom full-suite failure remains recorded outside affected source scope; remaining private/service Doop verification is explicitly user-deferred to `plan/fix-doop.md`, not reported fixed or passed. No whole-CI-green claim; source/protocol proof and deferred actual private acceptance remain distinct.

@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/COORDINATION.md
 - Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed) in `/Users/mac02/orca/workspaces/openbot/plan03-04`
-- Revision: 57
+- Revision: 59
 
 ## Plan-wide instructions
 
@@ -660,3 +660,29 @@ remainrequired. Doopfullprivatefour-profileproof moves tofollow-upbyuserdirectio
 - Verification: actualcoreprincipal/role/addressingchecks andfocusedcurrentcorrectionproof,
   independentfinalscope/evidencereview, linkedDoopfollow-up andnormalmainSHA; Plan04owncoregates.
 - Responses: p04acknowledgedr1 hereandTASK; futurePlan04registers/acknowledgesatstartup.
+
+
+## Core checkpoint and incoming planning merged (revision58)
+
+CommittedALLsource/records/evidence/learnings/fix-doopplan asa3194fe4822b0b9e965853460733a908cce5ef65,
+thenmergedorigin/main59936435 normally asc1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed. No stash,
+forcepush, discardedchanges ortestreruns forplanning-onlymerge. Incoming15files and7startupplan09
+paths retained; fix-doopstartupentryretained. No newruntimecontract. CoreRustlibrary/Cargo/
+migrations/.sqlx/Memoryidentical toR19actualCI; srcmainonlywarninginventorychanged. Postmergedocs/
+inventoryPASS. Pendingfinalindependentcore/deferral/evidencereview thennormalmainpublicationALL.
+C008r1 acknowledgedunchanged; no wholeCIgreenclaim.
+
+
+## Plan03 core accepted for publication (revision59)
+
+Root accepts integrated c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed /
+d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb under explicit
+C008/r1. Independent Astra/high 03PA-P04-B1-R17/N1 is PASS with no new findings; all
+source findings are resolved. Final evidence is B1-R17-final-core.evidence.json and
+B1-R17-reviewer.evidence.json. Doop remains user-deferred to plan/fix-doop.md; the
+unrelated Cloudroom failure remains retained and whole CI is not green.
+
+All remaining changes are excluded phase records/evidence. Root will verify their
+material-source equivalence, commit them, normally push ALL work to main, verify
+the remote SHA, and register Plan04 p01 using that published prerequisite.
+C008/r1 remains active and acknowledged; other I/C contracts are unchanged.

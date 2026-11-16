@@ -1574,3 +1574,29 @@ Freshfetchorigin/main599364355614eac4e2ab38b4793971b2fb7f0cab introducesonlyshar
 15files/planREADMEseven-to-ninecounts and7startupplanpathstrings. No runtime/dependency/schema
 change. Keepallupstreamplanning; integrateafterlocalfullypreservedcheckpoint, no stash. Final
 review/acceptance appliescombinedartifact andexplicituserDoopdeferral, notwholeCIgreen. Nomainpushyet.
+
+
+### R24 final integrated acceptance
+
+Root accepts Plan03 core under C008/r1 after independent Astra/high
+**03PA-P04-B1-R17/N1 PASS** for HEAD
+`c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed`, artifact
+`d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb`.
+No new findings; previous source findings resolved. Final author and supplemental
+reviewer manifests retain PASS, FAIL and NOT EXERCISED separately. Coordination
+revision59 records acceptance without changing C008/r1 or any original I/C contract.
+
+Core verification includes current stock 67/67, formatting, strict offline all-target
+Clippy, corrected offline compilation, migrations/native CI affected cases and actual
+history browser checks. Historical full stock and 139-case lease measurements are
+reused only under B R16/N2's explicit unchanged-source/environment assessment.
+Actual full native run remains 4677 PASS / 1 unrelated Cloudroom FAIL / 27 ignored.
+The Cloudroom socket-close cause remains unknown. Doop private acceptance remains
+failed/incomplete and user-deferred to `plan/fix-doop.md`; whole CI is not green.
+
+Implementation and follow-up plan were committed in a3194fe4 and upstream planning
+59936435 was normally merged in c1ccbc73. Final remaining changes are phase workflow
+records only. Next: recompute snapshot, validate all retained evidence, run Trail
+check, commit records preserving material-source equivalence, normal push to main,
+verify remote SHA, and start Plan04 p01. No additional runtime rerun is required for
+this records-only finalization.

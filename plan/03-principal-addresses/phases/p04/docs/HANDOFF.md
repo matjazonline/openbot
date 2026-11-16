@@ -1,89 +1,66 @@
-# Plan03 p04 — core proof ready; Doop follow-up authorized; integrate and publish ALL
+# Plan03 p04 — core accepted; publish and continue Plan04
 
-Latestuser: "if main plan03 is passing write new fix-doop.md plan, push to main and continue with
-plan04". This supersedesremainingDoopservice/privategatesasblockingPlan03core/Plan04. Keepfailed
-checks explicit; no CI skips/retries/raisedbounds orwhole-suitegreenclaim. Stopbefore05. Allcurrent
-source/records/evidence mustbepushed; priorcheckpointpush didnotpublishthesechanges.
+User authorized all work pushed to main, then Plan04, stopping before Plan05.
+Remaining Doop work is explicitly deferred to `plan/fix-doop.md` by C008/r1.
+Do not resume Doop investigation before Plan04 or claim whole CI is green.
 
-Worktree /Users/mac02/orca/workspaces/openbot/plan03-04, branchfeature/plan03_04. HEAD584d7d69c02569c6a1410b1b75a4d0ce2b3d3287;
-neworigin/main599364355614eac4e2ab38b4793971b2fb7f0cab (oneahead). Its15files areplanningonly,
-READMEseven-to-ninecounts and7mainstartupstrings. Preserve/integrateall, no stash. Root/A /root
-userconfirmedSol6.1/xhigh; B /root/p04_reviewer independentAstra/high idleafterR16/N2. RootownsTASK/
-HANDOFF/coordination; B reviewrecords. Coordination57/C008r1 explicitDoopfollow-upacknowledged;
-I001-I004/C001-C007 unchanged. Fullreviewbase3fceb7d3435f3b821c3b37820200e1c5400206d9.
+Worktree: `/Users/mac02/orca/workspaces/openbot/plan03-04`; branch `feature/plan03_04`.
+Root/A `/root` is user-confirmed Sol 6.1/xhigh. Retained independent B
+`/root/p04_reviewer` is Astra/high and has completed R17. Root owns TASK/HANDOFF/
+coordination; B owns review records. Authoritative coordination is
+`plan/03-principal-addresses/COORDINATION.md`, revision59; C008/r1 active and
+acknowledged, previous I/C contracts unchanged. Review base:
+`3fceb7d3435f3b821c3b37820200e1c5400206d9`.
 
-## Current proof and remaining bookkeeping
+## Accepted artifact
 
-R15source/focusedcheckpointPASSdc5b28cd2cee6eb9281ef6ed583d20682bfc9ecacd0afe597e4aa4a83f726c14.
-Lateronlyplan/fix-doop.md,src/main.rsstartupnote and.gitattributes evidencebyte-preservation changed.
-Newsourcefreeze/finalreviewnotyetrun forcombinedsource. Currentstagedsource59files+allp04records/
-logs; gitstatus~896stagedentries. Sourceexclusionssame7below. No activeCargo/runtime/otherfixture.
+ALL source, evidence, six learnings and fix-doop plan committed as a3194fe4.
+Upstream 59936435 planning changes normally merged as
+`c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed`. Final accepted artifact:
+`d27557291a01be97a3856d6cf1867e06900df104736a9c69f07754b3000f88fb`.
+Independent **03PA-P04-B1-R17/N1 PASS**, no new findings, previous source findings
+resolved. Root acceptance recorded in TASK and coordination59. Final manifests:
+`logs/B1-R17-final-core.evidence.json`, `logs/B1-R17-reviewer.evidence.json`.
 
-ActualLinuxR19mainCI43883869265 fullnative4677PASS/1FAIL/27IGNORE2986.46s. AllPlan03principal/role/
-address/nativeMCP/ordinaryDoopcasesPASS. SoleCloudroomRefreshCatalogacksetup socketclosedbefore
-shutdownassertions; B16/N1 confirms107relevantfiles matchR8passingprimary/stock andp04changedpaths
-notcalled. Preciseclosecausestillunknown; retainfullsuiteFAIL. Actualfullauthenticatedlogs downloaded
-using /suites/CHECK_SUITE_ID/logs (runAPIcheck_suite_id118799329580), inR24-ci-verify-evidence.
+Current stock 67/67 PASS, actual history fixture/browser 1+2 PASS, Node26/Python10
+PASS, formatting/strict Clippy/offline all-target compilation/docs PASS. Initial
+ENOSPC compilation failure retained; only owned incremental cache removed before
+successful retry. Historical 4678-case stock and 139-case lease measurements remain
+historical; B R16/N2 approves scoped reuse with current 67 bridging correction.
+Actual full native CI: 4677 PASS / 1 unchanged Cloudroom FAIL / 27 ignored. B R16/N1
+traced 107 unchanged relevant files and outside-scope branch; precise socket close
+cause unknown. Preserve full FAIL. No whole-CI-green claim.
 
-Currentstock2MiB/4thread67casesPASS158.30s (original66R18catalog/Doop/crash/reply +Cloudroom). Exact
-R18baselinebinary549a01e6…2055/currentRustlibrarysource; originalR23pollingprototypefullyremoved,
-proposalpatchretainedR24-deferred-doop-polling.patch.txt. B16/N2 independentlyapproveshistorical
-fullstock+current67 scopecoverage and139leaseprotocolmeasurementreuse; no newwholefullrerun/lease
-execution essential. Markhistoricalmeasurements historical. OldfullsourcecorelibrarysameasR19;
-onlymainwarningnewliteral. Historynative1/browser2PASS closedmissingbrowsergate.
+Doop lifecycle still reaches original 80-second deadline; pinned service has two
+intermittent browser failures and private four-profile acceptance is incomplete.
+All retained in `plan/fix-doop.md` and evidence. Reviewed catalog/Chrome/TMPDIR/
+diagnostic fixes are included. R23 prototype reverted, proposal patch retained.
+No unfinished Doop source remains local and no test limits/assertions are weakened.
 
-R24formatPASS; ClippyalltargetlockedofflinePASS33s; integrationdocs/newplanlinksPASS. Initial
-offlinecheckfailedENOSPC; retainedFAIL. Clearedonlytaskowned56GiBincrementalcache (notbinaries/
-backups/source/DBs), free70GiB; rerunCARGO_INCREMENTAL=0offlinealltargetcheckPASS2m54s. Actualstatic
-logs/results retained. New.gitattributes exactp04logprefix -text -whitespace preservesimmutable
-rawartifactspacing; all434stagedwhitespaceerrors confinedto135logs, sourcecheckingremainsnormal.
-StageddiffchecknowPASS;119trackedmanifestsvalidatedbeforefinalmanifest. Additionalnewlogscreated
-sincelaststagewillneedstagingagain.
+## Immediate next action
 
-## Doop scope and publication procedure
+Only workflow records/evidence remain uncommitted. Recompute accepted snapshot
+using exact exclusions below; validate evidence using a new output file; run Trail
+check; commit final records; prove commit changes only excluded records, then normal
+SSH push HEAD:main and verify remote SHA. No force push, no stash. Record publication
+in Plan04 p01 prerequisite, then implement Plan04 using the same workflow.
 
-plan/fix-doop.md written/reviewedB16/N1, sourcewarninginventoryentry added. Preservesremaining
-native80sdeadline issue, twointermittentpinnedservicebrowserfailures, missingfour-profileprivate
-acceptance, originalassertions/bounds andcohesivefocused/finalgates. R19service2728PASS vsR20twoFAIL
-retained. ChromechildTMPDIR=/tmp fix/catalogsame-rowreuse anddiagnosticsalreadyreviewed included.
-Unsupportednewstandalonebrowserpreflight removedR14/F1 (resolvedR15), no newresourceledger.
-UnreviewedR23rawstatuspollprototype reverted; allDoopunfinishedworknowconcreteplan+evidence.
-No newDoopimplementation/tests tostart inthisPlan03continuation.
+## Resources and Plan04 preparation
 
-Next: finishTrailcheck/available+trackedvalidator/whitespace retention, makefullypreservedlocal
-checkpoint commit (sourcealreadyreviewedR15 plusB16planreview; no publicationclaim yet), merge
-origin/main599 planningcommit normally, resolvebothstartupnoteentriesifneeded. This isonep04
-integrationbatch; no Plan04codeuntilaccepted/pushed. Freezecombinedartifact/sourceprojection,
-immutablecoordnoticecopy/finalmanifest, Bfinalcombinedcore/deferral/evidenceacceptance. Onlyaffected
-doc/inventory/format checks forplanning-onlymerge; no unnecessaryRust/DBfullrerun. Preserveoriginal
-failed/unavailablechecks and source/evidenceprojections. Rootrecompute/accept, commitfinalrecords,
-normalSSHmainpushALLsource/records/logs/6learnings; verifyremoteSHA. ThenimmediatelystartPlan04p01,
-recordacceptedproducer+actualpublicationSHA initsnewphase records. No forcepush/deployment.
+Environment: `/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-env.sh`.
+Node24/GNU/Python3.13/PG18, owned PostgreSQL localhost:51167. No active local Cargo
+or runtime worker. Preserve binaries, backups, databases and task-owned caches.
+Docker daemon unavailable locally. Normal SSH origin: git@github.com:matjazonline/openbot.git.
+Context controls unknown; use durable checkpoints.
 
-MainR20CI43888466155 identicalnativefullsuitewasstillactiveatlastpoll; mayusecompletedadditional
-proofifavailablebutdonotwaitunnecessarily/restartwholeCI. Requiredcorestock/leasecoverageapproved.
-FinalacceptancemustexplicitlystateDoopdeferredbyuser, unrelatedCloudroomfailure andnotallCIgreen.
+Plan04 originals read; read-only scope at external `pa04-readonly-scope/` beside env
+file, including 150 files / 263 company_members hits and FK/caller constraints.
+No Plan04 records or implementation yet. First batch needs cohesive architecture
+gate for root department/membership/owner/admin/schema/FK/lifecycle. Read nested
+HTTP pages AGENTS before HTML changes. Read original Plan04 docs and register its
+own coordination and phase records; no need to repeat exhaustive scope discovery.
 
-## Tools/resources/context
-
-Externalenv /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-env.sh: Node24/GNU/Python3.13/
-PG18. OwnedPGlocalhost51167, taskdev/test/reviewerDBs. No Dockerdaemon. Rootcache targetincremental
-removed, allretainedbinaries/backups preserved; oldR18baseline nowpa03-p04-r23-lifecycle-baseline-libtest.
-LocalnativeBunDoopsetup andexternaldiagnosticharness/output pa03-p04-r23-* retained, norunningworker.
-Do nottreatHTTPprofiling/privatehypothesesasacceptance. RuntimeUTF8; snapshotsGNUtools/LC_ALL=C.
-Personalnostashpreference. Onlyphase-ownedcachecleanup. Contextcontrolsunknown/durablecheckpoints.
-
-AuthenticatedChrome backgroundnavigationdownloads artifacts at /OWNER/REPO/actions/runs/RUN/artifacts/ID
-andlogarchives at /OWNER/REPO/suites/CHECK_SUITE_ID/logs. MatchAPIartifactbytes/digests; donotextract
-cookies/tokens. AX/AppleScriptblocked; no moreattempts. Narrowearlier-taskdownloadmetadatarevealed
-correctsuitearchiveURL; no unrelatedbrowserdata used. No permissionpending.
-
-Plan04fouroriginaldocumentsread; read-onlyscoping externalpa04-readonly-scope (150files263indexed
-company_membershits, SQLFK/rootmembershipcycleconstraints, callergraphs). Root/src/persistence/
-applicationAGENTSread; nestedHTTPpagesAGENTSstillneedfullreadbeforeHTMLedits. NoPlan04records/
-implementationyet. Rootp01architecturegate required forschema/ownership/membership/lifecycle.
-
-Exact7sourceexclusionsunchanged:
+Exact seven snapshot exclusions:
 - plan/03-principal-addresses/phases/p04/docs
 - plan/03-principal-addresses/phases/p03/docs
 - plan/03-principal-addresses/phases/p02/docs
@@ -92,7 +69,5 @@ Exact7sourceexclusionsunchanged:
 - plan/02-workflow-roles/COORDINATION.md
 - plan/02-workflow-roles/phases/p05/docs
 
-Historicalhandofflogs/R24-prior-handoff.md. Retainallhistory. Personaltrailnotel-064ed25e savedoutside
-repo; repolearningl-6aa31277 stagedwith5earlierlearnings. Trail~1200k savedtokens/roughly50calls;
-exacttallymayneedreconcilefromsummary. No dollarfigureprinted. Finaltrailnoteoutputinstructions
-fromthisturn requirecommittedrepolearninglineandpersonalnotesavedlineifreportingthem.
+Historical full prior handoff retained in logs/R24-prior-handoff.md. Source and
+evidence identity files retained in R24 integration and B1-R17 logs.

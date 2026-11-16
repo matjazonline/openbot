@@ -1,0 +1,16 @@
+{
+  "run": 43883869265,
+  "source": "581576e7e6918393480e5eb1004f11b6a51e5de6",
+  "result": "FullcommandFAIL;4677actualPASS/1unchangedunrelatedCloudroomFAIL/27IGNORE; nootherfailures",
+  "passes": 4677,
+  "failures": [
+    "adapters::http::routes::local_machine_connection::tests::failures::resources::cloudroom_connection_shutdown_cancels_slow_consumer_and_keeps_possible_delivery_uncertain"
+  ],
+  "ignored": 27,
+  "current_head": "c1ccbc73384d0ccd5cb0cb64d65a7a5fd29691ed",
+  "native_diff": [
+    "src/main.rs"
+  ],
+  "main_noninventory_bytes_identical": true,
+  "scope": "AllRustlibrary/Cargo/migration/SQLx/Memoryinputsbyteidentical; onlysrcmainstartupinventorydiffers. FailurebranchoutsidechangedPlan03scope independentlyreviewedR16N1. No whole-suitePASSclaim."
+}
