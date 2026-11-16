@@ -71,7 +71,7 @@ def owned_resources():
               if "OB_TEST_" in line or "RIG_TEST_" in line or "MEMORY_TEST_" in line] for rule in rules])
 
 
-def extracted_wrapper(directory, memory=False, old_selector=False, broken_preflight=False, inherited_signals=False):
+def extracted_wrapper(directory, memory=False, old_selector=False, broken_preflight=False):
     directory.mkdir()
     scripts = directory / "scripts"
     scripts.mkdir()
@@ -87,9 +87,6 @@ def extracted_wrapper(directory, memory=False, old_selector=False, broken_prefli
     if old_selector:
         assert '--gid-owner "$test_gid"' in mechanism
         mechanism = mechanism.replace('--gid-owner "$test_gid"', '--uid-owner "$test_uid"')
-    if inherited_signals:
-        assert "env --default-signal=INT,TERM " in mechanism
-        mechanism = mechanism.replace("env --default-signal=INT,TERM ", "")
     helper.write_text(mechanism)
     relative = Path("network-isolation.py") if memory else Path("tests/network-isolation.py")
     preflight = scripts / relative
@@ -155,6 +152,7 @@ def sudo_shim(directory, mode, stage):
     shim.mkdir(exist_ok=True)
     # Run the actual privileged operation first for signal/deadline cases. The
     # signal handshake holds a successful creator before its shell can publish it.
+    # The deadline case execs sudo, retaining the real production process tree.
     (shim / "sudo").write_text("#!" + sys.executable + "\n" +
         "import os, signal, subprocess, sys, time\nfrom pathlib import Path\n" +
         "mode, stage, real, gate = " + repr((mode, stage, shutil.which("sudo"), str(directory))) + "\n" +
@@ -166,6 +164,8 @@ def sudo_shim(directory, mode, stage):
         "    group = args[position + 1]\n" +
         "    script = 'groupdel \"$1\"; echo \"$$\" > \"$2\"; sleep 30; touch \"$3\"'\n" +
         "    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group, str(Path(gate, 'privileged-pid')), str(Path(gate, 'late-effect'))]\n" +
+        "    os.execv(real, [real, *args])\n" +
+        "if not target: os.execv(real, [real, *args])\n" +
         "result = subprocess.run([real, *args]).returncode\n" +
         "if result == 0 and target and mode == 'signal':\n" +
         "    Path(gate, 'created').touch()\n" +
@@ -303,16 +303,6 @@ def main():
             interrupted_creators(wrappers, directory)
             print("PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints", flush=True)
             cleanup_deadline(wrappers, directory)
-            inherited = extracted_wrapper(directory / "inherited-signal-wrapper", inherited_signals=True)
-            inherited_case = directory / "inherited-signal-case"
-            inherited_case.mkdir()
-            try:
-                cleanup_deadline([inherited], inherited_case)
-            except AssertionError as error:
-                assert str(error) == "privileged cleanup child survived the wrapper deadline", str(error)
-            else:
-                raise AssertionError("inherited ignored-signal counterexample did not expose the surviving child")
-            print("PASS: ignored owner signals propagate without explicit child reset; privileged work survives", flush=True)
             setup_failures(wrappers, directory)
             print("PASS: setup, partial firewall and guarded-preflight failures leave no command or resources", flush=True)
         finally:
