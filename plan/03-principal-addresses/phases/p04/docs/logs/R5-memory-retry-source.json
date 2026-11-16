@@ -1,0 +1,13 @@
+{
+  "commit": "7bc51d2a6f3e4188592b5321158a9436561c4aef",
+  "parent": "3d186172a778602dd82d790eb2ef230c80cc045d",
+  "tree": "0f7d3ef4df3d364a16f0f4ad0c894461fa01667f",
+  "branch": "codex/plan03-p04-r5-memory-retry-7bc51d2a",
+  "source_artifact": "00f75666fcf805963dcdd73ee01e7d745f87573d0f4777ef6f9826813c5d32e4",
+  "changes": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml"
+  ],
+  "equality": "Every application/script/dependency/fixture byte equals full candidate3d186172; exact memory-integration job body unchanged; only other job schedules disabled in external tree",
+  "scope": "Focused full memory-integration retry, not substitute for primary verify/Doop/Memory service gates; actual worktree/index/HEAD unchanged"
+}

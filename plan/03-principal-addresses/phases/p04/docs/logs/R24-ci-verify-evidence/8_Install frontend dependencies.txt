@@ -1,0 +1,30 @@
+﻿2026-11-16T14:16:51.7524029Z ##[group]Run npm ci
+2026-11-16T14:16:51.7524320Z [36;1mnpm ci[0m
+2026-11-16T14:16:51.7550985Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:16:51.7551510Z env:
+2026-11-16T14:16:51.7551750Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:16:51.7552006Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:16:51.7552521Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:16:51.7552809Z   SQLX_OFFLINE: true
+2026-11-16T14:16:51.7553062Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:16:51.7553330Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:16:51.7553719Z   CARGO_TERM_COLOR: always
+2026-11-16T14:16:51.7554008Z   CACHE_ON_FAILURE: false
+2026-11-16T14:16:51.7554261Z ##[endgroup]
+2026-11-16T14:16:52.6731664Z 
+2026-11-16T14:16:52.6732577Z added 37 packages, and audited 38 packages in 874ms
+2026-11-16T14:16:52.6732985Z 
+2026-11-16T14:16:52.6733225Z 7 packages are looking for funding
+2026-11-16T14:16:52.6733760Z   run `npm fund` for details
+2026-11-16T14:16:52.6743637Z 
+2026-11-16T14:16:52.6744415Z 1 high severity vulnerability
+2026-11-16T14:16:52.6744852Z 
+2026-11-16T14:16:52.6745060Z To address all issues, run:
+2026-11-16T14:16:52.6745326Z   npm audit fix
+2026-11-16T14:16:52.6745442Z 
+2026-11-16T14:16:52.6745584Z Run `npm audit` for details.
+2026-11-16T14:16:52.6750945Z npm warn install-scripts 2 packages have install scripts not yet covered by allowScripts:
+2026-11-16T14:16:52.6751697Z npm warn install-scripts   @parcel/watcher@2.6.0 (install: node scripts/build-from-source.js)
+2026-11-16T14:16:52.6752350Z npm warn install-scripts   @tailwindcss/oxide@4.1.12 (postinstall: node ./scripts/install.js)
+2026-11-16T14:16:52.6752771Z npm warn install-scripts
+2026-11-16T14:16:52.6753265Z npm warn install-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.

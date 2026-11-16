@@ -1,0 +1,153 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R11-preflight",
+  "artifact": "b02a5d77dc978805b9ac81cff068f3cd8377e7d55c0568571ebcfed288f209d1",
+  "checks": [
+    {
+      "criteria": [
+        "CAT1",
+        "CAT2",
+        "CAT3",
+        "local-progress"
+      ],
+      "command": "Current isolated libtest,66catalog/Doop/crash/reply cases,4threads",
+      "fixture": "PG51167 ownedpa03_p04_test/UUIDfixtures; explicit16MiB; TEST_DATABASE_URLunset; originalbudgets",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-catalog-doop-focused.txt",
+          "sha256": "41237eb444f5447a6884e7567567febb907b72bde54b97cf8ed2d8cfc33c6adb"
+        },
+        {
+          "path": "logs/R18-focused-inventory.txt",
+          "sha256": "76fde3dd277e4b86a861711c7568817616da67bdb86f1a0c796540e2c2008555"
+        },
+        {
+          "path": "logs/R18-focused-identity.json",
+          "sha256": "528d5ba2947fa64e9330987de33b79a3c838af1263ae31505e294ed75c4f715d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "runner-merge-fidelity"
+      ],
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "9isolatedfake-command tests, including inheritedfailure propagation/cleanenv; not actualimages",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-check-runner-tests.txt",
+          "sha256": "d165ac8cc58e036083ffc880a6f57d9134111e025f0c9ce02f33659c97b6df1c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "offline-compile",
+        "clippy",
+        "format"
+      ],
+      "command": "cargo test --locked --offline --lib --no-run; cargo clippy --locked --offline --all-targets -- -D warnings; cargo fmt --all -- --check",
+      "fixture": "Currentmergedtree/R18source; compile2m01s; alltargetClippy56.02s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-build-stderr.txt",
+          "sha256": "de652692ad04cb537baa3de24124bfde50ff35960e562a4a8db8ae05b36dd0fc"
+        },
+        {
+          "path": "logs/R18-clippy-all-targets.txt",
+          "sha256": "695c55b9eeef912e0badd0933337448498eb6fd33379c49c2a4fc39122fce1cb"
+        },
+        {
+          "path": "logs/R18-fmt.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "source-equality"
+      ],
+      "command": "52actualmaterial-file equality to candidatee1f2be66; upstreamcommittedtreeequalityd8=584",
+      "fixture": "RootHEAD584/b02a source; validation-onlyworkflowadditional; originalCI/Memory/privatepreserved",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-source.snapshot.txt",
+          "sha256": "13545854ac4c82271e1c89b0b29d1eeed6c71d72f2ca65a6d917965e3b9024aa"
+        },
+        {
+          "path": "logs/R18-candidate-equality.json",
+          "sha256": "bc0ca2bd335ad0c9d1e29a57006911b2fc29059d9d1061d160f945fb83ccc467"
+        },
+        {
+          "path": "logs/R18-ci-source.json",
+          "sha256": "0b25cdf6fb4983f04287570f9c5187f572b16df4f9a37711e84bf55959236ecc"
+        },
+        {
+          "path": "logs/R18-upstream-tree-equality.json",
+          "sha256": "6c59fff6da4ce64bc7cc17d6ef50a2e565a6b8dad5f2b33f3908364fcce952dd"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "historical-Linux-failure-retention"
+      ],
+      "command": "R16actualLinux23-case4thread runtime",
+      "fixture": "Precorrectionexact1e58;17PASS/6FAIL; no unrelatednessclaim",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R16-linux-focused-failure.txt",
+          "sha256": "26c7f4f6c5a4f3bad41e13e0591e364615e1fcf2eed271bb10dde1dc2dc6bac1"
+        },
+        {
+          "path": "logs/R16-linux-focused-download-identity.json",
+          "sha256": "c4d375edc4cd082c982af7546c7e1167b60950086ce73afedeff5d9905ce8891"
+        },
+        {
+          "path": "logs/R16-linux-platform.txt",
+          "sha256": "cb30df37d10b498070eeb716488cb6623bd3874421b962712864657b8d890ab7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "historical-full-gates"
+      ],
+      "command": "Priorcomplete localprimary/stock/lease gates plus browserprerequisiterepair",
+      "fixture": "Historicalexecutions only; currentmcp.rs conversion differs andhasfocusedproof; finalscopeassessmentpending",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R13-complete-local-check-failure.txt",
+          "sha256": "2d9ce11e8d42861a3ca815313c1cbf7ca8ef35ed717f1a259f8dde62f04ba412"
+        },
+        {
+          "path": "logs/R14-js-focused2.txt",
+          "sha256": "4b951c7b1be6be94895ee8a4e12af5491b938a3ab1756756d0556b1919c0c672"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CAT4",
+        "current-Linux",
+        "final-verification"
+      ],
+      "command": "CurrentactualLinux23caseproof andrequiredcurrentCI/privategates",
+      "fixture": "Candidatee1f2be66, actualCIactive; localDockerCLI presentbutdaemonunavailable",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/R18-docker-prerequisite.txt",
+          "sha256": "dfaeb80abd404fd9edf0891ac5c8d4c7430b2eadc2f52e06a583564933d53cd7"
+        }
+      ],
+      "reason": "CurrentLinuxprogressproof and requiredremaininggate outcomes not yet complete. No finalphaseacceptance."
+    }
+  ]
+}

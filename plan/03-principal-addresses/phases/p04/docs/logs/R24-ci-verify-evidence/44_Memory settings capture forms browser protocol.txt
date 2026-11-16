@@ -1,0 +1,32 @@
+﻿2026-11-16T14:45:51.9784384Z ##[group]Run cargo test --locked --offline --lib dump_memory_settings_browser_fixtures -- --ignored
+2026-11-16T14:45:51.9785044Z [36;1mcargo test --locked --offline --lib dump_memory_settings_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:51.9785599Z [36;1mnode --test scripts/tests/memory-settings-browser.mjs[0m
+2026-11-16T14:45:51.9812691Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:51.9813128Z env:
+2026-11-16T14:45:51.9813477Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:51.9813922Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:51.9814530Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:51.9815228Z   SQLX_OFFLINE: true
+2026-11-16T14:45:51.9815827Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:51.9816270Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:51.9816674Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:51.9817032Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:51.9817464Z   MEMORY_SETTINGS_BROWSER_FIXTURES: /tmp/memory-settings-browser
+2026-11-16T14:45:51.9817879Z ##[endgroup]
+2026-11-16T14:45:52.1781786Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:52.1968924Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:52.2037538Z 
+2026-11-16T14:45:52.2037904Z running 1 test
+2026-11-16T14:45:52.2058533Z test adapters::http::pages::company_memory::browser_fixtures::dump_memory_settings_browser_fixtures ... ok
+2026-11-16T14:45:52.2059073Z 
+2026-11-16T14:45:52.2059609Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.00s
+2026-11-16T14:45:52.2060235Z 
+2026-11-16T14:45:53.2643114Z ✔ capture forms are labelled, refuse a blank reason, post the policy and swap in the saved section (787.425878ms)
+2026-11-16T14:45:53.2768715Z ℹ tests 1
+2026-11-16T14:45:53.2769309Z ℹ suites 0
+2026-11-16T14:45:53.2770145Z ℹ pass 1
+2026-11-16T14:45:53.2770498Z ℹ fail 0
+2026-11-16T14:45:53.2770860Z ℹ cancelled 0
+2026-11-16T14:45:53.2771200Z ℹ skipped 0
+2026-11-16T14:45:53.2771554Z ℹ todo 0
+2026-11-16T14:45:53.2771956Z ℹ duration_ms 1041.146056

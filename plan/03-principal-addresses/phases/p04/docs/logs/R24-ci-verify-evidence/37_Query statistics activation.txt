@@ -1,0 +1,26 @@
+﻿2026-11-16T14:38:31.6477042Z ##[group]Run psql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \
+2026-11-16T14:38:31.6477418Z [36;1mpsql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 \[0m
+2026-11-16T14:38:31.6477756Z [36;1m  -c "SELECT 1 AS ci_pg_stat_statements_probe"[0m
+2026-11-16T14:38:31.6478144Z [36;1mtest "$(psql "$DATABASE_URL" -X -Atqc "SHOW pg_stat_statements.track")" = "top"[0m
+2026-11-16T14:38:31.6478670Z [36;1mtest "$(psql "$DATABASE_URL" -X -Atqc "SHOW pg_stat_statements.track_utility")" = "off"[0m
+2026-11-16T14:38:31.6479141Z [36;1mtest "$(psql "$DATABASE_URL" -X -Atqc "SHOW log_parameter_max_length")" = "0"[0m
+2026-11-16T14:38:31.6479653Z [36;1mtest "$(psql "$DATABASE_URL" -X -Atqc "SHOW log_parameter_max_length_on_error")" = "0"[0m
+2026-11-16T14:38:31.6480070Z [36;1mpsql "$DATABASE_URL" -X -v ON_ERROR_STOP=1 -Atqc \[0m
+2026-11-16T14:38:31.6480813Z [36;1m  "SELECT queryid FROM pg_stat_statements WHERE dbid = (SELECT oid FROM pg_database WHERE datname = current_database()) AND query LIKE '%ci_pg_stat_statements_probe%' LIMIT 1" \[0m
+2026-11-16T14:38:31.6481482Z [36;1m  | grep -Eq '^-?[0-9]+$'[0m
+2026-11-16T14:38:31.6510610Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:38:31.6510833Z env:
+2026-11-16T14:38:31.6510998Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:38:31.6511181Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:38:31.6511538Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:38:31.6511762Z   SQLX_OFFLINE: true
+2026-11-16T14:38:31.6511936Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:38:31.6512126Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:38:31.6512298Z   CARGO_TERM_COLOR: always
+2026-11-16T14:38:31.6512475Z   CACHE_ON_FAILURE: false
+2026-11-16T14:38:31.6512660Z ##[endgroup]
+2026-11-16T14:38:31.8118076Z  ci_pg_stat_statements_probe 
+2026-11-16T14:38:31.8118527Z -----------------------------
+2026-11-16T14:38:31.8118798Z                            1
+2026-11-16T14:38:31.8119045Z (1 row)
+2026-11-16T14:38:31.8119181Z 

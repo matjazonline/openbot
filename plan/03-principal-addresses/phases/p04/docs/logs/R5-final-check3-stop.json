@@ -1,0 +1,36 @@
+{
+  "reason": "main full library run completed 4644PASS/33FAIL/27IGNORE; stop duplicate stack-budget suite before focused failure diagnostics/correction",
+  "owned_process_group": 80338,
+  "processes": [
+    [
+      "21097",
+      "80338",
+      "80338",
+      "bash scripts/stack-budget.sh --offline"
+    ],
+    [
+      "21104",
+      "21097",
+      "80338",
+      "bash scripts/stack-budget.sh --offline"
+    ],
+    [
+      "21105",
+      "21104",
+      "80338",
+      "/Users/mac02/.rustup/toolchains/stable-aarch64-apple-darwin/bin/cargo test --locked --lib --offline"
+    ],
+    [
+      "21122",
+      "21105",
+      "80338",
+      "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230"
+    ],
+    [
+      "80338",
+      "35335",
+      "80338",
+      "bash scripts/check.sh"
+    ]
+  ]
+}

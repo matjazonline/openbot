@@ -1,0 +1,27 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 52s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 13 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_workflow_reply_matches_only_the_customer_it_answered ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_recorded_before_the_deadline_is_consumed_after_it ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_from_the_wrong_responder_or_after_expiry_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_crash_replay_matches_once ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_the_run_can_never_take_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_failing_on_the_last_attempt_fails_the_intent_observably ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_that_fell_through_is_never_matched_on_a_retry ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_resumes_its_wait_once_and_a_second_reply_is_ordinary ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_before_its_wait_parks_is_deferred_until_it_does ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_an_unawaited_send_is_ordinary_ingress ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_delivery_out_of_time_is_retried_not_settled ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_racing_wait_expiry_agrees_without_deadlock ... ok
+
+test result: ok. 13 passed; 0 failed; 0 ignored; 0 measured; 4691 filtered out; finished in 13.03s
+

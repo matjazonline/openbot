@@ -1,0 +1,15 @@
+{
+  "candidate": "a23d83bdc13fe6bf92ec03e45559ad912fe7dbbe",
+  "reviewer_test_binary_sha256": "3bb2e2bc6db1c5d956649cd6ea04d0a31d4bcace4d6f830f467a3ae7348e97d9",
+  "reviewer_test_log_sha256": "c5376e143c35918286e79e87b504c8ac3e905a045270f5d60947646c5832bcb6",
+  "reviewer_test_result": "7 PASS,0 FAIL,0 ignored;32.89s",
+  "reviewer_fixture": "PG18.7/51167 pa03_p04_b_review_20261115_1845_test and isolated own_database fixtures",
+  "material_content_differences": [
+    ".trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md"
+  ],
+  "candidate_added_files_present_equal_in_worktree": [
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs"
+  ]
+}

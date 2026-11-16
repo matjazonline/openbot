@@ -1,0 +1,119 @@
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/message_reply_tests.rs:81:
+ }
+ 
+ /// Publish, bind and admit a run asking through `ask`, and drive its question to completion.
+[31m-async fn question_start(s: &Intents, ask: Ask, workflow: WorkflowId) -> (Value, RelatedAssociation) {
+(B[m[32m+async fn question_start(
+(B[m[32m+    s: &Intents,
+(B[m[32m+    ask: Ask,
+(B[m[32m+    workflow: WorkflowId,
+(B[m[32m+) -> (Value, RelatedAssociation) {
+(B[m     match ask {
+         Ask::Member => {
+             let user = member(&s.fixture, "member").await;
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/message_reply_tests.rs:296:
+     use crate::application::ports::thread::{MessageAuthorWrite, MessageParticipantWrite};
+     use crate::application::use_cases::company::CompanyPersistence;
+     let channel = ChannelPersistence::get_by_id(s.p(), asked.channel)
+[31m-        .await.unwrap().unwrap();
+(B[m[32m+        .await
+(B[m[32m+        .unwrap()
+(B[m[32m+        .unwrap();
+(B[m     let company = CompanyPersistence::get_by_id(s.p(), channel.company_id)
+[31m-        .await.unwrap().unwrap();
+(B[m[31m-    let address = crate::entities::channel::Channel::address_for(
+(B[m[31m-        &channel.slug, &company.slug, "agents.test",
+(B[m[31m-    );
+(B[m[31m-    let identity = crate::application::ports::thread::qualified_email_identity(address.as_str())
+(B[m[32m+        .await
+(B[m[32m+        .unwrap()
+(B[m         .unwrap();
+[31m-    let mut incoming = inbound(s.thread, &format!("<relay-source-{n}@partner.test>"), &[], "A desk request");
+(B[m[31m-    incoming.author = MessageAuthorWrite::Observed(crate::application::ports::participant::IdentityObservation {
+(B[m[31m-        identity: identity.clone(),
+(B[m[31m-        display_label: None,
+(B[m[31m-        claim_metadata: crate::entities::participant::IdentityClaimMetadata::observation(),
+(B[m[31m-        provenance: crate::entities::participant::IdentityProvenance::TransportIngress,
+(B[m[31m-    });
+(B[m[32m+    let address =
+(B[m[32m+        crate::entities::channel::Channel::address_for(&channel.slug, &company.slug, "agents.test");
+(B[m[32m+    let identity =
+(B[m[32m+        crate::application::ports::thread::qualified_email_identity(address.as_str()).unwrap();
+(B[m[32m+    let mut incoming = inbound(
+(B[m[32m+        s.thread,
+(B[m[32m+        &format!("<relay-source-{n}@partner.test>"),
+(B[m[32m+        &[],
+(B[m[32m+        "A desk request",
+(B[m[32m+    );
+(B[m[32m+    incoming.author = MessageAuthorWrite::Observed(
+(B[m[32m+        crate::application::ports::participant::IdentityObservation {
+(B[m[32m+            identity: identity.clone(),
+(B[m[32m+            display_label: None,
+(B[m[32m+            claim_metadata: crate::entities::participant::IdentityClaimMetadata::observation(),
+(B[m[32m+            provenance: crate::entities::participant::IdentityProvenance::TransportIngress,
+(B[m[32m+        },
+(B[m[32m+    );
+(B[m     incoming.participants[0] = MessageParticipantWrite::new(
+[31m-        crate::entities::message::MessageParticipantKind::Sender, identity,
+(B[m[32m+        crate::entities::message::MessageParticipantKind::Sender,
+(B[m[32m+        identity,
+(B[m     );
+     s.p().create_message(&incoming).await.unwrap().canonical_id
+ }
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/message_reply_tests.rs:320:
+ /// Reconstruct the exact internal copy of a real workflow reply, leaving the native relay
+ /// guard enabled. A human message or an unsealed fixture delivery cannot provide this proof.
+ async fn relayed_reply(s: &Intents, asked: &Asked, n: usize) -> CanonicalMessageId {
+[31m-    use crate::application::ports::thread::{MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite, qualified_email_identity};
+(B[m[31m-    use crate::entities::message::{MessageDirection, MessageParticipantKind, MessageRole};
+(B[m[32m+    use crate::application::ports::thread::{
+(B[m[32m+        MessageAuthorWrite, MessageCorrelation, MessageParticipantWrite, MessageWrite,
+(B[m[32m+        qualified_email_identity,
+(B[m[32m+    };
+(B[m     use crate::entities::email_message::EmailMessageMetadata;
+[32m+    use crate::entities::message::{MessageDirection, MessageParticipantKind, MessageRole};
+(B[m     let source = Box::pin(relay_source(s, asked, n)).await;
+     let producer = Box::pin(asked_via(s, Ask::Reply(source), Then::AwaitOther, true)).await;
+     let delivery = delivery(s.pool(), producer.run, 0).await;
+Diff in /Users/mac02/orca/workspaces/openbot/plan03-04/src/adapters/persistence/workflow/message_reply_tests.rs:329:
+     let payload: Value = sqlx::query_scalar(
+         "SELECT part.payload->'body' FROM message_delivery_parts AS part WHERE part.company_id=$1 AND part.delivery_id=$2 AND part.part_index=0",
+     ).bind(s.fixture.target.company.as_uuid()).bind(delivery).fetch_one(s.pool()).await.unwrap();
+[31m-    let email: crate::adapters::protocols::email::OutboundEmailV1 = serde_json::from_value(payload).unwrap();
+(B[m[32m+    let email: crate::adapters::protocols::email::OutboundEmailV1 =
+(B[m[32m+        serde_json::from_value(payload).unwrap();
+(B[m     let message = MessageWrite::internal(
+[31m-        asked.thread, MessageAuthorWrite::Platform, email.subject, email.body_text.clone(),
+(B[m[31m-        MessageDirection::Inbound, MessageRole::System, email.correlation_id,
+(B[m[31m-    ).with_participants(vec![
+(B[m[31m-        MessageParticipantWrite::new(MessageParticipantKind::Sender, qualified_email_identity(email.from.as_str()).unwrap()),
+(B[m[31m-        MessageParticipantWrite::new(MessageParticipantKind::To, qualified_email_identity(email.recipients_to[0].as_str()).unwrap()),
+(B[m[31m-    ]).with_correlation(MessageCorrelation::Email(
+(B[m[31m-        EmailMessageMetadata::new(email.message_id).in_reply_to(email.in_reply_to)
+(B[m[31m-            .references(email.references).raw_bodies(Some(email.body_text), None),
+(B[m[32m+        asked.thread,
+(B[m[32m+        MessageAuthorWrite::Platform,
+(B[m[32m+        email.subject,
+(B[m[32m+        email.body_text.clone(),
+(B[m[32m+        MessageDirection::Inbound,
+(B[m[32m+        MessageRole::System,
+(B[m[32m+        email.correlation_id,
+(B[m[32m+    )
+(B[m[32m+    .with_participants(vec![
+(B[m[32m+        MessageParticipantWrite::new(
+(B[m[32m+            MessageParticipantKind::Sender,
+(B[m[32m+            qualified_email_identity(email.from.as_str()).unwrap(),
+(B[m[32m+        ),
+(B[m[32m+        MessageParticipantWrite::new(
+(B[m[32m+            MessageParticipantKind::To,
+(B[m[32m+            qualified_email_identity(email.recipients_to[0].as_str()).unwrap(),
+(B[m[32m+        ),
+(B[m[32m+    ])
+(B[m[32m+    .with_correlation(MessageCorrelation::Email(
+(B[m[32m+        EmailMessageMetadata::new(email.message_id)
+(B[m[32m+            .in_reply_to(email.in_reply_to)
+(B[m[32m+            .references(email.references)
+(B[m[32m+            .raw_bodies(Some(email.body_text), None),
+(B[m     ));
+     let message = s.p().create_message(&message).await.unwrap().canonical_id;
+     sqlx::query(

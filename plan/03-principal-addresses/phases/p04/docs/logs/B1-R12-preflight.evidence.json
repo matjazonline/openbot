@@ -1,0 +1,142 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R12-preflight",
+  "artifact": "e074382b1e41f4cd692b3ddb7bc9b1b29ec2ca6dc08ce89d92daf4bdcf1c5b34",
+  "checks": [
+    {
+      "criteria": [
+        "Linux-progress"
+      ],
+      "command": "CI43879335942 actualLinux23cases/4threads/originaltimeouts",
+      "fixture": "ExactR18production/testscope byte-identical to current R19; actualUbuntu24.04/PG18",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-ci-43879335942-jobs1.json",
+          "sha256": "be0a33d166b93a360a9974b1c829206928303c1b57ad04df8f646e787fa5e673"
+        },
+        {
+          "path": "logs/R18-linux-focused-workflow.yml",
+          "sha256": "5e3f6a21574357602b139c9f9112e83e255641464d9bc64a54d36639029319c0"
+        },
+        {
+          "path": "logs/R19-native-scope-equality.json",
+          "sha256": "55499e71b3f1b2739d67145a93059f37d3c157f0c048104c24c57d5a5d09b1e5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "native-catalog-contracts"
+      ],
+      "command": "CurrentRust66focusedcases,4threads,explicit16MiB; independentB5cases",
+      "fixture": "SameimmutableR18nativecode; no additionalRust rerun for Python/workflow-onlydelta",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R18-catalog-doop-focused.txt",
+          "sha256": "41237eb444f5447a6884e7567567febb907b72bde54b97cf8ed2d8cfc33c6adb"
+        },
+        {
+          "path": "logs/R18-focused-identity.json",
+          "sha256": "528d5ba2947fa64e9330987de33b79a3c838af1263ae31505e294ed75c4f715d"
+        },
+        {
+          "path": "logs/R19-native-scope-equality.json",
+          "sha256": "55499e71b3f1b2739d67145a93059f37d3c157f0c048104c24c57d5a5d09b1e5"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "diagnostic-bound",
+        "escaping",
+        "failure-propagation",
+        "clean-env"
+      ],
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "9isolatedfake-command cases; realfileoversizedoutputassertions,16KiBtail, finalmarker/earlymarker/escaping; notactualimageproof",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R19-check-runner-tests.txt",
+          "sha256": "d6799c4a6195a5b3e737fb143322d9dec3227f23cad21aa4a643abcea0595bc7"
+        },
+        {
+          "path": "logs/R19-diagnostic-delta.diff",
+          "sha256": "af22ee1017e2ead604bf55efa9f7af0f04f16745a44aa074bf35f43eee747249"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "syntax",
+        "whitespace",
+        "source-identity"
+      ],
+      "command": "WorkflowYAMLparse; gitdiffHEAD --check;53material-file equality",
+      "fixture": "HEAD584/sourcee074, no additionalcandidateworkflow; nativeRust unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R19-workflow-syntax.txt",
+          "sha256": "ca8bb477e2095d7a55ca2cac529d2651e738cd5c79c0a4d3ce6d84a70a0317c5"
+        },
+        {
+          "path": "logs/R19-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        },
+        {
+          "path": "logs/R19-source.snapshot.txt",
+          "sha256": "7abeaf4a4fc80536e43ba6289ae6a5e12088eaa04f6def383b6a502287279b86"
+        },
+        {
+          "path": "logs/R19-candidate-equality.json",
+          "sha256": "fc04a715b0cd19d47d9f82f2135557e9dc2a61189ab441e705bd911863575b1c"
+        },
+        {
+          "path": "logs/R19-ci-source.json",
+          "sha256": "abd75206c072aa0cd6a647af8c7ac84612fb4a14e59ecc38f4ec55a725a36062"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "separate-service-failure-retention"
+      ],
+      "command": "ExactR18privateDoopjob133340704941",
+      "fixture": "Separatepinnedservice bunrun testfailsbeforeOpenBothelper; detailedcasecause notyetknown",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R18-failed-133340704941-annotations.json",
+          "sha256": "c7ae26778650b1449ef05ee77a5966ad576582e7ff21ee2eb5585ca121f479a1"
+        },
+        {
+          "path": "logs/R18-ci-43879335550-jobs1.json",
+          "sha256": "f503520164cc1943ab7426237c973d59b01694acb0f63c20f24a2600ec042e48"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "current-private-proof",
+        "final-gates"
+      ],
+      "command": "ActualR19CI43883869265/Memory43883869063",
+      "fixture": "Exact581576e7 currentprivatehelper runtime; diagnostics retained iffailure",
+      "status": "NOT EXERCISED",
+      "files": [
+        {
+          "path": "logs/R19-ci-runs1.json",
+          "sha256": "e64cd603aa86d8c48b6eea9fa70a3d339bb9b4b63e1f9d35a005fe1829e80fa5"
+        },
+        {
+          "path": "logs/R19-ci-43883869265-jobs1.json",
+          "sha256": "07c37312d912984c5b7d2951a5a7ad06d6a6ecb4f746f05a5602970da1756d86"
+        }
+      ],
+      "reason": "Privategate/currentremainingrequiredproof active; no finalphaseacceptance."
+    }
+  ]
+}

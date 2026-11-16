@@ -1,0 +1,15 @@
+{
+  "candidate": "e1f2be664aba6475e322f3de62debda0df0a7f74",
+  "matched_material_files": 52,
+  "mismatches": [],
+  "committed_d8_584_equal_tree": "c11161906e7b9764e6ee1429f4a5f0d54a1bc957",
+  "coordination52_matches": true,
+  "review_binary_sha256": "549a01e614e40436d7d3bb6835118fba768f633762bb005179ee85e88c692055",
+  "review_database": "pa03_p04_r18_review_test on owned PG51167; per-test own UUID databases",
+  "runtime_result": "5PASS/0FAIL/0IGNORE in3.73s; explicitRUST_MIN_STACK16777216,RUST_TEST_THREADS2; network guard",
+  "decision_hashes": {
+    "D1-r5.md": "75279608421f0e4ad95bd3b76f1ae2bc72dc5acd2a5b30822ec487bf902cf32f",
+    "D2-r4.md": "80de44c5ff0449dacb8683e82df60d1d17c28dabb51540957e524d50c3f3a948",
+    "D3-r2.md": "8b3fab53aa5529387b29f61788a555d1b94be5ee4e83bd1a3c38b4f382a94e6b"
+  }
+}

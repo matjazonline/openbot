@@ -1,0 +1,5 @@
+PASS shell/Python/generated fixture syntax; actual Linux execution requires CI
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+PASS root Darwin branch
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+PASS standalone Memory Darwin branch

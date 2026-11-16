@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R11-reviewer",
+  "artifact": "b02a5d77dc978805b9ac81cff068f3cd8377e7d55c0568571ebcfed288f209d1",
+  "checks": [
+    {
+      "criteria": [
+        "CAT1",
+        "CAT2",
+        "CAT3"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r18-review-libtest autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture jsonb_row_context_mcp_quarantines_discovery_and_effective_grants catalog_reads_are_tenant_scoped_and_exclude_deleted_rows autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review --nocapture",
+      "fixture": "Independent B; copied binary SHA549a01e614e40436d7d3bb6835118fba768f633762bb005179ee85e88c692055; ownedpa03_p04_r18_review_test/PG51167 and ownUUID fixtures; bothDBenvvars overridden; explicitRUST_MIN_STACK16777216,RUST_TEST_THREADS2;5PASS/0FAIL/0IGNORE3.73s. Reviewer DB dropped after checks; no Cargo.",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R11-reviewer-focused.txt",
+          "sha256": "eb3470b92202fa2bcd486d0e16b08f87c2539dfdbbf7ff9de722a8f1809c2c7d"
+        },
+        {
+          "path": "logs/B1-R11-reviewer-identity.json",
+          "sha256": "fb0581715178a3fb2fa6332e8656466c7b268ee189d04f95ccbbf7c36b3a3dd8"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "CAT4",
+        "final-verification"
+      ],
+      "command": "Actual current Linux23case4thread proof and remaining affected integration/image/gate checks",
+      "fixture": "Remote jobs active as assigned; no currentLinux or actualimage proof executed by B",
+      "status": "NOT EXERCISED",
+      "files": [],
+      "reason": "Source/focused checkpoint only; R16Linux17PASS/6FAIL remains unresolved until actual current proof and final evidence review."
+    }
+  ]
+}

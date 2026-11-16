@@ -1,0 +1,722 @@
+--- R3/.github/workflows/ci.yml
++++ R4/.github/workflows/ci.yml
+@@ -373,11 +373,12 @@
+               for chunk in iter(lambda: source.read(1024 * 1024), b""): digest.update(chunk)
+           (root / "doop-libtest-sha256.txt").write_text(digest.hexdigest() + "\n")
+           PY
+-      - name: Prepare the pinned private deployment dependencies and image
+-        run: |
+-          docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
+-          docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
+-          python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"
++      - name: Pull the pinned private PostgreSQL image
++        run: docker pull postgres:18.6-alpine@sha256:123b17998ccaf47e53b502e8c6a1e79afd8f579c6f3eec83c563da026f957395
++      - name: Pull the pinned private object-storage image
++        run: docker pull dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5
++      - name: Build the private Doop deployment image
++        run: python3 scripts/doop-test.py image --managed --directory "$RUNNER_TEMP/doop" --output "$RUNNER_TEMP/doop-image"
+       - name: Require both private storage modes and both actual probe families
+         run: |
+           python3 scripts/doop-test.py acceptance --directory "$RUNNER_TEMP/doop" \
+--- R3/.trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md
++++ R4/.trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md
+@@ -0,0 +1,35 @@
++---
++title: Native effect locks must start before shared authority helpers
++author: Mac02
++date: 2026-11-15
++branch: feature/plan03_04
++id: l-070f6689
++scope: repo
++status: active
++src: agent
++touches:
++  - ".github/workflows/ci.yml"
++  - ".github/workflows/memory-service.yml"
++  - plan/03-principal-addresses/COORDINATION.md
++  - plan/03-principal-addresses/phases/p04/docs/HANDOFF.md
++  - plan/03-principal-addresses/phases/p04/docs/REVIEW.md
++  - plan/03-principal-addresses/phases/p04/docs/TASK.md
++  - plan/03-principal-addresses/phases/p04/docs/agent-review-findings.md
++  - plan/03-principal-addresses/phases/p04/docs/agent-review-notes.md
++  - src/adapters/persistence/workflow/action_account_hints.rs
++  - src/adapters/persistence/workflow/action_authority.rs
++---
++
++## Decided
++
++The live native effect prefix belongs in the existing purpose-specific sorted account union. Merge the original workflow actor/requester with broker and credential-owner/reviewer accounts before company ownership, preserve the native NOWAIT mode through the outer run acquisition, and revalidate lineage afterward. Select the prefix by the operation being authorized. Reservation entry, live output return and the final credential guard still require current source authority after approval and remote-marker insertion. Structural replay and explicit receipt/history/reconciliation reads keep their separate contracts.
++
++## Tried and ruled out
++
++An inner native source guard with NOWAIT did not prevent the earlier shared facts helper from taking ordinary waiting account/company locks. The role-selector helper test passed while the real mcp_step_request boundary still blocked; the new genuine originating-workflow test and PostgreSQL wait sampling exposed it. An early complete source authorization would take company ownership before an integration credential owner's account and violate the single sorted union. Treating approval or dispatch-row existence as historical observation is also wrong: those rows can precede the first gateway entry. Do not clone or reconstruct an opaque remote reservation just to manufacture an entry retry after a failed consumed permit.
++
++## Watch out
++
++Native local actions deliberately have Workflow origin. FrozenAction::local_agent rejects Agent origin; a role-selected Agent-origin native fixture would require inventing a new producer or bypassing that guard. Obtain a distinct real requester through a genuine application message and MessageAdmissions, and exercise actor/requester/selected-revision contention at actual auth, admission, preparation, fresh-intent, MCP-use, reserved-entry, output-return and credential-final boundaries. Historical unknown recovery after original principal/member removal must still work. Generic checkpoint and policy/history helpers must not acquire a fresh parked-source dependency merely because a run has a native marker.
++
++In the code: src/adapters/persistence/workflow/action_account_hints.rs owns AccountPrefix and explicit live wrappers; native_mcp/accounts.rs observes current lineage; generic prelock_on remains unchanged. local_agent_mcp_source_tests.rs and its entry/integration children use production admission, real approval and three distinct account owners. `cargo test --locked --offline --lib native_mcp_` passed 43 cases with one pre-existing external-CLI ignore after this correction. Plan03 p04 logs/D1-r5.md and reviews 03PA-P04-B1-R2/F1, 03PA-P04-D1-R4/F1 document the counterexamples and accepted decision.
+--- R3/src/adapters/http/routes/agent_api_tests.rs
++++ R4/src/adapters/http/routes/agent_api_tests.rs
+@@ -46,7 +46,7 @@
+         .await
+         .unwrap()
+         .id;
+-        // Every company agent is created with a desk, which answers on a keyed model.
++        // Every company agent's direct binding answers on a keyed model.
+         CompanyPersistence::replace_model_connections_for_user(
+             persistence.as_ref(),
+             user,
+@@ -138,6 +138,31 @@
+     }
+ }
+ 
++async fn assert_direct_binding(f: &Fixture, agent: Uuid) {
++    let direct: bool = sqlx::query_scalar(
++        "SELECT count(*)=1 AND bool_and(binding.active AND binding.channel_id IS NULL \
++         AND endpoint.status='active' AND address.slug=agents.slug) \
++         FROM agents JOIN principals AS principal ON principal.agent_id=agents.id \
++           AND principal.company_id=agents.company_id \
++         JOIN addresses AS address ON address.principal_id=principal.id \
++           AND address.company_id=principal.company_id \
++         JOIN channel_bindings AS endpoint ON endpoint.principal_id=principal.id \
++           AND endpoint.company_id=principal.company_id \
++         JOIN workflow_bindings AS binding ON binding.principal_id=principal.id \
++           AND binding.company_id=principal.company_id \
++         WHERE agents.company_id=$1 AND agents.id=$2",
++    )
++    .bind(f.company)
++    .bind(agent)
++    .fetch_one(f.persistence.pool())
++    .await
++    .unwrap();
++    assert!(
++        direct,
++        "the copy has its active direct address and workflow binding"
++    );
++}
++
+ /// The JSON API answers with an agent's own fields only; the retired runtime settings are
+ /// neither returned nor accepted (p08 B4c).
+ #[tokio::test]
+@@ -178,7 +203,8 @@
+         AssistantChannelService, ProvisioningDeployment,
+     };
+     use crate::application::workflow::provisioning::{
+-        AssistantChannelRequest, AssistantChannels, CREATE_AGENT, LIST_COMPANY_AGENTS, ReplyMode,
++        AssistantChannelRequest, AssistantChannels, CREATE_AGENT, CREATE_DESK_FOR_AGENT,
++        LIST_COMPANY_AGENTS, ReplyMode,
+     };
+     use crate::use_cases::company::CompanyModelConnectionWrite;
+     let Some(f) = Fixture::new().await else {
+@@ -217,9 +243,8 @@
+         .create_agent_from_library(f.user, f.company, definition.id, None)
+         .await
+         .unwrap();
+-    // 01DEP-P03-D1: the copy comes with its default desk at its slug; "Create additional desk"
+-    // adds more.
+-    assert_eq!(company_channels().await, channels_before + 1);
++    assert_eq!(company_channels().await, channels_before);
++    assert_direct_binding(&f, copied.agent.id).await;
+     assert_eq!(
+         (
+             copied.agent.provider.as_deref(),
+@@ -238,7 +263,10 @@
+         .fetch_one(f.persistence.pool())
+         .await
+         .unwrap();
+-    assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT]);
++    assert_eq!(
++        grants,
++        [LIST_COMPANY_AGENTS, CREATE_AGENT, CREATE_DESK_FOR_AGENT]
++    );
+ 
+     let templates = ProvisioningDeployment::new(
+         Arc::new(
+@@ -266,6 +294,7 @@
+         .unwrap()
+         .unwrap();
+     assert_eq!(created["channel"]["slug"], "builder-desk");
++    assert_eq!(company_channels().await, channels_before + 1);
+     let company: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id = $1")
+         .bind(f.company)
+         .fetch_one(f.persistence.pool())
+--- R3/src/adapters/http/routes/agent_api_tests/public_settings.rs
++++ R4/src/adapters/http/routes/agent_api_tests/public_settings.rs
+@@ -94,7 +94,10 @@
+         State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
+         AuthenticatedUser { id: f.user },
+         Path(f.company),
+-        Json(json!({"name":"Public", "slug":"public", "open_to_public":true})),
++        Json(
++            json!({"name":"Public", "slug":"public", "open_to_public":true,
++            "native_permissions":"full"}),
++        ),
+     )
+     .await;
+     assert!(
+--- R3/src/adapters/mcp/authentication_tests.rs
++++ R4/src/adapters/mcp/authentication_tests.rs
+@@ -115,7 +115,7 @@
+             let method = ["initialize", "tools/list", "tools/call"][phase];
+             exchanges.push(ScriptedExchange::new(
+                 move |request| {
+-                    if request.body["method"] == method {
++                    if request.body["method"] == method && (phase != 2 || request.body["id"] == 1) {
+                         Ok(())
+                     } else {
+                         Err("unexpected authentication probe")
+@@ -123,6 +123,9 @@
+                 },
+                 response,
+             ));
++            if phase == 2 {
++                exchanges.push(cancellation(1));
++            }
+             let expected_requests = exchanges.len();
+             let server = scripted_scenario(exchanges).await;
+             let adapter = adapter(&server.base_url);
+--- R3/src/adapters/mcp/cleanup_tests.rs
++++ R4/src/adapters/mcp/cleanup_tests.rs
+@@ -0,0 +1,189 @@
++//! Caller abandonment and adapter shutdown compete for one real protocol cleanup.
++use super::*;
++use crate::services::test_support::ScriptedRequest;
++use std::sync::{Arc, Mutex};
++
++const VERSION: &str = "2025-06-18";
++
++fn accepted() -> ScriptedResponse {
++    let mut response = ScriptedResponse::json_body(String::new());
++    response.status = 202;
++    response
++}
++
++fn protocol(request: &ScriptedRequest, session: Option<&str>) -> Result<(), &'static str> {
++    if !request.header_matches("authorization", "Bearer mcp-key")
++        || !request.header_matches("mcp-protocol-version", VERSION)
++        || session.is_some_and(|id| !request.header_matches("mcp-session-id", id))
++    {
++        return Err("cleanup must preserve the actual connection protocol and credential metadata");
++    }
++    Ok(())
++}
++
++fn handshake(session: Option<&'static str>) -> Vec<ScriptedExchange> {
++    let mut response = ScriptedResponse::json(json!({"jsonrpc":"2.0","id":0,"result":{
++        "protocolVersion":VERSION,"capabilities":{"tools":{}},
++        "serverInfo":{"name":"cleanup fixture","version":"1"}}}));
++    if let Some(session) = session {
++        response
++            .headers
++            .push(("Mcp-Session-Id".into(), session.into()));
++    }
++    vec![
++        ScriptedExchange::new(
++            |request| {
++                if request.body["method"] == "initialize" {
++                    Ok(())
++                } else {
++                    Err("initialize required")
++                }
++            },
++            response,
++        ),
++        ScriptedExchange::new(
++            move |request| {
++                protocol(request, session)?;
++                if request.body["method"] == "notifications/initialized" {
++                    Ok(())
++                } else {
++                    Err("initialized required")
++                }
++            },
++            accepted(),
++        ),
++    ]
++}
++
++async fn competing_cleanup(session: Option<&'static str>) {
++    let (arrived, observed) = tokio::sync::oneshot::channel();
++    let (release, released) = tokio::sync::oneshot::channel();
++    let id = Arc::new(Mutex::new(None::<Value>));
++    let captured = id.clone();
++    let mut response = ScriptedResponse::json(json!({"jsonrpc":"2.0","id":1,
++        "result":{"content":[],"isError":false}}));
++    response.barrier = Some((arrived, released));
++    let mut script = handshake(session);
++    script.push(ScriptedExchange::new(
++        move |request| {
++            protocol(request, session)?;
++            if request.body["method"] != "tools/call" {
++                return Err("one effect call required");
++            }
++            *captured.lock().unwrap() = Some(request.body["id"].clone());
++            Ok(())
++        },
++        response,
++    ));
++    script.push(ScriptedExchange::new(
++        move |request| {
++            protocol(request, session)?;
++            if request.body["method"] == "notifications/cancelled"
++                && id.lock().unwrap().as_ref() == Some(&request.body["params"]["requestId"])
++            {
++                Ok(())
++            } else {
++                Err("exactly the dispatched request must be cancelled")
++            }
++        },
++        accepted(),
++    ));
++    if session.is_some() {
++        script.push(ScriptedExchange::new(
++            move |request| {
++                protocol(request, session)?;
++                if request.method == "DELETE" {
++                    Ok(())
++                } else {
++                    Err("DELETE must follow cancellation")
++                }
++            },
++            accepted(),
++        ));
++    }
++    let server = scripted_scenario(script).await;
++    let adapter = Arc::new(adapter(&server.base_url));
++    let connected = adapter
++        .connect(
++            &server.base_url.clone().try_into().unwrap(),
++            Some(SecretString::from("mcp-key")),
++        )
++        .await
++        .unwrap();
++    let call = tokio::spawn(async move {
++        connected
++            .call(&"lookup".to_owned().try_into().unwrap(), json!({}))
++            .await
++    });
++    observed.await.unwrap();
++    let start = Arc::new(tokio::sync::Barrier::new(3));
++    let drop_start = start.clone();
++    let dropped = tokio::spawn(async move {
++        drop_start.wait().await;
++        call.abort();
++        assert!(
++            !matches!(call.await, Ok(Ok(_))),
++            "held call cannot finish successfully before abandonment"
++        );
++        release.send(()).unwrap();
++    });
++    let stop_start = start.clone();
++    let stopping = adapter.clone();
++    let shutdown = tokio::spawn(async move {
++        stop_start.wait().await;
++        stopping.shutdown().await.unwrap();
++    });
++    start.wait().await;
++    dropped.await.unwrap();
++    shutdown.await.unwrap();
++    assert!(adapter.workers.lock().await.is_empty());
++    assert_eq!(
++        server.finish().await,
++        Ok(if session.is_some() { 5 } else { 4 })
++    );
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn mcp_drop_and_shutdown_compete_for_one_stateless_cancellation() {
++    Box::pin(competing_cleanup(None)).await;
++}
++
++#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
++async fn mcp_drop_and_shutdown_cancel_before_one_stateful_delete() {
++    Box::pin(competing_cleanup(Some("cleanup-session"))).await;
++}
++
++#[tokio::test]
++async fn mcp_completed_protocol_error_does_not_cancel_or_retry_the_call() {
++    let mut script = handshake(None);
++    script.push(ScriptedExchange::new(
++        |request| {
++            protocol(request, None)?;
++            if request.body["method"] == "tools/call" && request.body["id"] == 1 {
++                Ok(())
++            } else {
++                Err("one call required")
++            }
++        },
++        ScriptedResponse::json(json!({"jsonrpc":"2.0","id":1,
++            "error":{"code":-32603,"message":"remote failure"}})),
++    ));
++    let server = scripted_scenario(script).await;
++    let adapter = adapter(&server.base_url);
++    let session = adapter
++        .connect(
++            &server.base_url.clone().try_into().unwrap(),
++            Some(SecretString::from("mcp-key")),
++        )
++        .await
++        .unwrap();
++    assert!(
++        session
++            .call(&"lookup".to_owned().try_into().unwrap(), json!({}))
++            .await
++            .is_err()
++    );
++    session.close().await.unwrap();
++    adapter.shutdown().await.unwrap();
++    assert_eq!(server.finish().await, Ok(3));
++}
+--- R3/src/adapters/mcp/connection.rs
++++ R4/src/adapters/mcp/connection.rs
+@@ -55,6 +55,8 @@
+             endpoint: endpoint.as_str().to_owned(),
+             token: token.clone(),
+             session: Default::default(),
++            pending_call: Default::default(),
++            gate: Default::default(),
+         };
+         let transport = StreamableHttpClientTransport::with_client(
+             http::BoundedHttp {
+@@ -122,7 +124,7 @@
+                 _endpoint_permit: endpoint_permit,
+                 token,
+                 remaining,
+-                pending_call: Default::default(),
++                pending_call: cleanup.pending_call.clone(),
+                 stop: control.stop.clone(),
+                 finished: Some(finished),
+                 cleanup,
+--- R3/src/adapters/mcp/doop_tests.rs
++++ R4/src/adapters/mcp/doop_tests.rs
+@@ -319,6 +319,23 @@
+         json!({"name":"export_frame", "arguments":arguments}),
+         pdf,
+     ));
++    let mut cancelled = ScriptedResponse::json_body(String::new());
++    cancelled.status = 202;
++    exchanges.push(ScriptedExchange::new(
++        |request| {
++            if request.method == "POST"
++                && request.path == "/"
++                && request.header_matches("authorization", &format!("Bearer {KEY}"))
++                && request.body["method"] == "notifications/cancelled"
++                && request.body["params"]["requestId"] == 1
++            {
++                Ok(())
++            } else {
++                Err("oversized result must cancel the original call, never retry it")
++            }
++        },
++        cancelled,
++    ));
+     let server = scripted_scenario(exchanges).await;
+     let adapter = client(&server.base_url);
+     let session = adapter
+@@ -335,7 +352,7 @@
+     assert!(!error.to_string().contains(KEY));
+     session.close().await.unwrap();
+     adapter.shutdown().await.unwrap();
+-    assert_eq!(server.finish().await, Ok(3));
++    assert_eq!(server.finish().await, Ok(4));
+ }
+ 
+ #[tokio::test]
+--- R3/src/adapters/mcp/http.rs
++++ R4/src/adapters/mcp/http.rs
+@@ -43,33 +43,102 @@
+     pub endpoint: String,
+     pub token: Option<SecretString>,
+     pub session: Arc<std::sync::Mutex<Option<SessionIdentity>>>,
+-}
++    pub pending_call: Arc<std::sync::Mutex<Option<rmcp::model::RequestId>>>,
++    pub gate: Arc<tokio::sync::Mutex<()>>,
++}
++#[derive(Clone)]
+ pub(super) struct SessionIdentity {
+-    id: String,
++    id: Option<String>,
+     headers: HashMap<HeaderName, HeaderValue>,
+ }
+ impl Cleanup {
+-    pub async fn finish(&self) -> Result<(), Error> {
+-        let session = self
++    fn record_protocol(&self, id: Option<&str>, headers: &HashMap<HeaderName, HeaderValue>) {
++        *self
++            .session
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(SessionIdentity {
++            id: id.map(str::to_owned),
++            headers: headers.clone(),
++        });
++    }
++
++    pub async fn cancel_pending(&self) -> Result<(), Error> {
++        let _gate = self.gate.lock().await;
++        self.cancel_locked().await
++    }
++
++    async fn cancel_locked(&self) -> Result<(), Error> {
++        let pending = self
++            .pending_call
++            .lock()
++            .unwrap_or_else(|poisoned| poisoned.into_inner())
++            .take();
++        let Some(request_id) = pending else {
++            return Ok(());
++        };
++        let identity = self
+             .session
+             .lock()
+             .unwrap_or_else(|poisoned| poisoned.into_inner())
+-            .take();
+-        if let Some(SessionIdentity { id, headers }) = session {
+-            tokio::time::timeout(
+-                std::time::Duration::from_secs(5),
++            .clone();
++        let Some(identity) = identity else {
++            return Ok(());
++        };
++        let notification =
++            rmcp::model::CancelledNotification::new(rmcp::model::CancelledNotificationParam {
++                request_id,
++                reason: Some("Local execution cancelled".into()),
++            });
++        let message = ClientJsonRpcMessage::notification(notification.into());
++        // This fixed cleanup message must survive an already-stopped SDK. It cannot admit an effect.
++        let request = BoundedHttp::request(
++            &self.client,
++            Method::POST,
++            &self.endpoint,
++            identity.id.as_deref(),
++            self.token.as_ref().map(|t| t.expose_secret().to_owned()),
++            identity.headers,
++        )?
++        .json(&message);
++        let response = tokio::time::timeout(std::time::Duration::from_secs(3), request.send())
++            .await
++            .map_err(|_| failed())?
++            .map_err(|_| failed())?;
++        if response.status().is_success() {
++            Ok(())
++        } else {
++            Err(failed())
++        }
++    }
++
++    pub async fn finish(&self) -> Result<(), Error> {
++        // Gate, cancellation and fallback DELETE share the original total cleanup budget.
++        tokio::time::timeout(std::time::Duration::from_secs(5), async {
++            let _gate = self.gate.lock().await;
++            let _ = self.cancel_locked().await;
++            let session = self
++                .session
++                .lock()
++                .unwrap_or_else(|poisoned| poisoned.into_inner())
++                .take();
++            if let Some(SessionIdentity {
++                id: Some(id),
++                headers,
++            }) = session
++            {
+                 delete(
+                     &self.client,
+                     &self.endpoint,
+                     &id,
+                     self.token.as_ref().map(|t| t.expose_secret().to_owned()),
+                     headers,
+-                ),
+-            )
+-            .await
+-            .map_err(|_| failed())??;
+-        }
+-        Ok(())
++                )
++                .await?;
++            }
++            Ok(())
++        })
++        .await
++        .map_err(|_| failed())?
+     }
+ }
+ fn failed() -> Error {
+@@ -133,16 +202,8 @@
+     ) -> Result<StreamableHttpPostResponse, Error> {
+         // Only protocol cancellation is cleanup; initialize/catalog/call always require
+         // the real selected-generation authority after every preceding wait.
+-        if let Some(id) = session_id.as_deref() {
+-            *self
+-                .cleanup
+-                .session
+-                .lock()
+-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(SessionIdentity {
+-                id: id.to_owned(),
+-                headers: headers.clone(),
+-            });
+-        }
++        self.cleanup
++            .record_protocol(session_id.as_deref(), &headers);
+         let cleanup = matches!(&message, ClientJsonRpcMessage::Notification(n) if matches!(&n.notification,rmcp::model::ClientNotification::CancelledNotification(_)));
+         if !cleanup {
+             self.control.check().await.map_err(|_| failed())?;
+@@ -191,16 +252,8 @@
+         if session.as_ref().is_some_and(|s| s.len() > 1024) {
+             return Err(failed());
+         }
+-        if let Some(id) = session.as_deref().or(session_id.as_deref()) {
+-            *self
+-                .cleanup
+-                .session
+-                .lock()
+-                .unwrap_or_else(|poisoned| poisoned.into_inner()) = Some(SessionIdentity {
+-                id: id.to_owned(),
+-                headers,
+-            });
+-        }
++        self.cleanup
++            .record_protocol(session.as_deref().or(session_id.as_deref()), &headers);
+         let mime = response
+             .headers()
+             .get("content-type")
+@@ -238,6 +291,8 @@
+         auth: Option<String>,
+         headers: HashMap<HeaderName, HeaderValue>,
+     ) -> Result<(), Error> {
++        let _gate = self.cleanup.gate.lock().await;
++        let _ = self.cleanup.cancel_locked().await;
+         delete(&self.client, &uri, &session, auth, headers).await?;
+         self.cleanup
+             .session
+--- R3/src/adapters/mcp/mod.rs
++++ R4/src/adapters/mcp/mod.rs
+@@ -105,7 +105,7 @@
+     _endpoint_permit: OwnedSemaphorePermit,
+     token: Option<SecretString>,
+     remaining: Arc<std::sync::atomic::AtomicUsize>,
+-    pending_call: std::sync::Mutex<Option<rmcp::model::RequestId>>,
++    pending_call: Arc<std::sync::Mutex<Option<rmcp::model::RequestId>>>,
+     stop: tokio_util::sync::CancellationToken,
+     finished: Option<tokio::sync::oneshot::Receiver<()>>,
+     cleanup: http::Cleanup,
+@@ -212,7 +212,10 @@
+             .lock()
+             .map_err(|_| failed("MCP session unavailable"))? = Some(handle.id.clone());
+         let response = tokio::time::timeout(Duration::from_secs(30), handle.await_response()).await;
+-        if response.is_ok() {
++        if matches!(
++            &response,
++            Ok(Ok(_)) | Ok(Err(rmcp::service::ServiceError::McpError(_)))
++        ) {
+             self.pending_call
+                 .lock()
+                 .map_err(|_| failed("MCP session unavailable"))?
+@@ -347,15 +350,6 @@
+ 
+ impl Session {
+     async fn cancel_pending(&self) {
+-        let pending = self.pending_call.lock().ok().and_then(|mut id| id.take());
+-        if let Some(request_id) = pending {
+-            let params = rmcp::model::CancelledNotificationParam {
+-                request_id,
+-                reason: Some("Local execution cancelled".into()),
+-            };
+-            let _ =
+-                tokio::time::timeout(Duration::from_secs(3), self.client.notify_cancelled(params))
+-                    .await;
+-        }
+-    }
+-}
++        let _ = tokio::time::timeout(Duration::from_secs(3), self.cleanup.cancel_pending()).await;
++    }
++}
+--- R3/src/adapters/mcp/tests.rs
++++ R4/src/adapters/mcp/tests.rs
+@@ -122,6 +122,29 @@
+     HttpMcpClient::new(EndpointPolicy::new([format!("{}/", url.trim_end_matches('/'))]).unwrap())
+ }
+ 
++fn cancellation(request_id: u64) -> ScriptedExchange {
++    let mut response = ScriptedResponse::json_body(String::new());
++    response.status = 202;
++    ScriptedExchange::new(
++        move |request| {
++            if request.method == "POST"
++                && request.path == "/"
++                && request.header_matches("authorization", "Bearer mcp-key")
++                && request.body["method"] == "notifications/cancelled"
++                && request.body["params"]["requestId"] == request_id
++            {
++                Ok(())
++            } else {
++                Err("only the original request may be cancelled; no effect retry")
++            }
++        },
++        response,
++    )
++}
++
++#[path = "cleanup_tests.rs"]
++mod cleanup_tests;
++
+ #[tokio::test]
+ async fn mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links() {
+     let output = json!({"type":"object","properties":{"name":{"type":"string"}}});
+@@ -321,7 +344,7 @@
+     response.disconnect = true;
+     exchanges.push(ScriptedExchange::new(
+         |r| {
+-            if r.body["method"] == "tools/call" {
++            if r.body["method"] == "tools/call" && r.body["id"] == 1 {
+                 Ok(())
+             } else {
+                 Err("call expected")
+@@ -329,6 +352,7 @@
+         },
+         response,
+     ));
++    exchanges.push(cancellation(1));
+     let server = scripted_scenario(exchanges).await;
+     let adapter = adapter(&server.base_url);
+     let session = adapter
+@@ -345,7 +369,7 @@
+     assert!(error.to_string().contains("indeterminate"));
+     session.close().await.unwrap();
+     adapter.shutdown().await.unwrap();
+-    assert_eq!(server.finish().await, Ok(3));
++    assert_eq!(server.finish().await, Ok(4));
+ }
+ #[tokio::test]
+ async fn mcp_shutdown_joins_an_abandoned_session_and_closes_admission() {
+--- R3/src/adapters/persistence/legacy_runtime_schema_tests.rs
++++ R4/src/adapters/persistence/legacy_runtime_schema_tests.rs
+@@ -59,7 +59,6 @@
+     "response_review_email_enabled",
+     "delegation_timeout_email_enabled",
+     "task_failure_email_enabled",
+-    "owner_agent_id",
+     "response_trigger",
+     "preferred_reviewer_principal_id",
+     "external_response_review_override",
+@@ -192,7 +191,8 @@
+         "SELECT table_name || '.' || column_name FROM information_schema.columns \
+          WHERE table_schema = 'public' AND (column_name = ANY($1) \
+             OR (table_name, column_name) IN (('message_deliveries', 'task_id'), \
+-                ('task_attempts', 'result'), ('task_attempts', 'error'))) \
++                ('task_attempts', 'result'), ('task_attempts', 'error'), \
++                ('channels', 'owner_agent_id'))) \
+          ORDER BY 1",
+     )
+     .bind(RETIRED_COLUMN_NAMES)
+--- R3/src/adapters/persistence/skill_tests.rs
++++ R4/src/adapters/persistence/skill_tests.rs
+@@ -202,6 +202,8 @@
+     let agent = AgentPersistence::create(&persistence, company_id, agent_write("atomic-agent"))
+         .await
+         .unwrap();
++    crate::adapters::persistence::test_support::register_native_agent_address(&persistence, &agent)
++        .await;
+ 
+     let mut selected = agent_write("atomic-agent");
+     selected.skill_ids = vec![skill.id];

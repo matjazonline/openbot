@@ -1,0 +1,9 @@
+{
+  "HEAD": "584d7d69c02569c6a1410b1b75a4d0ce2b3d3287",
+  "R19_changed_material": [
+    ".github/workflows/ci.yml",
+    "scripts/check-doop.py",
+    "scripts/tests/check-runner.py"
+  ],
+  "coordination54_matches": true
+}

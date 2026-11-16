@@ -1,0 +1,15 @@
+﻿2026-11-16T14:38:31.9447461Z ##[group]Run cargo sqlx prepare --check -- --all-targets
+2026-11-16T14:38:31.9447787Z [36;1mcargo sqlx prepare --check -- --all-targets[0m
+2026-11-16T14:38:31.9475010Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:38:31.9475228Z env:
+2026-11-16T14:38:31.9475394Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:38:31.9475581Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:38:31.9476095Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:38:31.9476326Z   SQLX_OFFLINE: false
+2026-11-16T14:38:31.9476501Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:38:31.9476690Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:38:31.9476858Z   CARGO_TERM_COLOR: always
+2026-11-16T14:38:31.9477036Z   CACHE_ON_FAILURE: false
+2026-11-16T14:38:31.9477219Z ##[endgroup]
+2026-11-16T14:38:32.4057455Z [1m[92m    Checking[0m open_bots v0.1.0 (/home/runner/work/openbot/openbot)
+2026-11-16T14:40:49.5681521Z [1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 2m 17s

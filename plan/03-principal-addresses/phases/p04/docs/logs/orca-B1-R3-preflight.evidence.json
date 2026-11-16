@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R3-preflight",
+  "artifact": "3afe41d0dd998fb1209be1ed1e017ce940c06d6dc9b2185079d5496445e652df",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "03PA-P04-B1-R1/F1",
+        "03PA-P04-B1-R2/F1",
+        "D1/r5"
+      ],
+      "command": "cargo test --locked --offline --lib native_mcp_",
+      "fixture": "PG18.7 owned51167; pa03_p04_test + own_database fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-native2.txt",
+          "sha256": "474c1c44192f42645d8a0fdce46b3f6daa9aa0c44c7b01ff635023f90329f254"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "ordinary consumer/replay/approval/credential/lock order"
+      ],
+      "command": "compiled current libtest executable; exact eight filters in orca-prefix-ordinary-focused.txt/TASK",
+      "fixture": "PG18.7 owned51167; pa03_p04_test + own_database fixtures",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-ordinary-focused.txt",
+          "sha256": "6636fc3c6fe93931a2463df8f7ec5f27744b8900d81b070b7732776f4750e4eb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "SQLx"
+      ],
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "fixture": "owned dev DBpa03_p04_dev/51167; init schema unchanged, .sqlx byte-unchanged",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-sqlx-prepare.txt",
+          "sha256": "136ab08edc2efc41e9fa10cb03ef956f87ceefc1861ce3b95834c540f12ad9b1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC1",
+        "FC2",
+        "FC3",
+        "transport/sample/integration boundaries"
+      ],
+      "command": "seven exact commands in orca-prefix-boundaries.json",
+      "fixture": "current source, real rg, PYTHONDONTWRITEBYTECODE=1",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-boundaries.json",
+          "sha256": "38b22ff3ab00baec04ff7aa5126dd31c08bd5ad4332329dc2152ecb1f64d7b1d"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-1.txt",
+          "sha256": "480891f26caa8bd468e29fde86837c36980ab880981422add136e69cc813b7e0"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-2.txt",
+          "sha256": "c923ead8c556a6ed82fc4c192c87b3e0b8e00568630d34a849de155536ef1789"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-3.txt",
+          "sha256": "160633ca336f772613a032b60c2aa43d19cd24e0d2d6ba15a363b5c9143164fa"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-4.txt",
+          "sha256": "228c0f0f23407594379b257a3e3684550f2f3eb1741d27acbc9be312e22e6d2d"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-5.txt",
+          "sha256": "2a62f948591942806b7aaefd74bf084c88335a25dda9487bcf4e6fb6dce94501"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-6.txt",
+          "sha256": "9f55dabd846b9377bfba6441b555d4ae8090f5b38d967ea08d6c338e9346f00a"
+        },
+        {
+          "path": "logs/orca-prefix-boundary-7.txt",
+          "sha256": "5cf88675881d2c2ff97e4c8c39b48cfd07618058a3d6d536fa707ca2608cbcf2"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3",
+        "test discovery"
+      ],
+      "command": "current libtest --list; compare retained merged-binary-inventory1.txt",
+      "fixture": "4690->4700,10 additions,0 removals; current correction5 additions since4695",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-inventory.txt",
+          "sha256": "f7b2a9b5ba67473f74bfb3b4e77b65ede62cc8c7929b844ffce6200b4625be77"
+        },
+        {
+          "path": "logs/orca-prefix-inventory-delta.json",
+          "sha256": "3136f950eb5fa11d532c38f5de1ef40fc0ba922626aaa93c5ffeffd77cbfac20"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "graph"
+      ],
+      "command": "trail build",
+      "fixture": "deterministic current graph, ignored local cache",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/orca-prefix-trail-build.txt",
+          "sha256": "6f70f894659c6e93c3ae362dd0bc641d5732bd377dcc6f252af1523265e7bf15"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "scripts/check.sh and remaining CI gates",
+      "fixture": "owned local check DB + exact current material CIcandidate a23d83bd",
+      "status": "NOT EXERCISED",
+      "reason": "Final gate/current CI results pending; final acceptance requires a new completed manifest."
+    }
+  ]
+}

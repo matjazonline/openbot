@@ -1,0 +1,33 @@
+﻿2026-11-16T14:46:00.5684369Z ##[group]Run cargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored
+2026-11-16T14:46:00.5685115Z [36;1mcargo test --locked --offline --lib dump_autonomous_workflow_agent_picker_browser_fixtures -- --ignored[0m
+2026-11-16T14:46:00.5685911Z [36;1mnode --test scripts/tests/workflow-agent-picker-browser.mjs[0m
+2026-11-16T14:46:00.5712281Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:46:00.5712728Z env:
+2026-11-16T14:46:00.5713219Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:46:00.5713664Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:46:00.5714334Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:46:00.5714712Z   SQLX_OFFLINE: true
+2026-11-16T14:46:00.5715051Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:46:00.5715467Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:46:00.5715966Z   CARGO_TERM_COLOR: always
+2026-11-16T14:46:00.5716310Z   CACHE_ON_FAILURE: false
+2026-11-16T14:46:00.5716721Z   WORKFLOW_AGENT_BROWSER_FIXTURES: /tmp/workflow-agent-browser
+2026-11-16T14:46:00.5717504Z ##[endgroup]
+2026-11-16T14:46:00.7651902Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:46:00.7835404Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:46:00.7909926Z 
+2026-11-16T14:46:00.7910397Z running 1 test
+2026-11-16T14:46:02.5757707Z test adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures ... ok
+2026-11-16T14:46:02.5758436Z 
+2026-11-16T14:46:02.5758814Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 1.78s
+2026-11-16T14:46:02.5759266Z 
+2026-11-16T14:46:04.0351075Z ✔ workflow agent choices preserve source and ignore transformations after editing or navigation (1176.31102ms)
+2026-11-16T14:46:05.1340696Z ✔ reviewer roles and people update unsaved source with visible progress and stale-response protection (1101.014933ms)
+2026-11-16T14:46:05.1474612Z ℹ tests 2
+2026-11-16T14:46:05.1475273Z ℹ suites 0
+2026-11-16T14:46:05.1476252Z ℹ pass 2
+2026-11-16T14:46:05.1476758Z ℹ fail 0
+2026-11-16T14:46:05.1477193Z ℹ cancelled 0
+2026-11-16T14:46:05.1477860Z ℹ skipped 0
+2026-11-16T14:46:05.1478422Z ℹ todo 0
+2026-11-16T14:46:05.1478935Z ℹ duration_ms 2530.286517

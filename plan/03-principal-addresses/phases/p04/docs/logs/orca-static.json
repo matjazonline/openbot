@@ -1,0 +1,178 @@
+[
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "typecheck"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-1.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "build"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-2.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "test"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-3.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "test:guards"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-4.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "--prefix",
+      "integrations/cloudroom-plugin",
+      "run",
+      "package"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-5.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "check:css"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-6.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "run",
+      "test:run-counts"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-7.txt"
+  },
+  {
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/sse-navigation.mjs",
+      "scripts/tests/agent-runtime.mjs",
+      "scripts/tests/channel-response-authoring.mjs",
+      "scripts/tests/workflow-runs.mjs",
+      "scripts/tests/workflow-conversations.mjs",
+      "scripts/tests/workflow-samples.mjs"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-8.txt"
+  },
+  {
+    "command": [
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-9.txt"
+  },
+  {
+    "command": [
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-10.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-11.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-12.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-13.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-14.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-15.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/knowledge-model-prepare.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-16.txt"
+  },
+  {
+    "command": [
+      "/usr/bin/python3",
+      "scripts/tests/doop-test.py"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-17.txt"
+  },
+  {
+    "command": [
+      "node",
+      "--test",
+      "scripts/tests/doop-probe.mjs"
+    ],
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-static-18.txt"
+  },
+  {
+    "command": [
+      "npm",
+      "ci",
+      "--omit=dev"
+    ],
+    "fixture": "owned extracted package",
+    "exit": 1,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/orca-package-install.txt"
+  }
+]

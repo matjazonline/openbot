@@ -5,3 +5,5 @@ integrations/doop/managed.patch whitespace=-blank-at-eol
 # Preserve section-boundary newlines when reconstructing the complete upstream guide.
 integrations/doop/document-guide-1.md whitespace=-blank-at-eof
 integrations/doop/document-guide-2.md whitespace=-blank-at-eof
+# Verification artifacts retain exact bytes, including spacing covered by evidence hashes.
+plan/03-principal-addresses/phases/p04/docs/logs/** -text -whitespace

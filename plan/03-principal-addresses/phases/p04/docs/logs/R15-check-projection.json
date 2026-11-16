@@ -1,0 +1,22 @@
+{
+  "base": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "changed_runtime_and_test_paths": [
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "src/adapters/persistence/test_support.rs",
+    "src/adapters/persistence/workflow/agent_history_process_driver.rs",
+    "src/adapters/persistence/workflow/channel_reply_recovery_tests.rs"
+  ],
+  "classification": {
+    "test_only_rust": [
+      "src/adapters/persistence/test_support.rs",
+      "src/adapters/persistence/workflow/agent_history_process_driver.rs",
+      "src/adapters/persistence/workflow/channel_reply_recovery_tests.rs"
+    ],
+    "Linux_helper_and_regression": [
+      "scripts/tests/network-isolation-scope.py",
+      "services/memory/scripts/network-isolation-linux.sh"
+    ]
+  },
+  "reuse": "All production Rust/Cargo/migrations/Darwin wrapper bytes unchanged from R13; historical full main/stock/lease cover that scope only. New fixture Rust and current Linux paths require focused R15/D3-r2 proof. No source change to Doop time or bounds."
+}

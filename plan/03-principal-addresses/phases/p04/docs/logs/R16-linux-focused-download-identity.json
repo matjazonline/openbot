@@ -1,0 +1,9 @@
+{
+  "run": 43867269846,
+  "job": 133298924079,
+  "candidate": "1e58fa362e7fd98b5f0772c74bcde6004988934e",
+  "archive_sha256": "df5827943ffff1c2ac580f5e71c66aec3ad4fe272debd2a677b1c6fc9a87ead7",
+  "entry": "focused-linux/9_Exercise actual Linux paths under network isolation with four competing test threads.txt",
+  "entry_sha256": "26c7f4f6c5a4f3bad41e13e0591e364615e1fcf2eed271bb10dde1dc2dc6bac1",
+  "acquisition": "Authenticated GitHub Download log archive in dedicated CI browser; candidate identity confirmed in job setup"
+}

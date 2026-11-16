@@ -1,0 +1,12 @@
+{
+  "commit": "d68c7353dce5957a9a64eb33f8faf2d22edc5863",
+  "parent": "8cd82c3024570dc7ee1951842c2b74567cc8e3d7",
+  "tree": "7d912a453f26fcafde85d88ccdbf7a2eec8fcc50",
+  "branch": "codex/plan03-p04-r15-d68c7353",
+  "changed_files": [
+    "src/adapters/persistence/test_support.rs",
+    "src/adapters/persistence/workflow/agent_history_process_driver.rs",
+    "src/adapters/persistence/workflow/channel_reply_recovery_tests.rs"
+  ],
+  "claim": "Only three fixture corrections added to exact D3/r2 candidate; actual worktree HEAD/index unchanged. Required original CI/Memory/private workflows preserved."
+}

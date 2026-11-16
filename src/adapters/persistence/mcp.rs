@@ -37,6 +37,12 @@ const CONNECTION_SELECT: &str = "SELECT connection.company_id, connection.id, co
 impl TryFrom<ConnectionRow> for CompanyMcpConnection {
     type Error = AppError;
     fn try_from(row: ConnectionRow) -> AppResult<Self> {
+        row.into_connection(None)
+    }
+}
+impl ConnectionRow {
+    fn into_connection(self, catalog: Option<ReadCatalog>) -> AppResult<CompanyMcpConnection> {
+        let row = self;
         let auth = match row.auth_type.as_str() {
             "none" => McpAuth::None,
             "bearer" => McpAuth::Bearer,
@@ -63,7 +69,11 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
         };
         // Validate ordinary settings strictly before the optional catalog is considered.
         write.validate()?;
-        match read_catalog(row.discovery_json, row.tool_grants) {
+        let catalog = match catalog {
+            Some(catalog) => Ok(catalog),
+            None => read_catalog(row.discovery_json, row.tool_grants),
+        };
+        match catalog {
             Ok(catalog) => {
                 write.discovered_tools = catalog.tools;
                 write.tool_grants = catalog.grants;
@@ -71,7 +81,7 @@ impl TryFrom<ConnectionRow> for CompanyMcpConnection {
             Err(error) => tracing::warn!(connection_id = %row.id, error,
                 "Stored MCP discovery was quarantined"),
         }
-        Ok(Self {
+        Ok(CompanyMcpConnection {
             access_level: crate::entities::access_level::AccessLevel::try_from(row.access_level)
                 .map_err(|_| invalid("Invalid connection access level"))?,
             company_id: row.company_id,
@@ -171,8 +181,10 @@ pub(super) async fn publication_connection_with_locks_on(
     .fetch_optional(db)
     .await?;
     row.map(|row| {
-        read_catalog(row.discovery_json.clone(), row.tool_grants.clone()).map_err(invalid)?;
-        row.try_into()
+        let catalog =
+            read_catalog(row.discovery_json.clone(), row.tool_grants.clone()).map_err(invalid)?;
+        // This exact row's catalog has passed strict validation; convert it once.
+        row.into_connection(Some(catalog))
     })
     .transpose()
 }

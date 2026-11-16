@@ -1,0 +1,6 @@
+{
+  "base": "3d186172a778602dd82d790eb2ef230c80cc045d",
+  "purpose": "R5 MCP source plus timing-only prints; Debug formatter corrected after first diagnostic compilation failed",
+  "path": "src/adapters/mcp/mod.rs",
+  "sha256": "5f7d6d3dd36b7269bc1141911c849889e910ae6eee7aa40a89c2b4fab58e52df"
+}

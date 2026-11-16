@@ -1,0 +1,1 @@
+integration docs: 3 link sets, 171 startup reset notices, configuration and CI inventory PASS

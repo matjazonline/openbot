@@ -1,0 +1,123 @@
+⚠ the diff is over 400 KB; only the first 400 KB is checked
+checking 53 changed files against 14 learnings and 4 skills
+
+● plan/03-principal-addresses/COORDINATION.md:25
+  sets p04 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 15: Plan03 p04 logs/D1-r5.md and reviews
+  03PA-P04-B1-R2/F1, 03PA-P04-D1-R4/F1 document the counterexamples
+  and accepted decision.
+● plan/03-principal-addresses/COORDINATION.md:25
+  sets p04 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Retained failure and passing source identities are in
+  plan/03-principal-addresses/phases/p04/docs/logs/R10-scope-failure-annotations.json,
+  R11-scope-failure-annotations.json,
+  R12-scope-failure-annotations.json and
+  R13-ci-43846081398-jobs1.json.
+● plan/03-principal-addresses/COORDINATION.md:25
+  sets p04 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 15: Plan03 p04 D2/r4 and D2-r4-old-ordering-proof.json
+  retain the decision and counterexample; B1-R4/F1 is the independent
+  finding.
+● plan/03-principal-addresses/COORDINATION.md:25
+  sets p04 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Accepted decision D3/r1 and independent
+  findings03PA-P04-B1-R8/F1-F2 are retained under
+  plan/03-principal-addresses/phases/p04/docs/.
+● plan/03-principal-addresses/COORDINATION.md:25
+  sets p04 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Investigation evidence:
+  plan/03-principal-addresses/phases/p04/docs/logs/R6-doop-cleanup-timing2.txt
+  and R6-doop-sample-excerpt.txt.
+● plan/03-principal-addresses/COORDINATION.md:304
+  brings back chang exact user, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Avoided changing more of this old dependency by doing
+  exact per-user discovery in the wrapper and invoking -p instead.
+● plan/03-principal-addresses/COORDINATION.md:315
+  brings back output active real, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Verbose output showed 100% active time and zero sleep
+  despite real CPU exceeding 100%; this was not a signal permission
+  issue.
+● plan/03-principal-addresses/COORDINATION.md:316
+  brings back grant check exist, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● plan/03-principal-addresses/COORDINATION.md:318
+  brings back fail build command, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A failing build can then be followed by a successful
+  command and the gate is reported as passing.
+● plan/03-principal-addresses/COORDINATION.md:334
+  brings back owned child open, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Inspection showed the owned download child blocked
+  with the archive and partially written icudtl.dat open, with no
+  executable installed.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:4
+  brings back root head unit, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 16: Root privileges or upgrading to that HEAD would not
+  fix the units.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:8
+  brings back git pull stash, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 14: `git pull --rebase` with autostash, or a manual stash:
+  forbidden, because it stashes the user's preserved edits.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:11
+  brings back openbot persistence two, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 14: A literal like `<escalation-{id}@openbot.invalid>`
+  built in persistence breaks the transport boundary in two ways: it
+  is a synthetic `.invalid` identity, and it is an RFC id made outside
+  the email adapter.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:12
+  sets retained to 1, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Retained failure and passing source identities are in
+  plan/03-principal-addresses/phases/p04/docs/logs/R10-scope-failure-annotations.json,
+  R11-scope-failure-annotations.json,
+  R12-scope-failure-annotations.json and
+  R13-ci-43846081398-jobs1.json.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:12
+  sets retained to 1, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Accepted decision D3/r1 and independent
+  findings03PA-P04-B1-R8/F1-F2 are retained under
+  plan/03-principal-addresses/phases/p04/docs/.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:15
+  brings back grant check exist, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:21
+  brings back build gate pass, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 16: A failing build can then be followed by a successful
+  command and the gate is reported as passing.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:29
+  sets proof to 4, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 15: Plan03 p04 D2/r4 and D2-r4-old-ordering-proof.json
+  retain the decision and counterexample; B1-R4/F1 is the independent
+  finding.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:50
+  sets plan03 to 04, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 15: Plan03 p04 logs/D1-r5.md and reviews
+  03PA-P04-B1-R2/F1, 03PA-P04-D1-R4/F1 document the counterexamples
+  and accepted decision.
+● plan/03-principal-addresses/phases/p04/docs/HANDOFF.md:134
+  sets plan to 03, which Mac02's learning warned about
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Investigation evidence:
+  plan/03-principal-addresses/phases/p04/docs/logs/R6-doop-cleanup-timing2.txt
+  and R6-doop-sample-excerpt.txt.
+
+· no conflicts · 20 worth a look

@@ -1,0 +1,34 @@
+﻿2026-11-16T14:45:49.4169161Z ##[group]Run cargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored
+2026-11-16T14:45:49.4169869Z [36;1mcargo test --locked --offline --lib dump_html_injection_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:49.4170506Z [36;1mnode --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs[0m
+2026-11-16T14:45:49.4197806Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:49.4198213Z env:
+2026-11-16T14:45:49.4198549Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:49.4198899Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:49.4199500Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:49.4199949Z   SQLX_OFFLINE: true
+2026-11-16T14:45:49.4200293Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:49.4200646Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:49.4200988Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:49.4201327Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:49.4201764Z   HTML_INJECTION_BROWSER_FIXTURES: /tmp/html-injection-browser
+2026-11-16T14:45:49.4202360Z   APP_JS_OUT: /tmp/html-injection-browser/app.js
+2026-11-16T14:45:49.4202752Z ##[endgroup]
+2026-11-16T14:45:49.6143398Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:49.6326609Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:49.6396354Z 
+2026-11-16T14:45:49.6396718Z running 1 test
+2026-11-16T14:45:49.6417173Z test adapters::http::pages::tests::dump_html_injection_browser_fixtures ... ok
+2026-11-16T14:45:49.6417574Z 
+2026-11-16T14:45:49.6418037Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.00s
+2026-11-16T14:45:49.6418474Z 
+2026-11-16T14:45:50.7819654Z ✔ form feedback and another member’s team autocomplete stay text under production CSP (841.544807ms)
+2026-11-16T14:45:50.7933237Z ✔ served team autocomplete renders account strings as text and keeps selection working (284.881053ms)
+2026-11-16T14:45:50.7935095Z ℹ tests 2
+2026-11-16T14:45:50.7935630Z ℹ suites 0
+2026-11-16T14:45:50.7936201Z ℹ pass 2
+2026-11-16T14:45:50.7936556Z ℹ fail 0
+2026-11-16T14:45:50.7936887Z ℹ cancelled 0
+2026-11-16T14:45:50.7937322Z ℹ skipped 0
+2026-11-16T14:45:50.7937658Z ℹ todo 0
+2026-11-16T14:45:50.7938066Z ℹ duration_ms 1120.386986

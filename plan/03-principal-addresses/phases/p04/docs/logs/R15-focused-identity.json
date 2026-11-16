@@ -1,0 +1,16 @@
+{
+  "binary": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+  "sha256": "7f486896379759df1e63b3abf3f2c9c68e2af79937e643c9779ed1663efd36d8",
+  "DATABASE_URL": "owned pa03_p04_test on localhost51167",
+  "TEST_DATABASE_URL": "unset",
+  "baseline_returncode": 101,
+  "returncode": 0,
+  "selected": [
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::crashes::agent_history_e2e_process_crashes_reconstruct_durable_frontiers_without_duplicate_calls",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_after_durable_enqueue_and_cancelled_middle_turn_recovers_in_order",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::selection::private::e2e::queue_crashes::agent_history_e2e_process_crash_before_successor_wakeup_recovers_by_poll_without_releasing_successor",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::recovery::channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant"
+  ]
+}

@@ -1,0 +1,77 @@
+[
+  {
+    "path": "src/adapters/mcp/mod.rs",
+    "sha256": "a3cb97938b452f91a6d04651d831770f3df7971d0d9aa39d67936a8fc752461c",
+    "spans": [
+      {
+        "start": 60,
+        "end": 73,
+        "source": "    async fn shutdown(&self) -> AppResult<()> {\n        self.capacity.close();\n        self.close_endpoint_capacity();\n        self.shutdown.cancel();\n        let mut workers = self.workers.lock().await;\n        let mut failed_worker = false;\n        while let Some(result) = workers.join_next().await {\n            failed_worker |= result.is_err();\n        }\n        if failed_worker {\n            return Err(failed(\"MCP worker shutdown failed\"));\n        }\n        Ok(())\n    }"
+      },
+      {
+        "start": 202,
+        "end": 247,
+        "source": "        let handle = self\n            .client\n            .send_cancellable_request(\n                request.into(),\n                rmcp::service::PeerRequestOptions::no_options(),\n            )\n            .await\n            .map_err(|error| errors::service(error, \"MCP effect indeterminate; do not retry\"))?;\n        *self\n            .pending_call\n            .lock()\n            .map_err(|_| failed(\"MCP session unavailable\"))? = Some(handle.id.clone());\n        let response = tokio::time::timeout(Duration::from_secs(30), handle.await_response()).await;\n        if matches!(\n            &response,\n            Ok(Ok(_)) | Ok(Err(rmcp::service::ServiceError::McpError(_)))\n        ) {\n            self.pending_call\n                .lock()\n                .map_err(|_| failed(\"MCP session unavailable\"))?\n                .take();\n        }\n        let result = response\n            .map_err(|_| failed(\"MCP effect indeterminate; do not retry\"))?\n            .map_err(|error| errors::service(error, \"MCP effect indeterminate; do not retry\"))?;\n        let rmcp::model::ServerResult::CallToolResult(result) = result else {\n            return Err(failed(\"MCP effect indeterminate; do not retry\"));\n        };\n        self.parse_result(result)\n    }\n    async fn close(mut self: Box<Self>) -> AppResult<()> {\n        self.cancel_pending().await;\n        self.stop.cancel();\n        let closed = self\n            .client\n            .close_with_timeout(Duration::from_secs(35))\n            .await;\n        if let Some(finished) = self.finished.take() {\n            finished\n                .await\n                .map_err(|_| failed(\"MCP HTTP cleanup failed\"))?;\n        }\n        self.cleanup\n            .finish()\n            .await\n            .map_err(|_| failed(\"MCP session cleanup failed\"))?;"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/mcp/http.rs",
+    "sha256": "52bacd04608b7ec1bfc8ea7cb74c7f83600c92a6661edf30e778443dd784ff8f",
+    "spans": [
+      {
+        "start": 65,
+        "end": 112,
+        "source": "    pub async fn cancel_pending(&self) -> Result<(), Error> {\n        let _gate = self.gate.lock().await;\n        self.cancel_locked().await\n    }\n\n    async fn cancel_locked(&self) -> Result<(), Error> {\n        let pending = self\n            .pending_call\n            .lock()\n            .unwrap_or_else(|poisoned| poisoned.into_inner())\n            .take();\n        let Some(request_id) = pending else {\n            return Ok(());\n        };\n        let identity = self\n            .session\n            .lock()\n            .unwrap_or_else(|poisoned| poisoned.into_inner())\n            .clone();\n        let Some(identity) = identity else {\n            return Ok(());\n        };\n        let notification =\n            rmcp::model::CancelledNotification::new(rmcp::model::CancelledNotificationParam {\n                request_id,\n                reason: Some(\"Local execution cancelled\".into()),\n            });\n        let message = ClientJsonRpcMessage::notification(notification.into());\n        // This fixed cleanup message must survive an already-stopped SDK. It cannot admit an effect.\n        let request = BoundedHttp::request(\n            &self.client,\n            Method::POST,\n            &self.endpoint,\n            identity.id.as_deref(),\n            self.token.as_ref().map(|t| t.expose_secret().to_owned()),\n            identity.headers,\n        )?\n        .json(&message);\n        let response = tokio::time::timeout(std::time::Duration::from_secs(3), request.send())\n            .await\n            .map_err(|_| failed())?\n            .map_err(|_| failed())?;\n        if response.status().is_success() {\n            Ok(())\n        } else {\n            Err(failed())\n        }\n    }"
+      },
+      {
+        "start": 287,
+        "end": 303,
+        "source": "    async fn delete_session(\n        &self,\n        uri: Arc<str>,\n        session: Arc<str>,\n        auth: Option<String>,\n        headers: HashMap<HeaderName, HeaderValue>,\n    ) -> Result<(), Error> {\n        let _gate = self.cleanup.gate.lock().await;\n        let _ = self.cleanup.cancel_locked().await;\n        delete(&self.client, &uri, &session, auth, headers).await?;\n        self.cleanup\n            .session\n            .lock()\n            .unwrap_or_else(|poisoned| poisoned.into_inner())\n            .take();\n        Ok(())\n    }"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/mcp/cleanup_tests.rs",
+    "sha256": "4c1d88947d780eec2cafaaa32db3826592fd7b44cba04af3b2072669141a77cb",
+    "spans": [
+      {
+        "start": 108,
+        "end": 154,
+        "source": "            &server.base_url.clone().try_into().unwrap(),\n            Some(SecretString::from(\"mcp-key\")),\n        )\n        .await\n        .unwrap();\n    let call = tokio::spawn(async move {\n        connected\n            .call(&\"lookup\".to_owned().try_into().unwrap(), json!({}))\n            .await\n    });\n    observed.await.unwrap();\n    let start = Arc::new(tokio::sync::Barrier::new(3));\n    let drop_start = start.clone();\n    let dropped = tokio::spawn(async move {\n        drop_start.wait().await;\n        call.abort();\n        assert!(\n            !matches!(call.await, Ok(Ok(_))),\n            \"held call cannot finish successfully before abandonment\"\n        );\n        release.send(()).unwrap();\n    });\n    let stop_start = start.clone();\n    let stopping = adapter.clone();\n    let shutdown = tokio::spawn(async move {\n        stop_start.wait().await;\n        stopping.shutdown().await.unwrap();\n    });\n    start.wait().await;\n    dropped.await.unwrap();\n    shutdown.await.unwrap();\n    assert!(adapter.workers.lock().await.is_empty());\n    assert_eq!(\n        server.finish().await,\n        Ok(if session.is_some() { 5 } else { 4 })\n    );\n}\n\n#[tokio::test(flavor = \"multi_thread\", worker_threads = 2)]\nasync fn mcp_drop_and_shutdown_compete_for_one_stateless_cancellation() {\n    Box::pin(competing_cleanup(None)).await;\n}\n\n#[tokio::test(flavor = \"multi_thread\", worker_threads = 2)]\nasync fn mcp_drop_and_shutdown_cancel_before_one_stateful_delete() {\n    Box::pin(competing_cleanup(Some(\"cleanup-session\"))).await;\n}"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rmcp-1.8.0/src/service.rs",
+    "sha256": "87af5ef04e9a35c4614d382f196c93c3d313b6a2d3ae8fd545062abdc13f2162",
+    "spans": [
+      {
+        "start": 616,
+        "end": 671,
+        "source": "    pub async fn send_request_with_option(\n        &self,\n        mut request: R::Req,\n        options: PeerRequestOptions,\n    ) -> Result<RequestHandle<R>, ServiceError> {\n        let id = self.request_id_provider.next_request_id();\n        let progress_token = self.progress_token_provider.next_progress_token();\n        if let Some(meta) = options.meta.clone() {\n            request.get_meta_mut().extend(meta);\n        }\n        request\n            .get_meta_mut()\n            .set_progress_token(progress_token.clone());\n        let (responder, receiver) = tokio::sync::oneshot::channel();\n        let progress_reset_rx = if options.reset_timeout_on_progress && options.timeout.is_some() {\n            let (sender, receiver) = mpsc::channel(1);\n            self.progress_timeout_watchers\n                .write()\n                .await\n                .insert(progress_token.clone(), sender);\n            Some(receiver)\n        } else {\n            None\n        };\n        if self\n            .tx\n            .send(PeerSinkMessage::Request {\n                request,\n                id: id.clone(),\n                responder,\n            })\n            .await\n            .is_err()\n        {\n            if progress_reset_rx.is_some() {\n                self.progress_timeout_watchers\n                    .write()\n                    .await\n                    .remove(&progress_token);\n            }\n            return Err(ServiceError::TransportClosed);\n        }\n        Ok(RequestHandle {\n            id,\n            rx: receiver,\n            progress_token,\n            options,\n            peer: self.clone(),\n            progress_reset_rx,\n        })\n    }\n\n    async fn notify_progress_timeout_watcher(&self, progress_token: &ProgressToken) {\n        let sender = self\n            .progress_timeout_watchers\n            .read()"
+      },
+      {
+        "start": 1115,
+        "end": 1130,
+        "source": "                Event::ProxyMessage(PeerSinkMessage::Request {\n                    request,\n                    id,\n                    responder,\n                }) => {\n                    local_responder_pool.insert(id.clone(), responder);\n                    let send = transport.send(JsonRpcMessage::request(request, id.clone()));\n                    {\n                        let id = id.clone();\n                        let current_span = tracing::Span::current();\n                        send_task_set.spawn(send.map(move |r| SendTaskResult::Request {\n                            id,\n                            result: r.map_err(DynamicTransportError::new::<T, R>),\n                        }).instrument(current_span));\n                    }\n                }"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rmcp-1.8.0/src/transport/streamable_http_client.rs",
+    "sha256": "1d92ea80e9254cf14d6da3d33589bf008e289daf352c27f352f8712716c6b5a6",
+    "spans": [
+      {
+        "start": 614,
+        "end": 667,
+        "source": "        }\n        // Main event loop - capture exit reason so we can do cleanup before returning\n        let loop_result: Result<(), WorkerQuitReason<Self::Error>> = 'main_loop: loop {\n            let event = tokio::select! {\n                _ = transport_task_ct.cancelled() => {\n                    tracing::debug!(\"cancelled\");\n                    break 'main_loop Err(WorkerQuitReason::Cancelled);\n                }\n                message = context.recv_from_handler() => {\n                    match message {\n                        Ok(msg) => Event::ClientMessage(msg),\n                        Err(e) => break 'main_loop Err(e),\n                    }\n                },\n                message = sse_worker_rx.recv() => {\n                    let Some(message) = message else {\n                        tracing::trace!(\"transport dropped, exiting\");\n                        break 'main_loop Err(WorkerQuitReason::HandlerTerminated);\n                    };\n                    Event::ServerMessage(message)\n                },\n                terminated_stream = streams.join_next(), if !streams.is_empty() => {\n                    match terminated_stream {\n                        Some(result) => {\n                            Event::StreamResult(result.map_err(StreamableHttpError::TokioJoinError).and_then(std::convert::identity))\n                        }\n                        None => {\n                            continue\n                        }\n                    }\n                }\n            };\n            match event {\n                Event::ClientMessage(send_request) => {\n                    let WorkerSendRequest { message, responder } = send_request;\n                    // Pass a clone to the first attempt so `message` is retained for a\n                    // potential re-init retry. `post_message` takes ownership and the\n                    // trait cannot be changed, so the clone is unavoidable.\n                    let response = self\n                        .client\n                        .post_message(\n                            config.uri.clone(),\n                            message.clone(),\n                            session_id.clone(),\n                            config.auth_header.clone(),\n                            protocol_headers.clone(),\n                        )\n                        .await;\n                    let send_result = match response {\n                        Err(StreamableHttpError::SessionExpired) => {\n                            if !config.reinit_on_expired_session {\n                                Err(StreamableHttpError::SessionExpired)\n                            } else {\n                                // The server discarded the session (HTTP 404). Perform a"
+      },
+      {
+        "start": 831,
+        "end": 848,
+        "source": "\n        // Cleanup session before returning (ensures close() waits for session deletion)\n        // Use a timeout to prevent indefinite hangs if the server is unresponsive\n        if let Some(cleanup) = session_cleanup_info {\n            const SESSION_CLEANUP_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);\n            let cleanup_session_id = cleanup.session_id.clone();\n            match tokio::time::timeout(\n                SESSION_CLEANUP_TIMEOUT,\n                cleanup.client.delete_session(\n                    cleanup.uri,\n                    cleanup.session_id,\n                    cleanup.auth_header,\n                    cleanup.protocol_headers,\n                ),\n            )\n            .await\n            {\n                Ok(Ok(_)) => {"
+      }
+    ]
+  }
+]

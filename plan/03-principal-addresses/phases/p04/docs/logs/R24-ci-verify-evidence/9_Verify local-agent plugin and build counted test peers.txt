@@ -1,0 +1,207 @@
+﻿2026-11-16T14:16:52.6962987Z ##[group]Run npm --prefix integrations/cloudroom-plugin ci
+2026-11-16T14:16:52.6963455Z [36;1mnpm --prefix integrations/cloudroom-plugin ci[0m
+2026-11-16T14:16:52.6963795Z [36;1mnpm --prefix integrations/cloudroom-plugin run typecheck[0m
+2026-11-16T14:16:52.6964211Z [36;1mnpm --prefix integrations/cloudroom-plugin run build[0m
+2026-11-16T14:16:52.6964563Z [36;1mnpm --prefix integrations/cloudroom-plugin test[0m
+2026-11-16T14:16:52.6964926Z [36;1mnpm --prefix integrations/cloudroom-plugin run test:guards[0m
+2026-11-16T14:16:52.6991944Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:16:52.6992319Z env:
+2026-11-16T14:16:52.6992553Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:16:52.6992838Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:16:52.6993340Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:16:52.6993630Z   SQLX_OFFLINE: true
+2026-11-16T14:16:52.6993902Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:16:52.6994159Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:16:52.6994426Z   CARGO_TERM_COLOR: always
+2026-11-16T14:16:52.6994710Z   CACHE_ON_FAILURE: false
+2026-11-16T14:16:52.6994991Z ##[endgroup]
+2026-11-16T14:16:53.1624780Z npm warn deprecated prebuild-install@7.1.3: No longer maintained. Please contact the author of the relevant native addon; alternatives are available.
+2026-11-16T14:16:58.6395912Z 
+2026-11-16T14:16:58.6396774Z added 55 packages, and audited 56 packages in 6s
+2026-11-16T14:16:58.6397055Z 
+2026-11-16T14:16:58.6399041Z 11 packages are looking for funding
+2026-11-16T14:16:58.6399583Z   run `npm fund` for details
+2026-11-16T14:16:58.6404454Z 
+2026-11-16T14:16:58.6404893Z found 0 vulnerabilities
+2026-11-16T14:16:58.7153557Z 
+2026-11-16T14:16:58.7154215Z > bb-plugin-openbot-local@0.2.0 typecheck
+2026-11-16T14:16:58.7154623Z > tsc --noEmit
+2026-11-16T14:16:58.7154799Z 
+2026-11-16T14:17:00.7794428Z 
+2026-11-16T14:17:00.7795331Z > bb-plugin-openbot-local@0.2.0 build
+2026-11-16T14:17:00.7796197Z > node scripts/build.mjs
+2026-11-16T14:17:00.7796349Z 
+2026-11-16T14:17:00.8293363Z built 1 plugin entry
+2026-11-16T14:17:00.8987454Z 
+2026-11-16T14:17:00.8988306Z > bb-plugin-openbot-local@0.2.0 test
+2026-11-16T14:17:00.8988853Z > node scripts/build.mjs && node scripts/build.mjs --test && node test/run.mjs
+2026-11-16T14:17:00.8989145Z 
+2026-11-16T14:17:00.9437925Z built 1 plugin entry
+2026-11-16T14:17:01.0213979Z built 18 test entries
+2026-11-16T14:17:01.7032056Z ✔ bundle transport uses trusted TLS and live identity with exact maximum streaming bytes (160.890118ms)
+2026-11-16T14:17:01.7229615Z ✔ bundle transport refuses redirects, revoked authority, corrupt digests and oversized declared bodies (20.642516ms)
+2026-11-16T14:17:01.7439209Z ✔ bundle body cancellation closes the active request and joins promptly (25.306042ms)
+2026-11-16T14:17:02.6473972Z ✔ real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls (1115.253257ms)
+2026-11-16T14:17:02.6562870Z ✔ authorization rejection stops reconnect attempts and never enters the SDK (9.091859ms)
+2026-11-16T14:17:02.6701987Z ✔ shutdown during a stalled TLS handshake joins network and dispatcher within the host drain (13.859178ms)
+2026-11-16T14:17:02.6957284Z ✔ real WSS rejects stale_identity before journal receipt or SDK entry (24.02762ms)
+2026-11-16T14:17:02.7218177Z ✔ real WSS rejects changed_digest before journal receipt or SDK entry (26.159625ms)
+2026-11-16T14:17:02.7468365Z ✔ real WSS rejects binary before journal receipt or SDK entry (24.231672ms)
+2026-11-16T14:17:02.7726888Z ✔ real WSS rejects unknown_field before journal receipt or SDK entry (24.976482ms)
+2026-11-16T14:17:03.0898025Z ✔ public plugin service reload joins SDK work before storage closes and settings changes stop admission (319.306436ms)
+2026-11-16T14:17:05.2131599Z ✔ configuration refuses non-origin URL http:// (0.912916ms)
+2026-11-16T14:17:05.2132953Z ✔ configuration refuses non-origin URL https:// (0.11947ms)
+2026-11-16T14:17:05.2134242Z ✔ configuration refuses non-origin URL https://path (0.072633ms)
+2026-11-16T14:17:05.2135145Z ✔ configuration refuses non-origin URL https:// (0.069847ms)
+2026-11-16T14:17:05.2138241Z ✔ configuration refuses non-origin URL https:// (0.132719ms)
+2026-11-16T14:17:05.2139646Z ✔ configuration canonicalizes HTTPS and refuses arbitrary project paths/duplicates/bounds (1.397845ms)
+2026-11-16T14:17:05.2141693Z ✔ user UTF8 prompt bound remains32KiB with fixed native operation header (5.202405ms)
+2026-11-16T14:17:05.2142767Z ✔ actual peer command decoder canonicalizes field order and rejects hash/date/field changes (0.714117ms)
+2026-11-16T14:17:05.2143917Z ✔ chunk transport roundtrips the exact2MiB limit and rejects overflow before send (37.46353ms)
+2026-11-16T14:17:05.2144763Z ✔ chunks reject interleaving, invalid UTF8/base64, unsafe integers and time expiry (7.646075ms)
+2026-11-16T14:17:05.2147866Z ✔ real SQLite survives receipt/intent reopen and replay keeps immutable payloads (31.859034ms)
+2026-11-16T14:17:05.2148992Z ✔ competing stale intent claimants have exactly one durable SDK entry marker (11.655394ms)
+2026-11-16T14:17:05.2151780Z ✔ missing command under reconcile enters durable recovery without a fresh SDK claim (5.973661ms)
+2026-11-16T14:17:05.2152981Z ✔ acknowledgment cannot forget an unknown future or restore an already-pruned cursor (8.600405ms)
+2026-11-16T14:17:05.2154122Z ✔ preflight refusal is durable but cannot follow the SDK intent cut (6.07392ms)
+2026-11-16T14:17:05.2154867Z ✔ fixed4096 history bound fails controlled admission and never allocates a dangling sequence (3585.074954ms)
+2026-11-16T14:17:05.2295413Z ✔ real process interruption at enrollment before-pending recovers the same durable claim (119.730095ms)
+2026-11-16T14:17:05.2324076Z ✔ real process interruption at enrollment pending recovers the same durable claim (92.683648ms)
+2026-11-16T14:17:05.2325652Z ✔ real process interruption at enrollment server-commit recovers the same durable claim (122.360075ms)
+2026-11-16T14:17:05.2326952Z ✔ real process interruption at enrollment receipt recovers the same durable claim (212.155451ms)
+2026-11-16T14:17:05.2329944Z ✔ real process interruption at enrollment journal recovers the same durable claim (115.979611ms)
+2026-11-16T14:17:05.2331119Z ✔ real process interruption at enrollment paired recovers the same durable claim (120.524738ms)
+2026-11-16T14:17:05.2332243Z ✔ real process interruption at enrollment cleaned recovers the same durable claim (136.623867ms)
+2026-11-16T14:17:05.2333355Z ✔ changed origin never receives a saved pending credential or pairing claim (3.876578ms)
+2026-11-16T14:17:05.2334523Z ✔ complete initial pairing 400 clears rejected input and explicit replacement starts a fresh attempt (6.173696ms)
+2026-11-16T14:17:05.2336752Z ✔ complete initial pairing 401 clears rejected input and explicit replacement starts a fresh attempt (6.256436ms)
+2026-11-16T14:17:05.2338307Z ✔ complete initial pairing 403 clears rejected input and explicit replacement starts a fresh attempt (4.375704ms)
+2026-11-16T14:17:05.2339819Z ✔ complete initial pairing 404 clears rejected input and explicit replacement starts a fresh attempt (4.138626ms)
+2026-11-16T14:17:05.2341228Z ✔ transport retains original pending secrets and ignores replacement input until outcome is resolved (3.918721ms)
+2026-11-16T14:17:05.2342604Z ✔ incomplete_rejection retains original pending secrets and ignores replacement input until outcome is resolved (3.955122ms)
+2026-11-16T14:17:05.2344022Z ✔ actual process interruption during definitive rejection cleaned cannot enroll stale input as a new identity (109.049386ms)
+2026-11-16T14:17:05.2347695Z ✔ actual process interruption during definitive rejection rejected cannot enroll stale input as a new identity (124.414552ms)
+2026-11-16T14:17:05.2349135Z ✔ a complete rejection cannot clear a Pending record or secret input once its journal is initialized (21.611164ms)
+2026-11-16T14:17:05.2350496Z ✔ real competing connector processes exclude each other and OS releases graceful and killed owners (678.941714ms)
+2026-11-16T14:17:05.2351738Z ✔ native MCP arguments bound hostile objects before cloning or durable intent and preserve valid Unicode (4.820374ms)
+2026-11-16T14:17:05.2353321Z ✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (31.097676ms)
+2026-11-16T14:17:05.2354637Z ✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (7.376806ms)
+2026-11-16T14:17:05.2368074Z ✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (7.782555ms)
+2026-11-16T14:17:05.2369868Z ✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (12.571564ms)
+2026-11-16T14:17:05.2371192Z ✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (7.753595ms)
+2026-11-16T14:17:20.3248059Z ✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (39.612909ms)
+2026-11-16T14:17:20.3249802Z ✔ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (25.420387ms)
+2026-11-16T14:17:20.3251343Z ✔ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (16687.767449ms)
+2026-11-16T14:17:20.3509547Z ✔ native abort cancels the immutable invocation even when the admission response was lost (25.711828ms)
+2026-11-16T14:17:20.9472429Z ✔ only a proven first-attempt admission rejection retires after restart; ambiguous errors retain the intent (596.295825ms)
+2026-11-16T14:17:20.9592544Z ✔ a positively received first rejection is durable even if native cancellation races its response cleanup (12.678106ms)
+2026-11-16T14:17:20.9825857Z ✔ unknown outcome survives a physical plugin journal restart; status from B resolves A without another admission (23.475123ms)
+2026-11-16T14:17:21.0517861Z ✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (71.940852ms)
+2026-11-16T14:17:21.0612840Z ✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (50.326676ms)
+2026-11-16T14:17:21.0614019Z ✔ native cache bytes refuses without reconstructing a mapped bundle (12.112627ms)
+2026-11-16T14:17:21.0618572Z ✔ native cache mode refuses without reconstructing a mapped bundle (10.791128ms)
+2026-11-16T14:17:21.0619329Z ✔ native cache symlink refuses without reconstructing a mapped bundle (10.767394ms)
+2026-11-16T14:17:21.0620043Z ✔ native cache missing refuses without reconstructing a mapped bundle (12.594834ms)
+2026-11-16T14:17:21.0620779Z ✔ native cache capacity refuses before writes and the download/materialization slot is bounded (5.191535ms)
+2026-11-16T14:17:21.0621986Z ✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (15.126556ms)
+2026-11-16T14:17:21.0622814Z ✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (12.645602ms)
+2026-11-16T14:17:21.0623484Z ✔ native cache cancellation joins owned writes without publishing a partial bundle (3.683365ms)
+2026-11-16T14:17:21.0624264Z ✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (26.798266ms)
+2026-11-16T14:17:21.0625058Z ✔ native cache abort during materialization removes its owned temporary directory before returning (17.905172ms)
+2026-11-16T14:17:21.0625965Z ✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (10.740369ms)
+2026-11-16T14:17:21.0626804Z ✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (7.981762ms)
+2026-11-16T14:17:21.0627593Z ✔ MCP contracts retain exact schema bytes and reject substituted binding/source identities before cache writes (9.899895ms)
+2026-11-16T14:17:21.0628177Z ✔ create sends explicit full native permissions (20.492503ms)
+2026-11-16T14:17:21.0628665Z ✔ send sends explicit full native permissions (6.253052ms)
+2026-11-16T14:17:21.0629168Z ✔ create sends explicit auto native permissions (5.348665ms)
+2026-11-16T14:17:21.0629616Z ✔ send sends explicit auto native permissions (5.164306ms)
+2026-11-16T14:17:21.0630051Z ✔ create sends explicit accept_edits native permissions (4.997926ms)
+2026-11-16T14:17:21.0630536Z ✔ send sends explicit accept_edits native permissions (5.204596ms)
+2026-11-16T14:17:21.0631064Z ✔ unsupported full access at provider refuses before native intent (6.883013ms)
+2026-11-16T14:17:21.0631571Z ✔ unsupported full access at server refuses before native intent (6.971456ms)
+2026-11-16T14:17:21.0632092Z ✔ unsupported full access at host refuses before native intent (4.715482ms)
+2026-11-16T14:17:21.0632595Z ✔ unsupported full access at manual refuses before native intent (6.025508ms)
+2026-11-16T14:17:21.0633181Z ✔ catalog advertises only permission modes allowed by provider and both ceilings (3.079017ms)
+2026-11-16T14:17:21.0633798Z ✔ permission policy has no implicit default or legacy permission decoder (0.182678ms)
+2026-11-16T14:17:21.0634419Z ✔ native idle admission preserves prompt order, queue identity and separate originating turns (42.254592ms)
+2026-11-16T14:17:21.0635118Z ✔ native human admission preserves prompt order, queue identity and separate originating turns (14.794854ms)
+2026-11-16T14:17:21.0635967Z ✔ native openbot admission preserves prompt order, queue identity and separate originating turns (13.219324ms)
+2026-11-16T14:17:21.0636779Z ✔ native queue idle_to_busy race is decided at admission without steering or a second SDK call (7.251018ms)
+2026-11-16T14:17:21.0637421Z ✔ native queue busy_to_idle race is decided at admission without steering or a second SDK call (8.023938ms)
+2026-11-16T14:17:21.0638117Z ✔ accepted native queue work survives lost SDK response and replay with one mutation and original order (9.047131ms)
+2026-11-16T14:17:21.0638874Z ✔ bounded mapping traversal passes a retained oldest page and wraps after reclaiming full history (274.49379ms)
+2026-11-16T14:17:21.0639646Z ✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (4096) (6160.231177ms)
+2026-11-16T14:17:21.0640503Z ✔ real WSS mapping traversal preserves the oldest page across timeout/reconnect and visits later mappings (205) (8810.558267ms)
+2026-11-16T14:17:21.0641321Z ✔ same-point journal restore retains mapping while SQL-only history rollback cannot reconstruct it at an equal cursor (17.128489ms)
+2026-11-16T14:17:21.0642075Z ✔ terminal receipts remain for90days after ACK and old compacted effects cannot enter the SDK again (10.222249ms)
+2026-11-16T14:17:21.0642826Z ✔ uncertainty and pending local references survive compaction and only unchanged confirmed mappings retire (6.595954ms)
+2026-11-16T14:17:21.0643711Z ✔ 64MiB outbox pressure coalesces progress and preserves its reserved unacknowledged terminal summary (77.241545ms)
+2026-11-16T14:17:21.0644425Z ✔ real WSS retirement requires current nonce and unchanged binding after server confirmation (68.139533ms)
+2026-11-16T14:17:21.0645101Z ✔ real WSS mapping retirement rejects a stale connection before deleting local ownership (57.499654ms)
+2026-11-16T14:17:21.0646055Z ✔ full mapping history pauses new creates while existing native work completes and ACKs drain (722.516315ms)
+2026-11-16T14:17:21.0646744Z ✔ lost read-only deliveries reconcile without poisoning native admission (27.207772ms)
+2026-11-16T14:17:21.0647415Z ✔ native startup error before turn acceptance stays uncertain across restart without resubmission (12.630975ms)
+2026-11-16T14:17:21.0648145Z ✔ create freezes explicit local checkout/provider/model and duplicate concurrent delivery submits once (8.17435ms)
+2026-11-16T14:17:21.0648814Z ✔ lost send response reopens intent and recovers exact turn without sending again (7.569104ms)
+2026-11-16T14:17:21.0649417Z ✔ spawn gap recovers positive plugin metadata, while absent threads never recreate (7.465505ms)
+2026-11-16T14:17:21.0650270Z ✔ human turn, idle thread and unrelated permission prompts cannot complete or take ownership (9.965566ms)
+2026-11-16T14:17:21.0651237Z ✔ persistent missing native thread coalesces evidence and retains effect capacity (20.143675ms)
+2026-11-16T14:17:21.0652034Z ✔ resolved matching permission updates running without item event across journal reopen (9.476387ms)
+2026-11-16T14:17:21.0652609Z ✔ preflight model refusal is durable before any SDK mutation (4.290257ms)
+2026-11-16T14:17:21.0653145Z ✔ preflight provider refusal is durable before any SDK mutation (3.874524ms)
+2026-11-16T14:17:21.0653678Z ✔ preflight project refusal is durable before any SDK mutation (3.472048ms)
+2026-11-16T14:17:21.0654176Z ✔ preflight expired refusal is durable before any SDK mutation (3.261593ms)
+2026-11-16T14:17:21.0654669Z ✔ preflight gate refusal is durable before any SDK mutation (3.247967ms)
+2026-11-16T14:17:21.0655163Z ✔ preflight foreign refusal is durable before any SDK mutation (3.476856ms)
+2026-11-16T14:17:21.0655994Z ✔ unknown work consumes eight effect slots but explicit mapped-thread stop retains headroom (28.486136ms)
+2026-11-16T14:17:21.0656692Z ✔ service abort cancels actual SDK wait and retains ambiguous intent without broad stop (12.552474ms)
+2026-11-16T14:17:21.0657317Z ✔ matching terminal output stays within UTF8 bound and unknown usage remains null (16.140384ms)
+2026-11-16T14:17:21.0657931Z ✔ ambiguous duplicate matching requests cannot attribute a human or second turn (2.662989ms)
+2026-11-16T14:17:21.0658521Z ✔ compacted sparse native replay survives restart and uses completed snapshots (5.008362ms)
+2026-11-16T14:17:21.0659102Z ✔ sparse native replay never invents missing request correlation (3.185641ms)
+2026-11-16T14:17:21.0659649Z ✔ sparse native replay never invents missing acceptance correlation (3.137427ms)
+2026-11-16T14:17:21.0660360Z ✔ prunable partial or started text cannot become final output without a completed snapshot (3.443332ms)
+2026-11-16T14:17:21.0661002Z ✔ startup paired selectedProjects change prevents connector and native admission (11.648502ms)
+2026-11-16T14:17:21.0661615Z ✔ startup paired openbotOrigin change prevents connector and native admission (3.282254ms)
+2026-11-16T14:17:21.0662227Z ✔ startup paired enrollment change prevents connector and native admission (3.297563ms)
+2026-11-16T14:17:21.0662878Z ✔ startup enrolling selectedProjects change prevents connector and native admission (17.735386ms)
+2026-11-16T14:17:21.0663495Z ✔ startup enrolling openbotOrigin change prevents connector and native admission (3.270422ms)
+2026-11-16T14:17:21.0664110Z ✔ startup enrolling enrollment change prevents connector and native admission (2.921149ms)
+2026-11-16T14:17:21.0664743Z ✔ legitimate internal Pending to Paired secret writes do not cancel connector startup (3.468104ms)
+2026-11-16T14:17:21.0665482Z ✔ profile ownership excludes competing processes and refuses unsafe directory/symlink (48.91811ms)
+2026-11-16T14:17:21.0666318Z ✔ supervisor observes failure, stops siblings and joins real children (21.537435ms)
+2026-11-16T14:17:21.0667031Z ✔ shutdown escalates a child which ignores TERM and joins it within the fixed drain (5019.786082ms)
+2026-11-16T14:17:21.0667726Z ℹ tests 133
+2026-11-16T14:17:21.0668050Z ℹ suites 0
+2026-11-16T14:17:21.0668340Z ℹ pass 133
+2026-11-16T14:17:21.0668633Z ℹ fail 0
+2026-11-16T14:17:21.0668921Z ℹ cancelled 0
+2026-11-16T14:17:21.0669331Z ℹ skipped 0
+2026-11-16T14:17:21.0669619Z ℹ todo 0
+2026-11-16T14:17:21.0669984Z ℹ duration_ms 19678.526811
+2026-11-16T14:17:21.1365263Z 
+2026-11-16T14:17:21.1366450Z > bb-plugin-openbot-local@0.2.0 test:guards
+2026-11-16T14:17:21.1367262Z > node --test compatibility/check-source.test.mjs scripts/install-local.test.mjs
+2026-11-16T14:17:21.1367792Z 
+2026-11-16T14:17:21.5816148Z ✔ bundled public SDK declarations match the pinned source and all approved patches (3.205331ms)
+2026-11-16T14:17:21.5817626Z ✔ multiple source patches validate all inputs before mutation and accept partial preparation (102.228776ms)
+2026-11-16T14:17:21.5821502Z ✔ source verification rejects changed tracked GUI source before any build, from any cwd (30.89142ms)
+2026-11-16T14:17:21.5822877Z ✔ prepared source accepts only the exact approved patch and rejects tampering (115.677154ms)
+2026-11-16T14:17:21.5823909Z ✔ cohesive source patch adds absent inputs and refuses partial or unsafe preparation (121.498992ms)
+2026-11-16T14:17:21.5824833Z ✔ pinned compatibility extension retains 75 percent source capacity headroom (0.416631ms)
+2026-11-16T14:17:21.5877594Z ✔ options require separate absolute directories and distinct unprivileged ports (6.907971ms)
+2026-11-16T14:17:21.5879841Z ✔ preflight reports every missing or mismatched prerequisite together (0.196844ms)
+2026-11-16T14:17:21.5880696Z ✔ the plugin directory must be absent or empty because Cloudroom runs it in place (0.688463ms)
+2026-11-16T14:17:21.5881657Z ✔ the archive must match its own integrity file and any trusted copy (1.462324ms)
+2026-11-16T14:17:21.5882376Z ✔ Cloudroom CLI calls address only the installed profile (0.267396ms)
+2026-11-16T14:17:21.5883072Z ✔ readiness follows the wrapper status lines (67.949805ms)
+2026-11-16T14:17:21.5883727Z ✔ shell quoting keeps printed commands copyable (0.344986ms)
+2026-11-16T14:17:21.5884362Z ✔ the command line refuses bad options before running anything (30.738955ms)
+2026-11-16T14:17:21.5884906Z ℹ tests 14
+2026-11-16T14:17:21.5885194Z ℹ suites 0
+2026-11-16T14:17:21.5885503Z ℹ pass 14
+2026-11-16T14:17:21.5886121Z ℹ fail 0
+2026-11-16T14:17:21.5886410Z ℹ cancelled 0
+2026-11-16T14:17:21.5886753Z ℹ skipped 0
+2026-11-16T14:17:21.5887032Z ℹ todo 0
+2026-11-16T14:17:21.5887391Z ℹ duration_ms 425.779672

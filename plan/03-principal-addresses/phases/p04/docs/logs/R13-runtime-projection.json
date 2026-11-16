@@ -1,0 +1,23 @@
+{
+  "before": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "after": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "changed_paths": [
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh"
+  ],
+  "unchanged_platform_projection": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "Darwin_sha256": "7f44f08d43344a2da2af0cc238a289bdeb2006a26a0835df7429d3ab8e46dcee",
+      "common_preamble_sha256": "0647ea6ff34077c4ff49f3747d05115197f9e0be0c8c23202d1c0575f8eca724"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "Darwin_sha256": "0d68cb5a83a6580e5fceea364983ed4c8ec280c7662fcc1ff4226603b6dd0063",
+      "common_preamble_sha256": "fddc2744dd4ceb10291e6ad2d100df382297d17b5039f27a04da7fbcb39ac5c4"
+    }
+  ],
+  "claim": "Rust/migrations/Cargo inputs/all other files identical between material candidates. Darwin common preambles and selected branches byte-identical. Local main/stock proof reused only for this unchanged projection; new Linux behavior comes from exactR13CI."
+}

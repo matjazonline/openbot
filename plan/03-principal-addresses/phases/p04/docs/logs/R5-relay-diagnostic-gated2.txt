@@ -1,0 +1,16 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer' (19977197) panicked at src/adapters/persistence/workflow/message_reply_tests.rs:388:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "internal relay must prove the exact delivery part it is and is immutable", detail: None, hint: None, position: None, where: Some("PL/pgSQL function guard_message_internal_relay() line 29 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("message_internal_relay_guard"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 5.28s
+

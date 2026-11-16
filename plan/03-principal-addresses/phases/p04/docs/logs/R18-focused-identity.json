@@ -1,0 +1,13 @@
+{
+  "artifact": "b02a5d77dc978805b9ac81cff068f3cd8377e7d55c0568571ebcfed288f209d1",
+  "binary": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+  "binary_sha256": "549a01e614e40436d7d3bb6835118fba768f633762bb005179ee85e88c692055",
+  "returncode": 0,
+  "test_threads": 4,
+  "RUST_MIN_STACK": "16777216",
+  "DATABASE_URL": "owned pa03_p04_test on PG51167",
+  "TEST_DATABASE_URL": "unset",
+  "selected_case_count": 66,
+  "registered_case_count": 4705,
+  "command": "Darwin network-isolated current libtest, catalog selection plus originalLinux23-case family"
+}

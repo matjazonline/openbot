@@ -1,0 +1,33 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (3.708041ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (2.973667ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (1034.87425ms)
+✔ ordinary page links release every stream before navigation (5.720542ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (8.02575ms)
+✔ anchors and non-document protocols keep streams (5.324292ms)
+✔ native filter submissions release all streams on every navigation (22.948916ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (4.0805ms)
+✔ late attribution and reconnect keep both replies, composer and stream owner (1513.768959ms)
+✔ a reconnect backlog keeps an explicit 200-message live window and the composer (1173.025042ms)
+✔ a late body read cannot remove preserved steps after a cancel or navigation (1998.32275ms)
+✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (1245.170625ms)
+✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (1112.150458ms)
+✔ board: two window reads completing out of order show the later choice (938.439458ms)
+✔ board: opening a run while a filter read is in flight keeps the chosen filters (1756.28975ms)
+✔ list: a wake-up during a filter read reads the new filter instead of undoing it (1022.012291ms)
+✔ board: a filter change while a wake-up read is in flight wins (918.791542ms)
+✔ board: a burst of run events reads at most once per two seconds and shows the final state (7433.308917ms)
+✔ board: constant change still reads every two seconds and never starves (11176.388709ms)
+✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1722.001708ms)
+✔ board: reads slower than the interval never overlap and keep landing under constant change (12875.166083ms)
+✔ board: a run change during a filter read is read again after it, on the new leaf (6019.3305ms)
+✔ board: two quick filter changes do not leave the coalescer waiting for ever (3196.335375ms)
+✔ sample progress, failed request recovery and late navigation response use the requesting form (1394.405708ms)
+✔ actual sample textarea template preserves leading newlines for every raw JSON field (666.505708ms)
+ℹ tests 25
+ℹ suites 0
+ℹ pass 25
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 52126.7955

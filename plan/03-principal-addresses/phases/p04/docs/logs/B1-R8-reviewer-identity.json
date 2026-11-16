@@ -1,0 +1,14 @@
+{
+  "candidate": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "delta": [
+    ".github/workflows/ci.yml",
+    "scripts/check.sh",
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/test-network-isolation.sh"
+  ],
+  "current_byte_mismatches": [],
+  "coordination43_matches": true,
+  "D3_sha256": "61d108373b190c52802eec281abdca7e00466f409dd339270d0e981ab7066b45",
+  "runtime_checks": "NOT EXERCISED; root full suite active; source-only review"
+}

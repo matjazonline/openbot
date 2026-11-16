@@ -1,0 +1,46 @@
+﻿2026-11-16T14:17:41.3502144Z ##[group]Run node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs
+2026-11-16T14:17:41.3503878Z [36;1mnode --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs scripts/tests/workflow-runs.mjs scripts/tests/workflow-conversations.mjs scripts/tests/workflow-samples.mjs[0m
+2026-11-16T14:17:41.3533884Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:17:41.3534119Z env:
+2026-11-16T14:17:41.3534294Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:17:41.3534488Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:17:41.3534918Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:17:41.3535148Z   SQLX_OFFLINE: true
+2026-11-16T14:17:41.3535339Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:17:41.3535535Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:17:41.3535846Z   CARGO_TERM_COLOR: always
+2026-11-16T14:17:41.3536084Z   CACHE_ON_FAILURE: false
+2026-11-16T14:17:41.3536253Z ##[endgroup]
+2026-11-16T14:17:41.4416391Z ✔ library payload carries the agent's own fields and no retired runtime fields (2.510211ms)
+2026-11-16T14:17:41.4447384Z ✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (1.993621ms)
+2026-11-16T14:17:42.1231739Z ✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (413.105115ms)
+2026-11-16T14:17:42.1407645Z ✔ ordinary page links release every stream before navigation (4.410551ms)
+2026-11-16T14:17:42.1417187Z ✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (5.602679ms)
+2026-11-16T14:17:42.1436973Z ✔ anchors and non-document protocols keep streams (2.385049ms)
+2026-11-16T14:17:42.1437712Z ✔ native filter submissions release all streams on every navigation (10.236611ms)
+2026-11-16T14:17:42.1438512Z ✔ cancelled, HTMX, dialog and other-window submissions retain streams (3.654391ms)
+2026-11-16T14:17:42.5652868Z ✔ late attribution and reconnect keep both replies, composer and stream owner (754.081385ms)
+2026-11-16T14:17:43.1828355Z ✔ a reconnect backlog keeps an explicit 200-message live window and the composer (624.666342ms)
+2026-11-16T14:17:43.8556414Z ✔ a late body read cannot remove preserved steps after a cancel or navigation (1066.934778ms)
+2026-11-16T14:17:43.8557317Z ✔ an actual SSE disconnect reconciles and preserves an unfinished note and disclosure (956.667889ms)
+2026-11-16T14:17:44.4759024Z ✔ a waiting parent refreshes a child badge on the child wakeup without reconnecting (619.997175ms)
+2026-11-16T14:17:44.9320670Z ✔ board: two window reads completing out of order show the later choice (456.146672ms)
+2026-11-16T14:17:46.2630967Z ✔ board: opening a run while a filter read is in flight keeps the chosen filters (1330.953846ms)
+2026-11-16T14:17:47.0569663Z ✔ list: a wake-up during a filter read reads the new filter instead of undoing it (793.817152ms)
+2026-11-16T14:17:47.5417302Z ✔ board: a filter change while a wake-up read is in flight wins (484.552537ms)
+2026-11-16T14:17:54.6421636Z ✔ board: a burst of run events reads at most once per two seconds and shows the final state (7100.37777ms)
+2026-11-16T14:18:05.4110061Z ✔ board: constant change still reads every two seconds and never starves (10768.509376ms)
+2026-11-16T14:18:06.6278915Z ✔ phone: a stream-driven or polled pane reload leaves the reader on the list; opening a run still moves them (1217.120192ms)
+2026-11-16T14:18:18.8149492Z ✔ board: reads slower than the interval never overlap and keep landing under constant change (12186.861236ms)
+2026-11-16T14:18:24.5612296Z ✔ board: a run change during a filter read is read again after it, on the new leaf (5746.417291ms)
+2026-11-16T14:18:27.1984462Z ✔ board: two quick filter changes do not leave the coalescer waiting for ever (2637.291897ms)
+2026-11-16T14:18:27.2089731Z ✔ sample progress, failed request recovery and late navigation response use the requesting form (675.12869ms)
+2026-11-16T14:18:27.2090776Z ✔ actual sample textarea template preserves leading newlines for every raw JSON field (183.668258ms)
+2026-11-16T14:18:27.2091229Z ℹ tests 25
+2026-11-16T14:18:27.2091453Z ℹ suites 0
+2026-11-16T14:18:27.2093675Z ℹ pass 25
+2026-11-16T14:18:27.2093999Z ℹ fail 0
+2026-11-16T14:18:27.2094225Z ℹ cancelled 0
+2026-11-16T14:18:27.2094465Z ℹ skipped 0
+2026-11-16T14:18:27.2094680Z ℹ todo 0
+2026-11-16T14:18:27.2094917Z ℹ duration_ms 45828.731581

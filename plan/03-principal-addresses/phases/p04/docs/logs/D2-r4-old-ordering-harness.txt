@@ -1,0 +1,2 @@
+{"command": ["scripts/test-network-isolation.sh", "cargo", "test", "--locked", "--offline", "--lib", "mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session", "--", "--nocapture"], "expected_exit": 101, "actual_exit": 101, "proof": "old ordering fails exact real cancellation-before-DELETE assertion", "corrected_source_sha256": "895ce7b711a576542a21e69d5c5baff40e4278ccc0c355586945fc13b364403e", "mutation_sha256": "f15ed941d490836b50b09c442df2ba086291a6d31cf44d494e48d93279d52457"}
+Corrected source restored

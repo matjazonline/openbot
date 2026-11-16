@@ -1,0 +1,180 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R14-preflight",
+  "artifact": "4d45c5c294aeb056ba4ce419fc21702dc168336f06f3af788610583a9771c36f",
+  "checks": [
+    {
+      "criteria": [
+        "browser-env-contract",
+        "competing-launch",
+        "failclosed-recovery",
+        "runner-diagnostics"
+      ],
+      "command": "Node24 node --test scripts/tests/doop-probe.mjs; PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "26existingNodecases and10Pythoncases; no skipped/removedcases; explicitshortchildTMPDIR/parentenv/profile/sandbox/TLS and failureoutput assertions",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R21-doop-probe.txt",
+          "sha256": "82b9d483fc6b485299e7b78877f4d4e5e4ae8b3c9798e180528c6f32a25537ab"
+        },
+        {
+          "path": "logs/R21-check-runner.txt",
+          "sha256": "ab56eacfe96752da085168befd4c386d7773bbc3f4169e835deddaa57d723a90"
+        },
+        {
+          "path": "logs/R21-native-scope-equality.json",
+          "sha256": "e6d67879c5deb40bad7de321976c528554e420f4993e251669dff4bd30fb8286"
+        },
+        {
+          "path": "logs/R21-source.snapshot.txt",
+          "sha256": "825f6d825a8d384dd1c712ec9739c7603d6be1e9f6d5f85ef729739f77e723b6"
+        },
+        {
+          "path": "logs/R21-ci-source.json",
+          "sha256": "4904a334a9863b3d62fd4a68ea41eb5cfecc4c7c60616f6728171e3a313800bc"
+        },
+        {
+          "path": "logs/R21-coordination55.md",
+          "sha256": "0276882ca0c0a2f102355084a0dcdec45bc92c686153e800e8c33d86405a2569"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "actual-platform-cause"
+      ],
+      "command": "ActualUbuntu43890914956 isolatedChrome longparentTMPDIR fails/shortparent launchescloses",
+      "fixture": "ExactprecorrectionbrowserOwner/pinnedPuppeteer/noauth/noaccounts; notexecutionproof ofnew/tmp implementation",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R20-browser-launch-source.json",
+          "sha256": "132b98a7e8611f3233f0c5b54635445271310e23012936dff235a4c1300aabd5"
+        },
+        {
+          "path": "logs/R20-browser-launch-workflow.yml",
+          "sha256": "a3ad88bb27d474568ca2432032704f74b9fe31066a9aa78bd98f7ee808f9ff6e"
+        },
+        {
+          "path": "logs/R20-browser-launch-jobs.json",
+          "sha256": "9282dab5fa5000c954b6acf2c780e0945d77b00972bed707926799d0967f3547"
+        },
+        {
+          "path": "logs/R20-browser-launch-annotations.json",
+          "sha256": "01c2c593972d7b1f39c6badcdfb0a0b8d33550252e62b1ce3d85ce3cb7d2d4cf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "pinned-service-suite"
+      ],
+      "command": "ActualR19private133356622982 pinnedservice fullgate",
+      "fixture": "2728PASS/303files on exact01584b34+managedpatch351a2180 lock9fc8b3c1 Bun1.3.10 samecleanenv/Chrome; servicegatepassedbeforeseparatebrowserlaunchfailure",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R19-service-gate-0.log.txt",
+          "sha256": "47960f95d9e37ba5cff656544ed9251661a38885a7fd14eed2fa2e7767b5434f"
+        },
+        {
+          "path": "logs/R19-service-gate-1.log.txt",
+          "sha256": "1d66faad74f5e8709353f7288592866bd3a9095da1174a916e7aa632949971e2"
+        },
+        {
+          "path": "logs/R19-service-gate-2.log.txt",
+          "sha256": "ae47736bb2a9401aa9743893f2f64b9a605e65a99d78cd991a8021e0f7722d87"
+        },
+        {
+          "path": "logs/R19-service-gate-3.log.txt",
+          "sha256": "67c12b7377a98a95ae54795d986ed95ce93abaa26cd7e711ebb620e0fbdbdab1"
+        },
+        {
+          "path": "logs/R19-service-gate-4.log.txt",
+          "sha256": "12f8e1b640bf8b079b2e6169621424ddff5a5f8c014088028951471aa33b3e55"
+        },
+        {
+          "path": "logs/R19-service-gate-5.log.txt",
+          "sha256": "7e56049bc2303e6f1b7dc2db11f86be7f26f95e6d77b530fe381e7498ab5f838"
+        },
+        {
+          "path": "logs/R19-service-gate-6.log.txt",
+          "sha256": "e8dbeaf2debac4bd0c7dbc5ebcb62c5572a9b3e11fcfb302859890ce83487e57"
+        },
+        {
+          "path": "logs/R20-private-artifact-download.json",
+          "sha256": "21aff3468cf7ce76760002ba5379b6dcf87be4e63018a292642a763ac8dadfce"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "retained-pinned-service-failure"
+      ],
+      "command": "ActualR20private133372898985 pinnedservice fullgate",
+      "fixture": "Samepinnedservice source/lock/Bun/commands/env; drawingBrowser replyempty/privateRendering pixelwhite, 2726PASS/2FAIL. No preciseintermittentcauseclaim; no servicecode/test/thresholdchange. NotwholeR20green.",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/R20-service-failure-plain.txt",
+          "sha256": "1cdd0771b37298a8fade41e20635d21de32745ce9d3aa861e5576372eec63cda"
+        },
+        {
+          "path": "logs/R20-service-artifact-download.json",
+          "sha256": "ff611e3ecbed99df9cdd51fe53c5011f268d9c22fb0e4133b86191235c2d2df5"
+        },
+        {
+          "path": "logs/R20-failed-133372898985-annotations.json",
+          "sha256": "4e2c00d60446f8412570f92b57b3bf82a810e602c893953ca1e9b12d8d88258a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "native-history-browser"
+      ],
+      "command": "Currentnative maxpagefixture1case; Nodeactualhistorybrowserdark/light",
+      "fixture": "UnchangedverifiedR18nativebinary; ownedPG51167; freshretainednativeHTML",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R20-history-browser.evidence.json",
+          "sha256": "26c61c97c9479838db1d73687bc966e9c5d99a4b18478aab4dc7917e337b3756"
+        },
+        {
+          "path": "logs/R20-history-fixture.txt",
+          "sha256": "145879963157ab073ae83839a3eb374ee77b8125f56334524ffa18b71c810834"
+        },
+        {
+          "path": "logs/R20-history-browser.txt",
+          "sha256": "f14503481faafad13a31140a7ea6663ec028c9ccaad0943669d8b3521064a10b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "required-final-native-gates",
+        "corrected-four-profile-private-proof"
+      ],
+      "command": "RetainedR19nativeCI43883869265 + currentfocusedR21privatecandidate",
+      "fixture": "ActualgeneralCI currentnativeprojection; actual56sourceprivatehelper/image/probes. ReuseunchangedMemory/service proofs withseparatefailedoutcomes retained.",
+      "status": "NOT EXERCISED",
+      "reason": "Actualremainingchecks running; no source/phaseacceptance yet.",
+      "files": [
+        {
+          "path": "logs/R21-ci-source.json",
+          "sha256": "4904a334a9863b3d62fd4a68ea41eb5cfecc4c7c60616f6728171e3a313800bc"
+        },
+        {
+          "path": "logs/R21-private-proof-workflow.yml",
+          "sha256": "011ccf1a30abc0155d1eda6ffaf2e54e86367f738bca6501b395ae7d00385c94"
+        },
+        {
+          "path": "logs/R21-poll-150325-43883869265.json",
+          "sha256": "46e67969cdf1b4283bb3266a4eda885c7db7fefe7f1e8ae1bfbc583c5e709c19"
+        }
+      ]
+    }
+  ]
+}

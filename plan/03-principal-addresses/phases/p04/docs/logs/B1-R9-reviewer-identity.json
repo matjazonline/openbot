@@ -1,0 +1,17 @@
+{
+  "candidate": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "matched_candidate_material_files": 44,
+  "extra_nonruntime_learnings": [
+    ".trail/learnings/2026-11-16-bound-the-privileged-operation-inside-sudo-mac02.md",
+    ".trail/learnings/2026-11-16-scope-test-egress-rules-to-the-mac02.md",
+    ".trail/learnings/2026-11-16-validate-a-resolved-definition-once-when-mac02.md"
+  ],
+  "R7_Rust_Cargo_migrations_unchanged": true,
+  "R8_Darwin_projection_unchanged": true,
+  "coordination45_matches": true,
+  "decision_hashes": {
+    "D1-r5.md": "75279608421f0e4ad95bd3b76f1ae2bc72dc5acd2a5b30822ec487bf902cf32f",
+    "D2-r4.md": "80de44c5ff0449dacb8683e82df60d1d17c28dabb51540957e524d50c3f3a948",
+    "D3-r1.md": "61d108373b190c52802eec281abdca7e00466f409dd339270d0e981ab7066b45"
+  }
+}

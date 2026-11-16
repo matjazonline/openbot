@@ -94,7 +94,10 @@ async fn direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk(
         State(crate::adapters::persistence::test_support::department_use_cases(&f.persistence)),
         AuthenticatedUser { id: f.user },
         Path(f.company),
-        Json(json!({"name":"Public", "slug":"public", "open_to_public":true})),
+        Json(
+            json!({"name":"Public", "slug":"public", "open_to_public":true,
+            "native_permissions":"full"}),
+        ),
     )
     .await;
     assert!(

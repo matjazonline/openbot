@@ -1,0 +1,134 @@
+[
+  {
+    "test": "adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry",
+    "last": "thread 'adapters::persistence::workflow::tests::local_agent_tests::e2e::cloudroom_e2e_cut_points_reconstruct_server_plugin_and_workers_without_blind_native_retry' (19763079) panicked at src/adapters/persistence/workflow/local_agent_e2e_tests.rs:282:14:\ncalled `Result::unwrap()` on an `Err` value: Elapsed(())\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_conflict_cannot_be_hidden_by_claimed_success' (19767807) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion' (19767890) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_imported_instructions_cannot_grant_canvas_creation_or_publication' (19767896) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model' (19767983) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observed_human_conflict_retains_business_reason_without_an_edit' (19767994) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas' (19768243) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_wrong_identity_or_claimed_success_with_empty_canvas_cannot_complete' (19768564) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown' (19772512) panicked at src/adapters/persistence/workflow/doop_document_recovery_tests.rs:120:18:\nthe intended remote boundary must be reached: Elapsed(())\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_incomplete_provider_stream_cannot_complete_or_duplicate_canvas' (19770967) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::failure_tests::doop_agent_revoked_write_after_approval_never_enters_remote_frame_creation' (19771476) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::policy_tests::doop_agent_saved_mcp_error_refuses_restart_and_saved_final_without_provider_or_write' (19772455) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_final_read_foreign_identity_workspace_title_or_error_cannot_deliver' (19773532) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"final_canvas\", \"read_final\", \"verify_editor\", \"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_ignores_forged_urls_and_preserves_private_message_level' (19773734) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"read_final\", \"verify_editor\", \"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_publishes_binds_and_runs_through_production_workers' (19776039) panicked at src/adapters/persistence/workflow/doop_setup_tests.rs:267:16:\nverification run must terminate: Elapsed(())\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_removed_recipient_cannot_receive_or_repeat_the_known_create' (19774451) panicked at src/adapters/persistence/workflow/doop_document_result_tests.rs:345:14:\nthe real final authenticated read must enter before recipient removal: Elapsed(())\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::result_tests::doop_result_native_one_under_step_budget_cannot_publish_success_or_repeat_create' (19774409) panicked at src/adapters/persistence/workflow/doop_document_tests.rs:344:23:\ndocument timed out: Some((\"running\", None, [\"verify_final_canvas\", \"final_canvas\", \"read_final\", \"verify_editor\", \"edit\", \"verify_created_canvas\", \"created_canvas\", \"read_created\", \"verify_created_workspace\", \"created\", \"create\", \"verify_workspace\", \"verify_bot\", \"profile\", \"canonical\"])); calls=[\"get_profile\", \"create_canvas\", \"get_canvas\", \"get_canvas\"]\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park' (19784060) panicked at src/adapters/persistence/workflow/lease_resolution_gate.rs:235:9:\nan operation ended before gated transaction was observed behind 99318\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_identity_failures_stop_at_distinct_steps_without_writes",
+    "last": "thread 'adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::doop_connection_verification_identity_failures_stop_at_distinct_steps_without_writes' (19775741) panicked at src/adapters/persistence/workflow/doop_setup_tests.rs:267:16:\nverification run must terminate: Elapsed(())\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_forged_claims_cannot_load_or_commit' (19810417) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_policy_change_refuses_without_redirecting' (19810541) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_rechecks_current_send_authority' (19810591) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::channel_reply_publication_write_failure_rolls_back_then_replays_original_plan' (19810689) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_competing_transactions_keep_one_canonical_receipt' (19810776) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::policy_runtime_tests::channel_reply_completion_privileged_reviewers_still_require_payload_clearance' (19809977) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_email_and_in_app_commit_exact_content_and_replay' (19810959) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::channel_reply_publication_internal_source_never_falls_back_to_email' (19811068) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_authority_lock_deadline_leaves_request_unstarted' (19811201) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_expired_started_request_recovers_unknown_without_resend' (19811448) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_revocation_before_provider_entry_cancels_unsent_work' (19811550) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_safe_retry_keeps_same_message_and_prepared_part' (19812128) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::delivery::channel_reply_delivery_unknown_is_quarantined_and_cannot_be_rewritten_or_deleted' (19812506) panicked at src/adapters/persistence/workflow/channel_reply_completion_tests.rs:207:14:\ncalled `Result::unwrap()` on an `Err` value: Conflict(\"Workflow batch transaction timed out\")\n"
+  },
+  {
+    "test": "adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer",
+    "last": "thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::reply_tests::message_reply_to_a_channel_post_matches_only_an_in_app_answer' (19831696) panicked at src/adapters/persistence/workflow/message_reply_tests.rs:348:6:\ncalled `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: \"23514\", message: \"internal relay must prove the exact delivery part it is and is immutable\", detail: None, hint: None, position: None, where: Some(\"PL/pgSQL function guard_message_internal_relay() line 29 at RAISE\"), schema: None, table: None, column: None, data_type: None, constraint: Some(\"message_internal_relay_guard\"), file: Some(\"pl_exec.c\"), line: Some(3939), routine: Some(\"exec_stmt_raise\") })"
+  }
+]

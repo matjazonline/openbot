@@ -1,0 +1,87 @@
+﻿2026-11-16T14:16:30.4743825Z ##[group]Run sudo apt-get update
+2026-11-16T14:16:30.4744111Z [36;1msudo apt-get update[0m
+2026-11-16T14:16:30.4744444Z [36;1msudo apt-get install --no-install-recommends -y ripgrep[0m
+2026-11-16T14:16:30.4773953Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:16:30.4774234Z env:
+2026-11-16T14:16:30.4774449Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:16:30.4774751Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:16:30.4775259Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:16:30.4775565Z   SQLX_OFFLINE: true
+2026-11-16T14:16:30.4776614Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:16:30.4776866Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:16:30.4777143Z   CARGO_TERM_COLOR: always
+2026-11-16T14:16:30.4777383Z   CACHE_ON_FAILURE: false
+2026-11-16T14:16:30.4777663Z ##[endgroup]
+2026-11-16T14:16:30.6586765Z Get:1 https://packages.microsoft.com/ubuntu/24.04/prod noble InRelease [3600 B]
+2026-11-16T14:16:30.6656825Z Get:2 file:/etc/apt/apt-mirrors.txt Mirrorlist [152 B]
+2026-11-16T14:16:30.7462303Z Get:6 https://packages.microsoft.com/ubuntu/24.04/prod noble/main arm64 Packages [702 kB]
+2026-11-16T14:16:30.7676495Z Get:7 https://packages.microsoft.com/ubuntu/24.04/prod noble/main amd64 Packages [772 kB]
+2026-11-16T14:16:30.7839605Z Hit:3 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble InRelease
+2026-11-16T14:16:30.7989961Z Get:4 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+2026-11-16T14:16:30.8506298Z Get:5 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-backports InRelease [126 kB]
+2026-11-16T14:16:30.9020960Z Get:8 http://security.ubuntu.com/ubuntu noble-security InRelease [126 kB]
+2026-11-16T14:16:30.9497099Z Get:9 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/main amd64 Packages [1450 kB]
+2026-11-16T14:16:31.0050635Z Get:10 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/main Translation-en [315 kB]
+2026-11-16T14:16:31.0232841Z Get:11 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/universe amd64 Packages [1713 kB]
+2026-11-16T14:16:31.0685426Z Get:12 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/universe Translation-en [345 kB]
+2026-11-16T14:16:31.0844284Z Get:13 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/restricted amd64 Packages [1883 kB]
+2026-11-16T14:16:31.1284930Z Get:14 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/restricted Translation-en [430 kB]
+2026-11-16T14:16:31.1434698Z Get:15 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble-updates/multiverse Translation-en [14.6 kB]
+2026-11-16T14:16:31.5251394Z Get:16 http://security.ubuntu.com/ubuntu noble-security/main amd64 Packages [1195 kB]
+2026-11-16T14:16:32.2431765Z Get:17 http://security.ubuntu.com/ubuntu noble-security/main Translation-en [238 kB]
+2026-11-16T14:16:32.3784258Z Get:18 http://security.ubuntu.com/ubuntu noble-security/universe amd64 Packages [1229 kB]
+2026-11-16T14:16:32.5942109Z Get:19 http://security.ubuntu.com/ubuntu noble-security/universe Translation-en [248 kB]
+2026-11-16T14:16:32.7320616Z Get:20 http://security.ubuntu.com/ubuntu noble-security/restricted amd64 Packages [1788 kB]
+2026-11-16T14:16:32.9679791Z Get:21 http://security.ubuntu.com/ubuntu noble-security/restricted Translation-en [411 kB]
+2026-11-16T14:16:33.1134928Z Get:22 http://security.ubuntu.com/ubuntu noble-security/multiverse Translation-en [12.7 kB]
+2026-11-16T14:16:41.6443806Z Fetched 13.1 MB in 3s (5243 kB/s)
+2026-11-16T14:16:42.5309140Z Reading package lists...
+2026-11-16T14:16:42.5613764Z Reading package lists...
+2026-11-16T14:16:42.7314479Z Building dependency tree...
+2026-11-16T14:16:42.7320681Z Reading state information...
+2026-11-16T14:16:42.9556533Z The following NEW packages will be installed:
+2026-11-16T14:16:42.9557625Z   ripgrep
+2026-11-16T14:16:42.9707543Z 0 upgraded, 1 newly installed, 0 to remove and 24 not upgraded.
+2026-11-16T14:16:42.9708051Z Need to get 1551 kB of archives.
+2026-11-16T14:16:42.9708637Z After this operation, 5335 kB of additional disk space will be used.
+2026-11-16T14:16:42.9709133Z Get:1 file:/etc/apt/apt-mirrors.txt Mirrorlist [152 B]
+2026-11-16T14:16:43.0273682Z Get:2 http://us-east-2.ec2.archive.ubuntu.com/ubuntu noble/universe amd64 ripgrep amd64 14.1.0-1 [1551 kB]
+2026-11-16T14:16:44.0635512Z Fetched 1551 kB in 0s (8544 kB/s)
+2026-11-16T14:16:44.1229175Z Selecting previously unselected package ripgrep.
+2026-11-16T14:16:44.4644105Z (Reading database ... 
+2026-11-16T14:16:44.4644742Z (Reading database ... 5%
+2026-11-16T14:16:44.4645018Z (Reading database ... 10%
+2026-11-16T14:16:44.4645285Z (Reading database ... 15%
+2026-11-16T14:16:44.4645537Z (Reading database ... 20%
+2026-11-16T14:16:44.4646112Z (Reading database ... 25%
+2026-11-16T14:16:44.4646408Z (Reading database ... 30%
+2026-11-16T14:16:44.4646654Z (Reading database ... 35%
+2026-11-16T14:16:44.4646902Z (Reading database ... 40%
+2026-11-16T14:16:44.4647157Z (Reading database ... 45%
+2026-11-16T14:16:44.4647416Z (Reading database ... 50%
+2026-11-16T14:16:44.7356485Z (Reading database ... 55%
+2026-11-16T14:16:45.4921608Z (Reading database ... 60%
+2026-11-16T14:16:45.7769810Z (Reading database ... 65%
+2026-11-16T14:16:46.0000492Z (Reading database ... 70%
+2026-11-16T14:16:46.1569480Z (Reading database ... 75%
+2026-11-16T14:16:46.4563017Z (Reading database ... 80%
+2026-11-16T14:16:47.3937134Z (Reading database ... 85%
+2026-11-16T14:16:48.7811642Z (Reading database ... 90%
+2026-11-16T14:16:49.8126732Z (Reading database ... 95%
+2026-11-16T14:16:49.8127549Z (Reading database ... 100%
+2026-11-16T14:16:49.8127966Z (Reading database ... 216380 files and directories currently installed.)
+2026-11-16T14:16:49.8169978Z Preparing to unpack .../ripgrep_14.1.0-1_amd64.deb ...
+2026-11-16T14:16:49.8183017Z Unpacking ripgrep (14.1.0-1) ...
+2026-11-16T14:16:49.8672831Z Setting up ripgrep (14.1.0-1) ...
+2026-11-16T14:16:49.8686718Z Processing triggers for man-db (2.12.0-4build2) ...
+2026-11-16T14:16:49.8708608Z Not building database; man-db/auto-update is not 'true'.
+2026-11-16T14:16:50.9951560Z 
+2026-11-16T14:16:50.9952395Z Running kernel seems to be up-to-date.
+2026-11-16T14:16:50.9952725Z 
+2026-11-16T14:16:50.9952900Z No services need to be restarted.
+2026-11-16T14:16:50.9953356Z 
+2026-11-16T14:16:50.9953527Z No containers need to be restarted.
+2026-11-16T14:16:50.9953797Z 
+2026-11-16T14:16:50.9954038Z No user sessions are running outdated binaries.
+2026-11-16T14:16:50.9954269Z 
+2026-11-16T14:16:50.9954646Z No VM guests are running outdated hypervisor (qemu) binaries on this host.

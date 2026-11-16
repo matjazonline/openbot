@@ -1,0 +1,22 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0425]: cannot find type `ScriptedRequest` in this scope
+  --> src/adapters/mcp/cleanup_tests.rs:13:23
+   |
+13 | fn protocol(request: &ScriptedRequest, session: Option<&str>) -> Result<(), &'static str> {
+   |                       ^^^^^^^^^^^^^^^
+   |
+  ::: src/application/services/test_support/scenario.rs:33:1
+   |
+33 | pub struct ScriptedResponse {
+   | --------------------------- similarly named struct `ScriptedResponse` defined here
+   |
+help: a struct with a similar name exists
+   |
+13 - fn protocol(request: &ScriptedRequest, session: Option<&str>) -> Result<(), &'static str> {
+13 + fn protocol(request: &ScriptedResponse, session: Option<&str>) -> Result<(), &'static str> {
+   |
+help: consider importing this struct through its public re-export
+   |
+ 2 + use crate::services::test_support::ScriptedRequest;
+   |
+

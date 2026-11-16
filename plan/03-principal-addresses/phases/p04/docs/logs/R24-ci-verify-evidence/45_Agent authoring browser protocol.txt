@@ -1,0 +1,32 @@
+﻿2026-11-16T14:45:53.2842205Z ##[group]Run cargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored
+2026-11-16T14:45:53.2842931Z [36;1mcargo test --locked --offline --lib dump_autonomous_agent_authoring_browser_fixtures -- --ignored[0m
+2026-11-16T14:45:53.2843489Z [36;1mnode --test scripts/tests/agent-authoring-browser.mjs[0m
+2026-11-16T14:45:53.2869948Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:53.2870363Z env:
+2026-11-16T14:45:53.2870705Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:53.2871076Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:53.2871685Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:53.2872069Z   SQLX_OFFLINE: true
+2026-11-16T14:45:53.2872422Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:53.2872799Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:53.2873129Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:53.2873464Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:53.2873867Z   AGENT_AUTHORING_BROWSER_FIXTURES: /tmp/agent-authoring-browser
+2026-11-16T14:45:53.2874498Z ##[endgroup]
+2026-11-16T14:45:53.4830960Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:53.5007238Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:53.5076868Z 
+2026-11-16T14:45:53.5077228Z running 1 test
+2026-11-16T14:45:54.2619286Z test adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures ... ok
+2026-11-16T14:45:54.2646448Z 
+2026-11-16T14:45:54.2647835Z test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.75s
+2026-11-16T14:45:54.2648437Z 
+2026-11-16T14:45:56.6527702Z ✔ agent selectors preserve unsaved input, publication retries and navigation after an accepted write (2111.619664ms)
+2026-11-16T14:45:56.6653596Z ℹ tests 1
+2026-11-16T14:45:56.6654277Z ℹ suites 0
+2026-11-16T14:45:56.6654777Z ℹ pass 1
+2026-11-16T14:45:56.6655319Z ℹ fail 0
+2026-11-16T14:45:56.6656088Z ℹ cancelled 0
+2026-11-16T14:45:56.6656835Z ℹ skipped 0
+2026-11-16T14:45:56.6657286Z ℹ todo 0
+2026-11-16T14:45:56.6657800Z ℹ duration_ms 2364.245476

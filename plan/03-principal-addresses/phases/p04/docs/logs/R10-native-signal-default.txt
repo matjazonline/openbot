@@ -1,0 +1,2 @@
+PASS counterexample: ignored owner signal reaches child
+PASS native env restores default child signals

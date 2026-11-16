@@ -1,0 +1,270 @@
+{
+  "binary_sha256": "67a04e45d0e22f375dc0fa32d6fff25bd996dc573e77178a631b4d5fca566b80",
+  "fixture_root": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+  "database": "PG51167 pa03_p04_browser_test",
+  "results": [
+    {
+      "family": "vault",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-vault-vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "vault",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-vault-vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "vault",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/vault-authoring-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-vault-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "html",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::pages::tests::dump_html_injection_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-html-dump_html_injection_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "html",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/team-autocomplete-browser.mjs",
+        "scripts/tests/html-injection-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-html-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "knowledge",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-knowledge-dump_knowledge_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "knowledge",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/knowledge-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-knowledge-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "memory",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::pages::company_memory::browser_fixtures::dump_memory_settings_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-memory-dump_memory_settings_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "memory",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/memory-settings-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-memory-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "agent",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-agent-dump_autonomous_agent_authoring_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "agent",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/agent-authoring-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-agent-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "local",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-local-dump_cloudroom_management_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "local",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/local-agents-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-local-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "skill",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-skill-dump_skill_bundle_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "skill",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/skill-bundle-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-skill-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "workflow-agent",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-workflow-agent-dump_autonomous_workflow_agent_picker_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "workflow-agent",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/workflow-agent-picker-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-workflow-agent-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "session",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures",
+        "--exact",
+        "--nocapture",
+        "--ignored"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-session-dump_session_revocation_browser_fixtures.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "session",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/session-revocation-browser.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-session-node.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "decisions",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-decisions-decision_browser_markup_and_closed_draft_recovery.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "decisions",
+      "command": [
+        "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+        "adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized",
+        "--exact",
+        "--nocapture"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-decisions-source_message_outside_window_is_exact_and_authorized.txt",
+      "status": "PASS",
+      "exit": 0
+    },
+    {
+      "family": "decisions",
+      "command": [
+        "node",
+        "--test",
+        "scripts/tests/workflow-decisions.mjs"
+      ],
+      "log": "plan/03-principal-addresses/phases/p04/docs/logs/D2-r4-browser-decisions-node.txt",
+      "status": "PASS",
+      "exit": 0
+    }
+  ]
+}

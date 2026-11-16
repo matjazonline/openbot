@@ -1,0 +1,41 @@
+{
+  "commit": "a23d83bdc13fe6bf92ec03e45559ad912fe7dbbe",
+  "parent": "f059f49808777abf0367d3a7f82d11e14bbd4e20",
+  "tree": "044e31cdb8758d3d2c4e3e5b707e1ad1545f3aa2",
+  "branch": "codex/plan03-p04-prefix-a23d83bd",
+  "source_digest": "990b7a9ebad0842c434c1e0d4de3139e25fd918d95f99bc3d6e002a6e6a791a4",
+  "exclusions": [
+    "plan/03-principal-addresses/phases/p04/docs",
+    "plan/03-principal-addresses/phases/p03/docs",
+    "plan/03-principal-addresses/phases/p02/docs",
+    "plan/03-principal-addresses/phases/p01/docs",
+    "plan/03-principal-addresses/COORDINATION.md",
+    "plan/02-workflow-roles/COORDINATION.md",
+    "plan/02-workflow-roles/phases/p05/docs"
+  ],
+  "material_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    "src/adapters/persistence/workflow/action_account_hints.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/action_dispatch.rs",
+    "src/adapters/persistence/workflow/action_receipts.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/http.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/local_agents/resolution.rs",
+    "src/adapters/persistence/workflow/mcp.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+    "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs"
+  ],
+  "equality": "every changed material Git blob equals working file; all other material files retain HEAD bytes",
+  "method": "external alternate Git index; actual HEAD/index/worktree unchanged"
+}

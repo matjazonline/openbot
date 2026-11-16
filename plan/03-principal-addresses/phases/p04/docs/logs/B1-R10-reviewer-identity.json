@@ -1,0 +1,16 @@
+{
+  "candidate": "d68c7353dce5957a9a64eb33f8faf2d22edc5863",
+  "files_checked": 50,
+  "byte_mismatches": [],
+  "actual_delta_equals_retained_diff": true,
+  "old_helper_matches_R13": true,
+  "old_helper_sha256": "c7a4d682a2e05a0bb29db642890c24702ee5c725ba1667fc90c927976b804407",
+  "coordination48_matches": true,
+  "decision_hashes": {
+    "D1-r5.md": "75279608421f0e4ad95bd3b76f1ae2bc72dc5acd2a5b30822ec487bf902cf32f",
+    "D2-r4.md": "80de44c5ff0449dacb8683e82df60d1d17c28dabb51540957e524d50c3f3a948",
+    "D3-r1.md": "61d108373b190c52802eec281abdca7e00466f409dd339270d0e981ab7066b45",
+    "D3-r2.md": "8b3fab53aa5529387b29f61788a555d1b94be5ee4e83bd1a3c38b4f382a94e6b"
+  },
+  "reviewer_runtime": "NOT EXERCISED: no Cargo/runtime/shared fixture commands; inspected actual current Linux CI and retained author binary evidence"
+}

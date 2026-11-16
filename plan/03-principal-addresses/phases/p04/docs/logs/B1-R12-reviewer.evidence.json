@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R12-reviewer",
+  "artifact": "e074382b1e41f4cd692b3ddb7bc9b1b29ec2ca6dc08ce89d92daf4bdcf1c5b34",
+  "checks": [
+    {
+      "criteria": [
+        "diagnostic-tail",
+        "escaping",
+        "failure-propagation",
+        "runner-wiring"
+      ],
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 scripts/tests/check-runner.py",
+      "fixture": "Independent isolated Python runner suite; real temporary file, mocked commands; no database or image execution",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R12-reviewer-runner.txt",
+          "sha256": "f751dfa4e999829dee5f0b8a9acc829713cce88ac69385db7c7468b651ed576e"
+        },
+        {
+          "path": "logs/B1-R12-reviewer-identity.json",
+          "sha256": "e794af0504d94268f53009dfddb053f29a66979746237943ef1f00bac762bec9"
+        },
+        {
+          "path": "logs/B1-R12-reviewer-entry.snapshot.txt",
+          "sha256": "7abeaf4a4fc80536e43ba6289ae6a5e12088eaa04f6def383b6a502287279b86"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "actual-private-proof",
+        "final-integration-acceptance"
+      ],
+      "command": "Completed actual private and remaining final gate evidence review",
+      "fixture": "Required current execution/evidence remains pending",
+      "status": "NOT EXERCISED",
+      "reason": "Source/focused review only; diagnostic correction does not resolve the retained pinned-service failure."
+    }
+  ]
+}

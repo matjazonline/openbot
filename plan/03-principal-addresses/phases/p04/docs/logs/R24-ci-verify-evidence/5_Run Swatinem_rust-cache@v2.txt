@@ -1,0 +1,58 @@
+﻿2026-11-16T14:16:25.3587010Z ##[group]Run Swatinem/rust-cache@v2
+2026-11-16T14:16:25.3587308Z with:
+2026-11-16T14:16:25.3587533Z   prefix-key: v0-rust
+2026-11-16T14:16:25.3587787Z   add-job-id-key: true
+2026-11-16T14:16:25.3588040Z   add-rust-environment-hash-key: true
+2026-11-16T14:16:25.3588414Z   cache-targets: true
+2026-11-16T14:16:25.3588675Z   cache-all-crates: false
+2026-11-16T14:16:25.3588981Z   cache-workspace-crates: false
+2026-11-16T14:16:25.3589247Z   save-if: true
+2026-11-16T14:16:25.3589541Z   cache-provider: github
+2026-11-16T14:16:25.3589769Z   cache-bin: true
+2026-11-16T14:16:25.3590018Z   lookup-only: false
+2026-11-16T14:16:25.3590247Z   cmd-format: {0}
+2026-11-16T14:16:25.3590466Z env:
+2026-11-16T14:16:25.3590713Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:16:25.3590966Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:16:25.3591453Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:16:25.3591742Z   SQLX_OFFLINE: true
+2026-11-16T14:16:25.3591984Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:16:25.3592269Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:16:25.3592582Z   CARGO_TERM_COLOR: always
+2026-11-16T14:16:25.3592833Z ##[endgroup]
+2026-11-16T14:16:26.7132017Z ##[group]Cache Configuration
+2026-11-16T14:16:26.7132543Z Cache Provider:
+2026-11-16T14:16:26.7132890Z     github
+2026-11-16T14:16:26.7133335Z Workspaces:
+2026-11-16T14:16:26.7133626Z     /home/runner/work/openbot/openbot
+2026-11-16T14:16:26.7133994Z Cache Paths:
+2026-11-16T14:16:26.7134304Z     /home/runner/.cargo/bin
+2026-11-16T14:16:26.7134653Z     /home/runner/.cargo/.crates.toml
+2026-11-16T14:16:26.7135043Z     /home/runner/.cargo/.crates2.json
+2026-11-16T14:16:26.7135359Z     /home/runner/.cargo/registry
+2026-11-16T14:16:26.7135627Z     /home/runner/.cargo/git
+2026-11-16T14:16:26.7136276Z     /home/runner/work/openbot/openbot/target
+2026-11-16T14:16:26.7136666Z Restore Key:
+2026-11-16T14:16:26.7137011Z     v0-rust-verify-Linux-x64-73e91c61
+2026-11-16T14:16:26.7137350Z Cache Key:
+2026-11-16T14:16:26.7137652Z     v0-rust-verify-Linux-x64-73e91c61-7e03e7ec
+2026-11-16T14:16:26.7138087Z .. Prefix:
+2026-11-16T14:16:26.7138387Z   - v0-rust-verify-Linux-x64
+2026-11-16T14:16:26.7138850Z .. Environment considered:
+2026-11-16T14:16:26.7139190Z   - Rust Versions:
+2026-11-16T14:16:26.7139623Z     - 1.100.0 x86_64-unknown-linux-gnu 0ef1bc386059596dada8fb65b50425aab2ea637a
+2026-11-16T14:16:26.7140154Z   - CARGO_HOME
+2026-11-16T14:16:26.7140454Z   - CARGO_INCREMENTAL
+2026-11-16T14:16:26.7140795Z   - CARGO_PROFILE_DEV_DEBUG
+2026-11-16T14:16:26.7141145Z   - CARGO_PROFILE_TEST_DEBUG
+2026-11-16T14:16:26.7141464Z   - CARGO_TERM_COLOR
+2026-11-16T14:16:26.7141784Z .. Lockfiles considered:
+2026-11-16T14:16:26.7142148Z   - /home/runner/work/openbot/openbot/.cargo/config.toml
+2026-11-16T14:16:26.7142590Z   - /home/runner/work/openbot/openbot/Cargo.lock
+2026-11-16T14:16:26.7143015Z   - /home/runner/work/openbot/openbot/Cargo.toml
+2026-11-16T14:16:26.7143511Z   - /home/runner/work/openbot/openbot/services/memory/.cargo/config.toml
+2026-11-16T14:16:26.7144068Z   - /home/runner/work/openbot/openbot/services/memory/rust-toolchain.toml
+2026-11-16T14:16:26.7144842Z ##[endgroup]
+2026-11-16T14:16:26.7145008Z 
+2026-11-16T14:16:26.7145154Z ... Restoring cache ...
+2026-11-16T14:16:26.7712714Z No cache found.

@@ -1,0 +1,12 @@
+{
+  "before": 4700,
+  "after": 4704,
+  "added": [
+    "adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call",
+    "adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete",
+    "adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation",
+    "adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session"
+  ],
+  "removed": [],
+  "binary_sha256": "67a04e45d0e22f375dc0fa32d6fff25bd996dc573e77178a631b4d5fca566b80"
+}

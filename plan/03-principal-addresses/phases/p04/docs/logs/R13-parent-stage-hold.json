@@ -1,0 +1,9 @@
+{
+  "parent_pid": 66037,
+  "reason": "Hold only parent before lease stage; stock suite continues unchanged. After stock completes adopt exact Linux-proven R13 helper/test at a controlled artifact boundary, snapshot/review and resume unchanged Darwin lease gate.",
+  "stock_children_continue": [
+    "73198 66037 S    bash scripts/stack-budget.sh --offline"
+  ],
+  "source_artifact": "9938338fb72334eb61bf07926c6747ab91f09c594dcd0660f9d836ac36fdf438",
+  "candidate": "fd5f7f76d6ee9788d2df2bd0544d309d78447723"
+}

@@ -1,0 +1,27 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 56s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 1 test
+
+thread 'tokio-rt-worker' (19270332) panicked at src/adapters/mcp/registration_test_support.rs:39:14:
+test must release the SDK handoff within the existing cancellation bound: Timeout
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session' (19270327) panicked at src/adapters/mcp/cleanup_tests.rs:131:20:
+called `Result::unwrap()` on an `Err` value: RecvError(())
+test adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session ... FAILED
+
+failures:
+
+failures:
+    adapters::mcp::tests::cleanup_tests::mcp_enqueue_preemption_cancels_original_call_before_shutdown_deletes_session
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 3.38s
+
+error: test failed, to rerun pass `--lib`

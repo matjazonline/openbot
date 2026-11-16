@@ -1,8 +1,8 @@
 # Plan coordination: 03-principal-addresses
 
-- Authority: /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/plan/03-principal-addresses/COORDINATION.md
-- Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed) in `/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot`
-- Revision: 28
+- Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/03-principal-addresses/COORDINATION.md
+- Writer: Codex root/A `/root` (Sol 6.1/xhigh, user-confirmed) in `/Users/mac02/orca/workspaces/openbot/plan03-04`
+- Revision: 57
 
 ## Plan-wide instructions
 
@@ -22,7 +22,7 @@ Run focused checks in implementation phases and the full repository/CI gate once
 | p01 | Claude Code root/A; accepted in phase (03PA-P01-B1-R2 PASS, digest dc9329df…ca23); integration pending p04 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p01/docs/TASK.md; HANDOFF.md |
 | p02 | Codex root/A `/root`; accepted in phase, integration pending p04 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p02/docs/TASK.md; HANDOFF.md |
 | p03 | Codex root/A `/root`; B1 implementation under accepted D1/r2 | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | phases/p03/docs/TASK.md; HANDOFF.md |
-| p04 | Codex root/A /root; transferred unfinished checkpoint | /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot | plan/03-principal-addresses/phases/p04/docs/TASK.md and HANDOFF.md |
+| p04 | Codex root/A /root; final correction verified in focus, final integration gate/review pending | /Users/mac02/orca/workspaces/openbot/plan03-04 | plan/03-principal-addresses/phases/p04/docs/TASK.md and HANDOFF.md |
 
 ## Cross-phase notices
 
@@ -298,3 +298,365 @@ constructor; the earlier unsupported Agent-origin native requirement is withdraw
 open for real Workflow-origin native actor/requester contention/rollback/retry and origin-guard
 proof. F2 is reviewer-resolved. No runtime/batch/final acceptance. All shared constraints and
 stop-before05 scope unchanged; only the corrected current-branch verification may proceed.
+
+## p04 resume in Orca checkout (revision29)
+
+User resumed Plan03 p04 here and explicitly authorized normal main push after completion, then
+Plan04. Prior stop-before-Plan05 limit persists. Sole coordination authority and implementation
+location transfer to this checkout, /Users/mac02/orca/workspaces/openbot/plan03-04. Historical absolute
+paths/handles remain evidence only. Root/A /root is user-confirmed Sol6.1/xhigh; fresh independent
+Astra/high B will resume review from retained original decisions and review evidence.
+Starting HEAD f059f49808777abf0367d3a7f82d11e14bbd4e20, branch feature/plan03_04, clean tree.
+I001–I004 (stop before05), C001–C007/r1 and revision10 remain acknowledged unchanged.
+D1/r3 accepted; F1 runtime proof/full verification/independent recheck still pending; F2 resolved.
+
+## p04 outer action prefix correction proposed (revision30)
+
+Real F1 runtime proof exposed R2/F1 waiting account/company prefix in broker action preparation.
+D1/r4 proposes extending existing sorted account ownership to the actual original source, selecting
+native NOWAIT before shared outer locks, with historical observation/replay preserved. Decision SHA256
+3fde20d3a5ea5aaea9d63766c0fe84da53aef43158d7cb05e95e670bcf9c159f. No dependent source edits before independent architecture PASS.
+I001–I004(stop before05)/C001–C007/r1/revision10 remain unchanged.
+
+## p04 explicit live-operation discriminator proposed (revision31)
+
+D1-R4/F1 correctly rejects interpreting dispatch/approval markers as historical-only; reservations
+precede actual gateway entry. D1/r5 SHA256 75279608421f0e4ad95bd3b76f1ae2bc72dc5acd2a5b30822ec487bf902cf32f
+now selects the current-source prefix by actual live operation, explicitly including enter_remote,
+return_authorized and final integration guard after reservation. Pure existing-intent/receipt/history
+branches stay unchanged. No dependent source edits before independent PASS; shared product notices
+and stop-before05 scope unchanged.
+
+## p04 D1/r5 architecture accepted (revision32)
+
+Root accepts independent03PA-P04-D1-R5/N1 PASS on decision75279608421f0e4ad95bd3b76f1ae2bc72dc5acd2a5b30822ec487bf902cf32f,
+unchanged source def5d444…426eea4/HEADf059f498 and coordination31. Explicit operation selection resolves
+D1-R4/F1. Dependent implementation may proceed; R1/F1 and R2/F1 runtime findings remain open.
+After-reservation enter/output/final integration credential-owner contention and historical proof
+remain required; no implementation/final acceptance. Shared notices/scope unchanged.
+
+## p04 final-gate lifecycle correction proposed (revision33)
+
+Whole-gate evidence identified stale API/schema assertions and a deterministic missing MCP cleanup
+notification. D2/r1 SHA256 fedfaae3abb50cf9033f8f2a74e4af4c70ef56d6019f1279064c8e6531e7ef6b
+proposes a bounded direct protocol cleanup through existing HTTP ownership, retaining3seconds and
+all source/admission checks. Pending independent architecture review before dependent MCP edits.
+D1/r5 remains accepted; R3/F1–F2 fixture fixes require no policy change. Original notices/scope and
+stop-before05 unchanged. Current source/gate artifact3afe41d0…652df remains unedited.
+
+## p04 MCP cleanup proposal refined before review (revision34)
+
+Read-only installed-SDK trace shows its transport also deletes sessions on stop, independently of
+Session.close. D2/r2 SHA256 3dc8c1be6051ff227af4ddf0303e3484e12470de8bb577fb239a27689bb63fc6
+therefore shares one pending-ID owner and serial cleanup gate across cancel/delete/finish, with
+existing3/5/35second total bounds retained. D2/r1 is an unimplemented draft superseded by r2 before
+review. No source edits; current full gate still collects3afe41d0 failures. Original notices/scope
+and D1/r5 unchanged. Independent D2/r2 PASS required before dependent MCP cleanup changes.
+
+## p04 MCP evidence rationale corrected (revision35)
+
+Independent D2-R2/N1 passed the cleanup decision, with low optionalF1 identifying that SDK notify
+does await transport completion. D2/r3 SHA256 0e4401d8cb2380f9d22e631a78e22fccf0791df3b5c46cceceb77cb3bc165cb6
+corrects the cause to adapter-wide cancellation of shared Control.stop before/concurrent with
+Session.close. The shared serialized HTTP cleanup decision and3/5/35second budgets are unchanged.
+Root obtains exact r3 rationale/identity PASS before dependent edits. Source still3afe41d0, no
+production edits during current gate; original notices/scope unchanged.
+
+## p04 D2/r3 accepted and correction boundary (revision36)
+
+Root accepts independent03PA-P04-D2-R3/N1 decisionPASS after matching decision0e4401d8cb2380f9d22e631a78e22fccf0791df3b5c46cceceb77cb3bc165cb6,
+unchanged source3afe41d0…652df/HEADf059f498 and coordination35. D2-R2/F1 rationale corrected;
+protocol unaffected. Current failed whole gate deliberately stopped after2490observed tests/9failures,
+exact owned processes only;13exact active disposable DBs cleaned, other clusters untouched.
+This releases the full correction batch after isolated diagnostics finish. Full verification must
+restart on completed runtime correction; no full-green or main-publication acceptance. D1/r5 and
+all original notices/scope remain unchanged; Plan04 follows Plan03 accepted/main push, stop before05.
+
+
+## p04 current-source focused correction proof (revision37)
+
+Accepted D2/r3 implemented; combined network-isolated current-source focused run115PASS/0FAIL/
+1existing external-CLI ignore. Three cleanup tests added, no names removed (4703total). SQLx
+preparePASS; offline cache unchanged. Runtime source/permission/schema contracts and all notice
+revisions unchanged; fixture corrections preserve exact guards/counts and add expected cleanup.
+Whole final scripts/check.sh restarted on corrected artifact; no full-green claim or phase/main
+acceptance until final gates, independent B and exact evidence pass. p04 current ownership/path
+corrected above. Plan04 follows accepted/main-pushed Plan03; stop before05 unchanged.
+
+
+## p04 admission/publication ownership correction proposed (revision38)
+
+Independent B1-R4/F1 identifies SDK queue admission preceding pending-ID publication, outside the
+cleanup gate. D2/r4 SHA256 80de44c5ff0449dacb8683e82df60d1d17c28dabb51540957e524d50c3f3a948 proposes extending the existing gate across SDK
+enqueue and synchronous real-ID publication only, with stopped/closed precheck and forced-window
+real HTTP regression.3/5/35second budgets and all authority/unknown/no-retry invariants unchanged.
+Source remains frozen99ec987f…54ab820; local full gate2 deliberately stopped before runtime tests
+at correction boundary after static/offline/Clippy/migrations/SQLx passes. Independent architecture
+PASS required before dependent source edits. All original notices and stop-before05 scope unchanged.
+
+
+## p04 D2/r4 architecture accepted (revision39)
+
+Root accepts independent D2-R4/N1 decisionPASS for80de44c5ff0449dacb8683e82df60d1d17c28dabb51540957e524d50c3f3a948,
+unchanged source99ec987f…54ab820/HEADf059f498 and coordination38. Existing-gate admission/publication
+boundary supported by actual SDK/Tokio cancellation semantics. Dependent correction may proceed;
+R4/F1 remains open until forced-window counterexample, corrected focused/full/CI and affected B
+recheck pass. Other D1/D2 invariants and original notices/scope unchanged; no main acceptance.
+
+
+## p04 D2/r4 discriminating correction proof (revision40)
+
+Corrected forced-window real SDK/HTTP casePASS; removing ONLY the registration lock makes the same
+wire-order assertionFAIL, then source restored byte-for-byte. Current combined116PASS/0FAIL/
+1existingCLIignore; source-module reachability8PASS; all10browser protocol groups16PASS/0skip with
+12real fixture preparationsPASS (22commands). No test names removed,4704total (4newcleanup cases).
+CI environment uses pinnedDocker29.9.3/containerd image store for native OCI export/import; exact
+unchanged Doop image build diagnostic43757432666PASS, no service source or image contract changed.
+All original live-source/unknown/no-retry/3/5/35budgets unchanged. New whole corrected artifact goes
+to B1-R5 recheck; final local/fullCI gates still pending. No plan/main acceptance or Plan04 start.
+
+
+## p04 final-gate fixture and CI resource correction (revision41)
+
+Gate3 completed4644PASS/33FAIL/27IGNORE; no full-green acceptance. Isolated relay fixture now uses
+a real sealed workflow reply, its exact frozen part, a system-authored internal copy and an enabled
+source desk; original13reply testsPASS. No guard, authorization or product contract weakened.
+Remaining Doop/lifecycle/budget failures are verification gaps under investigation; retained external
+counterfactual isolates the6MCPcleanupfiles without changing the authoritative worktree.
+
+Required CI verify/Doop/memory jobs lost hosted-runner communication; separate Memory service2jobs
+PASS. Local isolated compiler retained14,129,872KiB RSS with debuginfo2. Standard workflow-wide
+CARGO_PROFILE_DEV_DEBUG=0 and CARGO_PROFILE_TEST_DEBUG=0 omit debugger metadata while retaining
+unoptimized test code, debug assertions, network isolation and stock-stack/lease gates. This reduces
+compiler resource demand; no limit is raised and no check is removed. Actual CI proof still required.
+All I001–I004(stop before05), C001–C007/r1 and revision10 contracts unchanged. Final corrected
+source/evidence still needs independent affected review, complete gates and exact acceptance before
+normal main push. Plan04 remains queued after accepted/main-pushed Plan03.
+
+
+## p04 Linux verification isolation correction proposed (revision42)
+
+Current R7 CI verify lost hosted-runner communication during the network-isolated DB suite;
+private Doop/memory jobs passed. Read-only trace found both Linux wrappers select the entire
+invoking UID, including the CI control process. D3/r1 proposes a dedicated temporary primary
+GID for the guarded command tree and owner-group firewall rules, preserving UID/fixture/cache
+permissions and all existing egress/loopback/PostgreSQL restrictions. No OOM claim and no gate
+waiver. Independent D3 review required before dependent implementation. Current source88d4
+stays frozen while local main suite completes; parent33669 held only before next stock-stack
+stage, main child continues. All product contracts/notices and stop-before05 unchanged.
+
+
+## p04 D3/r1 architecture accepted (revision43)
+
+Root accepts independent03PA-P04-D3-R1/N1 PASS on decision61d108373b190c52802eec281abdca7e00466f409dd339270d0e981ab7066b45,
+material88d4/HEADf059f498/coord42 unchanged. Command-only Linux GID isolation may be implemented
+once the active focused binary replay releases runtime resources. Original UID/groups/environment,
+all firewall restrictions, partial-failure cleanup and standaloneMemory boundary remain required.
+Root main library4668PASS/10FAIL/27IGNORE retained; heldparent terminatedcorrectly at correction
+boundary before stock-stack. No fullgate/phase/plan acceptance; mainpush/Plan04 remainpending.
+All originalproductcontracts/notices and stopbefore05 unchanged.
+
+
+## p04 controlled Linux cleanup correction adoption (revision44)
+
+R8 primary localall-targetgate passed4678library/0FAIL/27IGNORE plus5binary+8source-modulecases.
+Rootheldonlycheckparent66037 beforestock-stack; no mainchildremains. Fourexactexternaldraft
+files(includingstandaloneLinuxhelper) adoptedfromcandidate60341d25. AllRust/migrations/Cargoinputs
+andbothDarwinbranchesbyte-identical toR8; mainproofretainedforunchangedprojection. NewLinuxcode
+isprovedbyitsCI, notoldDarwinexecution. Sourcefreeze/evidencemanifestwillpinnewrootdigest;
+subsequentstock-stack/leasegateusesunchangedDarwinpaths, recordedboundaryexplicitly.
+
+B1-R8/F1-F2 correctiondeferssetupsignalexituntilownershippublication, boundsnoninteractivecleanup,
+reportsincompleteremovalandretainsGIDafterfirewallfailure. OnehelperlivesinsideMemoryservicefor
+standaloneextraction andisreusedbybothentrypoints. NoarchitecturalpolicychangefromD3/r1; product
+bounds/notices/scopeunchanged. ActualLinuxsignal/deadline/sourceaffectedreviewandremainingfullCI/
+localgatesmandatory. Mainpush/Plan04remainpending; stopbefore05unchanged.
+
+
+## p04 final Linux correction adopted after stock proof (revision45)
+
+Stock-stack passed4678library/0FAIL/27IGNORE at2MiB in2536.12s; immutable pre-adoption log retained.
+Root heldonlyparent66037 withnochildren beforelease, then adopted two exact helper/test files from
+Linux-proven candidatefd5f7f76. D3/r1 contracts unchanged: native3s+1s timer executes inside sudo
+foractualprivilegedcleanup, existingouter5s+1s bound remains; signaldefaults restored. Corrected
+fixture execsreal sudo, checksactualprivilegedPIDdeath/no lateeffect and exposesfailures inCI.
+Earlier failed attempts remain evidence. No raisedlimit or newauthmodel/rootcoordinator.
+
+Rootmaterial1d5990aa52b4c252bd8104b3a3e625fda073f77487e2f834709c474bf6b87022 is stagedandfrozen.
+Allcode/test/configblobs matchcandidatefd5f7f76; threeadditionalnonruntimeTrailnotes are reviewed
+material. Rust/Cargo/migrations andDarwincommonpreambles/branches unchanged fromprimary/stock
+proof. R13-runtime-projection.json andR13-final-material-equality.json pinthisreuse. Rootwillresume
+onlyunchangedDarwinleasegate afterboundaryrecording. Requiredfull/currentCIandfinalBacceptance
+remainpending; noPlan03/mainpush orPlan04acceptance yet. Originalnotices/stopbefore05unchanged.
+
+
+## p04 uncertain setup ownership correction proposed (revision46)
+
+B1-R9/F1 finds post-success ownership flags omit OS mutations applied before a nonzero/timeout
+return. D3/r2 proposes bounded absence validation, claiming exact private live-PID/nonce identities
+before mutation, recording OUTPUT intent before insertion and reconciling actual owned state on
+failure. Preexisting collisions/probe errors never authorize foreign deletion. D3/r1 isolation,
+original UID/groups/environment and current inner3s+1s/outer5s+1s bounds remain unchanged. Independent
+architecture PASS required before dependent source edits. Source1d5990aa stays frozen; no producer
+Rust/schema/Darwin changes. Local full native/stack/lease passed; JS gate failed only for missing
+browser executable and focused rerun follows installation. Final phase/main/Plan04 still pending.
+
+
+## p04 D3/r2 architecture accepted (revision47)
+
+Root accepts independent03PA-P04-D3-R2/N1 PASS on decision8b3fab53aa5529387b29f61788a555d1b94be5ee4e83bd1a3c38b4f382a94e6b,
+unchanged stagedsource1d5990aa/HEADf059f498/coord46. Both supported exec callers satisfy the private
+live-PID namespace contract. Validated absence, pre-mutation ownership intent and exact bounded
+reconciliation may now be implemented; R9/F1 remains open until real after-mutation failure/timeout
+and collision proof passes. No new privilege policy, raised bound or global allocator. All native
+local gates passed; missing browser prerequisite installed and focusedJS8PASS. Historical full-script
+exit1 retained; no native/Rust rerun required for this environment repair. Required current Linux/
+CI/private gates and finalBacceptance still pending; no mainpush/Plan04, stopbefore05 unchanged.
+
+
+## p04 CI fixture configuration correction (revision48)
+
+D3/r2 implementation's exact Linux focus43858848414 passed; candidate8cd82c30 privateDoop and
+memory integration also passed. Historical R13 general CI4672PASS/6FAIL/27IGNORE downloaded and
+retained. Four failures directly require an unset TEST_DATABASE_URL while CI supplies DATABASE_URL;
+reuse the existing persistence test resolver for crash children and clone the actual fixture pool
+for unavailable-composer tests. No production/schema/bounds change. Two Doop lifetime failures
+remain verification gaps until current focused/full proof; no unrelatedness claim.
+
+Current staged material6207f5af68cebf9244db06ad05be67ab8459e18d07de0c672fd6f0229057f88f, HEADf059f498,
+seven exclusions unchanged. All50material blobs match candidate d68c7353dce5957a9a64eb33f8faf2d22edc5863;
+actualHEAD unchanged. Root's focused worker4728 owns local PG51167 fixtures; no competing checks.
+B source/recheck assignment will follow results. GeneralCI43863539586 andMemory43863539608 active;
+Linuxfocused43863539878PASS. Originalnotices/stopbefore05/mainauthorization unchanged; no mainpush/04.
+
+
+## p04 final verification contract clarified from originals (revision49)
+
+IndependentB1-R10/N2 confirms original plan/AGENTS/skill allow unchanged-gate evidence reuse and
+focused correction reruns; they do not require every entireCI job to restart after every fixture
+correction. Coordinator's blanket current-whole-CI pending condition is refined to actual required
+behavior/check coverage, without waiving any original gate. Two originalLinuxDoop failures remain
+a required gap: localtwo-threadPASS alone doesnot establish the Linux failure condition resolved.
+
+Root will exercise the complete19-caseDoop family plus4correctedfixturecases on actualUbuntu24.04/
+PostgreSQL18, originaltimeouts,4competingtestthreads and actualnetworkguard. This is supplementary
+focused proof on exactproduction/test source; originalfullCI continues unchanged. Final B must
+independently assess sufficiency and all unchangedcheckprojections before acceptance. Current
+Memoryverify/image/integration alreadyPASS; privateDoop actualprobes stillactive atlastpoll.
+Source6207f5af remainsfrozen; no productionedit or criterion waived. Normalmainpush/Plan04 waits
+for actualrequiredproof/finalacceptance; stopbefore05 unchanged.
+
+
+## User-requested main merge only (revision50)
+
+User: "origin/main has new commit - only merge, don't rerun tests". Merged6e55258c into this
+branch asd8fdd990. Kept upstream expanded verification/sharedDoop runner; restored Plan03 work.
+Existing OCI setup and failure annotations/log visibility now use the sharedDoop helper. No tests
+rerun after this instruction; no new implementation beyond conflict resolution.593nonoverlapping
+edited/evidence files retain exact bytes/modes; three overlap paths resolved, originalstaging
+restored with sharedhelper carrying priorCI diagnostics. Sourcebase/digest changed; premerge
+review/check identities remain historical. Plan03Linuxruntime failures remainunresolved, no
+mainpublication/Plan04start. B idle. No MCPcatalog optimization authored yet.
+
+
+## Explicit committed checkpoint pushed to main (revision51)
+
+User requested "push to main" after merge-only action. Normalfast-forwardSSHpush publishes
+committedHEADd8fdd990; remote tip verified. Uncommitted implementation/evidence remains local.
+No tests rerun by agent. No finalPlan03acceptance/Plan04start; originalcompletion work remains.
+
+
+## Resume fixes, testing and complete publication (revision52)
+
+User now explicitly allows tests and requests: fix failures, push all currentPlan03work to main,
+then continue plan/04-root-unit. Previous merge-only/no-test restriction is revoked for this work.
+The d8fdd990 committed checkpoint is already on main; current implementation/evidence remains
+uncommitted and must be included after fixes/verification. Do not mistake checkpoint publication
+for completedPlan03. Stopbefore05, no forcepush/deployment. Root resumes A, retainedB idle.
+
+R18 removes one proven duplicate catalog validation in strictMCP row conversion. Private parsed
+ReadCatalog from the exact same row is reused; strict validation still occurs before conversion,
+ordinarysettings validate before optionalcatalog/quarantine, currentauthority/locks/deadlines
+unchanged. No cache across reads, schema/API/ownership change or trust-boundary relaxation.
+Routine owner-local correction; D1/D2/D3 architectures unchanged, no new architecture gate.
+Required proof: strictinvalid and ordinaryquarantine tests, competingcatalog/grant tests, actual
+Linux four-thread Doop/fixture progress with originaltimeouts, then remainingfinalgates/Bacceptance.
+
+
+## R18 Linux progress passes; private-service failure visibility (revision53)
+
+Exacte1f2be66 Linux23cases/4threads/originaltimeouts PASS. Root66focusPASS; independentB5PASS
+andB1-R11source/focusedPASS onb02a. CurrentMemoryverify/image/integrationPASS. No finalacceptance
+yet: privateDoopjob133340704941 fails at separatepinnedservice bun test beforeOpenBothelper.
+Fulljoblogs inaccessible throughAPI/anonymousweb; macOSAX windowreads blocked despitepermission
+statusgranted. Root adds bounded16KiB failure-tail annotation plus retainedper-command servicelogs
+to existing sharedrunner; keepcommands/env/deadlines/fail-stop unchanged. Existingfake runnercase
+extended to prove tailbound/escaping/cleanenv/stop. This is diagnostic work, no waiver or claim
+that separate-service failure is unrelated until actualdetail/currentproof. NativeRustunchanged.
+
+
+## R19 service passes; later private failure visibility (revision54)
+
+Exact581576e7 privatejob133356622982 failed withoutservice-tailannotation; artifactretentionPASS.
+Detailedlaterfailure remainsunknown; no unrelatednessclaim. Rootreleasesfreeze for sharedrun()
+boundedstderr failurediagnostics, retainingordinarycomplete stderr aftercommandcompletion and
+existingexit/timeout/cwd/env/stdout contracts. Service tail helper is reused; compileJSONfailure
+also annotated/retained because compilererrors are emitted on stdoutJSON. Top-levelPythonerrors
+getboundedannotations. No testlimit/assertion or nativeRust change. TenrunnercasesPASS including
+actualsuccess/failingcommand stdout/stderr/exitcode/escaping/boundchecks; initialmissingtestimport
+failed and is corrected. GeneralR19verify independentlycontinues; no finalacceptanceyet.
+
+
+## Chrome IPC path correction (revision55)
+
+ActualisolatedUbuntu43890914956 provesChromeFATAL Socket path too long undernestedcleanTMPDIR,
+shortownedTMPDIRlaunch/closePASS. B1-R13/N2 independentlyclassifies exactD4/r1 asroutineowner-layer
+selection, noarchitecturegate required. HostbrowserOwner nowoverridesonlychildTMPDIR=/tmp, native
+Chromeowns itsprivate scopedIPCdirectory; explicitprofile/ledger/HOME/sandbox/TLS unchanged.
+No newownedresourceledger or guaranteeaboutSIGKILLOS-tempdeletion. NewactualIPCcheck requiresreal
+sandboxChrome under>108byteparenttemporarypath, about:blank, originalprofile/processreceipt and
+confirmedclose; sharedrunnerinvokesitbeforeexpensiveservicegates. Node26/Python10PASS. Actualfour
+privateprofilecorrectionproof andindependentfinalsource/evidence review stillrequired.
+
+R20unrelatedpinnedservice browserunit outcome2726PASS/2FAIL preserved alongsideR19same2728PASS.
+No pinnedsource/lock/test/assertion edit or raisedtimeout. Preciseintermittentcauseunproved;
+reuseonlyunderexplicitmatchingservice/environmentprojection, neverclaimwholeR20CIgreen.
+
+
+## Reuse supervised private-browser verification (revision56)
+
+B1-R14/N1 foundone mediumR14/F1 in the newlyadded standaloneIPCpreflight: receiptpublication
+failure skipsclose; close canstallwithouttheexistingprivate supervisor. Rootremovesnewprogram/
+invocation/artifactentry, retainingexactchildTMPDIRfix and26protocolassertions. D4/r2 supersedes
+onlytheverificationimplementation fromD4/r1; no newownershipprotocol orarchitecturegate. Actual
+mandatoryprivate/e2e acceptance alreadyowns browserrecovery andexerciseslongruntimepath. Current
+R21focusedCI canproveexactunchangedbrowserOwner/private/helper/imageprojection, notwholecurrent
+runneridentity. FinalBaffectedrecheck/native/privategates pending; no acceptancewaived.
+
+
+## User separates Doop follow-up from core publication (revision57)
+
+User: "if main plan03 is passing write new fix-doop.md plan, push to main and continue with plan04".
+This explicitly supersedes the requirement that remainingDoop private/serviceissues blockPlan03core
+publication andPlan04startup. Newplan/fix-doop.md retainsactualfailures/pinnedinputs/deadlines/
+assertions/focusedbatches/finalverification. Newstartupresetinventoryentry added. No testskip,
+retrymasking, raisedbound, whole-CIgreen or completedDoopacceptanceclaim. CurrentunreviewedR23
+pollingprototype removedfromsource andsavedasproposalpatch. Previouslyreviewedcatalog/Chrome/
+runnercorrections remainincluded inpublication, not keptlocal.
+
+CoreR19fullsuite4677PASS/1FAIL/27IGNORE: solefailureunchangedCloudroomRefreshCatalogacksetup,
+notprincipal/addressing/Doopordinarycase. B1-R16/N1 tracedbranch andmatched107relevantfiles toR8
+passingprimary/stocksource. Socketclosecauseunknown; preserveactualfullsuiteFAIL. This isoutside
+affectedPlan03source; currentfocusedproof/rootacceptance stillpending. Allapplicablecorecontracts
+remainrequired. Doopfullprivatefour-profileproof moves tofollow-upbyuserdirection; neverreportPASS.
+
+### 03PA-C008 / r1
+- State: active
+- Origin: latestuserdirection andplan/fix-doop.md; p04 R24scope record
+- Targets: p04acceptance andfuturePlan04phases
+- Instruction: Finish/review/verify/publishPlan03core, carryremainingDoopfailures as explicitfollow-up,
+  continuePlan04withoutwaitingforfix-doop execution. KeepDoopCI declarations/assertions, reportits
+  gaps anddon'tclaimwholeCIgreen. Reassessanynewaffectedfailure ratherthanlabelitdeferredblindly.
+- Verification: actualcoreprincipal/role/addressingchecks andfocusedcurrentcorrectionproof,
+  independentfinalscope/evidencereview, linkedDoopfollow-up andnormalmainSHA; Plan04owncoregates.
+- Responses: p04acknowledgedr1 hereandTASK; futurePlan04registers/acknowledgesatstartup.

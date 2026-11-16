@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R4-reviewer-focused",
+  "artifact": "99ec987f83548485a18f8edc71e96192d48507b117257ae7d3b962fbf54ab820",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-B1-R4-libtest adapters::mcp::tests::cleanup_tests:: mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup library_builder_copy_keeps_its_grants_on_an_explicit_model direct_public_settings_unconfirmed_create_has_no_partial_agent_or_desk capability_selection_is_scoped_and_updates_atomically adapters::persistence::legacy_runtime_schema_tests:: --nocapture --test-threads=2",
+      "fixture": "Copied immutable libtest SHA2567a6453a6a2d45b5a9fff9d87cc2a634935cd4e41e736caa2b398b3d7974128f0; private pa03_p04_b_r4_20261115_test on owned PostgreSQL51167; loopback scripted HTTP; 9PASS/0FAIL/0ignored in9.39s",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R4-reviewer-focused.txt",
+          "sha256": "11e4bf36b6b7fc7fa42ac11a5d6f5579dcccd02925bda3678f3c44a0c817c2f4"
+        }
+      ]
+    }
+  ]
+}

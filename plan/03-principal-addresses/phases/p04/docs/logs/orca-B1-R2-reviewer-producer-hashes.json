@@ -1,0 +1,62 @@
+[
+  {
+    "path": "src/application/workflow/actions/local_agents.rs",
+    "prior": "8439590f81852877ca0d7d90f0fe30a33704d12cdd64fcf790fec41e2ba79a8c",
+    "current": "8439590f81852877ca0d7d90f0fe30a33704d12cdd64fcf790fec41e2ba79a8c",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/preparation.rs",
+    "prior": "21443fd8b97ca0482a4cf6f6401b1cd34caf8d090570202a8ece78d3dd415659",
+    "current": "21443fd8b97ca0482a4cf6f6401b1cd34caf8d090570202a8ece78d3dd415659",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/http_runtime.rs",
+    "prior": "ba7bd12e062c5291e32fb00f1eed3913a588b5ed737ae9525392e088b63b3a5f",
+    "current": "ba7bd12e062c5291e32fb00f1eed3913a588b5ed737ae9525392e088b63b3a5f",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/admission.rs",
+    "prior": "5ddbf052413c19276a72d54de0199d205a900a5ab7454caa2dda748456c6b285",
+    "current": "5ddbf052413c19276a72d54de0199d205a900a5ab7454caa2dda748456c6b285",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "prior": "19431dc66e596b7def79765db9522dc8a87987c140ad9a1c62ae7383d66ca42f",
+    "current": "19431dc66e596b7def79765db9522dc8a87987c140ad9a1c62ae7383d66ca42f",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_origin.rs",
+    "prior": "8a4ffd94838847e4f2f4de909b0627fae367c3787733a7f1ee9d76b8fd89dc98",
+    "current": "8a4ffd94838847e4f2f4de909b0627fae367c3787733a7f1ee9d76b8fd89dc98",
+    "same": true
+  },
+  {
+    "path": "src/domain/entities/agent_capability.rs",
+    "prior": "d47c85da34b94da0c03e00c0df1161ac8f10ab945afc5aed177517ded9bbef51",
+    "current": "d47c85da34b94da0c03e00c0df1161ac8f10ab945afc5aed177517ded9bbef51",
+    "same": true
+  },
+  {
+    "path": "src/adapters/workflow_agent/mod.rs",
+    "prior": "2fcfb4223b4c5dd950247fa6be6d96c1a44e17e343ad8712ea97305eb423646c",
+    "current": "2fcfb4223b4c5dd950247fa6be6d96c1a44e17e343ad8712ea97305eb423646c",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/action_account_hints.rs",
+    "prior": "c01063cafcb7c70893af7ca4d6fbe110cb1a1746f71158194b650249b4cb1dff",
+    "current": "c01063cafcb7c70893af7ca4d6fbe110cb1a1746f71158194b650249b4cb1dff",
+    "same": true
+  },
+  {
+    "path": "src/adapters/persistence/workflow/provisioning.rs",
+    "prior": "f6b3a97f412de12a4c24b222b6ce61794954b049c61d537e3dd475c59c849ea3",
+    "current": "f6b3a97f412de12a4c24b222b6ce61794954b049c61d537e3dd475c59c849ea3",
+    "same": true
+  }
+]

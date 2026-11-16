@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 5 tests
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_capture_locks_mcp_catalog_operation_and_grant ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_resolution_malformed_stored_catalog_is_an_error_not_an_empty_capture ... ok
+test adapters::persistence::agent_publication::tests::mcp::autonomous_agent_publication_catalog_edit_first_cannot_commit_a_mixed_review ... ok
+test adapters::persistence::mcp_tests::reads::catalog_reads_are_tenant_scoped_and_exclude_deleted_rows ... ok
+test adapters::persistence::mcp_tests::jsonb_row_context_mcp_quarantines_discovery_and_effective_grants ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 4700 filtered out; finished in 3.73s
+

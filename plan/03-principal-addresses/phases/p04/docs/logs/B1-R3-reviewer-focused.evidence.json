@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R3-reviewer-focused",
+  "artifact": "3afe41d0dd998fb1209be1ed1e017ce940c06d6dc9b2185079d5496445e652df",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "03PA-P04-B1-R1/F1",
+        "03PA-P04-B1-R2/F1",
+        "D1/r5"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 '::source_tests::'",
+      "fixture": "Owned PG18.7/51167 pa03_p04_b_review_20261115_1845_test; tests use isolated own_database fixtures. Binary SHA2563bb2e2bc6db1c5d956649cd6ea04d0a31d4bcace4d6f830f467a3ae7348e97d9",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R3-reviewer-source-tests.txt",
+          "sha256": "c5376e143c35918286e79e87b504c8ac3e905a045270f5d60947646c5832bcb6"
+        },
+        {
+          "path": "logs/B1-R3-reviewer-ci-equivalence.json",
+          "sha256": "a1b9f77f57c15c4467780477a6e0e6814d6b9bb55a3b4ae99716f8411c5304aa"
+        }
+      ]
+    }
+  ]
+}

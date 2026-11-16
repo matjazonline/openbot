@@ -1,0 +1,46 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 33s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 15 tests
+test adapters::mcp::tests::authentication::mcp_authentication_http_error_preserves_the_openbot_session ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_preparation_cancelled_before_admission_sends_no_credential ... ok
+test adapters::mcp::tests::mcp_endpoint_permit_wait_expires_without_consuming_global_capacity ... ok
+test adapters::mcp::tests::mcp_shutdown_joins_an_abandoned_session_and_closes_admission ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_prepared_initialization_preserves_typed_failure_and_cleanup ... ok
+test adapters::mcp::tests::mcp_repeated_pagination_cursor_fails_without_calling_a_tool ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+
+thread 'adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried' (19066888) panicked at src/adapters/mcp/tests.rs:351:5:
+assertion `left == right` failed
+  left: Err("unexpected extra request")
+ right: Ok(3)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete ... ok
+
+thread 'adapters::mcp::tests::authentication::mcp_authentication_is_typed_through_actual_initialization_discovery_and_call' (19066883) panicked at src/adapters/mcp/authentication_tests.rs:162:13:
+assertion `left == right` failed
+  left: Err("unexpected extra request")
+ right: Ok(3)
+test adapters::mcp::tests::mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links ... ok
+test adapters::mcp::tests::mcp_initializes_discovers_and_explicitly_calls_json_and_sse_then_shuts_down ... ok
+test adapters::mcp::tests::mcp_busy_endpoint_waiters_leave_global_capacity_and_shutdown_promptly ... ok
+test adapters::mcp::tests::mcp_discovery_rejects_duplicates_external_schemas_secret_echoes_and_oversized_data ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_is_typed_through_actual_initialization_discovery_and_call ... FAILED
+test adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried ... FAILED
+
+failures:
+
+failures:
+    adapters::mcp::tests::authentication::mcp_authentication_is_typed_through_actual_initialization_discovery_and_call
+    adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried
+
+test result: FAILED. 13 passed; 2 failed; 0 ignored; 0 measured; 4687 filtered out; finished in 0.20s
+
+error: test failed, to rerun pass `--lib`

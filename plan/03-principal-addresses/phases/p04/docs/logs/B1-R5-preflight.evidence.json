@@ -1,0 +1,456 @@
+{
+  "version": 1,
+  "round": "03PA-P04-B1-R5-preflight",
+  "artifact": "00f75666fcf805963dcdd73ee01e7d745f87573d0f4777ef6f9826813c5d32e4",
+  "checks": [
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "scripts/test-network-isolation.sh cargo test --locked --offline --lib -- adapters::mcp:: adapters::http::routes::agent::api_tests:: adapters::persistence::legacy_runtime_schema_tests:: capability_selection_is_scoped_and_updates_atomically workflow_mcp_ native_mcp_ autonomous_agent_recovery_mcp_cancellation --nocapture",
+      "fixture": "PG51167 pa03_p04_test/isolated own_database; exact libtest SHA67a04e45d0e22f375dc0fa32d6fff25bd996dc573e77178a631b4d5fca566b80;116PASS/0FAIL/1existingCLIignore",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-combined-focused1.txt",
+          "sha256": "66bed846514e1ac67488ea705c72714a2c1f8643a003f05fc695a74dda4d56d7"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2"
+      ],
+      "command": "python3 logs/D2-r4-prove-old-ordering.py (requires actual wire assertion exit101 and byte-exact restoration)",
+      "fixture": "Actual stateful SDK/HTTP same-connection competing drop/shutdown; current test passes; removing only registration lock forces cancellation-before-DELETE assertion failure",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-forced-current2.txt",
+          "sha256": "6a035ccdfda0438b40fad78c131ebf4b2fa9cf79c91745bf16b99236f8bd9acb"
+        },
+        {
+          "path": "logs/D2-r4-old-ordering1.txt",
+          "sha256": "7404bafb33f989705b4a38cfb6921290129fdaf06cd12a13be3d9757dc407008"
+        },
+        {
+          "path": "logs/D2-r4-old-ordering-harness.txt",
+          "sha256": "39f343c06255b8dd5bed7078b10b22019156d73039789c308bd4151bd93cb09f"
+        },
+        {
+          "path": "logs/D2-r4-old-ordering-proof.json",
+          "sha256": "9c930a00eb437ccb55785db575d219da7dee031e52bc8ca7d7e82d2fefa94656"
+        },
+        {
+          "path": "logs/D2-r4-prove-old-ordering.py",
+          "sha256": "bd9a24f4fa5c8f822038e4cc7810048a55c6e9cfc6410484f8ef511cd286ab9e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "cargo test --locked --offline --test source_modules",
+      "fixture": "8PASS; new per-connection cfg(test) helper connected",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-source-modules.txt",
+          "sha256": "adcf6ad6278833d31a6e8ed3dbfcbea8c140907e83a5870a3fa1c27133a7551b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::ui_vault_bindings::tests::authoring::vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata --exact --nocapture",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-vault-vault_authoring_picker_is_owner_scoped_and_only_exposes_approved_metadata.txt",
+          "sha256": "9ef9de24e61fa0bf532383aaca0d1ed7ef4d69cd99d232cfc811e9188c0be9a6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::persistence::workflow::tests::http_tests::vault_tests::execution::native_portability::native_journeys::owner_browser::vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup --exact --nocapture",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-vault-vault_authoring_owner_forms_and_reconnect_states_emit_real_browser_markup.txt",
+          "sha256": "448917ab19bdd32f8dd349ff7af0e5e6af08754dc69957db6d9e9c925ad4424a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/vault-authoring-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-vault-node.txt",
+          "sha256": "c27a2fd1d0a595d67c4791ec16601a927959b212ad2af3050c427bc410abc56a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::pages::tests::dump_html_injection_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-html-dump_html_injection_browser_fixtures.txt",
+          "sha256": "422bd9ff7f65027528bd8bd156dc620511478254f7d16356679d8f9ee9a51aa1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/team-autocomplete-browser.mjs scripts/tests/html-injection-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-html-node.txt",
+          "sha256": "fe18572cea4fb764643fa48f114836ba2785a83df74cb3d50a622861ea73918c"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::pages::knowledge::tests::dump_knowledge_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-knowledge-dump_knowledge_browser_fixtures.txt",
+          "sha256": "b1068e55f4f7cc0cd1590dd9df91abd8c687b97eb0a5733af2a690914a1881c1"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/knowledge-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-knowledge-node.txt",
+          "sha256": "0d04986e76b4cf606a96abf4dd7a254ed8bb891507a51257136f98f23f2c7d89"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::pages::company_memory::browser_fixtures::dump_memory_settings_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-memory-dump_memory_settings_browser_fixtures.txt",
+          "sha256": "564d5ff09446d06164650c80c37d12d0a845f043f44e5ce9de9134cfe9e4fbe6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/memory-settings-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-memory-node.txt",
+          "sha256": "8530a61407a0d766105f024d59e301ec84b56efdd4c8eb9dd9d8f6990fa62a56"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::ui_agents::authoring::browser_fixtures::dump_autonomous_agent_authoring_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-agent-dump_autonomous_agent_authoring_browser_fixtures.txt",
+          "sha256": "c17319a38677e8eff51213763393786f8e718f7b5ef8c12eb97b9006d9f3338f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/agent-authoring-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-agent-node.txt",
+          "sha256": "f78510edc65927e9d73644d4fe8d834f32dd5d713fb19d15179e21abbdaec16e"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::persistence::local_agents::management::tests::dump_cloudroom_management_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-local-dump_cloudroom_management_browser_fixtures.txt",
+          "sha256": "ea2284eb31efd10effae86fb71fd20e86380df10c4086b163c9469002944ab1a"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/local-agents-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-local-node.txt",
+          "sha256": "acaa3e2b6ef15d13c13b769d0ac96d2917e4870730f7a4f6b988583379b3cc39"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::skill_library::http_tests::dump_skill_bundle_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-skill-dump_skill_bundle_browser_fixtures.txt",
+          "sha256": "3bf2e71fd2c5833c53bd8f795cfa851aafdd557fc379bd97e2a9ea8967bfca81"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/skill-bundle-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-skill-node.txt",
+          "sha256": "e581fc46b1d5c85280fab241d7ffdcdb59d67ae0ce8933daa65adcf9cb644feb"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::workflows::ui::authoring::tests::agent_picker_tests::dump_autonomous_workflow_agent_picker_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-workflow-agent-dump_autonomous_workflow_agent_picker_browser_fixtures.txt",
+          "sha256": "66cd3bac737d159d67d08abaaf18f3449d1c9f882f870a3b05ccf9df44f2c0b3"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/workflow-agent-picker-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-workflow-agent-node.txt",
+          "sha256": "b2421052bf7377509056aab0f6f464da243d33802537d2c51b4f801b2480747d"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::ui_profile::session_tests::dump_session_revocation_browser_fixtures --exact --nocapture --ignored",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-session-dump_session_revocation_browser_fixtures.txt",
+          "sha256": "4fd3bba2a476868e8832fab60974c2aaaf95613fea7d4fa0b1605fee01930c00"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/session-revocation-browser.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-session-node.txt",
+          "sha256": "327452f6a8f41889d818c1c1b1f8d8041f40f22b5501b96fe8042e1a1c408ddf"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::pages::workflow_decision::tests::decision_browser_markup_and_closed_draft_recovery --exact --nocapture",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-decisions-decision_browser_markup_and_closed_draft_recovery.txt",
+          "sha256": "99e6fafcc3e84b9d1dad4d8910c44d60135fa5d7e797c5f8d7296c723a37a51f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230 adapters::http::routes::ui::stream_tests::message_source_tests::source_message_outside_window_is_exact_and_authorized --exact --nocapture",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-decisions-source_message_outside_window_is_exact_and_authorized.txt",
+          "sha256": "9922b05ec1e237dfd2c15135187b602831bd5f9a7089586f4074b7f361c15ce9"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC2",
+        "FC3"
+      ],
+      "command": "node --test scripts/tests/workflow-decisions.mjs",
+      "fixture": "PG51167 pa03_p04_browser_test; captured actual current markup and Playwright; fixture root /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-browser-un4kr3ix",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-browser-decisions-node.txt",
+          "sha256": "1f7dbf85011dbe12ac2fcd3074503449729ea0d7a38f383362b2cec87ddbdbd6"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "Current copied libtest --list; compare discovered names",
+      "fixture": "4700->4704,4added/0removed; exact current binary hash",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-inventory-delta.json",
+          "sha256": "fc3007b0415564e9464ba616c139cd49ca9e51b46101372fed2ca14c6b60906b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "trail build; trail check",
+      "fixture": "Current graph refreshed,7learnings no conflicts",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-trail-build.txt",
+          "sha256": "f064afe00db3594f120feb9662ad7de1ba3099de9178b5215a5e76cb5ac074ad"
+        },
+        {
+          "path": "logs/D2-r4-image-store-trail-check.txt",
+          "sha256": "9d81c8f454f500bdd5d2fc6324ef19bfc104d14c93dd3baa1cd510ddc04d9042"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3"
+      ],
+      "command": "Isolated CI43757432666 managed Doop setup and scripts/doop-test.py image",
+      "fixture": "Unchanged Doop source, pinned Docker29.9.3/containerd store; actual OCI build/load/user/source-fingerprint/metadata validation; scoped image proof only",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/D2-r4-doop-image-store-43757432666-jobs1.json",
+          "sha256": "48350d19aee55c8ca24f0479ef876bf6230054408aecb9d295179282cad32863"
+        },
+        {
+          "path": "logs/D2-r4-doop-image-store-fixture.json",
+          "sha256": "d015553a025f6c3221bb943ddfa972cf70897ad0ba4ac22d67d1ce4cc3c6eb37"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "FC3",
+        "FC4"
+      ],
+      "command": "Complete current-source scripts/check.sh and exact full CI/private acceptance, final independent integration review",
+      "fixture": "Not yet run for new source; prior full gate stopped at controlled correction boundary",
+      "status": "NOT EXERCISED",
+      "reason": "Outstanding full local/CI gates and exact artifact acceptance remain mandatory"
+    }
+  ]
+}

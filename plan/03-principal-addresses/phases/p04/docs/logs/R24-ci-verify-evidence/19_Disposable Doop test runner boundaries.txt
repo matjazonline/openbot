@@ -1,0 +1,55 @@
+﻿2026-11-16T14:19:16.7670204Z ##[group]Run python3 scripts/tests/doop-test.py
+2026-11-16T14:19:16.7670483Z [36;1mpython3 scripts/tests/doop-test.py[0m
+2026-11-16T14:19:16.7670792Z [36;1mnode --test scripts/tests/doop-probe.mjs[0m
+2026-11-16T14:19:16.7690890Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:19:16.7691096Z env:
+2026-11-16T14:19:16.7691255Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:19:16.7691445Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:19:16.7691852Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:19:16.7692068Z   SQLX_OFFLINE: true
+2026-11-16T14:19:16.7692241Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:19:16.7692431Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:19:16.7692597Z   CARGO_TERM_COLOR: always
+2026-11-16T14:19:16.7692771Z   CACHE_ON_FAILURE: false
+2026-11-16T14:19:16.7692943Z ##[endgroup]
+2026-11-16T14:19:18.1078162Z Managed package ready: f093f7a2239f751274905bc5e173fe1439154383a1f071a989e405f000de04b0
+2026-11-16T14:19:18.1716065Z Managed source ready: c3486f8fd3c98311e257e77e5c9c674ee2aa9d922d6922952ee48d01fdfae593
+2026-11-16T14:19:21.2509312Z ..............................................
+2026-11-16T14:19:21.2509774Z ----------------------------------------------------------------------
+2026-11-16T14:19:21.2510099Z Ran 46 tests in 4.393s
+2026-11-16T14:19:21.2510219Z 
+2026-11-16T14:19:21.2510294Z OK
+2026-11-16T14:19:21.3383979Z ✔ document fresh readback accepts the actual expected replacement and parent identities (0.812636ms)
+2026-11-16T14:19:21.3384876Z ✔ document fresh readback rejects a stale saved pre-edit snapshot (0.531385ms)
+2026-11-16T14:19:21.3385639Z ✔ document fresh readback rejects a partial replacement retaining old text (0.132621ms)
+2026-11-16T14:19:21.3386524Z ✔ document fresh readback rejects a foreign frame identity (0.432672ms)
+2026-11-16T14:19:21.3425007Z ✔ document fresh readback rejects a foreign canvas identity (0.247412ms)
+2026-11-16T14:19:21.3425579Z ✔ document fresh readback rejects a foreign workspace identity (0.154896ms)
+2026-11-16T14:19:21.3426364Z ✔ document fresh readback rejects a frame missing from its parent (2.538676ms)
+2026-11-16T14:19:21.3427083Z ✔ document fresh readback rejects a missing HTML observation (0.16567ms)
+2026-11-16T14:19:21.3471149Z ✔ competing browser launches create one process with the existing profile and sandbox (12.426009ms)
+2026-11-16T14:19:21.3490806Z ✔ failed browser shutdown retains its created receipt for authoritative recovery (1.975651ms)
+2026-11-16T14:19:21.3531871Z ✔ browser with no positive process identity cannot claim confirmed removal (1.635297ms)
+2026-11-16T14:19:21.3765171Z ✔ lifecycle helper rejects an old executable that exits successfully without its exact marker (24.001324ms)
+2026-11-16T14:19:21.3766275Z ✔ shared native launcher refuses oversized stdin before starting any executable (0.347048ms)
+2026-11-16T14:19:21.3985613Z ✔ e2e helper rejects an old executable with zero selected document workflow tests (22.135473ms)
+2026-11-16T14:19:22.0648542Z ✔ native helper diagnostics redact retired and replacement keys (22.9322ms)
+2026-11-16T14:19:22.0649661Z ✔ compatibility report accepts the controlled positive (55.768638ms)
+2026-11-16T14:19:22.0650438Z ✔ compatibility report rejects list_canvases-error (53.64325ms)
+2026-11-16T14:19:22.0651195Z ✔ compatibility report rejects get_frame-error (54.053078ms)
+2026-11-16T14:19:22.0651883Z ✔ compatibility report rejects get_canvas-error (53.333036ms)
+2026-11-16T14:19:22.0652617Z ✔ compatibility report rejects wrong-workspace (54.350893ms)
+2026-11-16T14:19:22.0653236Z ✔ compatibility report rejects unpersisted-edit (52.529958ms)
+2026-11-16T14:19:22.0658021Z ✔ compatibility report rejects wrong-frame (51.006632ms)
+2026-11-16T14:19:22.0658706Z ✔ compatibility report rejects wrong-canvas (53.271002ms)
+2026-11-16T14:19:22.0659270Z ✔ compatibility report rejects helper-zero-matches (75.89099ms)
+2026-11-16T14:19:22.0660064Z ✔ compatibility report rejects helper-nonzero (80.222774ms)
+2026-11-16T14:19:22.0660657Z ✔ compatibility report rejects helper-unavailable (60.044838ms)
+2026-11-16T14:19:22.0722941Z ℹ tests 26
+2026-11-16T14:19:22.0723627Z ℹ suites 0
+2026-11-16T14:19:22.0723865Z ℹ pass 26
+2026-11-16T14:19:22.0724114Z ℹ fail 0
+2026-11-16T14:19:22.0724349Z ℹ cancelled 0
+2026-11-16T14:19:22.0724615Z ℹ skipped 0
+2026-11-16T14:19:22.0724825Z ℹ todo 0
+2026-11-16T14:19:22.0725068Z ℹ duration_ms 783.328023

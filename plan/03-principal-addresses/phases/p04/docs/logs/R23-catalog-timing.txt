@@ -1,0 +1,26 @@
+
+running 1 test
+test adapters::mcp::doop_tests::doop_contract_actual_catalog_compiles_with_existing_limits_and_fixed_workspace_arguments ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4704 filtered out; finished in 0.43s
+
+real 1.07
+user 0.14
+sys 0.04
+            96518144  maximum resident set size
+                   0  average shared memory size
+                   0  average unshared data size
+                   0  average unshared stack size
+                4280  page reclaims
+                2296  page faults
+                   0  swaps
+                   0  block input operations
+                   0  block output operations
+                   6  messages sent
+                   9  messages received
+                   0  signals received
+                   3  voluntary context switches
+                1086  involuntary context switches
+          1643383245  instructions retired
+           633675375  cycles elapsed
+            63177400  peak memory footprint

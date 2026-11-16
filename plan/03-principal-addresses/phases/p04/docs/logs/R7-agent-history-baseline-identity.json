@@ -1,0 +1,10 @@
+{
+  "path": ".github/workflows/agent-history.yml",
+  "blobs": {
+    "origin/main": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6",
+    "f059f49808777abf0367d3a7f82d11e14bbd4e20": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6",
+    "957de863ede7b0c8bb432937287842865ec862c3": "399dc7e53445a880a85850b99d3eeed6d8c6d1f6"
+  },
+  "run": 43772169403,
+  "disposition": "Inherited unchanged pre-job workflow failure; not a pass; required ci.yml gates remain mandatory"
+}

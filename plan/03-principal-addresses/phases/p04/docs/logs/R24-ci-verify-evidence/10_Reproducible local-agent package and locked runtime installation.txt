@@ -1,0 +1,30 @@
+﻿2026-11-16T14:17:21.5982415Z ##[group]Run npm --prefix integrations/cloudroom-plugin run package
+2026-11-16T14:17:21.5983072Z [36;1mnpm --prefix integrations/cloudroom-plugin run package[0m
+2026-11-16T14:17:21.5983562Z [36;1mpackage_dir="$(mktemp -d)"[0m
+2026-11-16T14:17:21.5984328Z [36;1mtar -xzf integrations/cloudroom-plugin/artifacts/bb-plugin-openbot-local-0.2.0.tgz -C "$package_dir" --strip-components=1[0m
+2026-11-16T14:17:21.5985086Z [36;1mnpm --prefix "$package_dir" ci --omit=dev[0m
+2026-11-16T14:17:21.6022375Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:17:21.6022815Z env:
+2026-11-16T14:17:21.6023219Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:17:21.6023551Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:17:21.6024193Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:17:21.6024588Z   SQLX_OFFLINE: true
+2026-11-16T14:17:21.6024956Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:17:21.6025361Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:17:21.6025665Z   CARGO_TERM_COLOR: always
+2026-11-16T14:17:21.6026290Z   CACHE_ON_FAILURE: false
+2026-11-16T14:17:21.6026714Z ##[endgroup]
+2026-11-16T14:17:21.6723395Z 
+2026-11-16T14:17:21.6724457Z > bb-plugin-openbot-local@0.2.0 package
+2026-11-16T14:17:21.6724975Z > node scripts/package.mjs
+2026-11-16T14:17:21.6725164Z 
+2026-11-16T14:17:21.8030023Z built 1 plugin entry
+2026-11-16T14:17:22.1521890Z built 1 plugin entry
+2026-11-16T14:17:22.4621685Z {"filename":"bb-plugin-openbot-local-0.2.0.tgz","sha256":"5cdb500a915d6c36a6c51791816f6553e00e80faf4eb71b9b74dc436c36ac10d"}
+2026-11-16T14:17:24.0880726Z 
+2026-11-16T14:17:24.0881684Z added 5 packages, and audited 6 packages in 2s
+2026-11-16T14:17:24.0882206Z 
+2026-11-16T14:17:24.0882562Z 2 packages are looking for funding
+2026-11-16T14:17:24.0883025Z   run `npm fund` for details
+2026-11-16T14:17:24.0888247Z 
+2026-11-16T14:17:24.0888738Z found 0 vulnerabilities

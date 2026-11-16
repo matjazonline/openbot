@@ -1,0 +1,15 @@
+{
+  "merge_commit": "d8fdd9909e9ebfaac45541044ed4317023d81ac3",
+  "upstream": "6e55258c",
+  "preserved_exact_file_count": 593,
+  "overlapping_edited_paths": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    "scripts/check.sh"
+  ],
+  "issues": [],
+  "original_staged_path_count": 50,
+  "staged_diagnostic_transfer": "scripts/check-doop.py",
+  "tests": "not rerun as explicitly requested",
+  "backup": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-main-merge-akrlfdl2"
+}

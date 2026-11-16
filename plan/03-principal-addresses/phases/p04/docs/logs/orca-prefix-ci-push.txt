@@ -1,0 +1,6 @@
+remote: 
+remote: Create a pull request for 'codex/plan03-p04-prefix-a23d83bd' on GitHub by visiting:        
+remote:      https://github.com/matjazonline/openbot/pull/new/codex/plan03-p04-prefix-a23d83bd        
+remote: 
+To github.com:matjazonline/openbot.git
+ * [new branch]        a23d83bdc13fe6bf92ec03e45559ad912fe7dbbe -> codex/plan03-p04-prefix-a23d83bd

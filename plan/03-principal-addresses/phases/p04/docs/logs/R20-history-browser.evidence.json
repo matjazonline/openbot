@@ -1,0 +1,58 @@
+{
+  "version": 1,
+  "round": "03PA-P04-R20-history-browser",
+  "artifact": "207bed93e1e421549788667ef611b642da9860b6640e619d42336dad217247f2",
+  "checks": [
+    {
+      "criteria": [
+        "native-history-fixture",
+        "agent-history-browser-gate"
+      ],
+      "command": "Darwin networkguard exactcurrentR18libtest agent_history_views_maximum_page_reaches_last_source_outside_page_and_keeps_exact_frozen_copy_after_expiry; Node24 node --test scripts/tests/agent-history-browser.mjs",
+      "fixture": "Verified549a01e6binary; ownedPG51167; TEST_DATABASE_URLunset; RUST_MIN_STACK16777216; freshnativeHTML copiedhere; tasklocalPlaywright Chromium",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/R20-history-fixture.txt",
+          "sha256": "145879963157ab073ae83839a3eb374ee77b8125f56334524ffa18b71c810834"
+        },
+        {
+          "path": "logs/R20-history-browser.txt",
+          "sha256": "f14503481faafad13a31140a7ea6663ec028c9ccaad0943669d8b3521064a10b"
+        },
+        {
+          "path": "logs/R20-history-fixtures/current-before-expiry.html",
+          "sha256": "606b72bc7072a2788e1187c588f53448d08205bda3b485a0a9fb0ce14a7c3a71"
+        },
+        {
+          "path": "logs/R20-history-fixtures/current.html",
+          "sha256": "886203498e19c3f4cd13666a8fc9118c6939092ad7bdc0f52680fc38c0c56708"
+        },
+        {
+          "path": "logs/R20-history-fixtures/facts.json",
+          "sha256": "d136879de1820a0cdd13ee76e6620c2d5d326aaed99249b820ca7e3d1b48e108"
+        },
+        {
+          "path": "logs/R20-history-fixtures/first.html",
+          "sha256": "34dd56a02fb9fe6fd41c2fa800224e30cd5eda8d01a9b5c667318109efb67400"
+        },
+        {
+          "path": "logs/R20-history-fixtures/loader.html",
+          "sha256": "a31291d1f04510582455645a5d62ba10e57e9a700255d3e4869600ecc5c71714"
+        },
+        {
+          "path": "logs/R20-history-fixtures/newest.html",
+          "sha256": "7869a133e1ab536828b4311c6096964dcbbfdd2b5fa820c03e63385a04eb1c05"
+        },
+        {
+          "path": "logs/R20-history-fixtures/older.html",
+          "sha256": "93b418a857ed92860e8388368c2e88b219bf50732a26da7e49cc28fdbe046de3"
+        },
+        {
+          "path": "logs/R20-history-fixtures/selected-outside-page.html",
+          "sha256": "4aa82d38f82b8e768f22ebec39a194592de3feba598391e82dbc995bed822284"
+        }
+      ]
+    }
+  ]
+}

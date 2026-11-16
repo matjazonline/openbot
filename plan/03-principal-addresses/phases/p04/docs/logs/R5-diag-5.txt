@@ -1,0 +1,11 @@
+network guard: loopback allowed; IPv4 and IPv6 external destinations rejected
+
+running 1 test
+observed gated transaction pids=[30015] blocker=30037 elapsed_ms=231
+observed resolution pids=[30023] blocker=30015 elapsed_ms=1925
+observed gated transaction pids=[30063] blocker=30082 elapsed_ms=221
+observed resolution pids=[30072] blocker=30063 elapsed_ms=1919
+test adapters::persistence::workflow::tests::message_tests::approval_tests::workflow_action_approval_race_message_lost_ack_resolves_park ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4703 filtered out; finished in 7.82s
+

@@ -1,0 +1,21 @@
+{
+  "before": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "after": "60341d256bcf78db780541b236108183c672852f",
+  "changed_paths": [
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh"
+  ],
+  "unchanged_Darwin_branches": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "darwin_branch_sha256": "7f44f08d43344a2da2af0cc238a289bdeb2006a26a0835df7429d3ab8e46dcee"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "darwin_branch_sha256": "0d68cb5a83a6580e5fceea364983ed4c8ec280c7662fcc1ff4226603b6dd0063"
+    }
+  ],
+  "claim": "All Rust source, migrations, Cargo inputs and Darwin wrapper branches unchanged; only four Linux correction/test paths differ. Local R8 proof applies only to unchanged projection, new Linux proof comes from exact candidate CI."
+}

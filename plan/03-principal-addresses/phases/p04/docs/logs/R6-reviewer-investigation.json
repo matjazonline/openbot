@@ -1,0 +1,173 @@
+{
+  "base": "3d186172a778602dd82d790eb2ef230c80cc045d",
+  "artifact": "7cf2b250dc2fe326802010ad5909c76866c17d1b32c7f6d1a799f3628c4a7e54",
+  "changed_material_files": [
+    ".github/workflows/ci.yml",
+    "src/adapters/persistence/workflow/message_reply_tests.rs"
+  ],
+  "counterfactual_six_blob_hashes_independently_match_f059f498": true,
+  "all_MCP_current_bytes_match_R5_candidate": true,
+  "sampled_step_progress": [
+    {
+      "elapsed": 8.8,
+      "new_steps": [
+        "canonical",
+        "profile"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 13.0,
+      "new_steps": [
+        "verify_bot",
+        "verify_workspace"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 15.2,
+      "new_steps": [
+        "create"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 24.0,
+      "new_steps": [
+        "created",
+        "verify_created_workspace"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 26.2,
+      "new_steps": [
+        "read_created"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 32.7,
+      "new_steps": [
+        "created_canvas",
+        "verify_created_canvas"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 34.9,
+      "new_steps": [
+        "edit"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 65.1,
+      "new_steps": [
+        "verify_editor"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 67.2,
+      "new_steps": [
+        "read_final"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 71.5,
+      "new_steps": [
+        "final_canvas"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 73.6,
+      "new_steps": [
+        "verify_final_canvas"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 75.7,
+      "new_steps": [
+        "notify"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    },
+    {
+      "elapsed": 82.0,
+      "new_steps": [
+        "result"
+      ],
+      "runs": [
+        {
+          "state": "running",
+          "waiting": null
+        }
+      ]
+    }
+  ],
+  "limits": "Read-only investigation; no causal attribution of six-file elapsed difference; sampled CPU stack is limited, not full profile; no reviewer runtime."
+}

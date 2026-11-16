@@ -1,0 +1,12 @@
+{
+  "before": 4700,
+  "after": 4703,
+  "added": [
+    "adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call",
+    "adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete",
+    "adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation"
+  ],
+  "removed": [],
+  "binary": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230",
+  "binary_sha256": "7a6453a6a2d45b5a9fff9d87cc2a634935cd4e41e736caa2b398b3d7974128f0"
+}

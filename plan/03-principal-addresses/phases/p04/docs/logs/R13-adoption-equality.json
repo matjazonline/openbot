@@ -1,0 +1,8 @@
+{
+  "candidate": "fd5f7f76d6ee9788d2df2bd0544d309d78447723",
+  "adopted_paths": [
+    "services/memory/scripts/network-isolation-linux.sh",
+    "scripts/tests/network-isolation-scope.py"
+  ],
+  "claim": "All candidate material blobs match actual root. Rust/Cargo/migrations/Darwin paths unchanged. Two additional current nonruntime Trail notes remain extra. Parent held with no children; stockPASS retained before adoption."
+}

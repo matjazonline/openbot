@@ -1,0 +1,77 @@
+{
+  "commit": "c5f9462c88dccfcd504356b140c61f71bf1a19e1",
+  "parent": "60341d256bcf78db780541b236108183c672852f",
+  "tree": "d0650092cdc02554204ebb57ded93d96a729a88f",
+  "branch": "codex/plan03-p04-r10-c5f9462c",
+  "base_material_candidate": "e888c26bf0738ed553abd42efb6ae763ae474347",
+  "external_draft": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r9-net",
+  "overrides": [
+    {
+      "path": "scripts/test-network-isolation.sh",
+      "blob": "c4bed3d56fcfd3b9ece71df0de3fd03dd0582660",
+      "sha256": "5cae73f957cf5751401def5896ec3db7353d036635f452ad8740b3bb2d6b6156"
+    },
+    {
+      "path": "services/memory/scripts/test-network-isolation.sh",
+      "blob": "ca1b603750692d87cd591b04bdc8e157335cff43",
+      "sha256": "463fbcf9ceb461fe9a22ee37de46a313bc9a2bf05f84cdba4f291192f6481e62"
+    },
+    {
+      "path": "services/memory/scripts/network-isolation-linux.sh",
+      "blob": "4b8824e0d79c15b6a876a201823143603cbba316",
+      "sha256": "ed799522bcf3d953f4100a305ea0516b91d33ef7c8a2988c7622b8491843248f"
+    },
+    {
+      "path": "scripts/tests/network-isolation-scope.py",
+      "blob": "6b29c01e03894b4006d152c6d058c5243f3b0322",
+      "sha256": "77c139f8cf3051974308629473737c5911f41f184f4a5804258ea563c9ad1fc8"
+    }
+  ],
+  "material_files": [
+    ".github/workflows/ci.yml",
+    ".github/workflows/memory-service.yml",
+    ".trail/learnings/2026-11-15-native-effect-locks-must-start-before-mac02.md",
+    ".trail/learnings/2026-11-15-publish-sdk-cancellation-ownership-before-cleanup-mac02.md",
+    "scripts/check.sh",
+    "scripts/test-network-isolation.sh",
+    "scripts/tests/network-isolation-scope.py",
+    "services/memory/scripts/network-isolation-linux.sh",
+    "services/memory/scripts/test-network-isolation.sh",
+    "src/adapters/http/routes/agent_api_tests.rs",
+    "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+    "src/adapters/mcp/authentication_tests.rs",
+    "src/adapters/mcp/cleanup_tests.rs",
+    "src/adapters/mcp/connection.rs",
+    "src/adapters/mcp/doop_tests.rs",
+    "src/adapters/mcp/http.rs",
+    "src/adapters/mcp/mod.rs",
+    "src/adapters/mcp/registration_test_support.rs",
+    "src/adapters/mcp/tests.rs",
+    "src/adapters/persistence/legacy_runtime_schema_tests.rs",
+    "src/adapters/persistence/skill_tests.rs",
+    "src/adapters/persistence/workflow/action_account_hints.rs",
+    "src/adapters/persistence/workflow/action_authority.rs",
+    "src/adapters/persistence/workflow/action_dispatch.rs",
+    "src/adapters/persistence/workflow/action_receipts.rs",
+    "src/adapters/persistence/workflow/actions.rs",
+    "src/adapters/persistence/workflow/http.rs",
+    "src/adapters/persistence/workflow/http_runtime.rs",
+    "src/adapters/persistence/workflow/integration_authority.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_entry_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_integration_tests.rs",
+    "src/adapters/persistence/workflow/local_agent_mcp_source_tests.rs",
+    "src/adapters/persistence/workflow/local_agents/delivery.rs",
+    "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "src/adapters/persistence/workflow/local_agents/resolution.rs",
+    "src/adapters/persistence/workflow/mcp.rs",
+    "src/adapters/persistence/workflow/message_publish.rs",
+    "src/adapters/persistence/workflow/message_reply_tests.rs",
+    "src/adapters/persistence/workflow/native_mcp/accounts.rs",
+    "src/adapters/persistence/workflow/native_mcp/live.rs",
+    "src/adapters/persistence/workflow/native_mcp/mod.rs",
+    "src/adapters/persistence/workflow/run_provenance/mod.rs",
+    "src/application/agent/contract_tests.rs",
+    "src/application/agent/definition.rs"
+  ],
+  "claim": "External correction: inherited ignored cleanup signals reset via native env before timeout/sudo. Strong root-child test, explicit old-signal counterexample, failure annotations. Root9938 remains frozen for unchanged Darwin stock/lease proof."
+}

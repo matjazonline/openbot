@@ -1,0 +1,44 @@
+[
+  {
+    "path": "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/rmcp-1.8.0/src/service.rs",
+    "sha256": "87af5ef04e9a35c4614d382f196c93c3d313b6a2d3ae8fd545062abdc13f2162",
+    "spans": [
+      {
+        "start": 537,
+        "end": 553,
+        "source": "\n#[derive(Debug, Default)]\n#[non_exhaustive]\npub struct PeerRequestOptions {\n    pub timeout: Option<Duration>,\n    pub meta: Option<Meta>,\n    /// Reset the request timeout when a matching progress notification is received.\n    pub reset_timeout_on_progress: bool,\n    /// Maximum total time to wait for the request, regardless of progress notifications.\n    pub max_total_timeout: Option<Duration>,\n}\n\nimpl PeerRequestOptions {\n    pub fn no_options() -> Self {\n        Self::default()\n    }\n"
+      },
+      {
+        "start": 616,
+        "end": 671,
+        "source": "    pub async fn send_request_with_option(\n        &self,\n        mut request: R::Req,\n        options: PeerRequestOptions,\n    ) -> Result<RequestHandle<R>, ServiceError> {\n        let id = self.request_id_provider.next_request_id();\n        let progress_token = self.progress_token_provider.next_progress_token();\n        if let Some(meta) = options.meta.clone() {\n            request.get_meta_mut().extend(meta);\n        }\n        request\n            .get_meta_mut()\n            .set_progress_token(progress_token.clone());\n        let (responder, receiver) = tokio::sync::oneshot::channel();\n        let progress_reset_rx = if options.reset_timeout_on_progress && options.timeout.is_some() {\n            let (sender, receiver) = mpsc::channel(1);\n            self.progress_timeout_watchers\n                .write()\n                .await\n                .insert(progress_token.clone(), sender);\n            Some(receiver)\n        } else {\n            None\n        };\n        if self\n            .tx\n            .send(PeerSinkMessage::Request {\n                request,\n                id: id.clone(),\n                responder,\n            })\n            .await\n            .is_err()\n        {\n            if progress_reset_rx.is_some() {\n                self.progress_timeout_watchers\n                    .write()\n                    .await\n                    .remove(&progress_token);\n            }\n            return Err(ServiceError::TransportClosed);\n        }\n        Ok(RequestHandle {\n            id,\n            rx: receiver,\n            progress_token,\n            options,\n            peer: self.clone(),\n            progress_reset_rx,\n        })\n    }\n\n    async fn notify_progress_timeout_watcher(&self, progress_token: &ProgressToken) {\n        let sender = self\n            .progress_timeout_watchers\n            .read()"
+      },
+      {
+        "start": 701,
+        "end": 703,
+        "source": "    pub fn is_transport_closed(&self) -> bool {\n        self.tx.is_closed()\n    }"
+      },
+      {
+        "start": 736,
+        "end": 740,
+        "source": "    /// Returns true if the service has been closed or cancelled.\n    #[inline]\n    pub fn is_closed(&self) -> bool {\n        self.handle.is_none() || self.cancellation_token.is_cancelled()\n    }"
+      }
+    ]
+  },
+  {
+    "path": "/Users/mac02/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/tokio-1.50.0/src/sync/mpsc/bounded.rs",
+    "sha256": "1d30b10e6656a3339874972a507ccd0c1ac349649611c547c520bff416f92b2e",
+    "spans": [
+      {
+        "start": 774,
+        "end": 787,
+        "source": "    /// [`Receiver`]: Receiver\n    ///\n    /// # Cancel safety\n    ///\n    /// If `send` is used as the event in a [`tokio::select!`](crate::select)\n    /// statement and some other branch completes first, then it is guaranteed\n    /// that the message was not sent. **However, in that case, the message\n    /// is dropped and will be lost.**\n    ///\n    /// To avoid losing messages, use [`reserve`](Self::reserve) to reserve\n    /// capacity, then use the returned [`Permit`] to send the message.\n    ///\n    /// This channel uses a queue to ensure that calls to `send` and `reserve`\n    /// complete in the order they were requested.  Cancelling a call to"
+      },
+      {
+        "start": 816,
+        "end": 825,
+        "source": "    pub async fn send(&self, value: T) -> Result<(), SendError<T>> {\n        match self.reserve().await {\n            Ok(permit) => {\n                permit.send(value);\n                Ok(())\n            }\n            Err(_) => Err(SendError(value)),\n        }\n    }\n"
+      }
+    ]
+  }
+]

@@ -1,0 +1,22 @@
+﻿2026-11-16T14:45:42.6079406Z ##[group]Run for family in integration_portability_ integration_service_contract_ vault_google_e2e_; do
+2026-11-16T14:45:42.6080534Z [36;1mfor family in integration_portability_ integration_service_contract_ vault_google_e2e_; do[0m
+2026-11-16T14:45:42.6081465Z [36;1m  cargo test --locked --offline --lib "$family" -- --list > /tmp/integration-conformance-list[0m
+2026-11-16T14:45:42.6082270Z [36;1m  grep -Eq ': test$' /tmp/integration-conformance-list[0m
+2026-11-16T14:45:42.6082841Z [36;1mdone[0m
+2026-11-16T14:45:42.6825427Z shell: /usr/bin/bash -e {0}
+2026-11-16T14:45:42.6826163Z env:
+2026-11-16T14:45:42.6826579Z   CARGO_PROFILE_DEV_DEBUG: 0
+2026-11-16T14:45:42.6826944Z   CARGO_PROFILE_TEST_DEBUG: 0
+2026-11-16T14:45:42.6828087Z   DATABASE_URL: ***localhost:5432/open_bots_test
+2026-11-16T14:45:42.6828571Z   SQLX_OFFLINE: true
+2026-11-16T14:45:42.6828978Z   CARGO_HOME: /home/runner/.cargo
+2026-11-16T14:45:42.6829349Z   CARGO_INCREMENTAL: 0
+2026-11-16T14:45:42.6829766Z   CARGO_TERM_COLOR: always
+2026-11-16T14:45:42.6830420Z   CACHE_ON_FAILURE: false
+2026-11-16T14:45:42.6830760Z ##[endgroup]
+2026-11-16T14:45:43.5563977Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.74s
+2026-11-16T14:45:43.5772775Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:43.7795100Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:43.7973366Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)
+2026-11-16T14:45:44.0051607Z [1m[92m    Finished[0m `test` profile [unoptimized] target(s) in 0.18s
+2026-11-16T14:45:44.0238066Z [1m[92m     Running[0m unittests src/lib.rs (target/debug/build/open_bots/0184607e6dde76e5/out/open_bots-0184607e6dde76e5)

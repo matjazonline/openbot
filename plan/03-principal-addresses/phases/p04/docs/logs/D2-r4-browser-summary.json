@@ -1,0 +1,14 @@
+{
+  "node_totals": {
+    "tests": 16,
+    "pass": 16,
+    "fail": 0,
+    "skipped": 0
+  },
+  "commands": 22,
+  "statuses": {
+    "PASS": 22,
+    "FAIL": 0,
+    "NOT EXERCISED": 0
+  }
+}

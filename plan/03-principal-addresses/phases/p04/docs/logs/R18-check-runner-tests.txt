@@ -1,0 +1,10 @@
+.......Doop gate: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/tmpqwfvu1qg/setup/tools/node_modules/.bin/bun install --frozen-lockfile --ignore-scripts
+Doop gate: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/tmpqwfvu1qg/setup/tools/node_modules/.bin/bun run format:check
+Doop gate: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/tmpqwfvu1qg/setup/tools/node_modules/.bin/bun run typecheck
+::error::Doop service gate failed: /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T/tmpqwfvu1qg/setup/tools/node_modules/.bin/bun run typecheck
+..
+----------------------------------------------------------------------
+Ran 9 tests in 0.095s
+
+OK
+memory image passed: non-root, offline/read-only model, RSS budget, database refusal

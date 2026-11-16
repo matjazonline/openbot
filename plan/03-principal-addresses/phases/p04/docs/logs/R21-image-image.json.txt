@@ -1,0 +1,21 @@
+{
+  "source_identity": {
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+    "kind": "packaged managed source"
+  },
+  "setup": {
+    "version": 1,
+    "revision": "01584b34f6cadcf21767127280cc6e320a6d748a",
+    "source": "https://github.com/kgoedecke/doop.git",
+    "bun": "1.3.10",
+    "lock_sha256": "9fc8b3c110b390a9c46975da45c3a297090096703f9d9721dcea19f84dad28e3",
+    "sdk": "1.30.0"
+  },
+  "tag": "openbot-doop-test:351a2180b4ca-e8623946",
+  "image_id": "sha256:19f00d007ab8ab428cc0202da9ad60d0988b557bd6e0a35f4c52dc1b4ac6761e",
+  "manifest_digest": "sha256:19f00d007ab8ab428cc0202da9ad60d0988b557bd6e0a35f4c52dc1b4ac6761e",
+  "config_digest": "sha256:5d2a91dba449ba4859ddd61065ec137631d87ced8f397e6ae9eef59dde13b847",
+  "archive_sha256": "36c8452cdd771d8e59eef93a401e40060eede71d1d92118b15bc01e35d6b566b",
+  "user": "node"
+}

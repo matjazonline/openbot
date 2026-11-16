@@ -1,0 +1,7 @@
+{
+  "pid": 33669,
+  "command": "bash scripts/check.sh",
+  "reason": "Primary library gate completed 4668PASS/10FAIL/27IGNORE. Stop held parent at explicit correction boundary before duplicate stock-stack; retained full failure buffer. D3 Linux scope correction and ten failure diagnostics pending. No source edits yet; no full-green claim.",
+  "source_artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362",
+  "exit_requested": 143
+}

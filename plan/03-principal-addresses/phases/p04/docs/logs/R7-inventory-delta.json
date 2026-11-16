@@ -1,0 +1,8 @@
+{
+  "before": 4704,
+  "after": 4705,
+  "added": [
+    "application::agent::contract_tests::autonomous_agent_contract_decoded_hash_preserves_canonical_proof_and_schema_validation"
+  ],
+  "removed": []
+}

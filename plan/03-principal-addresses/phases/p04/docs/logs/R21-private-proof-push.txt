@@ -1,0 +1,6 @@
+remote: 
+remote: Create a pull request for 'codex/plan03-p04-r21-private-76925ef6' on GitHub by visiting:        
+remote:      https://github.com/matjazonline/openbot/pull/new/codex/plan03-p04-r21-private-76925ef6        
+remote: 
+To github.com:matjazonline/openbot.git
+ * [new branch]        76925ef6836250171f556892ba449e9575dc4308 -> codex/plan03-p04-r21-private-76925ef6

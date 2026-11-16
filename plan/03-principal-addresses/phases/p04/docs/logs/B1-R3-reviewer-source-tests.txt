@@ -1,0 +1,12 @@
+
+running 7 tests
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_source_local_action_rejects_agent_origin_substitution ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::native_mcp_workflow_actor_requester_and_revision_contention_rolls_back_and_retries ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_return_authority_rechecks_original_accounts ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_outer_preparation_never_waits_for_broker_run ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::integration_tests::native_mcp_workflow_final_credential_guard_locks_distinct_source_and_credential_owners ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_fresh_action_and_credentials_use_original_account_prefix ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::source_tests::entry_tests::native_mcp_workflow_dispatch_rechecks_source_after_approval_and_reservation ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 4693 filtered out; finished in 32.89s
+

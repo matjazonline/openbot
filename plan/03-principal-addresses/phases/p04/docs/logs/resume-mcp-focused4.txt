@@ -1,0 +1,55 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 04s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-8b1fa2d2de168230)
+
+running 30 tests
+test adapters::mcp::policy::tests::memory_integration_company_connections_cannot_reach_the_memory_service_origin ... ok
+test adapters::mcp::policy::tests::policy_exceptions_are_exact_and_operator_owned ... ok
+test adapters::mcp::policy::tests::workflow_http_resolved_dns_rejects_any_prohibited_answer_and_rebinding ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_http_error_preserves_the_openbot_session ... ok
+test adapters::mcp::policy::tests::workflow_http_connector_uses_pinned_addresses_without_resolving_hostname_again ... ok
+test adapters::mcp::http::body_lifetime_tests::integration_gateway_native_mcp_sse_body_owns_completion_after_client_release ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_preparation_cancelled_before_admission_sends_no_credential ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_abandonment_and_shutdown_join_initialization ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_prepared_initialization_preserves_typed_failure_and_cleanup ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_completed_protocol_error_does_not_cancel_or_retry_the_call ... ok
+test adapters::mcp::doop_tests::doop_contract_profile_secret_echo_is_redacted_in_both_result_representations ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_competing_admission_cancel_releases_only_its_claim ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_compete_for_one_stateless_cancellation ... ok
+test adapters::mcp::tests::cleanup_tests::mcp_drop_and_shutdown_cancel_before_one_stateful_delete ... ok
+test adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup ... ok
+test adapters::mcp::tests::mcp_authentication_redirect_and_lost_effect_are_sanitized_and_never_retried ... ok
+test adapters::mcp::doop_tests::doop_private_export_actual_results_survive_guarded_transport_without_fetching_urls ... ok
+test adapters::mcp::doop_tests::doop_contract_actual_results_preserve_structure_images_resources_and_error_status ... ok
+
+thread 'adapters::mcp::doop_tests::doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing' (19080646) panicked at src/adapters/mcp/doop_tests.rs:338:5:
+assertion `left == right` failed
+  left: Err("unexpected extra request")
+ right: Ok(3)
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::mcp::tests::mcp_shutdown_joins_an_abandoned_session_and_closes_admission ... ok
+test adapters::mcp::tests::mcp_repeated_pagination_cursor_fails_without_calling_a_tool ... ok
+test adapters::mcp::tests::authentication::mcp_authentication_is_typed_through_actual_initialization_discovery_and_call ... ok
+test adapters::mcp::tests::mcp_output_schema_and_call_envelope_redact_secrets_without_fetching_links ... ok
+test adapters::mcp::tests::mcp_initializes_discovers_and_explicitly_calls_json_and_sse_then_shuts_down ... ok
+test adapters::mcp::tests::mcp_endpoint_permit_wait_expires_without_consuming_global_capacity ... ok
+test adapters::mcp::tests::mcp_discovery_rejects_duplicates_external_schemas_secret_echoes_and_oversized_data ... ok
+test adapters::mcp::doop_tests::doop_catalog_real_minimal_operations_and_identity_results_pass_workflow_contracts ... ok
+test adapters::mcp::tests::mcp_busy_endpoint_waiters_leave_global_capacity_and_shutdown_promptly ... ok
+test adapters::mcp::doop_tests::doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing ... FAILED
+test adapters::mcp::doop_tests::doop_contract_actual_catalog_compiles_with_existing_limits_and_fixed_workspace_arguments ... ok
+test adapters::mcp::preparation_tests::integration_gateway_native_mcp_cancellation_and_deadline_join_held_initialization ... ok
+
+failures:
+
+failures:
+    adapters::mcp::doop_tests::doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing
+
+test result: FAILED. 29 passed; 1 failed; 0 ignored; 0 measured; 4673 filtered out; finished in 0.64s
+
+error: test failed, to rerun pass `--lib`

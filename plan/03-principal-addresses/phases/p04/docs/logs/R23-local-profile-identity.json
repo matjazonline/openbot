@@ -1,0 +1,7 @@
+{
+  "native_binary_sha256": "549a01e614e40436d7d3bb6835118fba768f633762bb005179ee85e88c692055",
+  "native_source": "unchanged currentR18 production/test binary",
+  "source_fingerprint": "351a2180b4ca8cf7489d21cbdc3aa3ce7d275fc5b08ba56eb045592a43e34e1f",
+  "harness": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-p04-r23-profile-harness",
+  "changes": "Diagnosticexternalcopy invokesexistinglifecycle on localnativeHTTPmanagedservice, omitslaterprivate/restore/contracts. Originalnativehelper and80seconddeadlineunchanged; profileonly, NOTprivateacceptanceproof. Rootsourceunchanged."
+}

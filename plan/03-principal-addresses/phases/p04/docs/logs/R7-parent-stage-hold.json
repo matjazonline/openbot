@@ -1,0 +1,8 @@
+{
+  "reason": "Main suite has one new quota-test failure; hold parent only so primary run finishes and failure buffer can be inspected before a second full stock-stack run starts",
+  "parent_pid": 33669,
+  "state_before": "  PID  PPID  PGID STAT COMMAND\n33669 35335 33669 Ss   bash scripts/check.sh\n",
+  "cwd": "/Users/mac02/orca/workspaces/openbot/plan03-04",
+  "unit_run": "continues unchanged; no test process stopped",
+  "source_artifact": "88d4c4a7c134a8e72dd33830605179bfa12d03370a0885f98d6f28b98ff04362"
+}

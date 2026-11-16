@@ -1,0 +1,113 @@
+{
+  "total_count": 1,
+  "jobs": [
+    {
+      "id": 132944491805,
+      "run_id": 43757432666,
+      "workflow_name": "Plan03 Doop image diagnostic",
+      "head_branch": "codex/plan03-doop-image-diagnostic-2f218c86",
+      "run_url": "https://api.github.com/repos/matjazonline/openbot/actions/runs/43757432666",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTzLwQc8AAAAe9Bv1HQ",
+      "head_sha": "a194361e4c9671a708b396bd0496cf0cdd7b90ed",
+      "url": "https://api.github.com/repos/matjazonline/openbot/actions/jobs/132944491805",
+      "html_url": "https://github.com/matjazonline/openbot/actions/runs/43757432666/job/132944491805",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-11-15T20:19:38Z",
+      "started_at": "2026-11-15T20:19:40Z",
+      "completed_at": "2026-11-15T20:22:02Z",
+      "name": "image",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-11-15T20:19:41Z",
+          "completed_at": "2026-11-15T20:19:43Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-11-15T20:19:43Z",
+          "completed_at": "2026-11-15T20:19:53Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-11-15T20:19:53Z",
+          "completed_at": "2026-11-15T20:19:57Z"
+        },
+        {
+          "name": "Prepare the pinned managed source",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-11-15T20:19:57Z",
+          "completed_at": "2026-11-15T20:20:10Z"
+        },
+        {
+          "name": "Enable OCI image export and import",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-11-15T20:20:10Z",
+          "completed_at": "2026-11-15T20:20:21Z"
+        },
+        {
+          "name": "Build the actual private image and retain build errors",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-11-15T20:20:21Z",
+          "completed_at": "2026-11-15T20:21:48Z"
+        },
+        {
+          "name": "Post Enable OCI image export and import",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 10,
+          "started_at": "2026-11-15T20:21:48Z",
+          "completed_at": "2026-11-15T20:21:54Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-11-15T20:21:54Z",
+          "completed_at": "2026-11-15T20:21:54Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-11-15T20:21:54Z",
+          "completed_at": "2026-11-15T20:21:54Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-11-15T20:21:54Z",
+          "completed_at": "2026-11-15T20:21:54Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/matjazonline/openbot/check-runs/132944491805",
+      "labels": [
+        "ubuntu-24.04"
+      ],
+      "runner_id": 1000001156,
+      "runner_name": "GitHub Actions 1000001156",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}

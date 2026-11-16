@@ -1,0 +1,34 @@
+✔ document fresh readback accepts the actual expected replacement and parent identities (6.091208ms)
+✔ document fresh readback rejects a stale saved pre-edit snapshot (1.305708ms)
+✔ document fresh readback rejects a partial replacement retaining old text (0.273542ms)
+✔ document fresh readback rejects a foreign frame identity (0.883625ms)
+✔ document fresh readback rejects a foreign canvas identity (0.28725ms)
+✔ document fresh readback rejects a foreign workspace identity (5.937209ms)
+✔ document fresh readback rejects a frame missing from its parent (17.644958ms)
+✔ document fresh readback rejects a missing HTML observation (0.487834ms)
+✔ competing browser launches create one process with the existing profile and sandbox (106.351834ms)
+✔ failed browser shutdown retains its created receipt for authoritative recovery (28.1245ms)
+✔ browser with no positive process identity cannot claim confirmed removal (9.371916ms)
+✔ lifecycle helper rejects an old executable that exits successfully without its exact marker (256.43325ms)
+✔ shared native launcher refuses oversized stdin before starting any executable (0.6755ms)
+✔ e2e helper rejects an old executable with zero selected document workflow tests (154.157208ms)
+✔ native helper diagnostics redact retired and replacement keys (303.032458ms)
+✔ compatibility report accepts the controlled positive (266.687958ms)
+✔ compatibility report rejects list_canvases-error (289.570833ms)
+✔ compatibility report rejects get_frame-error (290.285583ms)
+✔ compatibility report rejects get_canvas-error (238.048791ms)
+✔ compatibility report rejects wrong-workspace (200.408208ms)
+✔ compatibility report rejects unpersisted-edit (240.396542ms)
+✔ compatibility report rejects wrong-frame (235.038917ms)
+✔ compatibility report rejects wrong-canvas (202.218167ms)
+✔ compatibility report rejects helper-zero-matches (499.083042ms)
+✔ compatibility report rejects helper-nonzero (434.708875ms)
+✔ compatibility report rejects helper-unavailable (182.872ms)
+ℹ tests 26
+ℹ suites 0
+ℹ pass 26
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4473.330333

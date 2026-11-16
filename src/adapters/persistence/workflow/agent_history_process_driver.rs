@@ -76,10 +76,12 @@ async fn history_crash_child_entry() {
     )
     .unwrap();
     spec.validate_fixture();
-    let options =
-        sqlx::postgres::PgConnectOptions::from_str(&std::env::var("TEST_DATABASE_URL").unwrap())
-            .unwrap()
-            .database(&spec.database.0);
+    let options = sqlx::postgres::PgConnectOptions::from_str(
+        &crate::adapters::persistence::test_support::test_database_url()
+            .expect("parent-owned database configuration"),
+    )
+    .unwrap()
+    .database(&spec.database.0);
     let pool = sqlx::postgres::PgPoolOptions::new()
         .max_connections(2)
         .connect_with(options)

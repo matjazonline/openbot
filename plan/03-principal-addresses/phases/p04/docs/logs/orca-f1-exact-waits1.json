@@ -1,0 +1,218 @@
+[
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  },
+  {
+    "database": "open_bots_own_6be95ef395eb4c7fb6acfa97e3a768c6",
+    "pid": 69965,
+    "wait": "transactionid",
+    "query": "SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE",
+    "blockers": [
+      69964
+    ]
+  }
+]
