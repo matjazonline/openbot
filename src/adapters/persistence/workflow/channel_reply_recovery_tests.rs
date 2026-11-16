@@ -7,10 +7,11 @@ struct ShortClaim {
     lease_expires_at: chrono::DateTime<chrono::Utc>,
 }
 
-async fn unavailable_composer() -> crate::application::transport::DeliveryComposer {
+async fn unavailable_composer(
+    source: &sqlx::PgPool,
+) -> crate::application::transport::DeliveryComposer {
     let pool = sqlx::postgres::PgPoolOptions::new()
-        .connect_lazy(&std::env::var("TEST_DATABASE_URL").unwrap())
-        .unwrap();
+        .connect_lazy_with(source.connect_options().as_ref().clone());
     pool.close().await;
     approval_test_support::composer(&PostgresPersistence::new(pool))
 }
@@ -38,7 +39,7 @@ async fn channel_reply_recovery_transient_composition_backs_off_and_spares_quiet
     .unwrap();
     let unavailable = ChannelReplyPublisher::new(
         f.p.clone(),
-        MessagePlanner::new(unavailable_composer().await, "agents.test".into()),
+        MessagePlanner::new(unavailable_composer(f.p.pool()).await, "agents.test".into()),
     );
     let before = outbound_count(&f).await;
     let batch =

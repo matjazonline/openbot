@@ -107,7 +107,7 @@ fn permits_skipping(value: Option<&str>) -> bool {
 ///
 /// Panics when neither is set and [`ALLOW_MISSING_URL_VAR`] is absent — see the module docs for
 /// why an unset variable is a failure rather than a skip.
-fn test_database_url() -> Option<String> {
+pub(super) fn test_database_url() -> Option<String> {
     let explicit = std::env::var("TEST_DATABASE_URL")
         .ok()
         .filter(|url| !url.trim().is_empty());
