@@ -43,10 +43,10 @@ fn invalid_provenance() -> AppError {
 impl RevisionRow {
     fn summary(self, company: CompanyId) -> AppResult<SelectedAgentSummary> {
         let content = self.content.ok_or_else(invalid_provenance)?;
-        let definition = ResolvedAgentDefinition::decode(content.as_bytes())?;
+        let (definition, digest) = ResolvedAgentDefinition::decode_and_hash(content.as_bytes())?;
         if definition.company_id != company
             || definition.agent_id.as_uuid() != self.agent_id
-            || definition.content_hash()?.as_slice() != self.digest.as_slice()
+            || digest.as_slice() != self.digest.as_slice()
         {
             return Err(invalid_provenance());
         }

@@ -1,0 +1,57 @@
+name: Plan03 Linux catalog correction proof
+on: [push]
+permissions:
+  contents: read
+jobs:
+  focused-linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:18.6-bookworm
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: open_bots_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d open_bots_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/open_bots_test
+      SQLX_OFFLINE: "true"
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_PROFILE_TEST_DEBUG: "0"
+      RUST_TEST_THREADS: "4"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: doop-integration
+      - name: Record platform and require ordinary CI database configuration
+        run: |
+          uname -a
+          nproc
+          test -z "${TEST_DATABASE_URL+x}"
+          test "$RUST_TEST_THREADS" = 4
+      - name: Fetch locked dependencies and compile current tests offline
+        run: |
+          cargo fetch --locked
+          cargo test --locked --offline --lib --no-run
+      - name: Require the complete Doop family and corrected crash and reply cases
+        run: |
+          cargo test --locked --offline --lib -- doop_agent_ agent_history_e2e_process_crash channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant --list > /tmp/plan03-linux-cases.txt
+          cat /tmp/plan03-linux-cases.txt
+          python3 - <<'PYCASES'
+          from pathlib import Path
+          names = [line for line in Path('/tmp/plan03-linux-cases.txt').read_text().splitlines() if line.endswith(': test')]
+          assert len(names) == 23, names
+          for expected in ('doop_agent_observe_policy_keeps_error_observation_available_to_the_model', 'doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas'):
+              assert sum(line.endswith('::' + expected + ': test') for line in names) == 1, expected
+          PYCASES
+      - name: Exercise actual Linux paths under network isolation with four competing test threads
+        run: scripts/test-network-isolation.sh cargo test --locked --offline --lib -- doop_agent_ agent_history_e2e_process_crash channel_reply_recovery_transient_composition_backs_off_and_spares_quiet_tenant --nocapture

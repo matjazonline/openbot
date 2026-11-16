@@ -17,12 +17,9 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
     tx: &mut Transaction<'_, Postgres>,
     request: &ActionRequest,
 ) -> AppResult<()> {
-    match Box::pin(authorize_inner(tx, request)).await {
-        Err(AppError::DatabaseTimeout(_)) => Err(AppError::ServiceUnavailable(
-            "Native MCP authority is busy; no new dispatch was authorized".into(),
-        )),
-        result => result,
-    }
+    Box::pin(authorize_inner(tx, request))
+        .await
+        .map_err(super::busy)
 }
 
 async fn authorize_inner(

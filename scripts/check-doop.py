@@ -30,7 +30,11 @@ def service_gate(runner, setup, output, chrome, database):
                  for name in ("format:check", "typecheck", "lint", "doc-lint", "test", "build")]
     for command in commands:
         print("Doop gate:", " ".join(command), flush=True)
-        run(*command, cwd=source, env=environment, timeout=1200)
+        try:
+            run(*command, cwd=source, env=environment, timeout=1200)
+        except subprocess.CalledProcessError:
+            print("::error::Doop service gate failed: " + " ".join(command), flush=True)
+            raise
     runner.reviewed_source(source, identity["fingerprint"], manifest)
 
 
@@ -86,8 +90,15 @@ def main():
         "dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5",
     ):
         run("docker", "pull", image)
-    run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
-        "--output", str(output / "image"))
+    try:
+        run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
+            "--output", str(output / "image"))
+    except subprocess.CalledProcessError:
+        for name in ("build.log", "load.log"):
+            log = output / "image" / name
+            if log.is_file():
+                print(log.read_text(errors="replace"), flush=True)
+        raise
     run("python3", "scripts/doop-test.py", "acceptance", "--directory", str(setup),
         "--image", str(output / "image/image.json"), "--output", str(output / "acceptance"),
         "--openbot-test-binary", str(helper), "--openbot-test-database", database, "--ui-chrome", chrome)
