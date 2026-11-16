@@ -126,7 +126,7 @@ async fn write_publication(
     if let Some(delivery) = &destination.delivery {
         let binding = channel_reply_binding_authority::BindingScope {
             company: scope.company.as_uuid(),
-            channel: destination.channel_id,
+            target: destination.target,
             binding: delivery.source_binding_id.as_uuid(),
             transport: delivery.transport,
         };

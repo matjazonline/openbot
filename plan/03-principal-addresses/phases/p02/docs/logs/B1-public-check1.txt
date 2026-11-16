@@ -1,0 +1,93 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0062]: field `open_to_public` specified more than once
+   --> src/adapters/http/routes/agent.rs:727:21
+    |
+725 |                     open_to_public: payload.open_to_public,
+    |                     -------------------------------------- first use of `open_to_public`
+726 |                     confirm_spam_disabled: payload.confirm_spam_disabled,
+727 |                     open_to_public: payload.open_to_public,
+    |                     ^^^^^^^^^^^^^^ used more than once
+
+error[E0062]: field `confirm_spam_disabled` specified more than once
+   --> src/adapters/http/routes/agent.rs:728:21
+    |
+726 |                     confirm_spam_disabled: payload.confirm_spam_disabled,
+    |                     ---------------------------------------------------- first use of `confirm_spam_disabled`
+727 |                     open_to_public: payload.open_to_public,
+728 |                     confirm_spam_disabled: payload.confirm_spam_disabled,
+    |                     ^^^^^^^^^^^^^^^^^^^^^ used more than once
+
+error[E0063]: missing fields `confirm_spam_disabled` and `open_to_public` in initializer of `agent_settings::AgentDraft<'_>`
+   --> src/adapters/http/routes/ui_agents.rs:666:22
+    |
+666 |         let stored = pages::AgentDraft {
+    |                      ^^^^^^^^^^^^^^^^^ missing `confirm_spam_disabled` and `open_to_public`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/company_agent.rs:86:77
+    |
+ 86 |     super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, write).await?;
+    |     --------------------------------------                                  ^^^^^ expected `&AgentWrite`, found `AgentWrite`
+    |     |
+    |     arguments to this function are incorrect
+    |
+note: function defined here
+   --> src/adapters/persistence/agent.rs:286:21
+    |
+286 | pub(super) async fn write_direct_settings_on(
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+290 |     write: &AgentWrite,
+    |     ------------------
+help: consider borrowing here
+    |
+ 86 |     super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, &write).await?;
+    |                                                                             +
+
+error[E0063]: missing fields `confirm_spam_disabled` and `open_to_public` in initializer of `application::use_cases::agent::AgentWrite`
+  --> src/adapters/http/routes/agent_library.rs:92:8
+   |
+92 |     Ok(AgentWrite {
+   |        ^^^^^^^^^^ missing `confirm_spam_disabled` and `open_to_public`
+
+error[E0063]: missing fields `confirm_spam_disabled` and `open_to_public` in initializer of `application::use_cases::agent::AgentWrite`
+   --> src/application/use_cases/agent.rs:232:5
+    |
+232 |     AgentWrite {
+    |     ^^^^^^^^^^ missing `confirm_spam_disabled` and `open_to_public`
+
+error[E0063]: missing field `open_to_public` in initializer of `domain::entities::agent::Agent`
+    --> src/adapters/http/pages/tests.rs:1397:5
+     |
+1397 |     Agent {
+     |     ^^^^^ missing `open_to_public`
+
+error[E0063]: missing field `open_to_public` in initializer of `domain::entities::agent::Agent`
+   --> src/adapters/http/routes/agent.rs:937:21
+    |
+937 |         let agent = Agent {
+    |                     ^^^^^ missing `open_to_public`
+
+error[E0063]: missing field `open_to_public` in initializer of `domain::entities::agent::Agent`
+   --> src/adapters/http/routes/onboarding.rs:368:9
+    |
+368 |         Agent {
+    |         ^^^^^ missing `open_to_public`
+
+Some errors have detailed explanations: E0062, E0063, E0308.
+For more information about an error, try `rustc --explain E0062`.
+error: could not compile `open_bots` (lib) due to 6 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0063]: missing field `open_to_public` in initializer of `domain::entities::agent::Agent`
+  --> src/application/use_cases/agent_tests.rs:37:21
+   |
+37 |         let agent = Agent {
+   |                     ^^^^^ missing `open_to_public`
+
+error[E0063]: missing field `open_to_public` in initializer of `domain::entities::agent::Agent`
+   --> src/application/use_cases/agent_tests.rs:684:76
+    |
+684 |     let definition = |name: &str, slug: &str, provider: &str, model: &str| Agent {
+    |                                                                            ^^^^^ missing `open_to_public`
+
+error: could not compile `open_bots` (lib test) due to 11 previous errors

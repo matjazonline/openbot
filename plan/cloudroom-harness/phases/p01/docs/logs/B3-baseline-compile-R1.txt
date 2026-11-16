@@ -1,0 +1,3 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-gate-baseline)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 08s
+  Executable unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-c4f538027eed5c31)

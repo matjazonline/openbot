@@ -29,10 +29,7 @@ fn company() -> CompanyId {
 /// tool.
 #[test]
 fn only_the_exact_name_only_built_in_is_trusted() {
-    for kind in [
-        ProvisioningKind::ListAgents,
-        ProvisioningKind::CreateAgentChannel,
-    ] {
+    for kind in [ProvisioningKind::ListAgents, ProvisioningKind::CreateAgent] {
         let trusted = builtin_provisioning_snapshot(company(), kind).unwrap();
         assert_eq!(trusted.kind(), ToolKind::Provisioning);
         assert!(is_trusted_provisioning_snapshot(&trusted).unwrap());
@@ -52,7 +49,7 @@ fn only_the_exact_name_only_built_in_is_trusted() {
         assert!(!is_trusted_provisioning_snapshot(&mcp).unwrap());
     }
     assert_eq!(
-        builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgentChannel)
+        builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgent)
             .unwrap()
             .policy
             .effect,
@@ -66,7 +63,7 @@ fn every_built_in_name_is_reserved() {
         "message.send",
         "message.reply",
         LIST_COMPANY_AGENTS,
-        CREATE_AGENT_CHANNEL,
+        CREATE_AGENT,
     ] {
         assert!(is_reserved_tool_name(name), "{name}");
     }
@@ -78,7 +75,7 @@ fn every_built_in_name_is_reserved() {
 /// two shapes, and nothing else.
 #[test]
 fn refusals_and_results_are_both_valid_receipts() {
-    let (_, create) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);
+    let (_, create) = provisioning_tool_schemas(ProvisioningKind::CreateAgent);
     for refusal in [
         ProvisioningRefusal::Forbidden,
         ProvisioningRefusal::Conflict("taken".into()),
@@ -91,8 +88,8 @@ fn refusals_and_results_are_both_valid_receipts() {
     let id = Uuid::nil().to_string();
     let created = json!({
         "agent": {"id": id, "slug": "helper"},
-        "channel": {"id": id, "slug": "helper", "address": "helper@acme"},
-        "workflow_id": id, "version_id": id, "binding_id": id, "reply_mode": "reviewed"
+        "principal_id": id, "address": "helper@acme.example.test",
+        "workflow_id": id, "version_id": id, "binding_id": id
     });
     assert!(valid(&create, &created));
     assert!(!valid(
@@ -109,16 +106,16 @@ fn refusals_and_results_are_both_valid_receipts() {
         "agents": [
             {"slug": "a", "name": "A", "description": null, "provider": null, "model": null,
                 "departments": [{"slug": "sales", "name": "Sales", "roles": ["lead"]}],
-                "desk": {"id": id, "address": "a@acme.example.test"}},
+                "address": {"principal_id": id, "address": "a@acme.example.test"}},
             {"slug": "b", "name": "B", "description": null, "provider": null, "model": null,
-                "departments": [], "desk": null}
+                "departments": [], "address": null}
         ],
         "models": [{"provider": "anthropic", "model": "claude"}],
         "truncated": false
     });
     assert!(valid(&list, &listed));
     // 01DEP-P03-D10: every listed agent names its departments and desk, with known roles only.
-    for field in ["departments", "desk"] {
+    for field in ["departments", "address"] {
         let mut missing = listed.clone();
         missing["agents"][1].as_object_mut().unwrap().remove(field);
         assert!(!valid(&list, &missing), "{field} is required");
@@ -134,21 +131,21 @@ fn refusals_and_results_are_both_valid_receipts() {
 
 #[test]
 fn arguments_are_held_to_the_input_contract() {
-    let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);
+    let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgent);
     let spec = json!({
         "name": "Helper", "slug": "helper", "system_prompt": "Help.",
-        "provider": "anthropic", "model": "claude", "reply_mode": "autonomous",
+        "provider": "anthropic", "model": "claude",
         "tools": ["crm.lookup"], "skills": ["support"]
     });
     assert!(valid(&input, &spec));
-    let parsed = CreateAgentChannel::parse(&spec).unwrap();
-    assert_eq!(parsed.reply_mode, ReplyMode::Autonomous);
-    assert_eq!(parsed.channel_slug, None);
+    let parsed = CreateAgent::parse(&spec).unwrap();
+    assert_eq!(parsed.slug, "helper");
+    assert_eq!(parsed.tools, vec!["crm.lookup"]);
 
     let mut unknown = spec.clone();
     unknown["owner"] = json!("someone");
     assert!(!valid(&input, &unknown));
-    assert!(CreateAgentChannel::parse(&unknown).is_err());
+    assert!(CreateAgent::parse(&unknown).is_err());
     let mut mode = spec.clone();
     mode["reply_mode"] = json!("public");
     assert!(!valid(&input, &mode));
@@ -165,18 +162,17 @@ fn arguments_are_held_to_the_input_contract() {
 /// and nothing else.
 #[test]
 fn custom_steps_are_held_to_the_builder_step_types() {
-    let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateAgentChannel);
+    let (input, _) = provisioning_tool_schemas(ProvisioningKind::CreateDeskForAgent);
     let step = json!({"id": "topic", "slot": "before_draft", "type": "ai.classify",
         "with": {"agent": {"literal": "helper"}}});
     let spec = |steps: Value| {
         json!({
-            "name": "Helper", "slug": "helper", "system_prompt": "Help.",
-            "provider": "anthropic", "model": "claude", "reply_mode": "autonomous",
+            "agent_slug": "helper", "channel_name": "Support", "channel_slug": "support", "reply_mode": "autonomous",
             "steps": steps
         })
     };
     assert!(valid(&input, &spec(json!([step]))));
-    let parsed = CreateAgentChannel::parse(&spec(json!([step]))).unwrap();
+    let parsed = CreateDeskForAgent::parse(&spec(json!([step]))).unwrap();
     assert_eq!(parsed.steps[0].id, "topic");
     assert_eq!(parsed.steps[0].definition["type"], "ai.classify");
 
@@ -203,7 +199,7 @@ fn custom_steps_are_held_to_the_builder_step_types() {
 fn http_operations_cannot_take_a_built_in_name() {
     use crate::application::workflow::http::HttpOperation;
     for tool in [
-        builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgentChannel).unwrap(),
+        builtin_provisioning_snapshot(company(), ProvisioningKind::CreateAgent).unwrap(),
         builtin_provisioning_snapshot(company(), ProvisioningKind::ListAgents).unwrap(),
         crate::application::workflow::message::builtin_message_snapshot(
             company(),

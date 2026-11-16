@@ -150,7 +150,7 @@ mod tests {
         let html = response_preview(&SampleResponse::Automatic {
             content: SampleResponseContent {
                 subject: "<img src=x onerror=alert(1)>".into(),
-                body: "</pre><script>private text</script>".into(),
+                body: concat!("</pre>", "<script>", "private text", "</script>").into(),
             },
             approval_required: true,
         });

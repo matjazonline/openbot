@@ -1,0 +1,25 @@
+{
+  "feature_input": "23eb638d609614cafe958bd6a5d17a4e9bef6463",
+  "main_input": "103004a8ac2fd643cf14bde7e09022ae79f72053",
+  "native_schema_function_comparison": {
+    "integration_mcp_reference_ready": true,
+    "native_mcp_broker_immutable": true,
+    "native_mcp_has_unknown": true,
+    "native_mcp_call_immutable": true,
+    "native_mcp_run_discriminator": true,
+    "native_mcp_witness": true,
+    "native_mcp_call_witness": true,
+    "native_mcp_run_witness": true,
+    "native_mcp_private_definition": true,
+    "native_mcp_private_version_selection": true,
+    "native_mcp_tool_source_live": true,
+    "native_mcp_revision_live": true,
+    "native_mcp_parent_agent_live": true,
+    "native_mcp_stop_requested": true,
+    "native_mcp_run_live": true
+  },
+  "coordination_hashes": {
+    "plan/cloudroom-harness/COORDINATION.md": "dd62dd12513a3124662dbcad71c3ae1d4c7a068627df93a3a21a846396cbf14e",
+    "/Users/mac02/.codex/worktrees/2050/openbot/plan/01-departments/COORDINATION.md": "35527a0a608edd5de30a74e7e8537ef79227f08e9046a1513e3b58d3ff6c3d37"
+  }
+}

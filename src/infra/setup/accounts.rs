@@ -29,13 +29,14 @@ pub(super) struct UseCases {
 fn agents(
     p: &Arc<crate::adapters::persistence::PostgresPersistence>,
     workflow: &crate::infra::workflow::WorkflowServices,
+    spam_scanning: crate::use_cases::agent::SpamScanning,
 ) -> anyhow::Result<Arc<AgentUseCases>> {
     let classifier: Arc<dyn TextClassifier> =
         Arc::new(crate::adapters::harness::rig::RigTextClassifier::new(
             crate::adapters::harness::rig::providers::ProviderRegistry::standard()?,
         ));
     Ok(Arc::new(
-        AgentUseCases::new(p.clone(), p.clone(), p.clone())
+        AgentUseCases::new(p.clone(), p.clone(), p.clone(), spam_scanning)
             .with_company_agents(workflow.company_agents())
             .with_prompt_classifier(classifier),
     ))
@@ -59,7 +60,7 @@ pub(super) fn build(
             allow_unverified_without_smtp: allow_unverified_email_without_smtp_from_env(),
         },
     ));
-    let agent = agents(p, workflow)?;
+    let agent = agents(p, workflow, f.config.spam_scanning())?;
     Ok(UseCases {
         user,
         company: Arc::new(CompanyUseCases::new(p.clone())),

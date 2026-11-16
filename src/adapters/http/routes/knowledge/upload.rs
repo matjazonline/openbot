@@ -7,7 +7,7 @@ pub(super) async fn receive(
     s: &Services,
     scope: KnowledgeScope,
     request: Request,
-) -> Result<Vec<KnowledgeDocumentLayer>, Response> {
+) -> Result<Vec<KnowledgeDocumentLayer>, Box<Response>> {
     // Resolve account/company membership and admission before constructing a multipart reader.
     s.library
         .documents()
@@ -33,9 +33,15 @@ pub(super) async fn receive(
             )
                 .into_response()
         })??;
-    s.library.upload(scope, files).await.map_err(mutation_error)
+    s.library
+        .upload(scope, files)
+        .await
+        .map_err(mutation_error)
+        .map_err(Box::new)
 }
-pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploadFile>, Response> {
+pub(super) async fn files(
+    mut multipart: Multipart,
+) -> Result<Vec<KnowledgeUploadFile>, Box<Response>> {
     let mut files = Vec::new();
     while let Some(mut field) = multipart
         .next_field()
@@ -43,13 +49,17 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
         .map_err(IntoResponse::into_response)?
     {
         if field.name() != Some("files") {
-            return Err(AppError::BadRequest(
-                "Only file fields are accepted; the level comes from each filename".into(),
-            )
-            .into_response());
+            return Err(Box::new(
+                AppError::BadRequest(
+                    "Only file fields are accepted; the level comes from each filename".into(),
+                )
+                .into_response(),
+            ));
         }
         if files.len() == MAX_KNOWLEDGE_FILES {
-            return Err(AppError::BadRequest("Pick at most ten files".into()).into_response());
+            return Err(Box::new(
+                AppError::BadRequest("Pick at most ten files".into()).into_response(),
+            ));
         }
         let filename = field
             .file_name()
@@ -60,9 +70,9 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
         let mut bytes = Vec::new();
         while let Some(chunk) = field.chunk().await.map_err(IntoResponse::into_response)? {
             if chunk.len() > MAX_KNOWLEDGE_FILE_BYTES.saturating_sub(bytes.len()) {
-                return Err(
-                    AppError::BadRequest("A selected file exceeds 1 MiB".into()).into_response()
-                );
+                return Err(Box::new(
+                    AppError::BadRequest("A selected file exceeds 1 MiB".into()).into_response(),
+                ));
             }
             bytes.extend_from_slice(&chunk);
         }
@@ -72,7 +82,9 @@ pub(super) async fn files(mut multipart: Multipart) -> Result<Vec<KnowledgeUploa
         );
     }
     if files.is_empty() {
-        return Err(AppError::BadRequest("Choose at least one file".into()).into_response());
+        return Err(Box::new(
+            AppError::BadRequest("Choose at least one file".into()).into_response(),
+        ));
     }
     Ok(files)
 }

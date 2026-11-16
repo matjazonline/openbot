@@ -1,0 +1,343 @@
+{
+  "version": 1,
+  "round": "03PA-P02-B1-R1",
+  "artifact": "776169e238188e2347d093f0bd45fbca8ceae56ca5d1d4b65419929fd028b1b1",
+  "checks": [
+    {
+      "criteria": [
+        "B1-AC1",
+        "B1-AC2",
+        "B1-AC3",
+        "B1-AC4",
+        "B1-AC5",
+        "B1-AC6",
+        "B1-AC7"
+      ],
+      "command": "TEST_DATABASE_URL=<phase test db> RUST_MIN_STACK=16777216 <current lib test binary> adapters::persistence::account_identity::tests adapters::persistence::address_tests adapters::http::routes::agent::api_tests adapters::persistence::agent::tests adapters::persistence::department::tests application::use_cases::agent::tests application::use_cases::channel:: domain::entities::participant::direct_tests",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-focused3.txt",
+          "sha256": "92b5eeaf8bd72a577854586469dae7fb394da6a87159cae2328ea436591c044b"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "CARGO_TARGET_DIR=<phase target> SQLX_OFFLINE=true cargo test --locked --offline --lib --no-run",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-build10.txt",
+          "sha256": "8802357711707f8e298cf40639474cf9348c4e315f73c44d7aadf02d2ba42090"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "CARGO_TARGET_DIR=<phase target> SQLX_OFFLINE=true cargo check --locked --offline --all-targets",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-offline-check3.txt",
+          "sha256": "e249ee6425f6630eafd889c483ad593c98a311bf6c6ef1b7ecab7977f098a160"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "CARGO_TARGET_DIR=<phase target> SQLX_OFFLINE=true cargo test --locked --offline --test source_modules",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-source-modules2.txt",
+          "sha256": "e5278cde045b6525a32e11f5952a52c8f4d336f1ff48f1a227c8ccc71c8fef89"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "cargo test --locked --offline --lib -- --list; compare before/after",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-tests-before-current.txt",
+          "sha256": "25ff3b7596bf240b2d107ad20730e6c54f33c7500c3284a8e6f176e495c8b5c0"
+        },
+        {
+          "path": "logs/B1-foundation-tests-final2.txt",
+          "sha256": "5c137c7fa9683547b768f8ceeea2dc79103fc8c8ae7fc790ae0bdde9126730d9"
+        },
+        {
+          "path": "logs/B1-R1-collection-delta.json",
+          "sha256": "7997388f1a44114087b2d86dfc054af4b7d1689b9408734f4a95a7d112670767"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "DATABASE_URL=<phase schema db> cargo sqlx migrate run; DATABASE_URL=<phase schema db> cargo sqlx prepare -- --all-targets",
+      "fixture": "phase-owned Postgres 127.0.0.1:52471; pa02_codex_model_tests_20261114 plus per-test OwnDatabase UUID databases",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-foundation-migrate4.txt",
+          "sha256": "e633b09d9baac1a16ce0ebaf953c7e8f290fbee1b48cb0a62e36d10d1af91cf8"
+        },
+        {
+          "path": "logs/B1-foundation-sqlx-prepare.txt",
+          "sha256": "49225ddbabc5a3cc6604eb38f18676943eddc6e27c1337a7287b653dece5218f"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "cargo fmt --all -- --check",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "git diff HEAD --check",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "bash scripts/tests/transport-boundary.sh",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "bash scripts/transport-boundary-check.sh",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/tests/workflow-sample-boundary.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/workflow-sample-boundary.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/tests/integration-boundary.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/integration-boundary.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/check-integration-docs.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/tests/workflow-evidence.py",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "B1-AC7"
+      ],
+      "command": "python3 scripts/check-workflow-evidence.py --available-manifests",
+      "fixture": "local static checks",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/B1-R1-static.txt",
+          "sha256": "1cb34435a5db10374fd2cb0bf60da624b88dbafa9f23c9640daefaba0273b6bb"
+        },
+        {
+          "path": "logs/B1-R1-static.json",
+          "sha256": "85da4f7bf29322b9be20ff46f9e07eb02e1d4443cdcbd5b9f7aede3a062ca8e0"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "inherited strict-clippy baseline; final integration must report"
+      ],
+      "command": "cargo clippy --locked --offline --all-targets -- -D warnings",
+      "fixture": "Rust 1.99.1; all five diagnostic source files unchanged from p02 start",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-foundation-clippy1.txt",
+          "sha256": "ec4f1871da490bea2e6e0e56156e382374c3187d128f5ab9d599c673c3d79814"
+        },
+        {
+          "path": "logs/B1-clippy-baseline-disposition.json",
+          "sha256": "3d06d0eb56a1d2f18a56f5d0184659ad48a39461f3389ddb60c198a8b2e495de"
+        }
+      ]
+    },
+    {
+      "criteria": [
+        "inherited p01 generated CSS; p04 integration regeneration"
+      ],
+      "command": "npm run build:css; compare assets/app.css with baseline",
+      "fixture": "unchanged baseline stylesheet; only inherited profile pb-10/lg:px-10 missing",
+      "status": "FAIL",
+      "files": [
+        {
+          "path": "logs/B1-foundation-css-regenerate.txt",
+          "sha256": "98b5ceb7be0105d4b9de2347ec7b5a3ca02b5e210c82283bc105fa8ea7723a32"
+        },
+        {
+          "path": "logs/B1-foundation-css-baseline-disposition.json",
+          "sha256": "1795563c0cbfbe7a8b8009d246621170b876a0835c7c46f185ed88304c701310"
+        }
+      ]
+    }
+  ]
+}

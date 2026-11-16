@@ -1,0 +1,26 @@
+
+[1m[46m RUN [49m[22m [36mv4.1.1 [39m[90m/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/plugins/provider-claude-code[39m
+
+ [32m✓[39m [30m[42m bb-plugin-provider-claude-code [49m[39m src/bridge/__tests__/native-tool-origins.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 52[2mms[22m[39m
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+claude-code bridge: Invalid params for turn/start: params.clientRequestId: Invalid string: must match pattern /^creq_[23456789abcdefghijkmnpqrstuvwxyz]{10}$/u
+claude-code bridge: Unknown method: turn/teleport
+claude-code bridge: Invalid params for thread/resume: params.providerThreadId: Invalid input: expected string, received null
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+{"jsonrpc":"2.0","id":2,"result":{"ok":true}}
+ [32m✓[39m [30m[45m bb-plugin-provider-claude-code:isolated [49m[39m src/bridge/__tests__/bridge.test.ts [2m([22m[2m78 tests[22m[2m)[22m[33m 369[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m2 passed[39m[22m[90m (2)[39m
+[2m      Tests [22m [1m[32m83 passed[39m[22m[90m (83)[39m
+[2m   Start at [22m 00:56:28
+[2m   Duration [22m 1.28s[2m (transform 888ms, setup 0ms, import 1.37s, tests 421ms, environment 0ms)[22m
+

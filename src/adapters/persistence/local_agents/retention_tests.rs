@@ -239,6 +239,7 @@ async fn cloudroom_retention_saved_old_manual_replay_survives_age_then_collected
     let operation = LocalAgentOperation::queued(
         id,
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id: session,
             selection: c.session.profile.selection.clone(),
             prompt: prompt.clone(),

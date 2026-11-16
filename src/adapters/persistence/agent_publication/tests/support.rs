@@ -10,6 +10,7 @@ pub(super) struct PublicationCounts {
 }
 
 pub(super) struct Fixture {
+    pub owner: Uuid,
     pub p: PostgresPersistence,
     pub scope: AgentPublicationScope,
     pub binding: AgentToolBinding,
@@ -60,7 +61,9 @@ impl Fixture {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(&p, &agent).await;
         Self {
+            owner: user.id,
             p,
             scope: AgentPublicationScope {
                 company: CompanyId::new(company.id),
@@ -99,6 +102,7 @@ impl Fixture {
             .create_company(
                 self.scope.company.as_uuid(),
                 SkillWrite {
+                    files: None,
                     slug: format!("skill-{}", Uuid::new_v4().simple()),
                     name: "Shared instructions".into(),
                     description: "Instructions for this fixture".into(),

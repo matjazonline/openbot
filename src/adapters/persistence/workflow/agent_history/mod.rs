@@ -88,9 +88,10 @@ impl Context {
     }
     fn columns(&self) -> ScopeColumns {
         match self.boundary {
-            AgentConversationBoundary::Thread { channel, thread } => ScopeColumns {
+            AgentConversationBoundary::Thread { target, thread } => ScopeColumns {
                 kind: "thread",
-                channel: Some(channel.as_uuid()),
+                channel: target.desk_id(),
+                principal: target.principal_id().map(|id| id.as_uuid()),
                 thread: Some(thread.as_uuid()),
                 session: None,
                 child: None,
@@ -99,6 +100,7 @@ impl Context {
                 kind: "private_session",
                 session: Some(session.as_uuid()),
                 channel: None,
+                principal: None,
                 thread: None,
                 child: None,
             },
@@ -106,6 +108,7 @@ impl Context {
                 kind: "child_branch",
                 child: Some(run.as_uuid()),
                 channel: None,
+                principal: None,
                 thread: None,
                 session: None,
             },
@@ -115,6 +118,7 @@ impl Context {
 struct ScopeColumns {
     kind: &'static str,
     channel: Option<Uuid>,
+    principal: Option<Uuid>,
     thread: Option<Uuid>,
     session: Option<Uuid>,
     child: Option<Uuid>,
@@ -155,8 +159,8 @@ async fn conversation_on(tx: &mut PgConnection, context: &Context) -> AppResult<
     let columns = context.columns();
     sqlx::query(
         "INSERT INTO agent_history_conversations \
-         (company_id,id,agent_id,scope_kind,channel_id,thread_id,session_id,child_run_id) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8) ON CONFLICT DO NOTHING",
+         (company_id,id,agent_id,scope_kind,channel_id,thread_id,session_id,child_run_id,principal_id) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT DO NOTHING",
     )
     .bind(context.company.as_uuid())
     .bind(proposed)
@@ -166,6 +170,7 @@ async fn conversation_on(tx: &mut PgConnection, context: &Context) -> AppResult<
     .bind(columns.thread)
     .bind(columns.session)
     .bind(columns.child)
+    .bind(columns.principal)
     .execute(&mut *tx)
     .await?;
     let id = find_on(tx, context).await?.ok_or_else(invalid)?;
@@ -178,7 +183,8 @@ async fn find_on(db: &mut PgConnection, context: &Context) -> AppResult<Option<U
         "SELECT id FROM agent_history_conversations WHERE company_id=$1 AND agent_id=$2 \
          AND scope_kind=$3 AND channel_id IS NOT DISTINCT FROM $4::uuid \
          AND thread_id IS NOT DISTINCT FROM $5::uuid AND session_id IS NOT DISTINCT FROM $6::uuid \
-         AND child_run_id IS NOT DISTINCT FROM $7::uuid",
+         AND child_run_id IS NOT DISTINCT FROM $7::uuid \
+         AND principal_id IS NOT DISTINCT FROM $8::uuid",
     )
     .bind(context.company.as_uuid())
     .bind(context.agent.as_uuid())
@@ -187,6 +193,7 @@ async fn find_on(db: &mut PgConnection, context: &Context) -> AppResult<Option<U
     .bind(columns.thread)
     .bind(columns.session)
     .bind(columns.child)
+    .bind(columns.principal)
     .fetch_optional(db)
     .await?)
 }

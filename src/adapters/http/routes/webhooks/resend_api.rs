@@ -102,7 +102,7 @@ impl FromRef<AppState> for ResendApiWebhookState {
 }
 
 #[instrument(skip_all, fields(provider = "resend_api"))]
-async fn resend_api_inbound_webhook(
+pub(crate) async fn resend_api_inbound_webhook(
     State(ResendApiWebhookState {
         config,
         accounts,

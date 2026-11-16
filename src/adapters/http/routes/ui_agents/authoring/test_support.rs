@@ -26,6 +26,11 @@ impl Fixture {
         )
         .await
         .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(
+            f.persistence.as_ref(),
+            &agent,
+        )
+        .await;
         let workflow =
             crate::infra::workflow::WorkflowEngine::for_tests(f.persistence.as_ref().clone())
                 .services();
@@ -73,6 +78,7 @@ impl Fixture {
                 self.f.owner.id,
                 self.f.company.id,
                 crate::use_cases::skill::SkillWrite {
+                    files: None,
                     slug: name.into(),
                     name: name.into(),
                     description: format!("Use {name}"),
@@ -117,6 +123,7 @@ pub(super) fn fields(revision: AgentDraftRevision, tools: &str) -> Vec<(&'static
     vec![
         ("name", "Edited <agent>".into()),
         ("slug", "authoring".into()),
+        ("native_permissions", "full".into()),
         ("provider", "openai".into()),
         ("model", "gpt-test".into()),
         (

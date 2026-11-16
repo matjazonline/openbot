@@ -119,7 +119,7 @@ async fn autonomous_agent_authoring_catalog_builtin_choices_do_not_offer_builder
             "search_knowledge"
         ]
     );
-    assert!(!output.contains("list_company_agents") && !output.contains("create_agent_channel"));
+    assert!(!output.contains("list_company_agents") && !output.contains("create_agent"));
     assert!(
         !output.contains("private immutable instruction marker")
             && !output.contains("authoring-secret-never-return")

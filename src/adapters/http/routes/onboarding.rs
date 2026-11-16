@@ -12,8 +12,6 @@ use uuid::Uuid;
 use crate::{
     adapters::http::{app_state::AppState, auth::AuthenticatedUser, pages},
     app_error::{AppError, AppResult},
-    application::workflow::{WorkflowActor, provisioning::AssistantChannels},
-    domain::workflow::CompanyId,
     entities::{agent::Agent, value_objects::EmailAddress},
     infra::config::AppConfig,
     use_cases::{
@@ -262,7 +260,12 @@ async fn create_agents(
                 .iter()
                 .map(|created| pages::OnboardedAgent {
                     agent: &created.agent,
-                    channel: created_channel(&created.channel),
+                    address: created_address(
+                        &company,
+                        &created.agent,
+                        created.principal_id,
+                        &config.app_domain_name,
+                    ),
                 })
                 .collect::<Vec<_>>();
             pages::onboarding_complete_page(&mailbox_user, &company, &onboarded)
@@ -271,50 +274,29 @@ async fn create_agents(
     Ok(Html(html).into_response())
 }
 
-/// What the completion page shows for an agent on a reload: the default desk its creation
-/// recorded (01DEP-P03-D4).
-async fn stored_onboarding_channel(
-    channels: &dyn AssistantChannels,
-    company_id: Uuid,
-    caller: WorkflowActor,
+fn created_address(
+    company: &crate::entities::company::Company,
     agent: &Agent,
-) -> AppResult<pages::OnboardingChannel> {
-    let stored = channels
-        .assistant_channel_result(CompanyId::new(company_id), caller, &onboarding_key(agent))
-        .await?;
-    Ok(stored.map_or(pages::OnboardingChannel::Missing, |created| {
-        created_channel(&created)
-    }))
-}
-
-/// The command key that records an agent's default desk, which the completion page reads back.
-fn onboarding_key(agent: &Agent) -> String {
-    crate::adapters::persistence::company_agent::default_desk_key(agent.id)
-}
-
-fn created_channel(created: &serde_json::Value) -> pages::OnboardingChannel {
-    let channel = &created["channel"];
-    match (
-        channel["id"]
-            .as_str()
-            .and_then(|id| Uuid::parse_str(id).ok()),
-        channel["address"].as_str(),
-    ) {
-        (Some(channel_id), Some(address)) => pages::OnboardingChannel::Created {
-            channel_id,
-            address: address.to_owned(),
-        },
-        _ => pages::OnboardingChannel::Missing,
+    principal: crate::entities::transport::PrincipalId,
+    domain: &str,
+) -> pages::OnboardingAddress {
+    pages::OnboardingAddress::Created {
+        principal_id: principal.as_uuid(),
+        address: crate::entities::channel::Channel::address_for(
+            &crate::entities::value_objects::ChannelSlug::from(agent.slug.as_str()),
+            &company.slug,
+            domain,
+        )
+        .to_string(),
     }
 }
 
-/// The completion page again, from what was stored: each company agent and the channel its
-/// onboarding command created.
+/// The completion page again from the current company agents and their direct principals.
 #[allow(clippy::too_many_arguments)]
 async fn complete(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
     State(agent_use_cases): State<Arc<AgentUseCases>>,
-    State(assistant_channels): State<Arc<dyn AssistantChannels>>,
+    State(onboarding_use_cases): State<Arc<OnboardingUseCases>>,
     State(config): State<Arc<AppConfig>>,
     State(user_use_cases): State<Arc<UserUseCases>>,
     user: AuthenticatedUser,
@@ -327,14 +309,22 @@ async fn complete(
     let agents = agent_use_cases
         .list_company_agents(user.id, company_id)
         .await?;
-    let caller = WorkflowActor::authenticated(user.id)?;
-    let mut onboarded = Vec::with_capacity(agents.len());
-    for agent in &agents {
-        let channel =
-            stored_onboarding_channel(assistant_channels.as_ref(), company_id, caller, agent)
-                .await?;
-        onboarded.push(pages::OnboardedAgent { agent, channel });
-    }
+    let ids = agents.iter().map(|agent| agent.id).collect::<Vec<_>>();
+    let completed = onboarding_use_cases
+        .completed(user.id, company_id, &ids)
+        .await?;
+    let onboarded = completed
+        .iter()
+        .map(|created| pages::OnboardedAgent {
+            agent: &created.agent,
+            address: created_address(
+                &company,
+                &created.agent,
+                created.principal_id,
+                &config.app_domain_name,
+            ),
+        })
+        .collect::<Vec<_>>();
     Ok(Html(pages::onboarding_complete_page(
         &mailbox_user,
         &company,
@@ -366,6 +356,8 @@ mod tests {
 
     fn library_agent(name: &str, slug: &str) -> Agent {
         Agent {
+            open_to_public: false,
+            native_permissions: Default::default(),
             draft_revision: crate::entities::agent_capability::AgentDraftRevision::new(1).unwrap(),
             id: Uuid::new_v4(),
             company_id: None,
@@ -476,14 +468,14 @@ mod tests {
             &[
                 pages::OnboardedAgent {
                     agent: &scheduler,
-                    channel: pages::OnboardingChannel::Created {
-                        channel_id: channel.id,
+                    address: pages::OnboardingAddress::Created {
+                        principal_id: channel.id,
                         address: "scheduler@acme.example.com".into(),
                     },
                 },
                 pages::OnboardedAgent {
                     agent: &triage,
-                    channel: pages::OnboardingChannel::Missing,
+                    address: pages::OnboardingAddress::Missing,
                 },
             ],
         );
@@ -496,7 +488,7 @@ mod tests {
             company.id, triage.id
         )));
         assert!(complete_page.contains(&format!(
-            "href=\"/ui?company_id={}&channel_id={}\" class=\"btn btn-primary\">Finish</a>",
+            "href=\"/ui?company_id={}&principal_id={}\" class=\"btn btn-primary\">Finish</a>",
             company.id, channel.id
         )));
 
@@ -505,7 +497,7 @@ mod tests {
             &company,
             &[pages::OnboardedAgent {
                 agent: &triage,
-                channel: pages::OnboardingChannel::Missing,
+                address: pages::OnboardingAddress::Missing,
             }],
         );
         assert!(no_channels.contains("Your agents are created"));
@@ -520,11 +512,9 @@ mod tests {
     /// under `agent:{id}`, for the company's managers only; an agent with no recorded desk (a
     /// fixture insert) shows none.
     #[tokio::test]
-    async fn agent_default_desk_onboarding_completion_reads_back_the_default_desk() {
+    async fn agent_direct_address_onboarding_completion_reads_back_the_principal() {
         use crate::adapters::persistence::company_agent::CompanyAgentService;
-        use crate::adapters::persistence::workflow::provisioning::{
-            AssistantChannelService, ProvisioningDeployment,
-        };
+        use crate::adapters::persistence::workflow::provisioning::ProvisioningDeployment;
         use crate::adapters::persistence::{PostgresPersistence, test_support::test_pool};
         use crate::adapters::workflow_source::WorkflowSourceDecoder;
         use crate::application::workflow::templates::TemplateCatalogue;
@@ -587,6 +577,8 @@ mod tests {
             &[],
             "agents.test",
         );
+        use crate::application::use_cases::onboarding::OnboardingPersistence;
+        use crate::application::workflow::{CompanyId, WorkflowActor};
         let caller = WorkflowActor::authenticated(owner).unwrap();
         let created = CompanyAgentService::new(persistence.clone(), templates.clone())
             .create(
@@ -612,35 +604,30 @@ mod tests {
         )
         .await
         .unwrap();
-        let channels = AssistantChannelService::new(persistence.clone(), templates);
-
-        let read = stored_onboarding_channel(&channels, company, caller, &created.agent)
+        let store = crate::adapters::persistence::onboarding::PostgresOnboarding::new(
+            persistence.clone(),
+            templates,
+        );
+        let mut session = OnboardingPersistence::begin(&store, owner, company)
+            .await
+            .unwrap();
+        let completed = session
+            .completed_agents(&[created.agent.id, bare.id])
             .await
             .unwrap();
         assert_eq!(
-            read,
-            pages::OnboardingChannel::Created {
-                channel_id: created.desk_id,
-                address: format!("desk@{suffix}.agents.test"),
-            }
+            completed.len(),
+            2,
+            "scoped completion reads actual agent principals"
         );
-        assert_eq!(
-            stored_onboarding_channel(&channels, company, caller, &bare)
+        assert_eq!(completed[0].agent.id, created.agent.id);
+        assert_eq!(completed[0].principal_id, created.principal_id);
+        drop(session);
+        // Someone who does not manage the company cannot read its completion state.
+        assert!(
+            OnboardingPersistence::begin(&store, outsider, company)
                 .await
-                .unwrap(),
-            pages::OnboardingChannel::Missing
-        );
-        // Someone who does not manage the company reads nothing.
-        assert_eq!(
-            stored_onboarding_channel(
-                &channels,
-                company,
-                WorkflowActor::authenticated(outsider).unwrap(),
-                &created.agent
-            )
-            .await
-            .unwrap(),
-            pages::OnboardingChannel::Missing
+                .is_err()
         );
     }
 }

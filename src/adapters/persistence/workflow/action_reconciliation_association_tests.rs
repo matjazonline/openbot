@@ -59,7 +59,7 @@ async fn associated(kind: AssociationKind) -> Associated {
     let conversation = Conversation::new(&f).await;
     let association = match kind {
         AssociationKind::Thread => RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(conversation.channel),
+            target: crate::entities::address::AddressTarget::Desk(conversation.channel),
             thread_id: RelatedThreadId::new(conversation.thread),
         },
         AssociationKind::Channel => {
@@ -149,7 +149,7 @@ async fn foreign_associations(f: &AdmissionFixture) -> ForeignAssociations {
     let other = Conversation::new(f).await;
     let other_scope = admitted_association(
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(other.channel),
+            target: crate::entities::address::AddressTarget::Desk(other.channel),
             thread_id: RelatedThreadId::new(other.thread),
         },
         f,
@@ -159,7 +159,7 @@ async fn foreign_associations(f: &AdmissionFixture) -> ForeignAssociations {
     ForeignAssociations {
         company: CompanyId::new(foreign.id),
         association: RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel.id),
+            target: crate::entities::address::AddressTarget::Desk(channel.id),
             thread_id: RelatedThreadId::new(foreign_thread),
         },
         other,
@@ -189,22 +189,16 @@ async fn assert_associations(
         .unwrap();
     for bad in [
         match foreign_association {
-            RelatedAssociation::Thread { channel_id, .. } => {
-                RelatedAssociation::Channel(channel_id)
-            }
+            RelatedAssociation::Thread { target, .. } => RelatedAssociation::inbox(target),
             _ => unreachable!(),
         },
         foreign_association,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(other.channel),
+            target: crate::entities::address::AddressTarget::Desk(other.channel),
             thread_id: RelatedThreadId::new(thread),
         },
         RelatedAssociation::Thread {
-            channel_id: match association {
-                RelatedAssociation::Channel(id)
-                | RelatedAssociation::Thread { channel_id: id, .. } => id,
-                _ => unreachable!(),
-            },
+            target: association.target().unwrap(),
             thread_id: RelatedThreadId::new(other.thread),
         },
     ] {

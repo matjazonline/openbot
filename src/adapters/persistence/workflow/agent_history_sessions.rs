@@ -9,7 +9,7 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
     let session = match command.history_session() {
         Some(reference) => reused_session(db, command, reference).await?,
         None => {
-            let (channel, thread) = binding_rows::association_columns(command.association());
+            let association = association::association_columns(command.association());
             let creator: Uuid = sqlx::query_scalar(
                 "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
             )
@@ -19,15 +19,16 @@ pub(super) async fn capture(db: &mut PgConnection, command: &PreparedAdmission) 
             .await?;
             sqlx::query(
                 "INSERT INTO agent_history_sessions \
-                 (company_id,id,creator_principal_id,live_creator_principal_id,creator_user_id,channel_id,thread_id) \
-                 VALUES ($1,$2,$3,$3,$4,$5,$6)",
+                 (company_id,id,creator_principal_id,live_creator_principal_id,creator_user_id,channel_id,thread_id,principal_id) \
+                 VALUES ($1,$2,$3,$3,$4,$5,$6,$7)",
             )
             .bind(company.as_uuid())
             .bind(run.as_uuid())
             .bind(creator)
             .bind(command.actor().user_id())
-            .bind(channel)
-            .bind(thread)
+            .bind(association.channel_id)
+            .bind(association.thread_id)
+            .bind(association.principal_id)
             .execute(&mut *db)
             .await?;
             run.as_uuid()
@@ -61,7 +62,7 @@ async fn reused_session(
     reference: AgentHistorySessionRef,
 ) -> AppResult<Uuid> {
     check_manual(command)?;
-    let (channel, thread) = binding_rows::association_columns(command.association());
+    let association = association::association_columns(command.association());
     sqlx::query_scalar(
         "SELECT session.id FROM workflow_agent_sessions AS mapping \
          JOIN agent_history_sessions AS session \
@@ -71,13 +72,15 @@ async fn reused_session(
            AND session.creator_user_id=$3 AND source.actor_id=$3 \
            AND session.channel_id IS NOT DISTINCT FROM $4::uuid \
            AND session.thread_id IS NOT DISTINCT FROM $5::uuid \
+           AND session.principal_id IS NOT DISTINCT FROM $6::uuid \
          FOR SHARE OF session, mapping, source",
     )
     .bind(command.company_id().as_uuid())
     .bind(reference.from_run.as_uuid())
     .bind(command.actor().user_id())
-    .bind(channel)
-    .bind(thread)
+    .bind(association.channel_id)
+    .bind(association.thread_id)
+    .bind(association.principal_id)
     .fetch_optional(db)
     .await?
     .ok_or_else(|| AppError::NotFound("agent session".into()))

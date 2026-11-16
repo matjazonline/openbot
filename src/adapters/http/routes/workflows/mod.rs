@@ -267,21 +267,30 @@ fn association_json(association: RelatedAssociation) -> Value {
         RelatedAssociation::Channel(channel) => {
             json!({"kind": "channel", "channel_id": channel.as_uuid()})
         }
-        RelatedAssociation::Thread {
-            channel_id,
-            thread_id,
-        } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
-            "thread_id": thread_id.as_uuid()}),
+        RelatedAssociation::Principal(principal) => {
+            json!({"kind": "principal", "principal_id": principal.as_uuid()})
+        }
+        RelatedAssociation::Thread { target, thread_id } => {
+            json!({"kind": "thread", "target": target, "thread_id": thread_id.as_uuid()})
+        }
     }
 }
 
-/// `{kind: company}`, `{kind: channel, channel_id}` or `{kind: thread, channel_id, thread_id}`.
+/// Company, one inbox, or a thread pinned to its exact typed inbox target.
 #[derive(Debug, Clone, Copy, serde::Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case", deny_unknown_fields)]
 pub enum AssociationBody {
     Company,
-    Channel { channel_id: Uuid },
-    Thread { channel_id: Uuid, thread_id: Uuid },
+    Channel {
+        channel_id: Uuid,
+    },
+    Principal {
+        principal_id: Uuid,
+    },
+    Thread {
+        target: crate::entities::address::AddressTarget,
+        thread_id: Uuid,
+    },
 }
 impl From<AssociationBody> for RelatedAssociation {
     fn from(body: AssociationBody) -> Self {
@@ -291,11 +300,11 @@ impl From<AssociationBody> for RelatedAssociation {
             AssociationBody::Channel { channel_id } => {
                 Self::Channel(RelatedChannelId::new(channel_id))
             }
-            AssociationBody::Thread {
-                channel_id,
-                thread_id,
-            } => Self::Thread {
-                channel_id: RelatedChannelId::new(channel_id),
+            AssociationBody::Principal { principal_id } => {
+                Self::Principal(crate::entities::transport::PrincipalId::new(principal_id))
+            }
+            AssociationBody::Thread { target, thread_id } => Self::Thread {
+                target,
                 thread_id: RelatedThreadId::new(thread_id),
             },
         }

@@ -19,6 +19,7 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         creation::CreationProvenance,
         transport::{
             ChannelBinding, ExternalTenantKey, InstallationId, InstallationStatus,
@@ -167,7 +168,7 @@ impl IntegrationUseCases {
         channel_id: Uuid,
     ) -> AppResult<Vec<ChannelBinding>> {
         self.bindings
-            .active_bindings_for_channel(company_id, channel_id)
+            .active_bindings_for_target(company_id, AddressTarget::Desk(channel_id))
             .await
     }
 
@@ -271,7 +272,7 @@ mod tests {
             let binding = ChannelBinding {
                 id: ChannelBindingId::random(),
                 company_id: write.company_id,
-                channel_id: write.channel_id,
+                target: write.target,
                 installation_id: write.installation_id,
                 transport: write.transport,
                 namespace: write.namespace.clone(),
@@ -290,10 +291,10 @@ mod tests {
             Ok(binding)
         }
 
-        async fn active_bindings_for_channel(
+        async fn active_bindings_for_target(
             &self,
             _: Uuid,
-            _: Uuid,
+            _: AddressTarget,
         ) -> AppResult<Vec<ChannelBinding>> {
             Ok(Vec::new())
         }
@@ -414,13 +415,13 @@ mod tests {
     fn write(transport: TransportKind, installation_id: Option<InstallationId>) -> BindingWrite {
         BindingWrite {
             company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            target: AddressTarget::Desk(Uuid::new_v4()),
             installation_id,
             transport,
             namespace: EndpointNamespace::parse("email").unwrap(),
             external_endpoint_key: ExternalEndpointKey::parse("support@acme").unwrap(),
             display_label: "Support".into(),
-            access_policy: BindingAccessPolicy::ChannelAcl,
+            access_policy: BindingAccessPolicy::TargetAcl,
             delivery_policy: BindingDeliveryPolicy::ReplyAndInitiate,
             access_snapshot: BindingAccessSnapshot::deployment_endpoint(),
             created_by: CreationProvenance::system(),

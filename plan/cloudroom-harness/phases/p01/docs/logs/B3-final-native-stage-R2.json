@@ -1,0 +1,42 @@
+{
+  "status": "PASS",
+  "exit": 0,
+  "observations": [
+    {
+      "path": "/v1/messages?beta=true",
+      "instruction_tail_received": true,
+      "skill_body_received": false,
+      "script_result_received": false,
+      "tools": [
+        "Bash",
+        "DeferredToolPlaceholder",
+        "Skill"
+      ]
+    },
+    {
+      "path": "/v1/messages?beta=true",
+      "instruction_tail_received": true,
+      "skill_body_received": true,
+      "script_result_received": false,
+      "tools": [
+        "Bash",
+        "DeferredToolPlaceholder",
+        "Skill"
+      ]
+    },
+    {
+      "path": "/v1/messages?beta=true",
+      "instruction_tail_received": true,
+      "skill_body_received": true,
+      "script_result_received": true,
+      "tools": [
+        "Bash",
+        "DeferredToolPlaceholder",
+        "Skill"
+      ]
+    }
+  ],
+  "asset_sha256": "b47c886b39517c266f052f7be26ff922dcc494b1ede85f5f6c4fb53f8b29942a",
+  "script_mode": "0o755",
+  "limitations": "Real CLI and production Cloudroom staging/plugin assembly; scripted local model replies do not prove model reasoning or live paid provider behavior."
+}

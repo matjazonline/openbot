@@ -31,12 +31,12 @@ async fn reject_unrelated_message(f: &AgentCase, output: &Output) {
     #[derive(sqlx::FromRow)]
     struct Input {
         message_id: Uuid,
-        channel_id: Uuid,
+        principal_id: Uuid,
         thread_id: Uuid,
     }
     ordinary(f).await;
     let p = f.people.role.p();
-    let input:Input=sqlx::query_as("SELECT message.id AS message_id,membership.channel_id,membership.thread_id \
+    let input:Input=sqlx::query_as("SELECT message.id AS message_id,membership.principal_id,membership.thread_id \
         FROM messages AS message JOIN thread_messages AS membership ON membership.company_id=message.company_id AND membership.message_id=message.id \
         WHERE message.company_id=$1 AND message.role='human' ORDER BY message.created_at DESC LIMIT 1")
         .bind(f.people.role.company().as_uuid()).fetch_one(p.pool()).await.unwrap();
@@ -49,14 +49,15 @@ async fn reject_unrelated_message(f: &AgentCase, output: &Output) {
         Some("23514")
     );
     let error=sqlx::query("INSERT INTO workflow_message_destinations(company_id,run_id,invocation_id,ordinal,kind,destination_channel_id, \
-        destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address) \
-        SELECT company_id,run_id,invocation_id,ordinal+1,'channel',$4,NULL,NULL,$4,$5,$3,NULL,NULL,NULL \
+        destination_user_id,replied_message_id,channel_id,thread_id,message_id,delivery_id,principal_id,recipient_address,target_principal_id) \
+        SELECT company_id,run_id,invocation_id,ordinal+1,'reply',NULL,NULL,$3,NULL,$5,$3,NULL,NULL,NULL,$4 \
         FROM workflow_message_destinations WHERE company_id=$1 AND message_id=$2")
         .bind(f.people.role.company().as_uuid()).bind(output.message_id).bind(input.message_id)
-        .bind(input.channel_id).bind(input.thread_id).execute(p.pool()).await.unwrap_err();
+        .bind(input.principal_id).bind(input.thread_id).execute(p.pool()).await.unwrap_err();
     assert_eq!(
         error.as_database_error().and_then(|e| e.code()).as_deref(),
-        Some("23514")
+        Some("23514"),
+        "{error}"
     );
     assert!(
         error.to_string().contains("exact canonical producer"),

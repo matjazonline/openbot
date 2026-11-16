@@ -1,0 +1,21 @@
+{
+  "before": 4574,
+  "after": 4588,
+  "added": [
+    "adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search",
+    "adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_association_codec_preserves_every_scope_and_refuses_invalid_null_shapes",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_reply_real_ingress_pure_completion_and_competing_publishers_keep_the_principal_binding",
+    "adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation",
+    "adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_competing_activation_and_roster_write_preserve_unambiguous_context",
+    "adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_role_activation_and_roster_mutations_require_exactly_one_department"
+  ],
+  "removed": []
+}

@@ -1,0 +1,2876 @@
+diff --git a/gui/apps/host-daemon/src/app.ts b/gui/apps/host-daemon/src/app.ts
+index 3c76beb7525118b6732ca6dee615afda52d5d42b..c1a00676a844cb71b344e985f3039473b0c3d98d 100644
+--- a/gui/apps/host-daemon/src/app.ts
++++ b/gui/apps/host-daemon/src/app.ts
+@@ -499,10 +499,10 @@ export async function createHostDaemonApp(
+     createRuntime: options.createRuntime,
+     dataDir: options.dataDir,
+     dataDirSkillsRootPath,
+-    fetchSkillTree: (treeHash) =>
++    fetchSkillTree: (treeHash, sourceKind) =>
+       runSessionRequest({
+         source: "fetchSkillTree",
+-        request: () => serverClient.fetchSkillTree(treeHash),
++        request: () => serverClient.fetchSkillTree(treeHash, sourceKind),
+       }),
+     hostWatcher: options.hostWatcher,
+     logger: options.logger,
+@@ -765,10 +765,10 @@ export async function createHostDaemonApp(
+         source: "fetchProjectAttachment",
+         request: () => serverClient.fetchProjectAttachment(args),
+       }),
+-    fetchSkillTree: (treeHash) =>
++    fetchSkillTree: (treeHash, sourceKind) =>
+       runSessionRequest({
+         source: "fetchSkillTree",
+-        request: () => serverClient.fetchSkillTree(treeHash),
++        request: () => serverClient.fetchSkillTree(treeHash, sourceKind),
+       }),
+     fetchPluginHostArtifact: (args) =>
+       runSessionRequest({
+diff --git a/gui/apps/host-daemon/src/injected-skills.ts b/gui/apps/host-daemon/src/injected-skills.ts
+index e9c578e65c58ed3467472548c1f637e9f2e79e60..1efd9e0f9649ebb9d9a6483346725e7f656516c5 100644
+--- a/gui/apps/host-daemon/src/injected-skills.ts
++++ b/gui/apps/host-daemon/src/injected-skills.ts
+@@ -81,18 +81,22 @@ interface CollectSkillTreeArgs {
+ }
+ 
+ interface CollectSkillDirectoryArgs {
++  sourceKind?: "required-tree";
+   name: string;
+   sourceRootPath: string;
+   skillFilePath: string;
+ }
+ 
+ interface WalkSkillTreeArgs {
++  sourceKind?: "required-tree";
+   currentPath: string;
+   depth: number;
+   rootPath: string;
+-  state: SkillTreeCollectionState;
++  state: WalkCollectionState;
+ }
+ 
++interface WalkCollectionState extends SkillTreeCollectionState { visited: number; paths: Set<string>; }
++
+ interface SkillTreeCollectionState {
+   directories: CollectedSkillDirectory[];
+   files: CollectedSkillFile[];
+@@ -235,17 +239,13 @@ function assertUsableSkillDirectory(args: CollectSkillDirectoryArgs): void {
+ }
+ 
+ async function walkSkillTree(args: WalkSkillTreeArgs): Promise<void> {
+-  if (args.depth > MAX_STAGED_SKILL_DEPTH) {
++  if (args.depth > (args.sourceKind === "required-tree" ? 120 : MAX_STAGED_SKILL_DEPTH)) {
+     throw new Error(
+       `Skill tree exceeds max depth ${MAX_STAGED_SKILL_DEPTH}: ${args.rootPath}`,
+     );
+   }
+ 
+-  const entries = (
+-    await fs.readdir(args.currentPath, {
+-      withFileTypes: true,
+-    })
+-  ).sort(sortDirentsByName);
++  const entries = args.sourceKind === "required-tree" ? await requiredDirents(args.currentPath, args.state) : (await fs.readdir(args.currentPath, { withFileTypes: true })).sort(sortDirentsByName);
+ 
+   for (const entry of entries) {
+     const sourcePath = path.join(args.currentPath, entry.name);
+@@ -255,6 +255,11 @@ async function walkSkillTree(args: WalkSkillTreeArgs): Promise<void> {
+     const relativePath = normalizeRelativePath(
+       path.relative(args.rootPath, sourcePath),
+     );
++    if (args.sourceKind === "required-tree") {
++      requiredRelativePath(relativePath); const folded = relativePath.toLowerCase();
++      if (args.state.paths.has(folded)) throw new Error("Required path case collision");
++      args.state.paths.add(folded);
++    }
+     const entryStat = await fs.lstat(sourcePath);
+     if (entryStat.isSymbolicLink()) {
+       throw new Error(`Skill tree contains a symlink: ${sourcePath}`);
+@@ -262,6 +267,7 @@ async function walkSkillTree(args: WalkSkillTreeArgs): Promise<void> {
+     if (entryStat.isDirectory()) {
+       args.state.directories.push({ relativePath });
+       await walkSkillTree({
++        sourceKind: args.sourceKind,
+         currentPath: sourcePath,
+         depth: args.depth + 1,
+         rootPath: args.rootPath,
+@@ -272,17 +278,17 @@ async function walkSkillTree(args: WalkSkillTreeArgs): Promise<void> {
+     if (!entryStat.isFile()) {
+       throw new Error(`Skill tree entry is not a regular file: ${sourcePath}`);
+     }
+-    if (args.state.files.length + 1 > MAX_STAGED_SKILL_FILES) {
++    if (args.state.files.length + 1 > (args.sourceKind === "required-tree" ? 65 : MAX_STAGED_SKILL_FILES)) {
+       throw new Error(
+         `Skill tree exceeds max file count ${MAX_STAGED_SKILL_FILES}: ${args.rootPath}`,
+       );
+     }
+-    if (args.state.totalBytes + entryStat.size > MAX_STAGED_SKILL_BYTES) {
++    if (args.state.totalBytes + entryStat.size > (args.sourceKind === "required-tree" ? 1024*1024 : MAX_STAGED_SKILL_BYTES)) {
+       throw new Error(
+         `Skill tree exceeds max byte count ${MAX_STAGED_SKILL_BYTES}: ${args.rootPath}`,
+       );
+     }
+-    const bytes = await fs.readFile(sourcePath);
++    const bytes = args.sourceKind === "required-tree" ? await readRequiredStoredFile(sourcePath, relativePath, entryStat.size) : await fs.readFile(sourcePath);
+     args.state.files.push({
+       bytes,
+       mode: entryStat.mode & 0o777,
+@@ -317,18 +323,22 @@ async function collectSkillDirectory(
+     );
+   }
+ 
+-  const state: SkillTreeCollectionState = {
++  const state: WalkCollectionState = {
++    visited: 0,
++    paths: new Set(),
+     directories: [],
+     files: [],
+     totalBytes: 0,
+   };
+   await walkSkillTree({
++    sourceKind: args.sourceKind,
+     currentPath: args.sourceRootPath,
+     depth: 0,
+     rootPath: args.sourceRootPath,
+     state,
+   });
+ 
++  if (args.sourceKind === "required-tree" && state.directories.some(directory => !state.files.some(file => file.relativePath.startsWith(`${directory.relativePath}/`)))) throw new Error("Unexpected required empty directory");
+   return state;
+ }
+ 
+@@ -336,6 +346,7 @@ async function collectSkillTree(
+   args: CollectSkillTreeArgs,
+ ): Promise<CollectedSkillTree> {
+   const state = await collectSkillDirectory({
++    sourceKind: args.source.kind === "required-tree" ? "required-tree" : undefined,
+     name: args.source.name,
+     sourceRootPath: args.sourceRootPath,
+     skillFilePath: args.skillFilePath,
+@@ -361,7 +372,7 @@ function hashCollectedTrees(trees: readonly CollectedSkillTree[]): string {
+     hash.update(tree.source.sourceType);
+     hash.update("\0");
+     hash.update(
+-      tree.source.kind === "tree"
++      (tree.source.kind === "tree" || tree.source.kind === "required-tree")
+         ? tree.source.treeHash
+         : tree.source.sourceRootPath,
+     );
+@@ -417,7 +428,7 @@ function createCatalogFile(args: CreateCatalogFileArgs): CatalogFile {
+       description: tree.source.description,
+       name: tree.source.name,
+       sourceRootPath:
+-        tree.source.kind === "tree"
++        (tree.source.kind === "tree" || tree.source.kind === "required-tree")
+           ? `skill-tree:${tree.source.treeHash}`
+           : tree.source.sourceRootPath,
+       sourceType: tree.source.sourceType,
+@@ -502,6 +513,7 @@ function buildSkillRoots(args: BuildSkillRootsArgs): AgentRuntimeSkillRoot[] {
+   return [
+     {
+       id: `global-skills:${args.catalogHash}`,
++      ...(args.trees.some(tree=>tree.source.kind==="required-tree")?{required:true}:{}),
+       path: path.join(args.stageRootPath, "skills"),
+       skills: args.trees.map((tree) => ({
+         name: tree.source.name,
+@@ -590,9 +602,11 @@ function hashStoredTreeFiles(files: readonly CollectedSkillFile[]): string {
+ export async function hashInstalledSkillDirectory(args: {
+   name: string;
+   skillDirectoryPath: string;
++  sourceKind?: "required-tree";
+ }): Promise<string | null> {
+   try {
+     const tree = await collectSkillDirectory({
++      sourceKind: args.sourceKind,
+       name: args.name,
+       sourceRootPath: args.skillDirectoryPath,
+       skillFilePath: path.join(args.skillDirectoryPath, SKILL_FILE_NAME),
+@@ -725,8 +739,9 @@ export async function ensureStoredSkillTree(args: {
+   dataDir: string;
+   fetchSkillTree: FetchSkillTree;
+   treeHash: string;
++  sourceKind?: "required-tree";
+ }): Promise<string> {
+-  const key = `${args.dataDir}\0${args.treeHash}`;
++  const key = `${args.dataDir}\0${args.sourceKind ?? "tree"}\0${args.treeHash}`;
+   const pending = pendingSkillTreePulls.get(key);
+   if (pending) {
+     return pending;
+@@ -736,6 +751,7 @@ export async function ensureStoredSkillTree(args: {
+     try {
+       await fs.access(path.join(treeRootPath, STORE_COMPLETE_MARKER));
+       await fs.access(path.join(treeRootPath, STORE_CONTENT_DIR));
++      if (args.sourceKind === "required-tree" && await hashInstalledSkillDirectory({ name: "required", skillDirectoryPath: path.join(treeRootPath, STORE_CONTENT_DIR), sourceKind: "required-tree" }) !== args.treeHash) throw new Error("Required cached tree integrity failed");
+       await touchStoredTree(treeRootPath);
+       await gcSkillStore(args.dataDir);
+       return path.join(treeRootPath, STORE_CONTENT_DIR);
+@@ -744,9 +760,11 @@ export async function ensureStoredSkillTree(args: {
+         throw error;
+       }
+     }
++    const tree = args.sourceKind === "required-tree" ? await args.fetchSkillTree(args.treeHash,"required-tree") : await args.fetchSkillTree(args.treeHash);
++    if (args.sourceKind === "required-tree") preflightRequiredTree(tree);
+     return writeFetchedTreeToStore({
+       dataDir: args.dataDir,
+-      tree: await args.fetchSkillTree(args.treeHash),
++      tree,
+       treeHash: args.treeHash,
+     });
+   }).finally(() => pendingSkillTreePulls.delete(key));
+@@ -770,12 +788,12 @@ export async function stageInjectedSkillSources(
+     compareStringsByCodePoint(left.name, right.name),
+   );
+   const stagedTreeHashes = sortedSources.flatMap((source) =>
+-    source.kind === "tree" ? [source.treeHash] : [],
++    source.kind === "tree" || source.kind === "required-tree" ? [source.treeHash] : [],
+   );
+   markActiveSkillTreeStages(args.dataDir, stagedTreeHashes);
+   try {
+     for (const source of sortedSources) {
+-      if (source.kind === "tree") {
++      if (source.kind === "tree" || source.kind === "required-tree") {
+         try {
+           if (args.fetchSkillTree === undefined) {
+             throw new Error("Skill tree fetch transport is unavailable");
+@@ -784,6 +802,7 @@ export async function stageInjectedSkillSources(
+             dataDir: args.dataDir,
+             fetchSkillTree: args.fetchSkillTree,
+             treeHash: source.treeHash,
++            sourceKind: source.kind === "required-tree" ? "required-tree" : undefined,
+           });
+           const skillFilePath = path.resolve(sourceRootPath, source.entryPath);
+           if (!isPathWithinDirectory(sourceRootPath, skillFilePath)) {
+@@ -855,6 +874,9 @@ export async function stageInjectedSkillSources(
+     dataDir: args.dataDir,
+     trees: sortedTrees,
+   });
++  for (const tree of sortedTrees) {
++    if (tree.source.kind === "required-tree" && await hashInstalledSkillDirectory({ name: tree.source.name, skillDirectoryPath: path.join(stageRootPath,"skills",tree.source.name), sourceKind:"required-tree" }) !== tree.source.treeHash) throw new Error("Required staged tree integrity failed");
++  }
+   return {
+     catalogHash,
+     skillRoots: buildSkillRoots({
+@@ -921,3 +943,43 @@ export async function cleanupInjectedSkillStagingDirs(
+     }),
+   );
+ }
++
++function requiredRelativePath(relative: string): void {
++  if (!relative || Buffer.byteLength(relative)>240 || !/^[A-Za-z0-9._/ -]+$/.test(relative) || relative.split("/").some(part=>!part || part==="." || part===".." || part.startsWith(" ") || /[. ]$/.test(part)) || (relative.split("/")[0]?.toLowerCase()==="skill.md" && relative!=="SKILL.md")) throw new Error("Unsafe required tree path");
++}
++async function requiredDirents(directory: string, state: WalkCollectionState): Promise<Dirent[]> {
++  const entries: Dirent[]=[];
++  const handle=await fs.opendir(directory);
++  for await (const entry of handle) {
++    if (++state.visited>8192) throw new Error("Required tree entry count exceeded");
++    entries.push(entry);
++  }
++  return entries.sort(sortDirentsByName);
++}
++async function readRequiredStoredFile(sourcePath: string, relativePath: string, size: number): Promise<Buffer> {
++  if (size>(relativePath==="SKILL.md"?20*1024:256*1024)) throw new Error("Required file too large");
++  const handle=await fs.open(sourcePath, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
++  try {
++    const before=await handle.stat();
++    if (!before.isFile() || before.size!==size || ![0o644,0o755].includes(before.mode & 0o777)) throw new Error("Required file changed");
++    const bytes=Buffer.alloc(size); let offset=0;
++    while(offset<size) { const {bytesRead}=await handle.read(bytes,offset,size-offset,null); if (!bytesRead) throw new Error("Incomplete required file"); offset+=bytesRead; }
++    if ((await handle.read(Buffer.alloc(1),0,1,null)).bytesRead) throw new Error("Required file grew");
++    const after=await handle.stat(); if(after.size!==size || after.mode!==before.mode || after.ctimeMs!==before.ctimeMs || after.mtimeMs!==before.mtimeMs) throw new Error("Required file changed during read");
++    return bytes;
++  } finally { await handle.close(); }
++}
++function preflightRequiredTree(tree: HostDaemonSkillTree): void {
++  if(tree.entries.length<1 || tree.entries.length>65) throw new Error("Required tree file count exceeded");
++  const paths:string[]=[]; let total=0; let entrySeen=false;
++  for(const entry of tree.entries) {
++    requiredRelativePath(entry.path); const folded=entry.path.toLowerCase();
++    if(paths.some(other=>other===folded || other.startsWith(`${folded}/`) || folded.startsWith(`${other}/`))) throw new Error("Required path collision"); paths.push(folded);
++    const length=entry.contentBase64.length;
++    if(length%4!==0) throw new Error("Invalid required base64");
++    const size=length*3/4-(entry.contentBase64.endsWith("==")?2:entry.contentBase64.endsWith("=")?1:0);
++    const isEntry=entry.path==="SKILL.md"; entrySeen ||= isEntry; total+=size;
++    if(size>(isEntry?20*1024:256*1024) || total>1024*1024 || ![0o644,0o755].includes(entry.mode)) throw new Error("Required tree capacity or mode exceeded");
++  }
++  if(!entrySeen) throw new Error("Required entry missing");
++}
+diff --git a/gui/apps/host-daemon/src/server-client.ts b/gui/apps/host-daemon/src/server-client.ts
+index 57aa2bf128616e2ca58fb38911bf6b27d0bea7c8..d9ada510d75194962ae64ba1e5f4063c4f119059 100644
+--- a/gui/apps/host-daemon/src/server-client.ts
++++ b/gui/apps/host-daemon/src/server-client.ts
+@@ -179,7 +179,7 @@ export interface ServerClient {
+   fetchProjectAttachment(
+     args: FetchProjectAttachmentArgs,
+   ): Promise<FetchedProjectAttachment>;
+-  fetchSkillTree(treeHash: string): Promise<HostDaemonSkillTree>;
++  fetchSkillTree(treeHash: string, sourceKind?: "required-tree"): Promise<HostDaemonSkillTree>;
+   fetchPluginHostArtifact(args: {
+     pluginId: string;
+     digest: string;
+@@ -508,15 +508,15 @@ export function createServerClient(
+       };
+     },
+ 
+-    async fetchSkillTree(treeHash: string): Promise<HostDaemonSkillTree> {
++    async fetchSkillTree(treeHash: string, sourceKind?: "required-tree"): Promise<HostDaemonSkillTree> {
+       const response = await fetchFn(
+-        buildInternalUrl(`/skills/tree/${encodeURIComponent(treeHash)}`),
+-        { method: "GET", headers: headers() },
++        buildInternalUrl(`/skills/${sourceKind === "required-tree" ? "required-tree" : "tree"}/${encodeURIComponent(treeHash)}`),
++        { method: "GET", headers: headers(), ...(sourceKind === "required-tree" ? { redirect: "error" as const, signal: AbortSignal.timeout(5000) } : {}) },
+       );
+       if (!response.ok) {
+         throw await createResponseError("fetch skill tree", response);
+       }
+-      return hostDaemonSkillTreeSchema.parse(await response.json());
++      return sourceKind === "required-tree" ? readRequiredTreeResponse(response) : hostDaemonSkillTreeSchema.parse(await response.json());
+     },
+ 
+     async fetchPluginHostArtifact(args): Promise<Uint8Array> {
+@@ -572,6 +572,7 @@ export function createServerClient(
+         providerThreadId: request.providerThreadId,
+         turnId: request.turnId,
+         callId: request.callId,
++        ...(request.nativeInvocation ? {nativeInvocation:request.nativeInvocation} : {}),
+         tool: request.tool,
+         ...(request.arguments !== undefined
+           ? { arguments: request.arguments }
+@@ -693,3 +694,15 @@ export function createServerClient(
+     },
+   };
+ }
++
++async function readRequiredTreeResponse(response: Response): Promise<HostDaemonSkillTree> {
++  const limit = 2 * 1024 * 1024;
++  const length = response.headers.get("content-length");
++  if (length !== null && (!/^\d+$/.test(length) || Number(length) > limit)) { await response.body?.cancel(); throw new Error("Required tree response too large"); }
++  if (!response.body) throw new Error("Required tree response is missing");
++  const reader = response.body.getReader(); const chunks: Uint8Array[] = []; let size = 0;
++  try {
++    for (;;) { const {done,value} = await reader.read(); if (done) break; size += value.byteLength; if (size > limit) throw new Error("Required tree response too large"); chunks.push(value); }
++    return hostDaemonSkillTreeSchema.parse(JSON.parse(new TextDecoder("utf-8",{fatal:true}).decode(Buffer.concat(chunks))));
++  } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
++}
+diff --git a/gui/apps/host-daemon/src/skill-trees.ts b/gui/apps/host-daemon/src/skill-trees.ts
+index 901b9693e3b7510f404d9da01d1d93454a9252bb..f07c1bdab7558949c779e3a7a181d128e8b32574 100644
+--- a/gui/apps/host-daemon/src/skill-trees.ts
++++ b/gui/apps/host-daemon/src/skill-trees.ts
+@@ -1,3 +1,3 @@
+ import type { HostDaemonSkillTree } from "@cloudroom/host-daemon-contract";
+ 
+-export type FetchSkillTree = (treeHash: string) => Promise<HostDaemonSkillTree>;
++export type FetchSkillTree = (treeHash: string, sourceKind?: "required-tree") => Promise<HostDaemonSkillTree>;
+diff --git a/gui/apps/server/src/internal/skills.ts b/gui/apps/server/src/internal/skills.ts
+index 75785070c6ae40e2c8dad63a4f19f6d29411d80c..e757ab1f801fd14104a643f5b568d8b3810776d1 100644
+--- a/gui/apps/server/src/internal/skills.ts
++++ b/gui/apps/server/src/internal/skills.ts
+@@ -5,6 +5,7 @@ import {
+ import type { Hono } from "hono";
+ import type { AppDeps } from "../types.js";
+ import { ApiError } from "../errors.js";
++import { readRegisteredRequiredSkillTree } from "../services/skills/required-skill-trees.js";
+ import { readSkillTreeManifest } from "../services/skills/injected-skills.js";
+ 
+ const TREE_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+@@ -12,6 +13,14 @@ const TREE_HASH_PATTERN = /^[a-f0-9]{64}$/u;
+ export function registerInternalSkillRoutes(app: Hono, deps: AppDeps): void {
+   const { get } = typedRoutes<HostDaemonInternalSchema>(app);
+ 
++  get("/skills/required-tree/:hash", (context) => {
++    const hash = context.req.param("hash");
++    if (!TREE_HASH_PATTERN.test(hash)) throw new ApiError(404,"skill_tree_not_found","Required skill tree not found");
++    try {
++      const manifest = readRegisteredRequiredSkillTree(hash);
++      return context.json({ treeHash: manifest.treeHash, entries: manifest.entries.map(entry => ({ path: entry.path, mode: entry.mode, contentBase64: entry.bytes.toString("base64") })) });
++    } catch { throw new ApiError(404,"skill_tree_not_found","Required skill tree not found"); }
++  });
+   get("/skills/tree/:hash", (context) => {
+     const requestedHash = context.req.param("hash");
+     if (!TREE_HASH_PATTERN.test(requestedHash)) {
+diff --git a/gui/apps/server/src/internal/tool-calls.ts b/gui/apps/server/src/internal/tool-calls.ts
+index b853bbf3b24ee071af96e1e6f711fe544252a5a3..db5700ace2826e590291b8a04e1a3408b095af0d 100644
+--- a/gui/apps/server/src/internal/tool-calls.ts
++++ b/gui/apps/server/src/internal/tool-calls.ts
+@@ -97,6 +97,7 @@ export function registerInternalToolCallRoutes(app: Hono, deps: AppDeps): void {
+             ctx: {
+               threadId: thread.id,
+               projectId: thread.projectId,
++              ...(payload.nativeInvocation ? {nativeInvocation:Object.freeze({...payload.nativeInvocation})} : {}),
+               signal,
+             },
+           }),
+diff --git a/gui/apps/server/src/services/plugins/plugin-agent-contributions.ts b/gui/apps/server/src/services/plugins/plugin-agent-contributions.ts
+index 187cd0f8dd9206e480449d863f8c823bb8b548b7..7765807897b7b6fcb0d2f4986a9bc64e1411695c 100644
+--- a/gui/apps/server/src/services/plugins/plugin-agent-contributions.ts
++++ b/gui/apps/server/src/services/plugins/plugin-agent-contributions.ts
+@@ -26,6 +26,7 @@ type PluginAgentContributions = Pick<
+     Pick<
+       PluginService,
+       | "resolveAgentConfiguration"
++      | "resolveRequiredAgentConfiguration"
+       | "resolveProviderEnv"
+       | "resolveProviderEnvHealth"
+     >
+@@ -137,3 +138,9 @@ export async function invokePluginAgentTool(
+     ctx: args.ctx,
+   });
+ }
++
++export async function resolveRequiredPluginAgentConfiguration(args: Parameters<PluginService["resolveRequiredAgentConfiguration"]>[0]) {
++  const active = contributions;
++  if (!active?.resolveRequiredAgentConfiguration) throw new Error("Required agent configuration plugin service is unavailable");
++  return active.resolveRequiredAgentConfiguration(args);
++}
+diff --git a/gui/apps/server/src/services/plugins/plugin-api.ts b/gui/apps/server/src/services/plugins/plugin-api.ts
+index a2aad1e39e476e5b58effd1415858eec9c107940..ba3597c8b28047ccf1c2fe3abfe55ed6cb3b6beb 100644
+--- a/gui/apps/server/src/services/plugins/plugin-api.ts
++++ b/gui/apps/server/src/services/plugins/plugin-api.ts
+@@ -290,6 +290,9 @@ export interface PluginApiHandle {
+     PluginProviderEnvHealthResolver
+   >;
+   agentConfigurationProvider: PluginAgentConfigurationProvider | null;
++  requiredAgentConfigurationProvider: Parameters<PluginAgents["configureRequired"]>[0] | null;
++  requiredAgentConfigurationSignal: AbortSignal;
++  cancelRequiredAgentConfiguration(): void;
+   instructionProvider: PluginInstructionProvider | null;
+   mentionProviders: PluginMentionProviderRecord[];
+   activate(): void;
+@@ -336,7 +339,7 @@ function withPluginThreadAttribution<
+   TArgs extends ThreadForkArgs | ThreadSpawnArgs,
+ >(args: TArgs, pluginId: string): TArgs {
+   const attribution: Pick<ThreadSpawnArgs, "origin" | "originPluginId"> =
+-    args.pluginMetadata !== undefined
++    args.pluginMetadata !== undefined || ("requiredAgentConfiguration" in args && args.requiredAgentConfiguration === true)
+       ? { origin: "plugin", originPluginId: pluginId }
+       : args.origin === undefined || args.origin === "plugin"
+         ? { origin: "plugin", originPluginId: args.originPluginId ?? pluginId }
+@@ -908,8 +911,16 @@ export function createPluginApi(options: {
+   let agentConfigurationProvider: PluginAgentConfigurationProvider | null =
+     null;
+   let instructionProvider: PluginInstructionProvider | null = null;
++  let requiredAgentConfigurationProvider: Parameters<PluginAgents["configureRequired"]>[0] | null = null;
++  const requiredAgentConfigurationAbort = new AbortController();
+ 
+   const agents: PluginAgents = {
++    nativeToolOriginVersion: 1,
++    configureRequired(provider) {
++      assertLive();
++      if (requiredAgentConfigurationProvider !== null || typeof provider !== "function") throw new Error("Invalid or duplicate required configuration provider");
++      requiredAgentConfigurationProvider = provider;
++    },
+     configure(provider) {
+       assertLive();
+       if (agentConfigurationProvider !== null) {
+@@ -1438,6 +1449,9 @@ export function createPluginApi(options: {
+     listProviderDeclarations: providerRegistrations.values,
+     providerEnvResolvers,
+     providerEnvHealthResolvers,
++    requiredAgentConfigurationSignal: requiredAgentConfigurationAbort.signal,
++    cancelRequiredAgentConfiguration() { requiredAgentConfigurationAbort.abort(); },
++    get requiredAgentConfigurationProvider() { return requiredAgentConfigurationProvider; },
+     get agentConfigurationProvider() {
+       return agentConfigurationProvider;
+     },
+@@ -1484,6 +1498,7 @@ export function createPluginApi(options: {
+       }
+     },
+     invalidate() {
++      requiredAgentConfigurationAbort.abort();
+       invalidated = true;
+       rpcCaller.revoke();
+     },
+diff --git a/gui/apps/server/src/services/plugins/plugin-runtime.ts b/gui/apps/server/src/services/plugins/plugin-runtime.ts
+index cb2a9f440bf80bce1991ffacc5308b564843337c..3a0a70481a1654105ee05676d9090908ba5114a2 100644
+--- a/gui/apps/server/src/services/plugins/plugin-runtime.ts
++++ b/gui/apps/server/src/services/plugins/plugin-runtime.ts
+@@ -1829,6 +1829,7 @@ export function createPluginRuntime(context: PluginRuntimeContext) {
+     plugin: LoadedPlugin,
+   ): Promise<void> {
+     disposingPluginIds.add(id);
++    plugin.handle.cancelRequiredAgentConfiguration();
+     try {
+       plugin.handle.closeWebSockets();
+       const hostArtifact = hostArtifacts.get(id);
+diff --git a/gui/apps/server/src/services/plugins/plugin-service.ts b/gui/apps/server/src/services/plugins/plugin-service.ts
+index 69d8c931f920133b2341882f403908bd1ddebb90..3d750ef86d40acc55a1baa2df43c6244f09bddb0 100644
+--- a/gui/apps/server/src/services/plugins/plugin-service.ts
++++ b/gui/apps/server/src/services/plugins/plugin-service.ts
+@@ -152,6 +152,8 @@ import {
+   type PluginHookProvider,
+ } from "./plugin-hook-registry.js";
+ import type { PluginEnvironmentProviderBridge } from "./plugin-environment-provider-registry.js";
++import { normalizeRequiredAgentConfiguration } from "./required-agent-configuration.js";
++import type { RequiredAgentConfiguration, RequiredAgentConfigurationContext } from "@get-bb/plugin-sdk";
+ import { createPluginRegistration } from "./plugin-registration.js";
+ import { createPluginRuntime, forgetMutableRoot } from "./plugin-runtime.js";
+ import {
+@@ -378,6 +380,7 @@ export interface PluginService {
+   ): Promise<PluginCliExecutionResult>;
+   listSkillRootContributions(): PluginSkillRootContribution[];
+   listAgentTools(): PluginAgentToolContribution[];
++  resolveRequiredAgentConfiguration(args: { pluginId: string; context: Omit<RequiredAgentConfigurationContext, "signal"> }): Promise<RequiredAgentConfiguration>;
+   resolveAgentConfiguration(args: {
+     context: Omit<PluginAgentConfigurationContext, "pluginMetadata">;
+     skillIdsByPlugin: ReadonlyMap<string, readonly string[]>;
+@@ -2036,6 +2039,24 @@ export function createPluginService(deps: PluginServiceDeps): PluginService {
+       );
+     },
+ 
++    async resolveRequiredAgentConfiguration({ pluginId, context }) {
++      const plugin = loaded.get(pluginId);
++      const provider = plugin?.handle.requiredAgentConfigurationProvider;
++      if (!plugin || !provider || plugin.handle.requiredAgentConfigurationSignal.aborted) throw new Error("Required agent configuration owner is unavailable");
++      const abort = new AbortController();
++      const signal = AbortSignal.any([abort.signal, plugin.handle.requiredAgentConfigurationSignal, AbortSignal.timeout(5000)]);
++      try {
++        const outcome = await raceTimeout(invokeWrapped(pluginId, "required agent configure", async () => {
++          signal.throwIfAborted();
++          const value = await provider({ ...context, signal });
++          signal.throwIfAborted();
++          return normalizeRequiredAgentConfiguration(value);
++        }), 5000, "Required agent configuration timed out");
++        if (!outcome.ok || loaded.get(pluginId) !== plugin) throw new Error("Required agent configuration failed");
++        signal.throwIfAborted();
++        return outcome.value;
++      } finally { abort.abort(); }
++    },
+     async resolveAgentConfiguration({ context, skillIdsByPlugin }) {
+       const allTools = collectAgentTools();
+       const tools: PluginAgentToolContribution[] = [];
+diff --git a/gui/apps/server/src/services/skills/injected-skills.ts b/gui/apps/server/src/services/skills/injected-skills.ts
+index cd2065bf62048d9072565ae049a1eee138eae93e..e57f1f8bfc8474004e6028f956e48f0328bbd63c 100644
+--- a/gui/apps/server/src/services/skills/injected-skills.ts
++++ b/gui/apps/server/src/services/skills/injected-skills.ts
+@@ -285,7 +285,7 @@ export function readSkillTreeManifest(rootPath: string): SkillTreeManifest {
+ }
+ 
+ function sourceRootPath(source: HostDaemonInjectedSkillSource): string {
+-  return source.kind === "tree"
++  return source.kind === "tree" || source.kind === "required-tree"
+     ? `skill-tree:${source.treeHash}`
+     : source.sourceRootPath;
+ }
+diff --git a/gui/apps/server/src/services/threads/dispatch-hooks.ts b/gui/apps/server/src/services/threads/dispatch-hooks.ts
+index 5736943a8f63132e44f7b799f03deea800a4c5a0..6fccdd9d145c2498f9be3b8d22a72e0895568275 100644
+--- a/gui/apps/server/src/services/threads/dispatch-hooks.ts
++++ b/gui/apps/server/src/services/threads/dispatch-hooks.ts
+@@ -1,4 +1,4 @@
+-import { getEnvironment } from "@cloudroom/db";
++import { getEnvironment, getRequiredAgentConfigurationOwner } from "@cloudroom/db";
+ import {
+   QUEUED_MESSAGE_WAIT_REASON_MAX_LENGTH,
+   type Environment,
+@@ -316,6 +316,7 @@ function buildHookContext(
+   );
+   return {
+     thread: request.threadResponse,
++    requiredAgentConfigurationOwner: getRequiredAgentConfigurationOwner(deps.db, request.threadResponse.id),
+     attempt: request.attempt,
+     project: request.project,
+     environment,
+diff --git a/gui/apps/server/src/services/threads/thread-create-helpers.ts b/gui/apps/server/src/services/threads/thread-create-helpers.ts
+index d9a20ba2f43bf3a229d2a0e3c24b35c80aee2c24..ec305a520454e7a791809c4d126f6a53c5cd589e 100644
+--- a/gui/apps/server/src/services/threads/thread-create-helpers.ts
++++ b/gui/apps/server/src/services/threads/thread-create-helpers.ts
+@@ -114,6 +114,7 @@ export function createThreadRecord(
+       originKind: args.request.originKind,
+       originPluginId: args.request.originPluginId ?? null,
+       pluginMetadata: args.request.pluginMetadata,
++      requiredAgentConfigurationPluginId: args.request.requiredAgentConfiguration ? args.request.originPluginId : undefined,
+       visibility: args.request.visibility,
+       createdAt: args.createdAt,
+       latestAttentionAt: args.latestAttentionAt,
+diff --git a/gui/apps/server/src/services/threads/thread-create-request.ts b/gui/apps/server/src/services/threads/thread-create-request.ts
+index a22f387b0ed0883730121b2c8587579551923d2d..a20da2991181752c1e1aae7491d47ebd532ce64b 100644
+--- a/gui/apps/server/src/services/threads/thread-create-request.ts
++++ b/gui/apps/server/src/services/threads/thread-create-request.ts
+@@ -32,6 +32,7 @@ export interface ThreadCreateServiceRequestInput {
+   model?: CreateThreadRequest["model"];
+   origin: ThreadCreateOrigin | null;
+   originPluginId?: CreateThreadRequest["originPluginId"];
++  requiredAgentConfiguration?: boolean;
+   originKind?: ThreadOriginKind | null;
+   parentThreadId?: string;
+   permissionMode?: CreateThreadRequest["permissionMode"];
+diff --git a/gui/apps/server/src/services/threads/thread-create.ts b/gui/apps/server/src/services/threads/thread-create.ts
+index e37c4a109a42fe2d0b0ae4a68b77160075ab3172..703354a8a2d2fb054606c82bcb6632f25d7d15ba 100644
+--- a/gui/apps/server/src/services/threads/thread-create.ts
++++ b/gui/apps/server/src/services/threads/thread-create.ts
+@@ -609,6 +609,9 @@ export async function createThreadFromRequest(
+   );
+   const sourceId = rawRequestInput.sourceThreadId ?? rawRequestInput.parentThreadId;
+   const source = sourceId ? getThread(deps.db, sourceId) : null;
++  if (rawRequestInput.requiredAgentConfiguration && (rawRequestInput.origin !== "plugin" || !rawRequestInput.originPluginId || rawRequestInput.executionTarget === "cloud" || rawRequestInput.originKind != null || rawRequestInput.sourceThreadId !== undefined || options.forkPoint || options.importedFork || options.importedText || (source !== null && isCloudThread(source)))) {
++    throw new ApiError(400, "invalid_request", "Required configuration needs a fresh local plugin-owned thread");
++  }
+   // Every Local fork (fork button, plugin, CLI) passes here, so a new worktree always gets the source's code. Once: a
+   // text fork's recursion (importedText) already carries the prepared environment.
+   if (source !== null && !isCloudThread(source) && rawRequestInput.originKind === "fork" && rawRequestInput.sourceThreadId && rawRequestInput.executionTarget !== "cloud" && !options.freshFork && !options.importedText) {
+diff --git a/gui/apps/server/src/services/threads/thread-runtime-config.ts b/gui/apps/server/src/services/threads/thread-runtime-config.ts
+index a86bdfdaebffd639186db4b8e7bb95c30ef4e0ef..9c2484cb42a221ade85a2015325295866f8ebc1d 100644
+--- a/gui/apps/server/src/services/threads/thread-runtime-config.ts
++++ b/gui/apps/server/src/services/threads/thread-runtime-config.ts
+@@ -3,7 +3,7 @@ import {
+   resolveHostEnvironment,
+   mergeHostAndProviderEnvironment,
+ } from "../hosts/host-environment.js";
+-import { getAppSettings, getEnvironment, getHost, getProject } from "@cloudroom/db";
++import { getAppSettings, getEnvironment, getHost, getProject, getRequiredAgentConfigurationOwner } from "@cloudroom/db";
+ import type {
+   DynamicTool,
+   InstructionMode,
+@@ -24,9 +24,11 @@ import {
+   listPluginInstructionContributions,
+   getPluginSkillRootContributions,
+   resolvePluginAgentConfiguration,
++  resolveRequiredPluginAgentConfiguration,
+   resolvePluginProviderEnv,
+ } from "../plugins/plugin-agent-contributions.js";
+ import { resolveSkillCatalog } from "../skills/skill-catalog.js";
++import { registerRequiredSkillTree } from "../skills/required-skill-trees.js";
+ import { discoverPluginSkillIds } from "../skills/injected-skills.js";
+ import { resolveWorkspaceProjectSkills } from "../skills/workspace-skills.js";
+ import { resolveSharedSkills } from "../skills/shared-skills.js";
+@@ -149,8 +151,7 @@ export async function resolveThreadRuntimeCommandConfig(
+     pluginSkillRoots,
+     skillTreeRegistry: deps.skillTreeRegistry,
+   });
+-  const conditionalConfiguration = await resolvePluginAgentConfiguration({
+-    context: {
++  const configurationContext = {
+       thread: {
+         id: args.thread.id,
+         title: args.thread.title,
+@@ -186,9 +187,11 @@ export async function resolveThreadRuntimeCommandConfig(
+         kind: args.thread.originKind,
+         pluginId: args.thread.originPluginId,
+       },
+-    },
+-    skillIdsByPlugin,
+-  });
++    };
++  const requiredOwner = getRequiredAgentConfigurationOwner(deps.db, args.thread.id);
++  const required = requiredOwner === null ? null : await resolveRequiredPluginAgentConfiguration({ pluginId: requiredOwner, context: configurationContext });
++  const requiredSources = required?.skillDirectories.map(directory => registerRequiredSkillTree(directory.rootPath, directory.expectedTreeHash)) ?? [];
++  const conditionalConfiguration = await resolvePluginAgentConfiguration({ context: configurationContext, skillIdsByPlugin });
+   const contributedEnv = mergeHostAndProviderEnvironment(
+     [
+       ...(await resolveHostEnvironment(deps, {
+@@ -217,6 +220,11 @@ export async function resolveThreadRuntimeCommandConfig(
+     sharedSkillSources: sharedSkills.runtimeSources,
+     pluginSkillSelections: conditionalConfiguration.selectedSkillIdsByPlugin,
+   }).map((entry) => entry.runtimeSource);
++  const names = new Set(injectedSkillSources.map(source => source.name));
++  for (const source of requiredSources) {
++    if (names.has(source.name)) throw new Error("Required skill name collides with another resolved skill");
++    names.add(source.name); injectedSkillSources.push(source);
++  }
+   const dataDirAgentInstructions = readDataDirAgentInstructions(
+     deps.logger,
+     deps.config.dataDir,
+@@ -235,6 +243,7 @@ export async function resolveThreadRuntimeCommandConfig(
+   );
+   const systemPrompt = cloudroomSystemPrompt(deps.db);
+   const instructionSections: string[] = systemPrompt ? [systemPrompt] : [];
++  if (required) instructionSections.push(required.instructions);
+   for (const contribution of dynamicToolContributions) {
+     if (!contribution.instructions) continue;
+     if (contribution.pluginId === null) {
+diff --git a/gui/apps/server/test/helpers/test-app.ts b/gui/apps/server/test/helpers/test-app.ts
+index fd7f6ec944a7e16493e83a6d3277d9ffe600f3dc..bbdb8501bc25efd2a2c97204206c5f9d01fe738b 100644
+--- a/gui/apps/server/test/helpers/test-app.ts
++++ b/gui/apps/server/test/helpers/test-app.ts
+@@ -96,6 +96,7 @@ export async function installTestBuiltinPlugin(
+ }
+ 
+ export type TestAppHarnessConfigOverrides = Partial<ServerRuntimeConfig> & {
++  databasePath?: string;
+   appVersionService?: AppVersionService;
+   cloudTerminal?: ConstructorParameters<
+     typeof TerminalSessionLifecycle
+@@ -164,6 +165,7 @@ export async function createTestAppHarness(
+ ): Promise<TestAppHarness> {
+   const {
+     appVersionService,
++    databasePath,
+     cloudTerminal,
+     terminalCloseTimeoutMs,
+     nativeRootsClock,
+@@ -176,7 +178,7 @@ export async function createTestAppHarness(
+     resolveSharedBuiltinSkillsRootPath(resolveBuiltinSkillsRootPath()),
+     join(dataDir, "shared-skills"),
+   );
+-  const db = createTestDb();
++  const db = databasePath === undefined ? createTestDb() : initDb(databasePath);
+   const hub = new NotificationHubImpl();
+   const watchInterests = new WatchInterestCoordinator({ db, hub });
+   const sharedPorts = new HostSharedPortCoordinator({ db, hub });
+diff --git a/gui/apps/server/tsconfig.json b/gui/apps/server/tsconfig.json
+index 812a3dd9c4d1bf7012d32fd89d5fedf48d755b71..183b74439c669ef83968ff727b19b19fca34bc3a 100644
+--- a/gui/apps/server/tsconfig.json
++++ b/gui/apps/server/tsconfig.json
+@@ -4,8 +4,17 @@
+     "@cloudroom/tsconfig/typecheck-overrides.json"
+   ],
+   "compilerOptions": {
+-    "rootDir": ".",
+-    "types": ["node"]
++    "rootDir": "../..",
++    "types": [
++      "node"
++    ]
+   },
+-  "include": ["scripts", "src", "test", "tests", "fixtures", "stories"]
++  "include": [
++    "scripts",
++    "src",
++    "test",
++    "tests",
++    "fixtures",
++    "stories"
++  ]
+ }
+diff --git a/gui/packages/agent-runtime/src/runtime-provider-process.ts b/gui/packages/agent-runtime/src/runtime-provider-process.ts
+index e74b8a7cf4fa6ae0d6a964489b84d4a5256b6e3f..0b684297fde118537a29dbca6aabeede2cde34f5 100644
+--- a/gui/packages/agent-runtime/src/runtime-provider-process.ts
++++ b/gui/packages/agent-runtime/src/runtime-provider-process.ts
+@@ -211,6 +211,9 @@ export class RuntimeProviderProcessManager {
+             type: "skills/configure",
+             skillRoots: this.args.skillRoots,
+           });
++          if (skillRootsCmd.kind !== "request" && this.args.skillRoots.some(root=>root.required)) {
++            throw new Error("Provider does not support required skill directories");
++          }
+           if (skillRootsCmd.kind === "request") {
+             await sendJsonRpcRequest({
+               child: providerProcess.child,
+diff --git a/gui/packages/agent-runtime/src/runtime-provider-requests.ts b/gui/packages/agent-runtime/src/runtime-provider-requests.ts
+index 9f65d74d234f74ba6e9cad7654ed973c2593086b..9e57c5f9ee76dcaedd22ef41d5a5ef45cfa3359b 100644
+--- a/gui/packages/agent-runtime/src/runtime-provider-requests.ts
++++ b/gui/packages/agent-runtime/src/runtime-provider-requests.ts
+@@ -206,6 +206,7 @@ function handleToolCallProviderRequest(
+     providerThreadId: toolCallReq.providerThreadId,
+     turnId: resolvedTurnId,
+     callId: toolCallReq.callId,
++    ...(toolCallReq.nativeInvocation ? {nativeInvocation:toolCallReq.nativeInvocation} : {}),
+     tool: toolCallReq.tool,
+     ...(toolCallReq.arguments !== undefined
+       ? { arguments: toolCallReq.arguments }
+diff --git a/gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts b/gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts
+index 05d28b9f0bcf987f5d5e94161aa2265f03a8d509..a008e5b6057ca1075002845225812353e0ab2038 100644
+--- a/gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts
++++ b/gui/packages/agent-runtime/src/runtime.skill-roots-capability.test.ts
+@@ -123,6 +123,19 @@ describe("skills/configure handshake capability", () => {
+     );
+   });
+ 
++  it("refuses required skill directories before thread startup when a bridge lacks the capability", async () => {
++    const record = createScriptedEchoRequestRecord();
++    const runtime = withBridgeLaunch(createAgentRuntime({workspacePath,env:record.env,
++      skillRoots:[{id:"required-root",path:stageSkillRoot(),required:true,skills:[]}],
++      onEvent:()=>{},onToolCall:async()=>({contentItems:[],success:true})}),
++      createScriptedEchoLaunch({pluginId:"echo-provider-example",modulePath:echoExampleBridgePath,
++        capabilities:{supportsThreadArchive:false,supportsThreadRename:false,fork:"none"}}));
++    runtimes.push(runtime);
++    await expect(runtime.startThread({environmentId:"env-1",projectId:"p1",providerId:"echo-agent",threadId:"required-t1",options:fullRuntimeOptions})).rejects.toThrow("Provider does not support required skill directories");
++    expect(record.read().map(entry=>entry.method)).not.toContain("thread/start");
++    expect(runtime.hasThread("required-t1")).toBe(false);
++  });
++
+   it("rejects a relative skill root path", () => {
+     expect(() =>
+       createAgentRuntime({
+diff --git a/gui/packages/db/drizzle/meta/_journal.json b/gui/packages/db/drizzle/meta/_journal.json
+index 08bab1b53f220f9e07a100143d638bc6079fc8a9..fc4813d35936c90cbb88a0396ecec443596e0859 100644
+--- a/gui/packages/db/drizzle/meta/_journal.json
++++ b/gui/packages/db/drizzle/meta/_journal.json
+@@ -946,6 +946,13 @@
+       "when": 1793580141164,
+       "tag": "0134_worktree_parked_at",
+       "breakpoints": true
++    },
++    {
++      "idx": 135,
++      "version": "6",
++      "when": 1793580141165,
++      "tag": "0135_required_agent_configurations",
++      "breakpoints": true
+     }
+   ]
+-}
+\ No newline at end of file
++}
+diff --git a/gui/packages/db/src/data/index.ts b/gui/packages/db/src/data/index.ts
+index 673434e50ac3c1f0ae18fe3550b0e04f46b63a4b..b9f119e2c333f53f28095ccf131cc30eab1b0f55 100644
+--- a/gui/packages/db/src/data/index.ts
++++ b/gui/packages/db/src/data/index.ts
+@@ -63,6 +63,7 @@ export {
+ 
+ export {
+   createThread,
++  getRequiredAgentConfigurationOwner,
+   countLiveThreadsInEnvironment,
+   countThreads,
+   countNonDeletedAssignedChildThreads,
+diff --git a/gui/packages/db/src/data/threads.ts b/gui/packages/db/src/data/threads.ts
+index 04e9334a2d4d7269117da3e7b7fff06589678cdc..7a37f64b2389082f04a117b521aac260ba12ee57 100644
+--- a/gui/packages/db/src/data/threads.ts
++++ b/gui/packages/db/src/data/threads.ts
+@@ -39,6 +39,7 @@ import {
+   projects,
+   threadSearchSegments,
+   threads,
++  threadRequiredAgentConfigurations,
+ } from "../schema.js";
+ import { createThreadId } from "../ids.js";
+ import { createOrderKeyBetween } from "./order-keys.js";
+@@ -275,6 +276,7 @@ export interface CreateThreadInput {
+   sourceThreadId?: string | null;
+   originKind?: ThreadOriginKind | null;
+   originPluginId?: string | null;
++  requiredAgentConfigurationPluginId?: string;
+   pluginMetadata?: { pluginId: string; metadata: JsonObject } | null;
+   visibility?: ThreadVisibility;
+   /** Imported chats keep their original dates. */
+@@ -291,6 +293,10 @@ export function createThread(
+   const now = Date.now();
+   const id = input.id ?? createThreadId();
+   const originKind = input.originKind ?? null;
++  const requiredOwner = input.requiredAgentConfigurationPluginId;
++  if (requiredOwner !== undefined && (requiredOwner.length < 1 || requiredOwner.length > 128 || input.originPluginId !== requiredOwner || (input.executionTarget ?? "local") !== "local" || originKind !== null || input.sourceThreadId != null)) {
++    throw new Error("Required configuration owner needs a fresh local plugin thread");
++  }
+   const thread = db.transaction(
+     (tx) => {
+       const createdThread = tx
+@@ -320,6 +326,9 @@ export function createThread(
+         })
+         .returning()
+         .get();
++      if (requiredOwner !== undefined) {
++        tx.insert(threadRequiredAgentConfigurations).values({ threadId: id, pluginId: requiredOwner }).run();
++      }
+       upsertThreadTitleSearchSegments(tx, {
+         threadId: createdThread.id,
+         title: createdThread.title,
+@@ -2109,3 +2118,9 @@ export function applyThreadLifecycleEvent(
+     { behavior: "immediate" },
+   );
+ }
++
++/** Independent of lineage and plugin installation; ordinary updates cannot change the owner. */
++export function getRequiredAgentConfigurationOwner(db: DbQueryConnection, threadId: string): string | null {
++  return db.select({ pluginId: threadRequiredAgentConfigurations.pluginId })
++    .from(threadRequiredAgentConfigurations).where(eq(threadRequiredAgentConfigurations.threadId, threadId)).get()?.pluginId ?? null;
++}
+diff --git a/gui/packages/db/src/schema.ts b/gui/packages/db/src/schema.ts
+index fa6c57c01eb08d7c445eb668a578267242874c6c..b3857190e93d0c12fbdc2a28ffeeb79420452651 100644
+--- a/gui/packages/db/src/schema.ts
++++ b/gui/packages/db/src/schema.ts
+@@ -670,6 +670,11 @@ export const cloudroomCommands = sqliteTable("cloudroom_commands", {
+   index("cloudroom_commands_thread_created_idx").on(table.threadId, table.createdAt),
+ ]);
+ 
++export const threadRequiredAgentConfigurations = sqliteTable("thread_required_agent_configurations", {
++  threadId: text("thread_id").primaryKey().references(() => threads.id, { onDelete: "cascade" }),
++  pluginId: text("plugin_id").notNull(),
++});
++
+ export const threadPluginMetadata = sqliteTable(
+   "thread_plugin_metadata",
+   {
+diff --git a/gui/packages/domain/src/provider-types.ts b/gui/packages/domain/src/provider-types.ts
+index 24272cafa9bdd6920ec55bb26412cb3f4833880d..8ad7362d12d5f5f3d4201a81400b4ee34dfd1a98 100644
+--- a/gui/packages/domain/src/provider-types.ts
++++ b/gui/packages/domain/src/provider-types.ts
+@@ -160,12 +160,20 @@ export const toolCallOutputItemSchema = z.discriminatedUnion("type", [
+   }),
+ ]);
+ 
++// Explicit provider origin, never the runtime's inferred current turn or RPC counter.
++export const nativeToolInvocationSchema = z.object({
++  clientRequestId: z.string().min(1).max(128),
++  callId: z.string().min(1).max(128),
++}).strict();
++export type NativeToolInvocation = z.infer<typeof nativeToolInvocationSchema>;
++
+ export const toolCallRequestSchema = z.object({
+   requestId: z.union([z.string().min(1), z.number()]),
+   threadId: z.string().min(1),
+   providerThreadId: z.string().min(1),
+   turnId: z.string().min(1),
+   callId: z.string().min(1),
++  nativeInvocation: nativeToolInvocationSchema.optional(),
+   tool: z.string().min(1),
+   arguments: z.unknown().optional(),
+ });
+diff --git a/gui/packages/host-daemon-contract/src/commands.ts b/gui/packages/host-daemon-contract/src/commands.ts
+index f8ffe46c0109757c1b5e78dc2c983ec4ae2a810f..102dc0317a2855310c863aaf9dcbba14afbc3f0d 100644
+--- a/gui/packages/host-daemon-contract/src/commands.ts
++++ b/gui/packages/host-daemon-contract/src/commands.ts
+@@ -134,6 +134,10 @@ export const hostDaemonInjectedSkillSourceSchema = z.discriminatedUnion(
+         sourceType: z.enum(["builtin", "data-dir"]),
+       })
+       .strict(),
++    hostDaemonInjectedSkillSourceBaseSchema.extend({
++      kind: z.literal("required-tree"), sourceType: z.literal("managed"),
++      treeHash: z.string().regex(/^[a-f0-9]{64}$/u), entryPath: z.literal("SKILL.md"),
++    }).strict(),
+     hostDaemonInjectedSkillSourceBaseSchema
+       .extend({
+         kind: z.literal("workspace-path"),
+diff --git a/gui/packages/host-daemon-contract/src/session.ts b/gui/packages/host-daemon-contract/src/session.ts
+index 58202f91598ab423adf183f055a6d1af08d9b9d9..0ce2320172b6b17e4cfc29cbb4760e6a4cb29243 100644
+--- a/gui/packages/host-daemon-contract/src/session.ts
++++ b/gui/packages/host-daemon-contract/src/session.ts
+@@ -786,6 +786,7 @@ export const hostDaemonToolCallRequestSchema = toolCallRequestSchema
+     providerThreadId: true,
+     turnId: true,
+     callId: true,
++    nativeInvocation: true,
+     tool: true,
+     arguments: true,
+   })
+@@ -878,6 +879,7 @@ export const hostDaemonSkillTreeSchema = z
+ export type HostDaemonSkillTree = z.infer<typeof hostDaemonSkillTreeSchema>;
+ 
+ export type HostDaemonInternalSchema = {
++  "/skills/required-tree/:hash": { $get: Endpoint<Record<never, never>, HostDaemonSkillTree, 200> };
+   "/skills/tree/:hash": {
+     $get: Endpoint<Record<never, never>, HostDaemonSkillTree, 200>;
+   };
+diff --git a/gui/packages/plugin-sdk/src/backend-contract.ts b/gui/packages/plugin-sdk/src/backend-contract.ts
+index 55d24c3d91797ff340b62821608e3d46b2c99f2d..d81e797b3bb359a977963e62efc2fc7c6ec63cdb 100644
+--- a/gui/packages/plugin-sdk/src/backend-contract.ts
++++ b/gui/packages/plugin-sdk/src/backend-contract.ts
+@@ -647,6 +647,8 @@ export type PluginDispatchAttemptKind = "start-turn" | "join-turn";
+  * on every drain, on restart, and on retry.
+  */
+ export interface MessageDispatchHookContext {
++  /** Immutable server-owned marker, independent of editable thread metadata. */
++  requiredAgentConfigurationOwner: string | null;
+   /**
+    * The target thread. Never null: thread creation is unhooked — it is a cheap
+    * row — so by the time the first message is decided about, the thread exists
+@@ -1109,6 +1111,10 @@ export type PluginAgentToolResult =
+ 
+ /** Per-call context handed to a native tool's execute (design §4.4). */
+ export interface PluginAgentToolContext {
++  /** Exact originating provider input/model call, when explicitly established by the provider.
++   * Absent for ordinary/inferred invocations; never derived from model arguments or current turn.
++   */
++  readonly nativeInvocation?: Readonly<{clientRequestId:string;callId:string}>;
+   threadId: string;
+   projectId: string;
+   /**
+@@ -1258,6 +1264,12 @@ export interface PluginAgentToolSelection {
+ }
+ 
+ /** Per-resolution selection returned by {@link PluginAgents.configure}. */
++export interface RequiredAgentConfiguration {
++  instructions: string;
++  skillDirectories: Array<{ rootPath: string; expectedTreeHash: string }>;
++}
++export type RequiredAgentConfigurationContext = Omit<PluginAgentConfigurationContext, "pluginMetadata"> & { readonly signal: AbortSignal };
++
+ export interface PluginAgentConfiguration {
+   /** Tool names registered by this plugin, or {@link PluginAgentToolSelection}
+    * entries to also override a tool's advertised parameter schema for this
+@@ -1668,6 +1680,10 @@ export interface PluginProviderDeclaration {
+ }
+ 
+ export interface PluginAgents {
++  /** This core preserves verified Claude prompt/tool origins in nativeInvocation. */
++  readonly nativeToolOriginVersion: 1;
++  /** Required owner callback; failures stop provider launch, including restart and queued sends. */
++  configureRequired(provider: (context: RequiredAgentConfigurationContext) => RequiredAgentConfiguration | Promise<RequiredAgentConfiguration>): void;
+   /**
+    * Select this plugin's statically registered tools and manifest skills for
+    * each thread/session resolution, with optional dynamic instructions. The
+diff --git a/gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts b/gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+index d386354ef6cb5fd28a0eb1fda4b28b844d529d8a..b848940807cdb4fb060378140ec0346ec06e1cca 100644
+--- a/gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts
++++ b/gui/packages/plugin-sdk/src/testing/fake-plugin-host.ts
+@@ -275,6 +275,7 @@ export interface FakePluginRegistrations {
+   agentConfigurationProvider:
+     | ((context: PluginAgentConfigurationContext) => PluginAgentConfiguration)
+     | null;
++  requiredAgentConfigurationProvider: Parameters<PluginAgents["configureRequired"]>[0] | null;
+   /** Provider from contributeInstructions, or null when none registered. */
+   instructionProvider:
+     | ((ctx: { threadId: string; projectId: string }) => string | null)
+@@ -1017,7 +1018,14 @@ function createFakePluginHostInternal(
+     },
+   };
+ 
++  let requiredAgentConfigurationProvider: Parameters<PluginAgents["configureRequired"]>[0] | null = null;
+   const agents: PluginAgents = {
++    nativeToolOriginVersion: 1,
++    configureRequired(provider) {
++      assertLive();
++      if (requiredAgentConfigurationProvider || typeof provider !== "function") throw new Error("Invalid or duplicate required configuration callback");
++      requiredAgentConfigurationProvider = provider;
++    },
+     configure(provider) {
+       assertLive();
+       if (agentConfigurationProvider !== null) {
+@@ -1632,6 +1640,7 @@ function createFakePluginHostInternal(
+         return cliRecord.registration;
+       },
+       agentTools,
++      get requiredAgentConfigurationProvider() { return requiredAgentConfigurationProvider; },
+       get agentConfigurationProvider() {
+         return agentConfigurationProvider;
+       },
+diff --git a/gui/packages/plugin-sdk/src/testing/fixtures.ts b/gui/packages/plugin-sdk/src/testing/fixtures.ts
+index dfca447e4f3c8b9c9361e44a469764daa9927fd9..158063d35f74ee1e0d914a1c0a2931bbb928b86d 100644
+--- a/gui/packages/plugin-sdk/src/testing/fixtures.ts
++++ b/gui/packages/plugin-sdk/src/testing/fixtures.ts
+@@ -193,6 +193,7 @@ export function makeMessageDispatchHookContext(
+   overrides: MessageDispatchHookContextOverrides = {},
+ ): MessageDispatchHookContext {
+   const context: MessageDispatchHookContext = {
++    requiredAgentConfigurationOwner: null,
+     thread: makeThreadResponse({ status: "pending" }),
+     project: {
+       id: "project-1",
+diff --git a/gui/packages/provider-bridge-acp/src/bridge/bridge.ts b/gui/packages/provider-bridge-acp/src/bridge/bridge.ts
+index f0cb656a642e98d456eded7b2b56fbdb41e925f9..8cf214691d5da9e5b2320d51cdded3d53b9a10ea 100644
+--- a/gui/packages/provider-bridge-acp/src/bridge/bridge.ts
++++ b/gui/packages/provider-bridge-acp/src/bridge/bridge.ts
+@@ -2969,6 +2969,7 @@ async function handleRequest(
+       configuredSkillRoots = request.params.roots.map((root) => ({
+         id: root.id,
+         skillDirectoryRootPath: root.path,
++        ...(root.required?{required:true}:{}),
+         skills: root.skills.map((skill) => ({
+           name: skill.name,
+           description: skill.description,
+diff --git a/gui/packages/provider-bridge-acp/src/session-params.test.ts b/gui/packages/provider-bridge-acp/src/session-params.test.ts
+index abe3a9bbec1246227645b54a75d9bb5379594ad4..a24c01b54290dbbba69fa2c4d3f3988945456032 100644
+--- a/gui/packages/provider-bridge-acp/src/session-params.test.ts
++++ b/gui/packages/provider-bridge-acp/src/session-params.test.ts
+@@ -1,3 +1,6 @@
++import {mkdtempSync,rmSync} from "node:fs";
++import {tmpdir} from "node:os";
++import {join} from "node:path";
+ import { readFileSync } from "node:fs";
+ import { describe, expect, it } from "vitest";
+ import {
+@@ -461,6 +464,18 @@ describe("buildAcpSessionParams skill instructions", () => {
+     });
+   }
+ 
++  it("keeps required skill semantics and refuses a missing required root",()=>{
++    const root=mkdtempSync(join(tmpdir(),"acp-required-"));
++    const skillRoots=[{id:"required",skillDirectoryRootPath:root,required:true,skills:[{name:"complete",description:"Whole skill"}]}];
++    try {
++      const params=paramsWithOptions({instructions:"Full instructions",skillRoots});
++      expect(params.instructions).toContain("complete [required]");
++      expect(params.instructions).toContain("stop and report an error");
++      expect(params.instructions).not.toContain("should be ignored");
++      rmSync(root,{recursive:true});expect(()=>paramsWithOptions({skillRoots})).toThrow();
++    }finally{rmSync(root,{recursive:true,force:true});}
++  });
++
+   it("appends sanitized skill instructions after the base instructions", () => {
+     expect(
+       paramsWithOptions({
+diff --git a/gui/packages/provider-bridge-acp/src/session-params.ts b/gui/packages/provider-bridge-acp/src/session-params.ts
+index 995d85c8583f2d07b122aa1fb57f769ab442176b..d904e036b50f3c56cf384cc16e5bace9e99b6973 100644
+--- a/gui/packages/provider-bridge-acp/src/session-params.ts
++++ b/gui/packages/provider-bridge-acp/src/session-params.ts
+@@ -1,3 +1,4 @@
++import { statSync } from "node:fs";
+ import type {
+   DynamicTool,
+   PermissionMode,
+@@ -27,6 +28,7 @@ export interface AcpSessionExecutionOptions {
+ }
+ 
+ export interface AcpSkillRoot {
++  required?: boolean;
+   id: string;
+   skillDirectoryRootPath: string;
+   skills: readonly { name: string; description: string }[];
+@@ -99,13 +101,14 @@ function buildAcpSkillsInstructions(
+   }
+ 
+   const skillLines = skillRoots.flatMap((skillRoot) => {
++    if (skillRoot.required && !statSync(skillRoot.skillDirectoryRootPath).isDirectory()) throw new Error("Required ACP skill root is unavailable");
+     return skillRoot.skills.map((skill) => {
+       const skillFilePath = path.join(
+         skillRoot.skillDirectoryRootPath,
+         skill.name,
+         "SKILL.md",
+       );
+-      return `- ${skill.name}: ${sanitizeAcpSkillDescription(skill.description)} (SKILL.md: ${skillFilePath})`;
++      return `- ${skill.name}${skillRoot.required ? " [required]" : ""}: ${sanitizeAcpSkillDescription(skill.description)} (SKILL.md: ${skillFilePath})`;
+     });
+   });
+   if (skillLines.length === 0) {
+@@ -113,7 +116,9 @@ function buildAcpSkillsInstructions(
+   }
+ 
+   return [
+-    "Cloudroom skills are reusable instruction folders. When the current task matches a listed skill description, read that skill's SKILL.md at the absolute path before proceeding; you may read supporting files in the same skill directory that SKILL.md references. If a listed path does not exist, the list is stale and should be ignored.",
++    skillRoots.some(root=>root.required)
++      ? "Cloudroom skills are reusable instruction folders. Read matching SKILL.md at its absolute path before proceeding, including supporting files it references. Required skill paths must be available; stop and report an error if a required path is missing."
++      : "Cloudroom skills are reusable instruction folders. When the current task matches a listed skill description, read that skill's SKILL.md at the absolute path before proceeding; you may read supporting files in the same skill directory that SKILL.md references. If a listed path does not exist, the list is stale and should be ignored.",
+     "",
+     "Available Cloudroom skills:",
+     ...skillLines,
+diff --git a/gui/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts b/gui/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
+index 690cb7c8a8e0544652692ae1a6415412c1dbeb7c..7eb075e8f597cf284991bfea1e4f89bd6a28982a 100644
+--- a/gui/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
++++ b/gui/packages/provider-bridge-protocol/src/bridge-kit/bridge-tool-calls.ts
+@@ -1,4 +1,5 @@
+ import { z } from "zod";
++import type { NativeToolInvocation } from "@cloudroom/domain";
+ import { toolCallResultSchema } from "../bridge-requests.js";
+ 
+ export interface BridgeToolCallRequest {
+@@ -10,6 +11,7 @@ export interface BridgeToolCallRequest {
+     threadId?: string;
+     turnId: string | null;
+     callId: string;
++    nativeInvocation?: NativeToolInvocation;
+     tool: string;
+     arguments: Record<string, unknown>;
+   };
+diff --git a/gui/packages/provider-bridge-protocol/src/bridge-kit/contracts.ts b/gui/packages/provider-bridge-protocol/src/bridge-kit/contracts.ts
+index 1c30c4a2d80a4710c75e169b768354c259bbf975..c38f541cee637956c7d56b439a2bb97f3806c5c7 100644
+--- a/gui/packages/provider-bridge-protocol/src/bridge-kit/contracts.ts
++++ b/gui/packages/provider-bridge-protocol/src/bridge-kit/contracts.ts
+@@ -1,4 +1,5 @@
+ import type {
++  NativeToolInvocation,
+   PendingInteractionPayload,
+   PendingInteractionResolution,
+ } from "@cloudroom/domain";
+@@ -39,6 +40,7 @@ export interface DecodedToolCallRequest {
+   providerThreadId: string;
+   turnId: string | null;
+   callId: string;
++  nativeInvocation?: NativeToolInvocation;
+   tool: string;
+   arguments?: unknown;
+   threadId?: string;
+diff --git a/gui/packages/provider-bridge-protocol/src/bridge-kit/pending-tool-call-tracker.ts b/gui/packages/provider-bridge-protocol/src/bridge-kit/pending-tool-call-tracker.ts
+index 62884f1e802e820734179d5f7bac1b74531a3192..e5ec7f674cd9cbaba4f4c9166889cc21068d6e2d 100644
+--- a/gui/packages/provider-bridge-protocol/src/bridge-kit/pending-tool-call-tracker.ts
++++ b/gui/packages/provider-bridge-protocol/src/bridge-kit/pending-tool-call-tracker.ts
+@@ -1,3 +1,4 @@
++import type { NativeToolInvocation } from "@cloudroom/domain";
+ import {
+   decodeToolCallResponsePayload,
+   type BridgeJsonRpcResponse,
+@@ -24,6 +25,7 @@ export interface ForwardBridgeToolCallArgs {
+   scope: object;
+   threadId: string;
+   toolName: string;
++  nativeInvocation?: NativeToolInvocation;
+ }
+ 
+ export interface PendingToolCallTracker {
+@@ -56,6 +58,7 @@ export function createPendingToolCallTracker(options: {
+               providerThreadId: args.providerThreadId,
+               turnId: null,
+               callId: `call-${requestId}`,
++              ...(args.nativeInvocation ? {nativeInvocation:args.nativeInvocation} : {}),
+               tool: args.toolName,
+               arguments: args.arguments,
+             },
+diff --git a/gui/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts b/gui/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
+index 9108cdd8d89397245afad7c4935f2212d23df11f..285737d6c8f8753b7b162abd44fc7f06663925b5 100644
+--- a/gui/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
++++ b/gui/packages/provider-bridge-protocol/src/bridge-kit/provider-tool-call-contract.ts
+@@ -21,6 +21,7 @@ export function decodeNormalizedProviderToolCallRequest(
+     providerThreadId: parsed.data.providerThreadId,
+     turnId: parsed.data.turnId,
+     callId: parsed.data.callId,
++    ...(parsed.data.nativeInvocation ? {nativeInvocation:parsed.data.nativeInvocation} : {}),
+     tool: parsed.data.tool,
+     ...(parsed.data.arguments !== undefined
+       ? { arguments: parsed.data.arguments }
+diff --git a/gui/packages/provider-bridge-protocol/src/bridge-requests.ts b/gui/packages/provider-bridge-protocol/src/bridge-requests.ts
+index ac621ef8b2cd0f6fb4064dc48fa78f0c9cce0df8..d8e792f61c3e16c804a001ca7fa5895785a7505a 100644
+--- a/gui/packages/provider-bridge-protocol/src/bridge-requests.ts
++++ b/gui/packages/provider-bridge-protocol/src/bridge-requests.ts
+@@ -1,4 +1,4 @@
+-import { pendingInteractionPayloadSchema } from "@cloudroom/domain";
++import { nativeToolInvocationSchema, pendingInteractionPayloadSchema } from "@cloudroom/domain";
+ import { z } from "zod";
+ 
+ export const BRIDGE_INBOUND_REQUEST_METHODS = {
+@@ -12,6 +12,7 @@ export const toolCallRequestParamsSchema = z
+     threadId: z.string().min(1).optional(),
+     turnId: z.union([z.string().min(1), z.null()]),
+     callId: z.string().min(1),
++    nativeInvocation: nativeToolInvocationSchema.optional(),
+     tool: z.string().min(1),
+     arguments: z.unknown(),
+     providerNativeIds: z.boolean().optional(),
+diff --git a/gui/packages/provider-bridge-protocol/src/requests.ts b/gui/packages/provider-bridge-protocol/src/requests.ts
+index a787d64d1a267b4ccd2ec253269aa70a47d8612b..1224002b7af6f9bcae837a5841a1bde4aeab752d 100644
+--- a/gui/packages/provider-bridge-protocol/src/requests.ts
++++ b/gui/packages/provider-bridge-protocol/src/requests.ts
+@@ -119,6 +119,7 @@ export const skillsConfigureRootSchema = z
+   .object({
+     id: z.string().min(1),
+     path: z.string().min(1),
++    required: z.boolean().optional(),
+     skills: z.array(
+       z
+         .object({
+diff --git a/gui/packages/server-contract/src/api/threads.ts b/gui/packages/server-contract/src/api/threads.ts
+index 77024b75719c615965f043e2eeb0e7a15695af62..9fc3d85e62e6d9826ed8a4d7bbe0ec4b87f510ec 100644
+--- a/gui/packages/server-contract/src/api/threads.ts
++++ b/gui/packages/server-contract/src/api/threads.ts
+@@ -119,6 +119,7 @@ export const createThreadRequestSchema = z
+     origin: threadCreateOriginSchema,
+     originPluginId: z.string().min(1).optional(),
+     pluginMetadata: pluginMetadataSchema.optional(),
++    requiredAgentConfiguration: z.boolean().optional(),
+     visibility: threadVisibilitySchema.optional(),
+     title: z.string().min(1).optional(),
+     input: z.array(promptInputSchema),
+@@ -147,6 +148,9 @@ export const createThreadRequestSchema = z
+       .optional(),
+   })
+   .superRefine((value, ctx) => {
++    if (value.requiredAgentConfiguration && (value.origin !== "plugin" || !value.originPluginId || value.executionTarget === "cloud" || value.originKind !== null || value.sourceThreadId !== undefined)) {
++      ctx.addIssue({ code: "custom", message: "Required configuration needs a fresh local plugin-owned thread" });
++    }
+     if (value.origin === "plugin" && value.originPluginId === undefined) {
+       ctx.addIssue({
+         code: "custom",
+diff --git a/gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts b/gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts
+index aa1f95018c4e434f75f9e741efa940f7c8dd22c7..cd4d5048f6f6b32574151296ec2a3a2ccca8ea32 100644
+--- a/gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts
++++ b/gui/plugins/provider-claude-code/src/bridge/__tests__/bridge.test.ts
+@@ -4562,6 +4562,18 @@ describe("canonical skills/configure", () => {
+     permissionEscalation: null,
+   };
+ 
++  it("refuses a missing required injected root without starting a native session", async () => {
++    const bridge=createBridgeJsonRpcTestHarness(handleLine);
++    const callsBefore=queryMock.mock.calls.length;
++    const missing=join(tmpdir(),`required-missing-${Date.now()}`);
++    try {
++      bridge.sendRequest(901,"skills/configure",{roots:[{id:"required-root",path:missing,skills:[],required:true}]});
++      const response=await bridge.waitForResponse(901);
++      expect(response).toMatchObject({error:{message:expect.stringContaining("Required skill plugin assembly failed")}});
++      expect(queryMock).toHaveBeenCalledTimes(callsBefore);
++    } finally { bridge.restore(); }
++  });
++
+   it("assembles a local plugin per generic skill root and loads them on canonical sessions", async () => {
+     const bridge = createBridgeJsonRpcTestHarness(handleLine);
+     const queries: ControlledClaudeQuery[] = [];
+diff --git a/gui/plugins/provider-claude-code/src/bridge/bridge.ts b/gui/plugins/provider-claude-code/src/bridge/bridge.ts
+index a83003ba7cc75feffb4271a72484052f64db18ad..6cc9f0685a5475e12bfe14b3d03f5c68a1e3581b 100644
+--- a/gui/plugins/provider-claude-code/src/bridge/bridge.ts
++++ b/gui/plugins/provider-claude-code/src/bridge/bridge.ts
+@@ -1,4 +1,5 @@
+ #!/usr/bin/env node
++import { NativeToolOrigins } from "./native-tool-origins.js";
+ import { ClaudeContextUsageCollector } from "./context-usage.js";
+ import { expandClaudeSkillInput } from "./skill-input.js";
+ 
+@@ -29,6 +30,7 @@ import {
+   experimental_defineProviderBridge,
+ } from "@get-bb/plugin-sdk/provider-bridge";
+ import { randomUUID } from "node:crypto";
++import { statSync } from "node:fs";
+ import { checkCommand } from "@get-bb/plugin-sdk/internal/command-guard";
+ import { join as joinPath, resolve as resolvePath } from "node:path";
+ import { isDeepStrictEqual } from "node:util";
+@@ -206,6 +208,7 @@ interface ClaudeSessionRestart {
+ }
+ 
+ interface ThreadSession {
++  nativeToolOrigins: NativeToolOrigins;
+   contextUsageCollector: ClaudeContextUsageCollector;
+   session: SdkSession;
+   attachment: ThreadAttachment;
+@@ -346,12 +349,13 @@ let skillPluginsRoot: string | null = null;
+ let bridgeTempDir: string | null = null;
+ 
+ function assembleSkillPlugins(
+-  roots: readonly { id: string; path: string }[],
++  roots: readonly { id: string; path: string; required?: boolean }[],
+ ): ClaudeCodeSkillRoot[] {
+   const takenNames = new Map<string, string>();
+   const assembled: ClaudeCodeSkillRoot[] = [];
+   for (const root of roots) {
+     try {
++      if (root.required && !statSync(root.path).isDirectory()) throw new Error("Required skill root is unavailable");
+       assembled.push({
+         id: root.id,
+         localPluginPath: ensureClaudeSkillPlugin({
+@@ -361,6 +365,7 @@ function assembleSkillPlugins(
+         }),
+       });
+     } catch (error) {
++      if (root.required) throw new Error(`Required skill plugin assembly failed: ${error instanceof Error ? error.message : String(error)}`);
+       process.stderr.write(
+         `claude bridge: skipping injected skill root "${root.id}": could not assemble its plugin: ${error instanceof Error ? error.message : String(error)}\n`,
+       );
+@@ -396,6 +401,7 @@ function resolvePendingSessionWork(
+   message: string,
+   notifyHost = true,
+ ): void {
++  threadSession.nativeToolOrigins.close();
+   toolCallTracker.resolvePendingToolCalls(threadSession, message);
+   resolvePendingInteractiveRequests(threadSession, message, notifyHost);
+ }
+@@ -468,8 +474,12 @@ function applyPermissionSetting(
+   }
+ }
+ 
+-function createForwardToolCall(getThreadId: () => string): ToolCallForwarder {
+-  return (toolName, args) => {
++function createForwardToolCall(
++  getThreadId: () => string,
++  sessionSerial: number,
++  origins: NativeToolOrigins,
++): ToolCallForwarder {
++  return (toolName, args, nativeToolUseId) => {
+     const threadId = getThreadId();
+     const attachment = threadAttachments.get(threadId);
+     const threadSession = attachment?.residentSession;
+@@ -477,15 +487,18 @@ function createForwardToolCall(getThreadId: () => string): ToolCallForwarder {
+       !attachment ||
+       attachment.closing ||
+       !threadSession ||
+-      threadSession.closing
++      threadSession.closing ||
++      threadSession.sessionSerial !== sessionSerial
+     ) {
+       return Promise.resolve({
+         content: "Thread session not found",
+         isError: true,
+       });
+     }
++    const nativeInvocation = origins.resolve(nativeToolUseId, toolName, args);
+     return forwardToolCall({
+       arguments: args,
++      ...(nativeInvocation ? {nativeInvocation} : {}),
+       providerThreadId: attachment.providerThreadId ?? threadId,
+       scope: threadSession,
+       threadId,
+@@ -719,7 +732,16 @@ function pushPromptInput(
+   threadSession: ThreadSession,
+   input: string,
+   permissionEscalation: PermissionEscalation | null,
++  clientRequestId: CanonicalTurnAcceptance["clientRequestId"],
+ ): Promise<void> {
++  let origin: string | undefined;
++  try {
++    origin = threadSession.nativeToolOrigins.enqueue(clientRequestId, input);
++  } catch {
++    // An ambiguous or exhausted origin map revokes company MCP for this SDK epoch.
++    // Ordinary native input and permission handling do not depend on that capability.
++    threadSession.nativeToolOrigins.close();
++  }
+   const promptId = randomUUID();
+   threadSession.permissionEscalationByPromptId.set(
+     promptId,
+@@ -727,6 +749,7 @@ function pushPromptInput(
+   );
+   return threadSession.session.pushInput(input, promptId).catch((error) => {
+     threadSession.permissionEscalationByPromptId.delete(promptId);
++    if (origin !== undefined) threadSession.nativeToolOrigins.cancel(origin);
+     throw error;
+   });
+ }
+@@ -1047,8 +1070,21 @@ function createThreadAttachment(
+ 
+ function createThreadSession(attachment: ThreadAttachment): ThreadSession {
+   const sessionSerial = nextSessionSerial();
++  const nativeToolOrigins = new NativeToolOrigins();
++  const ownHooks = nativeToolOrigins.hooks();
++  const hooks = {...attachment.sessionOptions.hooks};
++  for (const event of ["UserPromptSubmit", "PreToolUse"] as const) {
++    hooks[event] = [...(hooks[event] ?? []), ...(ownHooks[event] ?? [])];
++  }
++  const dynamicTools = attachment.sessionConstructionConfig.dynamicTools ?? [];
++  const sessionOptions: SdkSessionOptions = {...attachment.sessionOptions, hooks};
++  if (dynamicTools.length) sessionOptions.mcpServers = {
++    ...sessionOptions.mcpServers,
++    [BB_BRIDGE_MCP_SERVER_NAME]: buildBridgeMcpServer(dynamicTools,
++      createForwardToolCall(() => attachment.threadIdRef.current, sessionSerial, nativeToolOrigins)),
++  };
+   const session = new SdkSession(
+-    attachment.sessionOptions,
++    sessionOptions,
+     createOnSdkMessage({
+       sessionSerial,
+       threadIdRef: attachment.threadIdRef,
+@@ -1072,6 +1108,7 @@ function createThreadSession(attachment: ThreadAttachment): ThreadSession {
+     })),
+   );
+   const threadSession: ThreadSession = {
++    nativeToolOrigins,
+     contextUsageCollector: new ClaudeContextUsageCollector(),
+     session,
+     attachment,
+@@ -2340,8 +2377,13 @@ async function handleRequest(request: ClaudeCodeJsonRpcRequest): Promise<void> {
+       sendResult(request.id, await closeThreadForStop(request.params.threadId));
+       break;
+     case "skills/configure":
+-      configuredSkillRoots = assembleSkillPlugins(request.params.roots);
+-      sendResult(request.id, { ok: true });
++      try {
++        configuredSkillRoots = assembleSkillPlugins(request.params.roots);
++        sendResult(request.id, { ok: true });
++      } catch (error) {
++        configuredSkillRoots = null;
++        sendError(request.id, BRIDGE_JSON_RPC_ERRORS.BRIDGE_ERROR, error instanceof Error ? error.message : String(error));
++      }
+       break;
+   }
+ }
+@@ -2361,11 +2403,6 @@ function attachThreadSession(
+   sessionOptions.canUseTool = createCanUseTool(threadIdRef);
+   sessionOptions.onElicitation = createOnElicitation(threadIdRef);
+   if (params.dynamicTools && params.dynamicTools.length > 0) {
+-    const mcpServer = buildBridgeMcpServer(
+-      params.dynamicTools,
+-      createForwardToolCall(() => threadIdRef.current),
+-    );
+-    sessionOptions.mcpServers = { [BB_BRIDGE_MCP_SERVER_NAME]: mcpServer };
+     sessionOptions.allowedTools = getAllowedToolNames(params.dynamicTools);
+   }
+ 
+@@ -2573,6 +2610,7 @@ async function runTurnInput(
+       threadSession,
+       promptText,
+       params.permissionEscalation,
++      acceptance.clientRequestId,
+     );
+     emitCanonicalTurnInputAccepted(threadSession, acceptance, params.threadId);
+     threadSession.attachment.permissionEscalation = params.permissionEscalation;
+diff --git a/gui/plugins/provider-claude-code/src/bridge/tool-proxy-mcp.ts b/gui/plugins/provider-claude-code/src/bridge/tool-proxy-mcp.ts
+index c6930569f6b1712ffe58b2a89dbaa5208935cded..a61b68a307e1ad8660e1f63fd3c62b7f3b468a1f 100644
+--- a/gui/plugins/provider-claude-code/src/bridge/tool-proxy-mcp.ts
++++ b/gui/plugins/provider-claude-code/src/bridge/tool-proxy-mcp.ts
+@@ -18,6 +18,7 @@ type BridgeToolCallContent =
+ export type ToolCallForwarder = (
+   toolName: string,
+   args: Record<string, unknown>,
++  nativeToolUseId?: string,
+ ) => Promise<{
+   content: string;
+   contentBlocks?: BridgeToolCallContent[];
+@@ -53,10 +54,12 @@ export function buildBridgeMcpServer(
+         isError: true,
+       };
+     }
+-    const result = await forwardToolCall(
+-      def.name,
+-      request.params.arguments ?? {},
+-    );
++    const candidate = request.params._meta?.["claudecode/toolUseId"];
++    const nativeToolUseId = typeof candidate === "string" && candidate.length > 0 && candidate.length <= 128 ? candidate : undefined;
++    // Native SDK metadata is separate from model arguments, including arguments._meta.
++    const result = nativeToolUseId === undefined
++      ? await forwardToolCall(def.name, request.params.arguments ?? {})
++      : await forwardToolCall(def.name, request.params.arguments ?? {}, nativeToolUseId);
+     return {
+       content: experimental_buildBridgeToolCallContent(result),
+       ...(result.isError ? { isError: true } : {}),
+diff --git a/gui/tests/integration/helpers/harness.ts b/gui/tests/integration/helpers/harness.ts
+index 3aefa197b8f5ad946c133e1abc5aac72b3a028d5..9053fd778bb0c63111e551c19d3e41898b6a2a41 100644
+--- a/gui/tests/integration/helpers/harness.ts
++++ b/gui/tests/integration/helpers/harness.ts
+@@ -5,9 +5,9 @@ import { tmpdir } from "node:os";
+ import path from "node:path";
+ import { fileURLToPath } from "node:url";
+ import { serve } from "@hono/node-server";
+-import type { DbConnection } from "@cloudroom/db";
++import { upsertHost, type DbConnection } from "@cloudroom/db";
+ import { defaultFeatureFlags } from "@cloudroom/domain";
+-import { createCallerProofIssuer } from "@cloudroom/config/caller-proof";
++import { createCallerProofIssuer, CALLER_TOKEN_HEADER } from "@cloudroom/config/caller-proof";
+ import {
+   acquireDaemonLock,
+   createHostDaemonApp,
+@@ -33,6 +33,8 @@ import {
+ } from "../../../apps/server/test/helpers/provider-registry.js";
+ import {
+   copyBuiltinSkills,
++  copySharedBuiltinSkills,
++  resolveSharedBuiltinSkillsRootPath,
+   resolveBuiltinSkillsRootPath,
+ } from "../../../apps/server/src/services/skills/builtin-skills-copy.js";
+ import { SkillTreeRegistry } from "../../../apps/server/src/services/skills/injected-skills.js";
+@@ -77,6 +79,8 @@ const testLogger: ServerLogger = {
+ };
+ 
+ export interface RunningTestServer {
++  callerToken: string;
++  pluginService: ReturnType<typeof createApp>["pluginService"];
+   sweepEnvironments(): Promise<void>;
+   baseUrl: string;
+   close(): Promise<void>;
+@@ -106,6 +110,7 @@ export interface IntegrationHarness {
+ export const PROJECT_CHECKOUT_BUILTIN_PLUGIN = "environment-project-checkout";
+ 
+ interface CreateHarnessOptions {
++  loadEnvironmentFile?: boolean;
+   serverPort?: number;
+   bindHost?: "127.0.0.1" | "0.0.0.0";
+   staticDir?: string;
+@@ -179,6 +184,11 @@ async function startIntegrationServer(
+     targetPath: builtinSkillsRootPath,
+   });
+ 
++  await copySharedBuiltinSkills(
++    resolveSharedBuiltinSkillsRootPath(resolveBuiltinSkillsRootPath()),
++    path.join(serverDataDir, "shared-skills"),
++  );
++
+   const db = initDb(":memory:");
+   const hub = new NotificationHub();
+   const sharedPorts = new HostSharedPortCoordinator({ db, hub });
+@@ -314,6 +324,8 @@ async function startIntegrationServer(
+   }
+ 
+   return {
++    callerToken: serverDeps.callerProofs.issueInternal(),
++    pluginService,
+     sweepEnvironments: () => sweepProviderLifecycles(serverDeps),
+     baseUrl,
+     config,
+@@ -343,6 +355,7 @@ async function startHarnessDaemon(
+ 
+   try {
+     const identity = await loadHostIdentity({ dataDir });
++    upsertHost(server.db,server.hub,{id:identity.hostId,name:identity.hostName});
+     const hostKey = await server.machineAuth.issueDaemonHostKey({
+       hostId: identity.hostId,
+     });
+@@ -357,6 +370,7 @@ async function startHarnessDaemon(
+       logger: testLogger,
+       releaseLock,
+       serverUrl: server.baseUrl,
++      serverHeaders:{[CALLER_TOKEN_HEADER]:server.callerToken},
+     });
+     for (
+       let attempt = 1;
+@@ -393,7 +407,7 @@ async function startHarnessDaemon(
+ export async function createIntegrationHarness(
+   options: CreateHarnessOptions = {},
+ ): Promise<IntegrationHarness> {
+-  await loadProjectEnvFile();
++  if(options.loadEnvironmentFile !== false) await loadProjectEnvFile();
+   const tmpRoot = await fs.mkdtemp(path.join(tmpdir(), "bb-integration-"));
+   await fs.writeFile(
+     path.join(tmpRoot, "parent.pid"),
+@@ -486,8 +500,13 @@ export async function createIntegrationHarness(
+ 
+   try {
+     server = await startIntegrationServer(tmpRoot, options);
++    const integrationFetch=createIntegrationFetch();
++    const callerToken=server.callerToken;
+     const api = createPublicApiClient(server.baseUrl, {
+-      fetch: createIntegrationFetch(),
++      fetch: (input,init)=>{
++        const headers=new Headers(init?.headers);headers.set(CALLER_TOKEN_HEADER,callerToken);
++        return integrationFetch(input,{...init,headers});
++      },
+     });
+     daemonResources = await startHarnessDaemon(daemonDataDir, server);
+     await waitForHostConnected(api);
+diff --git a/gui/apps/server/src/services/plugins/required-agent-configuration.ts b/gui/apps/server/src/services/plugins/required-agent-configuration.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6c92268dec9ef90e4d6479ac82d64532b8a9bc2
+--- /dev/null
++++ b/gui/apps/server/src/services/plugins/required-agent-configuration.ts
+@@ -0,0 +1,15 @@
++import path from "node:path";
++import type { RequiredAgentConfiguration } from "@get-bb/plugin-sdk";
++
++export function normalizeRequiredAgentConfiguration(value: unknown): RequiredAgentConfiguration {
++  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid required configuration");
++  const raw = value as Record<string, unknown>;
++  if (Object.keys(raw).some(key => key !== "instructions" && key !== "skillDirectories") || typeof raw.instructions !== "string" || Buffer.byteLength(raw.instructions) > 32768 || raw.instructions.includes("\0") || !Array.isArray(raw.skillDirectories) || raw.skillDirectories.length > 16) throw new Error("Invalid or oversized required configuration");
++  const skillDirectories = raw.skillDirectories.map(item => {
++    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid required directory");
++    const entry = item as Record<string, unknown>;
++    if (Object.keys(entry).some(key => key !== "rootPath" && key !== "expectedTreeHash") || typeof entry.rootPath !== "string" || Buffer.byteLength(entry.rootPath) > 4096 || entry.rootPath.includes("\0") || !path.isAbsolute(entry.rootPath) || path.normalize(entry.rootPath) !== entry.rootPath || typeof entry.expectedTreeHash !== "string" || !/^[0-9a-f]{64}$/.test(entry.expectedTreeHash)) throw new Error("Invalid required directory descriptor");
++    return { rootPath: entry.rootPath, expectedTreeHash: entry.expectedTreeHash };
++  });
++  return { instructions: raw.instructions, skillDirectories };
++}
+diff --git a/gui/apps/server/src/services/skills/required-skill-trees.ts b/gui/apps/server/src/services/skills/required-skill-trees.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..53769c9d50de1495a124d338974369f1121b2f0e
+--- /dev/null
++++ b/gui/apps/server/src/services/skills/required-skill-trees.ts
+@@ -0,0 +1,82 @@
++import fs from "node:fs";
++import path from "node:path";
++import { parse as parseYaml } from "yaml";
++import type { HostDaemonInjectedSkillSource } from "@cloudroom/host-daemon-contract";
++import { hashSkillTreeEntries, type SkillTreeEntry } from "./injected-skills.js";
++
++const roots = new Map<string, string>();
++export const REQUIRED_TREE_REGISTRY_LIMIT = 4096;
++export const REQUIRED_TREE_LIMITS = Object.freeze({ files: 65, entryBytes: 20 * 1024, fileBytes: 256 * 1024, totalBytes: 1024 * 1024, visitedEntries: 8192 });
++type FileDescriptor = { absolute: string; relative: string; stat: fs.Stats };
++
++function portable(relative: string): void {
++  if (!relative || Buffer.byteLength(relative) > 240 || !/^[A-Za-z0-9._/ -]+$/.test(relative) || relative.split("/").some(part => !part || part === "." || part === ".." || part.startsWith(" ") || /[. ]$/.test(part)) || (relative.split("/")[0]?.toLowerCase() === "skill.md" && relative !== "SKILL.md")) throw new Error("Unsafe required skill path");
++}
++
++function descriptors(root: string): FileDescriptor[] {
++  if (!path.isAbsolute(root) || Buffer.byteLength(root) > 4096 || path.normalize(root) !== root || fs.realpathSync(root) !== root || !fs.lstatSync(root).isDirectory()) throw new Error("Invalid required skill root");
++  const pending = [root]; const files: FileDescriptor[] = []; const paths = new Set<string>();
++  let total = 0; let visited = 0;
++  while (pending.length) {
++    const directory = fs.opendirSync(pending.pop()!);
++    try {
++      for (let entry = directory.readSync(); entry !== null; entry = directory.readSync()) {
++        if (++visited > REQUIRED_TREE_LIMITS.visitedEntries) throw new Error("Required tree entry count exceeded");
++        const absolute = path.join(directory.path, entry.name);
++        const relative = path.relative(root, absolute).split(path.sep).join("/"); portable(relative);
++        const folded = relative.toLowerCase(); if (paths.has(folded)) throw new Error("Required skill case collision"); paths.add(folded);
++        const stat = fs.lstatSync(absolute);
++        if (stat.isSymbolicLink()) throw new Error("Required skill symlink refused");
++        if (stat.isDirectory()) { pending.push(absolute); continue; }
++        if (!stat.isFile()) throw new Error("Required skill special file refused");
++        const limit = relative === "SKILL.md" ? REQUIRED_TREE_LIMITS.entryBytes : REQUIRED_TREE_LIMITS.fileBytes;
++        total += stat.size;
++        if (stat.size > limit || total > REQUIRED_TREE_LIMITS.totalBytes || files.length >= REQUIRED_TREE_LIMITS.files || ![0o644,0o755].includes(stat.mode & 0o777)) throw new Error("Required skill capacity or mode refused");
++        files.push({ absolute, relative, stat });
++      }
++    } finally { directory.closeSync(); }
++  }
++  if ([...paths].some(entry => !files.some(file => file.relative.toLowerCase() === entry || file.relative.toLowerCase().startsWith(`${entry}/`)))) throw new Error("Unexpected empty required directory");
++  if (!files.some(file => file.relative === "SKILL.md")) throw new Error("Required skill entry is missing");
++  return files;
++}
++
++function readBounded(file: FileDescriptor): SkillTreeEntry {
++  const fd = fs.openSync(file.absolute, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW);
++  try {
++    const current = fs.fstatSync(fd);
++    if (!current.isFile() || current.ino !== file.stat.ino || current.dev !== file.stat.dev || current.size !== file.stat.size || current.mode !== file.stat.mode) throw new Error("Required file changed before read");
++    const bytes = Buffer.alloc(file.stat.size); let offset = 0;
++    while (offset < bytes.length) { const read = fs.readSync(fd, bytes, offset, bytes.length - offset, null); if (!read) throw new Error("Incomplete required file"); offset += read; }
++    if (fs.readSync(fd, Buffer.alloc(1),0,1,null) !== 0) throw new Error("Required file grew during read");
++    const after = fs.fstatSync(fd);
++    if (after.size !== current.size || after.mode !== current.mode || after.ctimeMs !== current.ctimeMs || after.mtimeMs !== current.mtimeMs) throw new Error("Required file changed during read");
++    return { path: file.relative, mode: current.mode & 0o777, bytes };
++  } finally { fs.closeSync(fd); }
++}
++
++export function readRequiredSkillTree(root: string, expectedTreeHash: string) {
++  const entries = descriptors(root).map(readBounded);
++  const treeHash = hashSkillTreeEntries(entries);
++  if (treeHash !== expectedTreeHash) throw new Error("Required tree hash mismatch");
++  const entry = entries.find(file => file.path === "SKILL.md")!;
++  const markdown = new TextDecoder("utf-8", { fatal: true }).decode(entry.bytes);
++  const header = /^\uFEFF?---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(markdown)?.[1];
++  if (header === undefined) throw new Error("Required skill frontmatter is missing");
++  const metadata: unknown = parseYaml(header, { maxAliasCount: 0 });
++  if (!metadata || typeof metadata !== "object" || !("name" in metadata) || typeof metadata.name !== "string" || !/^(?!.*--)[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/.test(metadata.name) || !("description" in metadata) || typeof metadata.description !== "string" || !metadata.description.trim() || [...metadata.description].length > 1024) throw new Error("Invalid required skill metadata");
++  return { entries, treeHash, name: metadata.name, description: metadata.description };
++}
++
++export function registerRequiredSkillTree(root: string, expectedTreeHash: string): HostDaemonInjectedSkillSource {
++  const tree = readRequiredSkillTree(root, expectedTreeHash);
++  roots.delete(tree.treeHash); roots.set(tree.treeHash,root);
++  if (roots.size > REQUIRED_TREE_REGISTRY_LIMIT) roots.delete(roots.keys().next().value!);
++  return { kind: "required-tree", sourceType: "managed", treeHash: tree.treeHash, entryPath: "SKILL.md", name: tree.name, description: tree.description };
++}
++
++export function readRegisteredRequiredSkillTree(hash: string) {
++  const root = roots.get(hash); if (root === undefined) throw new Error("Required tree registration is unavailable");
++  roots.delete(hash); roots.set(hash,root);
++  return readRequiredSkillTree(root,hash);
++}
+diff --git a/gui/apps/server/test/internal/required-skill-trees.test.ts b/gui/apps/server/test/internal/required-skill-trees.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..54820b96ed037d092fc130acbe46695aea492ca5
+--- /dev/null
++++ b/gui/apps/server/test/internal/required-skill-trees.test.ts
+@@ -0,0 +1,220 @@
++import fs from "node:fs";
++import { chmod, mkdir, readFile, stat, writeFile } from "node:fs/promises";
++import { execFile } from "node:child_process";
++import { promisify } from "node:util";
++import path from "node:path";
++import { describe, expect, it, vi } from "vitest";
++import { hostDaemonSkillTreeSchema } from "@cloudroom/host-daemon-contract";
++import { hashSkillTreeEntries, readSkillTreeManifest } from "../../src/services/skills/injected-skills.js";
++import { readRequiredSkillTree, registerRequiredSkillTree, readRegisteredRequiredSkillTree, REQUIRED_TREE_REGISTRY_LIMIT, REQUIRED_TREE_LIMITS } from "../../src/services/skills/required-skill-trees.js";
++import { stageInjectedSkillSources, ensureStoredSkillTree, hashInstalledSkillDirectory } from "../../../host-daemon/src/injected-skills.js";
++import { internalAuthHeaders } from "../helpers/commands.js";
++import { seedHostSession } from "../helpers/seed.js";
++import { createThread } from "@cloudroom/db";
++import { encodeClientTurnRequestIdNumber } from "@cloudroom/domain";
++import { buildExecutionOptions, buildThreadStartCommand } from "../../src/services/threads/thread-commands.js";
++import { seedEnvironment, seedProjectWithSource } from "../helpers/seed.js";
++import { textInput } from "../helpers/prompt-input.js";
++import { ensureClaudeSkillPlugin } from "../../../../plugins/provider-claude-code/src/bridge/skill-plugins.js";
++import { withTestHarness } from "../helpers/test-app.js";
++
++async function skill(root: string) {
++  const files = [
++    { path: "SKILL.md",mode:0o644,bytes:Buffer.from("---\nname: required-proof\ndescription: Complete native directory\n---\nRead the script and adjacent files.\n") },
++    { path: ".bb-registry-skill.json",mode:0o644,bytes:Buffer.from("preserved supporting bytes\n") },
++    { path: "assets/data.bin",mode:0o644,bytes:Buffer.from([0,255,3,128]) },
++    { path: "scripts/run.sh",mode:0o755,bytes:Buffer.from('#!/bin/sh\nset -eu\nroot="$(dirname "$0")/.."\ncat "$root/.bb-registry-skill.json"\nshasum -a 256 "$root/assets/data.bin"\n') },
++  ];
++  for (const file of files) { const target=path.join(root,file.path); await mkdir(path.dirname(target),{recursive:true}); await writeFile(target,file.bytes); await chmod(target,file.mode); }
++  return { root:await fs.promises.realpath(root),files,hash:hashSkillTreeEntries(files) };
++}
++
++describe("required skill directory transfer",()=>{
++  it("authenticates the required route, preserves every byte/mode through production daemon staging and executes an adjacent-file script",async()=>{
++    await withTestHarness(async harness=>{
++      const {host}=seedHostSession(harness.deps,{id:"host-required-tree"});
++      const root=path.join(harness.config.dataDir,"required-tree-source");
++      const fixture=await skill(root);
++      const source=registerRequiredSkillTree(fixture.root,fixture.hash);
++      const fetchTree=async(hash:string,kind?:"required-tree")=>{
++        expect(kind).toBe("required-tree");
++        const response=await harness.app.request(`/internal/skills/required-tree/${hash}`,{headers:internalAuthHeaders(harness,{hostId:host.id})});
++        expect(response.status).toBe(200); return hostDaemonSkillTreeSchema.parse(await response.json());
++      };
++      const unauthenticated=await harness.app.request(`/internal/skills/required-tree/${fixture.hash}`);
++      expect(unauthenticated.status).toBe(401);
++      const dataDir=path.join(harness.config.dataDir,"required-daemon");
++      const options={dataDir,injectedSkillSources:[source],fetchSkillTree:fetchTree};
++      const staged=await stageInjectedSkillSources(options);
++      expect(staged.skillRoots[0]!.required).toBe(true);
++      const stagedRoot=path.join(staged.skillRoots[0]!.path,source.name);
++      for(const file of fixture.files) { expect(await readFile(path.join(stagedRoot,file.path))).toEqual(file.bytes); expect((await stat(path.join(stagedRoot,file.path))).mode & 0o777).toBe(file.mode); }
++      expect(await hashInstalledSkillDirectory({name:source.name,skillDirectoryPath:stagedRoot,sourceKind:"required-tree"})).toBe(fixture.hash);
++      const result=await promisify(execFile)(path.join(stagedRoot,"scripts/run.sh"),[],{timeout:5000});
++      expect(result.stdout).toContain("preserved supporting bytes"); expect(result.stdout).toContain("assets/data.bin");
++      expect(readSkillTreeManifest(fixture.root).entries.some(file=>file.path===".bb-registry-skill.json")).toBe(false);
++      expect(readRequiredSkillTree(fixture.root,fixture.hash).entries.some(file=>file.path===".bb-registry-skill.json")).toBe(true);
++      await writeFile(path.join(stagedRoot,"assets/data.bin"),"tampered");
++      await expect(stageInjectedSkillSources(options)).rejects.toThrow("Required staged tree integrity failed");
++      const stored=await ensureStoredSkillTree({dataDir,treeHash:fixture.hash,sourceKind:"required-tree",fetchSkillTree:fetchTree});
++      await writeFile(path.join(stored,"assets/data.bin"),"tampered cache");
++      await expect(stageInjectedSkillSources(options)).rejects.toThrow("Required cached tree integrity failed");
++    });
++  });
++
++  it("refuses unregistered or changed trees and does not fall back to the ordinary registry",async()=>{
++    await withTestHarness(async harness=>{
++      const {host}=seedHostSession(harness.deps,{id:"host-required-refusal"});
++      const root=path.join(harness.config.dataDir,"required-changed"); const fixture=await skill(root);
++      harness.deps.skillTreeRegistry.register(fixture.hash,root);
++      const headers=internalAuthHeaders(harness,{hostId:host.id});
++      expect((await harness.app.request(`/internal/skills/required-tree/${fixture.hash}`,{headers})).status).toBe(404);
++      registerRequiredSkillTree(fixture.root,fixture.hash);
++      await writeFile(path.join(root,".bb-registry-skill.json"),"changed");
++      expect((await harness.app.request(`/internal/skills/required-tree/${fixture.hash}`,{headers})).status).toBe(404);
++    });
++  });
++
++  it("rejects file count and file-byte limit+1 before reading content",async()=>{
++    await withTestHarness(async harness=>{
++      const original=path.join(harness.config.dataDir,"required-bounds"); const root=(await skill(original)).root;
++      for(let i=0;i<62;i++) { const file=path.join(root,`extra-${i}`); await writeFile(file,"x"); await chmod(file,0o644); }
++      const read=vi.spyOn(fs,"readSync");
++      try { expect(()=>readRequiredSkillTree(root,"0".repeat(64))).toThrow("capacity"); expect(read).not.toHaveBeenCalled(); } finally { read.mockRestore(); }
++      for(let i=0;i<62;i++) await fs.promises.unlink(path.join(root,`extra-${i}`));
++      await writeFile(path.join(root,"assets/data.bin"),Buffer.alloc(256*1024+1));
++      const bytes=vi.spyOn(fs,"readSync");
++      try { expect(()=>readRequiredSkillTree(root,"0".repeat(64))).toThrow("capacity"); expect(bytes).not.toHaveBeenCalled(); } finally { bytes.mockRestore(); }
++    });
++  });
++});
++
++
++it("accepts exact count, file, entry and portable-path limits and refuses the next byte",async()=>{
++  await withTestHarness(async harness=>{
++    const root=(await skill(path.join(harness.config.dataDir,"required-max"))).root;
++    const markdown="---\nname: required-max\ndescription: Maximum complete directory\n---\n";
++    const files=[{path:"SKILL.md",mode:0o644,bytes:Buffer.from(markdown+"x".repeat(REQUIRED_TREE_LIMITS.entryBytes-Buffer.byteLength(markdown)))},
++      {path:"a/".repeat(118)+"file",mode:0o755,bytes:Buffer.from("binary path boundary")},
++      {path:"assets/max.bin",mode:0o644,bytes:Buffer.alloc(REQUIRED_TREE_LIMITS.fileBytes,255)}];
++    await fs.promises.rm(root,{recursive:true});await mkdir(root);
++    while(files.length<REQUIRED_TREE_LIMITS.files) files.push({path:`file-${files.length}`,mode:0o644,bytes:Buffer.from([0,128,255])});
++    for(const file of files){await mkdir(path.dirname(path.join(root,file.path)),{recursive:true});await writeFile(path.join(root,file.path),file.bytes);await chmod(path.join(root,file.path),file.mode);}
++    for(const index of [3,4,5]) {
++      const file=files[index]!;const others=files.reduce((total,item)=>total+(item===file?0:item.bytes.length),0);
++      file.bytes=Buffer.alloc(Math.min(REQUIRED_TREE_LIMITS.fileBytes,REQUIRED_TREE_LIMITS.totalBytes-others),128);
++      await writeFile(path.join(root,file.path),file.bytes);
++    }
++    expect(files.reduce((total,file)=>total+file.bytes.length,0)).toBe(REQUIRED_TREE_LIMITS.totalBytes);
++    const hash=hashSkillTreeEntries(files);expect(readRequiredSkillTree(root,hash).entries).toHaveLength(REQUIRED_TREE_LIMITS.files);
++    registerRequiredSkillTree(root,hash);
++    const {host}=seedHostSession(harness.deps,{id:"host-required-max"});
++    const response=await harness.app.request(`/internal/skills/required-tree/${hash}`,{headers:internalAuthHeaders(harness,{hostId:host.id})});expect(response.status).toBe(200);
++    const source=registerRequiredSkillTree(root,hash);
++    const staged=await stageInjectedSkillSources({dataDir:path.join(harness.config.dataDir,"max-daemon"),injectedSkillSources:[source],fetchSkillTree:async()=>hostDaemonSkillTreeSchema.parse(await response.json())});
++    expect(await readFile(path.join(staged.skillRoots[0]!.path,source.name,files[1]!.path))).toEqual(files[1]!.bytes);
++    await writeFile(path.join(root,"SKILL.md"),Buffer.alloc(REQUIRED_TREE_LIMITS.entryBytes+1));
++    const read=vi.spyOn(fs,"readSync");try{expect(()=>readRequiredSkillTree(root,hash)).toThrow("capacity");expect(read).not.toHaveBeenCalled();}finally{read.mockRestore();}
++    await writeFile(path.join(root,"SKILL.md"),files[0]!.bytes);
++    const longest=files[1]!.path;await fs.promises.rename(path.join(root,longest),path.join(root,longest+"x"));
++    const paths=vi.spyOn(fs,"readSync");try{expect(()=>readRequiredSkillTree(root,hash)).toThrow("Unsafe required skill path");expect(paths).not.toHaveBeenCalled();}finally{paths.mockRestore();}
++  });
++});
++
++it("evicts required registrations at its explicit bound without ordinary fallback",async()=>{
++  await withTestHarness(async harness=>{
++    const first=await skill(path.join(harness.config.dataDir,"required-lru-first"));registerRequiredSkillTree(first.root,first.hash);
++    const root=(await skill(path.join(harness.config.dataDir,"required-lru-churn"))).root;
++    for(let index=0;index<REQUIRED_TREE_REGISTRY_LIMIT;index++){
++      const bytes=Buffer.from(`---\nname: required-lru\ndescription: Bounded registration ${index}\n---\n${index}`);
++      await writeFile(path.join(root,"SKILL.md"),bytes);await chmod(path.join(root,"SKILL.md"),0o644);
++      const files=(await Promise.all(["SKILL.md",".bb-registry-skill.json","assets/data.bin","scripts/run.sh"].map(async name=>({path:name,mode:name==="scripts/run.sh"?0o755:0o644,bytes:await readFile(path.join(root,name))}))));
++      registerRequiredSkillTree(root,hashSkillTreeEntries(files));
++    }
++    expect(()=>readRegisteredRequiredSkillTree(first.hash)).toThrow("registration is unavailable");
++    const {host}=seedHostSession(harness.deps,{id:"host-required-lru"});
++    harness.deps.skillTreeRegistry.register(first.hash,first.root);
++    expect((await harness.app.request(`/internal/skills/required-tree/${first.hash}`,{headers:internalAuthHeaders(harness,{hostId:host.id})})).status).toBe(404);
++  });
++},20000);
++
++
++it.skipIf(!process.env.OPENBOT_NATIVE_STAGE_PROBE)("delivers real required instructions and production-staged complete skills to the isolated native Claude harness",async()=>{
++  await withTestHarness(async harness=>{
++    const root=path.join(harness.config.dataDir,"required-native-source");const source=await skill(root);
++    const markdown=source.files.find(file=>file.path==="SKILL.md")!;markdown.bytes=Buffer.concat([markdown.bytes,Buffer.from("OPENBOT_REQUIRED_NATIVE_SKILL_BODY\n")]);await writeFile(path.join(root,"SKILL.md"),markdown.bytes);
++    const hash=hashSkillTreeEntries(source.files);
++    const pluginRoot=path.join(harness.config.dataDir,"required-native-plugin");await mkdir(pluginRoot);
++    const instructions="Full required instructions. ".repeat(400)+"OPENBOT_REQUIRED_NATIVE_INSTRUCTION_TAIL";
++    await writeFile(path.join(pluginRoot,"package.json"),JSON.stringify({name:"bb-plugin-required-native",version:"0.1.0",bb:{name:"Required native fixture",description:"Native transfer fixture",branding:{icon:"Zap"},server:"./server.ts"}}));
++    await writeFile(path.join(pluginRoot,"server.ts"),`export default function plugin(bb){bb.agents.configureRequired(async()=>(${JSON.stringify({instructions,skillDirectories:[{rootPath:source.root,expectedTreeHash:hash}]})}));}`);
++    const installed=await harness.pluginService.installPath(pluginRoot);expect(installed.status).toBe("running");
++    const {host}=seedHostSession(harness.deps,{id:"host-required-native"});const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++    const environment=seedEnvironment(harness.deps,{hostId:host.id,projectId:project.id,path:path.join(harness.config.dataDir,"native-workspace"),status:"ready"});
++    const thread=createThread(harness.db,harness.hub,{projectId:project.id,environmentId:environment.id,providerId:"claude-code",originPluginId:installed.id,requiredAgentConfigurationPluginId:installed.id,status:"idle"});
++    const execution=await buildExecutionOptions(harness.deps,{model:"claude-sonnet-4-6",permissionMode:"full"},{threadId:thread.id});
++    const command=await buildThreadStartCommand(harness.deps,{environment,execution,fork:null,permissionEscalation:"ask",input:textInput("Use the required skill"),projectId:project.id,providerId:thread.providerId,requestId:encodeClientTurnRequestIdNumber({value:11}),syncGeneratedTitle:false,thread});
++    expect(command.instructions).toContain(instructions);expect(command.injectedSkillSources?.filter(source=>source.kind==="required-tree")).toHaveLength(1);
++    const staged=await stageInjectedSkillSources({dataDir:path.join(harness.config.dataDir,"native-daemon"),injectedSkillSources:command.injectedSkillSources!,fetchSkillTree:async (treeHash,kind)=>{
++      const response=await harness.app.request(`/internal/skills/${kind==="required-tree"?"required-tree":"tree"}/${treeHash}`,{headers:internalAuthHeaders(harness,{hostId:host.id})});expect(response.status).toBe(200);return hostDaemonSkillTreeSchema.parse(await response.json());
++    }});
++    const output=process.env.OPENBOT_NATIVE_STAGE_OUTPUT!;await mkdir(output,{recursive:true});
++    const instructionsPath=path.join(output,"required-instructions.txt");await writeFile(instructionsPath,command.instructions!);
++    const skillRoot=staged.skillRoots.find(root=>fs.existsSync(path.join(root.path,"required-proof")))!;expect(skillRoot).toBeDefined();
++    const assembled=ensureClaudeSkillPlugin({pluginsRoot:path.join(harness.config.dataDir,"native-assembled"),root:skillRoot});
++    const result=await promisify(execFile)("python3",[process.env.OPENBOT_NATIVE_STAGE_PROBE!,path.join(skillRoot.path,"required-proof"),assembled,instructionsPath,output],{timeout:60000,maxBuffer:128*1024});
++    expect(JSON.parse(result.stdout)).toMatchObject({status:"PASS",script_mode:"0o755"});
++  });
++},65000);
++
++it('refuses a required skill name colliding with a resolved ambient skill before provider launch',async()=>{
++  await withTestHarness(async harness=>{
++    const {host}=seedHostSession(harness.deps,{id:'host-required-collision'});const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++    const environment=seedEnvironment(harness.deps,{hostId:host.id,projectId:project.id,path:'/tmp/required-collision',status:'ready'});
++    const ordinary=createThread(harness.db,harness.hub,{projectId:project.id,environmentId:environment.id,providerId:'codex',status:'idle'});
++    const execution=await buildExecutionOptions(harness.deps,{model:'gpt-5'},{threadId:ordinary.id});
++    const args={environment,execution,fork:null,permissionEscalation:'ask' as const,input:textInput('collision'),projectId:project.id,providerId:'codex',requestId:encodeClientTurnRequestIdNumber({value:12}),syncGeneratedTitle:false};
++    const initial=await buildThreadStartCommand(harness.deps,{...args,thread:ordinary});const ambient=initial.injectedSkillSources![0]!;expect(ambient).toBeDefined();
++    const source=await skill(path.join(harness.config.dataDir,'required-collision-source'));
++    const entry=source.files.find(file=>file.path==='SKILL.md')!;entry.bytes=Buffer.from(`---\nname: ${ambient.name}\ndescription: Conflicting required skill\n---\nMust never be silently dropped.`);await writeFile(path.join(source.root,'SKILL.md'),entry.bytes);
++    const pluginRoot=path.join(harness.config.dataDir,'required-collision-plugin');await mkdir(pluginRoot);
++    await writeFile(path.join(pluginRoot,'package.json'),JSON.stringify({name:'bb-plugin-required-collision',version:'0.1.0',bb:{name:'Collision fixture',description:'Required collision regression',branding:{icon:'Zap'},server:'./server.ts'}}));
++    await writeFile(path.join(pluginRoot,'server.ts'),`export default function plugin(bb){bb.agents.configureRequired(async()=>(${JSON.stringify({instructions:'Whole required instructions',skillDirectories:[{rootPath:source.root,expectedTreeHash:hashSkillTreeEntries(source.files)}]})}));}`);
++    const installed=await harness.pluginService.installPath(pluginRoot);
++    const managed=createThread(harness.db,harness.hub,{projectId:project.id,environmentId:environment.id,providerId:'codex',originPluginId:installed.id,requiredAgentConfigurationPluginId:installed.id,status:'idle'});
++    await expect(buildThreadStartCommand(harness.deps,{...args,thread:managed})).rejects.toThrow('Required skill name collides');
++  });
++});
++
++it("hands off distinct leaves with identically spelled parent directories through the native transfer", async () => {
++  await withTestHarness(async (harness) => {
++    const fixture = await skill(path.join(harness.config.dataDir, "required-parent-spelling"));
++    for (const name of ["scripts/one", "scripts/two"]) {
++      const file = { path: name, mode: 0o755, bytes: Buffer.from(`#!/bin/sh\nprintf '${name}\\n'\n`) };
++      await mkdir(path.dirname(path.join(fixture.root, name)), { recursive: true });
++      await writeFile(path.join(fixture.root, name), file.bytes);
++      await chmod(path.join(fixture.root, name), file.mode);
++      fixture.files.push(file);
++    }
++    const hash = hashSkillTreeEntries(fixture.files);
++    const source = registerRequiredSkillTree(fixture.root, hash);
++    const { host } = seedHostSession(harness.deps, { id: "host-parent-spelling" });
++    const staged = await stageInjectedSkillSources({
++      dataDir: path.join(harness.config.dataDir, "parent-spelling-daemon"),
++      injectedSkillSources: [source],
++      fetchSkillTree: async () => {
++        const response = await harness.app.request(`/internal/skills/required-tree/${hash}`, {
++          headers: internalAuthHeaders(harness, { hostId: host.id }),
++        });
++        expect(response.status).toBe(200);
++        return hostDaemonSkillTreeSchema.parse(await response.json());
++      },
++    });
++    const root = path.join(staged.skillRoots[0]!.path, source.name);
++    for (const file of fixture.files) {
++      expect(await readFile(path.join(root, file.path))).toEqual(file.bytes);
++      expect((await stat(path.join(root, file.path))).mode & 0o777).toBe(file.mode);
++    }
++    expect((await promisify(execFile)(path.join(root, "scripts/two"))).stdout).toContain("scripts/two");
++  });
++});
+diff --git a/gui/apps/server/test/threads/required-agent-configuration.test.ts b/gui/apps/server/test/threads/required-agent-configuration.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d1e99bd637e90c12ec1e81ea2014b3c66a83d5e6
+--- /dev/null
++++ b/gui/apps/server/test/threads/required-agent-configuration.test.ts
+@@ -0,0 +1,164 @@
++import { mkdir, writeFile, mkdtemp, rm } from "node:fs/promises";
++import path from "node:path";
++import { tmpdir } from "node:os";
++import { describe,expect,it,vi } from "vitest";
++import { createThread,getRequiredAgentConfigurationOwner,getThread,deleteThread,getQueuedThreadMessage } from "@cloudroom/db";
++import { encodeClientTurnRequestIdNumber } from "@cloudroom/domain";
++import { buildExecutionOptions,buildThreadStartCommand } from "../../src/services/threads/thread-commands.js";
++import { seedEnvironment,seedHostSession,seedProjectWithSource,seedQueuedMessage,seedSession } from "../helpers/seed.js";
++import { normalizeRequiredAgentConfiguration } from "../../src/services/plugins/required-agent-configuration.js";
++import { sendQueuedMessageNow } from "../../src/services/threads/queued-messages.js";
++import { listQueuedThreadCommands } from "../helpers/commands.js";
++import { textInput } from "../helpers/prompt-input.js";
++import { withTestHarness,startTestServer } from "../helpers/test-app.js";
++
++async function plugin(root:string,instructions:string,callback="return {instructions,skillDirectories:[]}") {
++  await mkdir(root,{recursive:true});
++  await writeFile(path.join(root,"package.json"),JSON.stringify({name:"bb-plugin-required-config",version:"0.1.0",bb:{name:"Required config fixture",description:"Required owner regression",branding:{icon:"Zap"},server:"./server.ts"}}));
++  await writeFile(path.join(root,"server.ts"),`export default function plugin(bb) { const instructions=${JSON.stringify(instructions)}; bb.agents.configureRequired(async context=>{ ${callback}; }); }`);
++}
++
++describe("required native agent configuration",()=>{
++  it("persists an immutable owner in the create transaction, keeps lineage independent, and rolls back a refused owner insertion",async()=>{
++    await withTestHarness(async harness=>{
++      const {host}=seedHostSession(harness.deps,{id:"host-required-owner"}); const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++      const owner="required-config";
++      const root=createThread(harness.deps.db,harness.deps.hub,{projectId:project.id,providerId:"codex",originPluginId:owner,requiredAgentConfigurationPluginId:owner,status:"pending"});
++      expect(root.originKind).toBe(null); expect(root.sourceThreadId).toBe(null); expect(getRequiredAgentConfigurationOwner(harness.deps.db,root.id)).toBe(owner);
++      const child=createThread(harness.deps.db,harness.deps.hub,{projectId:project.id,providerId:"codex",parentThreadId:root.id,originPluginId:owner,requiredAgentConfigurationPluginId:owner});
++      expect(child.parentThreadId).toBe(root.id); expect(getRequiredAgentConfigurationOwner(harness.deps.db,child.id)).toBe(owner);
++      const fork=createThread(harness.deps.db,harness.deps.hub,{projectId:project.id,providerId:"codex",originKind:"fork",sourceThreadId:root.id});
++      expect(fork.sourceThreadId).toBe(root.id); expect(getRequiredAgentConfigurationOwner(harness.deps.db,fork.id)).toBe(null);
++      expect(()=>harness.deps.db.$client.prepare("UPDATE thread_required_agent_configurations SET plugin_id='other' WHERE thread_id=?").run(root.id)).toThrow("immutable");
++      expect(()=>harness.deps.db.$client.prepare("DELETE FROM thread_required_agent_configurations WHERE thread_id=?").run(root.id)).toThrow("belongs");
++      harness.deps.db.$client.exec("CREATE TRIGGER refuse_test_required_owner BEFORE INSERT ON thread_required_agent_configurations WHEN NEW.thread_id='thread-required-rollback' BEGIN SELECT RAISE(ABORT,'fixture owner refusal'); END;");
++      expect(()=>createThread(harness.deps.db,harness.deps.hub,{id:"thread-required-rollback",projectId:project.id,providerId:"codex",originPluginId:owner,requiredAgentConfigurationPluginId:owner})).toThrow("fixture owner refusal");
++      expect(getThread(harness.deps.db,"thread-required-rollback")).toBeNull();
++      deleteThread(harness.deps.db,harness.deps.hub,child.id);
++      expect(getRequiredAgentConfigurationOwner(harness.deps.db,child.id)).toBe(null);
++    });
++  });
++
++  it("uses the actual loaded required provider without truncation, and refuses disable, callback failure and stopped owner in the same server",async()=>{
++    await withTestHarness(async harness=>{
++      const root=path.join(harness.config.dataDir,"required-plugin"); const tail="REQUIRED_INSTRUCTION_TAIL";
++      const instructions="Complete instructions. ".repeat(400)+tail;
++      await plugin(root,instructions); const installed=await harness.pluginService.installPath(root); expect(installed.status).toBe("running");
++      const {host}=seedHostSession(harness.deps,{id:"host-required-runtime"}); const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++      const environment=seedEnvironment(harness.deps,{hostId:host.id,projectId:project.id,path:path.join(harness.config.dataDir,"required-workspace")});
++      const thread=createThread(harness.deps.db,harness.deps.hub,{projectId:project.id,environmentId:environment.id,providerId:"codex",originPluginId:installed.id,requiredAgentConfigurationPluginId:installed.id,status:"idle"});
++      const execution=await buildExecutionOptions(harness.deps,{model:"gpt-5"},{threadId:thread.id});
++      const build=()=>buildThreadStartCommand(harness.deps,{environment,execution,fork:null,permissionEscalation:"ask",input:textInput("hello"),projectId:project.id,providerId:"codex",requestId:encodeClientTurnRequestIdNumber({value:1}),syncGeneratedTitle:false,thread});
++      expect((await build()).instructions).toContain(instructions);
++      await harness.pluginService.setEnabled(installed.id,false);
++      expect(getRequiredAgentConfigurationOwner(harness.deps.db,thread.id)).toBe(installed.id);
++      await expect(build()).rejects.toThrow("Required agent configuration owner is unavailable");
++      await plugin(root,instructions,'throw new Error("required callback failed")');
++      await harness.pluginService.setEnabled(installed.id,true);
++      await expect(build()).rejects.toThrow("Required agent configuration failed");
++      await plugin(root,instructions); await harness.pluginService.reload(installed.id);
++      expect((await build()).instructions).toContain(tail);
++      await harness.pluginService.stop();
++      await expect(build()).rejects.toThrow("Required agent configuration");
++    });
++  });
++});
++
++
++describe("required configuration dispatch lifecycle",()=>{
++  it("keeps Send-now queued and sends no provider command when the durable owner is missing",async()=>{
++    await withTestHarness(async harness=>{
++      const {host}=seedHostSession(harness.deps,{id:"host-required-send-now"});
++      const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++      const environment=seedEnvironment(harness.deps,{hostId:host.id,projectId:project.id,path:"/tmp/required-send-now",status:"ready"});
++      const thread=createThread(harness.db,harness.hub,{projectId:project.id,environmentId:environment.id,providerId:"codex",originPluginId:"missing-required-owner",requiredAgentConfigurationPluginId:"missing-required-owner",status:"idle"});
++      const queued=seedQueuedMessage(harness.deps,{threadId:thread.id,content:textInput("send after restart")});
++      await expect(sendQueuedMessageNow(harness.deps,{threadId:thread.id,queuedMessageId:queued.id,mode:"auto"})).rejects.toThrow("Required agent configuration");
++      expect(getQueuedThreadMessage(harness.db,queued.id)).not.toBeNull();
++      expect(listQueuedThreadCommands(harness,"thread.start",thread.id)).toEqual([]);
++      expect(listQueuedThreadCommands(harness,"turn.submit",thread.id)).toEqual([]);
++    });
++  });
++
++  it("cancels an active required callback before unloading its owner",async()=>{
++    await withTestHarness(async harness=>{
++      const root=path.join(harness.config.dataDir,"required-cancel-plugin");
++      const marker=path.join(harness.config.dataDir,"required-callback-started");
++      await plugin(root,"instructions",`await import('node:fs/promises').then(fs=>fs.writeFile(${JSON.stringify(marker)},'started')); await new Promise((resolve,reject)=>{context.signal.addEventListener('abort',()=>reject(context.signal.reason),{once:true});}); return {instructions,skillDirectories:[]}`);
++      const installed=await harness.pluginService.installPath(root);
++      const {host}=seedHostSession(harness.deps,{id:"host-required-cancel"});const {project}=seedProjectWithSource(harness.deps,{hostId:host.id});
++      const environment=seedEnvironment(harness.deps,{hostId:host.id,projectId:project.id,path:"/tmp/required-cancel"});
++      const thread=createThread(harness.db,harness.hub,{projectId:project.id,environmentId:environment.id,providerId:"codex",originPluginId:installed.id,requiredAgentConfigurationPluginId:installed.id,status:"idle"});
++      const execution=await buildExecutionOptions(harness.deps,{model:"gpt-5"},{threadId:thread.id});
++      const pending=buildThreadStartCommand(harness.deps,{environment,execution,fork:null,permissionEscalation:"ask",input:textInput("hello"),projectId:project.id,providerId:"codex",requestId:encodeClientTurnRequestIdNumber({value:2}),syncGeneratedTitle:false,thread});
++      const rejected=expect(pending).rejects.toThrow();
++      await vi.waitFor(async()=>expect(await import('node:fs/promises').then(fs=>fs.readFile(marker,'utf8'))).toBe('started'));
++      const started=Date.now();await harness.pluginService.setEnabled(installed.id,false);
++      await rejected;expect(Date.now()-started).toBeLessThan(2000);
++      expect(getRequiredAgentConfigurationOwner(harness.db,thread.id)).toBe(installed.id);
++    });
++  });
++});
++
++
++it("public plugin spawn stamps the closure owner and refuses managed forks",async()=>{
++  const server=await startTestServer();
++  try {
++    const {host}=seedHostSession(server.deps,{id:"host-required-public"});
++    const {project}=seedProjectWithSource(server.deps,{hostId:host.id,path:"/tmp/required-public"});
++    seedEnvironment(server.deps,{hostId:host.id,projectId:project.id,path:"/tmp/required-public",status:"ready"});
++    server.pluginService.bindSdk({baseUrl:server.baseUrl});
++    const root=path.join(server.config.dataDir,"required-public-plugin");await plugin(root,"Required public instructions");
++    const installed=await server.pluginService.installPath(root);const api=server.pluginService.getApi(installed.id);expect(api).toBeDefined();
++    const args={projectId:project.id,prompt:"required public fixture",provider:"codex",environment:{type:"host" as const,hostId:host.id,workspace:{type:"unmanaged" as const,path:"/tmp/required-public"}},origin:"sdk" as const,originPluginId:"forged-owner",requiredAgentConfiguration:true};
++    const thread=await api!.sdk.threads.spawn(args);
++    expect(getRequiredAgentConfigurationOwner(server.db,thread.id)).toBe(installed.id);
++    expect(getThread(server.db,thread.id)).toMatchObject({originKind:null,originPluginId:installed.id,sourceThreadId:null});
++    await expect(api!.sdk.threads.spawn({...args,sourceThreadId:thread.id})).rejects.toThrow();
++  } finally {await server.close();}
++});
++
++
++it("bounds complete required instructions and explicit directory descriptors at their wire limits",()=>{
++  const skillDirectories=Array.from({length:16},(_,index)=>({rootPath:`/required-${index}`,expectedTreeHash:"a".repeat(64)}));
++  const value={instructions:"é".repeat(16384),skillDirectories};
++  expect(normalizeRequiredAgentConfiguration(value)).toEqual(value);
++  expect(()=>normalizeRequiredAgentConfiguration({...value,instructions:value.instructions+"x"})).toThrow("oversized");
++  expect(()=>normalizeRequiredAgentConfiguration({...value,skillDirectories:[...skillDirectories,skillDirectories[0]]})).toThrow("oversized");
++  const maximum={rootPath:"/"+"a".repeat(4095),expectedTreeHash:"a".repeat(64)};
++  expect(normalizeRequiredAgentConfiguration({instructions:"",skillDirectories:[maximum]}).skillDirectories[0]).toEqual(maximum);
++  expect(()=>normalizeRequiredAgentConfiguration({instructions:"",skillDirectories:[{...maximum,rootPath:maximum.rootPath+"a"}]})).toThrow("descriptor");
++  expect(()=>normalizeRequiredAgentConfiguration({...value,instructions:"NUL\0"})).toThrow();
++  expect(()=>normalizeRequiredAgentConfiguration({...value,extra:"unapproved"})).toThrow();
++});
++
++
++it("retains required ownership and queued work after a real on-disk server restart without its plugin state",async()=>{
++  const directory=await mkdtemp(path.join(tmpdir(),"required-restart-"));const databasePath=path.join(directory,"server.sqlite");
++  let first=await startTestServer({databasePath});let second:Awaited<ReturnType<typeof startTestServer>>|undefined;let firstClosed=false;
++  try {
++    const root=path.join(first.config.dataDir,"required-persisted-owner");await plugin(root,"Persisted required instructions");
++    const installed=await first.pluginService.installPath(root);expect(installed.status).toBe("running");
++    const {host}=seedHostSession(first.deps,{id:"host-required-restart"});const {project}=seedProjectWithSource(first.deps,{hostId:host.id});
++    const environment=seedEnvironment(first.deps,{hostId:host.id,projectId:project.id,path:path.join(directory,"workspace"),status:"ready"});
++    const thread=createThread(first.db,first.hub,{projectId:project.id,environmentId:environment.id,providerId:"codex",originPluginId:installed.id,requiredAgentConfigurationPluginId:installed.id,status:"idle"});
++    const queued=seedQueuedMessage(first.deps,{threadId:thread.id,content:textInput("queued before persisted restart")});
++    await first.pluginService.remove(installed.id);
++    expect(getRequiredAgentConfigurationOwner(first.db,thread.id)).toBe(installed.id);
++    await first.close();firstClosed=true;first.db.$client.close();
++    second=await startTestServer({databasePath});
++    expect(second.deps).not.toBe(first.deps);expect(second.db).not.toBe(first.db);
++    expect(second.pluginService.getApi(installed.id)).toBeUndefined();
++    expect(getRequiredAgentConfigurationOwner(second.db,thread.id)).toBe(installed.id);
++    expect(getQueuedThreadMessage(second.db,queued.id)).not.toBeNull();
++    seedSession(second.deps,host.id);
++    await expect(sendQueuedMessageNow(second.deps,{threadId:thread.id,queuedMessageId:queued.id,mode:"auto"})).rejects.toThrow("Required agent configuration");
++    expect(getQueuedThreadMessage(second.db,queued.id)).not.toBeNull();
++    expect(listQueuedThreadCommands(second,"thread.start",thread.id)).toEqual([]);
++    expect(listQueuedThreadCommands(second,"turn.submit",thread.id)).toEqual([]);
++  }finally{
++    if(!firstClosed){await first.close();first.db.$client.close();}
++    if(second){await second.close();second.db.$client.close();}
++    await rm(directory,{recursive:true,force:true});
++  }
++});
+diff --git a/gui/packages/db/drizzle/0135_required_agent_configurations.sql b/gui/packages/db/drizzle/0135_required_agent_configurations.sql
+new file mode 100644
+index 0000000000000000000000000000000000000000..abd5d26c478ef8b95df3dbb4051d62eb8f900a5c
+--- /dev/null
++++ b/gui/packages/db/drizzle/0135_required_agent_configurations.sql
+@@ -0,0 +1,11 @@
++CREATE TABLE thread_required_agent_configurations (
++  thread_id text PRIMARY KEY NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
++  plugin_id text NOT NULL CHECK(length(plugin_id) BETWEEN 1 AND 128)
++);
++--> statement-breakpoint
++CREATE TRIGGER required_agent_configuration_immutable BEFORE UPDATE ON thread_required_agent_configurations
++BEGIN SELECT RAISE(ABORT, 'required agent configuration is immutable'); END;
++--> statement-breakpoint
++CREATE TRIGGER required_agent_configuration_delete_owner_only BEFORE DELETE ON thread_required_agent_configurations
++WHEN EXISTS(SELECT 1 FROM threads WHERE id=OLD.thread_id)
++BEGIN SELECT RAISE(ABORT, 'required agent configuration belongs to its thread'); END;
+diff --git a/gui/plugins/provider-claude-code/src/bridge/__tests__/native-tool-origins.test.ts b/gui/plugins/provider-claude-code/src/bridge/__tests__/native-tool-origins.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..cdddd26214f34d8691427a8e3d62db7223340407
+--- /dev/null
++++ b/gui/plugins/provider-claude-code/src/bridge/__tests__/native-tool-origins.test.ts
+@@ -0,0 +1,133 @@
++import { describe, expect, it } from "vitest";
++import { NativeToolOrigins, NATIVE_ORIGIN_LIMITS } from "../native-tool-origins.js";
++import { BB_BRIDGE_MCP_SERVER_NAME } from "../../tool-classification.js";
++import { Client } from "@modelcontextprotocol/sdk/client/index.js";
++import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
++import { buildBridgeMcpServer } from "../tool-proxy-mcp.js";
++const tool = `mcp__${BB_BRIDGE_MCP_SERVER_NAME}__openbot_company_mcp`;
++const args = { alias: "crm", operation: "call", arguments: { key: "hello" } };
++
++describe("explicit native tool origins", () => {
++  it("forwards the actual outer MCP tool id without a descriptor after ambiguous native hooks", async () => {
++    const origins = new NativeToolOrigins();
++    origins.enqueue("creq_A", "same input");
++    origins.enqueue("creq_B", "same input");
++    const hooks = origins.hooks();
++    const common = { session_id: "sdk_session", transcript_path: "/fixture/transcript", cwd: "/fixture" };
++    const options = { signal: new AbortController().signal };
++    await hooks.UserPromptSubmit![0]!.hooks[0]!({ ...common, hook_event_name: "UserPromptSubmit", prompt_id: "prompt_B", prompt: "same input" }, undefined, options);
++    await hooks.PreToolUse![0]!.hooks[0]!({ ...common, hook_event_name: "PreToolUse", prompt_id: "prompt_B", tool_use_id: "toolu_B", tool_name: tool, tool_input: args }, "toolu_B", options);
++    const forwarded: unknown[] = [];
++    const server = buildBridgeMcpServer([{ name: "openbot_company_mcp", description: "fixture", inputSchema: { type: "object" } }], async (name, input, callId) => {
++      forwarded.push({ callId, invocation: origins.resolve(callId, name, input) });
++      return { content: "refused without native invocation" };
++    });
++    const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
++    await server.instance.connect(serverTransport);
++    const client = new Client({ name: "origin-boundary", version: "1" });
++    try {
++      await client.connect(clientTransport);
++      await client.callTool({ name: "openbot_company_mcp", arguments: args, _meta: { "claudecode/toolUseId": "toolu_B" } });
++      expect(forwarded).toEqual([{ callId: "toolu_B", invocation: undefined }]);
++    } finally { await client.close(); }
++  });
++
++  it("refuses identical pending inputs in either hook order without revoking unrelated proven calls", () => {
++    for (const first of ["prompt_A", "prompt_B"]) {
++      const origins = new NativeToolOrigins();
++      origins.enqueue("creq_proven", "proven input");
++      expect(origins.acknowledge("prompt_proven", "proven input")).toBe(true);
++      expect(origins.observeTool("prompt_proven", "toolu_proven", tool, args)).toBe(true);
++      origins.enqueue("creq_A", "same input");
++      origins.enqueue("creq_B", "same input");
++      expect(origins.acknowledge(first, "same input")).toBe(false);
++      expect(origins.acknowledge(first === "prompt_A" ? "prompt_B" : "prompt_A", "same input")).toBe(false);
++      expect(origins.observeTool("prompt_B", "toolu_B", tool, args)).toBe(false);
++      expect(origins.resolve("toolu_B", "openbot_company_mcp", args)).toBeUndefined();
++      expect(origins.resolve("toolu_proven", "openbot_company_mcp", args)?.clientRequestId).toBe("creq_proven");
++      origins.enqueue("creq_C", "unique C");
++      expect(origins.acknowledge("prompt_C", "unique C")).toBe(true);
++    }
++  });
++
++  it("never reuses cancelled input proof and invalidates a replayed prompt id after identical resubmission", () => {
++    const origins = new NativeToolOrigins();
++    const cancelled = origins.enqueue("creq_cancelled", "cancelled input");
++    origins.cancel(cancelled);
++    origins.enqueue("creq_later", "cancelled input");
++    expect(origins.acknowledge("prompt_delayed", "cancelled input")).toBe(false);
++    origins.enqueue("creq_A", "owned A");
++    expect(origins.acknowledge("prompt_A", "owned A")).toBe(true);
++    expect(origins.acknowledge("prompt_A", "owned A")).toBe(true);
++    expect(origins.observeTool("prompt_A", "toolu_A", tool, args)).toBe(true);
++    origins.enqueue("creq_replay", "owned A");
++    expect(origins.acknowledge("prompt_new", "owned A")).toBe(false);
++    expect(origins.resolve("toolu_A", "openbot_company_mcp", args)?.clientRequestId).toBe("creq_A");
++    expect(origins.acknowledge("prompt_A", "owned A")).toBe(false);
++    expect(origins.observeTool("prompt_A", "toolu_replay", tool, args)).toBe(false);
++    expect(origins.resolve("toolu_replay", "openbot_company_mcp", args)).toBeUndefined();
++  });
++
++  it("refuses the next prompt and tool record at the exact epoch bounds without reassigning old calls", () => {
++    const origins = new NativeToolOrigins();
++    for (let i=0;i<NATIVE_ORIGIN_LIMITS.prompts;i++) {
++      origins.enqueue(`creq_${i}`,`input ${i}`);
++      expect(origins.acknowledge(`prompt_${i}`,`input ${i}`)).toBe(true);
++    }
++    expect(()=>origins.enqueue("creq_overflow","overflow")).toThrow("identity unavailable");
++    for (let i=0;i<NATIVE_ORIGIN_LIMITS.calls;i++) expect(origins.observeTool("prompt_0",`toolu_${i}`,tool,args)).toBe(true);
++    expect(origins.observeTool("prompt_0","toolu_overflow",tool,args)).toBe(false);
++    expect(origins.resolve("toolu_overflow","openbot_company_mcp",args)).toBeUndefined();
++    expect(origins.resolve("toolu_0","openbot_company_mcp",args)?.clientRequestId).toBe("creq_0");
++  });
++
++  it("bounds submitted UTF-8 bytes and canonical tool arguments before identity hashing", () => {
++    const origins=new NativeToolOrigins();const input="é".repeat(NATIVE_ORIGIN_LIMITS.bytes/2);
++    origins.enqueue("creq_bytes",input);expect(origins.acknowledge("prompt_bytes",input)).toBe(true);
++    expect(()=>origins.enqueue("creq_too_large",input+"x")).toThrow("capacity exceeded");
++    const value={value:"x".repeat(NATIVE_ORIGIN_LIMITS.bytes-12)};
++    expect(origins.observeTool("prompt_bytes","toolu_bytes",tool,value)).toBe(true);
++    expect(()=>origins.observeTool("prompt_bytes","toolu_large",tool,{value:"x".repeat(NATIVE_ORIGIN_LIMITS.bytes)})).toThrow("capacity exceeded");
++    expect(origins.resolve("toolu_large","openbot_company_mcp",value)).toBeUndefined();
++  });
++
++  it("keeps A after queued B acknowledgment and refuses unknown/current-turn substitution", () => {
++    const origins = new NativeToolOrigins();
++    origins.enqueue("creq_A", "owned A"); origins.enqueue("creq_B", "owned B");
++    expect(origins.acknowledge("prompt_B", "owned B")).toBe(false);
++    expect(origins.acknowledge("prompt_A", "owned A")).toBe(true);
++    expect(origins.acknowledge("prompt_B", "owned B")).toBe(true);
++    expect(origins.observeTool("prompt_A", "toolu_A", tool, args)).toBe(true);
++    expect(origins.resolve("toolu_A", "openbot_company_mcp", args)).toEqual({ clientRequestId: "creq_A", callId: "toolu_A" });
++    expect(origins.resolve("call-1", "openbot_company_mcp", args)).toBeUndefined();
++    expect(origins.observeTool("unknown", "toolu_unknown", tool, args)).toBe(false);
++    expect(origins.resolve("toolu_unknown", "openbot_company_mcp", args)).toBeUndefined();
++  });
++
++  it("refuses conflicting tool/input identity, unowned prompts and replaced SDK epochs", () => {
++    const prior = new NativeToolOrigins(); prior.enqueue("creq_A", "owned A");
++    expect(prior.acknowledge("fake", "different input")).toBe(false);
++    prior.acknowledge("prompt_A", "owned A"); prior.observeTool("prompt_A", "toolu_A", tool, args);
++    expect(prior.resolve("toolu_A", "openbot_company_mcp", { ...args, alias: "other" })).toBeUndefined();
++    prior.close();
++    const replacement = new NativeToolOrigins(); replacement.enqueue("creq_B", "owned B"); replacement.acknowledge("prompt_B", "owned B");
++    replacement.observeTool("prompt_B", "toolu_A", tool, args);
++    expect(prior.resolve("toolu_A", "openbot_company_mcp", args)).toBeUndefined();
++    expect(prior.acknowledge("prompt_B", "owned B")).toBe(false);
++    expect(replacement.resolve("toolu_A", "openbot_company_mcp", args)?.clientRequestId).toBe("creq_B");
++    expect(replacement.observeTool("prompt_B", "toolu_A", tool, { ...args, alias: "changed" })).toBe(false);
++    expect(replacement.resolve("toolu_A", "openbot_company_mcp", args)).toBeUndefined();
++  });
++
++  it("does not grant native subagent/absent metadata authority and bounds the pending acknowledgment queue", () => {
++    const origins = new NativeToolOrigins();
++    for (let i = 0; i < NATIVE_ORIGIN_LIMITS.pending; i++) origins.enqueue(`creq_${i}`, `owned ${i}`);
++    expect(() => origins.enqueue("creq_overflow", "overflow")).toThrow("identity unavailable");
++    expect(origins.acknowledge("prompt_0", "owned 0", "subagent")).toBe(false);
++    expect(origins.acknowledge("prompt_0", "owned 0")).toBe(true);
++    expect(origins.observeTool("prompt_0", "toolu_0", tool, args, "subagent")).toBe(false);
++    expect(origins.resolve(undefined, "openbot_company_mcp", args)).toBeUndefined();
++    const pending = origins.enqueue("creq_extra", "owned extra"); origins.cancel(pending);
++    expect(origins.acknowledge("prompt_extra", "owned extra")).toBe(false);
++  });
++});
+diff --git a/gui/plugins/provider-claude-code/src/bridge/native-tool-origins.ts b/gui/plugins/provider-claude-code/src/bridge/native-tool-origins.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..e31c62555bbcbf4ceb95d47210c01ed57c2ae605
+--- /dev/null
++++ b/gui/plugins/provider-claude-code/src/bridge/native-tool-origins.ts
+@@ -0,0 +1,143 @@
++import { createHash, randomUUID } from "node:crypto";
++import type { HookCallback, Options } from "@anthropic-ai/claude-agent-sdk";
++import { BB_BRIDGE_MCP_SERVER_NAME } from "../tool-classification.js";
++
++export const NATIVE_ORIGIN_LIMITS = Object.freeze({ pending: 32, prompts: 256, calls: 4096, bytes: 128 * 1024 });
++export type ExplicitNativeInvocation = Readonly<{ clientRequestId: string; callId: string }>;
++type InputOwner = { token: string; request: string; digest: string };
++type ToolOwner = { request: string; prompt: string; tool: string; digest: string };
++const toolPrefix = `mcp__${BB_BRIDGE_MCP_SERVER_NAME}__`;
++const validId = (id: unknown): id is string =>
++  typeof id === "string" && id.length > 0 && id.length <= 128 && !/[\x00-\x1f\x7f]/.test(id);
++
++function inputDigest(text: string): string {
++  if (Buffer.byteLength(text) > NATIVE_ORIGIN_LIMITS.bytes) throw new Error("Native input identity capacity exceeded");
++  return createHash("sha256").update(text).digest("hex");
++}
++
++function toolDigest(value: unknown): string {
++  let nodes = 0;
++  let budget = NATIVE_ORIGIN_LIMITS.bytes;
++  const canonical = (item: unknown, depth: number): unknown => {
++    if (++nodes > 4096 || depth > 32) throw new Error("Native tool identity capacity exceeded");
++    if (item === null || typeof item === "boolean") return item;
++    if (typeof item === "number" && Number.isFinite(item)) return item;
++    if (typeof item === "string") {
++      budget -= Buffer.byteLength(item);
++      if (budget < 0) throw new Error("Native tool identity capacity exceeded");
++      return item;
++    }
++    if (Array.isArray(item)) return item.map((entry) => canonical(entry, depth + 1));
++    if (item && typeof item === "object") {
++      const entries = Object.entries(item);
++      if (entries.length > 4096) throw new Error("Native tool identity capacity exceeded");
++      return Object.fromEntries(entries.sort(([a], [b]) => a.localeCompare(b)).map(([key, entry]) => {
++        budget -= Buffer.byteLength(key);
++        if (budget < 0) throw new Error("Native tool identity capacity exceeded");
++        return [key, canonical(entry, depth + 1)];
++      }));
++    }
++    throw new Error("Invalid native tool identity input");
++  };
++  return inputDigest(JSON.stringify(canonical(value, 0)));
++}
++
++/** One exact SDK session owns this object. Replacement hooks never consult a resident session. */
++export class NativeToolOrigins {
++  private closed = false;
++  private readonly pending: InputOwner[] = [];
++  private readonly requests = new Set<string>();
++  // Retain cancelled and acknowledged digests for this bounded SDK epoch too:
++  // a delayed hook must never become proof for a later identical input.
++  private readonly inputDigests = new Set<string>();
++  private readonly ambiguousDigests = new Set<string>();
++  private readonly prompts = new Map<string, InputOwner | null>();
++  private readonly calls = new Map<string, ToolOwner | null>();
++
++  enqueue(clientRequestId: string, input: string): string {
++    if (this.closed || !validId(clientRequestId) || this.requests.has(clientRequestId)
++      || this.pending.length >= NATIVE_ORIGIN_LIMITS.pending || this.requests.size >= NATIVE_ORIGIN_LIMITS.prompts) {
++      throw new Error("Native input identity unavailable");
++    }
++    const owner = { token: randomUUID(), request: clientRequestId, digest: inputDigest(input) };
++    this.requests.add(clientRequestId);
++    if (this.inputDigests.has(owner.digest)) {
++      this.ambiguousDigests.add(owner.digest);
++      for (let i = this.pending.length - 1; i >= 0; i--) {
++        if (this.pending[i]!.digest === owner.digest) this.pending.splice(i, 1);
++      }
++      return owner.token;
++    }
++    this.inputDigests.add(owner.digest);
++    this.pending.push(owner);
++    return owner.token;
++  }
++
++  cancel(token: string): void {
++    const pending = this.pending.findIndex((owner) => owner.token === token);
++    if (pending >= 0) this.pending.splice(pending, 1);
++    for (const [prompt, owner] of this.prompts) if (owner?.token === token) this.prompts.set(prompt, null);
++  }
++
++  acknowledge(promptId: unknown, input: string, agentId?: string): boolean {
++    if (this.closed || agentId !== undefined || !validId(promptId)) return false;
++    const digest = inputDigest(input);
++    if (this.prompts.has(promptId)) {
++      const prior = this.prompts.get(promptId);
++      if (prior?.digest === digest && !this.ambiguousDigests.has(digest)) return true;
++      this.prompts.set(promptId, null);
++      return false;
++    }
++    if (this.ambiguousDigests.has(digest)) return false;
++    const owner = this.pending[0];
++    if (!owner || owner.digest !== digest || this.prompts.size >= NATIVE_ORIGIN_LIMITS.prompts) return false;
++    this.pending.shift();
++    this.prompts.set(promptId, owner);
++    return true;
++  }
++
++  observeTool(promptId: unknown, callId: unknown, tool: string, input: unknown, agentId?: string): boolean {
++    if (this.closed || agentId !== undefined || !validId(promptId) || !validId(callId) || (!tool.startsWith(toolPrefix) || tool.length > 512)) return false;
++    const owner = this.prompts.get(promptId);
++    if (!owner) return false;
++    const digest = toolDigest(input);
++    const prior = this.calls.get(callId);
++    if (this.calls.has(callId)) {
++      if (prior?.request === owner.request && prior.prompt === promptId && prior.tool === tool && prior.digest === digest) return true;
++      this.calls.set(callId, null);
++      return false;
++    }
++    if (this.calls.size >= NATIVE_ORIGIN_LIMITS.calls) return false;
++    this.calls.set(callId, { request: owner.request, prompt: promptId, tool, digest });
++    return true;
++  }
++
++  resolve(callId: unknown, tool: string, input: unknown): ExplicitNativeInvocation | undefined {
++    if (this.closed || !validId(callId)) return undefined;
++    const owner = this.calls.get(callId);
++    if (!owner || !this.prompts.get(owner.prompt) || owner.tool !== toolPrefix + tool || owner.digest !== toolDigest(input)) return undefined;
++    return Object.freeze({ clientRequestId: owner.request, callId });
++  }
++
++  close(): void {
++    this.closed = true;
++    this.pending.length = 0;
++    this.prompts.clear();
++    this.calls.clear();
++    this.requests.clear();
++    this.inputDigests.clear();
++    this.ambiguousDigests.clear();
++  }
++
++  hooks(): NonNullable<Options["hooks"]> {
++    const submitted: HookCallback = async (input) => {
++      if (input.hook_event_name === "UserPromptSubmit") this.acknowledge(input.prompt_id, input.prompt, input.agent_id);
++      return { continue: true };
++    };
++    const tool: HookCallback = async (input) => {
++      if (input.hook_event_name === "PreToolUse") this.observeTool(input.prompt_id, input.tool_use_id, input.tool_name, input.tool_input, input.agent_id);
++      return { continue: true };
++    };
++    return { UserPromptSubmit: [{ hooks: [submitted] }], PreToolUse: [{ hooks: [tool] }] };
++  }
++}
+diff --git a/gui/tests/integration/real/required-native-company-mcp.test.ts b/gui/tests/integration/real/required-native-company-mcp.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..ee3f231ae157956b9c7e87e9b37893c8721e5b27
+--- /dev/null
++++ b/gui/tests/integration/real/required-native-company-mcp.test.ts
+@@ -0,0 +1,136 @@
++import { createServer } from "node:http";
++import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import path from "node:path";
++import { pathToFileURL } from "node:url";
++import { once } from "node:events";
++import { it, expect } from "vitest";
++import { createIntegrationHarness } from "../helpers/harness.js";
++import { createProjectFixture } from "../helpers/fixtures.js";
++import { getThreadEvents } from "../helpers/api.js";
++
++async function ownedJson(file:string):Promise<any> {
++  const until=Date.now()+150000;
++  for(;;) {
++    await assertOwnedLive(path.dirname(file));
++    try{return JSON.parse(await readFile(file,"utf8"));}catch(error){if((error as NodeJS.ErrnoException).code!=="ENOENT")throw error;}
++    if(Date.now()>until)throw new Error(`Owned fixture handshake timed out: ${path.basename(file)}`);
++    await new Promise(resolve=>setTimeout(resolve,50));
++  }
++}
++
++async function assertOwnedLive(directory:string):Promise<void> {
++  try {await readFile(directory+"/abort.json");}
++  catch(error){if((error as NodeJS.ErrnoException).code==="ENOENT")return;throw error;}
++  throw new Error("Owned native fixture was cancelled");
++}
++async function writeOwned(file:string,value:unknown):Promise<void> {
++  const {rename}=await import("node:fs/promises");
++  await writeFile(file+".tmp",JSON.stringify(value,null,2));await rename(file+".tmp",file);
++}
++
++function reply(body:Record<string,any>):string {
++  const messages=JSON.stringify(body.messages??[]);
++  const definition=body.tools?.find((tool:any)=>tool.name.endsWith("__openbot_company_mcp"));
++  const search=!definition && messages.includes("NATIVE_COMPANY_MCP")
++    ? body.tools?.find((tool:any)=>tool.name==="ToolSearch"):undefined;
++  const results=(body.messages??[]).flatMap((message:any)=>Array.isArray(message.content)?message.content:[])
++    .filter((part:any)=>part.type==="tool_result");
++  const done=(id:string)=>results.some((part:any)=>part.tool_use_id===id);
++  const retained=/NATIVE_COMPANY_MCP_STATUS: ([0-9a-f-]{36})/.exec(messages);
++  const phase=retained?"status":!done("toolu_company_list")?"list":!done("toolu_company_describe")?"describe":"call";
++  const call=(definition||search) && !done(retained?"toolu_company_status":"toolu_company_call");
++  const id=definition?`toolu_company_${phase}`:`toolu_company_search_${messages.length}`;
++  const input=search?{query:"openbot_company_mcp"}:retained?{kind:"status",call_id:retained[1]}:phase==="list"?{kind:"list"}:phase==="describe"?{kind:"describe",alias:"crm.lookup"}
++    :{kind:"call",alias:"crm.lookup",arguments:{query:"actual native company MCP"}};
++  const message={id:"msg_company",type:"message",role:"assistant",content:[],model:body.model,stop_reason:null,stop_sequence:null,usage:{input_tokens:100,output_tokens:0}};
++  return [
++    ["message_start",{type:"message_start",message}],
++    ["content_block_start",{type:"content_block_start",index:0,content_block:call?{type:"tool_use",id,name:(definition??search).name,input:{}}:{type:"text",text:""}}],
++    ["content_block_delta",{type:"content_block_delta",index:0,delta:call?{type:"input_json_delta",partial_json:JSON.stringify(input)}:{type:"text_delta",text:"NATIVE_COMPANY_MCP_FINISHED"}}],
++    ["content_block_stop",{type:"content_block_stop",index:0}],
++    ["message_delta",{type:"message_delta",delta:{stop_reason:call?"tool_use":"end_turn",stop_sequence:null},usage:{output_tokens:20}}],
++    ["message_stop",{type:"message_stop"}],
++  ].map(([event,payload])=>`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`).join("");
++}
++
++it.skipIf(!process.env.OPENBOT_NATIVE_COMPANY_MCP_CONFIG)(
++  "runs the loaded Openbot proxy from the actual native Claude CLI through authenticated PostgreSQL broker approval and the normal MCP worker",
++  async()=>{
++    const config=JSON.parse(await readFile(process.env.OPENBOT_NATIVE_COMPANY_MCP_CONFIG!,"utf8"));
++    const root=await mkdtemp(path.join(tmpdir(),"openbot-native-company-mcp-"));
++    const observed:unknown[]=[];
++    const api=createServer(async(request,response)=>{
++      let raw="";for await(const chunk of request){raw+=chunk;if(Buffer.byteLength(raw)>4*1024*1024){response.writeHead(413).end();return;}}
++      if(request.url?.includes("count_tokens")){response.writeHead(200,{"content-type":"application/json"}).end('{"input_tokens":100}');return;}
++      const body=JSON.parse(raw||"{}");observed.push({model:body.model,messages:body.messages,tools:(body.tools??[]).map((tool:any)=>tool.name)});
++      response.writeHead(200,{"content-type":"text/event-stream"}).end(reply(body));
++    });
++    api.listen(0,"127.0.0.1");await once(api,"listening");const address=api.address();if(!address||typeof address==="string")throw new Error("no Messages fixture address");
++    process.env.HOME=path.join(root,"home");await mkdir(process.env.HOME);process.env.CLAUDE_CONFIG_DIR=path.join(process.env.HOME,".claude");
++    process.env.ANTHROPIC_API_KEY="sk-ant-openbot-disposable-fixture-only";process.env.ANTHROPIC_BASE_URL=`http://127.0.0.1:${address.port}`;
++    process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1";process.env.DISABLE_TELEMETRY="1";process.env.DISABLE_ERROR_REPORTING="1";
++    let harness:Awaited<ReturnType<typeof createIntegrationHarness>>|undefined;
++    let diagnostics:ReturnType<typeof setInterval>|undefined;
++    try {
++      harness=await createIntegrationHarness({loadEnvironmentFile:false});
++      const project=await createProjectFixture(harness,{name:"Actual Openbot company MCP"});
++      const owner=await harness.server.pluginService.installPath(config.pluginPath);expect(["running","needs-configuration"]).toContain(owner.status);
++      const publicApi=harness.server.pluginService.getApi(owner.id)!;
++      expect(publicApi.agents.nativeToolOriginVersion).toBe(1);
++      // Reuse a real fixture pairing receipt and an empty plugin-owned journal.
++      // Native session, prompt, invocation and broker authority are all produced normally.
++      const {Journal,enrollmentSchema}=await import(pathToFileURL(config.journalHelper).href);
++      const paired=enrollmentSchema.parse(config.paired);
++      new Journal(publicApi.storage.database()).initialize(paired.binding);
++      await harness.server.pluginService.updateSettings(owner.id,{openbotOrigin:config.paired.binding.origin,
++        selectedProjects:project.id,enrollment:JSON.stringify(paired)});
++      const reloaded=await harness.server.pluginService.reload(owner.id);expect(reloaded.ok).toBe(true);
++      diagnostics=setInterval(()=>{void (async()=>{
++        const status=await harness!.server.pluginService.runCliCommand(owner.id,["status"],{cwd:root,signal:AbortSignal.timeout(1000)});
++        const db=harness!.server.pluginService.getApi(owner.id)!.storage.database();
++        const mappings=(db.prepare("SELECT mapping FROM sessions").all() as Array<{mapping:string}>).map(row=>{const value=JSON.parse(row.mapping);return {threadId:value.threadId,operationId:value.operationId};});
++        const commands=(db.prepare("SELECT state FROM commands").all() as Array<{state:string}>).map(row=>{const value=JSON.parse(row.state);return {id:value.operation.id,sdkCalls:value.sdkCalls,queueId:value.queueId,stage:value.stage,nativeState:value.nativeState,lastObservation:value.lastObservation};});
++        await writeOwned(config.directory+"/connector.json",{status,mappings,commands,plugins:harness!.server.pluginService.list().filter(plugin=>plugin.id===owner.id),logs:await harness!.server.pluginService.readLogTail(owner.id,20)});
++      })().catch(()=>{});},1000);
++      await writeOwned(config.directory+"/ready.json",{projectId:project.id,hostId:harness.hostId,pluginId:owner.id});
++      const native=await ownedJson(config.directory+"/native.json");
++      const until=Date.now()+90000;
++      const liveApi=harness.server.pluginService.getApi(owner.id)!;
++      const settledB=()=>{
++        const row=liveApi.storage.database().prepare("SELECT state FROM commands WHERE id=?").get(native.followupOperation) as {state:string}|undefined;
++        return row && JSON.parse(row.state).nativeState==="completed";
++      };
++      while((await liveApi.sdk.threads.get({threadId:native.threadId})).status!=="idle" || !settledB()) {
++        await assertOwnedLive(config.directory);if(Date.now()>until)throw new Error("Native MCP completion deadline");
++        await new Promise(resolve=>setTimeout(resolve,50));
++      }
++      const events=await getThreadEvents(harness.api,native.threadId);
++      const input=events.find(event=>event.type==="client/turn/requested" && JSON.stringify(event.data).includes("NATIVE_COMPANY_MCP:"));
++      expect(input?.type).toBe("client/turn/requested");if(input?.type!=="client/turn/requested")throw new Error("missing native input event");
++      const db=harness.server.pluginService.getApi(owner.id)!.storage.database();
++      const intents=db.prepare("SELECT state,resolved FROM mcp_intents").all() as Array<{state:string;resolved:number}>;
++      expect(intents).toHaveLength(1);const intent=JSON.parse(intents[0]!.state);
++      expect(intent.request).toBe(input.data.requestId);expect(intent.modelCall).toBe("toolu_company_call");expect(intents[0]!.resolved).toBe(1);
++      const later=events.find(event=>event.type==="client/turn/requested" && JSON.stringify(event.data).includes("NATIVE_COMPANY_MCP_STATUS"));
++      expect(later?.type).toBe("client/turn/requested");if(later?.type!=="client/turn/requested")throw new Error("missing queued native B input");
++      expect(later.data.requestId).not.toBe(input.data.requestId);
++      const statusResult=observed.flatMap((item:any)=>(item.messages??[]).flatMap((message:any)=>Array.isArray(message.content)?message.content:[]))
++        .find((part:any)=>part.type==="tool_result" && part.tool_use_id==="toolu_company_status");
++      expect(statusResult).toBeDefined();expect(statusResult.is_error).not.toBe(true);expect(JSON.stringify(statusResult)).toContain(intent.receipt.call);
++      expect(JSON.stringify(statusResult)).toContain("Ada");
++      expect(JSON.stringify(events)).toContain("Ada");expect(JSON.stringify(events)).toContain("NATIVE_COMPANY_MCP_FINISHED");
++      await writeOwned(config.directory+"/proof.json",{status:"PASS",clientRequestId:input.data.requestId,clientRequestB:later.data.requestId,intent,events,observed,
++        limitations:"Actual pinned native CLI, loaded Openbot plugin, authenticated PG API and production worker/gateway; local scripted Messages and MCP, dummy key only."});
++      await ownedJson(config.directory+"/finish.json");
++    }catch(error){await writeFile(config.directory+"/native-failure.json",JSON.stringify({message:String(error),observed},null,2));throw error;}
++    finally {
++      if(diagnostics)clearInterval(diagnostics);
++      if(harness){await harness.cleanup();await harness.server.pluginService.stop();}
++      api.closeAllConnections();await new Promise<void>(resolve=>api.close(()=>resolve()));
++      // Native CLI cache writers can finish just after transport shutdown. Retry
++      // only this owned fixture removal within the existing bounded test teardown.
++      await rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:100});
++    }
++  },180000,
++);
+diff --git a/gui/tests/integration/real/required-native-origins.test.ts b/gui/tests/integration/real/required-native-origins.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..c22b52a9226fa67ae60108a94c002ceeb0b32a47
+--- /dev/null
++++ b/gui/tests/integration/real/required-native-origins.test.ts
+@@ -0,0 +1,115 @@
++import { createServer } from "node:http";
++import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
++import { tmpdir } from "node:os";
++import path from "node:path";
++import { once } from "node:events";
++import { it, expect } from "vitest";
++import { createIntegrationHarness } from "../helpers/harness.js";
++import { createProjectFixture } from "../helpers/fixtures.js";
++import { waitForThreadStatus } from "../helpers/assertions.js";
++import { getThreadEvents } from "../helpers/api.js";
++
++function reply(body: Record<string, any>): string {
++  const messages = JSON.stringify(body.messages ?? []);
++  const phase = messages.includes("NATIVE_ORIGIN_PHASE_2") ? 2 : 1;
++  const definition = body.tools?.find((tool: any) => tool.name.endsWith("__openbot_identity_probe"));
++  const search = !definition && body.model === "claude-sonnet-4-6" && messages.includes("NATIVE_ORIGIN_PHASE_")
++    ? body.tools?.find((tool:any)=>tool.name === "ToolSearch") : undefined;
++  const call = (definition || search) && !messages.includes(`NATIVE_IDENTITY_RESULT_${phase}`);
++  const message = { id: `msg_origin_${phase}`, type: "message", role: "assistant", content: [], model: body.model,
++    stop_reason: null, stop_sequence: null, usage: { input_tokens: 100, output_tokens: 0 } };
++  const content = call
++    ? { type: "tool_use", id: definition ? `toolu_origin_${phase}` : `toolu_search_${phase}_${messages.length}`, name: (definition ?? search).name, input: {} }
++    : { type: "text", text: "" };
++  const delta = call
++    ? { type: "input_json_delta", partial_json: JSON.stringify(definition ? { phase, claimedOrigin: { clientRequestId: "forged_request", callId: "forged_call" } } : {query:"openbot_identity_probe"}) }
++    : { type: "text_delta", text: `NATIVE_ORIGIN_COMPLETE_${phase}` };
++  return [
++    ["message_start", { type: "message_start", message }],
++    ["content_block_start", { type: "content_block_start", index: 0, content_block: content }],
++    ["content_block_delta", { type: "content_block_delta", index: 0, delta }],
++    ["content_block_stop", { type: "content_block_stop", index: 0 }],
++    ["message_delta", { type: "message_delta", delta: { stop_reason: call ? "tool_use" : "end_turn", stop_sequence: null }, usage: { output_tokens: 20 } }],
++    ["message_stop", { type: "message_stop" }],
++  ].map(([event, payload]) => `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`).join("");
++}
++
++it.skipIf(process.env.OPENBOT_NATIVE_ORIGIN_PROBE !== "1")(
++  "delivers explicit originating input and stable model tool id through the actual native SDK bridge daemon and public plugin context",
++  async () => {
++    const root = await mkdtemp(path.join(tmpdir(), "openbot-native-origin-"));
++    const proofs = path.join(root, "proofs.jsonl");
++    const observed: Array<Record<string,unknown>>=[];
++    const api = createServer(async (request, response) => {
++      let raw = "";
++      for await (const chunk of request) {
++        raw += chunk;
++        if (Buffer.byteLength(raw) > 4 * 1024 * 1024) { response.writeHead(413).end(); return; }
++      }
++      if (request.url?.includes("count_tokens")) {
++        response.writeHead(200, { "content-type": "application/json" }).end('{"input_tokens":100}'); return;
++      }
++      const body=JSON.parse(raw || "{}");observed.push({model:body.model,tools:(body.tools??[]).map((tool:any)=>tool.name)});
++      response.writeHead(200, { "content-type": "text/event-stream" }).end(reply(body));
++    });
++    api.listen(0, "127.0.0.1"); await once(api, "listening");
++    const address = api.address(); if (!address || typeof address === "string") throw new Error("missing fixture address");
++    process.env.HOME = path.join(root, "home"); await mkdir(process.env.HOME);
++    process.env.CLAUDE_CONFIG_DIR = path.join(root, "home", ".claude");
++    process.env.ANTHROPIC_API_KEY = "sk-ant-openbot-disposable-fixture-only";
++    process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${address.port}`;
++    process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
++    process.env.DISABLE_TELEMETRY = "1"; process.env.DISABLE_ERROR_REPORTING = "1";
++    let harness: Awaited<ReturnType<typeof createIntegrationHarness>> | undefined;
++    let stop: (() => Promise<unknown>) | undefined;
++    try {
++      harness = await createIntegrationHarness({ loadEnvironmentFile: false });
++      const project = await createProjectFixture(harness, { name: "Native origin fixture" });
++      const plugin = path.join(root, "owner"); await mkdir(plugin);
++      await writeFile(path.join(plugin, "package.json"), JSON.stringify({ name: "bb-plugin-native-origin", version: "0.1.0",
++        bb: { name: "Native origin", description: "Real originating identity proof", branding: { icon: "Zap" }, server: "./server.ts" } }));
++      await writeFile(path.join(plugin, "server.ts"), `import {appendFile} from "node:fs/promises";
++        export default function(bb){
++          bb.agents.configureRequired(async()=>({instructions:"Use the identity probe when asked.",skillDirectories:[]}));
++          bb.agents.registerTool({name:"openbot_identity_probe",description:"Disposable originating identity probe",
++            parameters:{type:"object",properties:{phase:{type:"integer"},claimedOrigin:{type:"object"}},required:["phase","claimedOrigin"]},
++            execute:async(params,ctx)=>{await appendFile(${JSON.stringify(proofs)},JSON.stringify({phase:params.phase,nativeInvocation:ctx.nativeInvocation,
++              threadId:ctx.threadId,projectId:ctx.projectId,frozen:Object.isFrozen(ctx.nativeInvocation),claimedOrigin:params.claimedOrigin})+"\\n");
++              return "NATIVE_IDENTITY_RESULT_"+params.phase;}});
++        }`);
++      const owner = await harness.server.pluginService.installPath(plugin); expect(owner.status).toBe("running");
++      const sdk = harness.server.pluginService.getApi(owner.id)!.sdk;
++      const thread = await sdk.threads.spawn({ projectId: project.id, title: "Native identity fixture", providerId: "claude-code",
++        model: "claude-sonnet-4-6", permissionMode: "full", requiredAgentConfiguration: true,
++        prompt: "NATIVE_ORIGIN_PHASE_1: use the native identity probe.",
++        environment: { type: "host", hostId: harness.hostId, workspace: { type: "unmanaged", path: harness.repoDir } } });
++      stop = () => sdk.threads.stop({ threadId: thread.id });
++      await waitForThreadStatus(harness.api, thread.id, "idle", 30000);
++      await sdk.threads.send({ threadId: thread.id, model: "claude-sonnet-4-6", permissionMode: "full", mode: "auto",
++        input: [{ type: "text", text: "NATIVE_ORIGIN_PHASE_2: use the native identity probe again.", mentions: [] }] });
++      await waitForThreadStatus(harness.api, thread.id, "idle", 30000);
++      const events = await getThreadEvents(harness.api, thread.id);
++      if(process.env.OPENBOT_NATIVE_ORIGIN_OUTPUT)await writeFile(process.env.OPENBOT_NATIVE_ORIGIN_OUTPUT+".debug.json",JSON.stringify({observed,events},null,2));
++      const rows = (await readFile(proofs, "utf8")).trim().split("\n").map((line) => JSON.parse(line));
++      expect(rows).toHaveLength(2);
++      for (const phase of [1, 2]) {
++        const requested = events.find((event) => event.type === "client/turn/requested" && JSON.stringify(event.data).includes(`NATIVE_ORIGIN_PHASE_${phase}`));
++        expect(requested?.type).toBe("client/turn/requested");
++        if (requested?.type !== "client/turn/requested") throw new Error("missing actual requested input");
++        const row = rows.find((proof) => proof.phase === phase);
++        expect(row).toMatchObject({ threadId: thread.id, projectId: project.id, frozen: true,
++          nativeInvocation: { clientRequestId: requested.data.requestId, callId: `toolu_origin_${phase}` },
++          claimedOrigin: { clientRequestId: "forged_request", callId: "forged_call" } });
++        expect(row.nativeInvocation.clientRequestId).not.toBe(row.claimedOrigin.clientRequestId);
++      }
++      expect(rows[0].nativeInvocation.clientRequestId).not.toBe(rows[1].nativeInvocation.clientRequestId);
++      if (process.env.OPENBOT_NATIVE_ORIGIN_OUTPUT) await writeFile(process.env.OPENBOT_NATIVE_ORIGIN_OUTPUT,
++        JSON.stringify({ status: "PASS", rows, limitations: "Actual pinned native SDK/provider/daemon/public plugin context; local scripted Messages/dummy key, no model reasoning or paid inference." }, null, 2) + "\n");
++    } finally {
++      await stop?.().catch(() => {});
++      if (harness) { await harness.cleanup(); await harness.server.pluginService.stop(); }
++      api.closeAllConnections(); await new Promise<void>((resolve) => api.close(() => resolve()));
++      await rm(root, { recursive: true, force: true });
++    }
++  }, 120000,
++);
+diff --git a/gui/tests/integration/real/required-native-permissions.test.ts b/gui/tests/integration/real/required-native-permissions.test.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..d6ae5ddd2640c47c68f82dd5618eed8f74219b89
+--- /dev/null
++++ b/gui/tests/integration/real/required-native-permissions.test.ts
+@@ -0,0 +1,186 @@
++import { createServer } from "node:http";
++import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
++import { existsSync } from "node:fs";
++import { tmpdir } from "node:os";
++import path from "node:path";
++import { once } from "node:events";
++import { it, expect } from "vitest";
++import { getRequiredAgentConfigurationOwner } from "@cloudroom/db";
++import { createIntegrationHarness } from "../helpers/harness.js";
++import { createProjectFixture } from "../helpers/fixtures.js";
++import { waitForThreadStatus } from "../helpers/assertions.js";
++import { getThreadEvents } from "../helpers/api.js";
++
++const pause = (milliseconds: number) =>
++  new Promise((resolve) => setTimeout(resolve, milliseconds));
++
++// Script only the remote model response. Tool execution, permission handling,
++// persisted interactions and approval resolution use the real native stack.
++function messagesReply(
++  body: Record<string, any>,
++  targets: string[],
++  observed: Array<Record<string, unknown>>,
++) {
++  const messages = JSON.stringify(body.messages ?? []);
++  const phase = messages.includes("OPENBOT_PERMISSION_REQUEST_2") ? 2 : 1;
++  const marker = `OPENBOT_PERMISSION_RESUMED_${phase}`;
++  const requested = messages.includes(`OPENBOT_PERMISSION_REQUEST_${phase}`) &&
++    body.tools?.some((tool: any) => tool.name === "Write");
++  const done = (body.messages ?? []).some((message: any) =>
++    Array.isArray(message.content) && message.content.some((block: any) =>
++      block.type === "tool_result" &&
++      block.tool_use_id?.startsWith(`toolu_native_permissions_${phase}_`) &&
++      block.is_error !== true,
++    ),
++  );
++  observed.push({ phase, requested, tool_result_received: done, model: body.model });
++  const tool = requested && !done;
++  const message = {
++    id: `msg_native_permissions_${observed.length}`,
++    type: "message", role: "assistant", content: [], model: body.model,
++    stop_reason: null, stop_sequence: null,
++    usage: { input_tokens: 100, output_tokens: 0 },
++  };
++  const block = tool
++    ? { type: "tool_use", id: `toolu_native_permissions_${phase}_${observed.length}`, name: "Write", input: {} }
++    : { type: "text", text: "" };
++  const delta = tool
++    ? { type: "input_json_delta", partial_json: JSON.stringify({ file_path: targets[phase - 1], content: marker + "\n" }) }
++    : { type: "text_delta", text: `NATIVE_PERMISSION_COMPLETE_${phase}` };
++  return [
++    ["message_start", { type: "message_start", message }],
++    ["content_block_start", { type: "content_block_start", index: 0, content_block: block }],
++    ["content_block_delta", { type: "content_block_delta", index: 0, delta }],
++    ["content_block_stop", { type: "content_block_stop", index: 0 }],
++    ["message_delta", { type: "message_delta", delta: { stop_reason: tool ? "tool_use" : "end_turn", stop_sequence: null }, usage: { output_tokens: 40 } }],
++    ["message_stop", { type: "message_stop" }],
++  ].map(([event, payload]) => `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`).join("");
++}
++
++it.skipIf(process.env.OPENBOT_NATIVE_PERMISSION_PROBE !== "1")(
++  "managed native spawn and send retain lower permissions, wait on a real approval and continue only after resolution",
++  async () => {
++    const root = await mkdtemp(path.join(tmpdir(), "openbot-native-permission-"));
++    // The project is a separate disposable repository owned by the harness.
++    const targets = [path.join(root, "protected-spawn.txt"), path.join(root, "protected-send.txt")];
++    const observed: Array<Record<string, unknown>> = [];
++    const api = createServer(async (request, response) => {
++      if (request.method !== "POST") {
++        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({
++          data: [{ id: "claude-sonnet-4-6", display_name: "Scripted Claude fixture", type: "model" }], has_more: false,
++        }));
++        return;
++      }
++      let raw = "";
++      for await (const chunk of request) {
++        raw += chunk;
++        if (Buffer.byteLength(raw) > 4 * 1024 * 1024) {
++          response.writeHead(413).end();
++          return;
++        }
++      }
++      const body = JSON.parse(raw);
++      if (request.url?.includes("count_tokens")) {
++        response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ input_tokens: 100 }));
++        return;
++      }
++      response.writeHead(200, { "content-type": "text/event-stream" }).end(messagesReply(body, targets, observed));
++    });
++    api.listen(0, "127.0.0.1");
++    await once(api, "listening");
++    const address = api.address();
++    if (!address || typeof address === "string") throw new Error("missing local fixture address");
++    process.env.HOME = path.join(root, "home");
++    process.env.CLAUDE_CONFIG_DIR = path.join(root, "home", ".claude");
++    await mkdir(process.env.HOME, { recursive: true });
++    process.env.ANTHROPIC_API_KEY = "sk-ant-openbot-disposable-fixture-only";
++    process.env.ANTHROPIC_BASE_URL = `http://127.0.0.1:${address.port}`;
++    process.env.DISABLE_TELEMETRY = "1";
++    process.env.DISABLE_ERROR_REPORTING = "1";
++    process.env.CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC = "1";
++    let harness: Awaited<ReturnType<typeof createIntegrationHarness>> | undefined;
++    let threadId: string | undefined;
++    let sdk: NonNullable<ReturnType<NonNullable<typeof harness>["server"]["pluginService"]["getApi"]>>["sdk"] | undefined;
++    try {
++      harness = await createIntegrationHarness({ loadEnvironmentFile: false });
++      const project = await createProjectFixture(harness, { name: "Required native permission fixture" });
++      const pluginRoot = path.join(root, "required-owner");
++      await mkdir(pluginRoot);
++      await writeFile(path.join(pluginRoot, "package.json"), JSON.stringify({
++        name: "bb-plugin-required-permission", version: "0.1.0",
++        bb: { name: "Required permission fixture", description: "Real lower permission regression", branding: { icon: "Zap" }, server: "./server.ts" },
++      }));
++      await writeFile(path.join(pluginRoot, "server.ts"), 'export default function plugin(bb){bb.agents.configureRequired(async()=>({instructions:"Disposable native permission fixture.",skillDirectories:[]}));}');
++      const owner = await harness.server.pluginService.installPath(pluginRoot);
++      expect(owner.status).toBe("running");
++      sdk = harness.server.pluginService.getApi(owner.id)!.sdk;
++      const thread = await sdk.threads.spawn({
++        projectId: project.id, title: "Native permission fixture", providerId: "claude-code",
++        model: "claude-sonnet-4-6", permissionMode: "accept-edits", requiredAgentConfiguration: true,
++        prompt: "OPENBOT_PERMISSION_REQUEST_1: run the protected write outside the project requested by the fixture.",
++        environment: { type: "host", hostId: harness.hostId, workspace: { type: "unmanaged", path: harness.repoDir } },
++      });
++      threadId = thread.id;
++      expect(getRequiredAgentConfigurationOwner(harness.db, thread.id)).toBe(owner.id);
++      const modeRecords = [];
++      const approvals: Array<Record<string, unknown>> = [];
++      for (const phase of [1, 2]) {
++        if (phase === 2) await sdk.threads.send({
++          threadId: thread.id, model: "claude-sonnet-4-6", permissionMode: "accept-edits", mode: "auto",
++          input: [{ type: "text", text: "OPENBOT_PERMISSION_REQUEST_2: run another protected write outside the project.", mentions: [] }],
++        });
++        const options = await sdk.threads.defaultExecutionOptions({ threadId: thread.id });
++        expect(options).not.toBeNull();
++        const mode = options!.permissionMode;
++        expect(mode).toBe("accept-edits");
++        modeRecords.push({ phase, mode });
++        let pending: Awaited<ReturnType<typeof sdk.threads.interactions.list>>[number] | undefined;
++        const until = Date.now() + 45000;
++        while (!pending && Date.now() < until) {
++          pending = (await sdk.threads.interactions.list({ threadId: thread.id })).find((interaction) => interaction.status === "pending");
++          if (!pending) {
++            if ((await sdk.threads.get({ threadId: thread.id })).status === "error") break;
++            await pause(50);
++          }
++        }
++        if (!pending && process.env.OPENBOT_NATIVE_PERMISSION_OUTPUT) await writeFile(
++          process.env.OPENBOT_NATIVE_PERMISSION_OUTPUT + ".debug.json",
++          JSON.stringify({ observed, targets: targets.map((target) => ({ exists: existsSync(target) })), thread: await sdk.threads.get({ threadId: thread.id }), events: await getThreadEvents(harness.api, thread.id) }, null, 2),
++        );
++        expect(pending, "actual native permission request must reach the persisted interaction path").toBeDefined();
++        approvals.push({ phase, interactionId: pending!.id, statusBeforeApproval: pending!.status });
++        expect(existsSync(targets[phase - 1]!)).toBe(false);
++        await pause(150);
++        expect((await sdk.threads.interactions.get({ threadId: thread.id, interactionId: pending!.id })).status).toBe("pending");
++        expect(existsSync(targets[phase - 1]!)).toBe(false);
++        await sdk.threads.interactions.resolve({
++          threadId: thread.id, interactionId: pending!.id,
++          resolution: { decision: "allow_once", grantedPermissions: null },
++        });
++        const effectDeadline = Date.now() + 20000;
++        while (!existsSync(targets[phase - 1]!) && Date.now() < effectDeadline) await pause(25);
++        expect(await readFile(targets[phase - 1]!, "utf8")).toContain(`OPENBOT_PERMISSION_RESUMED_${phase}`);
++        expect((await sdk.threads.interactions.get({ threadId: thread.id, interactionId: pending!.id })).status).toBe("resolved");
++        await waitForThreadStatus(harness.api, thread.id, "idle", 20000);
++      }
++      expect(observed.some((event) => event.phase === 1 && event.tool_result_received)).toBe(true);
++      expect(observed.some((event) => event.phase === 2 && event.tool_result_received)).toBe(true);
++      if (process.env.OPENBOT_NATIVE_PERMISSION_OUTPUT) await writeFile(
++        process.env.OPENBOT_NATIVE_PERMISSION_OUTPUT,
++        JSON.stringify({ status: "PASS", modeRecords, approvals, pendingBeforeApproval: 2, protectedEffectsBeforeApproval: 0, resolvedAndContinued: 2, observed,
++          limitations: "Actual pinned server, daemon, Claude bridge and native CLI with isolated local scripted Messages; no model reasoning or paid inference claimed.",
++        }, null, 2) + "\n",
++      );
++    } finally {
++      if (harness) {
++        if (threadId && sdk) await sdk.threads.stop({ threadId }).catch(() => {});
++        await harness.cleanup();
++        await harness.server.pluginService.stop();
++      }
++      api.closeAllConnections();
++      await new Promise<void>((resolve) => api.close(() => resolve()));
++      await rm(root, { recursive: true, force: true });
++    }
++  },
++  120000,
++);
+diff --git a/gui/tests/integration/vitest.required-native.config.ts b/gui/tests/integration/vitest.required-native.config.ts
+new file mode 100644
+index 0000000000000000000000000000000000000000..b6efd80f6a9f55091e3e46da8ca2b0e1ea7a6780
+--- /dev/null
++++ b/gui/tests/integration/vitest.required-native.config.ts
+@@ -0,0 +1,17 @@
++import { defineWorkspaceTestConfig } from "../../vitest.shared.js";
++
++// No real-provider environment loader or global setup: local scripted Messages only.
++export default defineWorkspaceTestConfig({
++  test: {
++    silent: "passed-only",
++    testTimeout: 120000,
++    projects: [{
++      extends: true,
++      test: {
++        name: "@cloudroom/required-native-permissions",
++        include: ["real/required-native-permissions.test.ts", "real/required-native-origins.test.ts", "real/required-native-company-mcp.test.ts"],
++        isolate: true,
++      },
++    }],
++  },
++});

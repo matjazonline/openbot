@@ -1,0 +1,7 @@
+{
+  "fixture": "pa03_codex_runtime2_20261115",
+  "source": "migrations/20260817000000_init_schema.sql",
+  "source_sha384": "a51c1198575fa9256cb41ef120f0cd288468241a30677ea50cd71386ff79041f57218e34b23d22e9881a76cc300a7636",
+  "applied_sha384": "a51c1198575fa9256cb41ef120f0cd288468241a30677ea50cd71386ff79041f57218e34b23d22e9881a76cc300a7636",
+  "match": true
+}

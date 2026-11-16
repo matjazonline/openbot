@@ -44,6 +44,7 @@ pub mod memory_tools;
 pub mod message;
 pub mod message_admission;
 pub mod metrics;
+pub mod native_mcp;
 pub(crate) mod people_resolution;
 mod ports;
 pub mod provisioning;

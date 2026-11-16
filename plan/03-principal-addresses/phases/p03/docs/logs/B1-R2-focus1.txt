@@ -1,0 +1,39 @@
+
+running 13 tests
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_retained_principal_delete_cannot_commit ... ok
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_insert_cannot_commit ... ok
+
+thread 'adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_update_cannot_commit' (16904404) panicked at src/adapters/persistence/agent_direct_lifecycle_tests.rs:140:10:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23503", message: "update or delete on table \"threads\" violates foreign key constraint \"thread_principals_thread_fk_principal_fk\" on table \"thread_principals\"", detail: Some("Key (company_id, principal_id, id)=(4f05001d-035a-40fd-8f9c-31bb666318e0, cde77f28-1bd7-4457-bddb-b9480073508e, 27050102-46ff-44a4-adbf-17b6b2238ef8) is still referenced from table \"thread_principals\"."), hint: None, position: None, where: None, schema: Some("public"), table: Some("thread_principals"), column: None, data_type: None, constraint: Some("thread_principals_thread_fk_principal_fk"), file: Some("ri_triggers.c"), line: Some(2865), routine: Some("ri_ReportViolation") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_update_cannot_commit ... FAILED
+
+thread 'adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::relay_identity_native_forged_workflow_agent_author_rolls_back_publication' (16904514) panicked at src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs:69:5:
+must reach workflow_message_author_guard rather than an unrelated constraint: error returned from database: channel publication requires its canonical linkage
+2026-11-15T13:23:34.291432Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(5b05235c-5d7e-4e76-8dea-8d1afff987c1)
+2026-11-15T13:23:34.299245Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=fc4a5bf1-0f05-4de8-8b57-6ca117909c70 correlation_id=acb9b0e1-8771-4d6f-a9b3-ab3f70dfce95 transport=email status=dead_letter
+test adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::system_relay::relay_identity_pure_workflow_system_reply_cannot_enter_a_team_only_desk ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work' (16904408) panicked at src/adapters/persistence/workflow/relay_private_agent_tests.rs:54:107:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "42P01", message: "relation \"workflow_escalation_agent_handling_roots\" does not exist", detail: None, hint: None, position: Some(Original(106)), where: None, schema: None, table: None, column: None, data_type: None, constraint: None, file: Some("parse_relation.c"), line: Some(1501), routine: Some("parserOpenTable") })
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::agent_address_create_actual_default_binding_answers_a_direct_message ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work ... FAILED
+2026-11-15T13:23:38.510758Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(a18dd036-6616-4553-aba5-40eeecabe230)
+2026-11-15T13:23:38.517849Z  WARN open_bots::application::services::delivery_worker: A delivery finished in a state that needs a human delivery_id=3c1768ef-90e5-4727-8ec6-955b1f3103b6 correlation_id=4c2b0f95-f2a3-4e38-b0bc-016b1e6ad07b transport=email status=dead_letter
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_nonmember_agent_is_refused_without_a_canonical_hop_or_smtp ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::direct_history_teardown::direct_company_teardown_removes_populated_agent_history_notes_and_transport ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_running_agent_cannot_send_as_another_agents_address ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::relay_identity_department_member_uses_its_agent_grant_and_keeps_its_author ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_source_rename_after_observation_refuses_commit_and_redelivery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::authority_races::relay_identity_target_revocation_after_observation_refuses_commit_and_redelivery ... ok
+
+failures:
+
+failures:
+    adapters::persistence::department::tests::agent_desks::direct_lifecycle::direct_target_native_foreign_principal_update_cannot_commit
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::binding_tests::origin_retention_tests::relays::identity::private_agent::relay_identity_actual_agent_to_private_agent_admits_ordinary_work
+    adapters::persistence::workflow::tests::message_tests::intent_tests::channel_reply_tests::completion_tests::publication_tests::authority::relay_identity_native_forged_workflow_agent_author_rolls_back_publication
+
+test result: FAILED. 10 passed; 3 failed; 0 ignored; 0 measured; 4597 filtered out; finished in 23.37s
+

@@ -102,12 +102,22 @@ impl Fixture {
             .expect("member accepted")
             .expect("pending invitation matched");
         let thread = p
-            .create_thread(channel, "Private thread", &[])
+            .create_thread(
+                company.id,
+                crate::entities::address::AddressTarget::Desk(channel),
+                "Private thread",
+                &[],
+            )
             .await
             .unwrap()
             .id;
         let foreign_thread = p
-            .create_thread(foreign_channel, "Foreign private thread", &[])
+            .create_thread(
+                foreign.id,
+                crate::entities::address::AddressTarget::Desk(foreign_channel),
+                "Foreign private thread",
+                &[],
+            )
             .await
             .unwrap()
             .id;
@@ -116,7 +126,13 @@ impl Fixture {
         Some(Self {
             companies: Arc::new(CompanyUseCases::new(p.clone())),
             agents: Arc::new(
-                AgentUseCases::new(p.clone(), p.clone(), p.clone()).with_company_agents(
+                AgentUseCases::new(
+                    p.clone(),
+                    p.clone(),
+                    p.clone(),
+                    crate::use_cases::agent::SpamScanning::Unavailable,
+                )
+                .with_company_agents(
                     crate::adapters::persistence::test_support::company_agents(p.as_ref()),
                 ),
             ),

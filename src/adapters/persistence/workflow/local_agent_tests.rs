@@ -29,6 +29,8 @@ mod resolution;
 mod continuation;
 #[path = "local_agent_correction_tests.rs"]
 mod corrections;
+#[path = "local_agent_mcp_tests.rs"]
+mod native_mcp;
 
 pub(in crate::adapters::persistence::workflow::tests) struct Setup {
     pub(in crate::adapters::persistence::workflow::tests) fixture: Fixture,
@@ -88,7 +90,7 @@ impl Setup {
                 let channel:Uuid=sqlx::query_scalar("UPDATE channels SET access_mode='allowlist' WHERE id=(SELECT channel_id FROM threads WHERE id=$1) RETURNING id")
                     .bind(thread).fetch_one(&local.database.pool).await.unwrap();
                 RelatedAssociation::Thread {
-                    channel_id: crate::application::workflow::RelatedChannelId::new(channel),
+                    target: crate::entities::address::AddressTarget::Desk(channel),
                     thread_id: crate::application::workflow::RelatedThreadId::new(thread),
                 }
             }
@@ -215,7 +217,7 @@ impl Setup {
         p.connect_journal(
             fence,
             &JournalHello {
-                version: 1,
+                version: 2,
                 installation_id: fence.machine.installation_id,
                 journal_id: self.journal_id,
                 journal_sequence: sequence as u64,

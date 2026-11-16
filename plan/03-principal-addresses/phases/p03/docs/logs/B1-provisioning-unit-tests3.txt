@@ -1,0 +1,11 @@
+
+running 6 tests
+test application::workflow::provisioning::tests::every_built_in_name_is_reserved ... ok
+test application::workflow::provisioning::tests::only_the_exact_name_only_built_in_is_trusted ... ok
+test application::workflow::provisioning::tests::arguments_are_held_to_the_input_contract ... ok
+test application::workflow::provisioning::tests::custom_steps_are_held_to_the_builder_step_types ... ok
+test application::workflow::provisioning::tests::refusals_and_results_are_both_valid_receipts ... ok
+test application::workflow::provisioning::tests::http_operations_cannot_take_a_built_in_name ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4587 filtered out; finished in 0.20s
+

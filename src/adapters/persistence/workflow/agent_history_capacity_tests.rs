@@ -36,7 +36,8 @@ pub(super) async fn new_thread(f: &mut HistoryThread) {
     f.s.thread =
         f.s.p()
             .create_thread(
-                f.s.channel,
+                f.s.fixture.target.company.as_uuid(),
+                crate::entities::address::AddressTarget::Desk(f.s.channel),
                 "Independent",
                 &[EmailAddress::from("customer@partner.test")],
             )

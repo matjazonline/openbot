@@ -390,7 +390,7 @@ async fn workflow_session_row(pool: &PgPool, company: Uuid, run: Uuid) -> Value 
     let installation = Uuid::new_v4();
     let profile = Uuid::new_v4();
     let selection = json!({"machine_id":machine,"project_id":"proj_test","provider":"codex","model":"gpt-6-luna",
-        "policy":{"workspace":"project_directory","permissions":"provider_default","reasoning":"low"}});
+        "policy":{"workspace":"project_directory","permissions":"full","reasoning":"low"}});
     sqlx::query("INSERT INTO local_installations(company_id,installation_id) VALUES($1,$2)")
         .bind(company)
         .bind(installation)

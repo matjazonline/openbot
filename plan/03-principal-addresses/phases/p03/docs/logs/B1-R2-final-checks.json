@@ -1,0 +1,90 @@
+[
+  {
+    "command": [
+      "cargo",
+      "sqlx",
+      "prepare",
+      "--",
+      "--all-targets"
+    ],
+    "env": {
+      "SQLX_OFFLINE": "false"
+    },
+    "exit": 0,
+    "log": "B1-R2-sqlx-prepare.txt"
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-offline-all-targets.txt"
+  },
+  {
+    "command": [
+      "cargo",
+      "test",
+      "--locked",
+      "--offline",
+      "--test",
+      "source_modules"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-source-modules.txt"
+  },
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-final-format.txt"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-final-whitespace.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-final-transport-boundary.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-final-transport-fixtures.txt"
+  },
+  {
+    "command": [
+      "trail",
+      "build"
+    ],
+    "env": {},
+    "exit": 0,
+    "log": "B1-R2-trail-build.txt"
+  }
+]

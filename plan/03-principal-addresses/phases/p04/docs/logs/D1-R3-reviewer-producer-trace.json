@@ -1,0 +1,117 @@
+[
+  {
+    "path": "src/application/workflow/actions/local_agents.rs",
+    "sha256": "8439590f81852877ca0d7d90f0fe30a33704d12cdd64fcf790fec41e2ba79a8c",
+    "spans": [
+      {
+        "start": 11,
+        "end": 39,
+        "source": "    pub fn run_local_agent<'a>(\n        &'a self,\n        claim: &'a ClaimedWorkflow,\n        inputs: &'a LocalRunInputs,\n        policy: LeasePolicy,\n    ) -> impl Future<Output = AppResult<LocalRunProgress>> + Send + 'a {\n        self.persistence.run_local_agent(claim, inputs, policy)\n    }\n}\nimpl FrozenAction {\n    pub(crate) fn local_agent(request: ActionRequest) -> AppResult<Self> {\n        let args: FrozenLocalRun =\n            serde_json::from_value(request.arguments.clone()).map_err(|_| workflow::invalid())?;\n        if crate::domain::local_agents::canonical_deadline(args.deadline)\n            .map_err(|_| workflow::invalid())?\n            != args.deadline\n        {\n            return Err(workflow::invalid());\n        }\n        if request.operation_key.as_str() != workflow::KIND\n            || request.context.origin != ToolCallOrigin::Workflow\n            || !workflow::is_trusted_snapshot(&request.contract)?\n            || !matches!(&request.target, ActionTarget::Local {resource,resource_kind}\n                if *resource==args.profile_id.as_uuid() && resource_kind.as_str()==workflow::RESOURCE_KIND)\n        {\n            return Err(workflow::invalid());\n        }\n        freeze::freeze(request)\n    }"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/preparation.rs",
+    "sha256": "21443fd8b97ca0482a4cf6f6401b1cd34caf8d090570202a8ece78d3dd415659",
+    "spans": [
+      {
+        "start": 5,
+        "end": 67,
+        "source": "pub(super) async fn prepare_on(\n    tx: &mut Transaction<'_, Postgres>,\n    claim: &ClaimedWorkflow,\n    policy: LeasePolicy,\n) -> AppResult<SavedCall> {\n    let scope = action_scope(claim.fence.scope);\n    let facts = http::runtime::facts(tx, scope).await?;\n    if !lease::lock_fence(tx, claim.fence, policy.attempt_bound()).await? {\n        return Err(conflict());\n    }\n    let inputs =\n        http::runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(contract::KIND.into()))\n            .await?;\n    if let Some(call) = saved_on(tx, scope).await? {\n        let action = call.action()?;\n        if action.scope() != scope {\n            return Err(invalid());\n        }\n        return Ok(call);\n    }\n    let inputs: LocalRunInputs = serde_json::from_value(inputs).map_err(|_| contract::invalid())?;\n    authorize_run_on(tx, scope.company, scope.run.as_uuid(), facts.actor).await?;\n    let captured = selection_on(tx, scope, facts.actor, &inputs).await?;\n    let deadline: DateTime<Utc> = sqlx::query_scalar(\n        \"SELECT LEAST(deadline,clock_timestamp()+interval '30 minutes') FROM workflow_runs WHERE company_id=$1 AND id=$2\",\n    ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;\n    let frozen = FrozenLocalRun {\n        profile_id: inputs.profile_id,\n        prompt: inputs.prompt,\n        session_id: inputs.session_id,\n        approval: inputs.approval,\n        selection: captured.selection,\n        harness: captured.harness,\n        deadline,\n    };\n    let tool = facts\n        .bundle\n        .snapshots()\n        .tools\n        .iter()\n        .find(|tool| tool.contract.name.as_str() == contract::KIND)\n        .cloned()\n        .ok_or_else(missing)?;\n    let mut context = http::runtime::context(&facts);\n    context.approval_required = frozen.approval.is_some();\n    let action = FrozenAction::local_agent(ActionRequest {\n        scope,\n        operation_key: tool.contract.name.clone(),\n        target: ActionTarget::Local {\n            resource: frozen.profile_id.as_uuid(),\n            resource_kind: TypeName::parse(contract::RESOURCE_KIND).map_err(|_| invalid())?,\n        },\n        contract: tool,\n        arguments: serde_json::to_value(frozen).map_err(|_| invalid())?,\n        context,\n    })?;\n    let intent = actions::insert_on(tx, &action, None).await?;\n    sqlx::query(\"INSERT INTO workflow_local_agent_calls(company_id,run_id,execution_id,invocation_id,argument_digest,profile_id) VALUES($1,$2,$3,$4,$5,$6)\")\n        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())\n        .bind(intent.invocation.as_uuid()).bind(intent.argument_digest.as_str()).bind(inputs.profile_id.as_uuid())\n        .execute(&mut **tx).await?;\n    saved_on(tx, scope).await?.ok_or_else(invalid)\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/http_runtime.rs",
+    "sha256": "ba7bd12e062c5291e32fb00f1eed3913a588b5ed737ae9525392e088b63b3a5f",
+    "spans": [
+      {
+        "start": 62,
+        "end": 78,
+        "source": "pub(in crate::adapters::persistence::workflow) fn context(facts: &RunFacts) -> ActionPolicyContext {\n    ActionPolicyContext {\n        integration: None,\n        origin: crate::application::agent::ToolCallOrigin::Workflow,\n        actor: facts.actor.user_id(),\n        capability_ceiling: facts\n            .bundle\n            .snapshots()\n            .tools\n            .iter()\n            .map(|tool| tool.policy.capability.clone())\n            .collect::<std::collections::BTreeSet<_>>()\n            .into_iter()\n            .collect(),\n        approval_required: false,\n    }\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/admission.rs",
+    "sha256": "5ddbf052413c19276a72d54de0199d205a900a5ab7454caa2dda748456c6b285",
+    "spans": [
+      {
+        "start": 6,
+        "end": 96,
+        "source": "pub(super) async fn run_on(\n    tx: &mut Transaction<'_, Postgres>,\n    claim: &ClaimedWorkflow,\n    policy: LeasePolicy,\n    dispatch: &Dispatch,\n    notices: Option<&DecisionNotices>,\n) -> AppResult<LocalRunProgress> {\n    let scope = action_scope(claim.fence.scope);\n    // A repeated handler call after COMMIT can prove the exact closed attempt's park.\n    // It cannot manufacture authority for another attempt or turn a wake into a result.\n    if let Some(call) = saved_on(tx, scope).await?\n        && let Some(wait) = call.wait_id\n        && continuation::confirm_on(tx, claim.fence, wait).await?\n    {\n        return Ok(LocalRunProgress::Suspended(WaitId::new(wait)));\n    }\n    let call = preparation::prepare_on(tx, claim, policy).await?;\n    let request = ActionDispatchRequest {\n        subject: call.subject()?,\n        fence: claim.fence,\n        lease: policy,\n    };\n    let authorized = dispatch\n        .authorize_on(tx, &request, policy.attempt_bound())\n        .await?;\n    token_budget::require_progression(tx, claim.fence.scope).await?;\n    if authorized.approval_required {\n        return decisions::approvals::park(tx, &request, &authorized.action, notices)\n            .await?\n            .map(LocalRunProgress::Suspended)\n            .ok_or_else(|| AppError::Forbidden(\"Local execution requires approval\".into()));\n    }\n    if action_uncertainty::conflicted_on(tx, scope).await? {\n        return Err(conflict());\n    }\n    if call.dispatch_id.is_some() {\n        let result = continuation::result_on(tx, &request, &authorized.action, &call).await?;\n        lease::live_window(tx, claim.fence, tokio::time::Instant::now())\n            .await?\n            .ok_or_else(conflict)?;\n        return Ok(result);\n    }\n    knowledge_release::evaluate_on(\n        tx,\n        &authorized.action,\n        knowledge_release::MessageRecipients::Current,\n    )\n    .await?;\n    let args: FrozenLocalRun =\n        serde_json::from_value(authorized.action.request().arguments.clone())\n            .map_err(|_| invalid())?;\n    let session = session_on(tx, scope, call.invocation_id, &args).await?;\n    let admission = operation_admission(\n        scope,\n        call.invocation_id,\n        authorized.action.request().context.actor,\n        args,\n        &session,\n    )?;\n    let now = waits::now(tx).await?;\n    crate::application::local_agents::bounds::validate_deadline(\n        now,\n        admission.operation.deadline(),\n    )\n    .map_err(|_| conflict())?;\n    shared::validate_capacity_on(\n        tx,\n        scope.company,\n        session.selection.machine_id,\n        admission.operation.command(),\n    )\n    .await?;\n    let (marker, wait) = (Uuid::new_v4(), Uuid::new_v4());\n    Dispatch::insert(\n        tx,\n        &request,\n        marker,\n        \"local_agent\",\n        authorized.current_policy,\n    )\n    .await?;\n    crate::adapters::persistence::local_agents::protocol::commands::insert_admission_on(\n        tx,\n        &admission,\n        session.installation_id,\n        OperationOrigin::Workflow,\n    )\n    .await?;\n    park_on(tx, &request, &session, &admission, marker, wait).await?;\n    Ok(LocalRunProgress::Suspended(WaitId::new(wait)))\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+    "sha256": "19431dc66e596b7def79765db9522dc8a87987c140ad9a1c62ae7383d66ca42f",
+    "spans": [
+      {
+        "start": 195,
+        "end": 208,
+        "source": "async fn lock_current_with_locks(\n    tx: &mut Transaction<'_, Postgres>,\n    authority: &ActionRunAuthority,\n    locks: super::row_locks::RowLocks,\n) -> AppResult<action_dispatch::LockedActionAuthority> {\n    let action = FrozenAction::local_agent(authority.action.request().clone())?;\n    authority::authorize_company_with_locks(tx, action.scope().company, authority.actor, locks)\n        .await?;\n    let args: FrozenLocalRun =\n        serde_json::from_value(action.request().arguments.clone()).map_err(|_| invalid())?;\n    authorize_run_with_locks_on(\n        tx,\n        action.scope().company,\n        action.scope().run.as_uuid(),"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/agent_origin.rs",
+    "sha256": "8a4ffd94838847e4f2f4de909b0627fae367c3787733a7f1ee9d76b8fd89dc98",
+    "spans": [
+      {
+        "start": 21,
+        "end": 73,
+        "source": "pub(super) async fn authority_with_locks_on(\n    db: &mut PgConnection,\n    request: &ActionRequest,\n    actor: WorkflowActor,\n    bundle: &PublishedBundle,\n    locks: super::row_locks::RowLocks,\n) -> AppResult<ActionOriginAuthority> {\n    super::native_mcp::structural_on(db, request, actor, bundle).await?;\n    match request.context.origin {\n        ToolCallOrigin::Workflow => {\n            require_workflow_origin(db, request.scope, bundle).await?;\n            Ok(ActionOriginAuthority::Workflow)\n        }\n        ToolCallOrigin::Agent(origin) => {\n            let selection =\n                selected_with_locks_on(db, request.scope, actor, bundle, origin, locks).await?;\n            validate_agent_action(request, &selection)?;\n            Ok(ActionOriginAuthority::Agent(Box::new(selection)))\n        }\n        ToolCallOrigin::ChannelFinal(_) => Err(missing()),\n    }\n}\n\n/// Prevent a missing agent origin from silently falling through to STEP/global authority.\npub(super) async fn require_workflow_origin(\n    db: &mut PgConnection,\n    scope: ActionScope,\n    bundle: &PublishedBundle,\n) -> AppResult<()> {\n    let step: String = sqlx::query_scalar(\n        \"SELECT step_id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND id=$3\",\n    )\n    .bind(scope.company.as_uuid())\n    .bind(scope.run.as_uuid())\n    .bind(scope.execution.as_uuid())\n    .fetch_optional(db)\n    .await?\n    .ok_or_else(missing)?;\n    let step = StepId::parse(step).map_err(|_| invalid())?;\n    let definition = bundle\n        .compiled()\n        .graph()\n        .definition()\n        .steps\n        .get(&step)\n        .ok_or_else(missing)?;\n    if crate::application::workflow::registry::ModelStep::of(definition.step_type.as_str())\n        .is_some()\n    {\n        return Err(missing());\n    }\n    Ok(())\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/domain/entities/agent_capability.rs",
+    "sha256": "d47c85da34b94da0c03e00c0df1161ac8f10ab945afc5aed177517ded9bbef51",
+    "spans": [
+      {
+        "start": 77,
+        "end": 91,
+        "source": "pub enum AgentBuiltinTool {\n    MessageSend,\n    MessageReply,\n    ListCompanyAgents,\n    CreateAgent,\n    CreateDeskForAgent,\n    SearchKnowledge,\n    /// The memory service tools (phase 05 E5), offered only while memory is enabled.\n    SearchMemory,\n    MemoryTimeline,\n    MemoryDetails,\n    SaveMemory,\n    ReadEscalation,\n    RespondToEscalation,\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/workflow_agent/mod.rs",
+    "sha256": "2fcfb4223b4c5dd950247fa6be6d96c1a44e17e343ad8712ea97305eb423646c",
+    "spans": [
+      {
+        "start": 94,
+        "end": 176,
+        "source": "enum ToolInvocation {\n    Http(Box<HttpToolCall>),\n    Mcp(Box<McpToolCall>),\n    Workflow(Box<WorkflowToolCall>),\n    Provisioning(Box<ProvisioningToolCall>),\n    Escalation(Box<EscalationToolCall>),\n    Message(Box<MessageToolCall>),\n    Knowledge(Box<KnowledgeToolCall>),\n    Memory(Box<MemoryToolCall>),\n}\nfn invocation(\n    tool: &PreparedTool,\n    call: ModelToolCallId,\n    arguments: Value,\n) -> AppResult<ToolInvocation> {\n    Ok(match &tool.target {\n        AgentToolTarget::Http { connection } => ToolInvocation::Http(Box::new(HttpToolCall {\n            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n            connection: *connection,\n            operation: tool.name.clone(),\n            arguments,\n            call,\n        })),\n        AgentToolTarget::Mcp { connection } => ToolInvocation::Mcp(Box::new(McpToolCall {\n            target: McpToolTarget::Agent {\n                connection: *connection,\n                origin: tool.origin,\n            },\n            tool: tool.name.clone(),\n            arguments,\n            call,\n        })),\n        AgentToolTarget::Workflow { pin } => ToolInvocation::Workflow(Box::new(WorkflowToolCall {\n            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n            name: tool.name.clone(),\n            pin: pin.clone(),\n            call: ToolCallId::new(\n                uuid::Uuid::parse_str(call.as_str())\n                    .map_err(|_| AppError::BadRequest(\"Invalid tool call\".into()))?,\n            ),\n            arguments,\n        })),\n        AgentToolTarget::Provisioning { .. } => {\n            ToolInvocation::Provisioning(Box::new(ProvisioningToolCall {\n                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n                kind: tool\n                    .provisioning_kind()\n                    .ok_or_else(|| AppError::BadRequest(\"Unknown provisioning tool\".into()))?,\n                arguments,\n                call,\n            }))\n        }\n        AgentToolTarget::Escalation { tool: kind } => {\n            ToolInvocation::Escalation(Box::new(EscalationToolCall {\n                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n                kind: *kind,\n                arguments,\n                call,\n            }))\n        }\n        AgentToolTarget::Message { .. } => ToolInvocation::Message(Box::new(MessageToolCall {\n            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n            kind: tool\n                .message_kind()\n                .ok_or_else(|| AppError::BadRequest(\"Unknown message tool\".into()))?,\n            arguments,\n            call,\n        })),\n        AgentToolTarget::Knowledge => ToolInvocation::Knowledge(Box::new(KnowledgeToolCall {\n            origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n            call,\n            arguments,\n        })),\n        AgentToolTarget::Memory { tool: memory } => {\n            ToolInvocation::Memory(Box::new(MemoryToolCall {\n                origin: crate::application::agent::ToolCallOrigin::Agent(tool.origin),\n                tool: *memory,\n                call,\n                arguments,\n            }))\n        }\n    })\n}"
+      },
+      {
+        "start": 179,
+        "end": 246,
+        "source": "    async fn dispatch(\n        &self,\n        fence: WorkflowFence,\n        tool: &PreparedTool,\n        call: ModelToolCallId,\n        arguments: Value,\n    ) -> AppResult<AgentToolObservation> {\n        // Dropping the handler future cancels the real work; external seams stay boxed.\n        let cancel = CancellationToken::new();\n        let outcome = async {\n            match invocation(tool, call, arguments)? {\n                ToolInvocation::Http(call) => {\n                    remote(Box::pin(self.http.call_tool(fence, *call, &cancel)).await?)\n                }\n                ToolInvocation::Mcp(call) => {\n                    remote(Box::pin(self.mcp.call_tool(fence, *call, &cancel)).await?)\n                }\n                ToolInvocation::Workflow(call) => {\n                    let workflow = self.workflow.as_ref().ok_or_else(|| {\n                        AppError::BadRequest(\n                            \"Workflow tools are not available to this worker\".into(),\n                        )\n                    })?;\n                    Box::pin(workflow.call_workflow_tool(fence, *call)).await\n                }\n                ToolInvocation::Provisioning(call) => {\n                    let provisioning = self.provisioning.as_ref().ok_or_else(|| {\n                        AppError::BadRequest(\n                            \"Provisioning tools are not available to this worker\".into(),\n                        )\n                    })?;\n                    Box::pin(provisioning.call_tool(fence, *call)).await\n                }\n                ToolInvocation::Escalation(call) => {\n                    Box::pin(self.escalation_runtime()?.call_tool(fence, *call)).await\n                }\n                ToolInvocation::Message(call) => {\n                    message(Box::pin(self.message.call_tool(fence, *call)).await?)\n                }\n                ToolInvocation::Knowledge(call) => {\n                    let knowledge = self.knowledge.as_ref().ok_or_else(|| {\n                        AppError::ServiceUnavailable(\n                            \"Knowledge search is unavailable to this worker\".into(),\n                        )\n                    })?;\n                    Box::pin(knowledge.call_knowledge_tool(fence, *call)).await\n                }\n                ToolInvocation::Memory(call) => {\n                    let memory = self.memory.as_ref().ok_or_else(|| {\n                        AppError::ServiceUnavailable(\n                            \"Memory tools are unavailable to this worker\".into(),\n                        )\n                    })?;\n                    Box::pin(memory.call_memory_tool(fence, *call)).await\n                }\n            }\n        }\n        .await;\n        match outcome {\n            Err(AppError::KnowledgeRelease { .. }) => {\n                Ok(AgentToolObservation::Completed(tool_error(\n                    crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,\n                    \"The destination cannot receive this run's content\",\n                )))\n            }\n            other => other,\n        }\n    }"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/action_account_hints.rs",
+    "sha256": "c01063cafcb7c70893af7ca4d6fbe110cb1a1746f71158194b650249b4cb1dff",
+    "spans": [
+      {
+        "start": 183,
+        "end": 200,
+        "source": "pub(in crate::adapters::persistence::workflow) async fn actor_hints_on(\n    db: &mut PgConnection,\n    scope: ActionScope,\n    reviewer: Option<WorkflowActor>,\n) -> AppResult<Option<ActorAccountHints>> {\n    let actor: Option<Uuid> =\n        sqlx::query_scalar(\"SELECT actor_id FROM workflow_runs WHERE company_id=$1 AND id=$2\")\n            .bind(scope.company.as_uuid())\n            .bind(scope.run.as_uuid())\n            .fetch_optional(&mut *db)\n            .await?;\n    let Some(actor) = actor else { return Ok(None) };\n    Ok(Some(ActorAccountHints {\n        actor,\n        reviewer,\n        requester: super::super::provisioning::requester_on(db, scope).await?,\n    }))\n}"
+      }
+    ]
+  },
+  {
+    "path": "src/adapters/persistence/workflow/provisioning.rs",
+    "sha256": "f6b3a97f412de12a4c24b222b6ce61794954b049c61d537e3dd475c59c849ea3",
+    "spans": [
+      {
+        "start": 286,
+        "end": 345,
+        "source": "pub(super) async fn requester_on(\n    tx: &mut PgConnection,\n    scope: ActionScope,\n) -> AppResult<Option<WorkflowActor>> {\n    #[derive(sqlx::FromRow)]\n    struct RootRequester {\n        id: Uuid,\n        actor: Uuid,\n        trigger: Uuid,\n    }\n    let root: Option<RootRequester> = sqlx::query_as(\n        \"WITH RECURSIVE chain(id, parent, actor, trigger, depth) AS ( \\\n           SELECT id, parent_run_id, actor_id, trigger_id, 0 FROM workflow_runs \\\n           WHERE company_id = $1 AND id = $2 \\\n           UNION ALL \\\n           SELECT run.id, run.parent_run_id, run.actor_id, run.trigger_id, chain.depth + 1 \\\n           FROM workflow_runs AS run JOIN chain ON run.company_id = $1 AND run.id = chain.parent \\\n           WHERE chain.depth < 64) \\\n         SELECT id, actor, trigger FROM chain WHERE parent IS NULL\",\n    )\n    .bind(scope.company.as_uuid())\n    .bind(scope.run.as_uuid())\n    .fetch_optional(&mut *tx)\n    .await?;\n    let Some(root) = root else {\n        return Ok(None);\n    };\n    let sources: Vec<String> = sqlx::query_scalar(\n        \"SELECT source_key FROM workflow_admissions WHERE company_id = $1 AND run_id = $2 LIMIT 2\",\n    )\n    .bind(scope.company.as_uuid())\n    .bind(root.id)\n    .fetch_all(&mut *tx)\n    .await?;\n    let [source] = sources.as_slice() else {\n        return Ok(None);\n    };\n    match requester_source(source) {\n        RequesterSource::RootActor => Ok(Some(WorkflowActor::authenticated(root.actor)?)),\n        RequesterSource::None => Ok(None),\n        RequesterSource::Message(message) => {\n            let author: Option<Uuid> = sqlx::query_scalar(\n                \"SELECT principal.user_id FROM workflow_message_intents AS intent \\\n                 JOIN messages AS message ON message.company_id = intent.company_id \\\n                   AND message.id = intent.message_id \\\n                 JOIN principals AS principal ON principal.company_id = message.company_id \\\n                   AND principal.id = message.author_principal_id \\\n                 WHERE intent.company_id = $1 AND intent.id = $2 AND intent.message_id = $3 \\\n                   AND intent.origin = 'application' AND principal.kind = 'person'\",\n            )\n            .bind(scope.company.as_uuid())\n            .bind(root.trigger)\n            .bind(message)\n            .fetch_optional(&mut *tx)\n            .await?\n            .flatten();\n            author.map(WorkflowActor::authenticated).transpose()\n        }\n    }\n}"
+      }
+    ]
+  }
+]

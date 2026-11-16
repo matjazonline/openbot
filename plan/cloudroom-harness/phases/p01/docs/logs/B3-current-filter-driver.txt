@@ -1,0 +1,12 @@
+{"filter": "jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement", "round": 1, "exit": 101, "seconds": 1.92, "log": "B3-current-filter-1-R1.txt"}
+{"filter": "jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement", "round": 2, "exit": 101, "seconds": 1.48, "log": "B3-current-filter-1-R2.txt"}
+{"filter": "jev_runtime_lost_lease_cancels_actual_http_and_prevents_settlement", "round": 3, "exit": 101, "seconds": 1.5, "log": "B3-current-filter-1-R3.txt"}
+{"filter": "doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion", "round": 1, "exit": 0, "seconds": 34.52, "log": "B3-current-filter-2-R1.txt"}
+{"filter": "doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion", "round": 2, "exit": 0, "seconds": 35.92, "log": "B3-current-filter-2-R2.txt"}
+{"filter": "doop_agent_human_edit_conflict_stops_without_blind_retry_or_false_completion", "round": 3, "exit": 0, "seconds": 34.23, "log": "B3-current-filter-2-R3.txt"}
+{"filter": "doop_agent_observe_policy_keeps_error_observation_available_to_the_model", "round": 1, "exit": 0, "seconds": 46.13, "log": "B3-current-filter-3-R1.txt"}
+{"filter": "doop_agent_observe_policy_keeps_error_observation_available_to_the_model", "round": 2, "exit": 0, "seconds": 48.49, "log": "B3-current-filter-3-R2.txt"}
+{"filter": "doop_agent_observe_policy_keeps_error_observation_available_to_the_model", "round": 3, "exit": 0, "seconds": 54.23, "log": "B3-current-filter-3-R3.txt"}
+{"filter": "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas", "round": 1, "exit": 0, "seconds": 49.03, "log": "B3-current-filter-4-R1.txt"}
+{"filter": "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas", "round": 2, "exit": 0, "seconds": 48.54, "log": "B3-current-filter-4-R2.txt"}
+{"filter": "doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas", "round": 3, "exit": 0, "seconds": 49.05, "log": "B3-current-filter-4-R3.txt"}

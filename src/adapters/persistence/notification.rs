@@ -87,6 +87,7 @@ struct NotificationRow {
     company_id: Uuid,
     company_label: String,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     channel_label: String,
     source_kind: String,
     source_id: Uuid,
@@ -107,7 +108,7 @@ impl TryFrom<NotificationRow> for ActionableNotification {
             id: NotificationId::new(row.id),
             company_id: row.company_id,
             company_label: row.company_label,
-            channel_id: row.channel_id,
+            inbox: notification_inbox(row.channel_id, row.principal_id)?,
             channel_label: row.channel_label,
             source_kind: row.source_kind.parse().map_err(AppError::Internal)?,
             source_id: row.source_id,
@@ -120,6 +121,21 @@ impl TryFrom<NotificationRow> for ActionableNotification {
             state_changed_at: row.state_changed_at,
             href: format!("/ui/notifications/{}/open", row.id),
         })
+    }
+}
+
+fn notification_inbox(
+    desk: Option<Uuid>,
+    principal: Option<Uuid>,
+) -> AppResult<Option<crate::entities::address::AddressTarget>> {
+    use crate::entities::address::AddressTarget;
+    match (desk, principal) {
+        (None, None) => Ok(None),
+        (Some(id), None) => Ok(Some(AddressTarget::Desk(id))),
+        (None, Some(id)) => Ok(Some(AddressTarget::Principal(PrincipalId::new(id)))),
+        _ => Err(AppError::Internal(
+            "Notification has two inbox targets".into(),
+        )),
     }
 }
 
@@ -336,7 +352,8 @@ impl NotificationPersistence for PostgresPersistence {
     ) -> AppResult<NotificationPage> {
         let rows = sqlx::query_as::<_, NotificationRow>(
             r#"SELECT notification.id, notification.company_id, company.name AS company_label,
-                      notification.channel_id, COALESCE(channel.name,'Company workflow') AS channel_label,
+                      notification.channel_id, notification.principal_id,
+                      COALESCE(channel.name,target.display_label,'Company workflow') AS channel_label,
                       notification.source_kind, notification.source_id,
                       notification.action_kind, notification.source_generation,
                       notification.state, notification.read_at, notification.created_at,
@@ -349,14 +366,17 @@ impl NotificationPersistence for PostgresPersistence {
                  LEFT JOIN channels AS channel
                    ON channel.company_id = notification.company_id
                   AND channel.id = notification.channel_id
+                 LEFT JOIN principals AS target ON target.company_id=notification.company_id AND target.id=notification.principal_id
                 WHERE notification.company_id = $1
                   AND notification.recipient_user_id = $2
                   AND notification.recipient_principal_id = $3
                   AND (notification.channel_id IS NULL OR notification.channel_id = ANY($4))
-                  AND notification_principal_can_view(
-                      notification.company_id, notification.channel_id,
+                  AND notification_target_can_view(
+                      notification.company_id, notification.channel_id, notification.principal_id,
                       notification.recipient_principal_id
                   )
+                  AND (notification.source_kind<>'direct_message' OR direct_message_notification_can_view(
+                      notification.company_id,notification.source_id,notification.recipient_principal_id))
                 ORDER BY (notification.state = 'active') DESC,
                          notification.created_at DESC, notification.id DESC
                 LIMIT $5"#,
@@ -625,6 +645,7 @@ mod escalation_failures;
 mod escalation_notice;
 pub(crate) use escalation_failures::refresh_person_escalations_on;
 pub(in crate::adapters::persistence) use escalation_failures::wake_failed_assignments_on;
+mod direct_message;
 mod projection;
 mod projection_lock;
 mod reviewer_notice;

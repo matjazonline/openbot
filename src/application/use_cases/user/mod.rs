@@ -240,6 +240,42 @@ impl UserUseCases {
             .set_notification_preferences(id, preferences)
             .await
     }
+
+    pub async fn person_addresses(
+        &self,
+        user_id: Uuid,
+    ) -> AppResult<Vec<crate::entities::address::PersonAddress>> {
+        self.persistence.person_addresses(user_id).await
+    }
+
+    /// Rename the caller's own address in one company: refused as a bad request when it is not a
+    /// valid address, a conflict when someone or something in the company holds it, and not
+    /// found when the caller is not a person of that company.
+    pub async fn rename_person_address(
+        &self,
+        user_id: Uuid,
+        company_id: Uuid,
+        slug: &str,
+    ) -> AppResult<crate::entities::address::PersonAddress> {
+        let slug = slug.trim().to_lowercase();
+        crate::use_cases::channel::validate_slug(
+            &slug,
+            crate::use_cases::channel::SlugKind::PersonAddress,
+        )?;
+        if !crate::use_cases::channel::is_address_slug(&slug) {
+            return Err(AppError::BadRequest(format!(
+                "Invalid address '{slug}': use lowercase letters, digits and inner hyphens."
+            )));
+        }
+        self.persistence
+            .rename_person_address(
+                user_id,
+                company_id,
+                &crate::entities::value_objects::ChannelSlug::from(slug),
+            )
+            .await?
+            .ok_or_else(|| AppError::NotFound("Address not found".into()))
+    }
 }
 fn is_plausible_address(email: &EmailAddress) -> bool {
     let mut parts = email.splitn(2, '@');

@@ -1,5 +1,5 @@
 //! The one company-agent creation transaction (01DEP-P03-D1): the agent, its principal, its
-//! first published version, its default desk at its slug and its department placement commit
+//! first published version, its direct address/workflow and department placement commit
 //! together or not at all.
 //!
 //! Lock order, after the caller's account `FOR SHARE` and company write lock: the new agent and
@@ -8,7 +8,6 @@
 //! principals `FOR KEY SHARE`, and last, in one sorted call, the gates of the members-only desks
 //! its grants reach.
 use async_trait::async_trait;
-use serde_json::Value;
 use sqlx::{Postgres, Transaction};
 use uuid::Uuid;
 
@@ -19,26 +18,20 @@ use super::{
     channel::prepare_library_agent_on,
     department::place_in_department_on,
     participant::create_agent_principal_on,
-    workflow::provisioning::{ProvisioningDeployment, assistant_channel_on, ready_models_on},
+    workflow::provisioning::{
+        AgentWorkflowOwner, ProvisioningDeployment, provision_agent_workflow_on, ready_models_on,
+    },
 };
 use crate::{
     app_error::{AppError, AppResult},
     application::{
         agent::{AgentCompanyScope, AgentPublicationScope},
-        workflow::{
-            WorkflowActor,
-            provisioning::{AssistantChannelRequest, ProvisioningRefusal, ReplyMode},
-        },
+        workflow::{WorkflowActor, provisioning::ProvisioningRefusal},
     },
     domain::workflow::CompanyId,
     entities::{agent::Agent, agent_capability::AgentId},
     use_cases::agent::{AgentPlacement, AgentWrite, CompanyAgents, CreatedAgent, model_allowed},
 };
-
-/// The command key that records an agent's default desk.
-pub(crate) fn default_desk_key(agent: Uuid) -> String {
-    format!("agent:{agent}")
-}
 
 /// What [`create_company_agent_on`] creates: the agent under `id` from `write`, placed in
 /// `placement` when one is named. A caller with writes of its own after the creation passes no
@@ -53,16 +46,7 @@ pub(crate) struct CompanyAgentCreation {
 pub(crate) struct CreatedCompanyAgent {
     /// The agent's principal, for a caller that places it after more work of its own.
     pub principal: crate::entities::transport::PrincipalId,
-    /// The default desk's provisioning result, as its `agent:{id}` command row stores it.
-    pub desk: Value,
-}
-impl CreatedCompanyAgent {
-    pub fn desk_id(&self) -> AppResult<Uuid> {
-        self.desk["channel"]["id"]
-            .as_str()
-            .and_then(|id| Uuid::parse_str(id).ok())
-            .ok_or_else(|| AppError::Internal("A default desk result has no channel id".into()))
-    }
+    pub workflow: super::workflow::provisioning::AgentWorkflow,
 }
 
 /// Create a company agent on the caller's transaction. The caller holds `actor`'s account row
@@ -83,6 +67,8 @@ pub(crate) async fn create_company_agent_on(
     resolve_model_on(tx, company, &mut write).await?;
     insert_agent_on(tx, id, Some(company.as_uuid()), &write).await?;
     let principal = create_agent_principal_on(tx, company.as_uuid(), id, &write.name).await?;
+    super::agent::write_direct_settings_on(tx, Some(company.as_uuid()), id, &write).await?;
+    register_agent_address_on(tx, company, principal, &write.slug).await?;
     publish_initial_on(
         tx,
         AgentPublicationScope {
@@ -92,18 +78,16 @@ pub(crate) async fn create_company_agent_on(
         },
     )
     .await?;
-    // Boxed: the desk descends into template compilation and workflow publication.
-    let desk = Box::pin(assistant_channel_on(
+    // Boxed: template compilation and publication otherwise dominate the creator's future.
+    let workflow = Box::pin(provision_agent_workflow_on(
         tx,
         templates,
         company,
         actor,
-        AssistantChannelRequest {
-            agent_slug: write.slug.clone(),
-            channel_slug: write.slug.clone(),
-            channel_name: write.name.clone(),
-            reply_mode: ReplyMode::Autonomous,
-            command_key: default_desk_key(id),
+        AgentWorkflowOwner {
+            agent: id,
+            principal,
+            slug: &write.slug,
         },
     ))
     .await?
@@ -120,7 +104,35 @@ pub(crate) async fn create_company_agent_on(
         )
         .await?;
     }
-    Ok(CreatedCompanyAgent { principal, desk })
+    Ok(CreatedCompanyAgent {
+        principal,
+        workflow,
+    })
+}
+
+async fn register_agent_address_on(
+    tx: &mut Transaction<'_, Postgres>,
+    company: CompanyId,
+    principal: crate::entities::transport::PrincipalId,
+    slug: &str,
+) -> AppResult<()> {
+    crate::use_cases::channel::validate_slug(slug, crate::use_cases::channel::SlugKind::AgentSlug)?;
+    let inserted: Option<String> = sqlx::query_scalar(
+        "INSERT INTO addresses (company_id,slug,target_kind,principal_id,is_primary) \
+         VALUES ($1,$2,'principal',$3,true) ON CONFLICT (company_id,slug) DO NOTHING RETURNING slug::text",
+    ).bind(company.as_uuid()).bind(slug).bind(principal.as_uuid())
+        .fetch_optional(&mut **tx).await?;
+    if inserted.is_none() {
+        return Err(AppError::Conflict(format!(
+            "Address '{slug}' is already taken in this company."
+        )));
+    }
+    super::integration::email_binding::sync_principal_email_binding_on(
+        tx,
+        company.as_uuid(),
+        principal,
+    )
+    .await
 }
 
 /// A desk refusal as the error the creating route answers with, as "Create assistant channel"
@@ -234,7 +246,7 @@ impl CompanyAgentService {
             },
         ))
         .await?;
-        let desk_id = created.desk_id()?;
+        let principal_id = created.principal;
         let agent: Agent = sqlx::query_as::<_, AgentDb>(&format!(
             "SELECT {AGENT_COLUMNS} FROM agents AS agent WHERE agent.id = $1"
         ))
@@ -245,7 +257,10 @@ impl CompanyAgentService {
         tx.commit()
             .await
             .map_err(super::agent_capability::relationship_error)?;
-        Ok(CreatedAgent { agent, desk_id })
+        Ok(CreatedAgent {
+            agent,
+            principal_id,
+        })
     }
 }
 

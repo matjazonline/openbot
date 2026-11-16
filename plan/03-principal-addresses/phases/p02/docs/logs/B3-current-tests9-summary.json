@@ -1,0 +1,18 @@
+[
+  {
+    "filter": "public_desk_private_agent_",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests9-1.txt",
+    "summary": [
+      "test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4579 filtered out; finished in 20.08s"
+    ]
+  },
+  {
+    "filter": "knowledge_e2e_cc_and_member_demotion",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests9-2.txt",
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4586 filtered out; finished in 4.23s"
+    ]
+  }
+]

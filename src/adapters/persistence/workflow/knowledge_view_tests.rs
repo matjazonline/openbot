@@ -209,6 +209,7 @@ async fn knowledge_view_refusal_attention_and_native_constraints_keep_only_histo
             visible_channel_ids: &[setup.channel],
             manager: true,
             company_items: true,
+            direct_items: true,
             view: AttentionView::MyWork,
             cursor: None,
             limit: 10,

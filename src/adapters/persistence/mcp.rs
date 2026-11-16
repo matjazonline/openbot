@@ -147,10 +147,25 @@ pub(super) async fn publication_connection_on(
     company: Uuid,
     id: Uuid,
 ) -> AppResult<Option<CompanyMcpConnection>> {
-    let row = sqlx::query_as::<_, ConnectionRow>(&format!(
+    publication_connection_with_locks_on(
+        db,
+        company,
+        id,
+        super::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(super) async fn publication_connection_with_locks_on(
+    db: &mut PgConnection,
+    company: Uuid,
+    id: Uuid,
+    locks: super::workflow::row_locks::RowLocks,
+) -> AppResult<Option<CompanyMcpConnection>> {
+    let row = sqlx::query_as::<_, ConnectionRow>(&locks.sql(&format!(
         "{CONNECTION_SELECT} WHERE connection.company_id=$1 AND connection.id=$2 \
          AND connection.deleted_at IS NULL FOR SHARE OF connection"
-    ))
+    )))
     .bind(company)
     .bind(id)
     .fetch_optional(db)

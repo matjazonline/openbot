@@ -127,9 +127,7 @@ impl<'a> Visibility<'a> {
 
     pub(super) async fn allows(&mut self, association: RelatedAssociation) -> AppResult<bool> {
         let association = match association {
-            RelatedAssociation::Thread { channel_id, .. } => {
-                RelatedAssociation::Channel(channel_id)
-            }
+            RelatedAssociation::Thread { target, .. } => RelatedAssociation::inbox(target),
             other => other,
         };
         if let Some(&allowed) = self.seen.get(&association) {

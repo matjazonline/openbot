@@ -15,6 +15,7 @@ pub struct Page<'a> {
     pub machines: &'a [LocalMachine],
     pub pairings: &'a [PairingAttempt],
     pub profiles: &'a RecordPage<LocalAgentProfile>,
+    pub native_agents: &'a RecordPage<NativeAgentChoice>,
     pub machine: Option<&'a MachineDetails>,
     pub runtime: Option<&'a MachineRuntime>,
     pub profile: Option<&'a LocalAgentProfile>,
@@ -50,15 +51,18 @@ fn base(company: Uuid) -> String {
     format!("/ui/companies/{company}/local-agents")
 }
 fn navigation(view: &Page<'_>, query: &str) -> String {
-    let context = view.conversation.map_or_else(String::new, |thread| {
-        format!("&channel={}&conversation={}", thread.channel_id, thread.id)
-    });
+    let context = view
+        .conversation
+        .and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id)))
+        .map_or_else(String::new, |(channel, thread)| {
+            format!("&channel={channel}&conversation={thread}")
+        });
     format!("{}?{query}{context}", base(view.company.id))
 }
 fn conversation_fields(view: &Page<'_>) -> String {
-    view.conversation.map_or_else(String::new, |thread| format!(
+    view.conversation.and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id))).map_or_else(String::new, |(channel, thread)| format!(
         r#"<input type="hidden" name="channel" value="{}"><input type="hidden" name="conversation" value="{}">"#,
-        thread.channel_id, thread.id))
+        channel, thread))
 }
 fn request_id() -> Uuid {
     Uuid::now_v7()
@@ -89,3 +93,19 @@ fn option(value: &str, label: &str, selected: bool) -> String {
         text(label)
     )
 }
+
+pub(crate) const PROFILE_PERMISSIONS_SCRIPT: &str = r#"
+document.addEventListener('input', function (event) {
+    var agent = event.target.closest('[data-local-agent-selector]');
+    if (!agent) return;
+    var form = agent.closest('form');
+    var permissions = form.querySelector('[data-local-agent-permissions]');
+    var fallback = form.querySelector('[data-local-agent-fallback]');
+    if (!permissions || !fallback) return;
+    if (!permissions.disabled && permissions.value) fallback.value = permissions.value;
+    var usesAgent = agent.value.trim().length > 0;
+    permissions.disabled = usesAgent;
+    permissions.required = !usesAgent;
+    fallback.disabled = !usesAgent;
+});
+"#;

@@ -1,7 +1,7 @@
 import type Database from 'better-sqlite3';
 import { z } from 'zod';
 import { catalogSchema, evidenceSchema, isEffect, LIMITS, nativeInput, observationSchema,
-  observationSequence, parseOperation, selectionSchema, turnState, external, uuid, type Catalog, type Delivery,
+  observationSequence, parseOperation, selectionSchema, harnessSchema, turnState, external, uuid, type Catalog, type Delivery,
   type Evidence, type Observation, type Operation, type Selection } from './protocol.js';
 
 export const JOURNAL_SCHEMA = [
@@ -15,13 +15,18 @@ export const JOURNAL_SCHEMA = [
     session_id TEXT GENERATED ALWAYS AS (json_extract(state,'$.operation.command.session_id')) VIRTUAL,
     CHECK((terminal=0 AND terminal_at IS NULL) OR (terminal=1 AND terminal_at IS NOT NULL)),
     CHECK(acknowledged_at IS NULL OR terminal=1))`,
-  `CREATE TABLE sessions(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL UNIQUE,selection TEXT NOT NULL,last_used_at INTEGER NOT NULL)`,
+  `CREATE TABLE sessions(id TEXT PRIMARY KEY,mapping TEXT NOT NULL CHECK(json_valid(mapping) AND length(mapping)<=4096),
+    thread_id TEXT GENERATED ALWAYS AS (json_extract(mapping,'$.threadId')) STORED NOT NULL UNIQUE,last_used_at INTEGER NOT NULL)`,
   `CREATE TABLE outbox(sequence INTEGER PRIMARY KEY,operation_id TEXT NOT NULL REFERENCES commands(id),
     payload TEXT NOT NULL,bytes INTEGER NOT NULL CHECK(bytes>0))`,
   `CREATE INDEX commands_session_mapping ON commands(session_id)`,
   `CREATE INDEX commands_retention ON commands(terminal,acknowledged_at,terminal_at,id)`,
   `CREATE INDEX sessions_retention ON sessions(last_used_at,id)`,
   `CREATE INDEX outbox_operation ON outbox(operation_id)`,
+  `CREATE TABLE mcp_intents(key TEXT PRIMARY KEY,operation_id TEXT NOT NULL REFERENCES commands(id) ON DELETE CASCADE,
+    state TEXT NOT NULL CHECK(json_valid(state)),bytes INTEGER NOT NULL CHECK(bytes=length(CAST(state AS BLOB)) AND bytes<=8192),
+    resolved INTEGER NOT NULL CHECK(resolved IN (0,1)),reserve INTEGER NOT NULL CHECK(reserve IN (0,256)))`,
+  `CREATE INDEX mcp_intents_operation ON mcp_intents(operation_id,resolved)`,
 ];
 export const bindingSchema = z.object({ origin: z.string().url(), installation_id: uuid,
   journal_id: uuid, machine_id: uuid, company_id: uuid, credential_generation: z.number().int().positive().max(Number.MAX_SAFE_INTEGER) }).strict();
@@ -29,7 +34,7 @@ export type Binding = z.infer<typeof bindingSchema>;
 const stored = z.object({ operation: z.unknown().transform(parseOperation),
   stage: z.enum(['received', 'intent', 'observing', 'uncertain', 'terminal']),
   sdkInput: z.string().max(LIMITS.prompt + 57), sdkCalls: z.number().int().min(0).max(1),
-  threadId: external.nullable(), requestId: external.nullable(),
+  hostId: external.nullable(), threadId: external.nullable(), requestId: external.nullable(),
   turnId: external.nullable(), queueId: external.nullable(),
   cursor: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
   items: z.array(z.object({ id: z.string().max(128), text: z.string() }).strict()).max(1024),
@@ -41,13 +46,17 @@ const stored = z.object({ operation: z.unknown().transform(parseOperation),
 export type CommandRecord = z.infer<typeof stored>;
 export type Importance = 'progress' | 'critical' | 'terminal';
 type Row = { id: string; digest: string; state: string; reserve: number; terminal: number };
-export type MappingCandidate = { id: string; thread_id: string; selection: string; last_used_at: number };
+export type MappingCandidate = { id: string; thread_id: string; mapping: string; last_used_at: number };
 export type MappingCursor = Pick<MappingCandidate, 'last_used_at' | 'id'>;
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 type Meta = { binding: string; allocated: number; acknowledged: number; recovery_required: number };
 export class RecoveryRequired extends Error { constructor() { super('local journal recovery required'); } }
 export class JournalCapacity extends Error { constructor() { super('local journal capacity reached'); } }
 
+export const mappingSchema = z.object({ sessionId: uuid, threadId: external, selection: selectionSchema,
+  harness: harnessSchema, operationId: uuid, hostId: external.nullable() }).strict()
+  .refine(mapping => mapping.harness.kind === 'unconfigured' || mapping.hostId !== null);
+export type SessionMapping = z.infer<typeof mappingSchema>;
 export class Journal {
   readonly db: Database.Database;
   constructor(db: Database.Database) {
@@ -93,7 +102,7 @@ export class Journal {
     return record;
   }
   private budget(): { used: number; reserved: number } {
-    return this.db.prepare('SELECT COALESCE((SELECT sum(bytes) FROM outbox),0) AS used,COALESCE((SELECT sum(reserve) FROM commands),0) AS reserved').get() as { used: number; reserved: number };
+    return this.db.prepare('SELECT COALESCE((SELECT sum(bytes) FROM outbox),0)+COALESCE((SELECT sum(bytes+reserve) FROM mcp_intents),0) AS used,COALESCE((SELECT sum(reserve) FROM commands),0) AS reserved').get() as { used: number; reserved: number };
   }
   private append(record: CommandRecord, observation: Observation, importance: Importance): void {
     const row = this.row(record.operation.id);
@@ -144,7 +153,7 @@ export class Journal {
       }
       if (!this.canAdmit(operation)) throw new JournalCapacity();
       const record: CommandRecord = { operation, stage: 'received', sdkInput: isEffect(operation.command) ? nativeInput(operation) : '',
-        sdkCalls: 0, threadId: null, requestId: null, turnId: null, queueId: null, cursor: 0,
+        sdkCalls: 0, hostId: null, threadId: null, requestId: null, turnId: null, queueId: null, cursor: 0,
         items: [], truncated: false, correlationConflict: false, nativeState: null, usage: null, lastObservation: null };
       this.db.prepare('INSERT INTO commands(id,digest,state,reserve,terminal) VALUES(?,?,?,?,0)').run(operation.id, operation.payload_digest,
         JSON.stringify(record), LIMITS.terminalReserve);
@@ -199,32 +208,65 @@ export class Journal {
         operation_id: record.operation.id, thread_id, evidence }, 'terminal');
     })();
   }
-  bindSession(session: string, thread: string, selection: Selection): void {
+  bindSession(mapping: SessionMapping): void {
+    const exact = mappingSchema.parse(mapping);
     this.db.transaction(() => {
-      const exact = selectionSchema.parse(selection);
-      external.parse(thread);
-      if (exact.machine_id !== this.binding().machine_id) throw new RecoveryRequired();
-      const old = this.session(session);
+      if (exact.selection.machine_id !== this.binding().machine_id) throw new RecoveryRequired();
+      const old = this.session(exact.sessionId);
       if (old) {
-        if (old.threadId !== thread || JSON.stringify(old.selection) !== JSON.stringify(exact)) throw new RecoveryRequired();
-        this.db.prepare('UPDATE sessions SET last_used_at=max(last_used_at,?) WHERE id=?').run(Date.now(), session);
+        const {operationId:_priorOperation,...prior}=old; const {operationId:_newOperation,...next}=exact;
+        if (JSON.stringify(prior) !== JSON.stringify(next)) throw new RecoveryRequired();
+        this.db.prepare('UPDATE sessions SET last_used_at=max(last_used_at+1,?) WHERE id=?').run(Date.now(), exact.sessionId);
         return;
       }
-      const count = this.db.prepare('SELECT count(*) AS count FROM sessions').get() as { count: number };
+      const count = this.db.prepare('SELECT count(*) AS count FROM sessions').get() as {count:number};
       if (count.count >= LIMITS.history) throw new JournalCapacity();
-      this.db.prepare('INSERT INTO sessions(id,thread_id,selection,last_used_at) VALUES(?,?,?,?)').run(uuid.parse(session), thread, JSON.stringify(exact), Date.now());
+      this.db.prepare('INSERT INTO sessions(id,mapping,last_used_at) VALUES(?,?,?)').run(exact.sessionId,JSON.stringify(exact),Date.now());
     })();
   }
-  session(id: string): { threadId: string; selection: Selection } | undefined {
-    const row = this.db.prepare('SELECT thread_id,selection FROM sessions WHERE id=?').get(id) as { thread_id: string; selection: string } | undefined;
-    return row ? { threadId: external.parse(row.thread_id), selection: selectionSchema.parse(JSON.parse(row.selection)) } : undefined;
+  session(id: string): SessionMapping | undefined {
+    const row = this.db.prepare('SELECT mapping FROM sessions WHERE id=?').get(id) as {mapping:string}|undefined;
+    return row ? mappingSchema.parse(JSON.parse(row.mapping)) : undefined;
   }
-  submission(record: CommandRecord, selection: Selection, state: 'accepted' | 'queued' | 'missing'): void {
+  thread(id: string): SessionMapping | undefined {
+    const row = this.db.prepare('SELECT mapping FROM sessions WHERE thread_id=?').get(id) as {mapping:string}|undefined;
+    return row ? mappingSchema.parse(JSON.parse(row.mapping)) : undefined;
+  }
+  referenceOperation(session: string, operation: string): void {
+    const mapping = this.session(session); if (!mapping) throw new RecoveryRequired();
+    mapping.operationId = uuid.parse(operation);
+    this.db.prepare('UPDATE sessions SET mapping=?,last_used_at=max(last_used_at+1,?) WHERE id=?').run(JSON.stringify(mapping),Date.now(),session);
+  }
+  bundleReferences(): Set<string> {
+    const references = new Set<string>();
+    const rows = this.db.prepare('SELECT mapping FROM sessions LIMIT ?').all(LIMITS.history+1) as {mapping:string}[];
+    if(rows.length>LIMITS.history) throw new RecoveryRequired();
+    for(const row of rows) { const mapping=mappingSchema.parse(JSON.parse(row.mapping)); if(mapping.harness.kind==='agent') references.add(mapping.harness.digest); }
+    const commands=this.db.prepare('SELECT id FROM commands LIMIT ?').all(LIMITS.history+1) as {id:string}[];
+    if(commands.length>LIMITS.history) throw new RecoveryRequired();
+    for(const row of commands) { const command=this.get(row.id)!.operation.command; if(command.kind==='create' && command.harness.kind==='agent') references.add(command.harness.digest); }
+    return references;
+  }
+  hasMappedBundle(digest: string): boolean {
+    const rows=this.db.prepare('SELECT mapping FROM sessions LIMIT ?').all(LIMITS.history+1) as {mapping:string}[];
+    if(rows.length>LIMITS.history) throw new RecoveryRequired();
+    return rows.some(row=>{const mapping=mappingSchema.parse(JSON.parse(row.mapping));return mapping.harness.kind==='agent' && mapping.harness.digest===digest;});
+  }
+  hasDispatchedBundle(digest:string):boolean {
+    const rows=this.db.prepare('SELECT id FROM commands LIMIT ?').all(LIMITS.history+1) as {id:string}[];
+    if(rows.length>LIMITS.history) throw new RecoveryRequired();
+    return rows.some(row=>{const record=this.get(row.id)!;const command=record.operation.command;
+      return record.sdkCalls!==0 && command.kind==='create' && command.harness.kind==='agent' && command.harness.digest===digest;});
+  }
+  submission(record: CommandRecord, selection: Selection, state: 'accepted'|'queued'|'missing'): void {
     this.db.transaction(() => {
-      if (!record.threadId || !('session_id' in record.operation.command)) throw new RecoveryRequired();
-      this.bindSession(record.operation.command.session_id, record.threadId, selection);
-      record.stage = state === 'missing' ? 'uncertain' : 'observing';
-      this.evidence(record, { kind: 'submission', thread_id: record.threadId, state }, 'critical');
+      const command=record.operation.command;
+      if(!record.threadId || !('session_id' in command)) throw new RecoveryRequired();
+      if(command.kind==='create') this.bindSession({sessionId:command.session_id,threadId:record.threadId,selection,
+        harness:command.harness,operationId:record.operation.id,hostId:command.harness.kind==='agent'?record.hostId:null});
+      else if (!this.session(command.session_id) || this.session(command.session_id)!.threadId!==record.threadId) throw new RecoveryRequired();
+      record.stage=state==='missing'?'uncertain':'observing';
+      this.evidence(record,{kind:'submission',thread_id:record.threadId,state},'critical');
     })();
   }
   pending(): CommandRecord[] {
@@ -267,10 +309,11 @@ export class Journal {
         AND command.terminal_at<? AND command.acknowledged_at<?
         AND (julianday(json_extract(command.state,'$.operation.deadline'))-2440587.5)*86400000<?
         AND NOT EXISTS(SELECT 1 FROM outbox WHERE operation_id=command.id)
+        AND NOT EXISTS(SELECT 1 FROM mcp_intents WHERE operation_id=command.id AND resolved=0)
       ORDER BY command.terminal_at,command.id LIMIT 128)`).run(Date.now() - RETENTION_MS, Date.now() - RETENTION_MS, Date.now()).changes)();
   }
   mappingCandidates(after?: MappingCursor): MappingCandidate[] {
-    return this.db.prepare(`SELECT session.id,session.thread_id,session.selection,session.last_used_at
+    return this.db.prepare(`SELECT session.id,session.thread_id,session.mapping,session.last_used_at
       FROM sessions AS session WHERE session.last_used_at<?
         AND (? IS NULL OR (session.last_used_at,session.id)>(?,?))
         AND NOT EXISTS(SELECT 1 FROM commands WHERE commands.session_id=session.id)
@@ -285,9 +328,9 @@ export class Journal {
       let removed = 0;
       for (const id of retired) {
         const candidate = exact.get(id)!;
-        removed += this.db.prepare(`DELETE FROM sessions WHERE id=? AND thread_id=? AND selection=? AND last_used_at=? AND last_used_at<?
+        removed += this.db.prepare(`DELETE FROM sessions WHERE id=? AND thread_id=? AND mapping=? AND last_used_at=? AND last_used_at<?
           AND NOT EXISTS(SELECT 1 FROM commands WHERE commands.session_id=sessions.id)`)
-          .run(uuid.parse(id), candidate.thread_id, candidate.selection, candidate.last_used_at, Date.now() - RETENTION_MS).changes;
+          .run(uuid.parse(id), candidate.thread_id, candidate.mapping, candidate.last_used_at, Date.now() - RETENTION_MS).changes;
       }
       return removed;
     })();

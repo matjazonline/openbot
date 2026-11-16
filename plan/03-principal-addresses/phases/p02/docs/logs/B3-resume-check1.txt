@@ -1,0 +1,789 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+warning: unused import: `RelatedChannelId`
+ --> src/adapters/persistence/local_agents/protocol/commands.rs:2:56
+  |
+2 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                                        ^^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `RelatedChannelId`
+ --> src/adapters/persistence/local_agents/management/mod.rs:4:56
+  |
+4 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                                        ^^^^^^^^^^^^^^^^
+
+warning: unused import: `RelatedChannelId`
+  --> src/application/workflow/message_admission.rs:10:25
+   |
+10 |     RelatedAssociation, RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission,
+   |                         ^^^^^^^^^^^^^^^^
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/http/routes/workflows/bindings.rs:130:42
+    |
+130 |             RelatedAssociation::Thread { channel_id, .. } => {
+    |                                          ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/admission.rs:94:17
+   |
+94 |                 channel_id,
+   |                 ^^^^^^^^^^
+   |                 |
+   |                 variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+   |                 help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+  --> src/adapters/persistence/workflow/admission.rs:93:17
+   |
+93 |               let RelatedAssociation::Thread {
+   |  _________________^
+94 | |                 channel_id,
+95 | |                 thread_id,
+96 | |             } = command.association()
+   | |_____________^ missing field `target`
+   |
+help: include the missing field in the pattern
+   |
+95 -                 thread_id,
+96 -             } = command.association()
+95 +                 thread_id, target } = command.association()
+   |
+help: if you don't care about this missing field, you can explicitly ignore it
+   |
+95 -                 thread_id,
+96 -             } = command.association()
+95 +                 thread_id, target: _ } = command.association()
+   |
+help: or always ignore missing fields here
+   |
+95 -                 thread_id,
+96 -             } = command.association()
+95 +                 thread_id, .. } = command.association()
+   |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+ --> src/adapters/persistence/workflow/admission_history.rs:6:9
+  |
+6 |         channel_id,
+  |         ^^^^^^^^^^
+  |         |
+  |         variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+  |         help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+ --> src/adapters/persistence/workflow/admission_history.rs:5:9
+  |
+5 |       let RelatedAssociation::Thread {
+  |  _________^
+6 | |         channel_id,
+7 | |         thread_id,
+8 | |     } = command.association()
+  | |_____^ missing field `target`
+  |
+help: include the missing field in the pattern
+  |
+7 -         thread_id,
+8 -     } = command.association()
+7 +         thread_id, target } = command.association()
+  |
+help: if you don't care about this missing field, you can explicitly ignore it
+  |
+7 -         thread_id,
+8 -     } = command.association()
+7 +         thread_id, target: _ } = command.association()
+  |
+help: or always ignore missing fields here
+  |
+7 -         thread_id,
+8 -     } = command.association()
+7 +         thread_id, .. } = command.association()
+  |
+
+error[E0609]: no field `0` on type `AssociationColumns`
+  --> src/adapters/persistence/workflow/admission_refusal.rs:49:23
+   |
+49 |     .bind(association.0)
+   |                       ^ unknown field
+   |
+   = note: available fields are: `channel_id`, `principal_id`, `thread_id`
+
+error[E0609]: no field `1` on type `AssociationColumns`
+  --> src/adapters/persistence/workflow/admission_refusal.rs:50:23
+   |
+50 |     .bind(association.1)
+   |                       ^ unknown field
+   |
+   = note: available fields are: `channel_id`, `principal_id`, `thread_id`
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/admission_replay.rs:79:51
+   |
+79 |         || (saved.channel_id, saved.thread_id) != association
+   |            -----------------------------------    ^^^^^^^^^^^ expected `(Option<Uuid>, Option<Uuid>)`, found `AssociationColumns`
+   |            |
+   |            expected because this is `(std::option::Option<uuid::Uuid>, std::option::Option<uuid::Uuid>)`
+   |
+   = note: expected tuple `(std::option::Option<uuid::Uuid>, std::option::Option<uuid::Uuid>)`
+             found struct `AssociationColumns`
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/admission_source.rs:52:9
+    |
+ 52 |         binding_rows::association_from_columns(original.channel_id, original.thread_id)?;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                      ------------------ unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/admission_source.rs:52:48
+    |
+ 52 |         binding_rows::association_from_columns(original.channel_id, original.thread_id)?;
+    |                                                ^^^^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 52 -         binding_rows::association_from_columns(original.channel_id, original.thread_id)?;
+ 52 +         binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/admission_source.rs:74:9
+   |
+74 |         channel_id,
+   |         ^^^^^^^^^^
+   |         |
+   |         variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+   |         help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+  --> src/adapters/persistence/workflow/admission_source.rs:73:9
+   |
+73 |       let RelatedAssociation::Thread {
+   |  _________^
+74 | |         channel_id,
+75 | |         thread_id,
+76 | |     } = command.association()
+   | |_____^ missing field `target`
+   |
+help: include the missing field in the pattern
+   |
+75 -         thread_id,
+76 -     } = command.association()
+75 +         thread_id, target } = command.association()
+   |
+help: if you don't care about this missing field, you can explicitly ignore it
+   |
+75 -         thread_id,
+76 -     } = command.association()
+75 +         thread_id, target: _ } = command.association()
+   |
+help: or always ignore missing fields here
+   |
+75 -         thread_id,
+76 -     } = command.association()
+75 +         thread_id, .. } = command.association()
+   |
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/admission_write.rs:129:9
+    |
+129 |     let (channel, thread) = binding_rows::association_columns(row.association);
+    |         ^^^^^^^^^^^^^^^^^   -------------------------------------------------- this expression has type `AssociationColumns`
+    |         |
+    |         expected `AssociationColumns`, found `(_, _)`
+    |
+    = note: expected struct `AssociationColumns`
+                found tuple `(_, _)`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/admission_write.rs:182:9
+    |
+182 |     let (channel, thread) = binding_rows::association_columns(job.association);
+    |         ^^^^^^^^^^^^^^^^^   -------------------------------------------------- this expression has type `AssociationColumns`
+    |         |
+    |         expected `AssociationColumns`, found `(_, _)`
+    |
+    = note: expected struct `AssociationColumns`
+                found tuple `(_, _)`
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/agent_history/frozen.rs:118:23
+    |
+118 |     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                   --------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/agent_history/frozen.rs:118:62
+    |
+118 |     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    |                                                              ^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+118 -     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+118 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/agent_history/preparation.rs:204:23
+    |
+204 |     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                   --------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/agent_history/preparation.rs:204:62
+    |
+204 |     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    |                                                              ^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+204 -     let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+204 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_sessions.rs:12:17
+   |
+12 |             let (channel, thread) = binding_rows::association_columns(command.association());
+   |                 ^^^^^^^^^^^^^^^^^   -------------------------------------------------------- this expression has type `AssociationColumns`
+   |                 |
+   |                 expected `AssociationColumns`, found `(_, _)`
+   |
+   = note: expected struct `AssociationColumns`
+               found tuple `(_, _)`
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/agent_history_sessions.rs:64:9
+   |
+64 |     let (channel, thread) = binding_rows::association_columns(command.association());
+   |         ^^^^^^^^^^^^^^^^^   -------------------------------------------------------- this expression has type `AssociationColumns`
+   |         |
+   |         expected `AssociationColumns`, found `(_, _)`
+   |
+   = note: expected struct `AssociationColumns`
+               found tuple `(_, _)`
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/agent_history_views/mod.rs:38:23
+    |
+ 38 |     let association = binding_rows::association_from_columns(anchor.channel_id, anchor.thread_id)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                    ---------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/agent_history_views/mod.rs:38:62
+    |
+ 38 |     let association = binding_rows::association_from_columns(anchor.channel_id, anchor.thread_id)?;
+    |                                                              ^^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 38 -     let association = binding_rows::association_from_columns(anchor.channel_id, anchor.thread_id)?;
+ 38 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/agent_history_views/mod.rs:51:23
+    |
+ 51 |     let association = binding_rows::association_from_columns(row.channel_id, row.thread_id)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                 ------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/agent_history_views/mod.rs:51:62
+    |
+ 51 |     let association = binding_rows::association_from_columns(row.channel_id, row.thread_id)?;
+    |                                                              ^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 51 -     let association = binding_rows::association_from_columns(row.channel_id, row.thread_id)?;
+ 51 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/agent_manifest/roles.rs:62:13
+   |
+62 |             channel_id: channel,
+   |             ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/agent_manifest/mod.rs:123:13
+    |
+123 |             channel_id: channel,
+    |             ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/agent_preparation.rs:37:9
+    |
+ 37 |         binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                   --------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/agent_preparation.rs:37:48
+    |
+ 37 |         binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
+    |                                                ^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 37 -         binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?,
+ 37 +         binding_rows::association_from_columns(/* AssociationColumns */)?,
+    |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/association.rs:16:13
+   |
+16 |             channel_id: channel,
+   |             ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/authoring_reads.rs:87:21
+   |
+87 |                     channel_id: channel,
+   |                     ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/authoring_reads.rs:161:29
+    |
+161 | ...                   channel_id: channel,
+    |                       ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/bindings.rs:148:9
+    |
+148 |     let (channel, thread) = association_columns(state.association);
+    |         ^^^^^^^^^^^^^^^^^   -------------------------------------- this expression has type `AssociationColumns`
+    |         |
+    |         expected `AssociationColumns`, found `(_, _)`
+    |
+    = note: expected struct `AssociationColumns`
+                found tuple `(_, _)`
+
+error[E0308]: mismatched types
+   --> src/adapters/persistence/workflow/bindings.rs:231:9
+    |
+231 |     let (Some(channel), _) = association_columns(state.association) else {
+    |         ^^^^^^^^^^^^^^^^^^   -------------------------------------- this expression has type `AssociationColumns`
+    |         |
+    |         expected `AssociationColumns`, found `(_, _)`
+    |
+    = note: expected struct `AssociationColumns`
+                found tuple `(_, _)`
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/children.rs:244:23
+    |
+244 |     let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                    ---------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/children.rs:244:62
+    |
+244 |     let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
+    |                                                              ^^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+244 -     let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
+244 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/jev_authorization.rs:114:9
+    |
+114 |         binding_rows::association_from_columns(hints.channel_id, hints.thread_id)?,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                   --------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/jev_authorization.rs:114:48
+    |
+114 |         binding_rows::association_from_columns(hints.channel_id, hints.thread_id)?,
+    |                                                ^^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+114 -         binding_rows::association_from_columns(hints.channel_id, hints.thread_id)?,
+114 +         binding_rows::association_from_columns(/* AssociationColumns */)?,
+    |
+
+error[E0559]: variant `application::workflow::authorization::RelatedAssociation::Thread` has no field named `channel_id`
+  --> src/adapters/persistence/workflow/jev_assets.rs:88:17
+   |
+88 |                 channel_id: reference.channel_id,
+   |                 ^^^^^^^^^^ `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+   |
+   = note: available fields are: `target`
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/knowledge.rs:55:9
+   |
+55 |         channel_id,
+   |         ^^^^^^^^^^
+   |         |
+   |         variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+   |         help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+  --> src/adapters/persistence/workflow/knowledge.rs:54:9
+   |
+54 |       let RelatedAssociation::Thread {
+   |  _________^
+55 | |         channel_id,
+56 | |         thread_id,
+57 | |     } = association
+   | |_____^ missing field `target`
+   |
+help: include the missing field in the pattern
+   |
+56 -         thread_id,
+57 -     } = association
+56 +         thread_id, target } = association
+   |
+help: if you don't care about this missing field, you can explicitly ignore it
+   |
+56 -         thread_id,
+57 -     } = association
+56 +         thread_id, target: _ } = association
+   |
+help: or always ignore missing fields here
+   |
+56 -         thread_id,
+57 -     } = association
+56 +         thread_id, .. } = association
+   |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/knowledge.rs:231:23
+    |
+231 |     let association = binding_rows::association_from_columns(channel, thread)?;
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^          ------ unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/knowledge.rs:231:62
+    |
+231 |     let association = binding_rows::association_from_columns(channel, thread)?;
+    |                                                              ^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+231 -     let association = binding_rows::association_from_columns(channel, thread)?;
+231 +     let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+  --> src/adapters/persistence/workflow/role_binding.rs:33:13
+   |
+33 |             channel_id: channel,
+   |             ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/schedules.rs:269:38
+    |
+269 |         RelatedAssociation::Thread { channel_id, .. } => Some(channel_id.as_uuid()),
+    |                                      ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/http/pages/workflow_runs/detail.rs:252:17
+    |
+252 |                 channel_id,
+    |                 ^^^^^^^^^^
+    |                 |
+    |                 variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+    |                 help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+   --> src/adapters/http/pages/workflow_runs/detail.rs:251:13
+    |
+251 | /             RelatedAssociation::Thread {
+252 | |                 channel_id,
+253 | |                 thread_id,
+254 | |             },
+    | |_____________^ missing field `target`
+    |
+help: include the missing field in the pattern
+    |
+253 -                 thread_id,
+254 -             },
+253 +                 thread_id, target },
+    |
+help: if you don't care about this missing field, you can explicitly ignore it
+    |
+253 -                 thread_id,
+254 -             },
+253 +                 thread_id, target: _ },
+    |
+help: or always ignore missing fields here
+    |
+253 -                 thread_id,
+254 -             },
+253 +                 thread_id, .. },
+    |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/http/routes/workflows/ui/authoring/bindings.rs:137:38
+    |
+137 |         RelatedAssociation::Thread { channel_id, .. } => {
+    |                                      ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/http/routes/workflows/mod.rs:271:13
+    |
+271 |             channel_id,
+    |             ^^^^^^^^^^
+    |             |
+    |             variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+    |             help: `application::workflow::authorization::RelatedAssociation::Thread` has a field named `target`
+
+error[E0027]: pattern does not mention field `target`
+   --> src/adapters/http/routes/workflows/mod.rs:270:9
+    |
+270 | /         RelatedAssociation::Thread {
+271 | |             channel_id,
+272 | |             thread_id,
+273 | |         } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+    | |_________^ missing field `target`
+    |
+help: include the missing field in the pattern
+    |
+272 -             thread_id,
+273 -         } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+272 +             thread_id, target } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+    |
+help: if you don't care about this missing field, you can explicitly ignore it
+    |
+272 -             thread_id,
+273 -         } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+272 +             thread_id, target: _ } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+    |
+help: or always ignore missing fields here
+    |
+272 -             thread_id,
+273 -         } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+272 +             thread_id, .. } => json!({"kind": "thread", "channel_id": channel_id.as_uuid(),
+    |
+
+error[E0559]: variant `application::workflow::authorization::RelatedAssociation::Thread` has no field named `channel_id`
+   --> src/adapters/http/routes/workflows/mod.rs:298:17
+    |
+298 |                 channel_id: RelatedChannelId::new(channel_id),
+    |                 ^^^^^^^^^^ `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/admission.rs:306:17
+    |
+306 |                 channel_id: actual, ..
+    |                 ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0609]: no field `0` on type `AssociationColumns`
+  --> src/adapters/persistence/workflow/admission_refusal.rs:19:32
+   |
+19 |         "channel": association.0,
+   |                                ^ unknown field
+   |
+   = note: available fields are: `channel_id`, `principal_id`, `thread_id`
+
+error[E0609]: no field `1` on type `AssociationColumns`
+  --> src/adapters/persistence/workflow/admission_refusal.rs:20:31
+   |
+20 |         "thread": association.1,
+   |                               ^ unknown field
+   |
+   = note: available fields are: `channel_id`, `principal_id`, `thread_id`
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/reads.rs:90:22
+    |
+ 90 |         association: association_from_columns(row.channel_id, row.thread_id)?,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^                 ------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/reads.rs:90:47
+    |
+ 90 |         association: association_from_columns(row.channel_id, row.thread_id)?,
+    |                                               ^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 90 -         association: association_from_columns(row.channel_id, row.thread_id)?,
+ 90 +         association: association_from_columns(/* AssociationColumns */)?,
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/reads.rs:134:22
+    |
+134 |         association: association_from_columns(row.channel_id, row.thread_id)?,
+    |                      ^^^^^^^^^^^^^^^^^^^^^^^^                 ------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/reads.rs:134:47
+    |
+134 |         association: association_from_columns(row.channel_id, row.thread_id)?,
+    |                                               ^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+134 -         association: association_from_columns(row.channel_id, row.thread_id)?,
+134 +         association: association_from_columns(/* AssociationColumns */)?,
+    |
+
+error[E0061]: this function takes 1 argument but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/inspection.rs:49:27
+    |
+ 49 |         let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
+    |                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^                  -------------- unexpected argument #2 of type `std::option::Option<uuid::Uuid>`
+    |
+note: expected `AssociationColumns`, found `Option<Uuid>`
+   --> src/adapters/persistence/workflow/inspection.rs:49:66
+    |
+ 49 |         let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
+    |                                                                  ^^^^^^^^^^^^^^^
+    = note: expected struct `AssociationColumns`
+                 found enum `std::option::Option<uuid::Uuid>`
+note: function defined here
+   --> src/adapters/persistence/workflow/binding_rows.rs:129:15
+    |
+129 | pub(super) fn association_from_columns(columns: AssociationColumns) -> AppResult<RelatedAssociation> {
+    |               ^^^^^^^^^^^^^^^^^^^^^^^^ ---------------------------
+help: remove the extra argument
+    |
+ 49 -         let association = binding_rows::association_from_columns(self.channel_id, self.thread_id)?;
+ 49 +         let association = binding_rows::association_from_columns(/* AssociationColumns */)?;
+    |
+
+error[E0004]: non-exhaustive patterns: `application::workflow::authorization::RelatedAssociation::Principal(_)` not covered
+   --> src/adapters/http/pages/workflow_authoring/tools.rs:222:55
+    |
+222 |                 association = escape_html_text(&match summary.association {
+    |                                                       ^^^^^^^^^^^^^^^^^^^ pattern `application::workflow::authorization::RelatedAssociation::Principal(_)` not covered
+    |
+note: `application::workflow::authorization::RelatedAssociation` defined here
+   --> src/application/workflow/authorization.rs:55:10
+    |
+ 55 | pub enum RelatedAssociation {
+    |          ^^^^^^^^^^^^^^^^^^
+...
+ 58 |     Principal(PrincipalId),
+    |     --------- not covered
+    = note: the matched value is of type `application::workflow::authorization::RelatedAssociation`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+    |
+231 ~                     ),
+232 ~                     application::workflow::authorization::RelatedAssociation::Principal(_) => todo!(),
+    |
+
+error[E0004]: non-exhaustive patterns: `application::workflow::authorization::RelatedAssociation::Principal(_)` not covered
+  --> src/adapters/http/pages/workflow_authoring/versions.rs:79:11
+   |
+79 |     match binding.binding.association {
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^ pattern `application::workflow::authorization::RelatedAssociation::Principal(_)` not covered
+   |
+note: `application::workflow::authorization::RelatedAssociation` defined here
+  --> src/application/workflow/authorization.rs:55:10
+   |
+55 | pub enum RelatedAssociation {
+   |          ^^^^^^^^^^^^^^^^^^
+...
+58 |     Principal(PrincipalId),
+   |     --------- not covered
+   = note: the matched value is of type `application::workflow::authorization::RelatedAssociation`
+help: ensure that all possible cases are being handled by adding a match arm with a wildcard pattern or an explicit pattern as shown
+   |
+88 ~         ),
+89 ~         application::workflow::authorization::RelatedAssociation::Principal(_) => todo!(),
+   |
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/action_reconciliation_association_tests.rs:192:42
+    |
+192 |             RelatedAssociation::Thread { channel_id, .. } => {
+    |                                          ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+error[E0559]: variant `application::workflow::authorization::RelatedAssociation::Thread` has no field named `channel_id`
+   --> src/adapters/persistence/workflow/action_reconciliation_association_tests.rs:203:13
+    |
+203 |             channel_id: match association {
+    |             ^^^^^^^^^^ `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+    |
+    = note: available fields are: `target`
+
+error[E0026]: variant `application::workflow::authorization::RelatedAssociation::Thread` does not have a field named `channel_id`
+   --> src/adapters/persistence/workflow/action_reconciliation_association_tests.rs:205:48
+    |
+205 |                 | RelatedAssociation::Thread { channel_id: id, .. } => id,
+    |                                                ^^^^^^^^^^ variant `application::workflow::authorization::RelatedAssociation::Thread` does not have this field
+
+Some errors have detailed explanations: E0004, E0026, E0027, E0061, E0308, E0559, E0609.
+For more information about an error, try `rustc --explain E0004`.
+warning: `open_bots` (lib) generated 3 warnings
+error: could not compile `open_bots` (lib) due to 49 previous errors; 3 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `open_bots` (lib test) generated 3 warnings (3 duplicates)
+error: could not compile `open_bots` (lib test) due to 52 previous errors; 3 warnings emitted

@@ -1,0 +1,1777 @@
+--- B1/src/adapters/http/pages/local_agents/mod.rs
++++ B2/src/adapters/http/pages/local_agents/mod.rs
+@@ -50,15 +50,18 @@
+     format!("/ui/companies/{company}/local-agents")
+ }
+ fn navigation(view: &Page<'_>, query: &str) -> String {
+-    let context = view.conversation.map_or_else(String::new, |thread| {
+-        format!("&channel={}&conversation={}", thread.channel_id, thread.id)
+-    });
++    let context = view
++        .conversation
++        .and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id)))
++        .map_or_else(String::new, |(channel, thread)| {
++            format!("&channel={channel}&conversation={thread}")
++        });
+     format!("{}?{query}{context}", base(view.company.id))
+ }
+ fn conversation_fields(view: &Page<'_>) -> String {
+-    view.conversation.map_or_else(String::new, |thread| format!(
++    view.conversation.and_then(|thread| thread.target.desk_id().map(|channel| (channel, thread.id))).map_or_else(String::new, |(channel, thread)| format!(
+         r#"<input type="hidden" name="channel" value="{}"><input type="hidden" name="conversation" value="{}">"#,
+-        thread.channel_id, thread.id))
++        channel, thread))
+ }
+ fn request_id() -> Uuid {
+     Uuid::now_v7()
+--- B1/src/adapters/http/pages/notifications.rs
++++ B2/src/adapters/http/pages/notifications.rs
+@@ -105,7 +105,7 @@
+             id: NotificationId::random(),
+             company_id: Uuid::new_v4(),
+             company_label: "<company>".into(),
+-            channel_id: Some(Uuid::new_v4()),
++            inbox: Some(crate::entities::address::AddressTarget::Desk(Uuid::new_v4())),
+             channel_label: "support & sales".into(),
+             source_kind: NotificationSourceKind::Delivery,
+             source_id: Uuid::new_v4(),
+--- B1/src/adapters/http/pages/workflow_decision.rs
++++ B2/src/adapters/http/pages/workflow_decision.rs
+@@ -236,12 +236,12 @@
+         <h1 class="text-xl font-bold">Source message</h1>
+         <p class="break-all text-xs">Message {id}</p>
+         <article id="source-message" tabindex="-1" autofocus>{bubble}</article>
+-        <a class="link" href="/ui?company_id={company}&amp;channel_id={channel}&amp;thread_id={thread}">Open latest conversation</a>
++        <a class="link" href="/ui?company_id={company}&amp;{target_query}&amp;thread_id={thread}">Open latest conversation</a>
+         </main>"#,
+             id = message.canonical_id.as_uuid(),
+             bubble = message_bubble_readonly(message, Some(viewer_email), scope, run_access),
+             company = scope.company_id,
+-            channel = scope.channel_id,
++            target_query = super::inbox_target_query(scope.target),
+             thread = message.thread_id
+         ),
+     )
+--- B1/src/adapters/http/routes/channel.rs
++++ B2/src/adapters/http/routes/channel.rs
+@@ -83,11 +83,11 @@
+         )
+         .route(
+             "/companies/{company_id}/channels/{id}/threads",
+-            get(list_channel_threads_page),
++            get(list_inbox_threads_page),
+         )
+         .route(
+             "/companies/{company_id}/channels/{id}/threads/list",
+-            get(list_channel_threads_fragment),
++            get(list_inbox_threads_fragment),
+         )
+         .route(
+             "/api/companies/{company_id}/channels",
+@@ -101,7 +101,7 @@
+         )
+         .route(
+             "/api/companies/{company_id}/channels/{id}/threads",
+-            get(list_channel_threads_json),
++            get(list_inbox_threads_json),
+         )
+ }
+ 
+@@ -261,7 +261,7 @@
+ pub(crate) async fn load_thread_page(
+     thread_use_cases: &ThreadUseCases,
+     viewer: &crate::entities::user::Viewer,
+-    channel: &Channel,
++    inbox: impl Into<crate::use_cases::thread::InboxReadScope>,
+     query: &ThreadListQuery,
+ ) -> AppResult<ThreadListResponse> {
+     let limit = query.limit.unwrap_or(DEFAULT_THREAD_PAGE_SIZE);
+@@ -277,7 +277,7 @@
+         .transpose()?;
+ 
+     let mut threads = thread_use_cases
+-        .list_channel_threads(viewer, channel.into(), before, limit + 1)
++        .list_inbox_threads(viewer, inbox.into(), before, limit + 1)
+         .await?;
+     let has_more = threads.len() > limit;
+     threads.truncate(limit);
+@@ -668,7 +668,7 @@
+ }
+ 
+ /// GET /companies/{company_id}/channels/{id}/threads - Paginated thread list page (Protected).
+-async fn list_channel_threads_page(
++async fn list_inbox_threads_page(
+     State(company_use_cases): State<Arc<CompanyUseCases>>,
+     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+@@ -705,7 +705,7 @@
+ }
+ 
+ /// GET /companies/{company_id}/channels/{id}/threads/list - Next HTMX page (Protected).
+-async fn list_channel_threads_fragment(
++async fn list_inbox_threads_fragment(
+     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+     State(config): State<Arc<AppConfig>>,
+@@ -742,7 +742,7 @@
+ }
+ 
+ /// JSON API: List channel threads newest-first with keyset pagination (Protected).
+-async fn list_channel_threads_json(
++async fn list_inbox_threads_json(
+     State(channel_use_cases): State<Arc<ChannelUseCases>>,
+     State(thread_use_cases): State<Arc<ThreadUseCases>>,
+     viewer: crate::entities::user::Viewer,
+@@ -888,7 +888,8 @@
+     fn thread_cursor_round_trips() {
+         let thread = Thread {
+             id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            company_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+             subject: "Subject".into(),
+             participant_principal_ids: Vec::new(),
+             participant_projection: crate::entities::thread::ThreadParticipantProjection::default(),
+@@ -974,7 +975,8 @@
+ 
+         let thread = Thread {
+             id: Uuid::new_v4(),
+-            channel_id: channel.id,
++            company_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(channel.id),
+             subject: "Question <script>".into(),
+             participant_principal_ids: Vec::new(),
+             participant_projection: crate::entities::thread::ThreadParticipantProjection {
+@@ -1134,7 +1136,8 @@
+ 
+         let sample_thread = crate::entities::thread::Thread {
+             id: Uuid::new_v4(),
+-            channel_id: channel.id,
++            company_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(channel.id),
+             subject: "Existing Thread Subject".to_string(),
+             participant_principal_ids: Vec::new(),
+             participant_projection: crate::entities::thread::ThreadParticipantProjection {
+--- B1/src/adapters/http/routes/channel/simulation.rs
++++ B2/src/adapters/http/routes/channel/simulation.rs
+@@ -107,7 +107,12 @@
+     let thread_id = Uuid::parse_str(thread_id_input.trim())
+         .map_err(|_| AppError::BadRequest("A valid thread UUID is required.".into()))?;
+     let thread = thread_use_cases
+-        .readable_thread(viewer, company.id, channel.id, thread_id)
++        .readable_thread(
++            viewer,
++            company.id,
++            crate::entities::address::AddressTarget::Desk(channel.id),
++            thread_id,
++        )
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+     let messages = thread_use_cases
+@@ -403,7 +408,12 @@
+         .parse::<Uuid>()
+         .map_err(|_| AppError::NotFound("Thread not found".into()))?;
+     let thread = thread_use_cases
+-        .readable_thread(&viewer, company_id, channel_id, thread_id)
++        .readable_thread(
++            &viewer,
++            company_id,
++            crate::entities::address::AddressTarget::Desk(channel_id),
++            thread_id,
++        )
+         .await?
+         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
+ 
+--- B1/src/adapters/http/routes/live_updates.rs
++++ B2/src/adapters/http/routes/live_updates.rs
+@@ -63,14 +63,16 @@
+     })
+ }
+ 
+-/// The mailbox column's wake-ups: a message or a run's activity on any of the channel's threads.
+-pub(super) fn channel_wake_ups(
+-    events: &MailboxEvents,
+-    label: &'static str,
+-    channel_id: Uuid,
+-) -> impl Stream<Item = Wake> + Send + use<> {
+-    wake_ups(events, label, move |event| {
+-        event.is_message_in_channel(channel_id) || event.is_activity_in_channel(channel_id)
++/// Wake one exact typed inbox; a desk and principal with the same UUID remain distinct.
++pub(super) fn inbox_wake_ups(
++    events: &MailboxEvents,
++    label: &'static str,
++    target: crate::entities::address::AddressTarget,
++) -> impl Stream<Item = Wake> + Send + use<> {
++    wake_ups(events, label, move |event| {
++        event
++            .thread_scope()
++            .is_some_and(|scope| scope.target == target)
+     })
+ }
+ 
+@@ -160,12 +162,16 @@
+         let thread_id = Uuid::new_v4();
+         let scope = ThreadScope {
+             thread_id,
+-            channel_id,
++            target: crate::entities::address::AddressTarget::Desk(channel_id),
+             company_id,
+         };
+ 
+         let mut thread = Box::pin(thread_wake_ups(&events, "test", thread_id));
+-        let mut column = Box::pin(channel_wake_ups(&events, "test", channel_id));
++        let mut column = Box::pin(inbox_wake_ups(
++            &events,
++            "test",
++            crate::entities::address::AddressTarget::Desk(channel_id),
++        ));
+ 
+         events.publish(MailboxEvent::AttentionChanged(AttentionScope {
+             company_id,
+@@ -175,7 +181,7 @@
+         }));
+         events.publish(MailboxEvent::ActivityChanged(ThreadScope {
+             thread_id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+             company_id,
+         }));
+         events.publish(MailboxEvent::ActivityChanged(scope));
+--- B1/src/adapters/http/routes/ui_local_agents.rs
++++ B2/src/adapters/http/routes/ui_local_agents.rs
+@@ -219,7 +219,12 @@
+         match (selection.channel, selection.conversation) {
+             (Some(channel), Some(thread)) => self
+                 .threads
+-                .readable_thread(&self.viewer, company, channel, thread)
++                .readable_thread(
++                    &self.viewer,
++                    company,
++                    crate::entities::address::AddressTarget::Desk(channel),
++                    thread,
++                )
+                 .await?
+                 .ok_or_else(missing)
+                 .map(Some),
+--- B1/src/adapters/persistence/channel.rs
++++ B2/src/adapters/persistence/channel.rs
+@@ -294,9 +294,9 @@
+         transaction,
+         CanonicalEmailBinding {
+             company_id,
+-            channel_id,
+-            channel_slug: &channel_slug,
+-            channel_name: &write.name,
++            target: crate::entities::address::AddressTarget::Desk(channel_id),
++            slug: &channel_slug,
++            name: &write.name,
+             created_by: &created_by,
+         },
+     )
+@@ -410,6 +410,26 @@
+         .await
+     }
+ 
++    async fn address_for_target(
++        &self,
++        company_id: Uuid,
++        target: AddressTarget,
++    ) -> AppResult<Option<ResolvedAddress>> {
++        let slug: Option<String> = sqlx::query_scalar(
++            "SELECT slug::text FROM addresses WHERE company_id=$1 AND is_primary \
++             AND channel_id IS NOT DISTINCT FROM $2 AND principal_id IS NOT DISTINCT FROM $3",
++        )
++        .bind(company_id)
++        .bind(target.desk_id())
++        .bind(target.principal_id().map(PrincipalId::as_uuid))
++        .fetch_optional(&self.pool)
++        .await?;
++        Ok(slug.map(|slug| ResolvedAddress {
++            slug: slug.into(),
++            target,
++        }))
++    }
++
+     async fn address_targets(
+         &self,
+         company_id: Uuid,
+--- B1/src/adapters/persistence/integration/mod.rs
++++ B2/src/adapters/persistence/integration/mod.rs
+@@ -24,12 +24,14 @@
+ use crate::{
+     app_error::{AppError, AppResult},
+     entities::{
++        address::AddressTarget,
+         creation::CreationProvenance,
+         transport::{
+             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
+             BindingAuditEventId, BindingAuditMetadata, BindingChangeReason, BindingDeliveryPolicy,
+             BindingStatus, ChannelBinding, ChannelBindingId, EndpointNamespace,
+             ExternalEndpointKey, ExternalTenantKey, InstallationId, IntegrationInstallation,
++            PrincipalId,
+         },
+     },
+ };
+@@ -47,7 +49,7 @@
+     binding.id, binding.company_id, binding.channel_id, binding.installation_id, \
+     binding.transport, binding.namespace, binding.external_endpoint_key, binding.display_label, \
+     binding.access_policy, binding.delivery_policy, binding.status, binding.disabled_reason, \
+-    binding.created_by, binding.access_snapshot, binding.created_at, binding.updated_at";
++    binding.created_by, binding.access_snapshot, binding.created_at, binding.updated_at, binding.principal_id";
+ 
+ const AUDIT_EVENT_COLUMNS: &str = "\
+     event.id, event.company_id, event.binding_id, event.action, event.reason, event.actor, \
+@@ -141,7 +143,8 @@
+ struct BindingDb {
+     id: Uuid,
+     company_id: Uuid,
+-    channel_id: Uuid,
++    channel_id: Option<Uuid>,
++    principal_id: Option<Uuid>,
+     installation_id: Option<Uuid>,
+     transport: String,
+     namespace: String,
+@@ -176,7 +179,13 @@
+         Ok(Self {
+             id: ChannelBindingId::new(row.id),
+             company_id: row.company_id,
+-            channel_id: row.channel_id,
++            target: AddressTarget::from_parts(
++                row.channel_id,
++                row.principal_id.map(PrincipalId::new),
++            )
++            .ok_or_else(|| {
++                AppError::Internal(format!("Invalid target on channel binding {}", row.id))
++            })?,
+             installation_id: row.installation_id.map(InstallationId::new),
+             transport: parsed(&row.transport, "channel_bindings.transport", row.id)?,
+             namespace: bounded(
+--- B1/src/adapters/persistence/thread/external.rs
++++ B2/src/adapters/persistence/thread/external.rs
+@@ -6,6 +6,8 @@
+ //! collide -- and neither is a column on `threads` or `messages`, which is what lets one canonical
+ //! thread be bound to email and several Slack conversations at once.
+ 
++use crate::entities::address::AddressTarget;
++use crate::entities::transport::PrincipalId;
+ use uuid::Uuid;
+ 
+ use crate::{
+@@ -53,27 +55,29 @@
+ pub(super) async fn canonical_email_binding(
+     connection: &mut sqlx::PgConnection,
+     company_id: Uuid,
+-    channel_id: Uuid,
++    target: AddressTarget,
+ ) -> AppResult<ChannelBindingId> {
+     let binding: Option<Uuid> = sqlx::query_scalar(
+         r#"SELECT binding.id
+            FROM channel_bindings AS binding
+            WHERE binding.company_id = $1
+-             AND binding.channel_id = $2
++             AND binding.channel_id IS NOT DISTINCT FROM $2
++             AND binding.principal_id IS NOT DISTINCT FROM $3
+              AND binding.transport = 'email'
+              AND binding.installation_id IS NULL
+            ORDER BY binding.created_at, binding.id
+            LIMIT 1"#,
+     )
+     .bind(company_id)
+-    .bind(channel_id)
++    .bind(target.desk_id())
++    .bind(target.principal_id().map(PrincipalId::as_uuid))
+     .fetch_optional(&mut *connection)
+     .await
+     .map_err(AppError::from)?;
+ 
+     binding.map(ChannelBindingId::new).ok_or_else(|| {
+         AppError::Internal(format!(
+-            "Channel {channel_id} has no canonical email binding to correlate mail against"
++            "Target {target:?} has no canonical email binding to correlate mail against"
+         ))
+     })
+ }
+@@ -199,7 +203,7 @@
+ /// thread.
+ pub(super) struct ExternalThreadMapping<'a> {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: AddressTarget,
+     pub binding_id: ChannelBindingId,
+     pub key: &'a ExternalThreadKey,
+     pub thread_id: Uuid,
+@@ -216,23 +220,24 @@
+ ) -> AppResult<()> {
+     let ExternalThreadMapping {
+         company_id,
+-        channel_id,
++        target,
+         binding_id,
+         key,
+         thread_id,
+     } = mapping;
+     sqlx::query(
+         r#"INSERT INTO external_threads (
+-                id, company_id, channel_id, binding_id, external_thread_key, thread_id
+-           ) VALUES ($1, $2, $3, $4, $5, $6)
++                id, company_id, channel_id, binding_id, external_thread_key, thread_id, principal_id
++           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+            ON CONFLICT (binding_id, external_thread_key) DO NOTHING"#,
+     )
+     .bind(Uuid::new_v4())
+     .bind(company_id)
+-    .bind(channel_id)
++    .bind(target.desk_id())
+     .bind(binding_id.as_uuid())
+     .bind(key.as_str())
+     .bind(thread_id)
++    .bind(target.principal_id().map(PrincipalId::as_uuid))
+     .execute(&mut *connection)
+     .await
+     .map_err(AppError::from)?;
+--- B1/src/adapters/persistence/thread/inbound.rs
++++ B2/src/adapters/persistence/thread/inbound.rs
+@@ -23,7 +23,11 @@
+ //! * A provider conversation mapping wins over a caller's stale create decision. A reply that
+ //!   arrives before its root can therefore create the conversation and the root joins it.
+ 
++use crate::entities::address::AddressTarget;
++use crate::entities::transport::PrincipalId;
+ use std::collections::HashMap;
++#[path = "inbound_target.rs"]
++mod target_gate;
+ 
+ use async_trait::async_trait;
+ use chrono::Utc;
+@@ -66,7 +70,7 @@
+ /// Every thread one association resolved to, once the commit has created the ones it had to.
+ struct ResolvedThread {
+     thread_id: Uuid,
+-    channel_id: Uuid,
++    address_target: AddressTarget,
+     binding_id: ChannelBindingId,
+ }
+ 
+@@ -107,7 +111,7 @@
+ }
+ 
+ #[derive(Clone, Copy)]
+-enum InboundAuthor {
++pub(super) enum InboundAuthor {
+     Observed,
+     Platform,
+ }
+@@ -122,7 +126,20 @@
+             "An inbound commit must name at least one thread association".into(),
+         ));
+     }
+-    hold_channel_settings(tx, request).await?;
++    target_gate::validate_target_alignment(request)?;
++    sqlx::query("SET LOCAL lock_timeout = '5s'")
++        .execute(&mut **tx)
++        .await?;
++    sqlx::query("SET LOCAL statement_timeout = '15s'")
++        .execute(&mut **tx)
++        .await?;
++    // Acquire the parent key lock before target rows; later FK inserts must not invert company deletion.
++    sqlx::query("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
++        .bind(request.company_id)
++        .fetch_optional(&mut **tx)
++        .await?
++        .ok_or_else(|| AppError::NotFound("Inbound company was not found".into()))?;
++    hold_channel_settings(tx, request, author).await?;
+     let binding_ids = verify_association_bindings(tx, request).await?;
+     lock_provider_keys(tx, request, &binding_ids).await?;
+ 
+@@ -167,16 +184,20 @@
+ pub(super) async fn hold_channel_settings(
+     tx: &mut Transaction<'_, Postgres>,
+     request: &InboundCommitRequest,
++    author: InboundAuthor,
+ ) -> AppResult<()> {
+     acquire_channel_gates_on(
+         tx,
+-        request
+-            .intents
+-            .iter()
+-            .map(|intent| ChannelGateKey::new(request.company_id, intent.channel_id)),
++        request.intents.iter().filter_map(|intent| {
++            intent
++                .target
++                .desk_id()
++                .map(|id| ChannelGateKey::new(request.company_id, id))
++        }),
+         ChannelGateAccess::Admit,
+     )
+     .await?;
++    target_gate::hold_principal_settings(tx, request, author).await?;
+     verify_channel_settings(tx, request).await
+ }
+ 
+@@ -193,7 +214,12 @@
+     let (channels, revisions): (Vec<Uuid>, Vec<i64>) = request
+         .intents
+         .iter()
+-        .map(|intent| (intent.channel_id, intent.settings_revision))
++        .filter_map(|intent| {
++            intent
++                .target
++                .desk_id()
++                .map(|id| (id, intent.settings_revision))
++        })
+         .unzip();
+     let superseded: Option<Uuid> = sqlx::query_scalar(
+         "SELECT seen.channel_id FROM unnest($2::uuid[], $3::bigint[]) AS seen(channel_id, revision) \
+@@ -395,11 +421,7 @@
+     tx: &mut Transaction<'_, Postgres>,
+     request: &InboundCommitRequest,
+ ) -> AppResult<Vec<ChannelBindingId>> {
+-    if let Some((binding_id, channel_id)) = first_unbound_association(tx, request).await? {
+-        return Err(AppError::NotFound(format!(
+-            "Active binding {binding_id} does not belong to channel {channel_id}"
+-        )));
+-    }
++    target_gate::verify_bindings(tx, request).await?;
+     let mut bindings = Vec::with_capacity(request.associations.len());
+     for association in &request.associations {
+         if !bindings.contains(&association.binding_id) {
+@@ -413,46 +435,6 @@
+     }
+     bindings.sort_unstable();
+     Ok(bindings)
+-}
+-
+-/// The first association whose binding is not an active binding of its channel in this company,
+-/// asked once for the whole list rather than once per recipient channel.
+-///
+-/// "First" is the request's own order, as it was when each association was its own round trip, so
+-/// a commit naming several bad pairs is refused naming the same one it always was.
+-async fn first_unbound_association(
+-    tx: &mut Transaction<'_, Postgres>,
+-    request: &InboundCommitRequest,
+-) -> AppResult<Option<(ChannelBindingId, Uuid)>> {
+-    let binding_ids: Vec<Uuid> = request
+-        .associations
+-        .iter()
+-        .map(|association| association.binding_id.as_uuid())
+-        .collect();
+-    let channel_ids: Vec<Uuid> = request
+-        .associations
+-        .iter()
+-        .map(|association| association.channel_id)
+-        .collect();
+-    let unbound: Option<(Uuid, Uuid)> = sqlx::query_as(
+-        r#"SELECT association.binding_id, association.channel_id
+-           FROM unnest($1::uuid[], $2::uuid[]) WITH ORDINALITY
+-                AS association (binding_id, channel_id, ordinal)
+-           WHERE NOT EXISTS (
+-               SELECT 1 FROM channel_bindings AS binding
+-               WHERE binding.id = association.binding_id AND binding.company_id = $3
+-                 AND binding.channel_id = association.channel_id AND binding.status = 'active'
+-           )
+-           ORDER BY association.ordinal
+-           LIMIT 1"#,
+-    )
+-    .bind(&binding_ids)
+-    .bind(&channel_ids)
+-    .bind(request.company_id)
+-    .fetch_optional(&mut **tx)
+-    .await
+-    .map_err(AppError::from)?;
+-    Ok(unbound.map(|(binding_id, channel_id)| (ChannelBindingId::new(binding_id), channel_id)))
+ }
+ 
+ /// Serialize every provider mapping this transaction may read or create.
+@@ -517,7 +499,8 @@
+ #[derive(sqlx::FromRow)]
+ struct LockedThread {
+     id: Uuid,
+-    channel_id: Uuid,
++    channel_id: Option<Uuid>,
++    principal_id: Option<Uuid>,
+ }
+ 
+ async fn resolve_threads(
+@@ -535,7 +518,8 @@
+             None => match resolution.target {
+                 ThreadTarget::Existing(thread_id) => thread_id,
+                 ThreadTarget::Create { subject } => {
+-                    open_thread(tx, request.company_id, association.channel_id, &subject).await?
++                    open_thread(tx, request.company_id, association.address_target, &subject)
++                        .await?
+                 }
+             },
+         };
+@@ -543,7 +527,7 @@
+         resolved_by_binding.insert(association.binding_id, thread_id);
+         threads.push(ResolvedThread {
+             thread_id,
+-            channel_id: association.channel_id,
++            address_target: association.address_target,
+             binding_id: association.binding_id,
+         });
+     }
+@@ -595,7 +579,7 @@
+     // Publications lock this same set in UUID order. Address order remains the presentation
+     // order, but cannot determine the lock order when a follow-up races a sibling reply.
+     let locked: Vec<LockedThread> = sqlx::query_as(
+-        "SELECT id, channel_id FROM threads WHERE company_id = $1 AND id = ANY($2) \
++        "SELECT id, channel_id, principal_id FROM threads WHERE company_id = $1 AND id = ANY($2) \
+          ORDER BY id FOR UPDATE",
+     )
+     .bind(company_id)
+@@ -607,13 +591,16 @@
+         let ThreadTarget::Existing(id) = resolution.target else {
+             continue;
+         };
+-        if !locked
+-            .iter()
+-            .any(|thread| thread.id == id && thread.channel_id == resolution.association.channel_id)
+-        {
++        if !locked.iter().any(|thread| {
++            thread.id == id
++                && AddressTarget::from_parts(
++                    thread.channel_id,
++                    thread.principal_id.map(PrincipalId::new),
++                ) == Some(resolution.association.address_target)
++        }) {
+             return Err(AppError::Internal(format!(
+-                "Thread {id} does not belong to channel {} of company {company_id}",
+-                resolution.association.channel_id,
++                "Thread {id} does not belong to target {:?} of company {company_id}",
++                resolution.association.address_target,
+             )));
+         }
+     }
+@@ -623,30 +610,21 @@
+ async fn open_thread(
+     tx: &mut Transaction<'_, Postgres>,
+     company_id: Uuid,
+-    channel_id: Uuid,
++    target: AddressTarget,
+     subject: &str,
+ ) -> AppResult<Uuid> {
+     let id = Uuid::new_v4();
+-    let created: Option<Uuid> = sqlx::query_scalar(
+-        r#"INSERT INTO threads (id, company_id, channel_id, subject)
+-           SELECT $1, channel.company_id, channel.id, $4
+-           FROM channels AS channel
+-           WHERE channel.id = $3 AND channel.company_id = $2
+-           RETURNING id"#,
++    sqlx::query(
++        "INSERT INTO threads(id,company_id,channel_id,principal_id,subject) VALUES($1,$2,$3,$4,$5)",
+     )
+     .bind(id)
+     .bind(company_id)
+-    .bind(channel_id)
++    .bind(target.desk_id())
++    .bind(target.principal_id().map(PrincipalId::as_uuid))
+     .bind(subject)
+-    .fetch_optional(&mut **tx)
+-    .await
+-    .map_err(AppError::from)?;
+-
+-    created.ok_or_else(|| {
+-        AppError::Internal(format!(
+-            "Channel {channel_id} of company {company_id} was not found"
+-        ))
+-    })
++    .execute(&mut **tx)
++    .await?;
++    Ok(id)
+ }
+ 
+ /// Add the handles this message brings to a thread, and touch it so readers see the change.
+@@ -662,7 +640,7 @@
+     super::insert_thread_principals(
+         tx,
+         request.company_id,
+-        association.channel_id,
++        association.address_target,
+         thread_id,
+         &association.principals,
+     )
+@@ -693,7 +671,7 @@
+             tx,
+             external::ExternalThreadMapping {
+                 company_id: request.company_id,
+-                channel_id: thread.channel_id,
++                target: thread.address_target,
+                 binding_id: thread.binding_id,
+                 key: thread_key,
+                 thread_id: thread.thread_id,
+@@ -759,7 +737,7 @@
+             tx,
+             message::ThreadScope {
+                 company_id: request.company_id,
+-                channel_id: thread.channel_id,
++                target: thread.address_target,
+             },
+             message::AssociationWrite {
+                 thread_id: thread.thread_id,
+@@ -818,37 +796,38 @@
+     threads: &[ResolvedThread],
+     message_id: CanonicalMessageId,
+ ) -> AppResult<Vec<Uuid>> {
+-    let thread_of: HashMap<Uuid, Uuid> = threads
++    let thread_of: HashMap<AddressTarget, Uuid> = threads
+         .iter()
+-        .map(|thread| (thread.channel_id, thread.thread_id))
++        .map(|thread| (thread.address_target, thread.thread_id))
+         .collect();
+     let directives = &request.envelope.directives;
+-    let trace: Vec<Uuid> = directives.trace_channels.iter().copied().collect();
++    let trace = serde_json::to_value(&directives.trace_targets)
++        .map_err(|error| AppError::Internal(format!("Cannot encode relay trace: {error}")))?;
+     let policy = match request.reply_delivery {
+         ReplyDelivery::Send => "deliver",
+         ReplyDelivery::InAppOnly => "in_app_only",
+     };
+     let mut ids = Vec::with_capacity(request.intents.len());
+     for intent in &request.intents {
+-        let thread_id = thread_of.get(&intent.channel_id).copied().ok_or_else(|| {
++        let thread_id = thread_of.get(&intent.target).copied().ok_or_else(|| {
+             AppError::Internal(format!(
+-                "Admission intent channel {} has no association in this commit",
+-                intent.channel_id
++                "Admission intent target {:?} has no association in this commit",
++                intent.target
+             ))
+         })?;
+         let id: Uuid = sqlx::query_scalar(
+             r#"INSERT INTO workflow_message_intents
+                    (company_id, id, message_id, channel_id, thread_id, role, mentioned, admissible,
+-                    origin, reply_to_message_id, responder_principal_id, hop_count, trace_channels,
+-                    delivery_policy, correlation_id)
++                    origin, reply_to_message_id, responder_principal_id, hop_count, trace_targets,
++                    delivery_policy, correlation_id, principal_id)
+                SELECT $1, $2, message.id, $3, $4, $5, $6, $7, $8, $9, message.author_principal_id,
+-                    $10, $11, $12, $13
++                    $10, $11, $12, $13, $15
+                FROM messages AS message WHERE message.company_id = $1 AND message.id = $14
+                RETURNING id"#,
+         )
+         .bind(request.company_id)
+         .bind(Uuid::new_v4())
+-        .bind(intent.channel_id)
++        .bind(intent.target.desk_id())
+         .bind(thread_id)
+         .bind(intent.role.as_str())
+         .bind(intent.mentioned)
+@@ -863,6 +842,7 @@
+         .bind(policy)
+         .bind(request.envelope.correlation_id.as_uuid())
+         .bind(message_id.as_uuid())
++        .bind(intent.target.principal_id().map(PrincipalId::as_uuid))
+         .fetch_one(&mut **tx)
+         .await
+         .map_err(AppError::from)?;
+--- B1/src/adapters/persistence/thread/message.rs
++++ B2/src/adapters/persistence/thread/message.rs
+@@ -7,6 +7,7 @@
+ //! provider keys -- hangs off that payload in its own table, so storing a Slack post, a schedule's
+ //! prompt or an agent's answer needs none of it.
+ 
++use crate::entities::address::AddressTarget;
+ use std::str::FromStr;
+ 
+ use chrono::{DateTime, Utc};
+@@ -288,25 +289,23 @@
+ #[derive(Clone, Copy)]
+ pub(super) struct ThreadScope {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: AddressTarget,
+ }
+ 
+ pub(super) async fn thread_scope(
+     connection: &mut sqlx::PgConnection,
+     thread_id: Uuid,
+ ) -> AppResult<ThreadScope> {
+-    let scope: Option<(Uuid, Uuid)> =
+-        sqlx::query_as("SELECT company_id, channel_id FROM threads WHERE id = $1")
++    let scope: Option<(Uuid, Option<Uuid>, Option<Uuid>)> =
++        sqlx::query_as("SELECT company_id,channel_id,principal_id FROM threads WHERE id=$1")
+             .bind(thread_id)
+             .fetch_optional(&mut *connection)
+-            .await
+-            .map_err(AppError::from)?;
+-    scope
+-        .map(|(company_id, channel_id)| ThreadScope {
+-            company_id,
+-            channel_id,
+-        })
+-        .ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))
++            .await?;
++    let (company_id, desk, principal) =
++        scope.ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))?;
++    let target = AddressTarget::from_parts(desk, principal.map(PrincipalId::new))
++        .ok_or_else(|| AppError::Internal("Invalid stored thread target".into()))?;
++    Ok(ThreadScope { company_id, target })
+ }
+ 
+ pub(super) async fn resolve_author(
+@@ -579,17 +578,18 @@
+         sqlx::query(
+             r#"INSERT INTO internal_notes (
+                     id, company_id, channel_id, thread_id, message_id, command_id,
+-                    command_fingerprint, author_principal_id, provenance
+-               ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, 'email_quiet_ingress')
++                    command_fingerprint, author_principal_id, provenance, principal_id
++               ) VALUES ($1, $2, $3, $4, $5, $5, $6, $7, 'email_quiet_ingress', $8)
+                ON CONFLICT (company_id, message_id) DO NOTHING"#,
+         )
+         .bind(Uuid::new_v4())
+         .bind(scope.company_id)
+-        .bind(scope.channel_id)
++        .bind(scope.target.desk_id())
+         .bind(write.thread_id)
+         .bind(canonical_id.as_uuid())
+         .bind(fingerprint)
+         .bind(author.principal_id.as_uuid())
++        .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
+         .execute(&mut *connection)
+         .await
+         .map_err(AppError::from)?;
+@@ -705,7 +705,7 @@
+     metadata: &EmailMessageMetadata,
+ ) -> AppResult<CanonicalMessageId> {
+     let binding_id =
+-        external::canonical_email_binding(connection, scope.company_id, scope.channel_id).await?;
++        external::canonical_email_binding(connection, scope.company_id, scope.target).await?;
+     let message_key = bounded_message_key(metadata.rfc_message_id.as_str())?;
+     let thread_key = bounded_thread_key(metadata.conversation_root_key().as_str())?;
+ 
+@@ -759,7 +759,7 @@
+         connection,
+         external::ExternalThreadMapping {
+             company_id: scope.company_id,
+-            channel_id: scope.channel_id,
++            target: scope.target,
+             binding_id,
+             key: &thread_key,
+             thread_id: payload.write.thread_id,
+@@ -908,18 +908,19 @@
+ ) -> AppResult<Uuid> {
+     let association_id: Option<Uuid> = sqlx::query_scalar(
+         r#"INSERT INTO thread_messages (
+-                id, company_id, channel_id, thread_id, message_id, created_at, entry_kind
+-           ) VALUES ($1, $2, $3, $4, $5, $6, $7)
+-           ON CONFLICT (channel_id, message_id) DO NOTHING
++                id, company_id, channel_id, thread_id, message_id, created_at, entry_kind, principal_id
++           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
++           ON CONFLICT DO NOTHING
+            RETURNING id"#,
+     )
+     .bind(Uuid::new_v4())
+     .bind(scope.company_id)
+-    .bind(scope.channel_id)
++    .bind(scope.target.desk_id())
+     .bind(write.thread_id)
+     .bind(canonical_id.as_uuid())
+     .bind(write.created_at)
+     .bind(write.entry_kind.as_str())
++    .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
+     .fetch_optional(&mut *connection)
+     .await
+     .map_err(AppError::from)?;
+@@ -932,9 +933,11 @@
+     // the existing association names a *different* thread, which would mean one conversation had
+     // been split in two for the same audience.
+     let existing: Option<(Uuid, Uuid, String)> = sqlx::query_as(
+-        "SELECT id, thread_id, entry_kind FROM thread_messages WHERE channel_id = $1 AND message_id = $2",
++        "SELECT id,thread_id,entry_kind FROM thread_messages WHERE company_id=$1 AND channel_id IS NOT DISTINCT FROM $2 AND principal_id IS NOT DISTINCT FROM $3 AND message_id=$4",
+     )
+-    .bind(scope.channel_id)
++    .bind(scope.company_id)
++    .bind(scope.target.desk_id())
++    .bind(scope.target.principal_id().map(PrincipalId::as_uuid))
+     .bind(canonical_id.as_uuid())
+     .fetch_optional(&mut *connection)
+     .await
+--- B1/src/adapters/persistence/thread/views.rs
++++ B2/src/adapters/persistence/thread/views.rs
+@@ -643,7 +643,8 @@
+     canonical_id: Uuid,
+     company_id: Uuid,
+     thread_id: Uuid,
+-    channel_id: Uuid,
++    channel_id: Option<Uuid>,
++    principal_id: Option<Uuid>,
+     #[sqlx(flatten)]
+     author: AuthorDb,
+     direction: String,
+@@ -679,6 +680,7 @@
+            message.company_id,
+            association.thread_id,
+            association.channel_id,
++           association.principal_id,
+ {AUTHOR_COLUMNS},
+            message.direction,
+            message.role,
+@@ -736,7 +738,12 @@
+         canonical_id: CanonicalMessageId::new(db.canonical_id),
+         company_id: db.company_id,
+         thread_id: db.thread_id,
+-        channel_id: db.channel_id,
++        target: crate::entities::address::AddressTarget::from_parts(
++            db.channel_id,
++            db.principal_id
++                .map(crate::entities::transport::PrincipalId::new),
++        )
++        .ok_or_else(|| AppError::Internal("Invalid message audit target".into()))?,
+         author: db.author.try_into()?,
+         direction: MessageDirection::from_str(&db.direction)
+             .map_err(|error| AppError::Internal(error.to_string()))?,
+--- B1/src/adapters/persistence/workflow/message.rs
++++ B2/src/adapters/persistence/workflow/message.rs
+@@ -484,8 +484,8 @@
+     source: CanonicalMessageId,
+     channel: Uuid,
+ ) -> AppResult<Option<SourceRelay>> {
+-    let recorded: Option<(i32, Vec<Uuid>)> = sqlx::query_as(
+-        "SELECT hop_count, trace_channels FROM workflow_message_intents \
++    let recorded: Option<(i32, serde_json::Value)> = sqlx::query_as(
++        "SELECT hop_count, trace_targets FROM workflow_message_intents \
+          WHERE company_id=$1 AND message_id=$2 AND channel_id=$3",
+     )
+     .bind(company.as_uuid())
+@@ -493,13 +493,14 @@
+     .bind(channel)
+     .fetch_optional(&mut *tx)
+     .await?;
+-    let Some((hop_count, trace_channels)) = recorded else {
++    let Some((hop_count, trace_targets)) = recorded else {
+         return Ok(None);
+     };
+     Ok(Some(SourceRelay {
+         hop_count: u32::try_from(hop_count)
+             .map_err(|_| refused("the source's recorded relay trace cannot be read"))?,
+-        trace_channels,
++        trace_targets: serde_json::from_value(trace_targets)
++            .map_err(|_| refused("the source relay trace is invalid"))?,
+     }))
+ }
+ 
+--- B1/src/adapters/protocols/email/ingress.rs
++++ B2/src/adapters/protocols/email/ingress.rs
+@@ -108,6 +108,8 @@
+ /// them.
+ #[derive(Debug, thiserror::Error)]
+ pub enum EmailIngressError {
++    #[error("unusable relay trace")]
++    RelayTrace,
+     #[error("unusable {field} address: {source}")]
+     Address {
+         field: &'static str,
+@@ -355,6 +357,9 @@
+         routing: &InboundRouting,
+         trust: EmailIngressTrust,
+     ) -> Result<InboundDraft, EmailIngressError> {
++        if parsed.trace_invalid {
++            return Err(EmailIngressError::RelayTrace);
++        }
+         let metadata = email_metadata(parsed);
+         let author = self.identity("sender", &parsed.sender)?;
+ 
+@@ -391,7 +396,7 @@
+             attachments: BoundedVec::parse("attachments", parsed.attachments.clone())?,
+             directives: IngressDirectives {
+                 hop_count: parsed.hop_count,
+-                trace_channels: BoundedVec::parse("trace channels", parsed.trace_channels.clone())?,
++                trace_targets: BoundedVec::parse("trace channels", parsed.trace_targets.clone())?,
+                 disposition,
+                 source_channel_id: parsed.channel_id_header,
+                 target_thread_id: if matches!(trust, EmailIngressTrust::Application) {
+@@ -687,3 +692,7 @@
+         );
+     }
+ }
++
++#[cfg(test)]
++#[path = "trace_tests.rs"]
++mod trace_tests;
+--- B1/src/application/ports/channel.rs
++++ B2/src/application/ports/channel.rs
+@@ -77,6 +77,13 @@
+         slugs: &[ChannelSlug],
+     ) -> AppResult<Vec<ResolvedAddress>>;
+ 
++    /// The current primary address of an exact tenant-scoped target; archived targets have none.
++    async fn address_for_target(
++        &self,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
++    ) -> AppResult<Option<ResolvedAddress>>;
++
+     /// The company's departments, to label its desks by owner (01-departments 04C.3).
+     async fn list_departments(
+         &self,
+--- B1/src/application/ports/integration.rs
++++ B2/src/application/ports/integration.rs
+@@ -2,6 +2,7 @@
+ use crate::{
+     app_error::{AppError, AppResult},
+     entities::{
++        address::AddressTarget,
+         creation::CreationProvenance,
+         transport::{
+             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
+@@ -17,11 +18,11 @@
+ /// it, so an operational view cannot ask the database for an unbounded scan.
+ pub const MAX_BINDING_AUDIT_EVENTS: i64 = 200;
+ 
+-/// Everything creating one protocol interface onto a channel sets.
++/// Everything creating one protocol interface onto an addressable target sets.
+ #[derive(Debug, Clone)]
+ pub struct BindingWrite {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: AddressTarget,
+     pub installation_id: Option<InstallationId>,
+     pub transport: TransportKind,
+     pub namespace: EndpointNamespace,
+@@ -37,6 +38,15 @@
+     /// The coherence rule the database also states as a `CHECK`, checked here so the caller gets a
+     /// sentence instead of a constraint name.
+     pub fn validate(&self) -> AppResult<()> {
++        if matches!(self.target, AddressTarget::Principal(_))
++            && (self.transport != TransportKind::Email
++                || self.access_policy != BindingAccessPolicy::TargetAcl)
++        {
++            return Err(AppError::BadRequest(
++                "A principal address requires email transport and the target's access policy."
++                    .into(),
++            ));
++        }
+         if self.transport.requires_installation() != self.installation_id.is_some() {
+             return Err(AppError::BadRequest(format!(
+                 "A {} binding {} name an installation.",
+@@ -108,12 +118,12 @@
+     /// Create the binding and its `linked` audit record in one transaction.
+     async fn create_binding(&self, write: BindingWrite) -> AppResult<ChannelBinding>;
+ 
+-    /// The interfaces this channel is currently carrying traffic on. Bindings whose installation
++    /// The interfaces this target is currently carrying traffic on. Bindings whose installation
+     /// is no longer usable are excluded here rather than being rewritten row by row.
+-    async fn active_bindings_for_channel(
++    async fn active_bindings_for_target(
+         &self,
+         company_id: Uuid,
+-        channel_id: Uuid,
++        target: AddressTarget,
+     ) -> AppResult<Vec<ChannelBinding>>;
+ 
+     /// The one active binding that owns this endpoint, for routing an inbound event.
+--- B1/src/application/ports/participant.rs
++++ B2/src/application/ports/participant.rs
+@@ -9,6 +9,13 @@
+ use async_trait::async_trait;
+ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
++
++/// A direct inbox may retain history after its address has been retired.
++#[derive(Debug, Clone)]
++pub struct DirectInbox {
++    pub principal: crate::entities::participant::Principal,
++    pub slug: Option<crate::entities::value_objects::ChannelSlug>,
++}
+ /// One sighting of a transport handle. Observing confers no grant; it only fixes which principal
+ /// every later decision about that handle will name.
+ #[derive(Debug, Clone, Serialize, Deserialize)]
+@@ -22,6 +29,14 @@
+ /// The actor facts channel policy needs, looked up by whichever handle the caller arrived with.
+ #[async_trait]
+ pub trait PrincipalAccessPersistence: Send + Sync {
++    /// Bounded current-viewer listing, including owner-readable archived personal targets.
++    async fn direct_inboxes(
++        &self,
++        company_id: Uuid,
++        user_id: Uuid,
++        limit: usize,
++    ) -> AppResult<Vec<DirectInbox>>;
++
+     /// Tenant-scoped target lookup. A missing principal never borrows another company's policy.
+     async fn principal_by_id(
+         &self,
+--- B1/src/application/ports/thread/mod.rs
++++ B2/src/application/ports/thread/mod.rs
+@@ -44,16 +44,18 @@
+     ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::access_level::AccessLevel>>;
+     async fn create_thread(
+         &self,
+-        channel_id: Uuid,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         subject: &str,
+         participant_emails: &[EmailAddress],
+     ) -> AppResult<Thread>;
+ 
+-    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
+-
+-    async fn list_threads_by_channel_id(
+-        &self,
+-        channel_id: Uuid,
++    async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
++
++    async fn list_threads_by_target(
++        &self,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         before: Option<ThreadCursor>,
+         limit: usize,
+     ) -> AppResult<Vec<Thread>>;
+@@ -74,20 +76,23 @@
+     /// reflected yet. `None` means from the start of the channel.
+     async fn list_threads_updated_after(
+         &self,
+-        channel_id: Uuid,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         after: Option<ThreadCursor>,
+         limit: usize,
+     ) -> AppResult<Vec<Thread>>;
+ 
+     async fn update_thread_participants(
+         &self,
++        company_id: Uuid,
+         id: Uuid,
+         participant_emails: &[EmailAddress],
+     ) -> AppResult<Thread>;
+ 
+     async fn find_thread_by_thread_index(
+         &self,
+-        channel_id: Uuid,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         thread_index: &ThreadIndex,
+     ) -> AppResult<Option<Thread>>;
+ 
+@@ -107,7 +112,8 @@
+     /// Find the thread containing this message within a given channel, if any.
+     async fn find_thread_for_message(
+         &self,
+-        channel_id: Uuid,
++        company_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         message_id: CanonicalMessageId,
+     ) -> AppResult<Option<Thread>>;
+ 
+--- B1/src/application/transport/compose.rs
++++ B2/src/application/transport/compose.rs
+@@ -236,7 +236,10 @@
+         transport: TransportKind,
+     ) -> AppResult<ChannelBinding> {
+         self.bindings
+-            .active_bindings_for_channel(request.company_id, request.channel_id)
++            .active_bindings_for_target(
++                request.company_id,
++                crate::entities::address::AddressTarget::Desk(request.channel_id),
++            )
+             .await?
+             .into_iter()
+             .find(|binding| binding.transport == transport)
+--- B1/src/application/transport/delivery.rs
++++ B2/src/application/transport/delivery.rs
+@@ -498,7 +498,7 @@
+     /// Hops already taken. The renderer stamps `hop_count + 1`; ingress refuses beyond
+     /// [`crate::transport::MAX_INGRESS_HOPS`].
+     pub hop_count: u32,
+-    pub trace_channels: Vec<Uuid>,
++    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
+ }
+ 
+ /// A delivery with its destination resolved, ready for one transport's renderer.
+--- B1/src/application/transport/mod.rs
++++ B2/src/application/transport/mod.rs
+@@ -56,9 +56,9 @@
+     InboundDraft, InboundEnvelope, InboundOrigin, InboundRouting, IngressDirectives,
+     IngressPolicyFacts, MAX_ADDRESSED_IDENTITIES, MAX_ADDRESSED_TARGETS, MAX_ATTACHMENTS,
+     MAX_BODY_BYTES, MAX_INGRESS_HOPS, MAX_REPLY_CANDIDATES, MAX_SUBJECT_BYTES,
+-    MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_CHANNELS, MessageDisposition,
++    MAX_THREAD_ASSOCIATIONS, MAX_THREAD_PRINCIPALS, MAX_TRACE_TARGETS, MessageDisposition,
+     PipelineStep, ReplyCandidates, ReplyDelivery, SMALL_INLINE_IMAGE_BYTES, SystemAddress,
+-    ThreadAssociation, ThreadPrincipalIntent, ThreadTarget,
++    ThreadAssociation, ThreadPrincipalIntent, ThreadPrincipalReference, ThreadTarget,
+ };
+ pub use lease::{ExecutionId, ExecutionLease, WorkerId};
+ pub use ports::{
+--- B1/src/application/transport/ports.rs
++++ B2/src/application/transport/ports.rs
+@@ -197,7 +197,7 @@
+     /// Hops this message *is*, not hops it answers: the same value the wire header carries, so an
+     /// internal hop costs exactly what an external one costs.
+     pub hop_count: u32,
+-    pub trace: Vec<Uuid>,
++    pub trace: Vec<crate::entities::address::AddressTarget>,
+     pub correlation_id: CorrelationId,
+     /// Which frozen delivery part this mail is. The receiving commit proves it against the stored
+     /// part, so a hop inherits its source message's provenance only through a real delivery.
+--- B1/src/application/use_cases/channel.rs
++++ B2/src/application/use_cases/channel.rs
+@@ -640,6 +640,21 @@
+             Ok(Vec::new())
+         }
+ 
++        async fn address_for_target(
++            &self,
++            company_id: Uuid,
++            target: crate::entities::address::AddressTarget,
++        ) -> AppResult<Option<crate::entities::address::ResolvedAddress>> {
++            Ok(self
++                .list_by_company_id(company_id)
++                .await?
++                .into_iter()
++                .find(|desk| target == crate::entities::address::AddressTarget::Desk(desk.id))
++                .map(|desk| crate::entities::address::ResolvedAddress {
++                    slug: desk.slug,
++                    target,
++                }))
++        }
+         async fn address_targets(
+             &self,
+             company_id: Uuid,
+--- B1/src/application/use_cases/integration.rs
++++ B2/src/application/use_cases/integration.rs
+@@ -19,6 +19,7 @@
+ use crate::{
+     app_error::{AppError, AppResult},
+     entities::{
++        address::AddressTarget,
+         creation::CreationProvenance,
+         transport::{
+             ChannelBinding, ExternalTenantKey, InstallationId, InstallationStatus,
+@@ -167,7 +168,7 @@
+         channel_id: Uuid,
+     ) -> AppResult<Vec<ChannelBinding>> {
+         self.bindings
+-            .active_bindings_for_channel(company_id, channel_id)
++            .active_bindings_for_target(company_id, AddressTarget::Desk(channel_id))
+             .await
+     }
+ 
+@@ -271,7 +272,7 @@
+             let binding = ChannelBinding {
+                 id: ChannelBindingId::random(),
+                 company_id: write.company_id,
+-                channel_id: write.channel_id,
++                target: write.target,
+                 installation_id: write.installation_id,
+                 transport: write.transport,
+                 namespace: write.namespace.clone(),
+@@ -290,10 +291,10 @@
+             Ok(binding)
+         }
+ 
+-        async fn active_bindings_for_channel(
++        async fn active_bindings_for_target(
+             &self,
+             _: Uuid,
+-            _: Uuid,
++            _: AddressTarget,
+         ) -> AppResult<Vec<ChannelBinding>> {
+             Ok(Vec::new())
+         }
+@@ -414,13 +415,13 @@
+     fn write(transport: TransportKind, installation_id: Option<InstallationId>) -> BindingWrite {
+         BindingWrite {
+             company_id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            target: AddressTarget::Desk(Uuid::new_v4()),
+             installation_id,
+             transport,
+             namespace: EndpointNamespace::parse("email").unwrap(),
+             external_endpoint_key: ExternalEndpointKey::parse("support@acme").unwrap(),
+             display_label: "Support".into(),
+-            access_policy: BindingAccessPolicy::ChannelAcl,
++            access_policy: BindingAccessPolicy::TargetAcl,
+             delivery_policy: BindingDeliveryPolicy::ReplyAndInitiate,
+             access_snapshot: BindingAccessSnapshot::deployment_endpoint(),
+             created_by: CreationProvenance::system(),
+--- B1/src/application/use_cases/thread/ingest/mod.rs
++++ B2/src/application/use_cases/thread/ingest/mod.rs
+@@ -64,7 +64,7 @@
+ #[derive(Debug, Clone)]
+ pub struct CanonicalMessageIngress {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: crate::entities::address::AddressTarget,
+     /// Explicit target thread, if continuing an existing conversation.
+     pub target_thread_id: Option<Uuid>,
+     /// Specific message turn being answered, if this is a direct reply.
+@@ -90,14 +90,14 @@
+ impl CanonicalMessageIngress {
+     pub fn new(
+         company_id: Uuid,
+-        channel_id: Uuid,
++        target: crate::entities::address::AddressTarget,
+         author: QualifiedIdentity,
+         text_body: impl Into<String>,
+         origin: IngressOrigin,
+     ) -> Self {
+         Self {
+             company_id,
+-            channel_id,
++            target,
+             target_thread_id: None,
+             reply_to_message_id: None,
+             author,
+@@ -409,7 +409,7 @@
+         for (prepared_channel, thread_id) in prepared.channels.iter().zip(&outcome.thread_ids) {
+             let thread = self
+                 .thread_persistence
+-                .get_thread_by_id(*thread_id)
++                .get_thread_by_id(prepared_channel.candidate.company.id, *thread_id)
+                 .await?
+                 .ok_or_else(|| {
+                     AppError::Internal(format!("Thread {thread_id} vanished after its own commit"))
+@@ -418,10 +418,12 @@
+             // positional. Checked rather than trusted: a mispaired thread would attribute one
+             // channel's conversation to another, and the redelivery path builds its list from the
+             // associations the *first* delivery wrote rather than from this request's.
+-            if thread.channel_id != prepared_channel.candidate.channel.id {
++            if !thread.belongs_to(
++                prepared_channel.candidate.company.id,
++                prepared_channel.candidate.inbox.target(),
++            ) {
+                 return Err(AppError::Internal(format!(
+-                    "Committed thread {thread_id} belongs to channel {} rather than {}",
+-                    thread.channel_id, prepared_channel.candidate.channel.id
++                    "Committed thread {thread_id} has the wrong target"
+                 )));
+             }
+             let inbound_message = self
+@@ -436,7 +438,7 @@
+                 })?;
+             channel_matches.push(ChannelMatch {
+                 company: prepared_channel.candidate.company.clone(),
+-                channel: prepared_channel.candidate.channel.clone(),
++                inbox: prepared_channel.candidate.inbox.clone(),
+                 matched_slug: Some(prepared_channel.candidate.matched_slug.clone()),
+                 thread,
+                 inbound_message,
+@@ -463,7 +465,7 @@
+             thread: Some(primary.thread.clone()),
+             inbound_message: Some(primary.inbound_message.clone()),
+             company: Some(primary.company.clone()),
+-            channel: Some(primary.channel.clone()),
++            channel: primary.inbox.desk().cloned(),
+             envelope: Some(envelope),
+             intent_ids: outcome.intent_ids,
+             reply_delivery,
+--- B1/src/application/use_cases/thread/ingest/policy.rs
++++ B2/src/application/use_cases/thread/ingest/policy.rs
+@@ -285,7 +285,7 @@
+         source_message_key: ExternalMessageKey,
+         recipient_to: EmailAddress,
+         company: &crate::entities::company::Company,
+-        available_channels: Vec<crate::use_cases::thread::ChannelDirectoryEntry>,
++        available_channels: Vec<crate::use_cases::thread::AddressDirectoryEntry>,
+         original_subject: String,
+     ) -> BounceInfo {
+         BounceInfo {
+--- B1/src/application/use_cases/thread/notices.rs
++++ B2/src/application/use_cases/thread/notices.rs
+@@ -62,9 +62,10 @@
+     pub suggestions: Vec<ChannelSlug>,
+ }
+ 
+-/// One channel the bouncing sender could have written to instead.
++/// One address the sender is currently authorized to write to.
+ #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+-pub struct ChannelDirectoryEntry {
++pub struct AddressDirectoryEntry {
++    pub target: crate::entities::address::AddressTarget,
+     pub address: EmailAddress,
+     pub name: String,
+     pub description: Option<String>,
+@@ -75,8 +76,6 @@
+ /// Why a principal's address could not take this message.
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ pub enum PrincipalRefusal {
+-    /// Direct messages are not delivered to people and agents yet.
+-    NotYetDeliverable,
+     /// A context suffix such as `+quiet` was put on a principal's address; it means "do not run
+     /// the desk's agent" and has no meaning for a person or an agent.
+     ContextSuffix,
+@@ -85,7 +84,6 @@
+ impl PrincipalRefusal {
+     pub fn as_str(self) -> &'static str {
+         match self {
+-            Self::NotYetDeliverable => "Direct messages to people and agents are not delivered yet",
+             Self::ContextSuffix => {
+                 "A context suffix is not accepted on a person's or an agent's address"
+             }
+@@ -127,7 +125,7 @@
+     /// channel directory from the bounce it earns. Defaulted on deserialize for the same reason as
+     /// `disabled_slugs`.
+     #[serde(default)]
+-    pub available_channels: Vec<ChannelDirectoryEntry>,
++    pub available_channels: Vec<AddressDirectoryEntry>,
+     pub original_subject: String,
+ }
+ 
+@@ -175,7 +173,7 @@
+         ));
+     }
+ 
+-    push_channel_directory(&mut body, &bounce.available_channels);
++    push_address_directory(&mut body, &bounce.available_channels);
+ 
+     body.push_str("Please check the desk address and try sending your email again.\n");
+     body
+@@ -186,18 +184,28 @@
+ ///
+ /// Nothing at all is rendered for an empty list, so a stranger's bounce is byte-for-byte what it
+ /// was before this section existed.
+-fn push_channel_directory(body: &mut String, entries: &[ChannelDirectoryEntry]) {
++fn push_address_directory(body: &mut String, entries: &[AddressDirectoryEntry]) {
+     if entries.is_empty() {
+         return;
+     }
+ 
+-    body.push_str("Desks you can write to:\n");
++    let desks: Vec<_> = entries
++        .iter()
++        .filter(|entry| entry.target.desk_id().is_some())
++        .collect();
++    let principals: Vec<_> = entries
++        .iter()
++        .filter(|entry| entry.target.principal_id().is_some())
++        .collect();
++    if !desks.is_empty() {
++        body.push_str("Desks you can write to:\n");
++    }
+     // Under department headings once any desk has a department (01-departments 04C.3); the
+     // entries already arrive in that order, root departments first and "No department" last.
+-    let headed = entries.iter().any(|entry| entry.department.is_some());
++    let headed = desks.iter().any(|entry| entry.department.is_some());
+     let indent = if headed { "  " } else { "" };
+     let mut heading: Option<Option<&str>> = None;
+-    for entry in entries {
++    for entry in desks {
+         let department = entry.department.as_deref();
+         if headed && heading != Some(department) {
+             body.push_str(&format!("  {}:\n", department.unwrap_or("No department")));
+@@ -213,12 +221,21 @@
+             body.push_str(&format!("{indent}      {description}\n"));
+         }
+     }
++    if !principals.is_empty() {
++        body.push_str("People and agents:\n");
++        for entry in &principals {
++            body.push_str(&format!("  - {} — {}\n", entry.address, entry.name));
++        }
++        if principals.len() == 201 {
++            body.push_str("  More addresses may be available.\n");
++        }
++    }
+     body.push('\n');
+ }
+ 
+ /// The reply `_help@{company}.{app_domain}` sends back.
+ ///
+-/// `entries` is whatever [`ThreadUseCases::writable_channel_directory`] allowed this sender, so the
++/// `entries` is whatever [`ThreadUseCases::writable_address_directory`] allowed this sender, so the
+ /// team-only rule is decided there rather than restated here; an empty list still gets the syntax
+ /// section, which discloses nothing about the company.
+ ///
+@@ -226,13 +243,14 @@
+ /// `parse_recipient_address_pipeline`, the separators in `strip_context_suffix_from_slug`, and the
+ /// bracket forms in `EmailParser::check_body_context_trigger`.
+ pub fn format_help_email_body(
+-    entries: &[ChannelDirectoryEntry],
++    entries: &[AddressDirectoryEntry],
+     company_slug: &CompanySlug,
+     app_domain: &str,
+ ) -> String {
+     let domain_part = format!("{company_slug}.{app_domain}");
+     let example = entries
+-        .first()
++        .iter()
++        .find(|entry| entry.target.desk_id().is_some())
+         .map(|entry| {
+             entry
+                 .address
+@@ -244,7 +262,7 @@
+         .unwrap_or_else(|| "support".to_string());
+ 
+     let mut body = String::from("Mail Agents Help\n\n");
+-    push_channel_directory(&mut body, entries);
++    push_address_directory(&mut body, entries);
+     if entries.is_empty() {
+         body.push_str(
+             "You are not currently a participant of any desk in this company, so there is \
+@@ -277,9 +295,6 @@
+     if let Some(principal) = bounce.principals.first() {
+         return if bounce.invalid_slugs.is_empty() && bounce.disabled_slugs.is_empty() {
+             match principal.refusal {
+-                PrincipalRefusal::NotYetDeliverable => {
+-                    "direct messages to people and agents are not delivered yet"
+-                }
+                 PrincipalRefusal::ContextSuffix => {
+                     "a context suffix is not accepted on a person's or an agent's address"
+                 }
+--- B1/src/application/workflow/authorization.rs
++++ B2/src/application/workflow/authorization.rs
+@@ -114,13 +114,21 @@
+ 
+ #[async_trait]
+ pub trait WorkflowThreadReader: Send + Sync {
+-    async fn workflow_thread(&self, id: RelatedThreadId) -> AppResult<Option<Thread>>;
++    async fn workflow_thread(
++        &self,
++        company: CompanyId,
++        id: RelatedThreadId,
++    ) -> AppResult<Option<Thread>>;
+ }
+ 
+ #[async_trait]
+ impl<T: ThreadPersistence + Send + Sync> WorkflowThreadReader for T {
+-    async fn workflow_thread(&self, id: RelatedThreadId) -> AppResult<Option<Thread>> {
+-        self.get_thread_by_id(id.as_uuid()).await
++    async fn workflow_thread(
++        &self,
++        company: CompanyId,
++        id: RelatedThreadId,
++    ) -> AppResult<Option<Thread>> {
++        self.get_thread_by_id(company.as_uuid(), id.as_uuid()).await
+     }
+ }
+ 
+@@ -181,10 +189,15 @@
+         if let RelatedAssociation::Thread { thread_id, .. } = association {
+             let thread = self
+                 .threads
+-                .workflow_thread(thread_id)
++                .workflow_thread(company, thread_id)
+                 .await?
+                 .ok_or_else(not_found)?;
+-            if thread.id != thread_id.as_uuid() || thread.channel_id != channel_id.as_uuid() {
++            if thread.id != thread_id.as_uuid()
++                || !thread.belongs_to(
++                    company.as_uuid(),
++                    crate::entities::address::AddressTarget::Desk(channel_id.as_uuid()),
++                )
++            {
+                 return Err(not_found());
+             }
+         }
+--- B1/src/application/workflow/message.rs
++++ B2/src/application/workflow/message.rs
+@@ -294,7 +294,7 @@
+ #[serde(deny_unknown_fields)]
+ pub struct SourceRelay {
+     pub hop_count: u32,
+-    pub trace_channels: Vec<Uuid>,
++    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
+ }
+ 
+ /// What publication must find unchanged under its locks.
+--- B1/src/application/workflow/message_planner.rs
++++ B2/src/application/workflow/message_planner.rs
+@@ -225,7 +225,9 @@
+                     relay: EmailRelayTrace {
+                         source_channel_id: sender.id,
+                         hop_count: 0,
+-                        trace_channels: vec![sender.id],
++                        trace_targets: vec![crate::entities::address::AddressTarget::Desk(
++                            sender.id,
++                        )],
+                     },
+                     purpose: DeliveryPurpose::WorkflowSend,
+                     thread_id,
+@@ -263,9 +265,9 @@
+                 relay: EmailRelayTrace {
+                     source_channel_id: sender.id,
+                     hop_count: relay.as_ref().map_or(0, |relay| relay.hop_count),
+-                    trace_channels: relay
++                    trace_targets: relay
+                         .as_ref()
+-                        .map(|relay| relay.trace_channels.clone())
++                        .map(|relay| relay.trace_targets.clone())
+                         .unwrap_or_default(),
+                 },
+                 purpose: DeliveryPurpose::WorkflowReply,
+--- B1/src/domain/entities/internal_note.rs
++++ B2/src/domain/entities/internal_note.rs
+@@ -49,7 +49,7 @@
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct AddInternalNote {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: crate::entities::address::AddressTarget,
+     pub thread_id: Uuid,
+     pub text: String,
+     pub command_id: Uuid,
+@@ -75,7 +75,7 @@
+ #[derive(Debug, Clone, PartialEq, Eq)]
+ pub struct TombstoneInternalNote {
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: crate::entities::address::AddressTarget,
+     pub thread_id: Uuid,
+     pub note_id: Uuid,
+     pub command_id: Uuid,
+@@ -105,7 +105,7 @@
+     fn note(text: String) -> AddInternalNote {
+         AddInternalNote {
+             company_id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+             thread_id: Uuid::new_v4(),
+             text,
+             command_id: Uuid::new_v4(),
+--- B1/src/domain/entities/message_view.rs
++++ B2/src/domain/entities/message_view.rs
+@@ -169,7 +169,7 @@
+     pub canonical_id: CanonicalMessageId,
+     pub company_id: Uuid,
+     pub thread_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: super::address::AddressTarget,
+     pub author: AuthorView,
+     pub direction: MessageDirection,
+     pub role: MessageRole,
+--- B1/src/domain/entities/thread.rs
++++ B2/src/domain/entities/thread.rs
+@@ -1,13 +1,15 @@
+ use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
++use crate::entities::address::AddressTarget;
+ use crate::entities::cursor::ThreadCursor;
+ use crate::entities::transport::{PrincipalId, QualifiedIdentity, TransportKind};
+ 
+ #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+ pub struct Thread {
+     pub id: Uuid,
+-    pub channel_id: Uuid,
++    pub company_id: Uuid,
++    pub target: AddressTarget,
+     pub subject: String,
+     pub participant_principal_ids: Vec<PrincipalId>,
+     /// Adapter/read-side identities for rendering and email delivery. Business authorization
+@@ -35,7 +37,11 @@
+ }
+ 
+ impl Thread {
+-    /// This thread's position in its channel's newest-first column — where paging continues from,
++    pub fn belongs_to(&self, company_id: Uuid, target: AddressTarget) -> bool {
++        self.company_id == company_id && self.target == target
++    }
++
++    /// This thread's position in its target's newest-first column — where paging continues from,
+     /// and where a live column resumes from.
+     pub fn cursor(&self) -> ThreadCursor {
+         ThreadCursor::new(self.updated_at, self.id)
+@@ -63,7 +69,8 @@
+     fn thread_with_subject(subject: &str) -> Thread {
+         Thread {
+             id: Uuid::new_v4(),
+-            channel_id: Uuid::new_v4(),
++            company_id: Uuid::new_v4(),
++            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+             subject: subject.to_string(),
+             participant_principal_ids: vec![],
+             participant_projection: ThreadParticipantProjection::default(),
+--- B1/src/domain/entities/transport/integration.rs
++++ B2/src/domain/entities/transport/integration.rs
+@@ -1,8 +1,7 @@
+-//! Provider accounts a company has installed, and the protocol interfaces a business channel
+-//! exposes through them.
++//! Provider accounts a company has installed, and protocol interfaces on desks and principals.
+ //!
+ //! A [`Channel`](crate::entities::channel::Channel) is not an inbox and not a conversation. It
+-//! owns agents, policy and threads; a [`ChannelBinding`] is one protocol-facing interface onto it.
++//! owns shared intake and its policy; a [`ChannelBinding`] is an interface onto an addressable target.
+ //! That is what lets a channel gain a second transport without a nullable column per provider,
+ //! and what lets one interface be paused while the rest of the channel keeps working.
+ //!
+@@ -20,7 +19,7 @@
+     BindingAuditEventId, ChannelBindingId, EndpointNamespace, ExternalEndpointKey,
+     ExternalTenantKey, InstallationId, InvalidTransportValue, TransportKind, stored_enum,
+ };
+-use crate::entities::creation::CreationProvenance;
++use crate::entities::{address::AddressTarget, creation::CreationProvenance};
+ 
+ stored_enum! {
+     /// Whether a provider account can currently be used, and if not, why not.
+@@ -78,13 +77,13 @@
+ stored_enum! {
+     /// Who may read and write through this interface.
+     ///
+-    /// `ChannelAcl` defers entirely to the channel's principal grants.
++    /// `TargetAcl` defers to the addressed desk's or principal's access policy.
+     /// `ConversationMembersReadAndParticipate` is the explicit, audited grant that linking a
+     /// private provider conversation makes to every current *and future* member of it -- the name
+     /// is the one `docs/transport_architecture.md` fixes, spelled out because "members" alone does
+     /// not say that it also lets them submit messages.
+     BindingAccessPolicy as "binding access policy" {
+-        ChannelAcl => "channel_acl",
++        TargetAcl => "target_acl",
+         ConversationMembersReadAndParticipate => "conversation_members_read_and_participate",
+     }
+ }
+@@ -115,6 +114,8 @@
+         ChannelDisabled => "channel_disabled",
+         /// Provider state and stored state disagree; a human has to look.
+         ProviderDrift => "provider_drift",
++        /// A direct address was retired; history keeps its interface, without a live endpoint.
++        PrincipalRetired => "principal_retired",
+     }
+ }
+ 
+@@ -234,7 +235,7 @@
+ pub struct ChannelBinding {
+     pub id: ChannelBindingId,
+     pub company_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: AddressTarget,
+     pub installation_id: Option<InstallationId>,
+     pub transport: TransportKind,
+     /// The scope in which `external_endpoint_key` is unique: a provider workspace for an
+--- B1/src/infra/events.rs
++++ B2/src/infra/events.rs
+@@ -59,7 +59,7 @@
+ #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+ pub struct ThreadScope {
+     pub thread_id: Uuid,
+-    pub channel_id: Uuid,
++    pub target: crate::entities::address::AddressTarget,
+     pub company_id: Uuid,
+ }
+ 
+@@ -152,12 +152,12 @@
+ 
+     /// True for a message committed anywhere in `channel_id`.
+     pub fn is_message_in_channel(&self, channel_id: Uuid) -> bool {
+-        matches!(self, MailboxEvent::MessageCommitted(scope) if scope.channel_id == channel_id)
++        matches!(self, MailboxEvent::MessageCommitted(scope) if scope.target == crate::entities::address::AddressTarget::Desk(channel_id))
+     }
+ 
+     /// True for a run's state change on any thread of `channel_id`.
+     pub fn is_activity_in_channel(&self, channel_id: Uuid) -> bool {
+-        matches!(self, MailboxEvent::ActivityChanged(scope) if scope.channel_id == channel_id)
++        matches!(self, MailboxEvent::ActivityChanged(scope) if scope.target == crate::entities::address::AddressTarget::Desk(channel_id))
+     }
+ 
+     pub fn attention_scope(&self, company_id: Uuid) -> Option<AttentionScope> {
+@@ -316,7 +316,7 @@
+     fn scope() -> ThreadScope {
+         ThreadScope {
+             thread_id: id(1),
+-            channel_id: id(2),
++            target: crate::entities::address::AddressTarget::Desk(id(2)),
+             company_id: id(3),
+         }
+     }
+@@ -327,7 +327,7 @@
+     fn parses_the_payload_the_triggers_build() {
+         let payload = r#"{
+             "thread_id": "0a8f5f5e-0000-4000-8000-000000000001",
+-            "channel_id": "0a8f5f5e-0000-4000-8000-000000000002",
++            "target": {"kind":"desk","id":"0a8f5f5e-0000-4000-8000-000000000002"},
+             "company_id": "0a8f5f5e-0000-4000-8000-000000000003"
+         }"#;
+ 

@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "round": "CH-P01-AG3-N3",
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "checks": [
+    {
+      "criteria": [
+        "AG3-F1-producer-facts-only"
+      ],
+      "command": "env -i PATH=<pinned Node24 and system paths> HOME=<owned isolated home> TMPDIR=<owned temporary directory> node plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-AG3-R3-reviewer-native-probe.mjs",
+      "fixture": "Actual installed Claude SDK 0.3.245, isolated HOME/config, owned local scripted Messages endpoint and dummy key; no Openbot B3 implementation or paid inference",
+      "status": "PASS",
+      "files": [
+        {
+          "path": "logs/CH-P01-AG3-R3-reviewer-native-probe.mjs",
+          "sha256": "491ca1a6bf72a6c396d3d83f6384129c35a256a8f7e00be0abeb52ce7bd9e22f"
+        },
+        {
+          "path": "logs/CH-P01-AG3-R3-reviewer-native-probe.json",
+          "sha256": "938aacb0f96d84454878bcf99f33fef59d736b3212672eb1777d015cdd2b27c9"
+        },
+        {
+          "path": "logs/CH-P01-AG3-R3-reviewer-native-probe.txt",
+          "sha256": "32b9e6c62744dd69a961b55f16f0135dfbb524a0f0912077185b23c03819d9b7"
+        }
+      ]
+    }
+  ]
+}

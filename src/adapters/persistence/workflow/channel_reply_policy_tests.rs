@@ -64,7 +64,9 @@ async fn channel_reply_completion_policy_rejects_unprivileged_reviewers_and_inva
         s.p()
             .channel_reply_settings(
                 s.fixture.target.company,
-                RelatedChannelId::new(s.channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(s.channel)).as_uuid()
+                ),
                 s.owner()
             )
             .await

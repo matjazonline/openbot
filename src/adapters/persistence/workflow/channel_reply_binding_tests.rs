@@ -27,7 +27,7 @@ pub(super) async fn selection(
 ) -> ConfigureChannelReply {
     ConfigureChannelReply {
         company: s.fixture.target.company,
-        channel: RelatedChannelId::new(s.channel),
+        target: crate::entities::address::AddressTarget::Desk(s.channel),
         actor: s.owner(),
         expected,
         approval_policy: None,
@@ -67,7 +67,9 @@ async fn channel_reply_binding_roundtrip_update_clear_and_stale_revision() {
         .p()
         .channel_reply_settings(
             s.fixture.target.company,
-            RelatedChannelId::new(s.channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(s.channel)).as_uuid(),
+            ),
             s.owner(),
         )
         .await
@@ -92,7 +94,7 @@ async fn channel_reply_binding_roundtrip_update_clear_and_stale_revision() {
         .p()
         .configure_channel_reply(ConfigureChannelReply {
             company: s.fixture.target.company,
-            channel: RelatedChannelId::new(s.channel),
+            target: crate::entities::address::AddressTarget::Desk(s.channel),
             actor: s.owner(),
             expected: Some(ReplySettingsRevision::try_from(2).unwrap()),
             responder: None,
@@ -133,7 +135,9 @@ async fn channel_reply_binding_competing_assignments_choose_one_current_responde
         .p()
         .channel_reply_settings(
             s.fixture.target.company,
-            RelatedChannelId::new(s.channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(s.channel)).as_uuid(),
+            ),
             s.owner(),
         )
         .await
@@ -292,7 +296,7 @@ async fn channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selecti
     s.reconfigure(binding, Some(MessageTrigger::Any)).await;
     assert!(s.p().configure_channel_reply(stale).await.is_err());
     stale = selection(&s, binding, None).await;
-    stale.channel = RelatedChannelId::new(new_channel(&s.fixture, "other").await);
+    stale.target = AddressTarget::Desk(new_channel(&s.fixture, "other").await);
     assert!(s.p().configure_channel_reply(stale).await.is_err());
     let outsider = member(&s.fixture, "member").await;
     let mut denied = selection(&s, binding, None).await;
@@ -302,7 +306,9 @@ async fn channel_reply_binding_rejects_foreign_inactive_thread_and_stale_selecti
         s.p()
             .channel_reply_settings(
                 s.fixture.target.company,
-                RelatedChannelId::new(s.channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(s.channel)).as_uuid()
+                ),
                 WorkflowActor::authenticated(outsider).unwrap()
             )
             .await

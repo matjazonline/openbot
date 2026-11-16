@@ -207,7 +207,7 @@ async fn retry_notice(f: &AgentCase) {
 }
 
 #[tokio::test]
-async fn workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk()
+async fn workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal()
  {
     let f = Box::pin(pending_agent()).await;
     let p = f.people.role.p();
@@ -224,12 +224,12 @@ async fn workflow_escalation_agent_actual_worker_commits_one_private_message_and
         "agent routing must create a private canonical notice, with no SMTP or direct run"
     );
     let channel: Uuid =
-        sqlx::query_scalar("SELECT channel_id FROM workflow_message_intents WHERE company_id=$1")
+        sqlx::query_scalar("SELECT principal_id FROM workflow_message_intents WHERE company_id=$1")
             .bind(f.people.role.company().as_uuid())
             .fetch_one(p.pool())
             .await
             .unwrap();
-    assert_eq!(channel, f.created.desk_id);
+    assert_eq!(channel, f.created.principal_id.as_uuid());
     let private_only: bool = sqlx::query_scalar(
         "SELECT message.audience='internal_only' AND intent.delivery_policy='in_app_only' \
          FROM workflow_message_intents AS intent \
@@ -242,7 +242,7 @@ async fn workflow_escalation_agent_actual_worker_commits_one_private_message_and
         "the notice and any reply must stay inside the application"
     );
     let origin: bool = sqlx::query_scalar(
-        "SELECT receipt.agent_id=$2 AND receipt.desk_id=$3 AND receipt.binding_id=binding.id \
+        "SELECT receipt.agent_id=$2 AND receipt.principal_id=$3 AND receipt.binding_id=binding.id \
          AND receipt.binding_revision=binding.configuration_revision AND author.kind='system' \
          AND message.role='system' AND intent.responder_principal_id=author.id \
          FROM workflow_escalation_agent_receipts AS receipt \
@@ -251,7 +251,7 @@ async fn workflow_escalation_agent_actual_worker_commits_one_private_message_and
          JOIN principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id \
          JOIN workflow_message_intents AS intent ON intent.company_id=receipt.company_id AND intent.id=receipt.intent_id \
          WHERE receipt.company_id=$1",
-    ).bind(f.people.role.company().as_uuid()).bind(f.created.agent.id).bind(f.created.desk_id)
+    ).bind(f.people.role.company().as_uuid()).bind(f.created.agent.id).bind(f.created.principal_id.as_uuid())
         .fetch_one(p.pool()).await.unwrap();
     assert!(
         origin,

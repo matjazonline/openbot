@@ -1,0 +1,87 @@
+[
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "before_sha256": "2704e822b8a2f5fa53b483815313a52b94a8d96d15258da2f7f076a579ef4838",
+    "after_sha256": "14c9b02a0cb6b838820d5a4f8840748f40aa7bcc3d80f25723893ba49ba17c1b"
+  },
+  {
+    "path": "src/adapters/http/pages/deliveries.rs",
+    "before_sha256": "ce80d4e3418efe6cad295ca3719fa66ed81c93a433d51ba956fa97db53644d43",
+    "after_sha256": "5c15bd08deced3f475c9407eec91ab7ff75b39067ebd22ae175faea6804b9c79"
+  },
+  {
+    "path": "src/adapters/http/pages/tests.rs",
+    "before_sha256": "2fd414ffe85184aadc68693db84885c1c8435bb49aad2a96ab432dd55c6ecc32",
+    "after_sha256": "0db8055f7cb08d6109982b5fb6a80da06a554c8964990a444473af811287598e"
+  },
+  {
+    "path": "src/adapters/http/routes/ui_deliveries.rs",
+    "before_sha256": "131a5d9709f62a330dd132bc96753c048d5eafded238581df4295e0dda5b0ee1",
+    "after_sha256": "6ee939727238f0280ef0a9b8b7133cb71d39a8ca07cf1ef0b3aa9372ae3c3827"
+  },
+  {
+    "path": "src/adapters/persistence/delivery/mod.rs",
+    "before_sha256": "2500105d27a65d84877c32bc2e4a49828fb73b1ad8ac85bd876f2fe5eb39cd2d",
+    "after_sha256": "4f7b9f5f3821a58c1f4621c2045f291f641495ace2913ac3bf6fd00810e20369"
+  },
+  {
+    "path": "src/adapters/persistence/delivery/read.rs",
+    "before_sha256": "e359fc0b6c1284bb548d9236836e73b9bcfc7691aab0c6d8d4d5058e4c207b86",
+    "after_sha256": "4206c5d91afe8a92ecd383d21d6c08cd22c21bc04a38676c3374325474a8e266"
+  },
+  {
+    "path": "src/adapters/persistence/test_support.rs",
+    "before_sha256": "df7e16b670f1f1f7cdcd4d2afc06a20c9b92858f6aa3187439086bda6663b5a0",
+    "after_sha256": "40745edeb5ca23683df9d90238ced9c9869c5f4a7d1efb6c2f99a9d7af70cc05"
+  },
+  {
+    "path": "src/adapters/persistence/view_visibility.rs",
+    "before_sha256": "b4b20981f7d6d36f12c7a3a86f234b0989cb0230901c3259acfc148567ec0302",
+    "after_sha256": "5b98ae7c45fe5ab55e9a4d04eed8f16a8681e5641278d27b8159ee89a4960bb0"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs",
+    "before_sha256": null,
+    "after_sha256": "3df5913a7162dfc4f1e6c57d37d1c4a77b8fbb7d83c763f311313441c2309c67"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_delivery_tests.rs",
+    "before_sha256": null,
+    "after_sha256": "92b9cad2a4dd24effb8135ae1a001f521e580f564f8e4f56ab3fa9b3c7db054f"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_workflow_tests.rs",
+    "before_sha256": "298e86745c9bbac590abe31676681cb02aad4c2294ada0ba5a95386f844badb6",
+    "after_sha256": "236c1781af978ea0961f38fde4af80e15d30ed3fa05f2f278624c2f8640a809f"
+  },
+  {
+    "path": "src/adapters/protocols/email/egress_tests.rs",
+    "before_sha256": "04c7ad18123155c2110061e569d270ad8ee4cff7886fed19da1978c496441178",
+    "after_sha256": "cd1eb9fa2b36f188c0d09b683086861e421bfe9e6a40a68c19fb40a9be69441a"
+  },
+  {
+    "path": "src/application/services/delivery_worker_tests.rs",
+    "before_sha256": "1f384e5fa5c56df0719bc317382c9016813af7bc256d027b5eb026939627a533",
+    "after_sha256": "5215f261acc4736c488511262bdc45a693ad298baaf64bf8c2f6f0ab30bd1ba6"
+  },
+  {
+    "path": "src/application/transport/queue.rs",
+    "before_sha256": "0fa3b154caefd32422a9f0b3ac596d74b0bdad78054836929b2c235f0b98efbe",
+    "after_sha256": "71a32d21b1dced7f7ab4e277108750ab383dc626876e0e3bde4be207f6165d18"
+  },
+  {
+    "path": "src/application/transport/tests.rs",
+    "before_sha256": "24aa4135214bfe6973959bbbb48079aae21c04fe114340b1ef540305670dc877",
+    "after_sha256": "6d99cb62805ebffa84ce91d3d847800b2850a86dfe6985e565b8ab3169290e2f"
+  },
+  {
+    "path": "src/application/use_cases/delivery.rs",
+    "before_sha256": "6d119d653175ce24451860e3ba46e65f427dfb4409826822c33c71d4629d7fb1",
+    "after_sha256": "f2d87af04eb7988ebacf34f89b88c43db77e9f7dba797d9aad9acfe027286872"
+  },
+  {
+    "path": "src/domain/entities/delivery.rs",
+    "before_sha256": "19495014604545bbf09d9b8622ba847fcb90db8cb8c8ba6e11d7cbebd0fba4fd",
+    "after_sha256": "cb73640f74ae2ab242f98bf33896db704958790ecbc5c268d0a3ca10698db254"
+  }
+]

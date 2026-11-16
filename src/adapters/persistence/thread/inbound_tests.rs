@@ -53,18 +53,76 @@ use crate::transport::ThreadTarget;
 use crate::transport::WorkerId;
 use crate::use_cases::participant::IdentityDirectory;
 
+#[path = "direct_company_lifecycle_tests.rs"]
+mod direct_company_lifecycle;
 #[path = "inbound_multi_task_tests.rs"]
 mod multi_task_tests;
 
 /// An answering intent for one channel, with no mention or parent.
 fn intent(channel_id: Uuid, role: RecipientRole) -> InboundAdmissionIntent {
     InboundAdmissionIntent {
-        channel_id,
+        target: crate::entities::address::AddressTarget::Desk(channel_id),
         role,
         mentioned: false,
         reply_to: None,
         settings_revision: 0,
     }
+}
+
+#[tokio::test]
+async fn application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship() {
+    let Some(fixture) = Fixture::isolated("platform_identity_prefix").await else {
+        return;
+    };
+    let rfc = format!("<platform-{}@example.test>", fixture.suffix);
+    let mut request = request(&fixture, &rfc, "Private platform message").await;
+    request.origin = InboundOrigin::Application;
+    request.reply_delivery = ReplyDelivery::InAppOnly;
+    let mut associations = request.associations.into_inner();
+    for association in &mut associations {
+        association.principals = BoundedVec::empty();
+    }
+    request.associations = BoundedVec::parse("platform targets", associations).unwrap();
+    let mut held = fixture.pool.begin().await.unwrap();
+    crate::adapters::persistence::participant::lock_identity_key(
+        &mut held,
+        fixture.company_id,
+        &request.envelope.author,
+    )
+    .await
+    .unwrap();
+    for recipient in &request.envelope.addressed {
+        crate::adapters::persistence::participant::lock_identity_key(
+            &mut held,
+            fixture.company_id,
+            &recipient.identity,
+        )
+        .await
+        .unwrap();
+    }
+    let persistence = fixture.persistence.clone();
+    let mut task = tokio::spawn(async move {
+        let mut tx = persistence.pool().begin().await.unwrap();
+        let outcome = super::inbound::commit_on(&mut tx, &request).await;
+        tx.commit().await.unwrap();
+        outcome
+    });
+    let independent = tokio::time::timeout(std::time::Duration::from_millis(100), &mut task).await;
+    assert!(
+        independent.is_err(),
+        "ordinary application ingress must acquire observed identity keys"
+    );
+    held.rollback().await.unwrap();
+    let outcome = task.await.unwrap().unwrap();
+    let message = fixture
+        .persistence
+        .get_thread_message(outcome.thread_ids[0], outcome.message_id)
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(message.role, crate::entities::message::MessageRole::Human);
+    assert!(message.author.identity_id.is_some());
+    assert!(!message.participants.is_empty());
 }
 
 fn identity(address: &str) -> QualifiedIdentity {
@@ -138,7 +196,7 @@ async fn request(fixture: &Fixture, rfc: &str, body: &str) -> InboundCommitReque
         associations: BoundedVec::parse(
             "thread associations",
             vec![ThreadAssociation {
-                channel_id: fixture.channel_id,
+                address_target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
                 binding_id,
                 target: ThreadTarget::Create {
                     subject: "Quick question".to_string(),
@@ -176,7 +234,7 @@ async fn request_on(
     request.associations = BoundedVec::parse(
         "thread associations",
         vec![ThreadAssociation {
-            channel_id,
+            address_target: crate::entities::address::AddressTarget::Desk(channel_id),
             binding_id,
             target: ThreadTarget::Create {
                 subject: "Quick question".to_string(),
@@ -610,9 +668,13 @@ async fn a_settings_edit_queued_behind_a_commit_applies_after_it() {
     let rfc = format!("<gate-commit-first-{}@example.com>", fixture.suffix);
     let routed = request(&fixture, &rfc, "Anyone there?").await;
     let mut admission = fixture.pool.begin().await.unwrap();
-    super::inbound::hold_channel_settings(&mut admission, &routed)
-        .await
-        .unwrap();
+    super::inbound::hold_channel_settings(
+        &mut admission,
+        &routed,
+        super::inbound::InboundAuthor::Observed,
+    )
+    .await
+    .unwrap();
 
     let edit = tokio::spawn({
         let pool = fixture.pool.clone();
@@ -818,7 +880,7 @@ async fn inconsistent_multi_binding_message_mappings_are_a_typed_collision() {
         vec![
             combined.associations[0].clone(),
             ThreadAssociation {
-                channel_id: second_channel,
+                address_target: crate::entities::address::AddressTarget::Desk(second_channel),
                 binding_id: second_binding,
                 target: ThreadTarget::Create {
                     subject: "Quick question".into(),
@@ -828,6 +890,21 @@ async fn inconsistent_multi_binding_message_mappings_are_a_typed_collision() {
                 principals: sender_principals(),
             },
         ],
+    )
+    .unwrap();
+
+    combined.intents = BoundedVec::parse(
+        "matching intents",
+        combined
+            .associations
+            .iter()
+            .map(|association| {
+                intent(
+                    association.address_target.desk_id().unwrap(),
+                    association.role,
+                )
+            })
+            .collect(),
     )
     .unwrap();
 
@@ -872,7 +949,7 @@ async fn slack_participant_intents_persist_with_explicit_roles_and_no_email_proj
     request.associations = BoundedVec::parse(
         "thread associations",
         vec![ThreadAssociation {
-            channel_id: fixture.channel_id,
+            address_target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
             binding_id: binding,
             target: ThreadTarget::Create {
                 subject: "Slack thread".into(),
@@ -1090,7 +1167,7 @@ async fn a_commit_that_fails_at_the_threads_writes_nothing_either() {
     // threads are still being resolved, before the message exists at all.
     let foreign_channel = fixture.extra_channel("billing").await;
     associations.push(ThreadAssociation {
-        channel_id: foreign_channel,
+        address_target: crate::entities::address::AddressTarget::Desk(foreign_channel),
         binding_id: fixture.email_binding_of(foreign_channel).await,
         target: ThreadTarget::Existing(fixture.thread.id),
         role: RecipientRole::Cc,
@@ -1148,7 +1225,7 @@ async fn an_association_through_another_channels_binding_names_the_first_bad_pai
     // A real, active binding -- of some other channel than the one it is paired with.
     let misbound =
         |channel_id: Uuid, binding_id: ChannelBindingId, index: usize| ThreadAssociation {
-            channel_id,
+            address_target: crate::entities::address::AddressTarget::Desk(channel_id),
             binding_id,
             target: ThreadTarget::Create {
                 subject: "Quick question".to_string(),
@@ -1163,6 +1240,21 @@ async fn an_association_through_another_channels_binding_names_the_first_bad_pai
     associations.push(misbound(billing, primary_binding, 1));
     associations.push(misbound(sales, billing_binding, 2));
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
+
+    request.intents = BoundedVec::parse(
+        "matching intents",
+        request
+            .associations
+            .iter()
+            .map(|association| {
+                intent(
+                    association.address_target.desk_id().unwrap(),
+                    association.role,
+                )
+            })
+            .collect(),
+    )
+    .unwrap();
 
     let error = fixture
         .persistence
@@ -1192,7 +1284,7 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
     let mut request = request(&fixture, &rfc, "Anyone there?").await;
     let mut associations = request.associations.into_inner();
     associations.push(ThreadAssociation {
-        channel_id: second_channel,
+        address_target: crate::entities::address::AddressTarget::Desk(second_channel),
         binding_id: second_binding,
         target: ThreadTarget::Create {
             subject: "Quick question".to_string(),
@@ -1203,8 +1295,28 @@ async fn a_message_addressed_to_two_channels_is_stored_once_and_mapped_on_each_b
     });
     request.associations = BoundedVec::parse("thread associations", associations).unwrap();
 
+    request.intents = BoundedVec::parse(
+        "matching intents",
+        request
+            .associations
+            .iter()
+            .map(|association| {
+                intent(
+                    association.address_target.desk_id().unwrap(),
+                    association.role,
+                )
+            })
+            .collect(),
+    )
+    .unwrap();
+
     let outcome = fixture.persistence.commit_inbound(request).await.unwrap();
 
+    assert_eq!(
+        outcome.intent_ids.len(),
+        2,
+        "each addressed target gets one intent"
+    );
     assert_eq!(outcome.thread_ids.len(), 2);
     assert_ne!(outcome.thread_ids[0], outcome.thread_ids[1]);
     // One payload, two conversations, two provider mappings -- the body is stored exactly once.

@@ -1,0 +1,18 @@
+{
+  "changed_paths": 8,
+  "hash_mismatches": [],
+  "independent_changed_paths": [
+    "src/adapters/persistence/agent_direct_lifecycle_tests.rs",
+    "src/adapters/persistence/workflow/direct_agent_history_teardown_tests.rs",
+    "src/adapters/persistence/workflow/message_tests.rs",
+    "src/adapters/persistence/workflow/public_desk_private_agent_tests.rs",
+    "src/adapters/persistence/workflow/relay_authority_race_tests.rs",
+    "src/adapters/persistence/workflow/relay_identity_tests.rs",
+    "src/adapters/persistence/workflow/relay_private_agent_tests.rs",
+    "src/adapters/persistence/workflow/workflow_message_sender_tests.rs"
+  ],
+  "exact_manifest_scope_match": true,
+  "baseline_omitted_head_bytes_verified": [
+    "tests/source_modules.rs"
+  ]
+}

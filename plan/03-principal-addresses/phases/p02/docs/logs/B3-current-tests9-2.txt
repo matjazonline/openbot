@@ -1,0 +1,8 @@
+
+running 1 test
+observed gated transaction pids=[53953] blocker=53968 elapsed_ms=522
+observed gated transaction pids=[53986] blocker=53995 elapsed_ms=525
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4586 filtered out; finished in 4.23s
+

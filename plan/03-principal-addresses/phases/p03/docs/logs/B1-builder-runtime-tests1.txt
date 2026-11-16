@@ -1,0 +1,36 @@
+
+running 10 tests
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk' (16609978) panicked at src/adapters/persistence/workflow/provisioning_runtime_tests.rs:868:14:
+called `Result::unwrap()` on an `Err` value: RowNotFound
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_stops_a_listing_loop_once_its_result_repeats ... ok
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline' (16609981) panicked at src/adapters/persistence/workflow/provisioning_runtime_tests.rs:571:23:
+index out of bounds: the len is 1 but the index is 1
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::requester_locks::delegated_provisioning_locks_requester_before_company ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline ... FAILED
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval' (16609977) panicked at src/adapters/persistence/workflow/channel_reply_native_runtime_tests.rs:39:23:
+index out of bounds: the len is 1 but the index is 1
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval ... FAILED
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow' (16609972) panicked at src/adapters/persistence/workflow/provisioning_runtime_tests.rs:362:23:
+index out of bounds: the len is 1 but the index is 1
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow ... FAILED
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_lead_desk_answers_through_its_current_lead ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_provisions_an_assistant_for_a_signed_in_admin ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_refuses_members_and_emailed_requests ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_sees_the_conversation_so_far ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::builder_adds_custom_steps_to_the_new_agents_workflow
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::channel_reply_native_runtime_tests::channel_reply_authoring_native_real_review_closes_reject_and_publishes_only_edited_approval
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::department_context_reaches_the_lead_on_its_department_desk
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::provisioning_runtime_tests::reviewed_assistants_park_their_answer_until_the_run_deadline
+
+test result: FAILED. 6 passed; 4 failed; 0 ignored; 0 measured; 4586 filtered out; finished in 18.28s
+

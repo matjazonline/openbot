@@ -97,6 +97,7 @@ pub(super) async fn freeze_on(
 struct Audience {
     actor_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     content_level: i16,
     frozen_level: Option<i16>,
@@ -108,14 +109,18 @@ pub(in crate::adapters::persistence::workflow) async fn audience_on(
     db: &mut PgConnection,
     scope: ActionScope,
 ) -> AppResult<()> {
-    let facts: Audience = sqlx::query_as("SELECT run.actor_id,run.channel_id,run.thread_id,run.content_level::smallint AS content_level,(exchange.frozen_preparation->'history'->>'content_level')::smallint AS frozen_level,conversation.scope_kind FROM workflow_runs AS run LEFT JOIN agent_history_exchanges AS exchange ON exchange.company_id=run.company_id AND exchange.run_id=run.id AND exchange.execution_id=$3 LEFT JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE run.company_id=$1 AND run.id=$2")
+    let facts: Audience = sqlx::query_as("SELECT run.actor_id,run.channel_id,run.principal_id,run.thread_id,run.content_level::smallint AS content_level,(exchange.frozen_preparation->'history'->>'content_level')::smallint AS frozen_level,conversation.scope_kind FROM workflow_runs AS run LEFT JOIN agent_history_exchanges AS exchange ON exchange.company_id=run.company_id AND exchange.run_id=run.id AND exchange.execution_id=$3 LEFT JOIN agent_history_conversations AS conversation ON conversation.company_id=exchange.company_id AND conversation.id=exchange.conversation_id WHERE run.company_id=$1 AND run.id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
         .fetch_optional(&mut *db).await?.ok_or_else(missing)?;
     let Some(frozen) = facts.frozen_level else {
         return Ok(());
     };
     let content = AccessLevel::try_from(frozen.max(facts.content_level)).map_err(|_| invalid())?;
-    let association = binding_rows::association_from_columns(facts.channel_id, facts.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: facts.channel_id,
+        principal_id: facts.principal_id,
+        thread_id: facts.thread_id,
+    })?;
     let destination = match (facts.scope_kind.as_deref(), association) {
         (Some("thread"), RelatedAssociation::Thread { .. }) => {
             super::super::knowledge::thread_audience_on(db, scope.company, association).await?

@@ -53,6 +53,11 @@ impl ChannelWrite {
             });
         }
 
+        if self.is_public() {
+            // Selecting public intake also clears a department's narrower members-only setting.
+            self.ownership.get_or_insert_default().members_only = Some(false);
+        }
+
         Ok(())
     }
 
@@ -95,12 +100,7 @@ fn check_spam_interlock(
     spam_scanning: SpamScanning,
     confirmed: bool,
 ) -> AppResult<()> {
-    if write.is_public() && spam_scanning == SpamScanning::Unavailable && !confirmed {
-        return Err(AppError::BadRequest(
-            "Spam scanning is disabled in server configuration. Saving a public channel (@public) requires explicit confirmation (confirm_spam_disabled) that you are aware spam scanning is disabled.".into(),
-        ));
-    }
-    Ok(())
+    spam_scanning.check_public_ingress(write.is_public(), confirmed)
 }
 
 /// A channel belonging to another company is reported exactly like a missing one, so an id probe
@@ -418,6 +418,7 @@ pub enum SlugKind {
     ChannelAlias,
     AgentSlug,
     DepartmentAddress,
+    PersonAddress,
 }
 
 impl SlugKind {
@@ -427,8 +428,53 @@ impl SlugKind {
             SlugKind::ChannelAlias => "desk alias",
             SlugKind::AgentSlug => "agent slug",
             SlugKind::DepartmentAddress => "department address",
+            SlugKind::PersonAddress => "address",
         }
     }
+}
+
+/// A name turned into slug characters: lowercase ASCII letters and digits, with every run of
+/// anything else collapsed to one `-`. Onboarding names its agents and desks with it, and a
+/// person's first address is derived from it.
+pub fn slugify(name: &str) -> String {
+    name.trim()
+        .to_lowercase()
+        .chars()
+        .map(|ch| if ch.is_ascii_alphanumeric() { ch } else { '-' })
+        .collect::<String>()
+        .split('-')
+        .filter(|part| !part.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+}
+
+/// The longest base a derived person address takes, leaving room for a `-<n>` or `-<8 hex>`
+/// suffix when the base is already taken in the company.
+const PERSON_ADDRESS_BASE_CHARS: usize = 48;
+
+/// The address a person is first given in a company, derived from their account name.
+///
+/// Truncating can leave a trailing separator, so the result is trimmed again after the cut and
+/// then checked against the same shape `addresses_slug_format` enforces; anything that still
+/// fails, or that slug validation refuses (a reserved suffix), becomes `member`.
+pub fn person_address_base(username: &str) -> String {
+    let slug = slugify(username);
+    let cut: String = slug.chars().take(PERSON_ADDRESS_BASE_CHARS).collect();
+    let candidate = cut.trim_matches('-');
+    if is_address_slug(candidate) && validate_slug(candidate, SlugKind::PersonAddress).is_ok() {
+        candidate.to_owned()
+    } else {
+        "member".to_owned()
+    }
+}
+
+/// The shape `addresses_slug_format` enforces: lowercase ASCII letters, digits and inner `-`,
+/// starting and ending with a letter or digit.
+pub fn is_address_slug(slug: &str) -> bool {
+    let bytes = slug.as_bytes();
+    let edge = |b: &u8| b.is_ascii_lowercase() || b.is_ascii_digit();
+    matches!((bytes.first(), bytes.last()), (Some(first), Some(last)) if edge(first) && edge(last))
+        && bytes.iter().all(|b| edge(b) || *b == b'-')
 }
 
 /// A malformed slug is user input, not a server fault, so every rejection here is a
@@ -514,11 +560,11 @@ pub fn find_similar_channel_slugs(target: &str, available: &[Channel]) -> Vec<Ch
 mod tests {
     use super::*;
 
-    use crate::adapters::protocols::email::EmailChannelSelectorParser;
+    use crate::adapters::protocols::email::EmailAddressParser;
     use crate::entities::channel::ChannelAccessMode;
     use crate::entities::company::Company;
     use crate::entities::company_member::CompanyMembership;
-    use crate::entities::transport::ChannelSelector;
+    use crate::entities::transport::AddressSelector;
     use crate::entities::value_objects::EmailAddress;
     use crate::use_cases::company_test_support::{MockCompanyPersistence, TeamByAddress};
     use crate::use_cases::participant::test_support::{
@@ -528,19 +574,19 @@ mod tests {
     use std::sync::Mutex;
 
     fn parse_platform_address(value: &str, domain: &str) -> Option<(CompanySlug, String)> {
-        EmailChannelSelectorParser::new(domain).parse_platform_address(value)
+        EmailAddressParser::new(domain).parse_platform_address(value)
     }
 
     fn parse_recipient_address_pipeline(
         value: &str,
         domain: &str,
     ) -> Option<(CompanySlug, Vec<ChannelSlug>, bool)> {
-        let selection = EmailChannelSelectorParser::new(domain).parse(value)?;
+        let selection = EmailAddressParser::new(domain).parse(value)?;
         let company = selection.primary().company()?.clone();
         let channels = selection
             .selectors()
             .iter()
-            .map(ChannelSelector::channel)
+            .map(AddressSelector::channel)
             .cloned()
             .collect();
         Some((company, channels, selection.delivery().is_context_only()))
@@ -592,6 +638,32 @@ mod tests {
             _company_id: Uuid,
         ) -> AppResult<Vec<crate::entities::department::Department>> {
             Ok(Vec::new())
+        }
+
+        async fn address_for_target(
+            &self,
+            company_id: Uuid,
+            target: crate::entities::address::AddressTarget,
+        ) -> AppResult<Option<crate::entities::address::ResolvedAddress>> {
+            Ok(self
+                .list_by_company_id(company_id)
+                .await?
+                .into_iter()
+                .find(|desk| target == crate::entities::address::AddressTarget::Desk(desk.id))
+                .map(|desk| crate::entities::address::ResolvedAddress {
+                    slug: desk.slug,
+                    target,
+                }))
+        }
+        async fn address_targets(
+            &self,
+            company_id: Uuid,
+            slugs: &[crate::entities::value_objects::ChannelSlug],
+        ) -> AppResult<Vec<crate::entities::address::ResolvedAddress>> {
+            Ok(crate::entities::address::desk_addresses(
+                &self.list_by_company_id(company_id).await?,
+                slugs,
+            ))
         }
 
         async fn list_by_company_id(&self, company_id: Uuid) -> AppResult<Vec<Channel>> {
@@ -1474,10 +1546,51 @@ mod tests {
     fn the_platform_domain_test_is_wider_than_the_address_parser() {
         // Email destination classification relies on this gap: `someone@mailagents.com` is ours
         // but malformed, and must not be classified as an external stranger.
-        let parser = EmailChannelSelectorParser::new("mailagents.com");
+        let parser = EmailAddressParser::new("mailagents.com");
         assert!(parser.is_platform_domain("mailagents.com"));
         assert!(parser.is_platform_domain("acme.mailagents.com"));
         assert!(!parser.is_platform_domain("elsewhere.com"));
         assert!(!parser.is_platform_domain("notmailagents.com"));
     }
+
+    #[test]
+    fn address_slug_derivation_keeps_the_database_shape() {
+        // A separator at the 48-character cut would end the slug in `-`; it is trimmed after.
+        let long = format!("{}_tail", "a".repeat(47));
+        let derived = person_address_base(&long);
+        assert_eq!(derived, "a".repeat(47));
+        assert!(is_address_slug(&derived));
+        assert_eq!(person_address_base(&"b".repeat(80)).len(), 48);
+
+        // Letters outside ASCII become separators, and a name that is nothing else falls back.
+        assert_eq!(person_address_base("José Núñez"), "jos-n-ez");
+        assert_eq!(person_address_base("李小龍"), "member");
+        assert_eq!(person_address_base("___"), "member");
+
+        // A reserved context suffix would make the address unanswerable, so it falls back too.
+        assert_eq!(person_address_base("Alice Quiet"), "member");
+        assert_eq!(person_address_base("quiet"), "member");
+        assert_eq!(person_address_base("Alice_Ng"), "alice-ng");
+    }
+
+    #[test]
+    fn address_slug_shape_matches_the_format_constraint() {
+        for good in ["a", "a1", "a-b", "front-desk-2"] {
+            assert!(is_address_slug(good), "{good}");
+        }
+        for bad in ["", "-a", "a-", "A", "a_b", "a.b", "é"] {
+            assert!(!is_address_slug(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn address_slug_onboarding_names_are_unchanged_by_the_shared_helper() {
+        assert_eq!(slugify("  Sales Assistant  "), "sales-assistant");
+        assert_eq!(slugify("Support--Bot!"), "support-bot");
+        assert_eq!(slugify("Ünïcode"), "n-code");
+    }
 }
+
+#[cfg(test)]
+#[path = "channel/public_settings_tests.rs"]
+mod public_settings_tests;

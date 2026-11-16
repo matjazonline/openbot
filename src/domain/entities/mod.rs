@@ -1,4 +1,5 @@
 pub mod access_level;
+pub mod address;
 pub mod agent;
 pub mod agent_capability;
 pub mod attention;
@@ -28,6 +29,7 @@ pub mod run_counts;
 pub mod runtime_metrics;
 pub mod schedule;
 pub mod skill;
+pub mod skill_bundle;
 pub mod stuck_work;
 pub mod task;
 pub mod thread;

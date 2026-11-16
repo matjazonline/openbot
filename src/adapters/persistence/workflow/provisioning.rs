@@ -1,5 +1,5 @@
 //! Built-in provisioning (p08 D2): the action authority, the local effect, the requester rule
-//! and `provision_on`, the one-transaction assistant setup the `create_agent_channel` tool and
+//! and `provision_on`, the one-transaction assistant setup the `create_agent` tool and
 //! the "Create assistant channel" command share.
 //!
 //! Lock order: requester/run-owner accounts precede company authorization on both tool and
@@ -12,21 +12,22 @@ use agent::provision_agent_on;
 mod builder;
 #[path = "provisioning_department.rs"]
 mod department;
-use builder::create_agent_channel_on;
+use builder::create_agent_on;
 pub(crate) use department::{
     department_desk_key, follow_department_lead_on, provision_department_desk_on,
 };
 #[path = "provisioning_native.rs"]
 mod native;
-pub(crate) use native::ProvisionedAssistant;
+pub(crate) use native::NativeWorkflow as AgentWorkflow;
 use native::provision_on;
+pub(crate) use native::{AgentWorkflowOwner, ProvisionedAssistant, provision_agent_workflow_on};
 
 use super::action_dispatch::{LockedActionAuthority, SqlActionAuthority, SqlLocalAction};
 use super::http::begin_http;
 use super::http::runtime::{context, facts};
 use super::*;
 use crate::adapters::persistence::channel::{
-    insert_channel_row_on, insert_channel_slugs, write_channel_email_binding,
+    insert_channel_row_on, insert_desk_addresses, write_channel_email_binding,
 };
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::use_cases::agent::{AgentWrite, model_allowed};
@@ -74,7 +75,7 @@ fn provisioning_status(company: CompanyId) -> AppResult<ResourceStatus> {
         id: RuntimeResourceId::new(company.as_uuid()),
         company_id: company,
         kind: TypeName::parse(PROVISIONING).map_err(|_| invalid())?,
-        supported_contracts: [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]
+        supported_contracts: [LIST_COMPANY_AGENTS, CREATE_AGENT, CREATE_DESK_FOR_AGENT]
             .into_iter()
             .map(|name| TypeName::parse(name).map_err(|_| invalid()))
             .collect::<AppResult<BTreeSet<_>>>()?,
@@ -216,11 +217,11 @@ impl SqlLocalAction for ProvisioningEffects {
             ProvisioningKind::ListAgents => {
                 list_on(tx, &self.templates, company, &request.arguments).await
             }
-            ProvisioningKind::CreateAgentChannel => {
-                let spec = CreateAgentChannel::parse(&request.arguments)?;
+            ProvisioningKind::CreateAgent => {
+                let spec = CreateAgent::parse(&request.arguments)?;
                 // Boxed: creation descends into publication and template compilation.
                 Ok(
-                    match Box::pin(create_agent_channel_on(
+                    match Box::pin(create_agent_on(
                         tx,
                         &self.templates,
                         company,
@@ -231,6 +232,25 @@ impl SqlLocalAction for ProvisioningEffects {
                     .await?
                     {
                         Ok(created) => created,
+                        Err(refusal) => refusal.tool_error(),
+                    },
+                )
+            }
+            ProvisioningKind::CreateDeskForAgent => {
+                let spec = CreateDeskForAgent::parse(&request.arguments)?;
+                let provisioning = Provisioning {
+                    company,
+                    requester,
+                    agent_slug: spec.agent_slug,
+                    channel_slug: spec.channel_slug,
+                    channel_name: spec.channel_name,
+                    reply_mode: spec.reply_mode,
+                    steps: spec.steps,
+                    key: ProvisioningKey::invocation(subject.invocation.as_uuid()),
+                };
+                Ok(
+                    match Box::pin(provision_guarded(tx, &self.templates, &provisioning)).await? {
+                        Ok(created) => created.to_json(),
                         Err(refusal) => refusal.tool_error(),
                     },
                 )
@@ -371,7 +391,7 @@ async fn list_on(
     arguments: &Value,
 ) -> AppResult<Value> {
     use crate::adapters::persistence::department_roster::{
-        DeskAddresses, agent_departments_on, agent_desks_on,
+        CompanyAddresses, agent_addresses_on, agent_departments_on,
     };
     let department = match arguments.get("department").and_then(Value::as_str) {
         None => None,
@@ -436,8 +456,8 @@ async fn list_on(
     let rows: Vec<ListedAgent> = rows.into_iter().take(MAX_LISTED_AGENTS).collect();
     let ids: Vec<Uuid> = rows.iter().map(|row| row.0).collect();
     let mut departments = agent_departments_on(tx, company, &ids).await?;
-    let mut addresses = DeskAddresses::new(company, Some(&templates.app_domain));
-    let mut desks = agent_desks_on(tx, &mut addresses, &ids).await?;
+    let mut addresses = CompanyAddresses::new(company, Some(&templates.app_domain));
+    let mut desks = agent_addresses_on(tx, &mut addresses, &ids).await?;
     let name = |name: &str| name.chars().take(MAX_LISTED_NAME_CHARS).collect::<String>();
     let mut agents = Vec::new();
     for (id, slug, agent_name, description, provider, model) in rows {
@@ -454,7 +474,7 @@ async fn list_on(
                 "name": name(&department.name),
                 "roles": department.roles.iter().map(|role| role.as_str()).collect::<Vec<_>>(),
             })).collect::<Vec<_>>(),
-            "desk": desks.remove(&id).map(|desk| json!({"id": desk.id.to_string(), "address": desk.address})),
+            "address": desks.remove(&id).map(|address| json!({"principal_id": address.principal_id, "address": address.address})),
         });
         if !fits(&entry) {
             truncated = true;
@@ -492,6 +512,12 @@ pub(crate) async fn ready_models_on(
 /// company and client command key for the UI command (D2.3 step 7).
 pub(crate) struct ProvisioningKey([u8; 32]);
 impl ProvisioningKey {
+    fn agent(agent: Uuid) -> Self {
+        Self(
+            Sha256::digest([b"principal.default.workflow:".as_slice(), agent.as_bytes()].concat())
+                .into(),
+        )
+    }
     fn invocation(invocation: Uuid) -> Self {
         Self(
             Sha256::digest([b"p08.provisioning.tool:".as_slice(), invocation.as_bytes()].concat())
@@ -561,14 +587,15 @@ pub(crate) async fn provision_guarded(
     }
 }
 
-/// The conflict refusal when a desk address is already taken in the company (aliases included).
+/// The conflict refusal when an address is already taken in the company: by a desk (aliases
+/// included), a person or an agent.
 async fn taken_slug(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     channel_slug: &str,
 ) -> AppResult<Option<ProvisioningRefusal>> {
     let taken: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT 1 FROM channel_slugs WHERE company_id = $1 AND slug = $2)",
+        "SELECT EXISTS (SELECT 1 FROM addresses WHERE company_id = $1 AND slug = $2)",
     )
     .bind(company.as_uuid())
     .bind(channel_slug.trim().to_lowercase())
@@ -590,7 +617,7 @@ async fn taken_slug(
 async fn agent_write(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
-    spec: &CreateAgentChannel,
+    spec: &CreateAgent,
     created_by: &CreationProvenance,
 ) -> AppResult<Provisioned<AgentWrite>> {
     let ready: Vec<_> = ready_models_on(tx, company)
@@ -745,7 +772,7 @@ async fn compiled(
     }
 }
 
-/// The address format the `agents_slug_format` and `channel_slugs_format` constraints hold
+/// The address format the `agents_slug_format` and `addresses_slug_format` constraints hold
 /// (`^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$`), checked before the insert so a model-supplied slug is
 /// refused rather than failing the action.
 fn malformed(noun: &str, slug: &str) -> Option<ProvisioningRefusal> {

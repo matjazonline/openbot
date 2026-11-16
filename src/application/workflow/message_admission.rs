@@ -7,9 +7,8 @@ use super::triggers::MessageTriggerInput;
 use super::waits::{IngressReply, ReplyIngress, WorkflowEventId, WorkflowWaits};
 use super::{
     AdmissionClaim, AdmissionResult, AdmitWorkflowRequest, DeliveryPolicy, IdempotencyKey,
-    RelatedAssociation, RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission,
-    WorkflowAuthorization, WorkflowBindings, WorkflowInspection, WorkflowRunTransitions,
-    WorkflowService,
+    RelatedAssociation, RelatedThreadId, WorkflowActor, WorkflowAdmission, WorkflowAuthorization,
+    WorkflowBindings, WorkflowInspection, WorkflowRunTransitions, WorkflowService,
 };
 use crate::application::app_error::{AppError, AppResult};
 use crate::domain::entities::correlation::CorrelationId;
@@ -59,7 +58,7 @@ pub struct IntentClaim {
 pub struct ClaimedIntent {
     pub claim: IntentClaim,
     pub message: CanonicalMessageId,
-    pub channel: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub thread: Uuid,
     pub facts: MessageFacts,
     /// The sender's stated disposition answers; a quiet message never admits.
@@ -493,7 +492,7 @@ fn admission_request(
         company_id: company,
         actor: binding.run_as,
         association: RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(intent.channel),
+            target: intent.target,
             thread_id: RelatedThreadId::new(intent.thread),
         },
         trigger: TriggerRef::new(

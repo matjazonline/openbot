@@ -65,7 +65,7 @@ async fn security_email_identity_workflow_channel_and_thread_need_current_addres
     let actor = WorkflowActor::authenticated(admin.id).unwrap();
     let channel_association = RelatedAssociation::Channel(RelatedChannelId::new(channel.id));
     let thread_association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(channel.id),
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
         thread_id: RelatedThreadId::new(thread_id),
     };
     let authorizer = LifecycleAuthorizer::new(p.clone(), p.clone(), p.clone());
@@ -276,14 +276,14 @@ async fn workflow_binding_sql_grant_revocation_thread_scope_and_fixed_associatio
     .unwrap();
     let mut request = f.request(None);
     request.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(second.id),
+        target: crate::entities::address::AddressTarget::Desk(second.id),
         thread_id: RelatedThreadId::new(thread),
     };
     let bad = f.prepare(request).await;
     assert!(p.save_binding(bad).await.is_err());
     let mut request = f.request(None);
     request.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(channel.id),
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
         thread_id: RelatedThreadId::new(thread),
     };
     let configured = f.service().configure(request).await.unwrap();

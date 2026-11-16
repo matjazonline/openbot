@@ -234,6 +234,7 @@ pub(crate) async fn delete_department_on(
                 AppError::from(error)
             }
         })?;
+    super::super::workflow::role_binding::check_principals_on(tx, company, &placed).await?;
     // Its lead was a child lead of the parent's desks.
     if let Some(parent) = current.parent_id {
         sync_department_grants_on(tx, company, &[parent]).await?;

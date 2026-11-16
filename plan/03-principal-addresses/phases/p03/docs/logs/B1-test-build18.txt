@@ -1,0 +1,238 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0425]: cannot find function `refusal` in this scope
+   --> src/application/use_cases/thread/tests.rs:233:9
+    |
+233 |         refusal(&disposition),
+    |         ^^^^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/http/routes/workflows/ui/authoring/mod.rs:236:1
+    |
+236 |   fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::authoring::refusal`: not accessible
+    |
+   ::: src/adapters/http/routes/workflows/ui/runs/controls.rs:14:1
+    |
+ 14 |   fn refusal(error: &WorkflowError) -> Option<String> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::runs::controls::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/integrations/connect_tests/provider.rs:109:1
+    |
+109 |   async fn refusal(case: Refusal, expected: ConnectStatus) {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::integrations::connect_tests::provider::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs:106:1
+    |
+106 | / async fn refusal(
+107 | |     tx: &mut Transaction<'_, Postgres>,
+108 | |     s: &Scheduled,
+109 | |     sequence: i64,
+...   |
+116 | |     Ok(())
+117 | | }
+    | |_^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:23:1
+    |
+ 23 |   fn refusal() -> RoleAdmissionRefusal {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::refusal`: not accessible
+    |
+   ::: src/application/use_cases/thread/test_support/relay.rs:100:1
+    |
+100 |   fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::use_cases::thread::tests::relay_support::refusal`: not accessible
+help: consider importing this function
+    |
+  1 + use crate::application::workflow::escalation::tools::refusal;
+    |
+
+error[E0425]: cannot find function `refusal` in this scope
+    --> src/application/use_cases/thread/tests.rs:1528:9
+     |
+1528 |         refusal(&disposition),
+     |         ^^^^^^^ not found in this scope
+     |
+note: these functions exist but are inaccessible
+    --> src/adapters/http/routes/workflows/ui/authoring/mod.rs:236:1
+     |
+ 236 |   fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::authoring::refusal`: not accessible
+     |
+    ::: src/adapters/http/routes/workflows/ui/runs/controls.rs:14:1
+     |
+  14 |   fn refusal(error: &WorkflowError) -> Option<String> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::runs::controls::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/integrations/connect_tests/provider.rs:109:1
+     |
+ 109 |   async fn refusal(case: Refusal, expected: ConnectStatus) {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::integrations::connect_tests::provider::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs:106:1
+     |
+ 106 | / async fn refusal(
+ 107 | |     tx: &mut Transaction<'_, Postgres>,
+ 108 | |     s: &Scheduled,
+ 109 | |     sequence: i64,
+...    |
+ 116 | |     Ok(())
+ 117 | | }
+     | |_^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:23:1
+     |
+  23 |   fn refusal() -> RoleAdmissionRefusal {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::refusal`: not accessible
+     |
+    ::: src/application/use_cases/thread/test_support/relay.rs:100:1
+     |
+ 100 |   fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::use_cases::thread::tests::relay_support::refusal`: not accessible
+help: consider importing this function
+     |
+   1 + use crate::application::workflow::escalation::tools::refusal;
+     |
+
+error[E0425]: cannot find function `refusal` in this scope
+    --> src/application/use_cases/thread/tests.rs:1699:9
+     |
+1699 |         refusal(&disposition),
+     |         ^^^^^^^ not found in this scope
+     |
+note: these functions exist but are inaccessible
+    --> src/adapters/http/routes/workflows/ui/authoring/mod.rs:236:1
+     |
+ 236 |   fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::authoring::refusal`: not accessible
+     |
+    ::: src/adapters/http/routes/workflows/ui/runs/controls.rs:14:1
+     |
+  14 |   fn refusal(error: &WorkflowError) -> Option<String> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::runs::controls::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/integrations/connect_tests/provider.rs:109:1
+     |
+ 109 |   async fn refusal(case: Refusal, expected: ConnectStatus) {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::integrations::connect_tests::provider::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs:106:1
+     |
+ 106 | / async fn refusal(
+ 107 | |     tx: &mut Transaction<'_, Postgres>,
+ 108 | |     s: &Scheduled,
+ 109 | |     sequence: i64,
+...    |
+ 116 | |     Ok(())
+ 117 | | }
+     | |_^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::refusal`: not accessible
+     |
+    ::: src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:23:1
+     |
+  23 |   fn refusal() -> RoleAdmissionRefusal {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::refusal`: not accessible
+     |
+    ::: src/application/use_cases/thread/test_support/relay.rs:100:1
+     |
+ 100 |   fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::use_cases::thread::tests::relay_support::refusal`: not accessible
+help: consider importing this function
+     |
+   1 + use crate::application::workflow::escalation::tools::refusal;
+     |
+
+error[E0425]: cannot find function `refusal` in this scope
+   --> src/application/use_cases/thread/address_resolution_tests.rs:300:16
+    |
+300 |     assert_eq!(refusal(&cycle), Some(IngestRejection::LoopCycle.as_str()));
+    |                ^^^^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/http/routes/workflows/ui/authoring/mod.rs:236:1
+    |
+236 |   fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::authoring::refusal`: not accessible
+    |
+   ::: src/adapters/http/routes/workflows/ui/runs/controls.rs:14:1
+    |
+ 14 |   fn refusal(error: &WorkflowError) -> Option<String> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::runs::controls::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/integrations/connect_tests/provider.rs:109:1
+    |
+109 |   async fn refusal(case: Refusal, expected: ConnectStatus) {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::integrations::connect_tests::provider::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs:106:1
+    |
+106 | / async fn refusal(
+107 | |     tx: &mut Transaction<'_, Postgres>,
+108 | |     s: &Scheduled,
+109 | |     sequence: i64,
+...   |
+116 | |     Ok(())
+117 | | }
+    | |_^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:23:1
+    |
+ 23 |   fn refusal() -> RoleAdmissionRefusal {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::refusal`: not accessible
+    |
+   ::: src/application/use_cases/thread/test_support/relay.rs:100:1
+    |
+100 |   fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::use_cases::thread::tests::relay_support::refusal`: not accessible
+help: consider importing this function
+    |
+  3 + use crate::application::workflow::escalation::tools::refusal;
+    |
+
+error[E0425]: cannot find function `refusal` in this scope
+   --> src/application/use_cases/thread/department_desk_relay_tests.rs:120:16
+    |
+120 |     assert_eq!(refusal(&looped), Some("Inter-channel loop cycle detected"));
+    |                ^^^^^^^ not found in this scope
+    |
+note: these functions exist but are inaccessible
+   --> src/adapters/http/routes/workflows/ui/authoring/mod.rs:236:1
+    |
+236 |   fn refusal(error: WorkflowError) -> Result<EditorState, WorkflowError> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::authoring::refusal`: not accessible
+    |
+   ::: src/adapters/http/routes/workflows/ui/runs/controls.rs:14:1
+    |
+ 14 |   fn refusal(error: &WorkflowError) -> Option<String> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::http::routes::workflows::ui::runs::controls::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/integrations/connect_tests/provider.rs:109:1
+    |
+109 |   async fn refusal(case: Refusal, expected: ConnectStatus) {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::integrations::connect_tests::provider::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/action_reconciliation_claim_sql_tests.rs:106:1
+    |
+106 | / async fn refusal(
+107 | |     tx: &mut Transaction<'_, Postgres>,
+108 | |     s: &Scheduled,
+109 | |     sequence: i64,
+...   |
+116 | |     Ok(())
+117 | | }
+    | |_^ `crate::adapters::persistence::workflow::tests::admission_tests::lease_tests::action_dispatch_tests::action_reconciliation_receipt_tests::provider_tests::authority_tests::proof_tests::sibling_tests::eligibility_tests::claim_sql_tests::refusal`: not accessible
+    |
+   ::: src/adapters/persistence/workflow/role_refusal_runtime_tests.rs:23:1
+    |
+ 23 |   fn refusal() -> RoleAdmissionRefusal {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::refusals::refusal`: not accessible
+    |
+   ::: src/application/use_cases/thread/test_support/relay.rs:100:1
+    |
+100 |   fn refusal(disposition: &crate::transport::RelayDisposition) -> Option<&str> {
+    |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `crate::use_cases::thread::tests::relay_support::refusal`: not accessible
+help: consider importing this function
+    |
+  4 + use crate::application::workflow::escalation::tools::refusal;
+    |
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `open_bots` (lib test) due to 5 previous errors

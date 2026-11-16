@@ -1,0 +1,84 @@
+{
+  "strict_status": "FAIL",
+  "inherited_diagnostics": 7,
+  "introduced_diagnostics": 0,
+  "check": "B1-resume-clippy2.txt",
+  "comparison": "accepted p02 sparse export; omitted paths use immutable export HEAD",
+  "source_identity": [
+    {
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "accepted_p02_sha256": "26aec2068b51c62f33a9e2da8fad168b190dc080b7434441b8eaeb6b9fa2f832",
+      "current_sha256": "26aec2068b51c62f33a9e2da8fad168b190dc080b7434441b8eaeb6b9fa2f832",
+      "unchanged": true
+    },
+    {
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "accepted_p02_sha256": "374c22a7a0d9b45d8952799edb20cb0e584ee25bea5f282011b63f9e228ea0a1",
+      "current_sha256": "374c22a7a0d9b45d8952799edb20cb0e584ee25bea5f282011b63f9e228ea0a1",
+      "unchanged": true
+    },
+    {
+      "path": "src/adapters/persistence/department.rs",
+      "accepted_p02_sha256": "79ce4188fde2173b235f33b878ea0edace2a39249c91612f102b12aa805bf2f3",
+      "current_sha256": "79ce4188fde2173b235f33b878ea0edace2a39249c91612f102b12aa805bf2f3",
+      "unchanged": true
+    },
+    {
+      "path": "src/application/services/model_usage/mod.rs",
+      "accepted_p02_sha256": "1d7bd8974cd4617248587189569a80508adb63891916ef9c57e2d1a659f7c285",
+      "current_sha256": "1d7bd8974cd4617248587189569a80508adb63891916ef9c57e2d1a659f7c285",
+      "unchanged": true
+    },
+    {
+      "path": "src/domain/workflow/reply_integrity.rs",
+      "accepted_p02_sha256": "1de31bb71786e68dea6d9960d87edb85d26f509387f6fd3ea69bd0fe3259b579",
+      "current_sha256": "1de31bb71786e68dea6d9960d87edb85d26f509387f6fd3ea69bd0fe3259b579",
+      "unchanged": true
+    }
+  ],
+  "diagnostics": [
+    {
+      "message": "this pattern is unneeded as the `..` pattern can match that element",
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 373,
+      "column": 9
+    },
+    {
+      "message": "this pattern is unneeded as the `..` pattern can match that element",
+      "path": "src/adapters/http/routes/ui_schedules.rs",
+      "line": 407,
+      "column": 9
+    },
+    {
+      "message": "the `Err`-variant returned from this function is very large",
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 10,
+      "column": 6
+    },
+    {
+      "message": "the `Err`-variant returned from this function is very large",
+      "path": "src/adapters/http/routes/knowledge/upload.rs",
+      "line": 38,
+      "column": 56
+    },
+    {
+      "message": "you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`",
+      "path": "src/adapters/persistence/department.rs",
+      "line": 346,
+      "column": 5
+    },
+    {
+      "message": "expression can be simplified using `Option::unwrap_or()`",
+      "path": "src/application/services/model_usage/mod.rs",
+      "line": 24,
+      "column": 33
+    },
+    {
+      "message": "using `chunks_exact` with a constant chunk size",
+      "path": "src/domain/workflow/reply_integrity.rs",
+      "line": 29,
+      "column": 47
+    }
+  ],
+  "disposition": "Confirmed unchanged inherited diagnostics, retained for plan03 p04 integration/full gate; no full-suite clean claim. New p03 async/redundant-field findings corrected."
+}

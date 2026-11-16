@@ -1,0 +1,59 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0433]: cannot find type `AddressTarget` in this scope
+  --> src/adapters/persistence/workflow/channel_reply_views.rs:80:21
+   |
+80 | ...   target: AddressTarget::from_parts(self.channel_id,self.principal_id.map(crate::entities::transport::PrincipalId::new)).ok_or_e...
+   |               ^^^^^^^^^^^^^ use of undeclared type `AddressTarget`
+   |
+help: consider importing this enum through its public re-export
+   |
+ 2 + use crate::adapters::persistence::workflow::AddressTarget;
+   |
+
+warning: unused imports: `RelatedAssociation`, `RelatedChannelId`, and `RelatedThreadId`
+ --> src/adapters/persistence/local_agents/protocol/commands.rs:2:36
+  |
+2 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                    ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `RelatedAssociation`, `RelatedChannelId`, and `RelatedThreadId`
+ --> src/adapters/persistence/local_agents/management/mod.rs:4:36
+  |
+4 | use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
+  |                                    ^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^
+
+warning: unused import: `uuid::Uuid`
+  --> src/application/transport/delivery.rs:15:5
+   |
+15 | use uuid::Uuid;
+   |     ^^^^^^^^^^
+
+warning: unused import: `RelatedChannelId`
+  --> src/application/workflow/channel_reply/mod.rs:21:13
+   |
+21 | use super::{RelatedChannelId, WorkflowActor};
+   |             ^^^^^^^^^^^^^^^^
+
+warning: unused import: `RelatedChannelId`
+  --> src/application/workflow/message_admission.rs:10:25
+   |
+10 |     RelatedAssociation, RelatedChannelId, RelatedThreadId, WorkflowActor, WorkflowAdmission,
+   |                         ^^^^^^^^^^^^^^^^
+
+error[E0609]: no field `channel` on type `&application::workflow::channel_reply::outcomes::ChannelResponseOutcome`
+  --> src/adapters/http/pages/workflow_runs/responses.rs:16:27
+   |
+16 |         channel = outcome.channel,
+   |                           ^^^^^^^ unknown field
+   |
+   = note: available fields are: `run`, `source`, `target`, `thread`, `execution` ... and 3 others
+
+Some errors have detailed explanations: E0433, E0609.
+For more information about an error, try `rustc --explain E0433`.
+warning: `open_bots` (lib) generated 5 warnings
+error: could not compile `open_bots` (lib) due to 2 previous errors; 5 warnings emitted
+warning: build failed, waiting for other jobs to finish...
+warning: `open_bots` (lib test) generated 5 warnings (5 duplicates)
+error: could not compile `open_bots` (lib test) due to 2 previous errors; 5 warnings emitted

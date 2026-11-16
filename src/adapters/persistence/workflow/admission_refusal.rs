@@ -12,12 +12,13 @@ pub(super) use replay::{RefusalKey, saved_binding_on};
 pub(super) use replay::{RefusalReplay, resolve_on};
 
 pub(super) fn fingerprint(command: &PreparedAdmission) -> AppResult<String> {
-    let association = binding_rows::association_columns(command.association());
+    let association = association::association_columns(command.association());
     crate::application::workflow::decisions::hex_digest(&serde_json::json!({
         "version": 1,
         "input": command.input(),
-        "channel": association.0,
-        "thread": association.1,
+        "channel": association.channel_id,
+        "principal": association.principal_id,
+        "thread": association.thread_id,
         "rerun_of": command.rerun_of(),
         "history_session": command.history_session(),
         "delivery_policy": command.delivery_policy().as_str(),
@@ -34,11 +35,11 @@ pub(super) async fn record_on(
         return Ok(false);
     }
     let id = AdmissionRefusalId::new(Uuid::new_v4());
-    let association = binding_rows::association_columns(command.association());
+    let association = association::association_columns(command.association());
     sqlx::query(
         "INSERT INTO workflow_admission_refusals \
-         (company_id,id,binding_id,binding_revision,source_key,request_fingerprint,channel_id,thread_id,role_refusal) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+         (company_id,id,binding_id,binding_revision,source_key,request_fingerprint,channel_id,thread_id,role_refusal,principal_id) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
     )
     .bind(command.company_id().as_uuid())
     .bind(id.as_uuid())
@@ -46,9 +47,10 @@ pub(super) async fn record_on(
     .bind(revision(command.binding().revision().get())?)
     .bind(source.as_str())
     .bind(fingerprint(command)?)
-    .bind(association.0)
-    .bind(association.1)
+    .bind(association.channel_id)
+    .bind(association.thread_id)
     .bind(serde_json::to_value(refusal).map_err(|_| invalid())?)
+    .bind(association.principal_id)
     .execute(&mut **tx)
     .await?;
     replay::insert_command_on(tx, command, id).await?;

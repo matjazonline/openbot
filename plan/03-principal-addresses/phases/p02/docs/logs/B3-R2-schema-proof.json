@@ -1,0 +1,8 @@
+{
+  "database": "pa02_codex_b3_runtime6_20261115",
+  "migration_version": 20260817000000,
+  "stored_checksum": "b2387c6db1d13705e269bf3243898024caee785794f5c0c3ea02632ab276a76115083eee6d0240f4e8175bb9c10d7abc",
+  "current_source_checksum": "b2387c6db1d13705e269bf3243898024caee785794f5c0c3ea02632ab276a76115083eee6d0240f4e8175bb9c10d7abc",
+  "same_schema": true,
+  "sqlx_reuse": "SQL and .sqlx unchanged after final prepare; subsequent source change strengthens only the private-reader foreign-tenant fixture."
+}

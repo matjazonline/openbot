@@ -27,7 +27,6 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::load_viewable_channel;
 use super::ui_attachments::AttachmentQuery;
 
 pub fn router() -> Router<AppState> {
@@ -44,25 +43,25 @@ pub fn router() -> Router<AppState> {
 /// the one the read is made under. Three of those are guards a caller could not satisfy by
 /// guessing an id; the fourth is what makes a guessed id from another tenant a plain "not found".
 #[instrument(skip_all)]
-async fn message_diagnostics(
+pub(super) async fn message_diagnostics(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     viewer: Viewer,
     Path((thread_id, association_id)): Path<(Uuid, Uuid)>,
     Query(query): Query<AttachmentQuery>,
 ) -> AppResult<Html<String>> {
-    let (_, channel) = load_viewable_channel(
+    let (_, channel) = super::ui::inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         query.company_id,
-        query.channel_id,
+        query.inbox,
     )
     .await?;
 
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+        .readable_thread(&viewer, channel.company_id(), channel.target(), thread_id)
         .await?
         .ok_or_else(missing)?;
 
@@ -73,7 +72,7 @@ async fn message_diagnostics(
             association_id,
         )
         .await?
-        .filter(|audit| audit.thread_id == thread.id && audit.channel_id == channel.id)
+        .filter(|audit| audit.thread_id == thread.id && audit.target == channel.target())
         .ok_or_else(missing)?;
 
     Ok(Html(pages::message_diagnostics_pane(&audit)))

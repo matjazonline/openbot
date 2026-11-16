@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Probe the edit-first order of a person's slug-only rename against a concurrent demotion, on the
+# real init schema at the reviewed artifact, in a disposable database that this script creates and
+# drops. Variant A: schema as implemented. Variant B: the guard widened to every UPDATE (what
+# R1/F4 warned about), to show the test gap matters.
+set -u
+WT=/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot
+BASE="postgres://mac02@127.0.0.1:52471"
+DB="b_editfirst_$(date +%s)_$$"
+createdb -h 127.0.0.1 -p 52471 -U mac02 "$DB" || exit 1
+URL="$BASE/$DB"
+trap 'dropdb -h 127.0.0.1 -p 52471 -U mac02 --if-exists --force "$DB"' EXIT
+psql -X -q "$URL" -v ON_ERROR_STOP=1 -f "$WT/migrations/20260817000000_init_schema.sql" >/dev/null || { echo "migrate failed"; exit 2; }
+echo "init schema applied to disposable $DB"
+
+seed() {
+psql -X -q -At "$URL" -v ON_ERROR_STOP=1 <<'SQL'
+BEGIN;
+DELETE FROM addresses; DELETE FROM principals; DELETE FROM company_members; DELETE FROM companies; DELETE FROM users;
+INSERT INTO users (id, username, email) VALUES ('00000000-0000-0000-0000-0000000000a1','hale','hale@example.test');
+INSERT INTO companies (id, user_id, name, slug) VALUES ('00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-0000000000a1','Acme','acme');
+INSERT INTO company_members (id, company_id, user_id, role, access_level) VALUES (gen_random_uuid(),'00000000-0000-0000-0000-0000000000c1','00000000-0000-0000-0000-0000000000a1','owner',9);
+INSERT INTO principals (id, company_id, kind, user_id, display_label) VALUES ('00000000-0000-0000-0000-0000000000b1','00000000-0000-0000-0000-0000000000c1','person','00000000-0000-0000-0000-0000000000a1','hale');
+INSERT INTO addresses (company_id, slug, target_kind, principal_id, is_primary) VALUES ('00000000-0000-0000-0000-0000000000c1','hale','principal','00000000-0000-0000-0000-0000000000b1',true);
+COMMIT;
+SQL
+}
+
+run_variant() {
+  local label="$1"
+  seed || { echo "$label: seed failed"; return; }
+  # Session A: the production slug-only rename statement, held open 3 s.
+  psql -X -q "$URL" -c "BEGIN;
+    UPDATE addresses AS address SET slug = 'hale-new'
+      FROM principals AS principal, companies AS company
+     WHERE principal.company_id = '00000000-0000-0000-0000-0000000000c1'
+       AND principal.user_id = '00000000-0000-0000-0000-0000000000a1' AND principal.kind = 'person'
+       AND address.company_id = principal.company_id AND address.principal_id = principal.id
+       AND company.id = principal.company_id;
+    SELECT pg_sleep(3); COMMIT;" > /dev/null 2>&1 &
+  local a=$!
+  sleep 0.7
+  # Session B: the demotion (as remove_member does it), 5 s lock_timeout like remove_member.
+  local out
+  out=$(psql -X -q -At "$URL" -c "SET lock_timeout='5s';" -c "UPDATE principals SET kind='external', user_id=NULL WHERE id='00000000-0000-0000-0000-0000000000b1';" 2>&1)
+  wait "$a"; local a_rc=$?
+  local left
+  left=$(psql -X -q -At "$URL" -c "SELECT count(*) FROM addresses WHERE principal_id='00000000-0000-0000-0000-0000000000b1'")
+  local dl=$(echo "$out" | grep -c -i "deadlock")
+  echo "$label | rename session exit=$a_rc | demotion output: ${out:-<none>} | deadlock_errors=$dl | addresses left for the (now external) principal=$left"
+}
+
+run_variant "A: schema as implemented (guard on INSERT or UPDATE OF target columns)"
+
+psql -X -q "$URL" -v ON_ERROR_STOP=1 -c "DROP TRIGGER guard_address_principal ON public.addresses;" \
+  -c "CREATE TRIGGER guard_address_principal BEFORE INSERT OR UPDATE ON public.addresses FOR EACH ROW EXECUTE FUNCTION public.guard_address_principal();" >/dev/null
+run_variant "B: guard widened to every UPDATE (hypothetical regression)"

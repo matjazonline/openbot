@@ -68,9 +68,9 @@ async fn reject_mismatched_thread_records(
     version_id: VersionId,
     channel: &Channel,
 ) {
-    let thread = thread(channel.id);
+    let thread = thread(channel);
     let association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(channel.id),
+        target: crate::entities::address::AddressTarget::Desk(channel.id),
         thread_id: RelatedThreadId::new(thread.id),
     };
     assert!(matches!(
@@ -99,7 +99,7 @@ async fn reject_mismatched_thread_records(
         Err(AppError::NotFound(_))
     ));
     let mut wrong = thread.clone();
-    wrong.channel_id = Uuid::new_v4();
+    wrong.target = crate::entities::address::AddressTarget::Desk(Uuid::new_v4());
     store.state.lock().unwrap().threads.insert(thread.id, wrong);
     assert!(matches!(
         service(store)

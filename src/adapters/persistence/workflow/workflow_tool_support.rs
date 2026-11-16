@@ -223,8 +223,9 @@ impl ToolSetup {
             },
         )
         .await
-        .unwrap()
-        .id;
+        .unwrap();
+        crate::adapters::persistence::test_support::register_native_agent_address(&p, &agent).await;
+        let agent = agent.id;
         CompanyPersistence::replace_model_connections_for_user(
             &p,
             fixture.target.actor.user_id(),

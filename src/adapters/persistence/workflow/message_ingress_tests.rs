@@ -8,7 +8,7 @@ use crate::adapters::protocols::email::parser::RawInboundPayload;
 use crate::application::ports::channel::ChannelPersistence;
 use crate::application::ports::channel::ChannelWrite;
 use crate::application::transport::TransportRenderers;
-use crate::application::use_cases::agent::{AgentPersistence, AgentWrite};
+use crate::application::use_cases::agent::{AgentPersistence, AgentWrite, CompanyAgents};
 use crate::application::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
 use crate::application::use_cases::thread::{InboundIngestPorts, ThreadStores, ThreadUseCases};
 use crate::application::workflow::channel_reply::*;
@@ -106,9 +106,37 @@ impl Deployment {
         }
         let p = fixture.persistence.clone();
         let company = fixture.target.company.as_uuid();
-        let agent = AgentPersistence::create(
+        CompanyPersistence::replace_model_connections_for_user(
             &p,
+            fixture.target.actor.user_id(),
             company,
+            vec![CompanyModelConnectionWrite {
+                provider: SCRIPTED_PROVIDER.into(),
+                api_key: Some("scripted-key".into()),
+                models: vec![SCRIPTED_MODEL.into()],
+                is_default: true,
+            }],
+        )
+        .await
+        .unwrap();
+        let templates =
+            crate::adapters::persistence::workflow::provisioning::ProvisioningDeployment::new(
+                Arc::new(
+                    crate::application::workflow::templates::TemplateCatalogue::shipped(
+                        &crate::adapters::workflow_source::WorkflowSourceDecoder,
+                    )
+                    .unwrap(),
+                ),
+                &[],
+                APP_DOMAIN,
+            );
+        let created = crate::adapters::persistence::company_agent::CompanyAgentService::new(
+            p.clone(),
+            templates,
+        )
+        .create(
+            fixture.target.actor,
+            fixture.target.company,
             AgentWrite {
                 name: "Assistant".into(),
                 slug: "assistant".into(),
@@ -117,9 +145,11 @@ impl Deployment {
                 system_prompt: Some("Answer the customer briefly.".into()),
                 ..Default::default()
             },
+            None,
         )
         .await
         .unwrap();
+        let agent = created.agent;
         let channel = ChannelPersistence::create(
             &p,
             company,
@@ -135,20 +165,6 @@ impl Deployment {
         .await
         .unwrap()
         .id;
-        CompanyPersistence::replace_model_connections_for_user(
-            &p,
-            fixture.target.actor.user_id(),
-            company,
-            vec![CompanyModelConnectionWrite {
-                provider: SCRIPTED_PROVIDER.into(),
-                api_key: Some("scripted-key".into()),
-                models: vec![SCRIPTED_MODEL.into()],
-                is_default: true,
-            }],
-        )
-        .await
-        .unwrap();
-        fixture.publish_agent(agent.id).await;
         let llm = scripted_llm(turns).await;
         register_scripted_agent_base_url(agent.id, &llm.base_url);
         let config = Arc::new(AppConfig {
@@ -213,7 +229,11 @@ impl Deployment {
         let channel = RelatedChannelId::new(self.channel);
         let current = self
             .p()
-            .channel_reply_settings(company, channel, actor)
+            .channel_reply_settings(
+                company,
+                crate::entities::address::AddressTarget::Desk((channel).as_uuid()),
+                actor,
+            )
             .await
             .unwrap();
         let state = self
@@ -225,7 +245,7 @@ impl Deployment {
         self.p()
             .configure_channel_reply(ConfigureChannelReply {
                 company,
-                channel,
+                target: AddressTarget::Desk(channel.as_uuid()),
                 actor,
                 expected: current.map(|settings| settings.revision),
                 responder: Some(ConfigureResponder {

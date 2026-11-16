@@ -1,0 +1,50 @@
+[
+  {
+    "filter": "direct_workflow",
+    "exit": 101,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-1.txt",
+    "summary": [
+      "test result: FAILED. 6 passed; 1 failed; 0 ignored; 0 measured; 4575 filtered out; finished in 5.04s"
+    ]
+  },
+  {
+    "filter": "direct_binding_",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-2.txt",
+    "summary": [
+      "test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4576 filtered out; finished in 4.22s"
+    ]
+  },
+  {
+    "filter": "attention",
+    "exit": 101,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-3.txt",
+    "summary": [
+      "test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 4555 filtered out; finished in 10.49s"
+    ]
+  },
+  {
+    "filter": "run_counts",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-4.txt",
+    "summary": [
+      "test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 4571 filtered out; finished in 60.34s"
+    ]
+  },
+  {
+    "filter": "workflow_run_triggers_notify",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-5.txt",
+    "summary": [
+      "test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4580 filtered out; finished in 1.70s"
+    ]
+  },
+  {
+    "filter": "agent_history_e2e_real_knowledge_cc_removal",
+    "exit": 0,
+    "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-current-tests4-6.txt",
+    "summary": [
+      "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4581 filtered out; finished in 22.97s"
+    ]
+  }
+]

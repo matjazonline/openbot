@@ -27,6 +27,7 @@ async fn cloudroom_commands_persisted_command_session_binding_is_checked_beyond_
     let commands = [
         command,
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id: c.session.id,
             selection: c.session.profile.selection.clone(),
             prompt: LocalPrompt::try_from("binding proof".to_owned()).unwrap(),
@@ -77,6 +78,7 @@ async fn assert_create_machine_binding(c: &Context, operation: &LocalAgentOperat
     let LocalCommand::Create {
         session_id,
         selection,
+        harness,
         prompt,
     } = operation.command()
     else {
@@ -89,6 +91,7 @@ async fn assert_create_machine_binding(c: &Context, operation: &LocalAgentOperat
         LocalCommand::Create {
             session_id: *session_id,
             selection: changed,
+            harness: harness.clone(),
             prompt: prompt.clone(),
         },
         operation.deadline(),

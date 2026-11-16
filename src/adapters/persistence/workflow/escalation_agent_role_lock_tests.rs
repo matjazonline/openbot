@@ -1,8 +1,5 @@
 //! Actual department and account writers, with observable PostgreSQL lock queues.
 use super::*;
-use crate::adapters::persistence::channel_gate::{
-    ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on,
-};
 use crate::adapters::persistence::test_support::minted_agent_notice_key;
 use crate::application::notification::{
     ClaimedNotificationEvent, NotificationPersistence, NotificationProjectionCommit,
@@ -25,16 +22,14 @@ async fn claim_notice(f: &AgentCase) -> ClaimedNotificationEvent {
     claimed.pop().unwrap()
 }
 
-async fn waiter(p: &PostgresPersistence, blocker: i32, mode: Option<&str>) -> i32 {
+async fn waiter(p: &PostgresPersistence, blocker: i32, excluded: Option<i32>) -> i32 {
     tokio::time::timeout(Duration::from_secs(3), async {
         loop {
             let pid: Option<i32> = sqlx::query_scalar(
                 "SELECT activity.pid FROM pg_stat_activity AS activity \
                  WHERE activity.datname=current_database() AND $1=ANY(pg_blocking_pids(activity.pid)) \
-                   AND ($2::text IS NULL OR EXISTS(SELECT 1 FROM pg_locks AS waiting \
-                     WHERE waiting.pid=activity.pid AND waiting.locktype='advisory' \
-                       AND NOT waiting.granted AND waiting.mode=$2)) ORDER BY activity.pid LIMIT 1",
-            ).bind(blocker).bind(mode).fetch_optional(p.pool()).await.unwrap();
+                   AND activity.pid IS DISTINCT FROM $2::integer ORDER BY activity.pid LIMIT 1",
+            ).bind(blocker).bind(excluded).fetch_optional(p.pool()).await.unwrap();
             if let Some(pid) = pid { return pid; }
             tokio::time::sleep(Duration::from_millis(5)).await;
         }
@@ -84,7 +79,7 @@ async fn update_account(
 
 async fn role_first(schedule: AccountSchedule) {
     let f = Box::pin(pending_agent()).await;
-    own_default_desk(&f).await;
+    assert_handler_department(&f).await;
     let p = f.people.role.p();
     let claim = claim_notice(&f).await;
     let expected = p
@@ -96,13 +91,12 @@ async fn role_first(schedule: AccountSchedule) {
         .fetch_one(&mut *blocker)
         .await
         .unwrap();
-    acquire_channel_gate_on(
-        &mut blocker,
-        ChannelGateKey::new(f.people.role.company().as_uuid(), f.created.desk_id),
-        ChannelGateAccess::ChangeSettings,
-    )
-    .await
-    .unwrap();
+    sqlx::query("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR UPDATE")
+        .bind(f.people.role.company().as_uuid())
+        .bind(f.created.principal_id.as_uuid())
+        .execute(&mut *blocker)
+        .await
+        .unwrap();
     let account =
         UserPersistence::get_by_id(p, f.people.role.admission.binding.target.actor.user_id())
             .await
@@ -111,11 +105,14 @@ async fn role_first(schedule: AccountSchedule) {
     let (role_tx, role_rx) = tokio::sync::oneshot::channel();
     let (account_tx, account_rx) = tokio::sync::oneshot::channel();
     let key = minted_agent_notice_key(&expected);
+    let recipient =
+        crate::adapters::persistence::test_support::minted_agent_notice_recipient(&expected);
     let notice = p.commit_notification_projection(NotificationProjectionCommit {
         fence: &claim.lease,
         expected: &expected,
         email: None,
         agent_message_key: key.as_ref(),
+        agent_recipient: recipient.as_ref(),
         escalation_ack_hours: Default::default(),
     });
     let role = async {
@@ -128,9 +125,11 @@ async fn role_first(schedule: AccountSchedule) {
         }
     };
     let release = async {
-        waiter(p, blocker_pid, Some("ShareLock")).await;
+        let projector = waiter(p, blocker_pid, None).await;
         role_tx.send(()).unwrap();
-        let writer = waiter(p, blocker_pid, Some("ExclusiveLock")).await;
+        // Both writers wait for this principal. Select the actual role writer, not
+        // the earlier queued projector, before starting the third account writer.
+        let writer = waiter(p, blocker_pid, Some(projector)).await;
         if matches!(schedule, AccountSchedule::Update) {
             account_tx.send(()).unwrap();
             waiter(p, writer, None).await;
@@ -167,7 +166,7 @@ async fn workflow_escalation_agent_real_account_update_role_writer_and_notice_al
 #[tokio::test]
 async fn workflow_escalation_agent_notice_before_real_role_writer_commits_captured_root_once() {
     let f = Box::pin(pending_agent()).await;
-    own_default_desk(&f).await;
+    assert_handler_department(&f).await;
     let p = f.people.role.p();
     let claim = claim_notice(&f).await;
     let expected = p
@@ -186,11 +185,14 @@ async fn workflow_escalation_agent_notice_before_real_role_writer_commits_captur
         .unwrap();
     let (role_tx, role_rx) = tokio::sync::oneshot::channel();
     let key = minted_agent_notice_key(&expected);
+    let recipient =
+        crate::adapters::persistence::test_support::minted_agent_notice_recipient(&expected);
     let notice = p.commit_notification_projection(NotificationProjectionCommit {
         fence: &claim.lease,
         expected: &expected,
         email: None,
         agent_message_key: key.as_ref(),
+        agent_recipient: recipient.as_ref(),
         escalation_ack_hours: Default::default(),
     });
     let role = async {

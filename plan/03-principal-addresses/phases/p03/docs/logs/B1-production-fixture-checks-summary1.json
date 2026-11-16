@@ -1,0 +1,22 @@
+[
+  {
+    "selection": "public_desk_private_agent_",
+    "exit": 101,
+    "log": "B1-production-public-agent-tests1.txt"
+  },
+  {
+    "selection": "message_ingress_end_to_end",
+    "exit": 0,
+    "log": "B1-production-ingress-tests1.txt"
+  },
+  {
+    "selection": "workflow_escalation_origin_actual_email_relay",
+    "exit": 101,
+    "log": "B1-relay-origin-tests1.txt"
+  },
+  {
+    "selection": "direct_binding_",
+    "exit": 101,
+    "log": "B1-direct-binding-tests1.txt"
+  }
+]

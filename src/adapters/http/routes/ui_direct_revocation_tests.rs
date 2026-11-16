@@ -1,0 +1,352 @@
+//! Current inbox access is required after each response's final independent read.
+use super::*;
+use axum::extract::Path;
+use futures::future::{BoxFuture, LocalBoxFuture};
+use tokio::{sync::Notify, task::JoinSet};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Surface {
+    Diagnostics,
+    ExactMessage,
+    Mailbox,
+    SentReply,
+}
+
+struct Scenario {
+    h: Harness,
+    actor: Viewer,
+    inbox: InboxSelection,
+    thread: Thread,
+    association: Uuid,
+    canonical: CanonicalMessageId,
+}
+
+fn prepare() -> LocalBoxFuture<'static, Option<Scenario>> {
+    // Keep the real fixture/ingress future out of the enclosing race's state machine.
+    Box::pin(async {
+        let h = Harness::isolated().await?;
+        let actor = member(&h, "response_race").await;
+        let inbox = selection(&h, &actor).await;
+        let thread = direct_thread(&h, &actor, inbox).await;
+        let messages = h
+            .threads
+            .get_thread_history(
+                &actor,
+                crate::use_cases::thread::ThreadReadScope::new(
+                    inbox.scope(h.company_id).unwrap(),
+                    thread.id,
+                ),
+            )
+            .await
+            .unwrap();
+        assert_eq!(messages.len(), 1);
+        let message = &messages[0];
+        let association = message.id;
+        let canonical = message.canonical_id;
+        Some(Scenario {
+            h,
+            actor,
+            inbox,
+            thread,
+            association,
+            canonical,
+        })
+    })
+}
+
+fn request(
+    s: &Scenario,
+    surface: Surface,
+    activity: Arc<dyn ThreadActivityReader>,
+) -> BoxFuture<'static, AppResult<String>> {
+    let companies = Arc::new(CompanyUseCases::new(s.h.persistence.clone()));
+    let channels = s.h.channels.clone();
+    let threads = s.h.threads.clone();
+    let account = users(&s.h);
+    let config = s.h.config.clone();
+    let actor = s.actor.clone();
+    let company_id = s.h.company_id;
+    let thread_id = s.thread.id;
+    let inbox = s.inbox;
+    let canonical = s.canonical;
+    let association = s.association;
+    // Erase the distinct real handler futures before Tokio adds task/drop machinery.
+    Box::pin(async move {
+        match surface {
+            Surface::Diagnostics => {
+                crate::adapters::http::routes::ui_message_diagnostics::message_diagnostics(
+                    State(companies),
+                    State(channels),
+                    State(threads),
+                    actor,
+                    Path((thread_id, association)),
+                    Query(
+                        crate::adapters::http::routes::ui_attachments::AttachmentQuery {
+                            company_id,
+                            inbox,
+                        },
+                    ),
+                )
+                .await
+                .map(|html| html.0)
+            }
+            Surface::ExactMessage => super::super::super::message::page(
+                State(companies),
+                State(channels),
+                State(threads),
+                State(activity),
+                actor,
+                Query(super::super::super::message::MessageQuery {
+                    company_id,
+                    inbox,
+                    thread_id,
+                    message_id: canonical.as_uuid(),
+                }),
+            )
+            .await
+            .map(|html| html.0),
+            Surface::Mailbox => mailbox_page(
+                State(companies),
+                State(channels),
+                State(threads),
+                State(activity),
+                State(account),
+                State(config),
+                AuthenticatedUser { id: actor.user_id },
+                actor,
+                Query(MailboxQuery {
+                    company_id: Some(company_id),
+                    inbox,
+                    thread_id: Some(thread_id),
+                }),
+            )
+            .await
+            .map(|html| html.0),
+            Surface::SentReply => {
+                let response = send_reply(
+                    State(companies),
+                    State(channels),
+                    State(threads),
+                    State(activity),
+                    State(account),
+                    State(config),
+                    actor,
+                    Form(ReplyForm {
+                        company_id,
+                        inbox,
+                        thread_id,
+                        reply_to_message_id: None,
+                        text_body: Some("Committed private reply".into()),
+                        deliver: None,
+                    }),
+                )
+                .await?;
+                let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                    .await
+                    .unwrap();
+                Ok(String::from_utf8(body.to_vec()).unwrap())
+            }
+        }
+    })
+}
+
+struct PausedActivity {
+    delegate: Arc<dyn ThreadActivityReader>,
+    surface: Surface,
+    loaded: Notify,
+    release: Notify,
+}
+impl PausedActivity {
+    async fn pause(&self) {
+        self.loaded.notify_one();
+        self.release.notified().await;
+    }
+}
+#[async_trait::async_trait]
+impl ThreadActivityReader for PausedActivity {
+    async fn inspectable_runs(
+        &self,
+        company: Uuid,
+        viewer: Uuid,
+        ids: &[Uuid],
+    ) -> AppResult<HashSet<Uuid>> {
+        let result = self.delegate.inspectable_runs(company, viewer, ids).await?;
+        if self.surface == Surface::ExactMessage {
+            self.pause().await;
+        }
+        Ok(result)
+    }
+    async fn thread_runs(
+        &self,
+        company: Uuid,
+        thread: Uuid,
+        viewer: Uuid,
+    ) -> AppResult<crate::application::thread_activity::ThreadRuns> {
+        self.delegate.thread_runs(company, thread, viewer).await
+    }
+    async fn thread_activity(
+        &self,
+        company: Uuid,
+        ids: &[Uuid],
+    ) -> AppResult<HashMap<Uuid, ThreadWorkSummary>> {
+        let result = self.delegate.thread_activity(company, ids).await?;
+        if matches!(self.surface, Surface::Mailbox | Surface::SentReply) {
+            self.pause().await;
+        }
+        Ok(result)
+    }
+}
+
+async fn finish(tasks: &mut JoinSet<AppResult<String>>) -> AppResult<String> {
+    match tokio::time::timeout(FRAME_TIMEOUT, tasks.join_next()).await {
+        Ok(Some(result)) => result.expect("reader did not panic"),
+        _ => {
+            tasks.shutdown().await;
+            panic!("reader must finish normally within its bound");
+        }
+    }
+}
+
+async fn rows(s: &Scenario) -> i64 {
+    sqlx::query_scalar("SELECT count(*) FROM thread_messages WHERE company_id=$1 AND thread_id=$2")
+        .bind(s.h.company_id)
+        .bind(s.thread.id)
+        .fetch_one(s.h.persistence.pool())
+        .await
+        .unwrap()
+}
+
+async fn revoke(s: &Scenario) {
+    s.h.persistence
+        .remove_member(s.h.company_id, s.actor.user_id)
+        .await
+        .unwrap();
+    assert!(
+        s.h.persistence
+            .access_context_for_user(s.h.company_id, s.actor.user_id)
+            .await
+            .unwrap()
+            .is_none()
+    );
+}
+
+fn activity_race(surface: Surface) -> LocalBoxFuture<'static, ()> {
+    Box::pin(async move {
+        let Some(s) = prepare().await else {
+            return;
+        };
+        let before = request(&s, surface, s.h.reader()).await.unwrap();
+        assert!(
+            before.contains("Private direct body"),
+            "authorized surface must render its real private message"
+        );
+        let before_rows = rows(&s).await;
+        let activity = Arc::new(PausedActivity {
+            delegate: s.h.reader(),
+            surface,
+            loaded: Notify::new(),
+            release: Notify::new(),
+        });
+        let mut tasks = JoinSet::new();
+        tasks.spawn(request(&s, surface, activity.clone()));
+        if tokio::time::timeout(FRAME_TIMEOUT, activity.loaded.notified())
+            .await
+            .is_err()
+        {
+            tasks.shutdown().await;
+            panic!("{surface:?} must reach its final activity read after loading private data");
+        }
+        if surface == Surface::SentReply {
+            assert_eq!(
+                rows(&s).await,
+                before_rows + 1,
+                "the write commits before the response's final activity read"
+            );
+        }
+        revoke(&s).await;
+        activity.release.notify_one();
+        let result = finish(&mut tasks).await;
+        assert!(
+            matches!(result, Err(AppError::NotFound(_))),
+            "revoked {surface:?} must not return cached private HTML: {result:?}"
+        );
+        let archive =
+            s.h.threads
+                .get_thread_history(
+                    &s.h.owner,
+                    crate::use_cases::thread::ThreadReadScope::new(
+                        s.inbox.scope(s.h.company_id).unwrap(),
+                        s.thread.id,
+                    ),
+                )
+                .await
+                .unwrap();
+        assert!(
+            archive
+                .iter()
+                .any(|message| message.body == "Private direct body")
+        );
+        if surface == Surface::SentReply {
+            assert_eq!(
+                archive.len() as i64,
+                before_rows + 1,
+                "response refusal does not erase the committed reply"
+            );
+        }
+    })
+}
+
+#[tokio::test]
+async fn direct_thread_ui_revocation_during_exact_message_activity_refuses_cached_body() {
+    activity_race(Surface::ExactMessage).await;
+}
+#[tokio::test]
+async fn direct_thread_ui_revocation_during_full_mailbox_activity_refuses_cached_body() {
+    activity_race(Surface::Mailbox).await;
+}
+#[tokio::test]
+async fn direct_thread_ui_revocation_during_post_reply_activity_refuses_cached_body() {
+    activity_race(Surface::SentReply).await;
+}
+
+#[tokio::test]
+async fn direct_thread_ui_revocation_during_actual_audit_payload_refuses_diagnostics() {
+    let Some(s) = prepare().await else {
+        return;
+    };
+    let before = request(&s, Surface::Diagnostics, s.h.reader())
+        .await
+        .unwrap();
+    assert!(
+        before.contains(&s.canonical.to_string()),
+        "positive diagnostics include the real canonical payload id"
+    );
+    let mut gate = s.h.persistence.pool().begin().await.unwrap();
+    sqlx::query("LOCK TABLE external_messages IN ACCESS EXCLUSIVE MODE")
+        .execute(&mut *gate)
+        .await
+        .unwrap();
+    let mut tasks = JoinSet::new();
+    tasks.spawn(request(&s, Surface::Diagnostics, s.h.reader()));
+    let waiting = tokio::time::timeout(FRAME_TIMEOUT, async {
+        loop {
+            let blocked: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE datname=current_database() AND wait_event_type='Lock' AND query LIKE '%SELECT association.id,%')")
+                .fetch_one(s.h.persistence.pool()).await.unwrap();
+            if blocked { return; }
+            tokio::time::sleep(Duration::from_millis(5)).await;
+        }
+    }).await;
+    if waiting.is_err() {
+        tasks.shutdown().await;
+        panic!(
+            "actual diagnostics query must reach the audit payload lock after initial authorization"
+        );
+    }
+    revoke(&s).await;
+    gate.commit().await.unwrap();
+    let result = finish(&mut tasks).await;
+    assert!(
+        matches!(result, Err(AppError::NotFound(_))),
+        "removed viewer must not receive actual private audit identifiers: {result:?}"
+    );
+}

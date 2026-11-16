@@ -1,0 +1,5 @@
+
+> @get-bb/plugin-sdk@0.6.50 build /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/packages/plugin-sdk
+> node scripts/build-runtime.mjs
+
+Built 21 @get-bb/plugin-sdk runtime entries.

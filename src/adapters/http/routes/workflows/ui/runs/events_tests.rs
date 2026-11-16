@@ -16,19 +16,19 @@ async fn the_event_stream_wakes_with_resync_first_and_names_only_visible_runs() 
     let board = f.channel("Board", "board", true).await;
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.other,
-        channel_id: None,
+        target: None,
         thread_id: None,
         run_id: Uuid::new_v4(),
     }));
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.company,
-        channel_id: Some(board),
+        target: Some(crate::entities::address::AddressTarget::Desk(board)),
         thread_id: None,
         run_id: Uuid::new_v4(),
     }));
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.company,
-        channel_id: None,
+        target: None,
         thread_id: None,
         run_id: visible,
     }));
@@ -116,7 +116,7 @@ async fn a_lagging_stream_asks_every_view_to_read_again() {
         sender
             .send(MailboxEvent::WorkflowRunChanged(RunScope {
                 company_id: f.company,
-                channel_id: None,
+                target: None,
                 thread_id: None,
                 run_id: *run,
             }))

@@ -337,11 +337,11 @@ async fn channel_reply_views_delivery_wakes_the_completed_run_and_conversation_w
     assert_eq!(notes[1].0, "workflow_run_changed");
     assert_eq!(
         notes[0].1,
-        json!({"company_id":f.scope.company.as_uuid(),"channel_id":f.s.channel,"thread_id":f.s.thread})
+        json!({"company_id":f.scope.company.as_uuid(),"target":AddressTarget::Desk(f.s.channel),"thread_id":f.s.thread})
     );
     assert_eq!(
         notes[1].1,
-        json!({"company_id":f.scope.company.as_uuid(),"channel_id":f.s.channel,"thread_id":f.s.thread,
+        json!({"company_id":f.scope.company.as_uuid(),"target":AddressTarget::Desk(f.s.channel),"thread_id":f.s.thread,
         "run_id":f.scope.run.as_uuid(),"state":"succeeded","waiting_reason":null})
     );
     assert_eq!(

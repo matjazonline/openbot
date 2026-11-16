@@ -6,6 +6,9 @@ use crate::use_cases::{
 };
 use serde_json::{Value, json};
 
+#[path = "agent_api_tests/public_settings.rs"]
+mod public_settings;
+
 async fn response_json(response: impl IntoResponse) -> Value {
     let response = response.into_response();
     assert!(response.status().is_success());
@@ -67,6 +70,7 @@ impl Fixture {
                 persistence.clone(),
                 persistence.clone(),
                 persistence.clone(),
+                crate::use_cases::agent::SpamScanning::Unavailable,
             )
             .with_company_agents(
                 crate::adapters::persistence::test_support::company_agents(persistence.as_ref()),
@@ -80,7 +84,8 @@ impl Fixture {
             company,
         })
     }
-    async fn create(&self, body: Value) -> Value {
+    async fn create(&self, mut body: Value) -> Value {
+        body["native_permissions"] = json!("full");
         response_json(
             create_agent_json(
                 State(self.agents.clone()),
@@ -99,8 +104,7 @@ impl Fixture {
         .await
     }
     async fn update(&self, id: Uuid, patch: Value) -> AppResult<Value> {
-        let mut body =
-            json!({"name":"Structured", "slug":"structured", "description":"Updated description"});
+        let mut body = json!({"name":"Structured", "slug":"structured", "description":"Updated description", "native_permissions":"full"});
         body.as_object_mut()
             .unwrap()
             .extend(patch.as_object().unwrap().clone());
@@ -174,8 +178,7 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         AssistantChannelService, ProvisioningDeployment,
     };
     use crate::application::workflow::provisioning::{
-        AssistantChannelRequest, AssistantChannels, CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS,
-        ReplyMode,
+        AssistantChannelRequest, AssistantChannels, CREATE_AGENT, LIST_COMPANY_AGENTS, ReplyMode,
     };
     use crate::use_cases::company::CompanyModelConnectionWrite;
     let Some(f) = Fixture::new().await else {
@@ -235,7 +238,7 @@ async fn library_builder_copy_keeps_its_grants_on_an_explicit_model() {
         .fetch_one(f.persistence.pool())
         .await
         .unwrap();
-    assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL]);
+    assert_eq!(grants, [LIST_COMPANY_AGENTS, CREATE_AGENT]);
 
     let templates = ProvisioningDeployment::new(
         Arc::new(

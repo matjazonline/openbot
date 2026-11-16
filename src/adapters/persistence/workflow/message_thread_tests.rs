@@ -96,7 +96,12 @@ async fn conversation_with(
     let user = member(&fixture, "member").await;
     let p = &fixture.persistence;
     let thread = p
-        .create_thread(channel, "Question", &[EmailAddress::from(CUSTOMER)])
+        .create_thread(
+            fixture.target.company.as_uuid(),
+            crate::entities::address::AddressTarget::Desk(channel),
+            "Question",
+            &[EmailAddress::from(CUSTOMER)],
+        )
         .await
         .unwrap();
     p.create_message(&inbound(thread.id, "<root@partner.test>", &[], "First"))
@@ -196,7 +201,12 @@ async fn conversation_with(
         }
         Source::Foreign => {
             let elsewhere = p
-                .create_thread(other, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+                .create_thread(
+                    fixture.target.company.as_uuid(),
+                    crate::entities::address::AddressTarget::Desk(other),
+                    "Elsewhere",
+                    &[EmailAddress::from(CUSTOMER)],
+                )
                 .await
                 .unwrap();
             p.create_message(&inbound(
@@ -226,7 +236,7 @@ async fn conversation_with(
         &fixture,
         target,
         RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(channel),
+            target: crate::entities::address::AddressTarget::Desk(channel),
             thread_id: RelatedThreadId::new(thread.id),
         },
         "message-thread-run",
@@ -556,13 +566,16 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
         ))
         .await;
         let setup = &conversation.setup;
-        let trace = vec![Uuid::new_v4(), Uuid::new_v4()];
+        let trace = vec![
+            crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+            crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+        ];
         if recorded {
             // An external hop: another deployment's relay headers. An `internal` intent must name
             // the delivery part that carried it (D4.3), which this source message never had.
             sqlx::query(
                 "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, \
-                   thread_id, role, mentioned, admissible, origin, hop_count, trace_channels, \
+                   thread_id, role, mentioned, admissible, origin, hop_count, trace_targets, \
                    delivery_policy, correlation_id) \
                  VALUES ($1, $2, $3, $4, $5, 'to', false, true, 'external', 2, $6, 'deliver', $2)",
             )
@@ -571,7 +584,7 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
             .bind(conversation.question.as_uuid())
             .bind(setup.channel)
             .bind(conversation.thread)
-            .bind(&trace)
+            .bind(serde_json::to_value(&trace).unwrap())
             .execute(setup.pool())
             .await
             .unwrap();
@@ -581,13 +594,13 @@ async fn workflow_message_thread_external_reply_continues_the_source_relay_trace
             WorkflowHandlerOutcome::Suspended(_)
         ));
         let (hop, channels) = if recorded {
-            (2, trace.iter().map(Uuid::to_string).collect::<Vec<_>>())
+            (2, trace.clone())
         } else {
             (0, Vec::new())
         };
         assert_eq!(
             reply_relay(setup).await,
-            json!({"source_channel_id": setup.channel.to_string(), "hop_count": hop, "trace_channels": channels}),
+            json!({"source_target": AddressTarget::Desk(setup.channel), "hop_count": hop, "trace_targets": channels}),
             "recorded={recorded}"
         );
     }
@@ -883,7 +896,12 @@ async fn message_thread_fk_destination_names_a_message_of_its_own_thread() {
     let elsewhere = setup
         .fixture
         .persistence
-        .create_thread(setup.channel, "Elsewhere", &[EmailAddress::from(CUSTOMER)])
+        .create_thread(
+            setup.fixture.target.company.as_uuid(),
+            crate::entities::address::AddressTarget::Desk(setup.channel),
+            "Elsewhere",
+            &[EmailAddress::from(CUSTOMER)],
+        )
         .await
         .unwrap()
         .id;

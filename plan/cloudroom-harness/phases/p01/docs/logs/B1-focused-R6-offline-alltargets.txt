@@ -1,0 +1,2 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 25.57s

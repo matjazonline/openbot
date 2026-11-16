@@ -1,0 +1,8 @@
+
+> openbots@1.0.0 check:css
+> bash scripts/check-css.sh
+
+≈ tailwindcss v4.1.12
+
+/*! 🌼 daisyUI 5.0.50 */
+Done in 299ms

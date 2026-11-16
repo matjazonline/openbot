@@ -49,17 +49,17 @@ async fn cloudroom_connection_header_authentication_and_version_refuse_before_le
     let server = Server::start(c.f.persistence.clone()).await;
     let cases = [
         HeaderCase {
-            protocol: "1",
+            protocol: "2",
             authorization: None,
             status: StatusCode::UNAUTHORIZED,
         },
         HeaderCase {
-            protocol: "1",
+            protocol: "2",
             authorization: Some(format!("Bearer {}", "0".repeat(64))),
             status: StatusCode::UNAUTHORIZED,
         },
         HeaderCase {
-            protocol: "2",
+            protocol: "1",
             authorization: Some(format!(
                 "Bearer {}",
                 c.paired.candidate.credential.expose_secret()

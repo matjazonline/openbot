@@ -9,8 +9,12 @@ pub(super) struct Foundation {
     pub(super) mail_transport: Arc<dyn MailTransport>,
     pub(super) mail_available: bool,
     pub(super) sessions: Arc<SessionAuthority>,
+    pub(super) scanner: Arc<dyn crate::services::spam_scanner::SpamScanner>,
 }
 pub(super) async fn build(config: Arc<AppConfig>) -> anyhow::Result<Foundation> {
+    let scanner = Arc::new(crate::adapters::spam_scanner::SpamScannerAdapter::new(
+        config.spam_scanner_settings(),
+    )?);
     let model_path = config.knowledge_model_dir.clone();
     // Load exactly one local model before database setup or worker construction.
     let mut loading = tokio::task::spawn_blocking(move || {
@@ -56,5 +60,6 @@ pub(super) async fn build(config: Arc<AppConfig>) -> anyhow::Result<Foundation> 
         mail_transport,
         mail_available,
         sessions,
+        scanner,
     })
 }

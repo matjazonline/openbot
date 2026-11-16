@@ -1,0 +1,40 @@
+    Checking open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src/adapters/http/routes/local_machine_connection/bundles.rs:38:19
+   |
+38 |     if one_header(&headers, "x-openbot-protocol-version")? != PROTOCOL_VERSION.to_string() {
+   |                   ^^^^^^^^ help: change this to: `headers`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+   = note: `-D clippy::needless-borrow` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src/adapters/http/routes/local_machine_connection/bundles.rs:72:20
+   |
+72 |         one_header(&headers, IF_NONE_MATCH.as_str())? == etag
+   |                    ^^^^^^^^ help: change this to: `headers`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#needless_borrow
+
+error: using `clone` on type `CredentialVerifier` which implements the `Copy` trait
+  --> src/adapters/persistence/local_agents/protocol/mcp.rs:24:27
+   |
+24 |                 verifier: request.verifier.clone(),
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `request.verifier`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#clone_on_copy
+   = note: `-D clippy::clone-on-copy` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::clone_on_copy)]`
+
+error: could not compile `open_bots` (lib) due to 3 previous errors
+warning: build failed, waiting for other jobs to finish...
+error: using `clone` on type `CredentialVerifier` which implements the `Copy` trait
+   --> src/adapters/persistence/workflow/local_agent_mcp_tests.rs:155:19
+    |
+155 |         verifier: request.verifier.clone(),
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^ help: try removing the `clone` call: `request.verifier`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.95.0/index.html#clone_on_copy
+
+error: could not compile `open_bots` (lib test) due to 4 previous errors

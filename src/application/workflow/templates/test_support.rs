@@ -32,6 +32,27 @@ impl Store {
 }
 #[async_trait]
 impl PrincipalAccessPersistence for Store {
+    async fn direct_inboxes(
+        &self,
+        _company: Uuid,
+        _user: Uuid,
+        _limit: usize,
+    ) -> AppResult<Vec<crate::application::ports::participant::DirectInbox>> {
+        Err(crate::app_error::AppError::Internal(
+            "direct inbox listing is outside this fixture".into(),
+        ))
+    }
+
+    async fn principal_by_id(
+        &self,
+        _company: Uuid,
+        _principal: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<crate::entities::participant::Principal>> {
+        Err(AppError::Internal(
+            "principal target lookup is outside this workflow fixture".into(),
+        ))
+    }
+
     async fn access_context_for_identity(
         &self,
         _: Uuid,
@@ -67,7 +88,7 @@ impl WorkflowChannelReader for Store {
 }
 #[async_trait]
 impl WorkflowThreadReader for Store {
-    async fn workflow_thread(&self, _: RelatedThreadId) -> AppResult<Option<Thread>> {
+    async fn workflow_thread(&self, _: CompanyId, _: RelatedThreadId) -> AppResult<Option<Thread>> {
         panic!("company association only")
     }
 }

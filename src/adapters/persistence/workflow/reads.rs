@@ -1,9 +1,9 @@
 //! The workflow routes' read models (p08 B3b-1): plain company-scoped reads with no locks. A
 //! route authorizes before it shows any of them.
-use super::binding_rows::association_from_columns;
+use super::association::association_from_columns;
 use super::board_reads;
 use super::*;
-use crate::application::workflow::board::{BoardCount, RunBoardScope, VisibleChannels};
+use crate::application::workflow::board::{BoardCount, RunBoardScope, VisibleInboxes};
 use crate::application::workflow::reads::*;
 use chrono::{DateTime, Utc};
 use serde_json::Value;
@@ -58,6 +58,7 @@ pub(super) struct BindingRow {
     configuration_revision: i64,
     active: bool,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     workflow_id: Uuid,
     version_id: Uuid,
@@ -68,7 +69,7 @@ pub(super) struct BindingRow {
 }
 
 pub(super) const BINDING_COLUMNS: &str = "binding.id, binding.state_revision, binding.configuration_revision, \
-    binding.active, binding.channel_id, binding.thread_id, version.workflow_id, revision.version_id, \
+    binding.active, binding.channel_id,binding.principal_id, binding.thread_id, version.workflow_id, revision.version_id, \
     revision.params, revision.run_as_user_id, revision.message_trigger, revision.escalation";
 pub(super) const BINDING_FROM: &str = "FROM workflow_bindings AS binding \
     JOIN workflow_binding_revisions AS revision ON revision.company_id = binding.company_id \
@@ -87,7 +88,11 @@ pub(super) fn binding_summary(row: BindingRow) -> AppResult<BindingSummary> {
         state_revision: revision_of(row.state_revision)?,
         configuration_revision: revision_of(row.configuration_revision)?,
         active: row.active,
-        association: association_from_columns(row.channel_id, row.thread_id)?,
+        association: association_from_columns(association::AssociationColumns {
+            channel_id: row.channel_id,
+            principal_id: row.principal_id,
+            thread_id: row.thread_id,
+        })?,
         workflow: WorkflowId::new(row.workflow_id),
         version: VersionId::new(row.version_id),
         params: row.params,
@@ -107,6 +112,7 @@ pub(super) struct RunRow {
     workflow_id: Uuid,
     version_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     state: String,
     waiting_reason: Option<String>,
@@ -119,7 +125,7 @@ pub(super) struct RunRow {
     finished_at: Option<DateTime<Utc>>,
 }
 
-pub(super) const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, channel_id, thread_id, state, \
+pub(super) const RUN_COLUMNS: &str = "id, binding_id, workflow_id, version_id, channel_id, principal_id, thread_id, state, \
     waiting_reason, revision, actor_id, parent_run_id, rerun_of_run_id, created_at, deadline, \
     finished_at";
 
@@ -131,7 +137,11 @@ pub(super) fn run_summary(row: RunRow) -> AppResult<RunSummary> {
         binding: WorkflowBindingId::new(row.binding_id),
         workflow: WorkflowId::new(row.workflow_id),
         version: VersionId::new(row.version_id),
-        association: association_from_columns(row.channel_id, row.thread_id)?,
+        association: association_from_columns(association::AssociationColumns {
+            channel_id: row.channel_id,
+            principal_id: row.principal_id,
+            thread_id: row.thread_id,
+        })?,
         state: row.state,
         waiting_reason: row.waiting_reason,
         revision: revision_of(row.revision)?,
@@ -377,7 +387,7 @@ impl WorkflowReads for PostgresPersistence {
             None => None,
             Some(after) => Some(
                 sqlx::query_as(
-                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2",
+                    "SELECT title, id FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
                 )
                 .bind(company.as_uuid())
                 .bind(after)
@@ -388,7 +398,7 @@ impl WorkflowReads for PostgresPersistence {
         };
         let rows = sqlx::query_as::<_, DefinitionRow>(
             "SELECT id, revision, title, archived, template_origin FROM workflow_definitions \
-             WHERE company_id = $1 AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
+             WHERE company_id = $1 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id) AND ($2::text IS NULL OR (title, id) > ($2, $3)) \
              ORDER BY title, id LIMIT $4",
         )
         .bind(company.as_uuid())
@@ -410,7 +420,7 @@ impl WorkflowReads for PostgresPersistence {
     ) -> AppResult<Option<DefinitionDetail>> {
         let row: Option<(Uuid, i64, String, bool, Option<Value>, String, String)> = sqlx::query_as(
             "SELECT id, revision, title, archived, template_origin, description, source \
-                 FROM workflow_definitions WHERE company_id = $1 AND id = $2",
+                 FROM workflow_definitions WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)",
         )
         .bind(company.as_uuid())
         .bind(workflow.as_uuid())
@@ -455,7 +465,7 @@ impl WorkflowReads for PostgresPersistence {
     ) -> AppResult<Page<BindingSummary>> {
         let rows = sqlx::query_as::<_, BindingRow>(&format!(
             "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 \
-             AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
+             AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id) AND ($2::uuid IS NULL OR binding.id > $2) ORDER BY binding.id LIMIT $3"
         ))
         .bind(company.as_uuid())
         .bind(page.after)
@@ -474,7 +484,7 @@ impl WorkflowReads for PostgresPersistence {
         binding: WorkflowBindingId,
     ) -> AppResult<Option<BindingSummary>> {
         sqlx::query_as::<_, BindingRow>(&format!(
-            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2"
+            "SELECT {BINDING_COLUMNS} {BINDING_FROM} WHERE binding.company_id = $1 AND binding.id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=binding.company_id AND broker.workflow_binding_id=binding.id)"
         ))
         .bind(company.as_uuid())
         .bind(binding.as_uuid())
@@ -547,7 +557,12 @@ impl WorkflowReads for PostgresPersistence {
             .map(|row| {
                 Ok(BoardCount {
                     state: RunStateName::parse(&row.state).ok_or_else(invalid)?,
-                    channel: row.channel_id,
+                    target: association_from_columns(association::AssociationColumns {
+                        channel_id: row.channel_id,
+                        principal_id: row.principal_id,
+                        thread_id: None,
+                    })?
+                    .target(),
                     runs: u64::try_from(row.runs).map_err(|_| invalid())?,
                 })
             })
@@ -559,7 +574,7 @@ impl WorkflowReads for PostgresPersistence {
         company: CompanyId,
         scope: &RunBoardScope,
         cutoff: DateTime<Utc>,
-        visible: &VisibleChannels,
+        visible: &VisibleInboxes,
     ) -> AppResult<Vec<RunSummary>> {
         if visible.is_empty() {
             return Ok(Vec::new());

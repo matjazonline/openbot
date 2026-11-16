@@ -47,6 +47,7 @@ url = "2"
 pulldown-cmark = "0.13"
 ammonia = "4"
 base64 = "0.22"
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
 image = { version = "=0.25.10", default-features = false, features = ["png", "jpeg"] }
 ring = "0.17"
 p256 = { version = "0.13", features = ["ecdsa", "pem"] }
@@ -65,6 +66,8 @@ tokenizers = { version = "=0.23.2", default-features = false, features = ["onig"
 libc = "0.2"
 
 [dev-dependencies]
+# Already used by mail-auth; local DNS fixtures exercise its real SPF/DMARC verifier.
+hickory-resolver = "=0.24.4"
 tokio-rustls = { version = "=0.26.4", default-features = false, features = ["ring", "tls12"] }
 tokio-tungstenite = "=0.26.2"
 syn = { version = "=2.0.119", features = ["full", "visit"] }

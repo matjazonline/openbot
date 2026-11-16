@@ -681,7 +681,7 @@ impl WorkflowEngine {
         )
     }
 
-    fn for_tests_with_clients(
+    pub(crate) fn for_tests_with_clients(
         persistence: PostgresPersistence,
         integrations: Arc<dyn crate::application::integrations::ExecutionGateway>,
         client: Arc<dyn McpClient>,

@@ -1,0 +1,54 @@
+[
+  {
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "log": "B1-R1-final-format.txt"
+  },
+  {
+    "command": [
+      "git",
+      "diff",
+      "--check"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "log": "B1-R1-final-whitespace.txt"
+  },
+  {
+    "command": [
+      "cargo",
+      "check",
+      "--locked",
+      "--offline",
+      "--all-targets"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "log": "B1-R1-final-offline-all-targets.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/transport-boundary-check.sh"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "log": "B1-R1-final-transport-boundary.txt"
+  },
+  {
+    "command": [
+      "bash",
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "status": "PASS",
+    "exit": 0,
+    "log": "B1-R1-final-transport-fixtures.txt"
+  }
+]

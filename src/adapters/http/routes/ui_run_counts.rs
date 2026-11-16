@@ -76,7 +76,10 @@ impl Workspace {
             .iter()
             .map(|channel| channel.id)
             .collect::<Vec<_>>();
-        let snapshot = self.reader.run_counts(company_id, &ids).await?;
+        let snapshot = self
+            .reader
+            .run_counts(company_id, &ids, self.viewer.user_id)
+            .await?;
         Ok(pages::run_counts_fragment(&snapshot))
     }
 }

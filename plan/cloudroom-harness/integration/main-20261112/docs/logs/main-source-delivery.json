@@ -1,0 +1,12 @@
+{
+  "source_commit": "3d9ee7e031cb7edf77497ddf0fc39dcba83fe475",
+  "accepted_artifact": "a0aa542552ba808a17447d5c219eb6777ec00c9c0801550da8dc8329219b2554",
+  "inputs": [
+    "23eb638d609614cafe958bd6a5d17a4e9bef6463",
+    "103004a8ac2fd643cf14bde7e09022ae79f72053"
+  ],
+  "file_hashes_verified": 1213,
+  "source_push": "PASS",
+  "destination": "origin/main",
+  "delivery_records_follow": true
+}

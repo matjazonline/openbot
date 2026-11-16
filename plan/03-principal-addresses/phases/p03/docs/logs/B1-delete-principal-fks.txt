@@ -1,0 +1,18 @@
+agent_history_conversations | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+agent_history_sessions | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+background_tasks | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+channel_reply_contexts | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+channel_reply_settings | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+external_threads | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+internal_notes | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+message_deliveries | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+notifications | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+thread_messages | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+thread_principals | FOREIGN KEY (company_id, target_principal_id) REFERENCES principals(company_id, id)
+threads | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+workflow_admission_refusals | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+workflow_bindings | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE
+workflow_history_members | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+workflow_message_destinations | FOREIGN KEY (company_id, target_principal_id) REFERENCES principals(company_id, id)
+workflow_message_intents | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)
+workflow_runs | FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id)

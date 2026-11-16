@@ -12,8 +12,6 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
-use uuid::Uuid;
-
 use crate::{
     entities::{
         correlation::CorrelationId,
@@ -494,11 +492,11 @@ impl EmailThreading {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct EmailRelayTrace {
     /// The channel this mail goes out as, which is also the channel a recipient must not be.
-    pub source_channel_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
     /// Hops already taken. The renderer stamps `hop_count + 1`; ingress refuses beyond
     /// [`crate::transport::MAX_INGRESS_HOPS`].
     pub hop_count: u32,
-    pub trace_channels: Vec<Uuid>,
+    pub trace_targets: Vec<crate::entities::address::AddressTarget>,
 }
 
 /// A delivery with its destination resolved, ready for one transport's renderer.

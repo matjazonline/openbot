@@ -1,0 +1,12 @@
+{
+  "decision": "D2/r1 PASS (architecture only)",
+  "decision_sha256": "315d018f5d4a587c5ad590c2cc3da8d6366cf0581d7a7886555b76974c694b24",
+  "source_digest": "26c71787f442752d2de436e197dcb0da8b36c5eaeca73103d925508b65c31a62",
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "start_final_snapshots_equal": true,
+  "coordination_revision": 18,
+  "coordination_live_pin_equal": true,
+  "coordination_sha256": "2b21f656cef252ffb8952d5506b72dadaf8e793c7db254bb83e60096a22a2cef",
+  "reviewer_runtime_tests_executed": false,
+  "source_accepted": false
+}

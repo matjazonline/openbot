@@ -1,0 +1,16 @@
+{
+  "artifact": "3247c1f394f32bb86dea1a31f3f1856c0f805ed0c68329149217f9c72fa9230d",
+  "environment": {
+    "DATABASE_URL": "postgresql://mac02@127.0.0.1:52471/pa03_review_b1r2_20261115",
+    "TEST_DATABASE_URL": "postgresql://mac02@127.0.0.1:52471/pa03_review_b1r2_20261115",
+    "RUST_MIN_STACK": "16777216"
+  },
+  "binary": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda",
+  "binary_sha256": "b081214e693908d1041308365f4cc4cb876b653feb8afbd0e5b0ebf0ed07e008",
+  "command": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda relay_identity_ direct_company_teardown_removes_populated_agent_history_notes_and_transport direct_target_native_ agent_address_create_actual_default_binding_answers_a_direct_message --test-threads=1",
+  "migration_command": "cargo sqlx migrate run",
+  "migration_log": "B1-R2-reviewer-migration.txt",
+  "test_log": "B1-R2-reviewer-focused-tests.txt",
+  "result": "13 PASS /0 FAIL /0 ignored,114.81s",
+  "recording_note": "First metadata write attempted unavailable Python hashlib.file_digest; retried with streaming SHA256. No source or runtime test effect."
+}

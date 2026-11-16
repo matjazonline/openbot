@@ -24,12 +24,14 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         creation::CreationProvenance,
         transport::{
             BindingAccessPolicy, BindingAccessSnapshot, BindingAuditAction, BindingAuditEvent,
             BindingAuditEventId, BindingAuditMetadata, BindingChangeReason, BindingDeliveryPolicy,
             BindingStatus, ChannelBinding, ChannelBindingId, EndpointNamespace,
             ExternalEndpointKey, ExternalTenantKey, InstallationId, IntegrationInstallation,
+            PrincipalId,
         },
     },
 };
@@ -47,7 +49,7 @@ const BINDING_COLUMNS: &str = "\
     binding.id, binding.company_id, binding.channel_id, binding.installation_id, \
     binding.transport, binding.namespace, binding.external_endpoint_key, binding.display_label, \
     binding.access_policy, binding.delivery_policy, binding.status, binding.disabled_reason, \
-    binding.created_by, binding.access_snapshot, binding.created_at, binding.updated_at";
+    binding.created_by, binding.access_snapshot, binding.created_at, binding.updated_at, binding.principal_id";
 
 const AUDIT_EVENT_COLUMNS: &str = "\
     event.id, event.company_id, event.binding_id, event.action, event.reason, event.actor, \
@@ -141,7 +143,8 @@ impl TryFrom<InstallationDb> for IntegrationInstallation {
 struct BindingDb {
     id: Uuid,
     company_id: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     installation_id: Option<Uuid>,
     transport: String,
     namespace: String,
@@ -176,7 +179,13 @@ impl TryFrom<BindingDb> for ChannelBinding {
         Ok(Self {
             id: ChannelBindingId::new(row.id),
             company_id: row.company_id,
-            channel_id: row.channel_id,
+            target: AddressTarget::from_parts(
+                row.channel_id,
+                row.principal_id.map(PrincipalId::new),
+            )
+            .ok_or_else(|| {
+                AppError::Internal(format!("Invalid target on channel binding {}", row.id))
+            })?,
             installation_id: row.installation_id.map(InstallationId::new),
             transport: parsed(&row.transport, "channel_bindings.transport", row.id)?,
             namespace: bounded(

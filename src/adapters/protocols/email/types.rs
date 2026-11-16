@@ -33,7 +33,7 @@ pub const EMAIL_IDENTITY_NAMESPACE: &str = "email";
 /// What this leaves is exactly what a lookup has in hand:
 /// `(company_id, channel_slug)`. Inbound routing parses the host off and resolves the company
 /// before it can authorize anything anyway
-/// ([`EmailChannelSelectorParser`](super::EmailChannelSelectorParser)), and the display form stays
+/// ([`EmailAddressParser`](super::EmailAddressParser)), and the display form stays
 /// a rendering concern where `Channel::inbound_address` already builds it from all three parts.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct EmailEndpointKey(ExternalEndpointKey);

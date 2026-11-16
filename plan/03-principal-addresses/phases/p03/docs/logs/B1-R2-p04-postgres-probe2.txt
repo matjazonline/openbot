@@ -1,0 +1,1 @@
+PostgreSQL 18.7 (Homebrew) on aarch64-apple-darwin27.2.0, compiled by Apple clang version 21.0.0 (clang-2100.4.1.1), 64-bit|en_US.UTF-8|pg_stat_statements|top|off|0|0|100

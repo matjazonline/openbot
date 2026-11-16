@@ -69,10 +69,10 @@ fn intents(
             let slug = result
                 .channel_matches
                 .iter()
-                .find(|matched| matched.channel.id == intent.channel_id)
+                .find(|matched| matched.inbox.target() == intent.target)
                 .unwrap()
-                .channel
-                .slug
+                .inbox
+                .slug()
                 .to_string();
             (
                 slug,
@@ -142,7 +142,7 @@ async fn an_unmentioned_cc_address_still_gets_an_intent() {
     let billing = result
         .channel_matches
         .iter()
-        .find(|matched| matched.channel.slug == "billing")
+        .find(|matched| matched.inbox.slug().as_str() == "billing")
         .unwrap();
     assert_eq!(
         billing.inbound_message.canonical_id,

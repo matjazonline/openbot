@@ -42,7 +42,7 @@ async fn insert_candidate(
     sqlx::query("INSERT INTO message_deliveries (id,company_id,channel_id,message_id,source_binding_id,destination_binding_id, \
         external_destination,correlation_id,transport,purpose,idempotency_key,max_attempts,message_audience) \
         VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)")
-        .bind(delivery.id.as_uuid()).bind(delivery.company_id).bind(delivery.channel_id).bind(delivery.message_id.as_uuid())
+        .bind(delivery.id.as_uuid()).bind(delivery.company_id).bind(delivery.target.desk_id()).bind(delivery.message_id.as_uuid())
         .bind(delivery.source_binding_id.as_uuid()).bind(delivery.destination_binding_id.as_uuid())
         .bind(delivery.external_destination.as_ref().map(|destination|destination.as_str()))
         .bind(delivery.correlation_id.as_uuid()).bind(delivery.transport.as_str()).bind(delivery.purpose.as_str())
@@ -196,7 +196,12 @@ async fn channel_reply_publication_component_membership_checks_new_tenant_and_me
     let target_thread = case
         .f
         .p
-        .create_thread(channel, "Target", &[])
+        .create_thread(
+            case.f.s.fixture.target.company.as_uuid(),
+            crate::entities::address::AddressTarget::Desk(channel),
+            "Target",
+            &[],
+        )
         .await
         .unwrap()
         .id;
@@ -214,7 +219,12 @@ async fn channel_reply_publication_component_membership_checks_new_tenant_and_me
     assert_eq!(count, 1);
     let normal_thread = donor
         .p()
-        .create_thread(donor.channel, "Ordinary", &[])
+        .create_thread(
+            donor.fixture.target.company.as_uuid(),
+            crate::entities::address::AddressTarget::Desk(donor.channel),
+            "Ordinary",
+            &[],
+        )
         .await
         .unwrap()
         .id;

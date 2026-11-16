@@ -1,0 +1,12 @@
+[
+  {
+    "selection": "provisioning_dispatch_tests",
+    "exit": 101,
+    "log": "B1-builder-dispatch-tests1.txt"
+  },
+  {
+    "selection": "workflow_escalation_origin_actual_email_relay",
+    "exit": 101,
+    "log": "B1-relay-origin-tests4.txt"
+  }
+]

@@ -99,7 +99,7 @@ async fn asked_via(s: &Intents, ask: Ask, then: Then, park: bool) -> Asked {
                     "content":{"literal":{"body":"Shall we proceed?"}},
                     "source_message":{"literal":source.as_uuid().to_string()}}}),
                 RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(s.channel),
+                    target: crate::entities::address::AddressTarget::Desk(s.channel),
                     thread_id: RelatedThreadId::new(s.thread),
                 },
             )
@@ -256,9 +256,9 @@ async fn reply_from(s: &Intents, asked: &Asked, by: By, role: &str, origin: &str
     sqlx::query(
         "INSERT INTO workflow_message_intents (company_id, id, message_id, channel_id, thread_id, \
            role, mentioned, admissible, origin, reply_to_message_id, responder_principal_id, \
-           hop_count, trace_channels, delivery_policy, correlation_id) \
+           hop_count, trace_targets, delivery_policy, correlation_id) \
          SELECT $1, $2, message.id, $3, $4, $5, false, true, $9, $6, \
-           COALESCE($7, message.author_principal_id), 0, '{}', 'deliver', $2 \
+           COALESCE($7, message.author_principal_id), 0, '[]', 'deliver', $2 \
          FROM messages AS message WHERE message.company_id = $1 AND message.id = $8",
     )
     .bind(s.fixture.target.company.as_uuid())
@@ -294,7 +294,12 @@ async fn relayed_reply(s: &Intents, asked: &Asked, n: usize) -> CanonicalMessage
     let source = new_channel(&s.fixture, &format!("delegate-{n}")).await;
     let thread = s
         .p()
-        .create_thread(source, "Delegated", &[])
+        .create_thread(
+            s.fixture.target.company.as_uuid(),
+            crate::entities::address::AddressTarget::Desk(source),
+            "Delegated",
+            &[],
+        )
         .await
         .unwrap()
         .id;

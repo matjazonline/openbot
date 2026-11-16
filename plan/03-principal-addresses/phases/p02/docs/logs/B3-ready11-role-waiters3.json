@@ -1,0 +1,95 @@
+[
+  {
+    "seconds": 0.04,
+    "rows": []
+  },
+  {
+    "seconds": 0.17,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|active|||{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 0.75,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 0.88,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|||{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 1.02,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 1.15,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 1.43,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|Client|ClientRead|{}|f|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 1.56,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|active|Lock|transactionid|{85364}|t|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|Client|ClientRead|{}|t|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|active|Lock|tuple|{85258}|t|f|f",
+      "85391|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|t"
+    ]
+  },
+  {
+    "seconds": 2.69,
+    "rows": [
+      "85258|open_bots_own_7696743775654229901f5cd95310c6fa|active|Lock|transactionid|{85364}|t|f|f",
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|Client|ClientRead|{}|t|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85366|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85368|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|f",
+      "85391|open_bots_own_7696743775654229901f5cd95310c6fa|idle|Client|ClientRead|{}|f|f|t"
+    ]
+  },
+  {
+    "seconds": 6.62,
+    "rows": [
+      "85364|open_bots_own_7696743775654229901f5cd95310c6fa|idle in transaction|LWLock|PgStatsData|{}|t|f|f",
+      "85365|open_bots_own_7696743775654229901f5cd95310c6fa|idle|||{}|f|f|f"
+    ]
+  },
+  {
+    "seconds": 6.77,
+    "rows": []
+  }
+]

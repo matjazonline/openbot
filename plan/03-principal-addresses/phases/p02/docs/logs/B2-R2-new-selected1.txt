@@ -1,0 +1,4 @@
+adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_actual_audit_payload_refuses_diagnostics
+adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_exact_message_activity_refuses_cached_body
+adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_full_mailbox_activity_refuses_cached_body
+adapters::http::routes::ui::stream_tests::direct_tests::revocation::direct_thread_ui_revocation_during_post_reply_activity_refuses_cached_body

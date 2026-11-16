@@ -128,6 +128,7 @@ async fn agent_setup_source(
     )
     .await
     .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(p, &agent).await;
     CompanyPersistence::replace_model_connections_for_user(
         p,
         fixture.target.actor.user_id(),
@@ -435,6 +436,7 @@ async fn workflow_agent_capability_writers_preserve_unsupplied_lists() {
         .unwrap();
     assert!(stored(setup.agent).await.is_empty());
     let write = |required: Option<Vec<TypeName>>| SkillWrite {
+        files: None,
         slug: "support".into(),
         name: "Support".into(),
         description: "Support policy".into(),

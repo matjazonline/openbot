@@ -1,0 +1,152 @@
+{
+  "artifact": "ef03b7ee614b9e72f0aa3b287a9c086527950b5e5851bb43831bf090bd17d00a",
+  "coordination_revision": 3,
+  "external_targets": [
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r2",
+      "count": 58,
+      "mismatches": []
+    },
+    {
+      "root": "/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom-replay-b3-r5-verify",
+      "count": 58,
+      "mismatches": []
+    }
+  ],
+  "probes": [
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-origin-probe.cjs",
+      "sha256": "a1dc83c19ad8d195f3319774355d93b878d05c3b5cc0e8559342707cf0b77bf4"
+    },
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-origin-probe.txt",
+      "sha256": "37644aafec7c65241b73eef67d0361190f61d339d4dc55dba6a62f4742bc9d7e"
+    },
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-refusal-probe.cjs",
+      "sha256": "10532d1a86076cee1b3d45760a3cbbcd54b33c46113e455ccf4552501b94a947"
+    },
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-refusal-probe.ts",
+      "sha256": "fa5a272d9bfd825366d449238d30317529357bcbc4e3726722566e85d39363d9"
+    },
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-refusal-probe.txt",
+      "sha256": "e6dc4ea609a64811c47c3f55e091405ccedf18b85ca689bcb83b5707f86489b7"
+    },
+    {
+      "path": "logs/CH-P01-B3-R2-reviewer-custody.txt",
+      "sha256": "6c12dfd80d2ff0aeb85f12b1b7ab5ddec9b94d582e370497b5bef8f65be4fdab"
+    }
+  ],
+  "R19_transitions": [
+    {
+      "index": 0,
+      "at": "2026-11-12T02:33:00.486890Z",
+      "state": "queued",
+      "live": true,
+      "machine_owner": true,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 15,
+      "at": "2026-11-12T02:33:01.803738Z",
+      "state": "running",
+      "live": true,
+      "machine_owner": true,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 20,
+      "at": "2026-11-12T02:33:02.118535Z",
+      "state": "waiting",
+      "live": true,
+      "machine_owner": true,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 325,
+      "at": "2026-11-12T02:33:18.535697Z",
+      "state": "waiting",
+      "live": false,
+      "machine_owner": false,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 327,
+      "at": "2026-11-12T02:33:18.640864Z",
+      "state": "cancelled",
+      "live": false,
+      "machine_owner": false,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 337,
+      "at": "2026-11-12T02:33:19.176640Z",
+      "state": "cancelled",
+      "live": true,
+      "machine_owner": true,
+      "outcome": null,
+      "turn": "running",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 359,
+      "at": "2026-11-12T02:33:20.347032Z",
+      "state": "cancelled",
+      "live": false,
+      "machine_owner": true,
+      "outcome": "succeeded",
+      "turn": "completed",
+      "cancel": false,
+      "revision_live": true
+    },
+    {
+      "index": 367,
+      "at": "2026-11-12T02:33:20.772605Z",
+      "state": "cancelled",
+      "live": false,
+      "machine_owner": false,
+      "outcome": "succeeded",
+      "turn": "completed",
+      "cancel": false,
+      "revision_live": true
+    }
+  ],
+  "R20_disconnect": {
+    "reason": "connection_lost",
+    "receivedFrames": 72,
+    "windowMs": 30005
+  },
+  "R21_audit": {
+    "status": "PASS",
+    "approvalHoldMs": 65100,
+    "samples": 1250,
+    "activeSamples": 1229,
+    "allActiveSourceLive": true,
+    "ownerGapsDuringActiveCall": 0,
+    "minMachineSeconds": 37.410398,
+    "limitations": "actual pinned CLI/loaded plugin/PG/worker/gateway, local scripted Messages and MCP; no paid provider inference"
+  }
+}

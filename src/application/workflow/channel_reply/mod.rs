@@ -18,7 +18,7 @@ mod origin_tests;
 pub use approval::{ReplyApprovalPolicy, ReplyReviewTimeout};
 pub use contract::{ChannelReplyContract, ReplyReference, ReplyText};
 
-use super::{RelatedChannelId, WorkflowActor};
+use super::WorkflowActor;
 use crate::app_error::AppResult;
 use crate::domain::workflow::{
     BindingRevision, BindingStateRevision, CompanyId, WorkflowBindingId,
@@ -71,7 +71,7 @@ pub struct ConfigureResponder {
 
 pub struct ConfigureChannelReply {
     pub company: CompanyId,
-    pub channel: RelatedChannelId,
+    pub target: crate::entities::address::AddressTarget,
     pub actor: WorkflowActor,
     pub expected: Option<ReplySettingsRevision>,
     pub responder: Option<ConfigureResponder>,
@@ -86,7 +86,7 @@ pub trait ChannelReplies: Send + Sync {
     async fn channel_reply_settings(
         &self,
         company: CompanyId,
-        channel: RelatedChannelId,
+        target: crate::entities::address::AddressTarget,
         actor: WorkflowActor,
     ) -> AppResult<Option<ChannelReplySettings>>;
     async fn configure_channel_reply(

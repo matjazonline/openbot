@@ -57,18 +57,25 @@ async fn create_thread_on(
     let Some(thread) = &destination.new_thread else {
         return Ok(());
     };
-    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject) VALUES ($1,$2,$3,$4)")
+    sqlx::query("INSERT INTO threads (id, company_id, channel_id, subject, principal_id) VALUES ($1,$2,$3,$4,$5)")
         .bind(thread.id)
         .bind(company.as_uuid())
-        .bind(thread.channel_id)
+        .bind(thread.target.desk_id())
         .bind(&thread.subject)
+        .bind(thread.target.principal_id().map(|id| id.as_uuid()))
         .execute(&mut *db)
         .await?;
-    // A member's send opens its own thread; the recipient belongs to exactly that thread.
-    if let (DestinationKind::User, Some(principal)) = (destination.kind, destination.principal_id) {
-        sqlx::query("INSERT INTO thread_principals (company_id, channel_id, thread_id, principal_id, role) VALUES ($1,$2,$3,$4,'participant')")
-            .bind(company.as_uuid()).bind(thread.channel_id).bind(thread.id).bind(principal)
-            .execute(db).await?;
+    let mut participants = Vec::new();
+    if destination.kind == DestinationKind::User {
+        participants.extend(destination.principal_id);
+    }
+    participants.extend(thread.target.principal_id().map(|id| id.as_uuid()));
+    participants.sort_unstable();
+    participants.dedup();
+    for principal in participants {
+        sqlx::query("INSERT INTO thread_principals (company_id,channel_id,thread_id,principal_id,role,target_principal_id) VALUES ($1,$2,$3,$4,'participant',$5)")
+            .bind(company.as_uuid()).bind(thread.target.desk_id()).bind(thread.id).bind(principal)
+            .bind(thread.target.principal_id().map(|id| id.as_uuid())).execute(&mut *db).await?;
     }
     Ok(())
 }
@@ -93,7 +100,7 @@ pub(in crate::adapters::persistence::workflow) async fn recheck_routes_on(
                 email,
                 sender,
             } => {
-                channel_exists_on(tx, company, *sender).await?
+                target_exists_on(tx, company, *sender).await?
                     && member_on(tx, company, *user, true)
                         .await?
                         .is_some_and(|member| {
@@ -103,15 +110,17 @@ pub(in crate::adapters::persistence::workflow) async fn recheck_routes_on(
             RouteCheck::Source {
                 source,
                 thread,
-                channel,
+                target,
             } => sqlx::query_scalar::<_, bool>(
                 "SELECT EXISTS(SELECT 1 FROM thread_messages WHERE company_id=$1 AND message_id=$2 \
-                   AND thread_id=$3 AND channel_id=$4 FOR KEY SHARE)",
+                   AND thread_id=$3 AND channel_id IS NOT DISTINCT FROM $4::uuid \
+                   AND principal_id IS NOT DISTINCT FROM $5::uuid FOR KEY SHARE)",
             )
             .bind(company.as_uuid())
             .bind(source.as_uuid())
             .bind(thread)
-            .bind(channel)
+            .bind(target.desk_id())
+            .bind(target.principal_id().map(|id| id.as_uuid()))
             .fetch_one(&mut *tx)
             .await?,
         };
@@ -137,4 +146,17 @@ async fn channel_exists_on(
     .fetch_optional(&mut *tx)
     .await?
     .is_some())
+}
+
+async fn target_exists_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    target: AddressTarget,
+) -> AppResult<bool> {
+    match target {
+        AddressTarget::Desk(id) => channel_exists_on(tx, company, id).await,
+        AddressTarget::Principal(id) => Ok(sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM principals WHERE company_id=$1 AND id=$2 AND kind='agent' FOR KEY SHARE",
+        ).bind(company.as_uuid()).bind(id.as_uuid()).fetch_optional(tx).await?.is_some()),
+    }
 }

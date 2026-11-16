@@ -36,8 +36,6 @@ use crate::{
     use_cases::{channel::ChannelUseCases, company::CompanyUseCases, thread::ThreadUseCases},
 };
 
-use super::ui::load_viewable_channel;
-
 /// Nothing an attachment is served with may be guessed at by the browser, and nothing may be kept.
 const NO_SNIFF: (&str, &str) = ("x-content-type-options", "nosniff");
 
@@ -55,14 +53,15 @@ pub fn router() -> Router<AppState> {
 #[derive(Debug, Clone, Deserialize)]
 pub struct AttachmentQuery {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    #[serde(flatten)]
+    pub inbox: super::ui::InboxSelection,
 }
 
 /// GET /ui/threads/{thread_id}/attachments/{sha256} - One attachment of one thread (Protected).
 #[instrument(skip_all)]
 pub(super) async fn download_attachment(
     State(company_use_cases): State<Arc<CompanyUseCases>>,
-    State(channel_use_cases): State<Arc<ChannelUseCases>>,
+    State(_channel_use_cases): State<Arc<ChannelUseCases>>,
     State(thread_use_cases): State<Arc<ThreadUseCases>>,
     State(storage): State<Option<Arc<dyn FileStorage>>>,
     viewer: Viewer,
@@ -70,17 +69,17 @@ pub(super) async fn download_attachment(
     Query(query): Query<AttachmentQuery>,
 ) -> AppResult<Response> {
     // The same two guards the mailbox opens a thread with. Nothing here decides access on its own.
-    let (_, channel) = load_viewable_channel(
+    let (_, channel) = super::ui::inbox::load_viewable_inbox(
         &company_use_cases,
-        &channel_use_cases,
+        &thread_use_cases,
         &viewer,
         query.company_id,
-        query.channel_id,
+        query.inbox,
     )
     .await?;
 
     let thread = thread_use_cases
-        .readable_thread(&viewer, channel.company_id, channel.id, thread_id)
+        .readable_thread(&viewer, channel.company_id(), channel.target(), thread_id)
         .await?
         .ok_or_else(missing)?;
 

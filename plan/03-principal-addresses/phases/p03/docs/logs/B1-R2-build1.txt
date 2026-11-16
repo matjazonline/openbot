@@ -1,0 +1,73 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0433]: cannot find `AgentId` in `workflow`
+   --> src/adapters/persistence/workflow/relay_authority_race_tests.rs:112:53
+    |
+112 |                     agent: crate::domain::workflow::AgentId::new(f.case.created.agent.id),
+    |                                                     ^^^^^^^ could not find `AgentId` in `workflow`
+    |
+help: consider importing this struct
+    |
+  2 + use crate::entities::agent_capability::AgentId;
+    |
+help: if you import `AgentId`, refer to it directly
+    |
+112 -                     agent: crate::domain::workflow::AgentId::new(f.case.created.agent.id),
+112 +                     agent: AgentId::new(f.case.created.agent.id),
+    |
+
+error[E0308]: mismatched types
+  --> src/adapters/persistence/workflow/relay_authority_race_tests.rs:81:31
+   |
+81 |                         slug: old.slug,
+   |                               ^^^^^^^^ expected `String`, found `ChannelSlug`
+   |
+help: try using a conversion method
+   |
+81 |                         slug: old.slug.to_string(),
+   |                                       ++++++++++++
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+  --> src/adapters/persistence/workflow/relay_authority_race_tests.rs:76:17
+   |
+76 |                   ChannelPersistence::update(
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^
+77 |                       &p,
+78 |                       desk,
+   |                       ---- expected `ChannelUpdate`, found `Uuid`
+79 | /                     ChannelWrite {
+80 | |                         name: old.name,
+81 | |                         slug: old.slug,
+82 | |                         enabled: false,
+83 | |                         ..Default::default()
+84 | |                     },
+   | |_____________________- unexpected argument #3 of type `application::ports::channel::ChannelWrite`
+   |
+note: method defined here
+  --> src/application/ports/channel.rs:94:14
+   |
+94 |     async fn update(&self, request: ChannelUpdate) -> AppResult<Channel>;
+   |              ^^^^^^        -------
+help: remove the extra argument
+   |
+78 -                     desk,
+79 -                     ChannelWrite {
+80 -                         name: old.name,
+81 -                         slug: old.slug,
+82 -                         enabled: false,
+83 -                         ..Default::default()
+84 -                     },
+78 +                     /* ChannelUpdate */,
+   |
+
+error[E0599]: no method named `as_database_error` found for struct `std::string::String` in the current scope
+  --> src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs:71:14
+   |
+70 | /         error
+71 | |             .as_database_error()
+   | |             -^^^^^^^^^^^^^^^^^ method not found in `std::string::String`
+   | |_____________|
+   |
+
+Some errors have detailed explanations: E0061, E0308, E0433, E0599.
+For more information about an error, try `rustc --explain E0061`.
+error: could not compile `open_bots` (lib test) due to 4 previous errors

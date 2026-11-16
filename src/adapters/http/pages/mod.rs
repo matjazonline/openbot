@@ -31,7 +31,7 @@ fn parse_platform_address(
     value: &str,
     app_domain_name: &str,
 ) -> Option<(crate::entities::value_objects::CompanySlug, String)> {
-    crate::adapters::protocols::email::EmailChannelSelectorParser::new(app_domain_name)
+    crate::adapters::protocols::email::EmailAddressParser::new(app_domain_name)
         .parse_platform_address(value)
 }
 

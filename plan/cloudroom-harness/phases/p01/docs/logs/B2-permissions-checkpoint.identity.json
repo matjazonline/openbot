@@ -1,0 +1,13 @@
+{
+  "status": "INCOMPLETE B2; source not reviewed/accepted",
+  "digest": "6c782bc816a757c5790ebc6a639529d1fdae0bd9df63f21a51fe5b43a5ec736f",
+  "base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "architecture": "CH-P01-M2/r2",
+  "architecture_sha256": "08357154aecaa1b044a42688a0f25230eff0e7ca2f9ca56d7bb7989889be9403",
+  "coordination_revision": 1,
+  "snapshot_exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "created_at_utc": "2026-11-10T22:19:25.031115+00:00"
+}

@@ -7,7 +7,7 @@ pub(super) async fn read_draft(
 ) -> AppResult<Option<DraftState>> {
     sqlx::query_as::<_, DraftRow>(&format!(
         "SELECT {DRAFT_COLUMNS} FROM workflow_definitions \
-        WHERE company_id = $1 AND id = $2"
+        WHERE company_id = $1 AND id = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_definitions.company_id AND broker.workflow_id=workflow_definitions.id)"
     ))
     .bind(company.as_uuid())
     .bind(workflow.as_uuid())
@@ -23,7 +23,7 @@ async fn read_publication(
 ) -> AppResult<Option<PublishedCommand>> {
     sqlx::query_as::<_, VersionRow>(&format!(
         "SELECT {VERSION_COLUMNS} FROM workflow_versions \
-        WHERE company_id = $1 AND command_key = $2"
+        WHERE company_id = $1 AND command_key = $2 AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)"
     ))
     .bind(company.as_uuid())
     .bind(key.as_str())
@@ -59,11 +59,12 @@ async fn event(
 async fn insert_draft(
     tx: &mut Transaction<'_, Postgres>,
     draft: &CompanyWorkflowDraft,
+    owner_agent: Option<Uuid>,
 ) -> AppResult<()> {
     sqlx::query(
         "INSERT INTO workflow_definitions \
-        (company_id, id, revision, title, description, source, template_origin) \
-        VALUES ($1, $2, $3, $4, $5, $6, $7)",
+        (company_id, id, revision, title, description, source, template_origin, owner_agent_id) \
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
     )
     .bind(draft.company().as_uuid())
     .bind(draft.workflow().as_uuid())
@@ -72,6 +73,7 @@ async fn insert_draft(
     .bind(draft.description())
     .bind(draft.source())
     .bind(origin_json(draft)?)
+    .bind(owner_agent)
     .execute(&mut **tx)
     .await
     .map_err(write_error)?;
@@ -84,7 +86,7 @@ impl WorkflowDraftCopies for PostgresPersistence {
         let mut tx = self.pool.begin().await?;
         let draft = copy.draft();
         authorize_company(&mut tx, draft.company(), copy.actor()).await?;
-        insert_draft(&mut tx, draft).await?;
+        insert_draft(&mut tx, draft, None).await?;
         event(&mut tx, draft, copy.actor(), "copied", None).await?;
         tx.commit().await?;
         Ok(())
@@ -117,7 +119,7 @@ impl WorkflowDefinitions for PostgresPersistence {
             WHERE company_id = $1 AND id = $2 AND EXISTS \
             (SELECT 1 FROM workflow_definitions AS definition \
              WHERE definition.company_id = workflow_versions.company_id \
-               AND definition.id = workflow_versions.workflow_id AND NOT definition.archived)"
+               AND definition.id = workflow_versions.workflow_id AND NOT definition.archived) AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker WHERE broker.company_id=workflow_versions.company_id AND broker.version_id=workflow_versions.id)"
         );
         sqlx::query_as::<_, VersionRow>(&query)
             .bind(company.as_uuid())
@@ -208,12 +210,15 @@ pub(super) async fn save_draft_on(
     archived: bool,
 ) -> AppResult<()> {
     match expected {
-        None => insert_draft(tx, draft).await?,
+        None => insert_draft(tx, draft, None).await?,
         Some(expected) => {
             let count = sqlx::query(
                 "UPDATE workflow_definitions SET revision = $3, title = $4, \
                 description = $5, source = $6, archived = $7 \
-                WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived",
+                WHERE company_id = $1 AND id = $2 AND revision = $8 AND NOT archived \
+                  AND NOT EXISTS(SELECT 1 FROM native_mcp_brokers AS broker \
+                    WHERE broker.company_id=workflow_definitions.company_id \
+                      AND broker.workflow_id=workflow_definitions.id)",
             )
             .bind(draft.company().as_uuid())
             .bind(draft.workflow().as_uuid())
@@ -247,8 +252,9 @@ pub(super) async fn insert_draft_on(
     draft: &CompanyWorkflowDraft,
     actor: WorkflowActor,
     kind: &str,
+    owner_agent: Option<Uuid>,
 ) -> AppResult<()> {
-    insert_draft(tx, draft).await?;
+    insert_draft(tx, draft, owner_agent).await?;
     event(tx, draft, actor, kind, None).await
 }
 

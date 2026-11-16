@@ -6,17 +6,9 @@ use crate::application::workflow::guard::{
 };
 
 async fn enable_handler_escalation(f: &AgentCase) {
-    own_default_desk(f).await;
+    assert_handler_department(f).await;
     let p = f.people.role.p();
-    let binding: Uuid = sqlx::query_scalar(
-        "SELECT (result->>'binding_id')::uuid FROM workflow_provisioning_commands \
-         WHERE company_id=$1 AND command_key=$2",
-    )
-    .bind(f.people.role.company().as_uuid())
-    .bind(crate::adapters::persistence::company_agent::default_desk_key(f.created.agent.id))
-    .fetch_one(p.pool())
-    .await
-    .unwrap();
+    let binding = handler_binding(f).await;
     let state = p
         .binding(f.people.role.company(), WorkflowBindingId::new(binding))
         .await
@@ -41,7 +33,7 @@ async fn enable_handler_escalation(f: &AgentCase) {
         .binding
         .request(Some(state.revision));
     request.target.binding = WorkflowBindingId::new(binding);
-    request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+    request.association = RelatedAssociation::Principal(f.created.principal_id);
     request.version = VersionId::new(row.version_id);
     request.params = row.params;
     request.resources = serde_json::from_value(row.resources).unwrap();
@@ -72,17 +64,17 @@ pub(super) async fn select_handler_revision(
     };
     let p = f.people.role.p();
     let company = f.people.role.company();
-    let channel = RelatedChannelId::new(f.created.desk_id);
+    let target = AddressTarget::Principal(f.created.principal_id);
     let actor = f.people.role.admission.binding.target.actor;
     let settings = p
-        .channel_reply_settings(company, channel, actor)
+        .channel_reply_settings(company, target, actor)
         .await
         .unwrap()
         .unwrap();
     let responder = settings.responder.unwrap();
     p.configure_channel_reply(ConfigureChannelReply {
         company,
-        channel,
+        target,
         actor,
         expected: Some(settings.revision),
         responder: Some(ConfigureResponder {

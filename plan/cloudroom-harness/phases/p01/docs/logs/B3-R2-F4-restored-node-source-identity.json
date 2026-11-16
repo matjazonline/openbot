@@ -1,0 +1,12 @@
+[
+  {
+    "file": "integrations/cloudroom-plugin/src/connector.ts",
+    "unchanged": true,
+    "sha256": "34092f79162adb5baf673efd78b005b68d502d75c841dfa05084758173520930"
+  },
+  {
+    "file": "integrations/cloudroom-plugin/src/server.ts",
+    "unchanged": true,
+    "sha256": "12fd895798e1e1242bb84abdf02ae957ea17f653442dd37b235a2ce19d51303a"
+  }
+]

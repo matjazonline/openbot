@@ -1,0 +1,6 @@
+
+> bb-plugin-openbot-local@0.2.0 typecheck
+> tsc --noEmit
+
+test/native-bundle.test.ts(128,55): error TS2345: Argument of type '{ kind: "turn"; thread_id: string; turn_id: string; state: "completed"; output: string; }' is not assignable to parameter of type '{ kind: "receipt"; } | { kind: "submission_intent"; } | { kind: "submission"; thread_id: string; state: "queued" | "missing" | "accepted"; } | { kind: "refused"; reason: "expired" | "project_unavailable" | ... 5 more ... | "recovery_required"; } | { ...; } | { ...; }'.
+  Type '{ kind: "turn"; thread_id: string; turn_id: string; state: "completed"; output: string; }' is missing the following properties from type '{ kind: "turn"; thread_id: string; turn_id: string; state: "queued" | "running" | "waiting_for_input" | "completed" | "failed" | "stopped" | "missing"; output: string | null; truncated: boolean; usage: { ...; } | null; }': truncated, usage

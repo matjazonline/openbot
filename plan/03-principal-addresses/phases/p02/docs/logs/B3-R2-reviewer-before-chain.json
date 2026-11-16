@@ -1,0 +1,85 @@
+[
+  {
+    "path": "migrations/20260817000000_init_schema.sql",
+    "basis": "independently verified R1 delta hash",
+    "before_sha256": "2704e822b8a2f5fa53b483815313a52b94a8d96d15258da2f7f076a579ef4838"
+  },
+  {
+    "path": "src/adapters/http/pages/deliveries.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "ce80d4e3418efe6cad295ca3719fa66ed81c93a433d51ba956fa97db53644d43"
+  },
+  {
+    "path": "src/adapters/http/pages/tests.rs",
+    "basis": "accepted B2 archive unchanged in R1",
+    "before_sha256": "2fd414ffe85184aadc68693db84885c1c8435bb49aad2a96ab432dd55c6ecc32"
+  },
+  {
+    "path": "src/adapters/http/routes/ui_deliveries.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "131a5d9709f62a330dd132bc96753c048d5eafded238581df4295e0dda5b0ee1"
+  },
+  {
+    "path": "src/adapters/persistence/delivery/mod.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "2500105d27a65d84877c32bc2e4a49828fb73b1ad8ac85bd876f2fe5eb39cd2d"
+  },
+  {
+    "path": "src/adapters/persistence/delivery/read.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "e359fc0b6c1284bb548d9236836e73b9bcfc7691aab0c6d8d4d5058e4c207b86"
+  },
+  {
+    "path": "src/adapters/persistence/test_support.rs",
+    "basis": "independently verified R1 delta hash",
+    "before_sha256": "df7e16b670f1f1f7cdcd4d2afc06a20c9b92858f6aa3187439086bda6663b5a0"
+  },
+  {
+    "path": "src/adapters/persistence/view_visibility.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "b4b20981f7d6d36f12c7a3a86f234b0989cb0230901c3259acfc148567ec0302"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs",
+    "basis": "new path"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_delivery_tests.rs",
+    "basis": "new path"
+  },
+  {
+    "path": "src/adapters/persistence/workflow/direct_workflow_tests.rs",
+    "basis": "independently verified R1 delta hash",
+    "before_sha256": "298e86745c9bbac590abe31676681cb02aad4c2294ada0ba5a95386f844badb6"
+  },
+  {
+    "path": "src/adapters/protocols/email/egress_tests.rs",
+    "basis": "independently verified R1 delta hash",
+    "before_sha256": "04c7ad18123155c2110061e569d270ad8ee4cff7886fed19da1978c496441178"
+  },
+  {
+    "path": "src/application/services/delivery_worker_tests.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "1f384e5fa5c56df0719bc317382c9016813af7bc256d027b5eb026939627a533"
+  },
+  {
+    "path": "src/application/transport/queue.rs",
+    "basis": "independently verified R1 delta hash",
+    "before_sha256": "0fa3b154caefd32422a9f0b3ac596d74b0bdad78054836929b2c235f0b98efbe"
+  },
+  {
+    "path": "src/application/transport/tests.rs",
+    "basis": "accepted B2 archive unchanged in R1",
+    "before_sha256": "24aa4135214bfe6973959bbbb48079aae21c04fe114340b1ef540305670dc877"
+  },
+  {
+    "path": "src/application/use_cases/delivery.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "6d119d653175ce24451860e3ba46e65f427dfb4409826822c33c71d4629d7fb1"
+  },
+  {
+    "path": "src/domain/entities/delivery.rs",
+    "basis": "HEAD unchanged through B2/R1",
+    "before_sha256": "19495014604545bbf09d9b8622ba847fcb90db8cb8c8ba6e11d7cbebd0fba4fd"
+  }
+]

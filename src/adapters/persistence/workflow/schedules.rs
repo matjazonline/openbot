@@ -266,7 +266,9 @@ async fn check_binding(
     Ok(match state.association {
         RelatedAssociation::Company => None,
         RelatedAssociation::Channel(bound) => Some(bound.as_uuid()),
-        RelatedAssociation::Thread { channel_id, .. } => Some(channel_id.as_uuid()),
+        RelatedAssociation::Thread { .. } | RelatedAssociation::Principal(_) => {
+            return Err(invalid());
+        }
     })
 }
 
@@ -580,7 +582,7 @@ impl SchedulePersistence for PostgresPersistence {
                AND configuration.binding_id = binding.id AND configuration.revision = binding.configuration_revision \
              JOIN workflow_versions AS version ON version.company_id = binding.company_id \
                AND version.id = configuration.version_id \
-             WHERE binding.company_id = $1 AND binding.thread_id IS NULL \
+             WHERE binding.company_id = $1 AND binding.thread_id IS NULL AND binding.principal_id IS NULL \
                AND ($2::uuid IS NULL OR binding.channel_id IS NULL OR binding.channel_id = $2) \
              ORDER BY version.title, binding.id",
         )

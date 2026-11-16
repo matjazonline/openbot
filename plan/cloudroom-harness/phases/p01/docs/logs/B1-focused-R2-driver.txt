@@ -1,0 +1,25 @@
+{"starting": "format", "command": ["cargo", "fmt", "--all"]}
+{"name": "format", "command": ["cargo", "fmt", "--all"], "exit": 0, "elapsed_s": 3.919, "log": "B1-focused-R2-format.txt"}
+{"starting": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"]}
+{"name": "offline-alltargets", "command": ["cargo", "check", "--locked", "--offline", "--all-targets"], "exit": 0, "elapsed_s": 26.548, "log": "B1-focused-R2-offline-alltargets.txt"}
+{"starting": "skill-bundles", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill_bundle"]}
+{"name": "skill-bundles", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill_bundle"], "exit": 101, "elapsed_s": 113.39, "log": "B1-focused-R2-skill-bundles.txt"}
+{"starting": "archives", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill_archive"]}
+{"name": "archives", "command": ["cargo", "test", "--locked", "--offline", "--lib", "skill_archive"], "exit": 0, "elapsed_s": 0.842, "log": "B1-focused-R2-archives.txt"}
+{"starting": "skill-persistence", "command": ["cargo", "test", "--locked", "--offline", "--lib", "adapters::persistence::skill::tests"]}
+{"name": "skill-persistence", "command": ["cargo", "test", "--locked", "--offline", "--lib", "adapters::persistence::skill::tests"], "exit": 0, "elapsed_s": 0.65, "log": "B1-focused-R2-skill-persistence.txt"}
+{"starting": "frozen-skills", "command": ["cargo", "test", "--locked", "--offline", "--lib", "agent_publication::tests::skills"]}
+{"name": "frozen-skills", "command": ["cargo", "test", "--locked", "--offline", "--lib", "agent_publication::tests::skills"], "exit": 0, "elapsed_s": 0.764, "log": "B1-focused-R2-frozen-skills.txt"}
+{"starting": "skill-usecases", "command": ["cargo", "test", "--locked", "--offline", "--lib", "application::use_cases::skill::tests"]}
+{"name": "skill-usecases", "command": ["cargo", "test", "--locked", "--offline", "--lib", "application::use_cases::skill::tests"], "exit": 0, "elapsed_s": 1.063, "log": "B1-focused-R2-skill-usecases.txt"}
+{"starting": "source-modules", "command": ["cargo", "test", "--locked", "--offline", "--test", "source_modules"]}
+{"name": "source-modules", "command": ["cargo", "test", "--locked", "--offline", "--test", "source_modules"], "exit": 0, "elapsed_s": 51.513, "log": "B1-focused-R2-source-modules.txt"}
+{"starting": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"]}
+{"name": "browser-fixtures", "command": ["cargo", "test", "--locked", "--offline", "--lib", "dump_skill_bundle_browser_fixtures", "--", "--ignored"], "exit": 0, "elapsed_s": 0.893, "log": "B1-focused-R2-browser-fixtures.txt"}
+{"starting": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"]}
+{"name": "browser", "command": ["node", "--test", "scripts/tests/skill-bundle-browser.mjs"], "exit": 0, "elapsed_s": 1.693, "log": "B1-focused-R2-browser.txt"}
+{"starting": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"]}
+{"name": "clippy", "command": ["cargo", "clippy", "--locked", "--offline", "--all-targets", "--", "-D", "warnings"], "exit": 0, "elapsed_s": 46.21, "log": "B1-focused-R2-clippy.txt"}
+{"starting": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"]}
+{"name": "sqlx-prepare-check", "command": ["cargo", "sqlx", "prepare", "--check", "--", "--all-targets"], "exit": 0, "elapsed_s": 21.389, "log": "B1-focused-R2-sqlx-prepare-check.txt"}
+{"completed": 12, "failures": ["skill-bundles"]}

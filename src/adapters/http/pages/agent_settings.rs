@@ -6,6 +6,9 @@
 //! list along out of band, so a rename or a delete shows up immediately.
 
 use super::*;
+use crate::entities::skill::SkillSummary;
+
+#[cfg(test)]
 use crate::entities::skill::Skill;
 
 /// Client-side behaviour this workspace adds on top of [`MAILBOX_SCRIPT`].
@@ -71,6 +74,7 @@ pub struct AgentDraft<'a> {
     pub slug: &'a str,
     /// The written system prompt in Advanced mode; the instructions to expand in Simple mode.
     pub system_prompt: &'a str,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// One line on what this agent is for, shown to sibling agents by the directory tool.
     pub description: &'a str,
     pub provider: &'a str,
@@ -83,6 +87,8 @@ pub struct AgentDraft<'a> {
     pub advanced: bool,
     pub expected_revision: Option<crate::entities::agent_capability::AgentDraftRevision>,
     pub tool_assignments: Option<&'a str>,
+    pub open_to_public: bool,
+    pub confirm_spam_disabled: bool,
 }
 
 /// The settings pane for an agent that already exists.
@@ -102,7 +108,7 @@ pub struct AgentEditPane<'a> {
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AgentCapabilityOptions<'a> {
-    pub skills: &'a [Skill],
+    pub skills: &'a [SkillSummary],
 }
 
 /// Which of the create pane's forms opens.
@@ -361,14 +367,14 @@ fn agent_placement_card(
     company_id: Uuid,
     entry: &crate::application::agent::AgentDirectoryEntry,
 ) -> String {
-    let desk = match &entry.desk {
-        Some(desk) => format!(
-            r#"<p class="text-sm">Mail to <code id="agent-default-desk" class="font-mono">{address}</code> reaches this agent's own desk, created with the agent.</p>
-            <a class="btn btn-ghost btn-sm" href="/ui/channels?company_id={company_id}&amp;channel_id={id}">Open desk settings</a>"#,
-            address = escape_html_text(&desk.address),
-            id = desk.id,
+    let desk = match &entry.address {
+        Some(address) => format!(
+            r#"<p class="text-sm">Mail to <code id="agent-direct-address" class="font-mono">{address}</code> reaches this agent's direct inbox.</p>
+            <a class="btn btn-ghost btn-sm" href="/ui?company_id={company_id}&amp;principal_id={id}">Open direct inbox</a>"#,
+            address = escape_html_text(&address.address),
+            id = address.principal_id,
         ),
-        None => r#"<p id="agent-default-desk" class="text-sm opacity-70">This agent's own desk was deleted. Create an additional desk below to give it an address again.</p>"#.to_string(),
+        None => r#"<p id="agent-direct-address" class="text-sm opacity-70">This agent's direct address is unavailable.</p>"#.to_string(),
     };
     let departments = if entry.departments.is_empty() {
         r#"<p class="text-sm opacity-70">Not in any department.</p>"#.to_string()
@@ -445,7 +451,7 @@ pub fn assistant_channel_card(
                 <section id="assistant-channel-card" class="mt-6 space-y-3 rounded-box border border-base-300 p-4">
                     <div>
                         <h3 class="font-semibold">Additional assistant desk</h3>
-                        <p class="text-sm opacity-70">The agent already has its own desk. Create another team desk (never public) that this agent answers, at a different address. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
+                        <p class="text-sm opacity-70">The agent has its own direct address. Create another team desk (never public) that this agent answers, at a different address. Autonomous replies send the agent's answer directly; reviewed replies wait for your approval first.</p>
                     </div>
                     {banner}
                     <form hx-post="/ui/agents/{agent_id}/assistant-channel?company_id={company_id}"
@@ -513,6 +519,7 @@ pub fn agent_create_pane(pane: &AgentCreatePane<'_>) -> String {
                     method="post" action="/ui/agents?company_id={company_id}" hx-post="/ui/agents?company_id={company_id}" hx-target="#agent-pane" hx-swap="outerHTML"
                     hx-params="not avatar_file" hx-disabled-elt="find button[type='submit']">
                     <input type="hidden" name="form_mode" value="simple">
+                    <input type="hidden" name="native_permissions" value="full">
                     <label class="form-control w-full">
                         <div class="label"><span class="text-xs opacity-70">Agent Name</span></div>
                         <input type="text" name="name" required value="{name}" placeholder="Support Triage"
@@ -684,7 +691,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
             model = escape_html_attr(draft.model),
         )
     } else {
-        company_model_selection(fields.model_connections, draft, &id_prefix)
+        company_model_selection(fields, &id_prefix)
     };
     format!(
         r##"
@@ -703,6 +710,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         </label>
                     </div>
                     {avatar_field}
+                    {direct_settings}
                     <div class="form-control w-full">
                         <div class="label justify-between">
                             <span class="text-xs opacity-70">System Prompt</span>
@@ -717,6 +725,7 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
                         <div class="collapse-content space-y-4">
                             {capabilities}
                             {model_connection_fields}
+                            {native_permissions_field}
                             <label class="form-control w-full">
                                 <div class="label">
                                     <span class="text-xs opacity-70">Description</span>
@@ -732,13 +741,62 @@ fn agent_fields(fields: &AgentFields<'_>) -> String {
         sparkle = icon(Icon::Sparkle, BUTTON_ICON),
         generator = prompt_generator(fields.scope, fields.agent_id, &id_prefix),
         capabilities = capability_picker(fields),
+        native_permissions_field = native_permissions_field(draft.native_permissions),
         prompt_textarea =
             agent_prompt_textarea(&id_prefix, draft.system_prompt, FragmentSwap::Inline),
+        direct_settings = match fields.scope {
+            AgentFormScope::Company(_) => direct_settings_fields(draft),
+            AgentFormScope::Library => String::new(),
+        },
         name = escape_html_text(draft.name),
         slug = escape_html_text(draft.slug),
         description_help = description_help,
         description = escape_html_text(draft.description),
         avatar_field = agent_avatar_field(&id_prefix, draft),
+    )
+}
+
+pub(super) fn direct_settings_fields(draft: &AgentDraft<'_>) -> String {
+    let public = if draft.open_to_public { " checked" } else { "" };
+    let confirmed = if draft.confirm_spam_disabled {
+        " checked"
+    } else {
+        ""
+    };
+    format!(
+        r#"<fieldset class="space-y-2">
+            <legend class="text-sm font-medium">Direct address</legend>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="open_to_public" value="true" class="checkbox checkbox-sm"{public}>
+                <span>Allow external messages to this agent's direct address</span>
+            </label>
+            <p class="text-xs opacity-70">This setting is independent of any desk the agent staffs.</p>
+            <label class="flex items-center gap-2">
+                <input type="checkbox" name="confirm_spam_disabled" value="true" class="checkbox checkbox-sm"{confirmed}>
+                <span class="text-xs">If spam scanning is unavailable, I accept external mail without scanning.</span>
+            </label>
+        </fieldset>"#,
+    )
+}
+
+fn native_permissions_field(selected: crate::domain::local_agents::LocalPermissions) -> String {
+    use crate::domain::local_agents::LocalPermissions;
+    let options: String = [
+        (LocalPermissions::Full, "Full access"),
+        (LocalPermissions::Auto, "Automatic approval"),
+        (LocalPermissions::AcceptEdits, "Approve edits"),
+    ]
+    .into_iter()
+    .map(|(mode, label)| {
+        format!(
+            r#"<option value="{}"{}>{label}</option>"#,
+            mode.as_str(),
+            if mode == selected { " selected" } else { "" }
+        )
+    })
+    .collect();
+    format!(
+        r#"<label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Native permissions</span></div><select name="native_permissions" class="select w-full">{options}</select><div class="label"><span class="text-xs opacity-60">Used by Local Agents profiles that select this agent.</span></div></label>"#
     )
 }
 
@@ -761,7 +819,7 @@ fn capability_picker(fields: &AgentFields<'_>) -> String {
     )
 }
 
-fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
+fn skill_picker(skills: &[SkillSummary], draft: &AgentDraft<'_>, scope: AgentFormScope) -> String {
     let skill_ids_text = draft
         .skill_ids_text
         .map(str::to_owned)
@@ -808,11 +866,19 @@ fn skill_picker(skills: &[Skill], draft: &AgentDraft<'_>, scope: AgentFormScope)
     )
 }
 
-fn company_model_selection(
-    connections: &[CompanyModelConnection],
-    draft: &AgentDraft<'_>,
-    id_prefix: &str,
-) -> String {
+fn company_model_selection(fields: &AgentFields<'_>, id_prefix: &str) -> String {
+    let connections = fields.model_connections;
+    let draft = fields.draft;
+    let (blank_choice, help) = match fields.agent_id {
+        None => (
+            "Company default",
+            "Leave both blank to use the company's default model for the new agent's direct workflow. Creating an agent requires a model connection with an API key.",
+        ),
+        Some(_) => (
+            "No hosted model",
+            "Leave both blank for native profiles. Hosted workflows require an explicit provider/model pair; invalid pairs are refused on save.",
+        ),
+    };
     let provider_options: String = connections
         .iter()
         .map(|connection| {
@@ -855,14 +921,14 @@ fn company_model_selection(
         r##"<div class="grid grid-cols-1 gap-4 md:grid-cols-2">
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Provider</span></div>
                 <select id="agent-provider-{id_prefix}" name="provider" class="select w-full font-mono text-sm">
-                    <option value="">Inherit company default</option>{provider_options}
+                    <option value="">{blank_choice}</option>{provider_options}
                 </select>
             </label>
             <label class="form-control w-full"><div class="label"><span class="text-xs opacity-70">Model</span></div>
                 <select id="agent-model-{id_prefix}" name="model" class="select w-full font-mono text-sm">
-                    <option value="">Inherit company default</option>{model_options}
+                    <option value="">{blank_choice}</option>{model_options}
                 </select>
-                <div class="label"><span class="text-[11px] opacity-60">Select a model belonging to the provider; invalid pairs are refused on save.</span></div>
+                <div class="label"><span class="text-[11px] opacity-60">{help}</span></div>
             </label>
         </div>"##
     )
@@ -980,7 +1046,10 @@ fn stored_draft(agent: &Agent) -> AgentDraft<'_> {
     AgentDraft {
         name: &agent.name,
         slug: &agent.slug,
+        open_to_public: agent.open_to_public,
+        confirm_spam_disabled: false,
         system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+        native_permissions: agent.native_permissions,
         description: agent.description.as_deref().unwrap_or(""),
         provider: agent.provider.as_deref().unwrap_or(""),
         model: agent.model.as_deref().unwrap_or(""),
@@ -1004,8 +1073,9 @@ mod capability_tests {
     use super::*;
     use crate::entities::{creation::CreationProvenance, value_objects::SkillSlug};
 
-    fn skill(company_id: Option<Uuid>, name: &str) -> Skill {
+    fn skill(company_id: Option<Uuid>, name: &str) -> SkillSummary {
         Skill {
+            files: Vec::new(),
             id: Uuid::new_v4(),
             company_id,
             slug: SkillSlug::parse(&name.to_ascii_lowercase()).unwrap(),
@@ -1016,6 +1086,7 @@ mod capability_tests {
             created_at: Utc::now(),
             updated_at: Utc::now(),
         }
+        .into()
     }
 
     #[test]

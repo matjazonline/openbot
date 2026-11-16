@@ -1,6 +1,6 @@
 use crate::entities::channel::{RESERVED_SLUG_SUFFIXES, RESERVED_SUFFIX_SEPARATORS};
 use crate::entities::{
-    transport::{ChannelSelector, ExternalDestination},
+    transport::{AddressSelector, ExternalDestination},
     value_objects::{ChannelSlug, CompanySlug, EmailAddress},
 };
 
@@ -25,22 +25,22 @@ impl EmailDeliveryHints {
 
 /// The ordered business-channel intents encoded by one platform email address.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct EmailChannelSelection {
-    selectors: Vec<ChannelSelector>,
+pub struct EmailAddressSelection {
+    selectors: Vec<AddressSelector>,
     delivery: EmailDeliveryHints,
 }
 
-impl EmailChannelSelection {
-    pub fn primary(&self) -> &ChannelSelector {
+impl EmailAddressSelection {
+    pub fn primary(&self) -> &AddressSelector {
         // Construction rejects an empty selector list.
         &self.selectors[0]
     }
 
-    pub fn selectors(&self) -> &[ChannelSelector] {
+    pub fn selectors(&self) -> &[AddressSelector] {
         &self.selectors
     }
 
-    pub fn into_selectors(self) -> Vec<ChannelSelector> {
+    pub fn into_selectors(self) -> Vec<AddressSelector> {
         self.selectors
     }
 
@@ -52,25 +52,25 @@ impl EmailChannelSelection {
 /// Classification performed before application routing.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum EmailRecipientDestination {
-    Channel(EmailChannelSelection),
+    Channel(EmailAddressSelection),
     External(ExternalDestination),
     InvalidPlatformAddress,
 }
 
 /// Pure parser for the email adapter's channel-address syntax.
 #[derive(Debug, Clone)]
-pub struct EmailChannelSelectorParser {
+pub struct EmailAddressParser {
     app_domain: String,
 }
 
-impl EmailChannelSelectorParser {
+impl EmailAddressParser {
     pub fn new(app_domain: impl AsRef<str>) -> Self {
         Self {
             app_domain: app_domain.as_ref().trim().to_ascii_lowercase(),
         }
     }
 
-    pub fn parse(&self, address: &str) -> Option<EmailChannelSelection> {
+    pub fn parse(&self, address: &str) -> Option<EmailAddressSelection> {
         let (company, channel_part) = self.parse_platform_address(address)?;
         let mut context_only = false;
         let mut slugs = Vec::new();
@@ -86,10 +86,10 @@ impl EmailChannelSelectorParser {
             return None;
         }
 
-        Some(EmailChannelSelection {
+        Some(EmailAddressSelection {
             selectors: slugs
                 .into_iter()
-                .map(|channel| ChannelSelector::Qualified {
+                .map(|channel| AddressSelector::Qualified {
                     company: company.clone(),
                     channel: ChannelSlug::new(channel),
                 })
@@ -173,18 +173,18 @@ mod tests {
 
     #[test]
     fn platform_addresses_produce_qualified_selectors() {
-        let parser = EmailChannelSelectorParser::new("mailagents.com");
+        let parser = EmailAddressParser::new("mailagents.com");
         let parsed = parser
             .parse("Support Desk <SUPPORT+Billing@Acme.mailagents.com>")
             .unwrap();
         assert_eq!(
             parsed.selectors(),
             &[
-                ChannelSelector::Qualified {
+                AddressSelector::Qualified {
                     company: CompanySlug::new("acme"),
                     channel: ChannelSlug::new("support"),
                 },
-                ChannelSelector::Qualified {
+                AddressSelector::Qualified {
                     company: CompanySlug::new("acme"),
                     channel: ChannelSlug::new("billing"),
                 },
@@ -196,7 +196,7 @@ mod tests {
 
     #[test]
     fn quiet_and_noagent_are_typed_delivery_hints() {
-        let parser = EmailChannelSelectorParser::new("mailagents.com");
+        let parser = EmailAddressParser::new("mailagents.com");
         for address in [
             "support.quiet@acme.mailagents.com",
             "support+noagent@acme.mailagents.com",
@@ -227,7 +227,7 @@ mod tests {
 
             assert!(
                 local.starts_with('_'),
-                "'{local}' is only safe to reserve because channel_slugs_format forbids a leading \
+                "'{local}' is only safe to reserve because addresses_slug_format forbids a leading \
                  underscore"
             );
             assert!(
@@ -240,7 +240,7 @@ mod tests {
                  context suffix -- see the assertion below"
             );
 
-            let parsed = EmailChannelSelectorParser::new("mailagents.com")
+            let parsed = EmailAddressParser::new("mailagents.com")
                 .parse(&format!("{local}@acme.mailagents.com"))
                 .expect("a reserved system address still has platform address syntax");
             assert!(
@@ -252,7 +252,7 @@ mod tests {
     }
     #[test]
     fn external_recipients_are_explicit_destinations() {
-        let parser = EmailChannelSelectorParser::new("mailagents.com");
+        let parser = EmailAddressParser::new("mailagents.com");
         assert!(matches!(
             parser.classify(EmailAddress::from("person@example.com")),
             EmailRecipientDestination::External(ExternalDestination::Email(_))

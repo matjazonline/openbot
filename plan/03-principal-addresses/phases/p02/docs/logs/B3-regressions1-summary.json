@@ -1,0 +1,34 @@
+[
+  {
+    "group": "bindings",
+    "filter": "workflow_binding_",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 7.43,
+    "log": "B3-bindings-regressions1.txt"
+  },
+  {
+    "group": "admission",
+    "filter": "workflow_admit_sql",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 15.69,
+    "log": "B3-admission-regressions1.txt"
+  },
+  {
+    "group": "reply-bindings",
+    "filter": "channel_reply_binding_",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 13.83,
+    "log": "B3-reply-bindings-regressions1.txt"
+  },
+  {
+    "group": "email",
+    "filter": "adapters::protocols::email::",
+    "status": "PASS",
+    "exit": 0,
+    "seconds": 0.05,
+    "log": "B3-email-regressions1.txt"
+  }
+]

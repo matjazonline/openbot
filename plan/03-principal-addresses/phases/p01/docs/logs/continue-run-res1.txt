@@ -1,0 +1,29 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 8 tests
+test application::use_cases::channel::tests::address_slug_shape_matches_the_format_constraint ... ok
+test application::use_cases::channel::tests::address_slug_onboarding_names_are_unchanged_by_the_shared_helper ... ok
+test application::use_cases::channel::tests::address_slug_derivation_keeps_the_database_shape ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_an_internal_relay_to_a_person_is_refused_definitely ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_and_a_person_together_are_refused_whole ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_context_suffix_strips_for_a_desk_and_is_refused_for_a_person ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_desk_is_admitted_and_a_person_is_refused_for_a_teammate ... ok
+test application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody ... FAILED
+
+failures:
+
+---- application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody stdout ----
+
+thread 'application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody' (8761359) panicked at src/application/use_cases/thread/address_resolution_tests.rs:180:9:
+assertion `left == right` failed: alice
+  left: Some(Undeliverable(UndeliverableReason { kind: UnknownChannel, bounce: BounceInfo { source_message_key: ExternalMessageKey("<6e9aee43-183e-40d4-9f4c-c67145d921b4.inbound@mailagents.com>"), recipient_to: EmailAddress("stranger@elsewhere.test"), company_id: e924af8d-83df-40c5-b06e-f7d1b5e0cdf8, company_slug: CompanySlug("acme"), invalid_slugs: [ChannelSlug("alice")], disabled_slugs: [], principals: [], suggestions: [BounceSuggestion { invalid_slug: ChannelSlug("alice"), suggestions: [] }], available_channels: [], original_subject: "Hello" } }))
+ right: Some(Undeliverable(UndeliverableReason { kind: UnknownChannel, bounce: BounceInfo { source_message_key: ExternalMessageKey("<0b90f423-57ad-4cc1-9ea2-4a59800732db.inbound@mailagents.com>"), recipient_to: EmailAddress("stranger@elsewhere.test"), company_id: e924af8d-83df-40c5-b06e-f7d1b5e0cdf8, company_slug: CompanySlug("acme"), invalid_slugs: [ChannelSlug("alice")], disabled_slugs: [], principals: [], suggestions: [BounceSuggestion { invalid_slug: ChannelSlug("alice"), suggestions: [] }], available_channels: [], original_subject: "Hello" } }))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::use_cases::thread::tests::address_resolution::address_resolution_a_stranger_cannot_tell_a_person_from_nobody
+
+test result: FAILED. 7 passed; 1 failed; 0 ignored; 0 measured; 4488 filtered out; finished in 0.13s
+
+EXIT 101

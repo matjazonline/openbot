@@ -5,6 +5,10 @@
 //! thread replaces the detail pane, and Compose puts a new-thread form in that same pane.
 
 use super::*;
+use crate::use_cases::thread::ReadableInbox;
+
+mod inbox;
+pub use inbox::{inbox_target_input, inbox_target_query};
 
 /// Who the mailbox is rendered for, as the top bar shows them.
 pub struct MailboxUser<'a> {
@@ -184,8 +188,9 @@ pub struct MailboxPage<'a> {
     pub companies: &'a [Company],
     /// Domain the channel addresses are built on, e.g. `mailagents.com`.
     pub app_domain_name: &'a str,
-    pub channels: &'a [Channel],
-    pub selected_channel: Option<&'a Channel>,
+    pub inboxes: &'a [ReadableInbox],
+    pub selected_inbox: Option<&'a ReadableInbox>,
+    pub direct_truncated: bool,
     pub threads: &'a [Thread],
     pub next_cursor: Option<&'a str>,
     pub selected_thread_id: Option<Uuid>,
@@ -198,7 +203,7 @@ pub struct MailboxPage<'a> {
 /// The thread column for one channel.
 pub struct ThreadColumn<'a> {
     pub company_id: Uuid,
-    pub channel: &'a Channel,
+    pub inbox: &'a ReadableInbox,
     /// Domain the channel addresses are built on, e.g. `mailagents.com` -- what tells a
     /// participant that is another channel apart from one that is a person.
     pub app_domain_name: &'a str,
@@ -212,7 +217,7 @@ pub struct ThreadColumn<'a> {
 /// The detail pane showing one thread's messages.
 pub struct MessagePane<'a> {
     pub company_id: Uuid,
-    pub channel: &'a Channel,
+    pub inbox: &'a ReadableInbox,
     pub thread: &'a Thread,
     pub messages: &'a [ThreadMessageView],
     /// The signed-in reader's address, used to put their own messages on the right.
@@ -229,7 +234,7 @@ pub struct MessagePane<'a> {
 /// The detail pane showing the new-message form for a thread that is already open.
 pub struct ReplyPane<'a> {
     pub company_id: Uuid,
-    pub channel: &'a Channel,
+    pub inbox: &'a ReadableInbox,
     pub thread: &'a Thread,
     /// The channel's inbound address, e.g. `support@acme.mailagents.com`.
     pub channel_address: &'a str,
@@ -242,7 +247,7 @@ pub struct ReplyPane<'a> {
 /// The detail pane showing the new-thread form.
 pub struct ComposePane<'a> {
     pub company_id: Uuid,
-    pub channel: &'a Channel,
+    pub inbox: &'a ReadableInbox,
     /// The channel's inbound address, e.g. `support@acme.mailagents.com`.
     pub channel_address: &'a str,
     pub sender_email: &'a str,
@@ -826,7 +831,7 @@ pub(super) fn ui_layout(title: &str, body: &str) -> String {
 
 pub(crate) fn application_javascript() -> String {
     format!(
-        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{agent_authoring}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_agent_picker}\n{workflow_runs}\n{thread_history}",
+        "var CHIP_SELECTED_MARK = {selected:?};\nvar CHIP_ADD_MARK = {add:?};\nvar AGENT_REPLIED_MARK = {replied:?};\n{app}\n{legacy}\n{mailbox}\n{local}\n{skeletons}\n{schedules}\n{agents}\n{agent_authoring}\n{local_agent_profile}\n{channels}\n{library}\n{delegation}\n{request_errors}\n{button_busy}\n{run_counts}\n{workflow_editor}\n{workflow_agent_picker}\n{workflow_runs}\n{thread_history}",
         selected = icon(Icon::Check, BUTTON_ICON),
         add = icon(Icon::Plus, BUTTON_ICON),
         replied = icon(Icon::Check, BUTTON_ICON),
@@ -838,6 +843,7 @@ pub(crate) fn application_javascript() -> String {
         schedules = super::schedules::SCHEDULES_SCRIPT,
         agents = super::agent_settings::AGENT_SETTINGS_SCRIPT,
         agent_authoring = super::agent_authoring::AGENT_AUTHORING_SCRIPT,
+        local_agent_profile = super::local_agents::PROFILE_PERMISSIONS_SCRIPT,
         channels = super::channel_settings::CHANNEL_SETTINGS_SCRIPT,
         library = super::agent_library_multi_select::AGENT_LIBRARY_SCRIPT,
         delegation = EVENT_DELEGATION_SCRIPT,
@@ -1037,10 +1043,10 @@ pub(crate) fn theme_init_javascript() -> &'static str {
 }
 
 pub fn mailbox_page(page: &MailboxPage<'_>) -> String {
-    let thread_column_html = match page.selected_channel {
-        Some(channel) => thread_column(&ThreadColumn {
+    let thread_column_html = match page.selected_inbox {
+        Some(inbox) => thread_column(&ThreadColumn {
             company_id: page.company.id,
-            channel,
+            inbox,
             app_domain_name: page.app_domain_name,
             threads: page.threads,
             next_cursor: page.next_cursor,
@@ -1759,20 +1765,9 @@ pub(crate) fn sidebar_header_with_action(title: &str, subtitle: &str, action: &s
 /// The channel column: one menu entry per channel, channel actions at the bottom.
 fn channel_sidebar(page: &MailboxPage<'_>) -> String {
     let header = sidebar_header("Mailbox", "Inbound desks and conversations.");
-    let items: String = page
-        .channels
-        .iter()
-        .map(|channel| {
-            channel_menu_item(
-                page.company.id,
-                channel,
-                &channel.inbound_address(&page.company.slug, page.app_domain_name),
-                page.selected_channel.is_some_and(|c| c.id == channel.id),
-            )
-        })
-        .collect();
+    let items = inbox::sidebar_items(page);
 
-    let menu_body = if page.channels.is_empty() {
+    let menu_body = if page.inboxes.is_empty() {
         r##"<li class="px-2 py-6 text-center text-xs opacity-60">No desks yet. Create one under Desks.</li>"##
             .to_string()
     } else {
@@ -1798,7 +1793,11 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
         "##,
         header = header,
         collapse = icon(Icon::ArrowLeft, BUTTON_ICON),
-        footer = channel_actions(page.company.id, page.selected_channel, FragmentSwap::Inline),
+        footer = channel_actions(
+            page.company.id,
+            page.selected_inbox.and_then(ReadableInbox::desk),
+            FragmentSwap::Inline
+        ),
     )
 }
 
@@ -1814,33 +1813,34 @@ fn channel_sidebar(page: &MailboxPage<'_>) -> String {
 /// the menu.
 fn compact_mailbox_header(page: &MailboxPage<'_>) -> String {
     let selected_name = page
-        .selected_channel
-        .map(|channel| channel.name.as_str())
+        .selected_inbox
+        .map(|inbox| inbox.name())
         .unwrap_or("Select a desk");
-    let options = if page.channels.is_empty() {
+    let options = if page.inboxes.is_empty() {
         r##"<li class="px-3 py-4 text-center text-xs opacity-60">No desks yet.</li>"##.to_string()
     } else {
-        page.channels
+        page.inboxes
             .iter()
-            .map(|channel| {
+            .map(|inbox| {
                 let active = page
-                    .selected_channel
-                    .is_some_and(|selected| selected.id == channel.id);
+                    .selected_inbox
+                    .is_some_and(|selected| selected.target() == inbox.target());
                 format!(
-                    r##"<li><a class="{active}" data-mailbox-channel="{channel_id}"
-                            hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
+                    r##"<li><a class="{active}" data-mailbox-channel="{inbox_key}"
+                            hx-get="/ui/threads?company_id={company_id}&{target_query}"
                             hx-target="#thread-column" hx-swap="outerHTML"
                             hx-sync="#thread-column:replace"
-                            hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
+                            hx-push-url="/ui?company_id={company_id}&{target_query}"
                             data-action="select-sidebar-item">
                             <span class="min-w-0 truncate" data-mailbox-channel-name>{name}</span>
                             <span class="badge badge-ghost badge-sm font-mono">{slug}</span>
                         </a></li>"##,
                     active = if active { "menu-active" } else { "" },
-                    channel_id = channel.id,
+                    inbox_key = inbox.target(),
+                    target_query = inbox_target_query(inbox.target()),
                     company_id = page.company.id,
-                    name = escape_html_text(&channel.name),
-                    slug = escape_html_text(&channel.slug),
+                    name = escape_html_text(inbox.name()),
+                    slug = escape_html_text(inbox.slug().map_or("Archived", |slug| slug.as_str())),
                 )
             })
             .collect()
@@ -1933,31 +1933,34 @@ pub(crate) fn selected_when(selected: bool) -> &'static str {
 
 /// Compose is only meaningful inside a channel, so it lives in that channel's thread column header
 /// and starts its new thread in the channel the column is showing.
-fn compose_button(company_id: Uuid, channel: &Channel) -> String {
+fn compose_button(company_id: Uuid, inbox: &ReadableInbox) -> String {
+    if inbox.slug().is_none() {
+        return String::new();
+    }
     format!(
         r##"<button id="compose-button" type="button" class="btn btn-primary btn-sm"
                     title="Start a new thread in this desk"
-                    hx-get="/ui/compose?company_id={company_id}&channel_id={channel_id}"
+                    hx-get="/ui/compose?company_id={company_id}&{target_query}"
                     hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{pencil} New Thread</button>"##,
-        channel_id = channel.id,
+        target_query = inbox_target_query(inbox.target()),
         pencil = icon(Icon::Pencil, BUTTON_ICON),
     )
 }
 
 fn channel_menu_item(
     company_id: Uuid,
-    channel: &Channel,
-    address: &EmailAddress,
+    inbox: &ReadableInbox,
+    address: Option<&EmailAddress>,
     selected: bool,
 ) -> String {
     format!(
         r##"
                 <li>
-                    <a class="flex flex-col items-start gap-0.5 {active}" data-mailbox-channel="{channel_id}"
-                        hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
+                    <a class="flex flex-col items-start gap-0.5 {active}" data-mailbox-channel="{inbox_key}"
+                        hx-get="/ui/threads?company_id={company_id}&{target_query}"
                         hx-target="#thread-column" hx-swap="outerHTML"
                         hx-sync="#thread-column:replace"
-                        hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}"
+                        hx-push-url="/ui?company_id={company_id}&{target_query}"
                         data-action="select-sidebar-item">
                         <span class="flex w-full items-center gap-2">
                             <span class="truncate" data-mailbox-channel-name>{name}</span>
@@ -1968,11 +1971,12 @@ fn channel_menu_item(
                 </li>
         "##,
         active = if selected { "menu-active" } else { "" },
-        channel_id = channel.id,
-        name = escape_html_text(&channel.name),
-        slug = escape_html_text(&channel.slug),
-        disabled_badge = disabled_badge(channel),
-        address = escape_html_text(address),
+        inbox_key = inbox.target(),
+        target_query = inbox_target_query(inbox.target()),
+        name = escape_html_text(inbox.name()),
+        slug = escape_html_text(inbox.slug().map_or("Archived", |slug| slug.as_str())),
+        disabled_badge = inbox.desk().map(disabled_badge).unwrap_or_default(),
+        address = address.map_or_else(|| "Archived".into(), |address| escape_html_text(address)),
     )
 }
 
@@ -2012,7 +2016,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
         r##"
         <section id="thread-column"{THREAD_COLUMN_SKELETON} class="flex min-h-0 w-full min-w-0 flex-1 flex-col border-r border-base-300 bg-base-100"
             hx-ext="sse"
-            sse-connect="/ui/threads/events?company_id={company_id}&channel_id={channel_id}{after}">
+            sse-connect="/ui/threads/events?company_id={company_id}&{target_query}{after}">
             <div class="flex items-center justify-between gap-2 border-b border-base-300 px-4 py-3">
                 <div class="min-w-0">
                     <h2 class="truncate text-lg font-bold">{channel_name}</h2>
@@ -2021,7 +2025,7 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
                     {compose_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square text-xl leading-none" title="Reload threads"
-                        hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
+                        hx-get="/ui/threads?company_id={company_id}&{target_query}"
                         hx-target="#thread-column" hx-swap="outerHTML" hx-sync="#thread-column:replace">{reload_glyph}</button>
                 </div>
             </div>
@@ -2031,12 +2035,12 @@ pub fn thread_column(column: &ThreadColumn<'_>) -> String {
         </section>
         "##,
         reload_glyph = icon(Icon::Sync, BUTTON_ICON),
-        channel_name = escape_html_text(&column.channel.name),
+        channel_name = escape_html_text(column.inbox.name()),
         company_id = column.company_id,
-        channel_id = column.channel.id,
+        target_query = inbox_target_query(column.inbox.target()),
         after = after,
         list_open = thread_list_open_tag(FragmentSwap::Inline),
-        compose_button = compose_button(column.company_id, column.channel),
+        compose_button = compose_button(column.company_id, column.inbox),
         list_html = thread_list_fragment(column, FragmentSwap::Inline),
     )
 }
@@ -2065,7 +2069,7 @@ pub fn thread_list_fragment(column: &ThreadColumn<'_>, swap: FragmentSwap) -> St
 fn thread_row(column: &ThreadColumn<'_>, thread: &Thread) -> String {
     thread_row_fragment(
         column.company_id,
-        column.channel,
+        column.inbox,
         thread,
         column.selected_thread_id == Some(thread.id),
         ThreadRowMarks {
@@ -2148,7 +2152,7 @@ pub struct ThreadRowMarks {
 /// indistinguishable from one that came with the page.
 pub fn thread_row_fragment(
     company_id: Uuid,
-    channel: &Channel,
+    inbox: &ReadableInbox,
     thread: &Thread,
     selected: bool,
     marks: ThreadRowMarks,
@@ -2161,16 +2165,16 @@ pub fn thread_row_fragment(
     } else {
         escape_html_text(&participant_addresses.join(", "))
     };
-    let channel_id = channel.id;
+    let target_query = inbox_target_query(inbox.target());
 
     format!(
         r##"
                 <button type="button" data-thread-id="{thread_id}"{last_role}
                     class="thread-row block w-full border-b border-base-300 px-4 py-3 text-left transition hover:bg-base-200 {active}"
-                    hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
+                    hx-get="/ui/messages?company_id={company_id}&{target_query}&thread_id={thread_id}"
                     hx-target="#detail-pane" hx-swap="outerHTML"
                     hx-sync="#detail-pane:replace"
-                    hx-push-url="/ui?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
+                    hx-push-url="/ui?company_id={company_id}&{target_query}&thread_id={thread_id}"
                     data-action="select-thread-row">
                     <div class="flex items-baseline justify-between gap-2">
                         <span class="flex min-w-0 items-center gap-1.5">{channel_glyph}<span class="truncate font-semibold">{subject}</span></span>
@@ -2186,7 +2190,7 @@ pub fn thread_row_fragment(
         "##,
         active = if selected { "bg-base-300" } else { "" },
         company_id = company_id,
-        channel_id = channel_id,
+        target_query = target_query,
         thread_id = thread.id,
         subject = escape_html_text(&thread.subject),
         channel_glyph = other_channel_glyph(
@@ -2212,14 +2216,14 @@ fn thread_pagination(column: &ThreadColumn<'_>, swap: FragmentSwap) -> String {
             r##"
                 <div id="thread-pagination" class="p-3"{oob}>
                     <button class="btn btn-ghost btn-sm btn-block" hx-disabled-elt="this"
-                        hx-get="/ui/threads/list?company_id={company_id}&channel_id={channel_id}&cursor={cursor}"
+                        hx-get="/ui/threads/list?company_id={company_id}&{target_query}&cursor={cursor}"
                         hx-target="#thread-list" hx-swap="beforeend" hx-sync="#thread-list:replace">
                         Load older threads
                     </button>
                 </div>
             "##,
             company_id = column.company_id,
-            channel_id = column.channel.id,
+            target_query = inbox_target_query(column.inbox.target()),
         ),
         None => format!(r##"<div id="thread-pagination"{oob}></div>"##),
     }
@@ -2240,14 +2244,14 @@ pub fn empty_detail_pane(message: &str, swap: FragmentSwap) -> String {
 
 /// "Open in Simulator", for the company owner only: every simulation route refuses anybody else.
 fn simulator_link(pane: &MessagePane<'_>) -> String {
-    if pane.viewer_membership != CompanyMembership::Owner {
+    if pane.viewer_membership != CompanyMembership::Owner || pane.inbox.desk().is_none() {
         return String::new();
     }
     format!(
         r##"<a href="/companies/{company_id}/channels/{channel_id}/simulate?thread_id={thread_id}"
                         class="btn btn-outline btn-sm">Open in Simulator</a>"##,
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        channel_id = pane.inbox.desk().unwrap().id,
         thread_id = pane.thread.id,
     )
 }
@@ -2276,7 +2280,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                     Some(pane.viewer_email),
                     MessageScope {
                         company_id: pane.company_id,
-                        channel_id: pane.channel.id,
+                        target: pane.inbox.target(),
                     },
                     RunLinkAccess::Authorized(&pane.activity.inspectable),
                 )
@@ -2296,7 +2300,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
     format!(
         r##"
         <section id="detail-pane"{PANE_SKELETON} data-thread-id="{thread_id}" class="ui-pane-detail flex min-w-0 flex-1 flex-col bg-base-100" hx-ext="sse"
-            sse-connect="/ui/events?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}{after}">
+            sse-connect="/ui/events?company_id={company_id}&{target_query}&thread_id={thread_id}{after}">
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-base-300 px-4 py-3 sm:px-6 sm:py-4">
                 <div class="min-w-0 grow basis-48">
                     <h2 class="truncate text-lg font-bold sm:text-xl">{subject}</h2>
@@ -2304,11 +2308,9 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
                     <p class="truncate font-mono text-[11px] opacity-40">{thread_id}</p>
                 </div>
                 <div class="flex shrink-0 flex-wrap items-center gap-2">
-                    <button type="button" class="btn btn-primary btn-sm" title="Send another message in this thread"
-                        hx-get="/ui/reply?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
-                        hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{pencil} New Message</button>
+                    {new_message_button}
                     <button type="button" class="btn btn-ghost btn-sm btn-square" title="Reload messages"
-                        hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
+                        hx-get="/ui/messages?company_id={company_id}&{target_query}&thread_id={thread_id}"
                         hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace">{reload}</button>
                     {simulator}
                     {local_agent}
@@ -2326,14 +2328,18 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
             {diagnostics_dialog}
         </section>
         "##,
+        new_message_button = inbox::new_message_button(pane),
         history_limit = crate::entities::message_view::THREAD_HISTORY_LIMIT,
-        pencil = icon(Icon::Pencil, BUTTON_ICON),
         reload = icon(Icon::Sync, BUTTON_ICON),
         simulator = simulator_link(pane),
-        local_agent = if pane.viewer_membership.manages_company_operations() {
+        local_agent = if let Some(desk) = pane
+            .inbox
+            .desk()
+            .filter(|_| pane.viewer_membership.manages_company_operations())
+        {
             format!(
                 r#"<a class="btn btn-ghost btn-sm" href="/ui/companies/{}/local-agents?channel={}&amp;conversation={}">Run locally</a>"#,
-                pane.company_id, pane.channel.id, pane.thread.id
+                pane.company_id, desk.id, pane.thread.id
             )
         } else {
             String::new()
@@ -2342,7 +2348,7 @@ pub fn message_pane(pane: &MessagePane<'_>) -> String {
         participants = participants,
         thread_id = pane.thread.id,
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        target_query = inbox_target_query(pane.inbox.target()),
         after = after,
         messages_html = messages_html,
         pane_error = pane.error.map_or_else(String::new, |message| format!(
@@ -2383,12 +2389,15 @@ const DIAGNOSTICS_DIALOG: &str = r##"
 /// It posts to the same `/ui/reply` endpoint as the header's "New Message" form, so a rejected
 /// message comes back as that fuller form with the text kept and the reason on top.
 fn thread_composer(pane: &MessagePane<'_>) -> String {
+    if pane.inbox.slug().is_none() {
+        return String::new();
+    }
     format!(
         r##"
             <form class="border-t border-base-300 px-4 py-3 sm:px-6" hx-post="/ui/reply"
                 hx-target="#detail-pane" hx-swap="outerHTML">
                 <input type="hidden" name="company_id" value="{company_id}">
-                <input type="hidden" name="channel_id" value="{channel_id}">
+                {target_input}
                 <input type="hidden" name="thread_id" value="{thread_id}">
                 <div class="flex items-end gap-2">
                     <div class="aura aura-holo flex-1 [--aura-radius:var(--radius-field)]">
@@ -2409,17 +2418,20 @@ fn thread_composer(pane: &MessagePane<'_>) -> String {
             </form>
         "##,
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        target_input = inbox_target_input(pane.inbox.target()),
         thread_id = pane.thread.id,
     )
 }
 
 fn internal_note_composer(pane: &MessagePane<'_>) -> String {
+    if pane.inbox.slug().is_none() {
+        return String::new();
+    }
     format!(
         r##"<form class="border-t border-info/40 bg-info/5 px-4 py-3 sm:px-6"
                 hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
             <input type="hidden" name="company_id" value="{company_id}">
-            <input type="hidden" name="channel_id" value="{channel_id}">
+            {target_input}
             <input type="hidden" name="thread_id" value="{thread_id}">
             <input type="hidden" name="command_id" value="{command_id}">
             <div class="mb-2"><p class="font-semibold text-info">Internal note</p>
@@ -2435,7 +2447,7 @@ fn internal_note_composer(pane: &MessagePane<'_>) -> String {
             </div>
         </form>"##,
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        target_input = inbox_target_input(pane.inbox.target()),
         thread_id = pane.thread.id,
         command_id = Uuid::new_v4(),
     )
@@ -2617,7 +2629,7 @@ fn message_note_controls(
                     <form class="dropdown-content z-20 mt-1 w-80 space-y-2 rounded-box border border-base-300 bg-base-100 p-3 shadow"
                         hx-post="/ui/internal-notes" hx-target="#detail-pane" hx-swap="outerHTML">
                         <input type="hidden" name="company_id" value="{company_id}">
-                        <input type="hidden" name="channel_id" value="{channel_id}">
+                        {target_input}
                         <input type="hidden" name="thread_id" value="{thread_id}">
                         <input type="hidden" name="command_id" value="{correct_command}">
                         <input type="hidden" name="supersedes_note_id" value="{note_id}">
@@ -2626,14 +2638,14 @@ fn message_note_controls(
                     </form></details>
                 <form hx-post="/ui/internal-notes/{note_id}/tombstone" hx-target="#detail-pane" hx-swap="outerHTML">
                     <input type="hidden" name="company_id" value="{company_id}">
-                    <input type="hidden" name="channel_id" value="{channel_id}">
+                    {target_input}
                     <input type="hidden" name="thread_id" value="{thread_id}">
                     <input type="hidden" name="command_id" value="{remove_command}">
                     <button class="link link-error text-xs" type="submit">remove</button>
                 </form>"##,
             note_id = note.id,
             company_id = scope.company_id,
-            channel_id = scope.channel_id,
+            target_input = inbox_target_input(scope.target),
             thread_id = message.thread_id,
             correct_command = Uuid::new_v4(),
             remove_command = Uuid::new_v4(),
@@ -2652,12 +2664,12 @@ fn diagnostics_link(message: &ThreadMessageView, scope: MessageScope) -> String 
         r##" · <button type="button" class="link link-hover"
                     title="Transport identifiers for this message"
                     data-action="open-dialog" data-dialog="message-diagnostics"
-                    hx-get="/ui/threads/{thread_id}/messages/{message_id}/diagnostics?company_id={company_id}&channel_id={channel_id}"
+                    hx-get="/ui/threads/{thread_id}/messages/{message_id}/diagnostics?company_id={company_id}&{target_query}"
                     hx-target="#message-diagnostics-body" hx-swap="innerHTML">ids</button>"##,
         thread_id = message.thread_id,
         message_id = message.id,
         company_id = scope.company_id,
-        channel_id = scope.channel_id,
+        target_query = inbox_target_query(scope.target),
     )
 }
 
@@ -2669,7 +2681,7 @@ fn diagnostics_link(message: &ThreadMessageView, scope: MessageScope) -> String 
 #[derive(Debug, Clone, Copy)]
 pub struct MessageScope {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
 }
 
 /// What was attached to a message, under its body.
@@ -2708,11 +2720,11 @@ fn attachment_chip(
     match attachment.storage_key.is_some() {
         true => format!(
             r##"<a class="btn btn-xs btn-ghost gap-1 normal-case"
-                            href="/ui/threads/{thread_id}/attachments/{sha256}?company_id={company_id}&channel_id={channel_id}"
+                            href="/ui/threads/{thread_id}/attachments/{sha256}?company_id={company_id}&{target_query}"
                             download="{filename}" title="Download {filename}">📎 {label}</a>"##,
             sha256 = escape_html_text(&attachment.sha256_hash),
             company_id = scope.company_id,
-            channel_id = scope.channel_id,
+            target_query = inbox_target_query(scope.target),
             filename = escape_html_text(&attachment.filename),
         ),
         false => format!(
@@ -2790,7 +2802,7 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
                 {error_html}
                 <form hx-post="/ui/compose" hx-target="#detail-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="company_id" value="{company_id}">
-                    <input type="hidden" name="channel_id" value="{channel_id}">
+                    {target_input}
                     {to_field}
                     {from_field}
                     <label class="form-control w-full">
@@ -2808,9 +2820,9 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
             </div>
         </section>
         "##,
-        channel_name = escape_html_text(&pane.channel.name),
+        channel_name = escape_html_text(pane.inbox.name()),
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        target_input = inbox_target_input(pane.inbox.target()),
         to_field = readonly_field("To", pane.channel_address),
         from_field = readonly_field("From", pane.sender_email),
         subject = escape_html_text(pane.subject),
@@ -2819,10 +2831,10 @@ pub fn compose_pane(pane: &ComposePane<'_>) -> String {
         footer = send_form_footer(
             pane.deliver,
             &format!(
-                r##"hx-get="/ui/threads?company_id={company_id}&channel_id={channel_id}"
+                r##"hx-get="/ui/threads?company_id={company_id}&{target_query}"
                             hx-target="#thread-column" hx-swap="outerHTML" hx-sync="#thread-column:replace""##,
                 company_id = pane.company_id,
-                channel_id = pane.channel.id,
+                target_query = inbox_target_query(pane.inbox.target()),
             ),
         ),
     )
@@ -2844,7 +2856,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
                 {error_html}
                 <form hx-post="/ui/reply" hx-target="#detail-pane" hx-swap="outerHTML" class="space-y-4">
                     <input type="hidden" name="company_id" value="{company_id}">
-                    <input type="hidden" name="channel_id" value="{channel_id}">
+                    {target_input}
                     <input type="hidden" name="thread_id" value="{thread_id}">
                     {to_field}
                     {from_field}
@@ -2861,7 +2873,7 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         "##,
         subject = escape_html_text(&pane.thread.subject),
         company_id = pane.company_id,
-        channel_id = pane.channel.id,
+        target_input = inbox_target_input(pane.inbox.target()),
         thread_id = pane.thread.id,
         to_field = readonly_field("To", pane.channel_address),
         from_field = readonly_field("From", pane.sender_email),
@@ -2871,10 +2883,10 @@ pub fn reply_pane(pane: &ReplyPane<'_>) -> String {
         footer = send_form_footer(
             pane.deliver,
             &format!(
-                r##"hx-get="/ui/messages?company_id={company_id}&channel_id={channel_id}&thread_id={thread_id}"
+                r##"hx-get="/ui/messages?company_id={company_id}&{target_query}&thread_id={thread_id}"
                             hx-target="#detail-pane" hx-swap="outerHTML" hx-sync="#detail-pane:replace""##,
                 company_id = pane.company_id,
-                channel_id = pane.channel.id,
+                target_query = inbox_target_query(pane.inbox.target()),
                 thread_id = pane.thread.id,
             ),
         ),

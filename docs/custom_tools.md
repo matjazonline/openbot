@@ -1,48 +1,36 @@
-# Agent Tools
+# Agent tools
 
-Phase 06C removed the legacy agent-runtime tool layer:
+An agent's published revision freezes its approved tool bindings, aliases, ordered skills and
+supporting skill files. Each call uses the application's action service and current authority;
+a frozen definition does not preserve a revoked grant. See [Agent authoring](agent-authoring.md)
+for the UI and JSON assignment contract.
 
-- the static tool catalogue and its ten built-ins (`calculator`, `datetime`, `echo`, `json`,
-  `math`, `random`, `template`, `text`, `todo`, `web_fetch`);
-- the native tools `create_agent_channel`, `outreach_and_await_quorum`, `list_company_agents`,
-  `transfer_or_release_task` and `request_approval`;
-- per-agent `granted_tool_ids`, `native_tool_policy` and runtime (`harness_kind`) selection;
-- agent MCP selections and executable skill tool steps.
+An agent can receive these tool sources:
 
-Requests that still send `harness_kind`, `granted_tool_ids` or `native_tool_policy` to the agent
-JSON API are rejected as unknown fields.
+- Built-ins such as message send/reply and knowledge search, within the run's actual target and
+  source-message authority.
+- Company HTTP and MCP operations, with an approved connection, reviewed operation and exact
+  per-agent assignment. Discovery alone grants no execution authority.
+- Registered workflow tools, pinned to an immutable workflow version and parameter configuration.
 
-## What an agent can use now
-
-- **Skills** are prompt-only. An `agent.run` step appends each attached skill's instructions to
-  the agent's prompt. That executes nothing; the model follows the prompt steps. See
-  [Rig agents](rig.md).
-- **Workflow tools.** An agent's `workflow_tools` names the workflow tool types it may use. The
-  list is frozen into a workflow at publication and revoked if the agent loses it later. Calls are
-  workflow actions dispatched through the application's action service, never runtime tools.
-- **Company HTTP MCP** tools are reached the same way: through workflow MCP actions against the
-  company catalog and its reviewed grants. See [Company HTTP MCP](rig.md#company-http-mcp).
-
-An agent has no runtime configuration of its own, so nothing stored on it can grant tools beyond
-the two lists above.
+Skills supply instructions and supporting files. Importing them executes nothing on the server;
+a native session receives its frozen bundle under the selected execution policy. The agent's
+`native_permissions` chooses `auto`, `accept_edits` or `full` for native execution and grants no
+additional hosted workflow tools. Direct-address public access is a separate admission control.
 
 ## Agent Builder
 
-The server installs an `agent-builder` definition into the global agent library after database
-migrations, inserted only when that library slug is absent. It guides a user through the agent's
-purpose, constraints, system prompt, least-privilege workflow tools and company skills. It is
-granted two workflow tools:
+The server installs an `agent-builder` library definition after migrations when its slug is absent.
+Its trusted provisioning tools are available only to company owners/admins writing in the app:
 
-- `list_company_agents`: the company's agents, so it does not duplicate one, with each agent's
-  departments and roles and its own desk's address; `department` (a slug) lists only that
-  department's members and role holders. An entry carries no intake schema yet: that arrives with
-  `channel.call` (agent-workflow-call);
-- `create_agent_channel`: provisions the new agent with its own autonomous desk at its slug and,
-  when `channel_slug` names another address, a second team (never public) desk bound to the
-  reply-mode workflow the conversation chose (p08 D2). `department` and `role` place the agent in
-  a department.
+- `list_company_agents` lists agents, their departments and roles, and their principal addresses.
+  The `department` slug filter limits entries to that department's members and role holders.
+- `create_agent` creates the agent, its canonical principal address and active published default
+  workflow binding in one transaction. `department` and `role` place the agent in the organization.
+- `create_desk_for_agent` creates an optional shared desk answered by an existing agent. The
+  requester becomes the binding's run-as member. The desk has its own access settings and address.
 
-Both answer only an owner or admin writing in the app; the requester becomes the binding's run-as
-member.
-
-An owner or admin can provision the same way from the UI: an agent's settings offer "Create additional desk" beside the desk the agent already has.
+The ordinary agent authoring API cannot acquire Builder privileges. The UI uses the same
+provisioning owners and offers **Create additional desk** beside the agent's direct address.
+A direct address is separate from the desks the agent staffs; public access to either is configured
+independently. See [Agent authoring](agent-authoring.md#direct-address-and-shared-desks).

@@ -1,0 +1,28 @@
+[
+  {
+    "path": "src/adapters/http/routes/ui_schedules.rs",
+    "entire_file_equals_HEAD": true,
+    "sha256": "26aec2068b51c62f33a9e2da8fad168b190dc080b7434441b8eaeb6b9fa2f832"
+  },
+  {
+    "path": "src/adapters/http/routes/knowledge/upload.rs",
+    "entire_file_equals_HEAD": true,
+    "sha256": "374c22a7a0d9b45d8952799edb20cb0e584ee25bea5f282011b63f9e228ea0a1"
+  },
+  {
+    "path": "src/application/services/model_usage/mod.rs",
+    "entire_file_equals_HEAD": true,
+    "sha256": "1d7bd8974cd4617248587189569a80508adb63891916ef9c57e2d1a659f7c285"
+  },
+  {
+    "path": "src/domain/workflow/reply_integrity.rs",
+    "entire_file_equals_HEAD": true,
+    "sha256": "1de31bb71786e68dea6d9960d87edb85d26f509387f6fd3ea69bd0fe3259b579"
+  },
+  {
+    "path": "src/adapters/persistence/department.rs",
+    "context": "place_in_department_on through following documentation",
+    "equals_HEAD": true,
+    "sha256": "5ffef772d52c4ac00981da202ce032d70cbb578af0143026f906b5b67aa3b721"
+  }
+]

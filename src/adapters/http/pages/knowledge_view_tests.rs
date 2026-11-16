@@ -83,7 +83,7 @@ pub(super) fn restricted_browser_fixture() -> String {
         None,
         crate::adapters::http::pages::MessageScope {
             company_id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
         },
         crate::adapters::http::pages::RunLinkAccess::Label,
     );

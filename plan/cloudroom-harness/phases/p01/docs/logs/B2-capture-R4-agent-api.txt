@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.24s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 2 tests
+test adapters::http::routes::agent::api_tests::api_agents_carry_no_retired_runtime_fields ... ok
+test adapters::http::routes::agent::api_tests::library_builder_copy_keeps_its_grants_on_an_explicit_model ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4062 filtered out; finished in 0.87s
+

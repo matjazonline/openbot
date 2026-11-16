@@ -104,7 +104,9 @@ async fn channel_reply_authoring_select_clear_stale_form_and_escaped_rejection()
         .channel_replies()
         .channel_reply_settings(
             CompanyId::new(f.company),
-            RelatedChannelId::new(channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(channel)).as_uuid(),
+            ),
             f.ui(f.owner).actor().unwrap(),
         )
         .await
@@ -131,7 +133,9 @@ async fn channel_reply_authoring_rejects_invalid_projection_before_activation_an
             .channel_replies()
             .channel_reply_settings(
                 CompanyId::new(f.company),
-                RelatedChannelId::new(channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(channel)).as_uuid()
+                ),
                 f.ui(f.owner).actor().unwrap(),
             )
             .await

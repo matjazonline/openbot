@@ -5,8 +5,10 @@ import { canonicalOrigin, ConfigurationRequired, defineSettings, recoverEnrollme
 import { JOURNAL_SCHEMA, Journal } from './journal.js';
 import { acquireProfileLock } from './lock.js';
 import { CloudroomSdk, sdkSignal } from './sdk.js';
+import { NativeMcpProxy } from './mcp-proxy.js';
 
 export default async function openbot(bb: BbPluginApi): Promise<void> {
+  if(typeof bb.agents?.configureRequired!=='function' || typeof bb.experimental_hooks?.on!=='function' || typeof bb.experimental_hooks?.recheck!=='function') throw new ConfigurationRequired('Install the verified Cloudroom native configuration compatibility patch');
   const settings = defineSettings(bb); const db = bb.storage.database();
   bb.storage.migrate(db, [...JOURNAL_SCHEMA]);
   const journal = new Journal(db);
@@ -22,6 +24,8 @@ export default async function openbot(bb: BbPluginApi): Promise<void> {
       finally { if (ownSecret) expectedSecrets.delete(nextSecret); }
     } };
   const sdk = new CloudroomSdk(bb, journal, () => selected);
+  sdk.registerRequiredConfiguration(bb);
+  new NativeMcpProxy(journal,sdk,{current:()=>connector?.nativeMcpConnection,latest:()=>connector?.latestNativeMcpConnection}).register(bb);
   settings.onChange((next, prev) => {
     if (next.openbotOrigin !== prev.openbotOrigin
         || (next.enrollment !== prev.enrollment && !expectedSecrets.has(next.enrollment))
@@ -56,6 +60,7 @@ export default async function openbot(bb: BbPluginApi): Promise<void> {
         recoveryRequired: journal.initialized() ? journal.recoveryRequired() : false,
         sequence: journal.initialized() ? journal.sequence() : 0,
         acknowledged: journal.initialized() ? journal.acknowledged() : 0, providers: [...sdk.health.values()],
+        nativeConfiguration: sdk.nativeConfigurationIssue,
         journal: journal.initialized() ? journal.diagnostics() : undefined,
       }) };
       if (argv.length === 1 && argv[0] === 'projects') {

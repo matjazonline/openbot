@@ -119,15 +119,16 @@ fn execute(bundle: Arc<PublishedBundle>, mut request: SampleRequest) -> AppResul
                     })
                     .collect();
                 request.agents.push(ResolvedAgentDefinition {
+                    native_permissions: Default::default(),
                     company_id: next.company_id(),
                     agent_id: reference.agent_id,
                     key: reference.key.clone(),
                     instructions: "Sample instructions".into(),
-                    model: ModelSettings {
+                    model: Some(ModelSettings {
                         provider: name("test"),
                         model: "sample".into(),
                         max_output_tokens: 1000,
-                    },
+                    }),
                     tools,
                     skills: vec![],
                 });

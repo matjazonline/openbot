@@ -1,0 +1,25 @@
+error[E0599]: no method named `create_user` found for struct `PostgresPersistence` in the current scope
+   --> /private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/plan/cloudroom-harness/phases/p01/docs/logs/B1-review-copy-race.rs:10:13
+    |
+ 10 |  let user=p.create_user(&label,&format!("{label}@example.test"),"unused").await.unwrap();
+    |             ^^^^^^^^^^^
+    |
+   ::: src/application/use_cases/user/ports.rs:107:14
+    |
+107 |     async fn create_user(
+    |              ----------- the method is available for `PostgresPersistence` here
+    |
+    = help: items from traits can only be used if the trait is in scope
+help: there is a method `create_external_user` with a similar name, but with different arguments
+   --> src/application/use_cases/user/ports.rs:103:1
+    |
+103 | #[async_trait]
+    | ^^^^^^^^^^^^^^
+help: trait `UserPersistence` which provides `create_user` is implemented but not in scope; perhaps you want to import it
+    |
+  1 + use open_bots::use_cases::user::UserPersistence;
+    |
+
+error: aborting due to 1 previous error
+
+For more information about this error, try `rustc --explain E0599`.

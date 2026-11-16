@@ -1,0 +1,5 @@
+application::workflow::native_mcp::tests::native_broker_compiles_real_mcp_contract_and_binds_original_reviewer: test
+application::workflow::native_mcp::tests::native_broker_refuses_invalid_arguments_and_non_mcp_sources: test
+application::workflow::native_mcp::tests::native_broker_refuses_postgres_nul_values_and_keys_before_publication: test
+
+3 tests, 0 benchmarks

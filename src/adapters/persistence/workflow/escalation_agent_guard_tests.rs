@@ -1,5 +1,4 @@
 use super::*;
-use crate::application::workflow::channel_reply::{ChannelReplies, ConfigureChannelReply};
 
 pub(super) async fn reject_requested_binding(
     f: &AgentCase,
@@ -22,7 +21,7 @@ pub(super) async fn reject_requested_binding(
         .request("requested-unrelated-notice-binding", trigger);
     request.binding_id = other;
     request.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(intent.channel),
+        target: intent.target,
         thread_id: crate::application::workflow::RelatedThreadId::new(intent.thread),
     };
     request.input = p.trigger_input(intent).await.unwrap().to_value();
@@ -30,9 +29,9 @@ pub(super) async fn reject_requested_binding(
     request.correlation_id = intent.correlation;
     request.delivery_policy = intent.delivery_policy;
     let service = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight);
-    let result = service.admit(request).await.unwrap();
+    let result = service.admit(request).await;
     assert!(
-        matches!(result, AdmissionResult::Stale),
+        matches!(result, Err(AppError::NotFound(_))),
         "a requested unrelated binding must not bypass captured-origin revalidation: {result:?}"
     );
     assert_eq!(facts(f).await["runs"], 0);
@@ -43,21 +42,12 @@ async fn workflow_escalation_agent_origin_policy_stays_private_without_a_reply_c
     let f = Box::pin(pending_agent()).await;
     let p = f.people.role.p();
     let company = f.people.role.company();
-    let actor = f.people.role.admission.binding.target.actor;
-    let channel = RelatedChannelId::new(f.created.desk_id);
-    let settings = p
-        .channel_reply_settings(company, channel, actor)
-        .await
-        .unwrap()
-        .unwrap();
-    p.configure_channel_reply(ConfigureChannelReply {
-        company,
-        channel,
-        actor,
-        expected: Some(settings.revision),
-        responder: None,
-        approval_policy: None,
-    })
+    // Deliberately omit only the reply-context snapshot in this isolated DB. The real
+    // selected route remains live; immutable private origins must not depend on that snapshot.
+    sqlx::query(
+        "ALTER TABLE workflow_message_intents DISABLE TRIGGER channel_reply_ingress_snapshot",
+    )
+    .execute(p.pool())
     .await
     .unwrap();
     assert_eq!(
@@ -90,66 +80,153 @@ async fn workflow_escalation_agent_origin_policy_stays_private_without_a_reply_c
     assert!(private);
 }
 
-/// The receipt guard binds the receipt's message to its notice through the key's local part.
-/// Replaying the committed receipt passes the guard and is refused only as a duplicate; once the
-/// message's key names anything but this notice, the guard itself refuses it.
+/// Mutate the canonical key immediately before native receipt validation, while the real
+/// projector fence/route/source are still valid. Post-completion replay would mask this check.
 #[tokio::test]
 async fn workflow_escalation_agent_receipt_guard_binds_the_message_key_to_its_notice() {
-    let f = Box::pin(pending_agent()).await;
-    let p = f.people.role.p();
-    let company = f.people.role.company().as_uuid();
-    assert_eq!(
-        notification_worker(p, Default::default())
-            .drain_once()
+    use crate::adapters::persistence::test_support::{
+        minted_agent_notice_key, minted_agent_notice_recipient,
+    };
+    use crate::application::notification::{NotificationPersistence, NotificationProjectionCommit};
+    for key in [
+        "'<'||gen_random_uuid()::text||'@'||split_part(metadata.rfc_message_id,'@',2)",
+        "'<escalation-'||NEW.notice_id::text||'@'||split_part(metadata.rfc_message_id,'@',2)",
+        "'<'||NEW.notice_id::text||'>'",
+    ] {
+        let f = Box::pin(pending_agent()).await;
+        let p = f.people.role.p();
+        sqlx::raw_sql(&format!("CREATE SEQUENCE notice_key_probe_reached; \
+            CREATE FUNCTION tamper_notice_key() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN \
+              PERFORM nextval('notice_key_probe_reached'); \
+              UPDATE email_message_metadata AS metadata SET rfc_message_id={key} \
+                WHERE metadata.company_id=NEW.company_id AND metadata.message_id=NEW.message_id; \
+              RETURN NEW; END $$; \
+            CREATE TRIGGER aa_tamper_notice_key BEFORE INSERT ON workflow_escalation_agent_receipts \
+              FOR EACH ROW EXECUTE FUNCTION tamper_notice_key();"))
+            .execute(p.pool()).await.unwrap();
+        let claim = p
+            .claim_notification_events(
+                crate::transport::WorkerId::random(),
+                std::time::Duration::from_secs(30),
+                1,
+            )
             .await
-            .unwrap(),
-        1
-    );
-    let replay = "INSERT INTO workflow_escalation_agent_receipts(company_id,notice_id,event_id, \
-        principal_id,agent_id,desk_id,binding_id,binding_revision,message_id,intent_id) \
-        SELECT company_id,notice_id,event_id,principal_id,agent_id,desk_id,binding_id, \
-        binding_revision,message_id,intent_id FROM workflow_escalation_agent_receipts WHERE company_id=$1";
-    let refused = async |key: Option<&str>| {
-        let mut tx = p.pool().begin().await.unwrap();
-        if let Some(key) = key {
-            sqlx::query(&format!(
-                "UPDATE email_message_metadata AS metadata SET rfc_message_id={key} \
-                 FROM workflow_escalation_agent_receipts AS receipt \
-                 WHERE receipt.company_id=$1 AND metadata.company_id=receipt.company_id \
-                   AND metadata.message_id=receipt.message_id"
-            ))
-            .bind(company)
-            .execute(&mut *tx)
+            .unwrap()
+            .pop()
+            .unwrap();
+        let expected = p
+            .resolve_notification_projection(&claim.event)
             .await
             .unwrap();
-        }
-        let error = sqlx::query(replay)
-            .bind(company)
-            .execute(&mut *tx)
+        let key = minted_agent_notice_key(&expected);
+        let recipient = minted_agent_notice_recipient(&expected);
+        let error = p
+            .commit_notification_projection(NotificationProjectionCommit {
+                fence: &claim.lease,
+                expected: &expected,
+                email: None,
+                agent_message_key: key.as_ref(),
+                agent_recipient: recipient.as_ref(),
+                escalation_ack_hours: Default::default(),
+            })
             .await
             .unwrap_err();
-        tx.rollback().await.unwrap();
-        let error = error.into_database_error().unwrap();
-        (
-            error.code().unwrap().into_owned(),
-            error.constraint().map(str::to_owned),
-        )
-    };
-    // The minted key: everything holds, so only the primary key refuses the copy.
-    assert_eq!(refused(None).await.0, "23505");
-    let guard = Some("workflow_escalation_agent_receipt_guard".to_owned());
-    for forged in [
-        // Another notice's id under the same deployment domain.
-        "'<'||gen_random_uuid()::text||'@'||split_part(metadata.rfc_message_id,'@',2)",
-        // The retired hand-built local part under the same deployment domain.
-        "'<escalation-'||receipt.notice_id::text||'@'||split_part(metadata.rfc_message_id,'@',2)",
-        // The notice id with no domain at all.
-        "'<'||receipt.notice_id::text||'>'",
-    ] {
-        assert_eq!(
-            refused(Some(forged)).await,
-            ("23514".to_owned(), guard.clone()),
-            "{forged}"
+        assert!(
+            error.to_string().contains("agent notice origin must prove"),
+            "{error}"
         );
+        let reached: bool = sqlx::query_scalar("SELECT is_called FROM notice_key_probe_reached")
+            .fetch_one(p.pool())
+            .await
+            .unwrap();
+        assert!(
+            reached,
+            "failure before the native receipt boundary proves nothing about key binding"
+        );
+        assert_eq!(facts(&f).await["messages"], 0);
+        assert_eq!(facts(&f).await["intents"], 0);
+        let receipts: i64 =
+            sqlx::query_scalar("SELECT count(*) FROM workflow_escalation_agent_receipts")
+                .fetch_one(p.pool())
+                .await
+                .unwrap();
+        assert_eq!(receipts, 0);
     }
 }
+
+#[tokio::test]
+async fn workflow_escalation_agent_authenticated_projector_ignores_unobserved_wire_identity_locks()
+{
+    use crate::adapters::persistence::test_support::{
+        minted_agent_notice_key, minted_agent_notice_recipient,
+    };
+    use crate::application::notification::{
+        NotificationPersistence, NotificationProjectionCommit, NotificationProjectionCommitOutcome,
+    };
+    let f = Box::pin(pending_agent()).await;
+    let p = f.people.role.p();
+    let claim = p
+        .claim_notification_events(
+            crate::transport::WorkerId::random(),
+            std::time::Duration::from_secs(30),
+            1,
+        )
+        .await
+        .unwrap()
+        .pop()
+        .unwrap();
+    let expected = p
+        .resolve_notification_projection(&claim.event)
+        .await
+        .unwrap();
+    let key = minted_agent_notice_key(&expected);
+    let recipient = minted_agent_notice_recipient(&expected);
+    let mut blocked = p.pool().begin().await.unwrap();
+    crate::adapters::persistence::participant::lock_identity_key(
+        &mut blocked,
+        f.people.role.company().as_uuid(),
+        recipient.as_ref().unwrap(),
+    )
+    .await
+    .unwrap();
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(2),
+        p.commit_notification_projection(NotificationProjectionCommit {
+            fence: &claim.lease,
+            expected: &expected,
+            email: None,
+            agent_message_key: key.as_ref(),
+            agent_recipient: recipient.as_ref(),
+            escalation_ack_hours: Default::default(),
+        }),
+    )
+    .await;
+    blocked.rollback().await.unwrap();
+    assert_eq!(
+        result
+            .expect("the authenticated projector observes no wire identity")
+            .unwrap()
+            .0,
+        NotificationProjectionCommitOutcome::Applied
+    );
+    let unobserved: bool=sqlx::query_scalar(
+        "SELECT count(*)=1 AND bool_and(author.kind='system' AND message.authored_identity_id IS NULL \
+         AND NOT EXISTS(SELECT 1 FROM message_participants AS participant \
+             WHERE participant.company_id=message.company_id AND participant.message_id=message.id)) \
+         FROM workflow_escalation_agent_receipts AS receipt JOIN messages AS message \
+           ON message.company_id=receipt.company_id AND message.id=receipt.message_id \
+         JOIN principals AS author ON author.company_id=message.company_id AND author.id=message.author_principal_id \
+         WHERE receipt.company_id=$1")
+        .bind(f.people.role.company().as_uuid()).fetch_one(p.pool()).await.unwrap();
+    assert!(unobserved);
+    let intent = claims(&f).await.pop().unwrap();
+    process(&f, intent).await;
+    assert_eq!(
+        facts(&f).await["runs"],
+        1,
+        "the actual targeted claim admits its one accountable root"
+    );
+}
+
+#[path = "escalation_agent_native_claim_tests.rs"]
+mod native_claims;

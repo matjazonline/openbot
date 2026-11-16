@@ -51,11 +51,7 @@ pub(super) async fn thread_audience_on(
     company: CompanyId,
     association: RelatedAssociation,
 ) -> AppResult<AccessLevel> {
-    let RelatedAssociation::Thread {
-        channel_id,
-        thread_id,
-    } = association
-    else {
+    let RelatedAssociation::Thread { target, thread_id } = association else {
         return Ok(AccessLevel::PUBLIC);
     };
     // One MVCC statement is the audience's freeze point. DISTINCT bounds allocation by
@@ -67,8 +63,9 @@ pub(super) async fn thread_audience_on(
            ON (principal.company_id,principal.id)=(party.company_id,party.principal_id) \
          JOIN companies AS company ON company.id=party.company_id \
          LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(principal.company_id,principal.user_id) \
-         WHERE party.company_id=$1 AND party.channel_id=$2 AND party.thread_id=$3 LIMIT $4")
-        .bind(company.as_uuid()).bind(channel_id.as_uuid()).bind(thread_id.as_uuid()).bind((MAX_READER_FACTS+1) as i64)
+         WHERE party.company_id=$1 AND party.channel_id IS NOT DISTINCT FROM $2::uuid AND party.thread_id=$3 \
+           AND party.target_principal_id IS NOT DISTINCT FROM $5::uuid LIMIT $4")
+        .bind(company.as_uuid()).bind(target.desk_id()).bind(thread_id.as_uuid()).bind((MAX_READER_FACTS+1) as i64).bind(target.principal_id().map(|id| id.as_uuid()))
         .fetch_all(db).await?;
     audience(company, facts)
 }
@@ -219,19 +216,24 @@ pub(crate) async fn destination_level_on(
     company: CompanyId,
     run: RunId,
 ) -> AppResult<AccessLevel> {
-    let (actor, channel, thread): (Uuid, Option<Uuid>, Option<Uuid>) = sqlx::query_as(
-        "SELECT run.actor_id, run.channel_id, run.thread_id FROM workflow_runs AS run \
-         WHERE run.company_id=$1 AND run.id=$2",
-    )
-    .bind(company.as_uuid())
-    .bind(run.as_uuid())
-    .fetch_optional(&mut *db)
-    .await?
-    .ok_or_else(missing)?;
-    let association = binding_rows::association_from_columns(channel, thread)?;
+    #[derive(sqlx::FromRow)]
+    struct Destination {
+        actor_id: Uuid,
+        channel_id: Option<Uuid>,
+        principal_id: Option<Uuid>,
+        thread_id: Option<Uuid>,
+    }
+    let destination = sqlx::query_as::<_, Destination>(
+        "SELECT actor_id, channel_id, principal_id, thread_id FROM workflow_runs WHERE company_id=$1 AND id=$2",
+    ).bind(company.as_uuid()).bind(run.as_uuid()).fetch_optional(&mut *db).await?.ok_or_else(missing)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: destination.channel_id,
+        principal_id: destination.principal_id,
+        thread_id: destination.thread_id,
+    })?;
     match association {
         RelatedAssociation::Thread { .. } => thread_audience_on(db, company, association).await,
-        _ => actor_level_on(db, company, Some(actor)).await,
+        _ => actor_level_on(db, company, Some(destination.actor_id)).await,
     }
 }
 

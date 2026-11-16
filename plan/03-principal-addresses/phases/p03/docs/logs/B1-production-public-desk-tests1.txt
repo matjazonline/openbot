@@ -1,0 +1,25 @@
+
+running 8 tests
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_private_selection_preserves_members_only ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_a_hidden_members_only_setting ... ok
+test application::use_cases::channel::public_settings_tests::public_desk_private_agent_public_selection_clears_only_the_members_only_flag ... ok
+observed gated transaction pids=[32890] blocker=32926 elapsed_ms=578
+2026-11-15T11:37:00.030633Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T11:37:00.038789Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(04199181-8105-4ebf-af76-1db60e7a3db6)
+2026-11-15T11:37:00.079154Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(83f5b198-7fba-4a62-93f6-6e174f5a02c7)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... ok
+2026-11-15T11:37:00.620218Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b2e87a96-5e19-42bb-baf7-fad68c02da1e)
+2026-11-15T11:37:00.654392Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(b2e87a96-5e19-42bb-baf7-fad68c02da1e)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::public_desk_private_agent_real_runtime_replies_on_the_desk_and_keeps_direct_policy_independent ... ok
+observed gated transaction pids=[32966] blocker=32980 elapsed_ms=551
+2026-11-15T11:37:01.481056Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T11:37:01.501157Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(da0f35a6-bf6c-4e42-b034-037b0424ba55)
+2026-11-15T11:37:01.558323Z  WARN open_bots::application::use_cases::thread::ingest::routing: Sender is not authorized for this inbox target=Desk(39c155d2-9baa-4410-8871-1dcf8a331ec6)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::webhook::public_desk_private_agent_signed_webhook_claims_real_inbox_and_preserves_auth_spam_and_reply_scope ... ok
+observed gated transaction pids=[32992] blocker=33018 elapsed_ms=541
+observed gated transaction pids=[33040] blocker=33102 elapsed_ms=579
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_refuse_external_egress_after_actual_audience_change ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::public_desk_private_agent_entrypoints_external_cc_has_public_ceiling_before_search ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4588 filtered out; finished in 18.44s
+

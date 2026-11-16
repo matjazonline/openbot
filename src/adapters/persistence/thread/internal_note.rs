@@ -107,6 +107,38 @@ async fn load_note_by_command(
         .transpose()
 }
 
+/// Direct note writes and replay hold current target/actor authority through their commit.
+async fn hold_direct_authority(
+    tx: &mut Transaction<'_, Postgres>,
+    company_id: Uuid,
+    target: crate::entities::address::AddressTarget,
+    actor: PrincipalId,
+) -> AppResult<()> {
+    let Some(target) = target.principal_id() else {
+        return Ok(());
+    };
+    sqlx::query("SELECT id FROM companies WHERE id=$1 FOR KEY SHARE")
+        .bind(company_id)
+        .execute(&mut **tx)
+        .await?;
+    sqlx::query(
+        "SELECT id FROM principals WHERE company_id=$1 AND id=ANY($2) ORDER BY id FOR SHARE",
+    )
+    .bind(company_id)
+    .bind(vec![target.as_uuid(), actor.as_uuid()])
+    .fetch_all(&mut **tx)
+    .await?;
+    let allowed: bool = sqlx::query_scalar(
+        "SELECT EXISTS(SELECT 1 FROM principals AS target WHERE target.company_id=$1 AND target.id=$2 \
+         AND target.kind IN ('person','agent') AND principal_direct_can_view($1,$2,$3))"
+    ).bind(company_id).bind(target.as_uuid()).bind(actor.as_uuid())
+        .fetch_one(&mut **tx).await?;
+    if !allowed {
+        return Err(AppError::NotFound("Thread not found.".into()));
+    }
+    Ok(())
+}
+
 pub(super) async fn create_internal_note(
     pool: &PgPool,
     command: &AddInternalNote,
@@ -115,7 +147,7 @@ pub(super) async fn create_internal_note(
     command.validate().map_err(AppError::BadRequest)?;
     let command_fingerprint = fingerprint(serde_json::json!({
         "company_id": command.company_id,
-        "channel_id": command.channel_id,
+        "target": command.target,
         "thread_id": command.thread_id,
         "text": command.text.trim(),
         "supersedes_note_id": command.supersedes_note_id,
@@ -123,6 +155,7 @@ pub(super) async fn create_internal_note(
         "actor": actor.as_uuid(),
     }));
     let mut tx = pool.begin().await.map_err(AppError::from)?;
+    hold_direct_authority(&mut tx, command.company_id, command.target, actor).await?;
     lock_command(&mut tx, command.company_id, command.command_id).await?;
     if let Some((_, existing_fingerprint, message_id, thread_id)) =
         load_note_by_command(&mut tx, command.company_id, command.command_id).await?
@@ -162,12 +195,12 @@ pub(super) async fn create_internal_note(
     sqlx::query(
         r#"INSERT INTO internal_notes (
                 id, company_id, channel_id, thread_id, message_id, command_id,
-                command_fingerprint, author_principal_id, provenance, supersedes_note_id
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)"#,
+                command_fingerprint, author_principal_id, provenance, supersedes_note_id, principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)"#,
     )
     .bind(note_id)
     .bind(command.company_id)
-    .bind(command.channel_id)
+    .bind(command.target.desk_id())
     .bind(command.thread_id)
     .bind(inserted.canonical_id.as_uuid())
     .bind(command.command_id)
@@ -175,6 +208,7 @@ pub(super) async fn create_internal_note(
     .bind(actor.as_uuid())
     .bind(command.provenance.as_str())
     .bind(command.supersedes_note_id)
+    .bind(command.target.principal_id().map(|id| id.as_uuid()))
     .execute(&mut *tx)
     .await
     .map_err(|error| match &error {
@@ -198,13 +232,16 @@ async fn note_actor_role(
         r#"SELECT principal.kind
              FROM threads AS thread
              JOIN principals AS principal ON principal.company_id = thread.company_id
-            WHERE thread.company_id = $1 AND thread.channel_id = $2 AND thread.id = $3
+            WHERE thread.company_id = $1 AND thread.channel_id IS NOT DISTINCT FROM $2 AND thread.id = $3
+              AND thread.principal_id IS NOT DISTINCT FROM $5
+              AND (thread.principal_id IS NULL OR principal_direct_can_view($1,thread.principal_id,$4))
               AND principal.id = $4 AND principal.kind <> 'external'"#,
     )
     .bind(command.company_id)
-    .bind(command.channel_id)
+    .bind(command.target.desk_id())
     .bind(command.thread_id)
     .bind(actor.as_uuid())
+    .bind(command.target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?
@@ -226,16 +263,17 @@ async fn lock_active_note(
 ) -> AppResult<()> {
     let active = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT note.id FROM internal_notes AS note
-            WHERE note.company_id = $1 AND note.channel_id = $2 AND note.thread_id = $3
-              AND note.id = $4
+            WHERE note.company_id = $1 AND note.channel_id IS NOT DISTINCT FROM $2 AND note.thread_id = $3
+              AND note.id = $4 AND note.principal_id IS NOT DISTINCT FROM $5
               AND NOT EXISTS (SELECT 1 FROM internal_notes AS next WHERE next.supersedes_note_id = note.id)
               AND NOT EXISTS (SELECT 1 FROM internal_note_tombstones AS gone WHERE gone.note_id = note.id)
             FOR UPDATE OF note"#,
     )
     .bind(command.company_id)
-    .bind(command.channel_id)
+    .bind(command.target.desk_id())
     .bind(command.thread_id)
     .bind(note_id)
+    .bind(command.target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut **tx)
     .await
     .map_err(AppError::from)?;
@@ -255,12 +293,13 @@ pub(super) async fn tombstone_internal_note(
 ) -> AppResult<InternalNoteView> {
     let command_fingerprint = fingerprint(serde_json::json!({
         "company_id": command.company_id,
-        "channel_id": command.channel_id,
+        "target": command.target,
         "thread_id": command.thread_id,
         "note_id": command.note_id,
         "actor": actor.as_uuid(),
     }));
     let mut tx = pool.begin().await.map_err(AppError::from)?;
+    hold_direct_authority(&mut tx, command.company_id, command.target, actor).await?;
     lock_command(&mut tx, command.company_id, command.command_id).await?;
     let existing: Option<(Uuid, String)> = sqlx::query_as(
         "SELECT note_id, command_fingerprint FROM internal_note_tombstones WHERE company_id = $1 AND command_id = $2",
@@ -283,17 +322,20 @@ pub(super) async fn tombstone_internal_note(
     let note_exists = sqlx::query_scalar::<_, Uuid>(
         r#"SELECT note.id FROM internal_notes AS note
              JOIN principals AS actor ON actor.company_id = note.company_id AND actor.id = $5
-            WHERE note.company_id = $1 AND note.channel_id = $2 AND note.thread_id = $3
-              AND note.id = $4 AND actor.kind <> 'external'
+            WHERE note.company_id = $1 AND note.channel_id IS NOT DISTINCT FROM $2 AND note.thread_id = $3
+              AND note.id = $4 AND note.principal_id IS NOT DISTINCT FROM $6
+              AND (note.principal_id IS NULL OR principal_direct_can_view($1,note.principal_id,$5))
+              AND actor.kind <> 'external'
               AND NOT EXISTS (SELECT 1 FROM internal_notes AS next WHERE next.supersedes_note_id = note.id)
               AND NOT EXISTS (SELECT 1 FROM internal_note_tombstones AS gone WHERE gone.note_id = note.id)
             FOR UPDATE OF note"#,
     )
     .bind(command.company_id)
-    .bind(command.channel_id)
+    .bind(command.target.desk_id())
     .bind(command.thread_id)
     .bind(command.note_id)
     .bind(actor.as_uuid())
+    .bind(command.target.principal_id().map(|id| id.as_uuid()))
     .fetch_optional(&mut *tx)
     .await
     .map_err(AppError::from)?;

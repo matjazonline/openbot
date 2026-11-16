@@ -1,0 +1,15 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department' (15813953) panicked at src/adapters/persistence/workflow/direct_role_admission_tests.rs:47:14:
+both real writers reached the held company lock: Elapsed(())
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::direct::direct_binding_role_admission_and_competing_roster_write_capture_one_current_department
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4587 filtered out; finished in 6.79s
+

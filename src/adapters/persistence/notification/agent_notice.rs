@@ -136,7 +136,19 @@ async fn attempt_on(
         .ok_or_else(|| AppError::Internal("Missing owned agent notice".into()))?;
     match hint {
         Some(route) if route::eligible_on(tx, &event, &source, &route).await? => {
-            Box::pin(message::commit_on(tx, &event, &source, &route, key)).await?;
+            let recipient = commit.agent_recipient.as_ref().ok_or_else(|| {
+                AppError::Superseded("Agent notice has no rendered current recipient".into())
+            })?;
+            Box::pin(message::commit_on(
+                tx,
+                &event,
+                &source,
+                &route,
+                key,
+                recipient,
+                commit.fence,
+            ))
+            .await?;
         }
         _ => fail_route_on(tx, &event, &source).await?,
     }

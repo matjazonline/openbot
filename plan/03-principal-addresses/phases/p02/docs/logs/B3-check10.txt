@@ -1,0 +1,326 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0050]: method `operational_summary` has 3 parameters but the declaration in trait `application::attention::AttentionPersistence::operational_summary` has 4
+   --> src/adapters/http/routes/attention_authorization_tests.rs:166:9
+    |
+166 | /         &self,
+167 | |         _company_id: Uuid,
+168 | |         _visible_channel_ids: &[Uuid],
+    | |_____________________________________^ expected 4 parameters, found 3
+    |
+   ::: src/application/attention.rs:35:9
+    |
+ 35 | /         &self,
+ 36 | |         company_id: uuid::Uuid,
+ 37 | |         visible_channel_ids: &[uuid::Uuid],
+ 38 | |         viewer: PrincipalId,
+    | |___________________________- trait requires 4 parameters
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+  --> src/adapters/persistence/workflow/attention_decision_tests.rs:31:22
+   |
+31 |     p.list_attention(AttentionQuery {
+   |                      ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+  --> src/adapters/persistence/workflow/escalation_attention_tests.rs:15:25
+   |
+15 |         .list_attention(AttentionQuery {
+   |                         ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+  --> src/adapters/persistence/workflow/escalation_person_tests.rs:61:25
+   |
+61 |         .list_attention(AttentionQuery {
+   |                         ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/workflow/escalation_person_tests.rs:91:14
+   |
+91 |             .operational_summary(f.role.company().as_uuid(), &channels)
+   |              ^^^^^^^^^^^^^^^^^^^--------------------------------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+   |
+note: method defined here
+  --> src/application/attention.rs:34:14
+   |
+34 |     async fn operational_summary(
+   |              ^^^^^^^^^^^^^^^^^^^
+...
+38 |         viewer: PrincipalId,
+   |         ------
+help: provide the argument
+   |
+91 |             .operational_summary(f.role.company().as_uuid(), &channels, /* PrincipalId */)
+   |                                                                       +++++++++++++++++++
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+  --> src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs:57:29
+   |
+57 |             .list_attention(AttentionQuery {
+   |                             ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+   --> src/adapters/persistence/workflow/knowledge_message_tests.rs:341:25
+    |
+341 |         .list_attention(AttentionQuery {
+    |                         ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+  --> src/adapters/persistence/attention_tests.rs:24:5
+   |
+24 |     AttentionQuery {
+   |     ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0609]: no field `channel_id` on type `&domain::entities::attention::AttentionItem`
+  --> src/adapters/persistence/attention_tests.rs:60:25
+   |
+60 |         assert_eq!(item.channel_id, channel);
+   |                         ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `source_kind`, `source_id`, `company_id`, `target`, `thread_id` ... and 14 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/attention_tests.rs:90:21
+   |
+90 |     let summary = p.operational_summary(f.company, &[]).await.unwrap();
+   |                     ^^^^^^^^^^^^^^^^^^^---------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+   |
+note: method defined here
+  --> src/application/attention.rs:34:14
+   |
+34 |     async fn operational_summary(
+   |              ^^^^^^^^^^^^^^^^^^^
+...
+38 |         viewer: PrincipalId,
+   |         ------
+help: provide the argument
+   |
+90 |     let summary = p.operational_summary(f.company, &[], /* PrincipalId */).await.unwrap();
+   |                                                       +++++++++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::attention::AttentionItem`
+  --> src/adapters/persistence/workflow/attention_decision_tests.rs:77:25
+   |
+77 |         assert_eq!(item.channel_id, None);
+   |                         ^^^^^^^^^^ unknown field
+   |
+   = note: available fields are: `source_kind`, `source_id`, `company_id`, `target`, `thread_id` ... and 14 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/attention_decision_tests.rs:112:21
+    |
+112 |     let summary = p.operational_summary(company, &[]).await.unwrap();
+    |                     ^^^^^^^^^^^^^^^^^^^-------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+112 |     let summary = p.operational_summary(company, &[], /* PrincipalId */).await.unwrap();
+    |                                                     +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/attention_decision_tests.rs:130:11
+    |
+130 |         p.operational_summary(company, &[])
+    |           ^^^^^^^^^^^^^^^^^^^-------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+130 |         p.operational_summary(company, &[], /* PrincipalId */)
+    |                                           +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/attention_decision_tests.rs:196:11
+    |
+196 |         p.operational_summary(company, &[])
+    |           ^^^^^^^^^^^^^^^^^^^-------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+196 |         p.operational_summary(company, &[], /* PrincipalId */)
+    |                                           +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/attention_decision_tests.rs:220:11
+    |
+220 |         p.operational_summary(company, &[])
+    |           ^^^^^^^^^^^^^^^^^^^-------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+220 |         p.operational_summary(company, &[], /* PrincipalId */)
+    |                                           +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+  --> src/adapters/persistence/workflow/escalation_attention_tests.rs:89:14
+   |
+89 |             .operational_summary(f.scope.company.as_uuid(), &channels)
+   |              ^^^^^^^^^^^^^^^^^^^-------------------------------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+   |
+note: method defined here
+  --> src/application/attention.rs:34:14
+   |
+34 |     async fn operational_summary(
+   |              ^^^^^^^^^^^^^^^^^^^
+...
+38 |         viewer: PrincipalId,
+   |         ------
+help: provide the argument
+   |
+89 |             .operational_summary(f.scope.company.as_uuid(), &channels, /* PrincipalId */)
+   |                                                                      +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/escalation_attention_tests.rs:136:14
+    |
+136 |             .operational_summary(f.scope.company.as_uuid(), &channels)
+    |              ^^^^^^^^^^^^^^^^^^^-------------------------------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+136 |             .operational_summary(f.scope.company.as_uuid(), &channels, /* PrincipalId */)
+    |                                                                      +++++++++++++++++++
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+   --> src/adapters/persistence/workflow/message_delivery_tests.rs:288:26
+    |
+288 |         p.list_attention(AttentionQuery {
+    |                          ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/message_delivery_tests.rs:342:11
+    |
+342 |         p.operational_summary(company, &visible)
+    |           ^^^^^^^^^^^^^^^^^^^------------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+    |
+note: method defined here
+   --> src/application/attention.rs:34:14
+    |
+ 34 |     async fn operational_summary(
+    |              ^^^^^^^^^^^^^^^^^^^
+...
+ 38 |         viewer: PrincipalId,
+    |         ------
+help: provide the argument
+    |
+342 |         p.operational_summary(company, &visible, /* PrincipalId */)
+    |                                                +++++++++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/message_delivery_tests.rs:562:10
+    |
+562 |         .run_counts(company.as_uuid(), &[setup.channel])
+    |          ^^^^^^^^^^------------------------------------- argument #3 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/run_counts.rs:9:14
+    |
+  9 |     async fn run_counts(
+    |              ^^^^^^^^^^
+...
+ 13 |         viewer_user_id: Uuid,
+    |         --------------
+help: provide the argument
+    |
+562 |         .run_counts(company.as_uuid(), &[setup.channel], /* Uuid */)
+    |                                                        ++++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/adapters/persistence/workflow/message_delivery_tests.rs:584:10
+    |
+584 |         .run_counts(company.as_uuid(), &[setup.channel, setup.other])
+    |          ^^^^^^^^^^-------------------------------------------------- argument #3 of type `uuid::Uuid` is missing
+    |
+note: method defined here
+   --> src/application/run_counts.rs:9:14
+    |
+  9 |     async fn run_counts(
+    |              ^^^^^^^^^^
+...
+ 13 |         viewer_user_id: Uuid,
+    |         --------------
+help: provide the argument
+    |
+584 |         .run_counts(company.as_uuid(), &[setup.channel, setup.other], /* Uuid */)
+    |                                                                     ++++++++++++
+
+error[E0609]: no field `channel_id` on type `&domain::entities::attention::AttentionItem`
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1381:20
+     |
+1381 |     assert_eq!(row.channel_id, Some(s.channel));
+     |                    ^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `source_kind`, `source_id`, `company_id`, `target`, `thread_id` ... and 14 others
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1417:14
+     |
+1417 |             .operational_summary(company, &channels)
+     |              ^^^^^^^^^^^^^^^^^^^-------------------- argument #3 of type `domain::entities::transport::PrincipalId` is missing
+     |
+note: method defined here
+    --> src/application/attention.rs:34:14
+     |
+  34 |     async fn operational_summary(
+     |              ^^^^^^^^^^^^^^^^^^^
+...
+  38 |         viewer: PrincipalId,
+     |         ------
+help: provide the argument
+     |
+1417 |             .operational_summary(company, &channels, /* PrincipalId */)
+     |                                                    +++++++++++++++++++
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1355:9
+     |
+1355 |         AttentionQuery {
+     |         ^^^^^^^^^^^^^^ missing `direct_items`
+
+error[E0063]: missing field `direct_items` in initializer of `domain::entities::attention::AttentionQuery<'_>`
+   --> src/adapters/persistence/workflow/knowledge_view_tests.rs:206:25
+    |
+206 |         .list_attention(AttentionQuery {
+    |                         ^^^^^^^^^^^^^^ missing `direct_items`
+
+Some errors have detailed explanations: E0050, E0061, E0063, E0609.
+For more information about an error, try `rustc --explain E0050`.
+error: could not compile `open_bots` (lib test) due to 25 previous errors

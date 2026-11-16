@@ -49,7 +49,9 @@ pub(super) async fn read(
         .channel_replies()
         .channel_reply_settings(
             company(company_id),
-            RelatedChannelId::new(channel),
+            crate::entities::address::AddressTarget::Desk(
+                (RelatedChannelId::new(channel)).as_uuid(),
+            ),
             actor(&user)?,
         )
         .await?;
@@ -95,7 +97,7 @@ pub(super) async fn save(
         .channel_replies()
         .configure_channel_reply(ConfigureChannelReply {
             company: company(company_id),
-            channel: RelatedChannelId::new(channel),
+            target: crate::entities::address::AddressTarget::Desk(channel),
             actor,
             expected,
             responder,

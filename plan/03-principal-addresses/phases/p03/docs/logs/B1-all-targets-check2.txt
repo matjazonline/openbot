@@ -1,0 +1,63 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0277]: the trait bound `persistence::PostgresPersistence: application::use_cases::onboarding::OnboardingPersistence` is not satisfied
+   --> src/adapters/http/routes/onboarding.rs:606:56
+    |
+606 |         let mut session = OnboardingPersistence::begin(&persistence, owner, company)
+    |                           ---------------------------- ^^^^^^^^^^^^ unsatisfied trait bound
+    |                           |
+    |                           required by a bound introduced by this call
+    |
+help: the trait `application::use_cases::onboarding::OnboardingPersistence` is not implemented for `persistence::PostgresPersistence`
+   --> src/adapters/persistence/mod.rs:52:1
+    |
+ 52 | pub struct PostgresPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `application::use_cases::onboarding::OnboardingPersistence` is implemented for `persistence::onboarding::PostgresOnboarding`
+   --> src/adapters/persistence/onboarding.rs:46:1
+    |
+ 46 | impl OnboardingPersistence for PostgresOnboarding {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0277]: the trait bound `persistence::PostgresPersistence: application::use_cases::onboarding::OnboardingPersistence` is not satisfied
+   --> src/adapters/http/routes/onboarding.rs:623:42
+    |
+623 |             OnboardingPersistence::begin(&persistence, outsider, company)
+    |             ---------------------------- ^^^^^^^^^^^^ unsatisfied trait bound
+    |             |
+    |             required by a bound introduced by this call
+    |
+help: the trait `application::use_cases::onboarding::OnboardingPersistence` is not implemented for `persistence::PostgresPersistence`
+   --> src/adapters/persistence/mod.rs:52:1
+    |
+ 52 | pub struct PostgresPersistence {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+help: the trait `application::use_cases::onboarding::OnboardingPersistence` is implemented for `persistence::onboarding::PostgresOnboarding`
+   --> src/adapters/persistence/onboarding.rs:46:1
+    |
+ 46 | impl OnboardingPersistence for PostgresOnboarding {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+   --> src/adapters/persistence/department_roster_tests.rs:195:25
+    |
+195 |         let principal = agent_principal(f.pool(), f.company, &format!("agent-{index:02}")).await;
+    |                         ^^^^^^^^^^^^^^^                      ---------------------------- unexpected argument #3 of type `&std::string::String`
+    |
+note: expected `&Departments`, found `&Pool<Postgres>`
+   --> src/adapters/persistence/department_roster_tests.rs:195:41
+    |
+195 |         let principal = agent_principal(f.pool(), f.company, &format!("agent-{index:02}")).await;
+    |                                         ^^^^^^^^
+    = note: expected reference `&persistence::department::tests::Departments`
+               found reference `&Pool<sqlx::Postgres>`
+note: function defined here
+   --> src/adapters/persistence/department_roster_tests.rs:20:10
+    |
+ 20 | async fn agent_principal(f: &Departments, agent: Uuid) -> PrincipalId {
+    |          ^^^^^^^^^^^^^^^ ---------------
+help: remove the extra argument
+    |
+195 -         let principal = agent_principal(f.pool(), f.company, &format!("agent-{index:02}")).await;
+195 +         let principal = agent_principal(/* &Departments */, f.company).await;
+    |
+

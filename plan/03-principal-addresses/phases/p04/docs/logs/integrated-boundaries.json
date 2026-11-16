@@ -1,0 +1,56 @@
+[
+  {
+    "command": [
+      "scripts/tests/transport-boundary.sh"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-1.txt"
+  },
+  {
+    "command": [
+      "scripts/transport-boundary-check.sh"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-2.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-sample-boundary.py"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-3.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/workflow-sample-boundary.py"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-4.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/integration-boundary.py"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-5.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/integration-boundary.py"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-6.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-integration-docs.py"
+    ],
+    "exit_code": 0,
+    "log": "plan/03-principal-addresses/phases/p04/docs/logs/integrated-boundary-7.txt"
+  }
+]

@@ -63,16 +63,18 @@ Messages that other desks in the company hand to a members-only desk are still a
 the usual hop budget and loop refusal (see `inter_channel_agent_communication.md`): the
 restriction is on people and outside senders, not on desk-to-desk relays.
 
-### Agents' own desks
+### Agents' direct addresses
 
-Every company agent gets its own desk when it is created, on every creation path (the agents page,
-the JSON API, a library copy, onboarding, the Agent Builder): a team desk at the agent's slug,
-answered by that agent through the autonomous workflow. Creating the agent needs a model
-connection with an API key, because the desk answers on an explicit model; a taken address refuses
-the whole creation. The agent's settings show this desk's address and the departments it is in;
-"Create additional desk" adds more. Library agents get no desk until copied into a company.
+Every company agent gets a principal address at its slug and an active published workflow binding
+when created through the agents page, JSON API, library copy, onboarding or Agent Builder. This
+creates no desk. A keyed model connection is required and a taken address refuses the whole
+transaction. Agent settings show the direct address and departments. **Create additional desk**
+creates an optional shared desk answered by that agent. Library agents receive company addresses
+when copied into a company.
 
-An agent's own desk belongs to no department, even when the agent is a member of one.
+The agent's direct address has its own **Allow external messages** setting. A private agent can
+answer a public department desk without making its direct address public. Department membership
+and role-derived desk grants apply to an authenticated agent's relay identity.
 
 ### The department's desk
 
@@ -93,13 +95,13 @@ hand over. Detach the desk, or fix its workflow, first.
 An `agent.run` on a desk a department owns gets the department's context as system text after
 the agent's own instructions: the department's name and charter, that the agent answers as the
 department's lead when it holds the `lead` role, and — on a desk that is not public — the desks
-around the department: its own desk, its parent's, its direct children's and its agents' own desks,
+around the department: its own desk, its parent's, its direct children's and its agents' principal addresses,
 each by address (at most 20 children and 50 agents, with a note when there are more). People are
 not listed. The context is frozen with the run's prepared request, so a retry sees what the first
 attempt saw.
 
-The Agent Builder's `list_company_agents` tool names each agent's departments, roles and own
-desk and can list one department (`department` slug); it stays an owner's or admin's tool. The
+The Agent Builder's `list_company_agents` tool names each agent's departments, roles and direct
+address and can list one department (`department` slug); it stays an owner's or admin's tool. The
 plan's intake schema for a member's desk arrives with `channel.call`; the directory does not carry
 one yet.
 
@@ -147,7 +149,7 @@ another case.
   sent a third time.
 
 People get an in-app notification, and email unless they opted out of it. Agents get an internal
-message on their own desk and act through the `read_escalation` and `respond_to_escalation` tools
+message on their exact principal binding and act through the `read_escalation` and `respond_to_escalation` tools
 when their published tools include them; a successful run is not an acknowledgement. A person's
 notice only says that something needs attention and links to the escalation decision, which shows
 the run, the step and the reason. An agent's notice also names the reason code and the step.
@@ -172,8 +174,8 @@ needs to be able to see the run to act on it.
   charts stay the whole company's.
 - **Model usage**: "Group by Department" shows spend by the department that owns each run's desk
   now. Archived usage keeps no run and counts under "No department".
-- **`_help` replies and undeliverable-address bounces** list the desks a teammate may write to
-  under their department's heading, root first.
+- **`_help` replies and undeliverable-address bounces** list writable desks
+  under their department headings, followed by **People and agents** with writable principal addresses.
 - **JSON**: desk responses carry `department_id` and `members_only`; agent responses carry
   `departments` (`id`, `name`, `slug`, `roles`) and `more_departments`.
 

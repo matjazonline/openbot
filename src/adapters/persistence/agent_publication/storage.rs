@@ -24,10 +24,25 @@ pub(in crate::adapters::persistence) async fn revision_on(
     scope: AgentPublicationScope,
     id: AgentRevisionId,
 ) -> AppResult<Option<PublishedAgentRevision>> {
-    let row = sqlx::query_as::<_, RevisionRow>(
+    revision_with_locks_on(
+        db,
+        scope,
+        id,
+        super::super::workflow::row_locks::RowLocks::Wait,
+    )
+    .await
+}
+
+pub(in crate::adapters::persistence) async fn revision_with_locks_on(
+    db: &mut PgConnection,
+    scope: AgentPublicationScope,
+    id: AgentRevisionId,
+    locks: super::super::workflow::row_locks::RowLocks,
+) -> AppResult<Option<PublishedAgentRevision>> {
+    let row = sqlx::query_as::<_, RevisionRow>(&locks.sql(
         "SELECT id,draft_revision,content,digest FROM agent_revisions \
          WHERE company_id=$1 AND agent_id=$2 AND id=$3 FOR SHARE",
-    )
+    ))
     .bind(scope.company.as_uuid())
     .bind(scope.agent.as_uuid())
     .bind(id.as_uuid())

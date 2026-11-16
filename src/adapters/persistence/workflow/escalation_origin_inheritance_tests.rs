@@ -26,11 +26,9 @@ fn leaf(schema: &Value) -> Value {
 }
 
 async fn configure_caller(f: &AgentCase) {
-    own_default_desk(f).await;
+    assert_handler_department(f).await;
     let p = f.people.role.p();
-    let binding=WorkflowBindingId::new(sqlx::query_scalar("SELECT (result->>'binding_id')::uuid FROM workflow_provisioning_commands WHERE company_id=$1 AND command_key=$2")
-        .bind(f.people.role.company().as_uuid()).bind(crate::adapters::persistence::company_agent::default_desk_key(f.created.agent.id))
-        .fetch_one(p.pool()).await.unwrap());
+    let binding = WorkflowBindingId::new(handler_binding(f).await);
     let state = p
         .binding(f.people.role.company(), binding)
         .await
@@ -63,7 +61,7 @@ async fn configure_caller(f: &AgentCase) {
         .binding
         .request(Some(state.revision));
     request.target.binding = binding;
-    request.association = RelatedAssociation::Channel(RelatedChannelId::new(f.created.desk_id));
+    request.association = RelatedAssociation::Principal(f.created.principal_id);
     request.version = version;
     request.params = json!({});
     request.resources = Default::default();
@@ -158,12 +156,12 @@ async fn fail(f: &AgentCase, scope: ActivationRequest) {
 async fn rerun(f: &AgentCase, original: RunId) -> PreparedAdmission {
     #[derive(sqlx::FromRow)]
     struct Source {
-        channel_id: Uuid,
+        principal_id: Uuid,
         thread_id: Uuid,
         binding_id: Uuid,
         input: Value,
     }
-    let row:Source=sqlx::query_as("SELECT channel_id,thread_id,binding_id,input FROM workflow_runs WHERE company_id=$1 AND id=$2")
+    let row:Source=sqlx::query_as("SELECT principal_id,thread_id,binding_id,input FROM workflow_runs WHERE company_id=$1 AND id=$2")
         .bind(f.people.role.company().as_uuid()).bind(original.as_uuid()).fetch_one(f.people.role.p().pool()).await.unwrap();
     let mut request = f
         .people
@@ -172,7 +170,9 @@ async fn rerun(f: &AgentCase, original: RunId) -> PreparedAdmission {
         .request("marked-rerun", f.people.role.admission.manual());
     request.binding_id = WorkflowBindingId::new(row.binding_id);
     request.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(row.channel_id),
+        target: crate::entities::address::AddressTarget::Principal(
+            crate::entities::transport::PrincipalId::new(row.principal_id),
+        ),
         thread_id: RelatedThreadId::new(row.thread_id),
     };
     request.input = row.input;

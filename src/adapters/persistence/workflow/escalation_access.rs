@@ -6,6 +6,7 @@ struct ScopeRow {
     source_kind: String,
     run_id: Option<Uuid>,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     correlation_id: Option<Uuid>,
     source_key: Option<String>,
@@ -21,6 +22,7 @@ pub(crate) struct CaseScope {
     payload: PayloadSource,
     pub run_id: Option<Uuid>,
     pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
     pub correlation_id: Option<Uuid>,
 }
@@ -38,7 +40,7 @@ pub(crate) async fn case_scope_on(
     case: EscalationId,
 ) -> AppResult<Option<CaseScope>> {
     let row=sqlx::query_as::<_,ScopeRow>("SELECT escalation.source_kind,escalation.run_id,run.correlation_id, \
-        COALESCE(run.channel_id,refusal.channel_id) AS channel_id,COALESCE(run.thread_id,refusal.thread_id) AS thread_id,refusal.source_key \
+        COALESCE(run.channel_id,refusal.channel_id) AS channel_id,COALESCE(run.principal_id,refusal.principal_id) AS principal_id,COALESCE(run.thread_id,refusal.thread_id) AS thread_id,refusal.source_key \
         FROM workflow_escalation_cases AS escalation \
         LEFT JOIN workflow_runs AS run ON run.company_id=escalation.company_id AND run.id=escalation.run_id \
         LEFT JOIN workflow_admission_refusals AS refusal ON refusal.company_id=escalation.company_id AND refusal.id=escalation.admission_refusal_id \
@@ -57,6 +59,7 @@ pub(crate) async fn case_scope_on(
         payload,
         run_id: row.run_id,
         channel_id: row.channel_id,
+        principal_id: row.principal_id,
         thread_id: row.thread_id,
         correlation_id: row.correlation_id,
     }))

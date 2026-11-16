@@ -1,0 +1,9 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/plugins/provider-claude-code
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  20:37:36
+   Duration  655ms (transform 379ms, setup 0ms, import 546ms, tests 10ms, environment 0ms)
+

@@ -7,6 +7,7 @@ pub(super) struct Anchor {
     pub expired_count: i64,
     pub expired_through_order: i64,
     pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
 }
 
@@ -30,6 +31,7 @@ pub(super) struct Metadata {
     pub finished_at: Option<DateTime<Utc>>,
     pub content_level: i16,
     pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub thread_id: Option<Uuid>,
     pub workflow_state: String,
     pub waiting_reason: Option<String>,
@@ -42,7 +44,7 @@ pub(super) const METADATA: &str = "SELECT exchange.id,exchange.run_id,exchange.e
     exchange.agent_id,exchange.revision_id,exchange.manifest_id,
     exchange.position,exchange.state,exchange.access_level::smallint AS access_level,exchange.payload_retained,
     exchange.preparation_digest,exchange.output_digest,exchange.created_at,exchange.activated_at,exchange.finished_at,
-    run.content_level::smallint AS content_level,run.channel_id,run.thread_id,run.state AS workflow_state,run.waiting_reason,
+    run.content_level::smallint AS content_level,run.channel_id,run.principal_id,run.thread_id,run.state AS workflow_state,run.waiting_reason,
     EXISTS(SELECT 1 FROM workflow_waits AS wait WHERE wait.company_id=exchange.company_id
       AND wait.run_id=exchange.run_id AND wait.execution_id=exchange.execution_id AND wait.state='waiting'
       AND (wait.reason='decision' OR (wait.reason='event' AND wait.notification_intent IS NOT NULL))) AS human_wait,

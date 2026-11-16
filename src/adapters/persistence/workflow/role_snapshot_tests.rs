@@ -19,6 +19,9 @@ mod race_tests;
 #[path = "escalation_refusal_tests.rs"]
 mod escalation_refusals;
 
+#[path = "direct_role_admission_tests.rs"]
+mod direct;
+
 struct RoleFixture {
     admission: AdmissionFixture,
     department: DepartmentId,

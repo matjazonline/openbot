@@ -1,0 +1,12 @@
+[package]
+name="pa02_review_b2_audit_probe"
+version="0.1.0"
+edition="2024"
+[dependencies]
+open_bots={path="/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot"}
+tokio={version="1",features=["full"]}
+sqlx={version="0.8",features=["postgres","runtime-tokio-rustls","uuid"]}
+uuid={version="1.18.0",features=["v4"]}
+[[bin]]
+name="pa02_review_b2_audit_probe"
+path="main.rs"

@@ -1,0 +1,3 @@
+init schema applied to disposable b_editfirst_1794650807_12912
+A: schema as implemented (guard on INSERT or UPDATE OF target columns) | rename session exit=0 | demotion output: <none> | deadlock_errors=0 | addresses left for the (now external) principal=0
+B: guard widened to every UPDATE (hypothetical regression) | rename session exit=0 | demotion output: <none> | deadlock_errors=0 | addresses left for the (now external) principal=0

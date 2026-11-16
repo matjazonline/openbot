@@ -100,9 +100,15 @@ async fn scope(persistence: &PostgresPersistence) -> Scope {
     )
     .await
     .unwrap();
-    let thread = ThreadPersistence::create_thread(persistence, channel.id, "Delivery", &[])
-        .await
-        .unwrap();
+    let thread = ThreadPersistence::create_thread(
+        persistence,
+        company.id,
+        crate::entities::address::AddressTarget::Desk(channel.id),
+        "Delivery",
+        &[],
+    )
+    .await
+    .unwrap();
     Scope {
         company,
         channel,

@@ -1,0 +1,9 @@
+
+running 1 test
+observed gated transaction pids=[28077] blocker=28136 elapsed_ms=144
+observed native writer behind final checkpoint pids=[27980] blocker=28077 elapsed_ms=8
+observed native writer behind final checkpoint pids=[28079] blocker=28077 elapsed_ms=8
+test adapters::persistence::workflow::tests::message_tests::intent_tests::agent_history_threads::ordering::acknowledgement::agent_history_recovery_unknown_final_ack_keeps_turn_until_commit_and_completed_replay_cannot_release_successor ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4577 filtered out; finished in 5.74s
+

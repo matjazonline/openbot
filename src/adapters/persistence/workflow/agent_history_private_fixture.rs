@@ -41,7 +41,7 @@ impl ManualHistory {
             actor: self.actor,
             binding_id: self.binding,
             association: RelatedAssociation::Thread {
-                channel_id: RelatedChannelId::new(self.f.s.channel),
+                target: crate::entities::address::AddressTarget::Desk(self.f.s.channel),
                 thread_id: RelatedThreadId::new(self.f.s.thread),
             },
             trigger: TriggerRef::new(

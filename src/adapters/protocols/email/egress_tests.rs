@@ -15,7 +15,7 @@ use crate::adapters::protocols::email::test_support::{RecordingTransport, Refusi
 use crate::{
     entities::{
         message::CanonicalMessageId,
-        transport::{ChannelBindingId, ChannelSelector, DeliveryPurpose},
+        transport::{AddressSelector, ChannelBindingId, DeliveryPurpose},
         value_objects::{ChannelSlug, CompanySlug},
     },
     transport::{
@@ -67,9 +67,9 @@ fn context(recipient: &str) -> EmailDeliveryContext {
             references: vec![MessageId::from("<root@example.com>")],
         },
         relay: Some(crate::transport::EmailRelayTrace {
-            source_channel_id: Uuid::new_v4(),
+            source_target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             hop_count: 1,
-            trace_channels: Vec::new(),
+            trace_targets: Vec::new(),
         }),
     }
 }
@@ -314,7 +314,7 @@ fn the_internal_relay_and_the_wire_agree_on_the_hop_budget() {
         .expect("a channel's mail addressed to one of our channels can be relayed");
     assert_eq!(
         mail.target,
-        &ChannelSelector::Qualified {
+        &AddressSelector::Qualified {
             company: CompanySlug::new("acme"),
             channel: ChannelSlug::new("sales"),
         },
@@ -328,7 +328,7 @@ fn the_internal_relay_and_the_wire_agree_on_the_hop_budget() {
 
     assert_eq!(header.value, mail.hop_count.to_string());
     assert!(
-        mail.trace.contains(&mail.source_channel_id),
+        mail.trace.contains(&mail.source_target),
         "the sending channel joins the trace, or a return hop reads as an unexplained cycle"
     );
 }
@@ -549,7 +549,7 @@ fn record() -> DeliveryRecord {
         id: crate::entities::transport::DeliveryId::random(),
         company_id: Uuid::new_v4(),
         attribution: Some(crate::transport::DeliveryAttribution {
-            channel_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             message_id: CanonicalMessageId::random(),
             source_binding_id: ChannelBindingId::random(),
             destination_binding_id: ChannelBindingId::random(),
@@ -737,3 +737,6 @@ fn application_message_keys_are_owned_by_email_egress_and_qualified_by_company()
             .unwrap()
     );
 }
+
+#[path = "trace_egress_tests.rs"]
+mod trace_egress_tests;

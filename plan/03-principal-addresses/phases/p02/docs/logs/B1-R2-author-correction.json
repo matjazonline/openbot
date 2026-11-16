@@ -1,0 +1,11 @@
+{
+  "paths": [
+    "src/adapters/persistence/account_identity.rs",
+    "src/adapters/persistence/participant.rs",
+    "src/adapters/persistence/participant/person.rs",
+    "src/adapters/persistence/address_tests/direct.rs",
+    "src/adapters/persistence/address_tests/rejoin.rs"
+  ],
+  "basis": "R1 source; unchanged from paused implementation for these paths, HEAD fallback for previously untouched account_identity.rs, absent new rejoin.rs",
+  "sha256": "334f8e00c40b2806bce43f3c4003940fdf2ee8b00b94868da4766d15a0e777a7"
+}

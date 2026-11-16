@@ -33,6 +33,8 @@ mod race_tests;
 mod reconcile_tests;
 #[path = "message_recovery_tests.rs"]
 mod recovery_tests;
+#[path = "workflow_message_sender_tests.rs"]
+mod sender_tests;
 #[path = "message_sql_tests.rs"]
 mod sql_tests;
 #[path = "storage_message_tests.rs"]

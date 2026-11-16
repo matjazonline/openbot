@@ -66,12 +66,16 @@ async fn autonomous_agent_views_keep_v1_v2_and_exact_targets_under_one_workflow_
     )
     .await
     .unwrap();
-    sqlx::query("UPDATE agents SET slug='renamed-current-agent' WHERE company_id=$1 AND id=$2")
-        .bind(original.company.as_uuid())
-        .bind(setup.agent)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::rename_native_agent(
+        p,
+        AgentPublicationScope {
+            company: original.company,
+            actor: setup.fixture.target.actor,
+            agent: AgentId::new(setup.agent),
+        },
+        "renamed-current-agent",
+    )
+    .await;
     let retained = p
         .run_view(scope(&setup, original.run))
         .await

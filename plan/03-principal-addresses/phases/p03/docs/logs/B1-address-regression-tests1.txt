@@ -1,0 +1,86 @@
+
+running 52 tests
+test adapters::persistence::address_tests::address_namespace_kind_guard_fires_only_when_a_target_changes ... ok
+
+thread 'adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address' (16611272) panicked at src/adapters/persistence/address_tests.rs:517:6:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address ... ok
+test adapters::persistence::address_tests::address_namespace_rejects_a_target_from_another_company ... ok
+test adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address ... FAILED
+test adapters::persistence::address_tests::address_namespace_deleting_an_account_drops_its_addresses ... ok
+test adapters::persistence::address_tests::direct::bindings::direct_transport_binding_native_owner_kind_tenant_and_shape_guards ... ok
+test adapters::persistence::address_tests::direct::bindings::direct_transport_binding_person_creation_and_rename_keep_one_real_interface ... ok
+test adapters::persistence::address_tests::address_namespace_a_slug_names_one_desk_or_person_per_company ... ok
+test adapters::persistence::address_tests::address_namespace_person_paths_leave_exactly_one_address ... ok
+test adapters::persistence::address_tests::direct::bindings::direct_transport_binding_unused_principal_delete_cascades_only_its_own_endpoint ... ok
+test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... ok
+test adapters::persistence::address_tests::direct::bindings::direct_transport_binding_retirement_rejoin_release_endpoint_and_reuse_lifetime_binding ... ok
+test adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse ... ok
+test adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets ... ok
+test adapters::persistence::address_tests::address_namespace_competing_insert_and_demotion_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner ... ok
+test adapters::persistence::address_tests::address_namespace_competing_self_edit_and_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_competing_held_edit_then_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::direct::direct_thread_native_owner_shape_rejects_null_person_and_historical_system ... ok
+test adapters::persistence::address_tests::direct::direct_competing_personal_rejoin_claimants_restore_one_lifetime_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_competing_same_conversation_and_redelivery_keep_one_target_thread ... ok
+
+thread 'adapters::persistence::address_tests::direct::ingress::direct_thread_agent_policy_and_revocation_do_not_borrow_participant_authority' (16611527) panicked at src/adapters/persistence/address_tests/ingress.rs:46:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::address_tests::direct::ingress::direct_thread_agent_policy_and_revocation_do_not_borrow_participant_authority ... FAILED
+
+thread 'adapters::persistence::address_tests::direct::ingress::direct_thread_identity_adoption_preserves_the_direct_target_and_membership_pin' (16611530) panicked at src/adapters/persistence/address_tests/ingress.rs:46:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::address_tests::direct::ingress::direct_thread_identity_adoption_preserves_the_direct_target_and_membership_pin ... FAILED
+test adapters::persistence::address_tests::direct::ingress::direct_thread_native_message_and_note_wakes_carry_the_principal_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_thread_real_ingress_and_all_viewer_projections_enforce_person_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_thread_stale_slug_rolls_back_every_ingress_row ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_thread_unrelated_roots_stay_separate_and_replies_reuse_the_target ... ok
+test adapters::persistence::address_tests::direct::ingress::direct_trace_native_shape_and_bound_match_the_typed_wire_contract ... ok
+
+thread 'adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_promotion_and_mail_finish_in_both_identity_lock_orders' (16611613) panicked at src/adapters/persistence/address_tests/ingress.rs:46:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_promotion_and_mail_finish_in_both_identity_lock_orders ... FAILED
+test adapters::persistence::address_tests::direct::ingress::notifications::authority::direct_thread_notification_account_deletion_and_verified_replacement_never_transfer_receipts ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::authority::direct_thread_notification_content_clearance_loss_withdraws_before_list_and_open ... ok
+
+thread 'adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_competing_mixed_redelivery_emits_only_each_persons_exact_event' (16611925) panicked at src/adapters/persistence/address_tests/ingress.rs:46:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::address_tests::direct::ingress::notifications::authority::direct_thread_notification_native_guards_refuse_wrong_membership_retargeting_and_receipt_owner ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_competing_mixed_redelivery_emits_only_each_persons_exact_event ... FAILED
+test adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_projected_retirement_withdraws_before_open_and_stays_hidden_on_rejoin ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_real_self_ingress_worker_list_open_and_read_state ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_source_deletion_resolves_without_an_actionable_link ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_unprocessed_retirement_and_rejoin_never_revive_an_old_source ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_removal_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_self_mail_rekey_finishes_in_both_identity_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_rename_and_mail_finish_in_both_target_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::status::direct_thread_paused_interface_is_undeliverable_and_reactivation_uses_current_revision ... ok
+test adapters::persistence::address_tests::direct::ingress::status::direct_transport_binding_status_no_op_preserves_revision_and_audit ... ok
+
+thread 'adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks' (16612237) panicked at src/adapters/persistence/address_tests/ingress.rs:46:23:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "agent slug and direct address must agree", detail: None, hint: None, position: None, where: Some("PL/pgSQL function check_agent_address_slug() line 15 at RAISE"), schema: None, table: None, column: None, data_type: None, constraint: Some("agent_address_slug_matches"), file: Some("pl_exec.c"), line: Some(3939), routine: Some("exec_stmt_raise") })
+test adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks ... FAILED
+test adapters::persistence::address_tests::direct::ingress::validation::direct_thread_commit_requires_one_intent_for_every_gated_target_before_writing ... ok
+test adapters::persistence::address_tests::direct::ingress::validation::direct_thread_native_foreign_target_and_wrong_membership_pin_are_rejected ... ok
+test adapters::persistence::address_tests::direct::ingress::validation::direct_thread_private_address_and_unknown_address_have_identical_suggestions ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::races::direct_thread_notification_competing_open_and_retirement_finish_in_both_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::notifications::races::direct_thread_notification_competing_projection_and_retirement_finish_in_both_lock_orders ... ok
+test adapters::persistence::address_tests::direct::ingress::status::direct_competing_binding_status_and_ingress_finish_in_both_lock_orders ... ok
+
+failures:
+
+failures:
+    adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address
+    adapters::persistence::address_tests::direct::ingress::direct_thread_agent_policy_and_revocation_do_not_borrow_participant_authority
+    adapters::persistence::address_tests::direct::ingress::direct_thread_identity_adoption_preserves_the_direct_target_and_membership_pin
+    adapters::persistence::address_tests::direct::ingress::identity_races::direct_competing_person_promotion_and_mail_finish_in_both_identity_lock_orders
+    adapters::persistence::address_tests::direct::ingress::notifications::direct_thread_notification_competing_mixed_redelivery_emits_only_each_persons_exact_event
+    adapters::persistence::address_tests::direct::ingress::validation::address_resolution_directory_lists_only_currently_writable_people_and_agents_after_desks
+
+test result: FAILED. 46 passed; 6 failed; 0 ignored; 0 measured; 4544 filtered out; finished in 24.39s
+

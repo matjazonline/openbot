@@ -1,0 +1,2 @@
+Preparing worktree (detached HEAD d8b3cc3)
+HEAD is now at d8b3cc3 Publish core 0.1.98: Rust Mac helper trial, safer Linux sandbox checks, faster big-chat teleports

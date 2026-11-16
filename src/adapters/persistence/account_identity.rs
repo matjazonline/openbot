@@ -130,7 +130,7 @@ async fn identity_holder(
 /// The identity and its messages move in one statement: `messages_authored_identity_author_fk`
 /// requires a message's author to hold its authored identity, and it is checked at the end of the
 /// statement, so two separate updates would each violate it.
-async fn detach_old_address(
+pub(super) async fn detach_old_address(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     person: PrincipalId,
@@ -180,7 +180,7 @@ async fn detach_old_address(
 }
 
 /// Make the new address the person's account identity, adopting what an outsider held with it.
-async fn adopt_new_address(
+pub(super) async fn adopt_new_address(
     connection: &mut sqlx::PgConnection,
     company_id: Uuid,
     person: PrincipalId,
@@ -256,11 +256,11 @@ async fn adopt_outsider_places(
         .map_err(AppError::from)?;
     sqlx::query(
         r#"INSERT INTO thread_principals
-               (company_id, channel_id, thread_id, principal_id, role, created_at)
-           SELECT company_id, channel_id, thread_id, $3, role, created_at
+               (company_id, channel_id, thread_id, principal_id, role, created_at, target_principal_id)
+           SELECT company_id, channel_id, thread_id, $3, role, created_at, target_principal_id
            FROM thread_principals
            WHERE company_id = $1 AND principal_id = $2
-           ON CONFLICT (company_id, channel_id, thread_id, principal_id, role) DO NOTHING"#,
+           ON CONFLICT (company_id, thread_id, principal_id, role) DO NOTHING"#,
     )
     .bind(company_id)
     .bind(outsider)

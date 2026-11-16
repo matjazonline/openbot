@@ -1,0 +1,15 @@
+BIN /Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-81c16b063ee66a24
+
+running 8 tests
+test adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address ... ok
+test adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address ... ok
+test adapters::persistence::address_tests::address_namespace_rejects_a_target_from_another_company ... ok
+test adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner ... ok
+test adapters::persistence::address_tests::address_namespace_a_slug_names_one_desk_or_person_per_company ... ok
+test adapters::persistence::address_tests::address_namespace_competing_self_edit_and_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_person_paths_leave_exactly_one_address ... ok
+test adapters::persistence::address_tests::address_namespace_competing_insert_and_demotion_leave_no_address_on_an_outsider ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 4480 filtered out; finished in 0.32s
+
+EXIT 0

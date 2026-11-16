@@ -1,0 +1,91 @@
+{
+  "before": 4589,
+  "after": 4589,
+  "removed": [
+    "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments",
+    "adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_lead_creation_takes_its_desk_gates_once",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug",
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model",
+    "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel",
+    "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh",
+    "adapters::persistence::thread::inbound_tests::direct_thread_platform_commit_does_not_lock_unobserved_author_or_recipient_identities",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk",
+    "application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents"
+  ],
+  "added": [
+    "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_direct_address_and_departments",
+    "adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model",
+    "adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow",
+    "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_creates_a_fresh_principal",
+    "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh",
+    "adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship",
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal",
+    "application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents"
+  ],
+  "candidates": {
+    "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_desk_and_departments": [
+      "adapters::http::pages::tests::department_ui::department_ui_agent_settings_show_its_direct_address_and_departments"
+    ],
+    "adapters::http::routes::onboarding::tests::agent_default_desk_onboarding_completion_reads_back_the_default_desk": [
+      "adapters::http::routes::onboarding::tests::agent_direct_address_onboarding_completion_reads_back_the_principal"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_creators_of_one_slug_make_one_agent": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_creators_of_one_slug_make_one_agent"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_competing_lead_creation_takes_its_desk_gates_once": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_competing_lead_creation_takes_its_desk_gates_once"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_creation_commits_the_agent_with_its_desk": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_creation_commits_the_agent_with_its_principal_binding"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_deletion_guards_are_unchanged": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_unused_deletion_removes_owned_workflow"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_library_definitions_have_none_and_copies_do": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_library_definitions_have_none_and_copies_do"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_places_the_agent_and_its_lead_role_with_grants": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_places_the_agent_and_its_lead_role_with_grants"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_library_copy_it_cannot_publish": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_library_copy_it_cannot_publish"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_a_taken_address_or_slug": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_a_taken_address_or_slug"
+    ],
+    "adapters::persistence::department::tests::agent_desks::agent_default_desk_refuses_without_a_keyed_model": [
+      "adapters::persistence::department::tests::agent_desks::agent_direct_address_refuses_without_a_keyed_model"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_does_not_replay_an_old_channel": [
+      "adapters::persistence::onboarding::tests::onboarding_new_key_after_rename_creates_a_fresh_principal"
+    ],
+    "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_channel_deletion_and_agent_rename_is_fresh": [
+      "adapters::persistence::onboarding::tests::onboarding_same_key_replays_and_new_key_after_agent_rename_is_fresh"
+    ],
+    "adapters::persistence::thread::inbound_tests::direct_thread_platform_commit_does_not_lock_unobserved_author_or_recipient_identities": [
+      "adapters::persistence::thread::inbound_tests::application_ingress_keeps_identity_locks_and_cannot_fabricate_system_authorship"
+    ],
+    "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_default_desk": [
+      "adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::agent_notices::workflow_escalation_agent_actual_worker_commits_one_private_message_and_intent_on_principal"
+    ],
+    "application::use_cases::agent::tests::agent_default_desk_creation_goes_through_company_agents": [
+      "application::use_cases::agent::tests::agent_direct_address_creation_goes_through_company_agents"
+    ]
+  },
+  "status": "Candidates only; root must verify each semantic replacement."
+}

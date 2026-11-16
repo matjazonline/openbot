@@ -16,7 +16,7 @@ use crate::{
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
-            ChannelBindingId, ChannelSelector, DeliveryId, ExternalMessageKey, ExternalThreadKey,
+            AddressSelector, ChannelBindingId, DeliveryId, ExternalMessageKey, ExternalThreadKey,
             TransportKind, UnsupportedTransport,
         },
         value_objects::{EmailAddress, MessageId},
@@ -40,10 +40,22 @@ use crate::{
 /// the mapping that would deduplicate its redelivery.
 #[async_trait]
 pub trait InboundMessageCommitter: Send + Sync {
+    /// Authenticate the stored delivery part before considering its recipients.
+    async fn authenticate_internal_relay(
+        &self,
+        mail: &InternalRelayMail<'_>,
+    ) -> AppResult<Option<AuthenticatedRelaySource>>;
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
     ) -> AppResult<InboundCommitOutcome>;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AuthenticatedRelaySource {
+    pub company_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
+    pub agent_principal: Option<crate::entities::transport::PrincipalId>,
 }
 
 /// Read-only resolution of provider keys, for the decisions that must happen before the commit.
@@ -139,6 +151,13 @@ pub trait TransportRenderer: Send + Sync {
         company: &crate::entities::value_objects::CompanySlug,
         nonce: Uuid,
     ) -> AppResult<ExternalMessageKey>;
+
+    /// Render a registered application address using this deployment's transport namespace.
+    fn application_address(
+        &self,
+        company: &crate::entities::value_objects::CompanySlug,
+        address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity>;
 }
 
 /// One external request, and what the provider said about it.
@@ -183,7 +202,7 @@ pub trait InternalMailRelay: Send + Sync {
 #[derive(Debug, Clone)]
 pub struct InternalRelayMail<'a> {
     /// The email adapter has already interpreted its own address syntax into application intent.
-    pub target: &'a ChannelSelector,
+    pub target: &'a AddressSelector,
     pub from: &'a EmailAddress,
     pub recipient_to: &'a EmailAddress,
     pub subject: &'a str,
@@ -193,11 +212,11 @@ pub struct InternalRelayMail<'a> {
     pub references: &'a [MessageId],
     /// The channel this mail goes out as. Checked against the stated sender address, so a relayed
     /// message cannot claim to come from a channel it does not.
-    pub source_channel_id: Uuid,
+    pub source_target: crate::entities::address::AddressTarget,
     /// Hops this message *is*, not hops it answers: the same value the wire header carries, so an
     /// internal hop costs exactly what an external one costs.
     pub hop_count: u32,
-    pub trace: Vec<Uuid>,
+    pub trace: Vec<crate::entities::address::AddressTarget>,
     pub correlation_id: CorrelationId,
     /// Which frozen delivery part this mail is. The receiving commit proves it against the stored
     /// part, so a hop inherits its source message's provenance only through a real delivery.

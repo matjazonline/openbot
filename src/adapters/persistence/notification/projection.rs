@@ -3,7 +3,7 @@ use crate::entities::notification::NotificationTarget;
 
 #[derive(Debug)]
 pub(super) struct SourceSnapshot {
-    pub(super) channel_id: Option<Uuid>,
+    pub(super) inbox: Option<crate::entities::address::AddressTarget>,
     pub(super) thread_id: Option<Uuid>,
     pub(super) run_id: Option<Uuid>,
     pub(super) correlation_id: Option<Uuid>,
@@ -21,7 +21,8 @@ pub(super) enum SourceLifecycle {
 
 #[derive(Debug, sqlx::FromRow)]
 struct DeliverySourceRow {
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Uuid,
     run_id: Uuid,
     correlation_id: Uuid,
@@ -48,7 +49,11 @@ pub(super) async fn resolve_projection_on(
     let Some(source) = source_snapshot(connection, event).await? else {
         return Ok(NotificationProjection {
             event: event.clone(),
-            disposition: NotificationDisposition::Withdrawn,
+            disposition: if event.source_kind == NotificationSourceKind::DirectMessage {
+                NotificationDisposition::Resolved
+            } else {
+                NotificationDisposition::Withdrawn
+            },
         });
     };
     let newer_exists: bool = sqlx::query_scalar(
@@ -100,15 +105,17 @@ async fn source_snapshot(
     match (event.source_kind, event.action_kind) {
         (NotificationSourceKind::Delivery, NotificationActionKind::DeliveryFailure) => {
             let row = sqlx::query_as::<_, DeliverySourceRow>(
-                r#"SELECT delivery.channel_id, destination.thread_id, run.id AS run_id,
+                r#"SELECT delivery.channel_id,delivery.principal_id, COALESCE(destination.thread_id,context.thread_id) AS thread_id, run.id AS run_id,
                           delivery.correlation_id, delivery.status,
                           actor.id AS actor_principal_id
                      FROM message_deliveries AS delivery
-                     JOIN workflow_message_destinations AS destination
+                     LEFT JOIN workflow_message_destinations AS destination
                        ON destination.company_id = delivery.company_id
                       AND destination.delivery_id = delivery.id
-                     JOIN workflow_runs AS run
-                       ON run.company_id = destination.company_id AND run.id = destination.run_id
+                     LEFT JOIN channel_reply_decisions AS final_reply ON final_reply.company_id=delivery.company_id
+                       AND final_reply.delivery_id=delivery.id AND final_reply.state='published'
+                     LEFT JOIN channel_reply_contexts AS context ON context.company_id=final_reply.company_id AND context.intent_id=final_reply.intent_id
+                     JOIN workflow_runs AS run ON run.company_id=delivery.company_id AND run.id=COALESCE(destination.run_id,final_reply.run_id)
                      LEFT JOIN principals AS actor
                        ON actor.company_id = run.company_id AND actor.user_id = run.actor_id
                       AND actor.kind = 'person'
@@ -120,23 +127,37 @@ async fn source_snapshot(
             .fetch_optional(&mut *connection)
             .await
             .map_err(AppError::from)?;
-            Ok(row.map(|row| SourceSnapshot {
-                channel_id: Some(row.channel_id),
-                thread_id: Some(row.thread_id),
-                run_id: Some(row.run_id),
-                correlation_id: Some(row.correlation_id),
-                responsible_principal_id: row.actor_principal_id,
-                target: NotificationTarget::DeliveryRecovery,
-                lifecycle: if matches!(row.status.as_str(), "dead_letter" | "outcome_unknown") {
-                    if row.actor_principal_id.is_some() {
-                        SourceLifecycle::Active
+            row.map(|row| {
+                let inbox = super::super::workflow::association::association_from_columns(
+                    super::super::workflow::association::AssociationColumns {
+                        channel_id: row.channel_id,
+                        principal_id: row.principal_id,
+                        thread_id: Some(row.thread_id),
+                    },
+                )?
+                .target();
+                Ok(SourceSnapshot {
+                    inbox,
+                    thread_id: Some(row.thread_id),
+                    run_id: Some(row.run_id),
+                    correlation_id: Some(row.correlation_id),
+                    responsible_principal_id: row.actor_principal_id,
+                    target: NotificationTarget::DeliveryRecovery,
+                    lifecycle: if matches!(row.status.as_str(), "dead_letter" | "outcome_unknown") {
+                        if row.actor_principal_id.is_some() {
+                            SourceLifecycle::Active
+                        } else {
+                            SourceLifecycle::Withdrawn
+                        }
                     } else {
-                        SourceLifecycle::Withdrawn
-                    }
-                } else {
-                    SourceLifecycle::Resolved
-                },
-            }))
+                        SourceLifecycle::Resolved
+                    },
+                })
+            })
+            .transpose()
+        }
+        (NotificationSourceKind::DirectMessage, NotificationActionKind::DirectMessageReceived) => {
+            super::direct_message::source_on(connection, event).await
         }
         (NotificationSourceKind::DecisionReviewer, NotificationActionKind::DecisionReview) => {
             super::reviewer_notice::source_on(connection, event).await
@@ -167,7 +188,7 @@ async fn recipient_for_source(
     }
     let row = sqlx::query_as::<_, RecipientRow>(
         r#"SELECT principal.user_id, account.email,
-                  company.name AS company_label, COALESCE(channel.name,'Company workflow') AS channel_label,
+                  company.name AS company_label, COALESCE(channel.name,target.display_label,'Company workflow') AS channel_label,
                   COALESCE(preference.delivery_failure_email_enabled, TRUE)
                       AS delivery_failure_email_enabled,
                   COALESCE(preference.decision_email_enabled, TRUE)
@@ -180,16 +201,18 @@ async fn recipient_for_source(
              JOIN companies AS company ON company.id = principal.company_id
              LEFT JOIN channels AS channel
                ON channel.company_id = principal.company_id AND channel.id = $3
+             LEFT JOIN principals AS target ON target.company_id=principal.company_id AND target.id=$4
              LEFT JOIN user_notification_preferences AS preference
                ON preference.user_id = account.id
             WHERE principal.company_id = $1 AND principal.id = $2
               AND principal.kind = 'person'
-              AND notification_principal_can_view($1, $3, $2)
+              AND notification_target_can_view($1, $3, $4, $2)
             "#,
     )
     .bind(event.company_id)
     .bind(principal_id)
-    .bind(source.channel_id)
+    .bind(source.inbox.and_then(|target| target.desk_id()))
+    .bind(source.inbox.and_then(|target| target.principal_id()).map(|id| id.as_uuid()))
     .fetch_optional(&mut *connection)
     .await
     .map_err(AppError::from)?;
@@ -204,7 +227,7 @@ async fn recipient_for_source(
             email: EmailAddress::from(row.email),
             company_label: row.company_label,
             channel_label: row.channel_label,
-            channel_id: source.channel_id,
+            inbox: source.inbox,
             thread_id: source.thread_id,
             run_id: source.run_id,
             correlation_id: source
@@ -287,11 +310,11 @@ pub(super) async fn apply_projection_on(
     let inserted_id: Uuid = sqlx::query_scalar(
         r#"INSERT INTO notifications (
                id, company_id, recipient_user_id, recipient_principal_id, event_id,
-               source_kind, source_id, action_kind, source_generation, channel_id
-           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+               source_kind, source_id, action_kind, source_generation, channel_id, principal_id
+           ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
            ON CONFLICT ON CONSTRAINT notifications_identity_key DO UPDATE
              SET recipient_principal_id = EXCLUDED.recipient_principal_id,
-                 event_id = EXCLUDED.event_id, channel_id = EXCLUDED.channel_id,
+                 event_id = EXCLUDED.event_id, channel_id = EXCLUDED.channel_id, principal_id=EXCLUDED.principal_id,
                  state = 'active', state_changed_at = CURRENT_TIMESTAMP,
                  updated_at = CURRENT_TIMESTAMP
            RETURNING id"#,
@@ -305,7 +328,8 @@ pub(super) async fn apply_projection_on(
     .bind(projection.event.source_id)
     .bind(projection.event.action_kind.as_str())
     .bind(i64::try_from(projection.event.source_generation).unwrap_or(i64::MAX))
-    .bind(recipient.channel_id)
+    .bind(recipient.inbox.and_then(|target| target.desk_id()))
+    .bind(recipient.inbox.and_then(|target| target.principal_id()).map(|id| id.as_uuid()))
     .fetch_one(&mut **tx)
     .await
     .map_err(AppError::from)?;
@@ -347,6 +371,15 @@ pub(super) fn source_href(event: &NotificationEvent, recipient: &NotificationRec
         }
         NotificationTarget::WorkflowDecision { decision_id } => {
             format!("/ui/workflow-decisions/{decision_id}")
+        }
+        NotificationTarget::DirectThread {
+            principal_id,
+            thread_id,
+        } => {
+            format!(
+                "/ui?company_id={}&principal_id={principal_id}&thread_id={thread_id}",
+                event.company_id
+            )
         }
         NotificationTarget::WorkflowEscalation { decision_id } => {
             format!("/ui/workflow-decisions/escalations/{decision_id}")

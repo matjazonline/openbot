@@ -1,0 +1,6 @@
+{
+  "complete_delta_paths": 134,
+  "matches_author_manifest": true,
+  "scope": "src/migrations/docs/scripts/tests/.sqlx/Cargo source; sparse accepted archive with HEAD bytes for omitted files",
+  "source": "63dc835d92424c643cafcea862aa1afd127e3d121f3f5c9e2de2a14c9a48f866"
+}

@@ -55,7 +55,8 @@ struct IntentRow {
     id: Uuid,
     claim_generation: Uuid,
     message_id: Uuid,
-    channel_id: Uuid,
+    channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Uuid,
     role: String,
     mentioned: bool,
@@ -86,7 +87,12 @@ impl IntentRow {
                 generation: self.claim_generation,
             },
             message: CanonicalMessageId::new(self.message_id),
-            channel: self.channel_id,
+            target: AddressTarget::from_parts(
+                self.channel_id,
+                self.principal_id
+                    .map(crate::entities::transport::PrincipalId::new),
+            )
+            .ok_or_else(invalid)?,
             thread: self.thread_id,
             facts: MessageFacts {
                 role,
@@ -142,7 +148,8 @@ const CANDIDATES: &str = "SELECT binding.id, configuration.revision AS configura
      WHERE binding.company_id = $1 \
        AND (response.intent_id IS NOT NULL OR (binding.active AND binding.activated_at <= intent.created_at)) \
        AND configuration.message_trigger IS NOT NULL \
-       AND binding.channel_id = intent.channel_id \
+       AND binding.channel_id IS NOT DISTINCT FROM intent.channel_id \
+       AND binding.principal_id IS NOT DISTINCT FROM intent.principal_id \
        AND (binding.thread_id IS NULL OR binding.thread_id = intent.thread_id) \
        AND ($3::uuid IS NULL OR binding.id = $3) \
        AND (notice_target.intent_id IS NULL OR (notice_target.intent_id=intent.id \
@@ -263,7 +270,7 @@ impl MessageIntentQueue for PostgresPersistence {
                updated_at = clock_timestamp() \
              FROM locked WHERE intent.company_id = locked.company_id AND intent.id = locked.id \
              RETURNING intent.company_id, intent.id, intent.claim_generation, intent.message_id, \
-               intent.channel_id, intent.thread_id, intent.role, intent.mentioned, intent.admissible, \
+               intent.channel_id, intent.principal_id, intent.thread_id, intent.role, intent.mentioned, intent.admissible, \
                intent.origin, intent.reply_to_message_id, intent.reply_settled, \
                intent.responder_principal_id, \
                intent.delivery_policy, intent.correlation_id, intent.attempts, intent.created_at, \

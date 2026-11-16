@@ -48,7 +48,7 @@ async fn internal_notes_are_idempotent_immutable_and_auditable() {
             .unwrap();
     let command = AddInternalNote {
         company_id: fixture.company_id,
-        channel_id: fixture.channel_id,
+        target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
         thread_id: fixture.thread.id,
         text: "Customer supplied a replacement purchase order.".into(),
         command_id: Uuid::new_v4(),
@@ -161,7 +161,7 @@ async fn internal_notes_are_idempotent_immutable_and_auditable() {
 
     let tombstone = TombstoneInternalNote {
         company_id: fixture.company_id,
-        channel_id: fixture.channel_id,
+        target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
         thread_id: fixture.thread.id,
         note_id: correction_note.id,
         command_id: Uuid::new_v4(),
@@ -449,7 +449,16 @@ async fn one_message_joins_several_threads_but_never_a_foreign_one() {
         .channel(foreign_company, "foreign", &fixture.suffix)
         .await
         .unwrap();
-    let foreign_thread = fixture.extra_thread(foreign_channel.id, "Elsewhere").await;
+    let foreign_thread = fixture
+        .persistence
+        .create_thread(
+            foreign_company,
+            crate::entities::address::AddressTarget::Desk(foreign_channel.id),
+            "Elsewhere",
+            &[],
+        )
+        .await
+        .unwrap();
     let refused = fixture
         .persistence
         .associate_message(
@@ -494,7 +503,7 @@ async fn one_thread_is_reachable_through_several_bindings() {
         &mut connection,
         external::ExternalThreadMapping {
             company_id: fixture.company_id,
-            channel_id: fixture.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
             binding_id: slack,
             key: &slack_key,
             thread_id: fixture.thread.id,
@@ -523,7 +532,7 @@ async fn one_thread_is_reachable_through_several_bindings() {
         &mut connection,
         external::ExternalThreadMapping {
             company_id: fixture.company_id,
-            channel_id: fixture.channel_id,
+            target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
             binding_id: slack,
             key: &slack_key,
             thread_id: rival.id,
@@ -1231,7 +1240,7 @@ async fn note(fixture: &Fixture) -> Uuid {
         .create_internal_note(
             &AddInternalNote {
                 company_id: fixture.company_id,
-                channel_id: fixture.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
                 thread_id: fixture.thread.id,
                 text: "Checked with finance.".into(),
                 command_id,
@@ -1352,7 +1361,7 @@ async fn channel_path_fk_external_threads_and_notes_leave_with_channel_and_compa
             &mut connection,
             external::ExternalThreadMapping {
                 company_id: fixture.company_id,
-                channel_id: fixture.channel_id,
+                target: crate::entities::address::AddressTarget::Desk(fixture.channel_id),
                 binding_id: slack,
                 key: &ExternalThreadKey::parse("1712345678.000200").unwrap(),
                 thread_id: fixture.thread.id,

@@ -1,0 +1,28 @@
+
+running 3 tests
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_keeps_places_on_a_still_reachable_outsider ... ok
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places ... FAILED
+test adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority ... FAILED
+
+failures:
+
+---- adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places stdout ----
+
+thread 'adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places' (12616633) panicked at src/adapters/persistence/address_tests/rejoin.rs:216:5:
+assertion failed: desk.viewer_access(viewer)
+
+---- adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority stdout ----
+
+thread 'adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority' (12616634) panicked at src/adapters/persistence/address_tests/rejoin.rs:162:5:
+assertion `left == right` failed
+  left: Member
+ right: None
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_adopts_current_outsider_grants_and_thread_places
+    adapters::persistence::address_tests::direct::rejoin::direct_thread_changed_email_rejoin_does_not_revive_old_email_authority
+
+test result: FAILED. 1 passed; 2 failed; 0 ignored; 0 measured; 4521 filtered out; finished in 0.54s
+

@@ -27,7 +27,9 @@ async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibilit
         s.p()
             .channel_reply_settings(
                 s.fixture.target.company,
-                RelatedChannelId::new(s.channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(s.channel)).as_uuid()
+                ),
                 s.owner()
             )
             .await
@@ -54,7 +56,9 @@ async fn channel_reply_binding_rechecks_current_run_as_private_channel_visibilit
         s.p()
             .channel_reply_settings(
                 s.fixture.target.company,
-                RelatedChannelId::new(s.channel),
+                crate::entities::address::AddressTarget::Desk(
+                    (RelatedChannelId::new(s.channel)).as_uuid()
+                ),
                 s.owner()
             )
             .await
@@ -82,7 +86,7 @@ async fn channel_reply_binding_inactive_before_ingress_has_visible_refusal_until
     s.p()
         .configure_channel_reply(ConfigureChannelReply {
             company: s.fixture.target.company,
-            channel: RelatedChannelId::new(s.channel),
+            target: crate::entities::address::AddressTarget::Desk(s.channel),
             actor: s.owner(),
             expected: Some(selected.revision),
             responder: None,
@@ -123,7 +127,7 @@ async fn channel_reply_binding_thread_scoped_binding_cannot_own_channel_response
     let target = s.target(s.owner(), WorkflowBindingId::new(Uuid::new_v4()));
     let mut request = s.configuration(target, None, None, Some(MessageTrigger::Any));
     request.association = RelatedAssociation::Thread {
-        channel_id: RelatedChannelId::new(s.channel),
+        target: crate::entities::address::AddressTarget::Desk(s.channel),
         thread_id: RelatedThreadId::new(s.thread),
     };
     let state = s.bindings().configure(request).await.unwrap();
@@ -153,7 +157,7 @@ async fn channel_reply_binding_manual_root_has_no_automatic_response_authority()
         company_id: s.fixture.target.company,
         actor: s.owner(),
         association: RelatedAssociation::Thread {
-            channel_id: RelatedChannelId::new(s.channel),
+            target: crate::entities::address::AddressTarget::Desk(s.channel),
             thread_id: RelatedThreadId::new(s.thread),
         },
         trigger: TriggerRef::new(
@@ -193,8 +197,8 @@ async fn channel_reply_binding_context_insert_and_source_acceptance_roll_back_to
     let mut tx = s.pool().begin().await.unwrap();
     sqlx::query(
         "INSERT INTO workflow_message_intents(company_id,id,message_id,channel_id,thread_id,role,\
-        mentioned,admissible,origin,hop_count,trace_channels,delivery_policy,correlation_id) \
-        VALUES($1,$2,$3,$4,$5,'to',false,true,'external',0,'{}','deliver',$2)",
+        mentioned,admissible,origin,hop_count,trace_targets,delivery_policy,correlation_id) \
+        VALUES($1,$2,$3,$4,$5,'to',false,true,'external',0,'[]','deliver',$2)",
     )
     .bind(s.fixture.target.company.as_uuid())
     .bind(intent)

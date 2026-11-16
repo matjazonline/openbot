@@ -141,12 +141,7 @@ async fn workflow_tool_registration_commands_keep_revisions_authority_and_bounds
     for refused in [
         create("message.send", child_workflow(), setup.child, params("x")),
         // p08 D2.1: the provisioning built-ins are reserved too.
-        create(
-            "create_agent_channel",
-            child_workflow(),
-            setup.child,
-            params("x"),
-        ),
+        create("create_agent", child_workflow(), setup.child, params("x")),
         create(
             "list_company_agents",
             child_workflow(),

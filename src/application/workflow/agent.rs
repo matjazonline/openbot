@@ -91,7 +91,9 @@ impl AgentToolTarget {
             AgentBuiltinTool::MessageSend | AgentBuiltinTool::MessageReply => {
                 Self::Message { name: name()? }
             }
-            AgentBuiltinTool::ListCompanyAgents | AgentBuiltinTool::CreateAgentChannel => {
+            AgentBuiltinTool::ListCompanyAgents
+            | AgentBuiltinTool::CreateAgent
+            | crate::entities::agent_capability::AgentBuiltinTool::CreateDeskForAgent => {
                 Self::Provisioning { name: name()? }
             }
             AgentBuiltinTool::SearchKnowledge => Self::Knowledge,
@@ -327,9 +329,9 @@ impl PreparedAgent {
 
     pub fn policy(&self) -> AppResult<RigExecutionPolicy> {
         let mut policy = RigExecutionPolicy::default();
-        policy.request_output_tokens = policy
-            .request_output_tokens
-            .min(u64::from(self.selection.agent().model.max_output_tokens));
+        policy.request_output_tokens = policy.request_output_tokens.min(u64::from(
+            self.selection.agent().hosted_model()?.max_output_tokens,
+        ));
         policy.validate()?;
         Ok(policy)
     }
@@ -337,7 +339,7 @@ impl PreparedAgent {
     /// The immutable checkpoint contract for the claimed workflow job. No credentials.
     pub fn spec(&self, fence: WorkflowFence) -> AppResult<WorkflowCheckpointSpec> {
         let prepared = serde_json::to_value(self).map_err(|_| invalid("Invalid preparation"))?;
-        let model = &self.selection.agent().model;
+        let model = self.selection.agent().hosted_model()?;
         Ok(WorkflowCheckpointSpec {
             identity: RunIdentity {
                 company_id: fence.scope.company.as_uuid(),

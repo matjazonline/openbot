@@ -1,0 +1,22 @@
+{
+  "command": [
+    "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-ecc73d9eac497eda",
+    "direct_",
+    "public_desk_private_agent_",
+    "role_snapshot_tests",
+    "resend_api",
+    "adapters::smtp::server",
+    "inbound_event_worker",
+    "infra::events",
+    "run_counts",
+    "attention",
+    "--test-threads=4"
+  ],
+  "fixture": "pa02_codex_b3_gate_20261115 plus OwnDatabase isolated fixtures",
+  "exit": 101,
+  "elapsed_seconds": 194.94,
+  "summary": [
+    "test result: FAILED. 367 passed; 13 failed; 2 ignored; 0 measured; 4206 filtered out; finished in 194.88s"
+  ],
+  "log": "plan/03-principal-addresses/phases/p02/docs/logs/B3-ready10-focused1.txt"
+}

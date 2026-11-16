@@ -528,6 +528,27 @@ fn service(
 
 #[async_trait]
 impl PrincipalAccessPersistence for MemoryStore {
+    async fn direct_inboxes(
+        &self,
+        _company: Uuid,
+        _user: Uuid,
+        _limit: usize,
+    ) -> AppResult<Vec<crate::application::ports::participant::DirectInbox>> {
+        Err(crate::app_error::AppError::Internal(
+            "direct inbox listing is outside this fixture".into(),
+        ))
+    }
+
+    async fn principal_by_id(
+        &self,
+        _company: Uuid,
+        _principal: crate::entities::transport::PrincipalId,
+    ) -> AppResult<Option<crate::entities::participant::Principal>> {
+        Err(AppError::Internal(
+            "principal target lookup is outside this workflow fixture".into(),
+        ))
+    }
+
     async fn access_context_for_identity(
         &self,
         _company_id: Uuid,
@@ -566,7 +587,11 @@ impl WorkflowChannelReader for MemoryStore {
 
 #[async_trait]
 impl WorkflowThreadReader for MemoryStore {
-    async fn workflow_thread(&self, id: RelatedThreadId) -> AppResult<Option<Thread>> {
+    async fn workflow_thread(
+        &self,
+        _company: CompanyId,
+        id: RelatedThreadId,
+    ) -> AppResult<Option<Thread>> {
         let state = self.state.lock().unwrap();
         if state.fail_thread {
             return Err(AppError::Database("thread failed".into()));

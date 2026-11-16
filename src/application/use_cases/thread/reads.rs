@@ -3,27 +3,33 @@ use super::*;
 use crate::entities::access_level::{AccessLevel, visible_to};
 
 #[derive(Clone, Copy)]
-pub struct ChannelReadScope {
+pub struct InboxReadScope {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: AddressTarget,
 }
-impl From<&Channel> for ChannelReadScope {
+impl From<&Channel> for InboxReadScope {
     fn from(channel: &Channel) -> Self {
         Self {
             company_id: channel.company_id,
-            channel_id: channel.id,
+            target: AddressTarget::Desk(channel.id),
         }
     }
 }
+impl From<&super::ReadableInbox> for InboxReadScope {
+    fn from(inbox: &super::ReadableInbox) -> Self {
+        inbox.scope()
+    }
+}
+
 #[derive(Clone, Copy)]
 pub struct ThreadReadScope {
-    pub channel: ChannelReadScope,
+    pub inbox: InboxReadScope,
     pub thread_id: Uuid,
 }
 impl ThreadReadScope {
-    pub fn new(channel: &Channel, thread_id: Uuid) -> Self {
+    pub fn new(channel: impl Into<InboxReadScope>, thread_id: Uuid) -> Self {
         Self {
-            channel: channel.into(),
+            inbox: channel.into(),
             thread_id,
         }
     }
@@ -53,28 +59,50 @@ impl ThreadUseCases {
             .map_or(AccessLevel::PUBLIC, |context| context.access_level))
     }
 
-    async fn require_readable_channel(
+    pub(super) async fn require_readable_inbox(
         &self,
         viewer: &Viewer,
-        scope: ChannelReadScope,
+        scope: InboxReadScope,
     ) -> AppResult<()> {
-        let readers = ChannelReaders {
-            companies: self.company_persistence.as_ref(),
-            channels: self.channel_persistence.as_ref(),
-            participants: self.participant_persistence.as_ref(),
+        let allowed = match scope.target {
+            AddressTarget::Desk(id) => {
+                let readers = ChannelReaders {
+                    companies: self.company_persistence.as_ref(),
+                    channels: self.channel_persistence.as_ref(),
+                    participants: self.participant_persistence.as_ref(),
+                };
+                readable_channel(&readers, viewer, scope.company_id, id)
+                    .await?
+                    .is_some()
+            }
+            AddressTarget::Principal(id) => {
+                let principal = self
+                    .participant_persistence
+                    .principal_by_id(scope.company_id, id)
+                    .await?;
+                let context = self
+                    .participant_persistence
+                    .access_context_for_user(scope.company_id, viewer.user_id)
+                    .await?;
+                principal
+                    .zip(context)
+                    .is_some_and(|(principal, context)| principal.direct_viewer_access(context))
+            }
         };
-        readable_channel(&readers, viewer, scope.company_id, scope.channel_id)
-            .await?
-            .ok_or_else(|| AppError::NotFound("Desk not found".into()))?;
+        if !allowed {
+            return Err(AppError::NotFound("Inbox not found".into()));
+        }
         Ok(())
     }
 
     pub(super) async fn project_thread_titles(
         &self,
         viewer: &Viewer,
-        company_id: Uuid,
+        scope: InboxReadScope,
         mut threads: Vec<Thread>,
     ) -> AppResult<Vec<Thread>> {
+        self.require_readable_inbox(viewer, scope).await?;
+        let company_id = scope.company_id;
         let ids = threads.iter().map(|thread| thread.id).collect::<Vec<_>>();
         // A title may originate outside the bounded message window. Protect it conservatively
         // with the maximum immutable stamp, without hiding the thread or moving its cursor.
@@ -95,44 +123,44 @@ impl ThreadUseCases {
         Ok(threads)
     }
 
-    pub async fn list_channel_threads(
+    pub async fn list_inbox_threads(
         &self,
         viewer: &Viewer,
-        scope: ChannelReadScope,
+        scope: InboxReadScope,
         before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
-        self.require_readable_channel(viewer, scope).await?;
+        self.require_readable_inbox(viewer, scope).await?;
         let threads = self
             .thread_persistence
-            .list_threads_by_channel_id(scope.channel_id, before, limit)
+            .list_threads_by_target(scope.company_id, scope.target, before, limit)
             .await?;
-        self.project_thread_titles(viewer, scope.company_id, threads)
-            .await
+        self.project_thread_titles(viewer, scope, threads).await
     }
 
-    pub async fn get_channel_threads_after(
+    pub async fn inbox_threads_after(
         &self,
         viewer: &Viewer,
-        scope: ChannelReadScope,
+        scope: InboxReadScope,
         after: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
-        self.require_readable_channel(viewer, scope).await?;
+        self.require_readable_inbox(viewer, scope).await?;
         let threads = self
             .thread_persistence
-            .list_threads_updated_after(scope.channel_id, after, limit)
+            .list_threads_updated_after(scope.company_id, scope.target, after, limit)
             .await?;
-        self.project_thread_titles(viewer, scope.company_id, threads)
-            .await
+        self.project_thread_titles(viewer, scope, threads).await
     }
 
     async fn project_messages(
         &self,
         viewer: &Viewer,
-        company_id: Uuid,
+        scope: InboxReadScope,
         mut messages: Vec<ThreadMessageView>,
     ) -> AppResult<Vec<ThreadMessageView>> {
+        self.require_readable_inbox(viewer, scope).await?;
+        let company_id = scope.company_id;
         // This authority read follows ALL payload reads. Message stamps cannot change.
         let level = self.viewer_level(viewer, company_id).await?;
         for message in &mut messages {
@@ -149,8 +177,8 @@ impl ThreadUseCases {
     ) -> AppResult<Option<EmailReplyContext>> {
         self.readable_thread(
             viewer,
-            scope.channel.company_id,
-            scope.channel.channel_id,
+            scope.inbox.company_id,
+            scope.inbox.target,
             scope.thread_id,
         )
         .await?
@@ -177,8 +205,8 @@ impl ThreadUseCases {
     ) -> AppResult<Vec<ThreadMessageView>> {
         self.readable_thread(
             viewer,
-            scope.channel.company_id,
-            scope.channel.channel_id,
+            scope.inbox.company_id,
+            scope.inbox.target,
             scope.thread_id,
         )
         .await?
@@ -187,8 +215,7 @@ impl ThreadUseCases {
             .thread_persistence
             .list_thread_message_views(scope.thread_id)
             .await?;
-        self.project_messages(viewer, scope.channel.company_id, messages)
-            .await
+        self.project_messages(viewer, scope.inbox, messages).await
     }
 
     pub async fn get_thread_messages_after(
@@ -200,8 +227,8 @@ impl ThreadUseCases {
     ) -> AppResult<Vec<ThreadMessageView>> {
         self.readable_thread(
             viewer,
-            scope.channel.company_id,
-            scope.channel.channel_id,
+            scope.inbox.company_id,
+            scope.inbox.target,
             scope.thread_id,
         )
         .await?
@@ -210,8 +237,7 @@ impl ThreadUseCases {
             .thread_persistence
             .list_thread_message_views_after(scope.thread_id, after, limit)
             .await?;
-        self.project_messages(viewer, scope.channel.company_id, messages)
-            .await
+        self.project_messages(viewer, scope.inbox, messages).await
     }
 
     pub async fn get_thread_message_view(
@@ -222,8 +248,8 @@ impl ThreadUseCases {
     ) -> AppResult<Option<ThreadMessageView>> {
         self.readable_thread(
             viewer,
-            scope.channel.company_id,
-            scope.channel.channel_id,
+            scope.inbox.company_id,
+            scope.inbox.target,
             scope.thread_id,
         )
         .await?
@@ -233,11 +259,7 @@ impl ThreadUseCases {
             .get_thread_message_view(scope.thread_id, message_id)
             .await?;
         let projected = self
-            .project_messages(
-                viewer,
-                scope.channel.company_id,
-                message.into_iter().collect(),
-            )
+            .project_messages(viewer, scope.inbox, message.into_iter().collect())
             .await?;
         Ok(projected.into_iter().next())
     }
@@ -251,20 +273,21 @@ impl ThreadUseCases {
     ) -> AppResult<Option<MessageAuditView>> {
         self.readable_thread(
             viewer,
-            scope.channel.company_id,
-            scope.channel.channel_id,
+            scope.inbox.company_id,
+            scope.inbox.target,
             scope.thread_id,
         )
         .await?
         .ok_or_else(|| AppError::NotFound("Thread not found".into()))?;
         let audit = self
             .thread_persistence
-            .get_message_audit(scope.channel.company_id, association_id)
+            .get_message_audit(scope.inbox.company_id, association_id)
             .await?
             .filter(|audit| {
-                audit.thread_id == scope.thread_id && audit.channel_id == scope.channel.channel_id
+                audit.thread_id == scope.thread_id && audit.target == scope.inbox.target
             });
-        let level = self.viewer_level(viewer, scope.channel.company_id).await?;
+        self.require_readable_inbox(viewer, scope.inbox).await?;
+        let level = self.viewer_level(viewer, scope.inbox.company_id).await?;
         Ok(audit.filter(|audit| visible_to(level, audit.access_level)))
     }
 }

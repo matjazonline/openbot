@@ -9,6 +9,7 @@ use std::{collections::BTreeMap, time::Duration};
 struct Hints {
     actor_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     bundle: Vec<u8>,
     resources: Value,
@@ -111,7 +112,11 @@ pub(in crate::adapters::persistence::workflow) async fn authorize_on(
         tx,
         scope.company,
         actor,
-        binding_rows::association_from_columns(hints.channel_id, hints.thread_id)?,
+        association::association_from_columns(association::AssociationColumns {
+            channel_id: hints.channel_id,
+            principal_id: hints.principal_id,
+            thread_id: hints.thread_id,
+        })?,
     )
     .await?;
     let selected = selection(&hints, claim)?;
@@ -168,7 +173,7 @@ fn hints_on(
     company: CompanyId,
     run: RunId,
 ) -> impl std::future::Future<Output = Result<Option<Hints>, sqlx::Error>> + '_ {
-    sqlx::query_as("SELECT actor_id,channel_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2")
+    sqlx::query_as("SELECT actor_id,channel_id, principal_id,thread_id,stored.bundle AS bundle,resources FROM workflow_runs AS run LEFT JOIN workflow_bundles AS stored ON stored.company_id=run.company_id AND stored.digest=run.bundle_digest WHERE run.company_id=$1 AND id=$2")
         .bind(company.as_uuid()).bind(run.as_uuid()).fetch_optional(db)
 }
 
@@ -184,6 +189,7 @@ async fn verify_locked(
         .ok_or(sqlx::Error::RowNotFound)?;
     if hints.actor_id != locked.actor_id
         || hints.channel_id != locked.channel_id
+        || hints.principal_id != locked.principal_id
         || hints.thread_id != locked.thread_id
         || hints.bundle != locked.bundle
         || hints.resources != locked.resources

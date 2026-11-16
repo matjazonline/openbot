@@ -10,6 +10,7 @@
 //! [`crate::use_cases::participant::test_support`], so a fixture can name an actor before anything
 //! has observed it.
 
+use crate::entities::address::AddressTarget;
 use std::{
     collections::{HashMap, HashSet},
     sync::{Arc, Mutex},
@@ -173,12 +174,13 @@ struct Association {
 /// so the key is scoped by channel.
 #[derive(Clone, PartialEq, Eq, Hash)]
 struct ProviderKey {
-    channel_id: Uuid,
+    target: AddressTarget,
     key: String,
 }
 
 #[derive(Default)]
 struct Store {
+    binding_targets: HashMap<ChannelBindingId, AddressTarget>,
     threads: Vec<Thread>,
     canonical: Vec<Canonical>,
     associations: Vec<Association>,
@@ -291,12 +293,12 @@ impl InMemoryThreads {
         messages
     }
 
-    fn thread_channel(store: &Store, thread_id: Uuid) -> AppResult<Uuid> {
+    fn thread_target(store: &Store, thread_id: Uuid) -> AppResult<AddressTarget> {
         store
             .threads
             .iter()
             .find(|thread| thread.id == thread_id)
-            .map(|thread| thread.channel_id)
+            .map(|thread| thread.target)
             .ok_or_else(|| AppError::NotFound(format!("Thread {thread_id} was not found")))
     }
 
@@ -400,13 +402,15 @@ impl ThreadPersistence for InMemoryThreads {
     }
     async fn create_thread(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         subject: &str,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
         let thread = Thread {
             id: Uuid::new_v4(),
-            channel_id,
+            company_id,
+            target,
             subject: subject.to_string(),
             participant_principal_ids: self.principals_for(participant_emails),
             participant_projection: ThreadParticipantProjection {
@@ -425,20 +429,21 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(thread)
     }
 
-    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>> {
+    async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>> {
         Ok(self
             .store
             .lock()
             .unwrap()
             .threads
             .iter()
-            .find(|thread| thread.id == id)
+            .find(|thread| thread.company_id == company_id && thread.id == id)
             .cloned())
     }
 
-    async fn list_threads_by_channel_id(
+    async fn list_threads_by_target(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
@@ -448,7 +453,7 @@ impl ThreadPersistence for InMemoryThreads {
             .unwrap()
             .threads
             .iter()
-            .filter(|thread| thread.channel_id == channel_id)
+            .filter(|thread| thread.belongs_to(company_id, target))
             .filter(|thread| before.is_none_or(|cursor| thread.cursor() < cursor))
             .cloned()
             .collect();
@@ -459,7 +464,8 @@ impl ThreadPersistence for InMemoryThreads {
 
     async fn list_threads_updated_after(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         after: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>> {
@@ -469,7 +475,7 @@ impl ThreadPersistence for InMemoryThreads {
             .unwrap()
             .threads
             .iter()
-            .filter(|thread| thread.channel_id == channel_id)
+            .filter(|thread| thread.belongs_to(company_id, target))
             .filter(|thread| after.is_none_or(|cursor| thread.cursor() > cursor))
             .cloned()
             .collect();
@@ -480,6 +486,7 @@ impl ThreadPersistence for InMemoryThreads {
 
     async fn update_thread_participants(
         &self,
+        company_id: Uuid,
         id: Uuid,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread> {
@@ -487,7 +494,7 @@ impl ThreadPersistence for InMemoryThreads {
         let thread = store
             .threads
             .iter_mut()
-            .find(|thread| thread.id == id)
+            .find(|thread| thread.company_id == company_id && thread.id == id)
             .ok_or_else(|| AppError::NotFound(format!("Thread {id} was not found")))?;
         thread.participant_principal_ids = participant_emails
             .iter()
@@ -520,7 +527,8 @@ impl ThreadPersistence for InMemoryThreads {
 
     async fn find_thread_for_message(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         message_id: CanonicalMessageId,
     ) -> AppResult<Option<Thread>> {
         let store = self.store.lock().unwrap();
@@ -533,7 +541,7 @@ impl ThreadPersistence for InMemoryThreads {
         Ok(store
             .threads
             .iter()
-            .find(|thread| thread.channel_id == channel_id && thread_ids.contains(&thread.id))
+            .find(|thread| thread.belongs_to(company_id, target) && thread_ids.contains(&thread.id))
             .cloned())
     }
 
@@ -558,7 +566,8 @@ impl ThreadPersistence for InMemoryThreads {
 
     async fn find_thread_by_thread_index(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
         thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>> {
         let ancestors = thread_index.ancestor_chain().unwrap_or_default();
@@ -583,7 +592,7 @@ impl ThreadPersistence for InMemoryThreads {
             store
                 .threads
                 .iter()
-                .find(|thread| thread.id == thread_id && thread.channel_id == channel_id)
+                .find(|thread| thread.id == thread_id && thread.belongs_to(company_id, target))
                 .cloned()
         }))
     }
@@ -607,7 +616,7 @@ impl ThreadPersistence for InMemoryThreads {
         let author = self.resolve_author(&write.author);
         let participants = Self::resolve_participants(&write.participants);
         let mut store = self.store.lock().unwrap();
-        let channel_id = Self::thread_channel(&store, write.thread_id)?;
+        let target = Self::thread_target(&store, write.thread_id)?;
 
         let incoming = Canonical {
             // The producer's own id, exactly as `insert_message_on` uses it. Minting one here
@@ -629,11 +638,11 @@ impl ThreadPersistence for InMemoryThreads {
         let canonical_id = match &write.correlation {
             MessageCorrelation::Email(metadata) => {
                 let message_key = ProviderKey {
-                    channel_id,
+                    target,
                     key: metadata.rfc_message_id.as_str().to_string(),
                 };
                 let thread_key = ProviderKey {
-                    channel_id,
+                    target,
                     key: metadata.conversation_root_key().as_str().to_string(),
                 };
                 let canonical_id = match store.external_messages.get(&message_key).copied() {
@@ -693,7 +702,7 @@ impl ThreadPersistence for InMemoryThreads {
         entry_kind: crate::entities::message::ThreadEntryKind,
     ) -> AppResult<Message> {
         let mut store = self.store.lock().unwrap();
-        Self::thread_channel(&store, thread_id)?;
+        Self::thread_target(&store, thread_id)?;
         if !store
             .canonical
             .iter()
@@ -915,7 +924,7 @@ impl ThreadPersistence for InMemoryThreads {
         let fingerprint = format!(
             "{}:{}:{}:{}:{}:{:?}",
             command.company_id,
-            command.channel_id,
+            command.target,
             command.thread_id,
             command.text.trim(),
             actor,
@@ -991,7 +1000,7 @@ impl ThreadPersistence for InMemoryThreads {
     ) -> AppResult<InternalNoteView> {
         let fingerprint = format!(
             "{}:{}:{}:{}:{}",
-            command.company_id, command.channel_id, command.thread_id, command.note_id, actor
+            command.company_id, command.target, command.thread_id, command.note_id, actor
         );
         let mut store = self.store.lock().unwrap();
         if let Some((existing, note_id)) = store.tombstone_commands.get(&command.command_id) {
@@ -1234,11 +1243,11 @@ impl InMemoryThreads {
     ///
     /// Conversation bindings first, then message keys: the same order the SQL reader uses, so
     /// reply-before-root resolves here too.
-    fn find_thread_by_keys(&self, channel_id: Uuid, keys: &[String]) -> Option<Thread> {
+    fn find_thread_by_keys(&self, target: AddressTarget, keys: &[String]) -> Option<Thread> {
         let store = self.store.lock().unwrap();
         for key in keys {
             let key = ProviderKey {
-                channel_id,
+                target,
                 key: key.clone(),
             };
             if let Some(thread_id) = store.external_threads.get(&key).copied() {
@@ -1251,7 +1260,7 @@ impl InMemoryThreads {
         }
         for key in keys {
             let key = ProviderKey {
-                channel_id,
+                target,
                 key: key.clone(),
             };
             let Some(canonical_id) = store.external_messages.get(&key).copied() else {
@@ -1275,13 +1284,13 @@ impl InMemoryThreads {
     }
 
     /// The canonical message a provider key already names in one channel.
-    fn message_for_key(&self, channel_id: Uuid, key: &str) -> Option<CanonicalMessageId> {
+    fn message_for_key(&self, target: AddressTarget, key: &str) -> Option<CanonicalMessageId> {
         self.store
             .lock()
             .unwrap()
             .external_messages
             .get(&ProviderKey {
-                channel_id,
+                target,
                 key: key.to_string(),
             })
             .copied()
@@ -1341,22 +1350,29 @@ impl StandaloneDeliveryEnqueuer for InMemoryIngress {
 
 impl InMemoryIngress {
     /// The channel a synthetic binding stands for.
-    fn channel_of(binding_id: ChannelBindingId) -> Uuid {
-        binding_id.as_uuid()
+    fn target_of(&self, binding_id: ChannelBindingId) -> AddressTarget {
+        self.threads
+            .store
+            .lock()
+            .unwrap()
+            .binding_targets
+            .get(&binding_id)
+            .copied()
+            .unwrap_or(AddressTarget::Desk(binding_id.as_uuid()))
     }
 
     fn binding_of(channel_id: Uuid) -> ChannelBinding {
         ChannelBinding {
             id: ChannelBindingId::new(channel_id),
             company_id: Uuid::nil(),
-            channel_id,
+            target: AddressTarget::Desk(channel_id),
             installation_id: None,
             transport: TransportKind::Email,
             namespace: EndpointNamespace::parse("email").expect("a valid namespace"),
             external_endpoint_key: ExternalEndpointKey::parse(channel_id.to_string())
                 .expect("a UUID is a valid endpoint key"),
             display_label: format!("{channel_id}@test"),
-            access_policy: BindingAccessPolicy::ChannelAcl,
+            access_policy: BindingAccessPolicy::TargetAcl,
             delivery_policy: BindingDeliveryPolicy::ReplyAndInitiate,
             status: BindingStatus::Active,
             disabled_reason: None,
@@ -1376,12 +1392,33 @@ impl ChannelBindingPersistence for InMemoryIngress {
         ))
     }
 
-    async fn active_bindings_for_channel(
+    async fn active_bindings_for_target(
         &self,
-        _company_id: Uuid,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: AddressTarget,
     ) -> AppResult<Vec<ChannelBinding>> {
-        Ok(vec![Self::binding_of(channel_id)])
+        let id = match target {
+            AddressTarget::Desk(id) => ChannelBindingId::new(id),
+            AddressTarget::Principal(_) => {
+                let mut store = self.threads.store.lock().unwrap();
+                match store
+                    .binding_targets
+                    .iter()
+                    .find(|(_, stored)| **stored == target)
+                {
+                    Some((id, _)) => *id,
+                    None => {
+                        let id = ChannelBindingId::new(Uuid::new_v4());
+                        store.binding_targets.insert(id, target);
+                        id
+                    }
+                }
+            }
+        };
+        let mut binding = Self::binding_of(id.as_uuid());
+        binding.company_id = company_id;
+        binding.target = target;
+        Ok(vec![binding])
     }
 
     async fn find_active_binding_by_endpoint(
@@ -1400,7 +1437,9 @@ impl ChannelBindingPersistence for InMemoryIngress {
         _company_id: Uuid,
         binding_id: ChannelBindingId,
     ) -> AppResult<Option<ChannelBinding>> {
-        Ok(Some(Self::binding_of(Self::channel_of(binding_id))))
+        let mut binding = Self::binding_of(binding_id.as_uuid());
+        binding.target = self.target_of(binding_id);
+        Ok(Some(binding))
     }
 
     async fn set_binding_status(&self, _change: BindingStatusChange) -> AppResult<ChannelBinding> {
@@ -1432,7 +1471,7 @@ impl ExternalCorrelationStore for InMemoryIngress {
             .collect();
         Ok(self
             .threads
-            .find_thread_by_keys(Self::channel_of(binding_id), &keys)
+            .find_thread_by_keys(self.target_of(binding_id), &keys)
             .map(|thread| thread.id))
     }
 
@@ -1447,7 +1486,7 @@ impl ExternalCorrelationStore for InMemoryIngress {
             .collect();
         Ok(self
             .threads
-            .find_thread_by_keys(Self::channel_of(binding_id), &keys)
+            .find_thread_by_keys(self.target_of(binding_id), &keys)
             .map(|thread| thread.id))
     }
 
@@ -1458,12 +1497,24 @@ impl ExternalCorrelationStore for InMemoryIngress {
     ) -> AppResult<Option<CanonicalMessageId>> {
         Ok(self
             .threads
-            .message_for_key(Self::channel_of(binding_id), message_key.as_str()))
+            .message_for_key(self.target_of(binding_id), message_key.as_str()))
     }
 }
 
 #[async_trait]
 impl InboundMessageCommitter for InMemoryIngress {
+    async fn authenticate_internal_relay(
+        &self,
+        mail: &crate::transport::InternalRelayMail<'_>,
+    ) -> AppResult<Option<crate::transport::AuthenticatedRelaySource>> {
+        // This fixture stands in for frozen-delivery proof; production proof uses PostgreSQL.
+        Ok(Some(crate::transport::AuthenticatedRelaySource {
+            company_id: mail.proof.company_id(),
+            source_target: mail.source_target,
+            agent_principal: mail.source_target.principal_id(),
+        }))
+    }
+
     async fn commit_inbound(
         &self,
         request: InboundCommitRequest,
@@ -1479,18 +1530,23 @@ impl InboundMessageCommitter for InMemoryIngress {
             let emails: Vec<EmailAddress> = association
                 .principals
                 .iter()
-                .filter(|intent| {
-                    intent.role == crate::entities::participant::ThreadPrincipalRole::Participant
-                        && intent.identity.transport() == TransportKind::Email
+                .filter_map(|intent| match &intent.reference {
+                    crate::transport::ThreadPrincipalReference::Observed(identity)
+                        if intent.role
+                            == crate::entities::participant::ThreadPrincipalRole::Participant
+                            && identity.transport() == TransportKind::Email =>
+                    {
+                        Some(EmailAddress::from(identity.subject().as_str()))
+                    }
+                    _ => None,
                 })
-                .map(|intent| EmailAddress::from(intent.identity.subject().as_str()))
                 .collect();
             let thread_id = match &association.target {
                 ThreadTarget::Existing(thread_id) => {
                     if !emails.is_empty() {
                         let thread = self
                             .threads
-                            .get_thread_by_id(*thread_id)
+                            .get_thread_by_id(request.company_id, *thread_id)
                             .await?
                             .ok_or_else(|| AppError::NotFound("Thread was not found".into()))?;
                         let mut participants: Vec<EmailAddress> = thread
@@ -1508,18 +1564,50 @@ impl InboundMessageCommitter for InMemoryIngress {
                             }
                         }
                         self.threads
-                            .update_thread_participants(*thread_id, &participants)
+                            .update_thread_participants(
+                                request.company_id,
+                                *thread_id,
+                                &participants,
+                            )
                             .await?;
                     }
                     *thread_id
                 }
                 ThreadTarget::Create { subject } => {
                     self.threads
-                        .create_thread(association.channel_id, subject, &emails)
+                        .create_thread(
+                            request.company_id,
+                            association.address_target,
+                            subject,
+                            &emails,
+                        )
                         .await?
                         .id
                 }
             };
+            {
+                let mut store = self.threads.store.lock().unwrap();
+                let thread = store
+                    .threads
+                    .iter_mut()
+                    .find(|thread| thread.id == thread_id)
+                    .unwrap();
+                for principal in
+                    association
+                        .principals
+                        .iter()
+                        .filter_map(|intent| match intent.reference {
+                            crate::transport::ThreadPrincipalReference::Known(principal) => {
+                                Some(principal)
+                            }
+                            _ => None,
+                        })
+                {
+                    if !thread.participant_principal_ids.contains(&principal) {
+                        thread.participant_principal_ids.push(principal);
+                    }
+                }
+            }
             thread_ids.push(thread_id);
         }
 
@@ -1529,7 +1617,7 @@ impl InboundMessageCommitter for InMemoryIngress {
         let already_stored = self
             .threads
             .message_for_key(
-                Self::channel_of(envelope.source.binding_id),
+                self.target_of(envelope.source.binding_id),
                 envelope.source.message_key.as_str(),
             )
             .is_some();
@@ -1538,13 +1626,13 @@ impl InboundMessageCommitter for InMemoryIngress {
         // stored message, and one carrying different content is refused.
         let stored = self.threads.create_message(&write).await?;
         let mut association_by_channel = std::collections::HashMap::new();
-        association_by_channel.insert(request.associations[0].channel_id, stored.id);
+        association_by_channel.insert(request.associations[0].address_target, stored.id);
         for (association, thread_id) in request.associations.iter().zip(&thread_ids).skip(1) {
             let message = self
                 .threads
                 .associate_message(*thread_id, stored.canonical_id, write.entry_kind)
                 .await?;
-            association_by_channel.insert(association.channel_id, message.id);
+            association_by_channel.insert(association.address_target, message.id);
         }
         // The double stores no intent rows. It names each association's intent the same way on
         // every delivery, so a redelivery reports the first delivery's intents, as the SQL
@@ -1554,7 +1642,11 @@ impl InboundMessageCommitter for InMemoryIngress {
             .iter()
             .map(|intent| {
                 Uuid::from_u128(
-                    stored.canonical_id.as_uuid().as_u128() ^ intent.channel_id.as_u128(),
+                    stored.canonical_id.as_uuid().as_u128()
+                        ^ match intent.target {
+                            AddressTarget::Desk(id) => id.as_u128(),
+                            AddressTarget::Principal(id) => id.as_uuid().as_u128() ^ 1,
+                        },
                 )
             })
             .collect();
@@ -1600,17 +1692,17 @@ fn inbound_message_write(envelope: &InboundEnvelope, thread_id: Uuid) -> Message
         clean_text_body: envelope.content.body_text().to_string(),
         attachments: envelope.attachments.to_vec(),
         direction: MessageDirection::Inbound,
-        role: if envelope.directives.source_channel_id.is_some() {
+        role: if envelope.directives.source_target.is_some() {
             MessageRole::Agent
         } else {
             MessageRole::Human
         },
-        audience: if envelope.directives.source_channel_id.is_some() {
+        audience: if envelope.directives.source_target.is_some() {
             crate::entities::message::MessageAudience::InternalOnly
         } else {
             crate::entities::message::MessageAudience::ExternalConversation
         },
-        entry_kind: if envelope.directives.source_channel_id.is_some() {
+        entry_kind: if envelope.directives.source_target.is_some() {
             crate::entities::message::ThreadEntryKind::Delegation
         } else {
             crate::entities::message::ThreadEntryKind::Conversation

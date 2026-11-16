@@ -1,0 +1,11 @@
+
+running 6 tests
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_association_codec_preserves_every_scope_and_refuses_invalid_null_shapes ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_role_activation_and_roster_mutations_require_exactly_one_department ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_real_ingress_admits_one_agent_run_with_exact_target_and_history_pins ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::policy::direct_binding_admission_rechecks_external_source_after_public_policy_revocation ... ok
+test adapters::persistence::workflow::tests::role_binding_tests::direct::direct_binding_competing_activation_and_roster_write_preserve_unambiguous_context ... ok
+test adapters::persistence::workflow::tests::message_tests::intent_tests::direct_workflow::direct_binding_person_is_refused_by_application_and_native_guard_and_receives_no_run ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4576 filtered out; finished in 4.22s
+

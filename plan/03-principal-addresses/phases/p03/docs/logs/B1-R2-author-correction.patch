@@ -1,0 +1,781 @@
+--- r1/src/adapters/persistence/agent_direct_lifecycle_tests.rs
++++ r2/src/adapters/persistence/agent_direct_lifecycle_tests.rs
+@@ -112,6 +112,40 @@
+ }
+ 
+ #[tokio::test]
++async fn direct_target_native_foreign_principal_update_cannot_commit() {
++    let Some(f) = Departments::new().await else {
++        return;
++    };
++    let Some(foreign) = Departments::new().await else {
++        return;
++    };
++    // A valid native row without participants isolates the deferred target pin from the
++    // separate immediate FK that correctly makes populated thread membership immutable.
++    let thread = Uuid::new_v4();
++    sqlx::query("INSERT INTO threads(id,company_id,principal_id,subject) VALUES($1,$2,$3,'Original direct target')")
++        .bind(thread).bind(f.company).bind(f.agent_principal.as_uuid()).execute(f.pool()).await.unwrap();
++    let before = state(&f).await;
++    let other_before = state(&foreign).await;
++    let mut tx = f.pool().begin().await.unwrap();
++    sqlx::query("UPDATE threads SET principal_id=$3 WHERE company_id=$1 AND id=$2")
++        .bind(f.company)
++        .bind(thread)
++        .bind(foreign.agent_principal.as_uuid())
++        .execute(&mut *tx)
++        .await
++        .unwrap();
++    let error = tx.commit().await.unwrap_err();
++    assert_eq!(
++        error
++            .as_database_error()
++            .and_then(|error| error.constraint()),
++        Some("threads_target_principal_fk")
++    );
++    assert_eq!(state(&f).await, before);
++    assert_eq!(state(&foreign).await, other_before);
++}
++
++#[tokio::test]
+ async fn agent_address_delete_retained_external_binding_restores_every_owned_resource() {
+     use crate::application::workflow::lifecycle::{
+         BindingService, BindingTarget, ConfigureBinding,
+--- r1/src/adapters/persistence/workflow/direct_agent_history_teardown_tests.rs
++++ r2/src/adapters/persistence/workflow/direct_agent_history_teardown_tests.rs
+@@ -0,0 +1,187 @@
++//! Company ownership must remove populated direct descendants without touching another tenant.
++use super::*;
++use crate::application::ports::thread::ThreadPersistence;
++use crate::entities::internal_note::{AddInternalNote, InternalNoteProvenance};
++
++const DESCENDANTS: &[&str] = &[
++    "principals",
++    "addresses",
++    "channel_bindings",
++    "threads",
++    "thread_messages",
++    "thread_principals",
++    "messages",
++    "external_threads",
++    "external_messages",
++    "workflow_message_intents",
++    "workflow_runs",
++    "agent_history_sessions",
++    "agent_history_conversations",
++    "agent_history_exchanges",
++    "internal_notes",
++    "message_deliveries",
++];
++
++async fn rows(d: &Deployment, company: Uuid) -> Value {
++    let mut result = serde_json::Map::new();
++    for table in DESCENDANTS {
++        let value: Value = sqlx::query_scalar(&format!(
++            "SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) \
++             FROM {table} AS record WHERE record.company_id=$1"
++        )).bind(company).fetch_one(d.p().pool()).await.unwrap();
++        result.insert((*table).into(), value);
++    }
++    result.into()
++}
++
++async fn note(d: &Deployment, thread: &crate::entities::thread::Thread) {
++    let actor = d
++        .threads
++        .principal_access_for_user(thread.company_id, d.fixture.target.actor.user_id())
++        .await
++        .unwrap()
++        .unwrap();
++    d.threads
++        .add_internal_note(
++            AddInternalNote {
++                company_id: thread.company_id,
++                target: thread.target,
++                thread_id: thread.id,
++                text: "A retained direct note".into(),
++                command_id: Uuid::new_v4(),
++                supersedes_note_id: None,
++                provenance: InternalNoteProvenance::HumanUi,
++            },
++            actor,
++        )
++        .await
++        .unwrap();
++}
++
++async fn populated(d: &Deployment, thread: &crate::entities::thread::Thread) -> Value {
++    let before = rows(d, thread.company_id).await;
++    for table in DESCENDANTS {
++        assert!(
++            !before[*table].as_array().unwrap().is_empty(),
++            "must populate {table} before teardown"
++        );
++    }
++    for table in [
++        "agent_history_sessions",
++        "agent_history_conversations",
++        "internal_notes",
++    ] {
++        let direct: bool = sqlx::query_scalar(&format!(
++            "SELECT count(*)>0 AND bool_and(channel_id IS NULL AND principal_id=$2) FROM {table} WHERE company_id=$1"
++        )).bind(thread.company_id).bind(thread.target.principal_id().unwrap().as_uuid())
++            .fetch_one(d.p().pool()).await.unwrap();
++        assert!(direct, "{table} must pin the actual direct principal");
++    }
++    before
++}
++
++async fn configured_survivor(d: &Deployment) -> crate::entities::company::Company {
++    let owner = d.fixture.target.actor;
++    let company = CompanyPersistence::create(
++        d.p(),
++        owner.user_id(),
++        CompanyWrite {
++            name: "Surviving tenant".into(),
++            slug: format!("survivor-{}", Uuid::new_v4().simple()),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    CompanyPersistence::replace_model_connections_for_user(
++        d.p(),
++        owner.user_id(),
++        company.id,
++        vec![CompanyModelConnectionWrite {
++            provider: SCRIPTED_PROVIDER.into(),
++            api_key: Some("scripted-key".into()),
++            models: vec![SCRIPTED_MODEL.into()],
++            is_default: true,
++        }],
++    )
++    .await
++    .unwrap();
++    let service = crate::adapters::persistence::test_support::company_agents(d.p());
++    let created = Box::pin(service.create(
++        owner,
++        CompanyId::new(company.id),
++        AgentWrite {
++            name: "Surviving assistant".into(),
++            slug: "assistant".into(),
++            provider: Some(SCRIPTED_PROVIDER.into()),
++            model: Some(SCRIPTED_MODEL.into()),
++            ..Default::default()
++        },
++        None,
++    ))
++    .await
++    .unwrap();
++    register_scripted_agent_base_url(created.agent.id, &d.llm.base_url);
++    company
++}
++
++async fn answered_other(d: &Deployment) -> crate::entities::thread::Thread {
++    let other = Box::pin(configured_survivor(d)).await;
++    let owner: String = sqlx::query_scalar("SELECT email::text FROM users WHERE id=$1")
++        .bind(d.fixture.target.actor.user_id())
++        .fetch_one(d.p().pool())
++        .await
++        .unwrap();
++    let accepted = d
++        .email(RawInboundPayload {
++            from: owner,
++            to: format!("assistant@{}.{APP_DOMAIN}", other.slug),
++            subject: Some("Surviving direct work".into()),
++            text: Some("Please answer this direct message".into()),
++            headers: Some(format!("Message-ID: <{}@sender.test>\n", Uuid::new_v4())),
++            ..Default::default()
++        })
++        .await;
++    let delivery = Delivery::start(d, ProviderCase::Accept);
++    d.run_until("the surviving tenant has populated direct history and a delivered outbox", async || {
++        sqlx::query_scalar::<_,i64>("SELECT count(*) FROM message_deliveries WHERE company_id=$1 AND purpose='workflow_reply' AND status='delivered'")
++            .bind(other.id).fetch_one(d.p().pool()).await.unwrap()==1
++    }).await;
++    assert_eq!(delivery.stop().await.messages().len(), 1);
++    accepted.thread.unwrap()
++}
++
++#[tokio::test]
++async fn direct_company_teardown_removes_populated_agent_history_notes_and_transport() {
++    // Both production agents run against the same native database and the scripted provider;
++    // boxed fixtures keep the real agent/runtime boundary inside the stock stack budget.
++    let d = Box::pin(answered_default(vec![
++        LlmTurn::text(r#"{"body":"A direct production reply"}"#),
++        LlmTurn::text(r#"{"body":"A surviving direct production reply"}"#),
++    ]))
++    .await;
++    let company = d.fixture.target.company.as_uuid();
++    let thread_id: Uuid = sqlx::query_scalar(
++        "SELECT id FROM threads WHERE company_id=$1 AND principal_id IS NOT NULL",
++    )
++    .bind(company)
++    .fetch_one(d.p().pool())
++    .await
++    .unwrap();
++    let thread = ThreadPersistence::get_thread_by_id(d.p(), company, thread_id)
++        .await
++        .unwrap()
++        .unwrap();
++    let other_thread = Box::pin(answered_other(&d)).await;
++    note(&d, &thread).await;
++    note(&d, &other_thread).await;
++    populated(&d, &thread).await;
++    let surviving = populated(&d, &other_thread).await;
++    CompanyPersistence::delete(d.p(), company).await.unwrap();
++    let after = rows(&d, company).await;
++    for table in DESCENDANTS {
++        assert_eq!(after[*table], json!([]), "leftover {table}");
++    }
++    assert_eq!(rows(&d, other_thread.company_id).await, surviving);
++    assert_eq!(d.llm.finish().await.unwrap(), 2);
++}
+--- r1/src/adapters/persistence/workflow/message_tests.rs
++++ r2/src/adapters/persistence/workflow/message_tests.rs
+@@ -33,6 +33,8 @@
+ mod reconcile_tests;
+ #[path = "message_recovery_tests.rs"]
+ mod recovery_tests;
++#[path = "workflow_message_sender_tests.rs"]
++mod sender_tests;
+ #[path = "message_sql_tests.rs"]
+ mod sql_tests;
+ #[path = "storage_message_tests.rs"]
+--- r1/src/adapters/persistence/workflow/public_desk_private_agent_tests.rs
++++ r2/src/adapters/persistence/workflow/public_desk_private_agent_tests.rs
+@@ -1,6 +1,8 @@
+ //! Production ingest/runtime/final publisher/delivery over a scripted model. Direct address
+ //! registration comes from real company-agent creation, alongside an explicit shared intake desk.
+ use super::*;
++#[path = "direct_agent_history_teardown_tests.rs"]
++mod direct_history_teardown;
+ #[path = "public_desk_private_agent_smtp_tests.rs"]
+ pub(in super::super) mod smtp;
+ #[path = "relay_system_identity_tests.rs"]
+@@ -204,10 +206,21 @@
+ 
+ #[tokio::test]
+ async fn agent_address_create_actual_default_binding_answers_a_direct_message() {
+-    let d = Deployment::new(vec![LlmTurn::text(
++    let d = Box::pin(answered_default(vec![LlmTurn::text(
+         r#"{"body":"A direct production reply"}"#,
+-    )])
++    )]))
+     .await;
++    assert_eq!(d.llm.finish().await.unwrap(), 1);
++}
++
++async fn answered_default(turns: Vec<LlmTurn>) -> Deployment {
++    let d = Deployment::new(turns).await;
++    // The shared fixture permits unrelated snapshot-corruption tests. This runtime proof
++    // exercises the production run guard as well as the direct-target lifecycle constraints.
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(d.p().pool())
++        .await
++        .unwrap();
+     let company = d.fixture.target.company.as_uuid();
+     let principal: Uuid = sqlx::query_scalar("SELECT principal.id FROM principals AS principal JOIN agents AS agent ON agent.company_id=principal.company_id AND agent.id=principal.agent_id WHERE principal.company_id=$1 AND agent.slug='assistant'")
+         .bind(company).fetch_one(d.p().pool()).await.unwrap();
+@@ -252,5 +265,5 @@
+     );
+     let provider = delivery.stop().await;
+     assert_eq!(provider.messages().len(), 1);
+-    assert_eq!(d.llm.finish().await.unwrap(), 1);
+-}
++    d
++}
+--- r1/src/adapters/persistence/workflow/relay_authority_race_tests.rs
++++ r2/src/adapters/persistence/workflow/relay_authority_race_tests.rs
+@@ -0,0 +1,185 @@
++//! Competing production writers change authority after relay observation and before commit gates.
++use super::*;
++use crate::adapters::persistence::channel_gate::{
++    ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on,
++};
++use crate::application::agent::AgentPublicationScope;
++use crate::application::ports::channel::ChannelUpdate;
++use crate::entities::agent_capability::AgentId;
++
++#[derive(Clone, Copy)]
++enum Revoke {
++    SourceAddress,
++    TargetSettings,
++}
++
++async fn gate_waiter(p: &PostgresPersistence, blocker: i32, access: ChannelGateAccess) {
++    let pattern = match access {
++        ChannelGateAccess::Admit => "SELECT pg_advisory_xact_lock_shared(%",
++        ChannelGateAccess::ChangeSettings => "SELECT pg_advisory_xact_lock(%",
++    };
++    tokio::time::timeout(Duration::from_secs(4), async {
++        loop {
++            let waiting: bool = sqlx::query_scalar(
++                "SELECT EXISTS(SELECT 1 FROM pg_stat_activity WHERE $1=ANY(pg_blocking_pids(pid)) AND query LIKE $2)",
++            ).bind(blocker).bind(pattern).fetch_one(p.pool()).await.unwrap();
++            if waiting { return; }
++            tokio::time::sleep(Duration::from_millis(5)).await;
++        }
++    }).await.expect("the actual writer/relay must reach its channel gate");
++}
++
++async fn pending_target_edit(f: &QueuedRelay, blocker: i32) -> tokio::task::JoinHandle<()> {
++    let p = f.case.people.role.p();
++    let desk = f.target.desk_id().unwrap();
++    let old = ChannelPersistence::get_by_id(p, desk)
++        .await
++        .unwrap()
++        .unwrap();
++    let p = p.clone();
++    let writer = tokio::spawn(async move {
++        ChannelPersistence::update(
++            &p,
++            ChannelUpdate {
++                company_id: old.company_id,
++                channel_id: desk,
++                write: ChannelWrite {
++                    name: old.name,
++                    slug: old.slug.to_string(),
++                    enabled: false,
++                    ..Default::default()
++                },
++            },
++        )
++        .await
++        .unwrap();
++    });
++    gate_waiter(
++        f.case.people.role.p(),
++        blocker,
++        ChannelGateAccess::ChangeSettings,
++    )
++    .await;
++    writer
++}
++
++async fn effects(f: &QueuedRelay) -> Value {
++    let mut result = serde_json::Map::new();
++    for table in [
++        "messages",
++        "threads",
++        "thread_messages",
++        "thread_principals",
++        "participant_identities",
++        "message_participants",
++        "email_message_metadata",
++        "external_messages",
++        "external_threads",
++        "workflow_message_intents",
++        "message_internal_relays",
++        "message_deliveries",
++    ] {
++        let rows: Value = sqlx::query_scalar(&format!(
++            "SELECT COALESCE(jsonb_agg(to_jsonb(record) ORDER BY to_jsonb(record)::text),'[]'::jsonb) \
++             FROM {table} AS record WHERE company_id=$1"
++        )).bind(f.case.people.role.company().as_uuid()).fetch_one(f.case.people.role.p().pool()).await.unwrap();
++        result.insert(table.into(), rows);
++    }
++    result.into()
++}
++
++async fn revoke_at_gate(f: &QueuedRelay, change: Revoke) {
++    let p = f.case.people.role.p();
++    let desk = f.target.desk_id().unwrap();
++    let mut blocker = p.pool().begin().await.unwrap();
++    let pid: i32 = sqlx::query_scalar("SELECT pg_backend_pid()")
++        .fetch_one(&mut *blocker)
++        .await
++        .unwrap();
++    acquire_channel_gate_on(
++        &mut blocker,
++        ChannelGateKey::new(f.case.people.role.company().as_uuid(), desk),
++        ChannelGateAccess::ChangeSettings,
++    )
++    .await
++    .unwrap();
++    let writer = match change {
++        Revoke::TargetSettings => Some(pending_target_edit(f, pid).await),
++        Revoke::SourceAddress => None,
++    };
++    let threads = relay_threads(p);
++    let proof = InternalRelayProof::claiming(
++        f.case.people.role.company().as_uuid(),
++        f.delivery,
++        PartIndex::new(0),
++    );
++    let mail = hop(&f.email, proof);
++    let mutation = async {
++        // This shared gate is inside commit_as_on, after real proof/ACL observation and before
++        // any provider key, thread or canonical effect. PostgreSQL also queues the settings
++        // writer ahead of the receiving claimant, so its commit must be observed on release.
++        gate_waiter(p, pid, ChannelGateAccess::Admit).await;
++        if matches!(change, Revoke::SourceAddress) {
++            crate::adapters::persistence::test_support::rename_native_agent(
++                p,
++                AgentPublicationScope {
++                    company: f.case.people.role.company(),
++                    actor: f.case.people.role.admission.binding.target.actor,
++                    agent: AgentId::new(f.case.created.agent.id),
++                },
++                "renamed-relay-sender",
++            )
++            .await;
++        }
++        blocker.commit().await.unwrap();
++        if let Some(writer) = writer {
++            writer.await.unwrap();
++        }
++    };
++    let (outcome, ()) = tokio::join!(threads.relay_internal(&mail), mutation);
++    match change {
++        Revoke::SourceAddress => assert!(
++            matches!(outcome, Ok(RelayDisposition::Refused(_))),
++            "{outcome:?}"
++        ),
++        Revoke::TargetSettings => assert!(
++            matches!(outcome, Err(AppError::Superseded(_))),
++            "{outcome:?}"
++        ),
++    }
++    assert!(
++        matches!(
++            threads.relay_internal(&mail).await.unwrap(),
++            RelayDisposition::Refused(_)
++        ),
++        "retry/redelivery must reauthorize current source and target"
++    );
++}
++
++async fn race(change: Revoke) {
++    for redelivery in [false, true] {
++        let f = Box::pin(queued(Receiver::SameDepartment)).await;
++        if redelivery {
++            let smtp = Box::pin(deliver(&f.case, relay_threads(f.case.people.role.p()))).await;
++            assert!(smtp.sent().is_empty());
++            assert_eq!(received(&f).await.len(), 1);
++        }
++        let before = effects(&f).await;
++        Box::pin(revoke_at_gate(&f, change)).await;
++        assert_eq!(
++            effects(&f).await,
++            before,
++            "revocation must leave every receiving effect unchanged"
++        );
++    }
++}
++
++#[tokio::test]
++async fn relay_identity_source_rename_after_observation_refuses_commit_and_redelivery() {
++    Box::pin(race(Revoke::SourceAddress)).await;
++}
++
++#[tokio::test]
++async fn relay_identity_target_revocation_after_observation_refuses_commit_and_redelivery() {
++    Box::pin(race(Revoke::TargetSettings)).await;
++}
+--- r1/src/adapters/persistence/workflow/relay_identity_tests.rs
++++ r2/src/adapters/persistence/workflow/relay_identity_tests.rs
+@@ -9,19 +9,57 @@
+ enum Receiver {
+     SameDepartment,
+     OtherDepartment,
++    PrivateAgent,
+ }
+ 
+ struct QueuedRelay {
+     case: AgentCase,
+     delivery: DeliveryId,
+     email: OutboundEmailV1,
+-    desk: Uuid,
++    target: crate::entities::address::AddressTarget,
+ }
+ 
+ async fn queued(receiver: Receiver) -> QueuedRelay {
+     let (f, _, _) = Box::pin(answering_case()).await;
++    let target = receiving_target(&f, receiver).await;
++    let address: String = sqlx::query_scalar(
++        "SELECT address.slug || '@' || company.slug || '.agents.test' FROM addresses AS address \
++         JOIN companies AS company ON company.id=address.company_id WHERE address.company_id=$1 \
++         AND address.is_primary AND address.channel_id IS NOT DISTINCT FROM $2 \
++         AND address.principal_id IS NOT DISTINCT FROM $3",
++    )
++    .bind(f.people.role.company().as_uuid())
++    .bind(target.desk_id())
++    .bind(target.principal_id().map(|id| id.as_uuid()))
++    .fetch_one(f.people.role.p().pool())
++    .await
++    .unwrap();
++    let (root, _) = Box::pin(settle_root(&f)).await;
++    let (source, thread) = spoofed_from_department(&f, &address).await;
++    let rerun = Box::pin(deliver_rerun(&f, root, thread)).await;
++    let delivery = Box::pin(queued_reply(&f, rerun, source)).await;
++    let email = frozen(&f, delivery).await;
++    QueuedRelay {
++        case: f,
++        delivery,
++        email,
++        target,
++    }
++}
++
++async fn receiving_target(
++    f: &AgentCase,
++    receiver: Receiver,
++) -> crate::entities::address::AddressTarget {
++    use crate::entities::{address::AddressTarget, transport::PrincipalId};
+     let p = f.people.role.p();
+     let department = match receiver {
++        Receiver::PrivateAgent => {
++            let agent = Box::pin(department_agent(f)).await;
++            let principal: Uuid = sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2 AND NOT open_to_public")
++                .bind(f.people.role.company().as_uuid()).bind(agent).fetch_one(p.pool()).await.unwrap();
++            return AddressTarget::Principal(PrincipalId::new(principal));
++        }
+         Receiver::SameDepartment => f.people.role.department,
+         Receiver::OtherDepartment => {
+             PostgresDepartments::new(
+@@ -61,18 +99,7 @@
+     )
+     .await
+     .unwrap();
+-    let address = address(&f, desk.id).await;
+-    let (root, _) = Box::pin(settle_root(&f)).await;
+-    let (source, thread) = spoofed_from_department(&f, &address).await;
+-    let rerun = Box::pin(deliver_rerun(&f, root, thread)).await;
+-    let delivery = Box::pin(queued_reply(&f, rerun, source)).await;
+-    let email = frozen(&f, delivery).await;
+-    QueuedRelay {
+-        case: f,
+-        delivery,
+-        email,
+-        desk: desk.id,
+-    }
++    AddressTarget::Desk(desk.id)
+ }
+ 
+ #[derive(Debug, PartialEq, sqlx::FromRow)]
+@@ -88,12 +115,14 @@
+            ON message.company_id=relay.company_id AND message.id=relay.message_id \
+          JOIN thread_messages AS membership \
+            ON membership.company_id=message.company_id AND membership.message_id=message.id \
+-         WHERE relay.company_id=$1 AND relay.delivery_id=$2 AND membership.channel_id=$3 \
++         WHERE relay.company_id=$1 AND relay.delivery_id=$2 AND membership.channel_id IS NOT DISTINCT FROM $3 \
++           AND membership.principal_id IS NOT DISTINCT FROM $4 \
+            AND message.role='agent' AND message.direction='inbound'",
+     )
+     .bind(f.case.people.role.company().as_uuid())
+     .bind(f.delivery.as_uuid())
+-    .bind(f.desk)
++    .bind(f.target.desk_id())
++    .bind(f.target.principal_id().map(|id| id.as_uuid()))
+     .fetch_all(f.case.people.role.p().pool())
+     .await
+     .unwrap()
+@@ -126,12 +155,17 @@
+         "SELECT count(*) FROM thread_messages WHERE company_id=$1 AND channel_id=$2",
+     )
+     .bind(f.case.people.role.company().as_uuid())
+-    .bind(f.desk)
++    .bind(f.target.desk_id().unwrap())
+     .fetch_one(f.case.people.role.p().pool())
+     .await
+     .unwrap();
+     assert_eq!(messages, 0);
+ }
++
++#[path = "relay_authority_race_tests.rs"]
++mod authority_races;
++#[path = "relay_private_agent_tests.rs"]
++mod private_agent;
+ 
+ #[tokio::test]
+ async fn relay_identity_running_agent_cannot_send_as_another_agents_address() {
+--- r1/src/adapters/persistence/workflow/relay_private_agent_tests.rs
++++ r2/src/adapters/persistence/workflow/relay_private_agent_tests.rs
+@@ -0,0 +1,59 @@
++//! An ordinary authenticated agent has direct participation authority without a notice exception.
++use super::*;
++
++#[tokio::test]
++async fn relay_identity_actual_agent_to_private_agent_admits_ordinary_work() {
++    let f = Box::pin(queued(Receiver::PrivateAgent)).await;
++    let p = f.case.people.role.p();
++    let company = f.case.people.role.company().as_uuid();
++    let principal = f.target.principal_id().unwrap();
++    let smtp = Box::pin(deliver(&f.case, relay_threads(p))).await;
++    assert!(smtp.sent().is_empty());
++    assert_eq!(delivered(&f.case, f.delivery).await, "delivered");
++    let sender = f.case.created.principal_id.as_uuid();
++    assert_eq!(
++        received(&f).await,
++        [ReceivedHop {
++            author_principal: sender,
++            sender_principal: sender
++        }]
++    );
++    let message: Uuid = sqlx::query_scalar(
++        "SELECT relay.message_id FROM message_internal_relays AS relay \
++         JOIN workflow_message_intents AS intent ON intent.company_id=relay.company_id AND intent.message_id=relay.message_id \
++         WHERE relay.company_id=$1 AND relay.delivery_id=$2 AND intent.channel_id IS NULL \
++         AND intent.principal_id=$3 AND intent.origin='internal'",
++    ).bind(company).bind(f.delivery.as_uuid()).bind(principal.as_uuid()).fetch_one(p.pool()).await.unwrap();
++    let receipts: i64 = sqlx::query_scalar("SELECT count(*) FROM workflow_escalation_agent_receipts WHERE company_id=$1 AND message_id=$2")
++        .bind(company).bind(message).fetch_one(p.pool()).await.unwrap();
++    assert_eq!(
++        receipts, 0,
++        "ordinary relay must not borrow a platform-notice receipt"
++    );
++    let binding: Uuid = sqlx::query_scalar(
++        "SELECT binding_id FROM channel_reply_settings WHERE company_id=$1 AND principal_id=$2",
++    )
++    .bind(company)
++    .bind(principal.as_uuid())
++    .fetch_one(p.pool())
++    .await
++    .unwrap();
++    for claim in claims(&f.case).await {
++        process(&f.case, claim).await;
++    }
++    let run = admitted_from(&f.case, message, WorkflowBindingId::new(binding)).await;
++    let exact: bool = sqlx::query_scalar(
++        "SELECT run.channel_id IS NULL AND run.principal_id=$3 AND run.binding_id=$4 \
++         AND NOT EXISTS(SELECT 1 FROM workflow_escalation_handling_roots AS handling \
++             WHERE handling.company_id=run.company_id AND handling.run_id=run.id) \
++         AND EXISTS(SELECT 1 FROM run_dependency_manifests AS ownership \
++             JOIN agent_manifest_revisions AS selection ON selection.company_id=ownership.company_id AND selection.manifest_id=ownership.manifest_id \
++             JOIN principals AS target ON target.company_id=selection.company_id AND target.agent_id=selection.agent_id \
++             WHERE ownership.company_id=run.company_id AND ownership.run_id=run.id AND target.id=$3) \
++         FROM workflow_runs AS run WHERE run.company_id=$1 AND run.id=$2",
++    ).bind(company).bind(run.as_uuid()).bind(principal.as_uuid()).bind(binding).fetch_one(p.pool()).await.unwrap();
++    assert!(
++        exact,
++        "the ordinary private agent's selected workflow must own the admitted run"
++    );
++}
+--- r1/src/adapters/persistence/workflow/workflow_message_sender_tests.rs
++++ r2/src/adapters/persistence/workflow/workflow_message_sender_tests.rs
+@@ -0,0 +1,124 @@
++//! Native producer proof rejects an agent impersonating a sealed pure-workflow message.
++use super::*;
++use crate::use_cases::agent::{AgentPersistence, AgentWrite};
++
++async fn publication_effects(p: &PostgresPersistence, company: Uuid) -> Value {
++    let mut result = serde_json::Map::new();
++    for table in [
++        "messages",
++        "threads",
++        "thread_messages",
++        "external_messages",
++        "message_deliveries",
++        "message_delivery_parts",
++        "workflow_message_destinations",
++        "workflow_message_producer_seals",
++        "workflow_action_intents",
++        "workflow_action_dispatches",
++        "workflow_action_receipts",
++        "workflow_message_actions",
++    ] {
++        let count: i64 =
++            sqlx::query_scalar(&format!("SELECT count(*) FROM {table} WHERE company_id=$1"))
++                .bind(company)
++                .fetch_one(p.pool())
++                .await
++                .unwrap();
++        result.insert(table.into(), count.into());
++    }
++    result.into()
++}
++
++async fn install_sender_probe(p: &PostgresPersistence, run: RunId, principal: Uuid) {
++    sqlx::raw_sql(&format!(
++        "CREATE FUNCTION reserve_workflow_sender() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN \
++         INSERT INTO workflow_message_producer_seals(company_id,message_id,producer_run_id) \
++         VALUES(NEW.company_id,NEW.id,'{}'::uuid); RETURN NEW; END $$; \
++         CREATE TRIGGER reserve_workflow_sender BEFORE INSERT ON messages FOR EACH ROW \
++         EXECUTE FUNCTION reserve_workflow_sender(); \
++         CREATE FUNCTION forge_workflow_sender() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN \
++         NEW.author_principal_id='{principal}'::uuid; NEW.authored_identity_id=NULL; NEW.role='agent'; \
++         RETURN NEW; END $$; CREATE TRIGGER forge_workflow_sender BEFORE INSERT ON messages \
++         FOR EACH ROW EXECUTE FUNCTION forge_workflow_sender();", run.as_uuid()
++    )).execute(p.pool()).await.unwrap();
++}
++
++#[tokio::test]
++async fn relay_identity_native_forged_workflow_agent_author_rolls_back_publication() {
++    let f = Box::pin(send(&[To::Channel])).await;
++    let p = &f.fixture.persistence;
++    sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
++        .execute(p.pool())
++        .await
++        .unwrap();
++    assert!(matches!(
++        f.runtime().execute(&f.kind, &f.claim).await,
++        WorkflowHandlerOutcome::Completed(Ok(_))
++    ));
++    let company = f.scope().company.as_uuid();
++    let source = invocations(f.pool(), f.scope().run).await[0];
++    let pretender = AgentPersistence::create(
++        p,
++        company,
++        AgentWrite {
++            name: "Unrelated native agent".into(),
++            slug: "unrelated-native-agent".into(),
++            ..Default::default()
++        },
++    )
++    .await
++    .unwrap();
++    let principal: Uuid =
++        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND agent_id=$2")
++            .bind(company)
++            .bind(pretender.id)
++            .fetch_one(f.pool())
++            .await
++            .unwrap();
++    let before = publication_effects(p, company).await;
++    // The SQL-only clone must reserve its explicit producer before INSERT, just as the real
++    // writer does. Otherwise it intentionally seals an ordinary message, outside this guard.
++    // Corrupt only its author; no native guard is disabled.
++    install_sender_probe(p, f.scope().run, principal).await;
++    let mut tx = f.pool().begin().await.unwrap();
++    let cloned = super::sql_tests::sql_publication(&mut tx, source)
++        .await
++        .unwrap();
++    let forged: bool = sqlx::query_scalar(
++        "SELECT message.author_principal_id=$2 AND message.role='agent' AND producer.producer_run_id=$3 \
++         FROM workflow_message_destinations AS destination JOIN messages AS message \
++           ON message.company_id=destination.company_id AND message.id=destination.message_id \
++         JOIN workflow_message_producer_seals AS producer \
++           ON producer.company_id=message.company_id AND producer.message_id=message.id \
++         WHERE destination.invocation_id=$1",
++    ).bind(cloned).bind(principal).bind(f.scope().run.as_uuid()).fetch_one(&mut *tx).await.unwrap();
++    assert!(
++        forged,
++        "the native boundary must see an actual forged author and explicit producer"
++    );
++    let error = tx.commit().await.unwrap_err();
++    assert_eq!(
++        error
++            .as_database_error()
++            .and_then(|error| error.constraint()),
++        Some("workflow_message_author_guard")
++    );
++    assert_eq!(publication_effects(p, company).await, before);
++    sqlx::raw_sql(
++        "DROP TRIGGER forge_workflow_sender ON messages; DROP FUNCTION forge_workflow_sender();",
++    )
++    .execute(f.pool())
++    .await
++    .unwrap();
++    let mut tx = f.pool().begin().await.unwrap();
++    super::sql_tests::sql_publication(&mut tx, source)
++        .await
++        .unwrap();
++    tx.commit().await.unwrap();
++    assert_eq!(
++        publication_effects(p, company).await["messages"],
++        before["messages"].as_i64().unwrap() + 1
++    );
++    sqlx::raw_sql("DROP TRIGGER reserve_workflow_sender ON messages; DROP FUNCTION reserve_workflow_sender();")
++        .execute(f.pool()).await.unwrap();
++}

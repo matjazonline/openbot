@@ -1,0 +1,61 @@
+{
+  "status": "PASS",
+  "modeRecords": [
+    {
+      "phase": 1,
+      "mode": "accept-edits"
+    },
+    {
+      "phase": 2,
+      "mode": "accept-edits"
+    }
+  ],
+  "approvals": [
+    {
+      "phase": 1,
+      "interactionId": "pint_r4mfvhy4u4",
+      "statusBeforeApproval": "pending"
+    },
+    {
+      "phase": 2,
+      "interactionId": "pint_s8wqk93xip",
+      "statusBeforeApproval": "pending"
+    }
+  ],
+  "pendingBeforeApproval": 2,
+  "protectedEffectsBeforeApproval": 0,
+  "resolvedAndContinued": 2,
+  "observed": [
+    {
+      "phase": 1,
+      "requested": false,
+      "tool_result_received": false,
+      "model": "claude-opus-5-5"
+    },
+    {
+      "phase": 1,
+      "requested": true,
+      "tool_result_received": false,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "phase": 1,
+      "requested": true,
+      "tool_result_received": true,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "phase": 2,
+      "requested": true,
+      "tool_result_received": false,
+      "model": "claude-sonnet-4-6"
+    },
+    {
+      "phase": 2,
+      "requested": true,
+      "tool_result_received": true,
+      "model": "claude-sonnet-4-6"
+    }
+  ],
+  "limitations": "Actual pinned server, daemon, Claude bridge and native CLI with isolated local scripted Messages; no model reasoning or paid inference claimed."
+}

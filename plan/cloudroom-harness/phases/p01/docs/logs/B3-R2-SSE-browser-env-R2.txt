@@ -1,0 +1,16 @@
+✔ library payload carries the agent's own fields and no retired runtime fields (1.335333ms)
+✔ accepted library writes show progress, prevent duplicate submits, and restore on failure (0.919542ms)
+✔ response form supports keyboard navigation and submit and shows request progress without dropping form fields (1767.153334ms)
+✔ ordinary page links release every stream before navigation (2.350083ms)
+✔ HTMX/prevented clicks, modified clicks, downloads and new tabs keep streams (2.227ms)
+✔ anchors and non-document protocols keep streams (1.116708ms)
+✔ native filter submissions release all streams on every navigation (5.205041ms)
+✔ cancelled, HTMX, dialog and other-window submissions retain streams (1.536458ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2013.592

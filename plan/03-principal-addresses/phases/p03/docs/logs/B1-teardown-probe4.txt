@@ -1,0 +1,15 @@
+BEGIN
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+SELECT 1
+INSERT 0 1
+INSERT 0 1
+DELETE 1
+SET CONSTRAINTS
+ company_remaining 
+-------------------
+                 0
+(1 row)
+
+ROLLBACK

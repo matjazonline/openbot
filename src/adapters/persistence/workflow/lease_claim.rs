@@ -17,6 +17,14 @@ pub(super) async fn claim_on(
     let Some((run, job)) = lock_scope(db, scope, bound.server_timeout()).await? else {
         return Ok(None);
     };
+    if !sqlx::query_scalar::<_, bool>("SELECT COALESCE(public.native_mcp_run_live($1,$2),false)")
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_one(&mut *db)
+        .await?
+    {
+        return Ok(None);
+    }
     if channel_reply_proposals::existing_on(db, scope)
         .await?
         .is_some()

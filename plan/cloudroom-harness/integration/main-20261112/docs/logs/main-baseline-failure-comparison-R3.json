@@ -1,0 +1,32 @@
+[
+  {
+    "input": "combined",
+    "test": "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript",
+    "body": "\nthread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (49928447) panicked at src/adapters/http/pages/tests.rs:4701:5:\ninline JavaScript is blocked by the page CSP and will never run:\n/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  },
+  {
+    "input": "combined",
+    "test": "adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup",
+    "body": "\nthread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (49935050) panicked at src/adapters/mcp/tests.rs:417:5:\nassertion `left == right` failed\n  left: Err(\"unused required exchanges: completed 3 of 4\")\n right: Ok(4)\n\n"
+  },
+  {
+    "input": "feature_input",
+    "test": "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript",
+    "body": "\nthread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (49473537) panicked at src/adapters/http/pages/tests.rs:4665:5:\ninline JavaScript is blocked by the page CSP and will never run:\n/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  },
+  {
+    "input": "feature_input",
+    "test": "adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup",
+    "body": "\nthread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (49476556) panicked at src/adapters/mcp/tests.rs:417:5:\nassertion `left == right` failed\n  left: Err(\"unused required exchanges: completed 3 of 4\")\n right: Ok(4)\n\n"
+  },
+  {
+    "input": "feature_input",
+    "test": "adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript",
+    "body": "\nthread 'adapters::http::pages::tests::rendered_markup_carries_no_inline_javascript' (49520200) panicked at src/adapters/http/pages/tests.rs:4665:5:\ninline JavaScript is blocked by the page CSP and will never run:\n/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/src/adapters/http/pages/workflow_authoring/sample.rs:153: inline <script> block\nnote: run with `RUST_BACKTRACE=1` environment variable to display a backtrace\n"
+  },
+  {
+    "input": "feature_input",
+    "test": "adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup",
+    "body": "\nthread 'adapters::mcp::tests::mcp_dropped_call_sends_protocol_cancellation_and_joins_cleanup' (49523209) panicked at src/adapters/mcp/tests.rs:417:5:\nassertion `left == right` failed\n  left: Err(\"unused required exchanges: completed 3 of 4\")\n right: Ok(4)\n\n"
+  }
+]

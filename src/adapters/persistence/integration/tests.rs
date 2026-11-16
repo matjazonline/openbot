@@ -4,6 +4,7 @@
 //! database and runs in parallel. Nothing here touches an unscoped queue claim, so no test in this
 //! file needs the shared claim guard.
 
+use crate::entities::address::AddressTarget;
 use std::sync::Arc;
 
 use regex::Regex;
@@ -112,7 +113,7 @@ fn slack_binding_write(
 ) -> BindingWrite {
     BindingWrite {
         company_id,
-        channel_id,
+        target: AddressTarget::Desk(channel_id),
         installation_id: Some(installation.id),
         transport: TransportKind::Slack,
         namespace: EndpointNamespace::parse(installation.external_tenant_key.as_str()).unwrap(),
@@ -237,7 +238,7 @@ async fn a_binding_cannot_disagree_with_its_transport_about_installations() {
                (id, company_id, channel_id, installation_id, transport, namespace,
                 external_endpoint_key, display_label, access_policy, delivery_policy, status,
                 created_by, access_snapshot)
-           VALUES ($1, $2, $3, $4, 'email', 'email', 'other@acme', 'Support', 'channel_acl',
+           VALUES ($1, $2, $3, $4, 'email', 'email', 'other@acme', 'Support', 'target_acl',
                    'reply_and_initiate', 'active', $5, $6)"#,
     )
     .bind(Uuid::new_v4())
@@ -304,7 +305,7 @@ async fn two_channels_cannot_hold_the_same_installed_endpoint() {
         ))
         .await
         .unwrap();
-    assert_eq!(relinked.channel_id, second_channel.id);
+    assert_eq!(relinked.target, AddressTarget::Desk(second_channel.id));
 }
 
 /// Exactly the statuses `BindingStatus::holds_endpoint_claim` names must block a second link.
@@ -422,7 +423,7 @@ async fn disabling_a_binding_removes_it_from_routing_and_leaves_everything_else(
         "a disabled binding must not route inbound events"
     );
     let active = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap();
     assert!(
@@ -510,7 +511,7 @@ async fn revoking_an_installation_silences_its_bindings_without_rewriting_them()
     );
     assert!(
         persistence
-            .active_bindings_for_channel(acme.id, support.id)
+            .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
             .await
             .unwrap()
             .iter()
@@ -750,14 +751,14 @@ async fn a_channel_gets_exactly_one_canonical_email_binding() {
     let support = channel(&persistence, acme.id, "support").await;
 
     let bindings = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap();
     assert_eq!(bindings.len(), 1);
     let email = &bindings[0];
     assert_eq!(email.transport, TransportKind::Email);
     assert_eq!(email.installation_id, None);
-    assert_eq!(email.access_policy, BindingAccessPolicy::ChannelAcl);
+    assert_eq!(email.access_policy, BindingAccessPolicy::TargetAcl);
     assert_eq!(
         email.delivery_policy,
         BindingDeliveryPolicy::ReplyAndInitiate
@@ -827,7 +828,7 @@ async fn renaming_a_channel_address_moves_its_binding_and_records_the_move() {
     let acme = company(&persistence, "renamed").await;
     let support = channel(&persistence, acme.id, "support").await;
     let before = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap()
         .remove(0);
@@ -848,7 +849,7 @@ async fn renaming_a_channel_address_moves_its_binding_and_records_the_move() {
     .await
     .unwrap();
     let after = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap()
         .remove(0);
@@ -889,7 +890,7 @@ async fn binding_audit_rows_cannot_be_rewritten() {
     let acme = company(&persistence, "appendon").await;
     let support = channel(&persistence, acme.id, "support").await;
     let binding = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap()
         .remove(0);
@@ -1043,7 +1044,7 @@ async fn renaming_a_company_leaves_its_email_bindings_alone_and_resolvable() {
     let acme = company(&persistence, "corprename").await;
     let support = channel(&persistence, acme.id, "support").await;
     let before = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap()
         .remove(0);
@@ -1065,7 +1066,7 @@ async fn renaming_a_company_leaves_its_email_bindings_alone_and_resolvable() {
     .unwrap();
 
     let after = persistence
-        .active_bindings_for_channel(acme.id, support.id)
+        .active_bindings_for_target(acme.id, AddressTarget::Desk(support.id))
         .await
         .unwrap()
         .remove(0);
@@ -1108,8 +1109,9 @@ async fn no_channel_has_an_email_binding_that_disagrees_with_its_primary_slug() 
     let stale: Vec<(Uuid, String, String)> = sqlx::query_as(
         r#"SELECT binding.channel_id, slug.slug::text, binding.external_endpoint_key
            FROM channel_bindings AS binding
-           JOIN channel_slugs AS slug
-               ON slug.channel_id = binding.channel_id AND slug.is_primary
+           JOIN addresses AS slug
+               ON slug.company_id = binding.company_id AND slug.channel_id = binding.channel_id
+              AND slug.is_primary
            WHERE binding.transport = 'email'
              AND binding.status IN ('active', 'paused')
              AND binding.external_endpoint_key <> slug.slug::text"#,

@@ -1,0 +1,8 @@
+
+running 1 test
+2026-11-15T06:48:37.063978Z  WARN open_bots::application::use_cases::thread::ingest: Refusing an inbound message at the ingress guard rejection=DMARC authentication did not pass
+2026-11-15T06:48:37.072043Z  WARN open_bots::application::use_cases::thread::ingest::routing: Refusing a message over the spam-score threshold target=Desk(0a9bc2c8-66ab-4828-b823-4e92c3faa480)
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::smtp::public_desk_private_agent_smtp_uses_real_dns_authentication_spam_policy_and_desk_reply ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4583 filtered out; finished in 3.58s
+

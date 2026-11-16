@@ -29,7 +29,7 @@ fn record(company_id: uuid::Uuid) -> DeliveryRecord {
         id: DeliveryId::random(),
         company_id,
         attribution: Some(DeliveryAttribution {
-            channel_id: uuid::Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(uuid::Uuid::new_v4()),
             message_id: CanonicalMessageId::random(),
             source_binding_id: ChannelBindingId::random(),
             destination_binding_id: ChannelBindingId::random(),
@@ -540,6 +540,15 @@ impl TransportRenderer for NoopRenderer {
             provider_key: None,
             extension: crate::application::ports::thread::ProtocolExtension::none(),
         })
+    }
+    fn application_address(
+        &self,
+        _company: &crate::entities::value_objects::CompanySlug,
+        _address: &crate::entities::value_objects::ChannelSlug,
+    ) -> AppResult<crate::entities::transport::QualifiedIdentity> {
+        Err(crate::app_error::AppError::BadRequest(
+            "Fixture transport does not render application addresses".into(),
+        ))
     }
     fn application_message_key(
         &self,

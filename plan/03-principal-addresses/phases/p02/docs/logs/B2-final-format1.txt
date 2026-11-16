@@ -1,0 +1,376 @@
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:5:
+     entities::{access_level::AccessLevel, company_member::CompanyAccessRole},
+     use_cases::{
+         company_invite::CreateCompanyInvite,
+[31m-        user::{AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange, auth_attempt_key},
+(B[m[32m+        user::{
+(B[m[32m+            AccountChange, AccountChangeKind, AccountChangePersistence, PendingAccountChange,
+(B[m[32m+            auth_attempt_key,
+(B[m[32m+        },
+(B[m     },
+ };
+ use futures::future::{BoxFuture, LocalBoxFuture};
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:13:
+ use tokio::task::JoinSet;
+ 
+ #[derive(Clone, Copy, PartialEq, Eq)]
+[31m-enum First { Mail, Change }
+(B[m[32m+enum First {
+(B[m[32m+    Mail,
+(B[m[32m+    Change,
+(B[m[32m+}
+(B[m #[derive(Clone, Copy, PartialEq, Eq)]
+[31m-enum Change { Rekey, Promote, Rename, Remove }
+(B[m[32m+enum Change {
+(B[m[32m+    Rekey,
+(B[m[32m+    Promote,
+(B[m[32m+    Rename,
+(B[m[32m+    Remove,
+(B[m[32m+}
+(B[m enum Outcome {
+     Mail(crate::app_error::AppResult<crate::use_cases::thread::InboundIngestResult>),
+     Change,
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:34:
+ 
+ fn competing(first: First, change: Change) -> LocalBoxFuture<'static, ()> {
+     Box::pin(async move {
+[31m-        let Some(f) = Fixture::isolated().await else { return; };
+(B[m[32m+        let Some(f) = Fixture::isolated().await else {
+(B[m[32m+            return;
+(B[m[32m+        };
+(B[m         let (user, name) = account(&f.persistence, "identity_race").await;
+         sqlx::query("UPDATE users SET email_verified_at=CURRENT_TIMESTAMP WHERE id=$1")
+[31m-            .bind(user).execute(f.pool()).await.unwrap();
+(B[m[32m+            .bind(user)
+(B[m[32m+            .execute(f.pool())
+(B[m[32m+            .await
+(B[m[32m+            .unwrap();
+(B[m         let old = email_of(f.pool(), user).await;
+         let new = EmailAddress::from(format!("changed-{}@example.test", Uuid::new_v4().simple()));
+         let target = if change == Change::Promote {
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:47:
+         };
+         let service = Arc::new(threads(&f));
+         let input = email(&f, target, &old, "identity-race", "identity-root").await;
+[31m-        let InboundPreflight::Accepted(prepared) = service.preflight_inbound(input.clone()).await.unwrap() else {
+(B[m[32m+        let InboundPreflight::Accepted(prepared) =
+(B[m[32m+            service.preflight_inbound(input.clone()).await.unwrap()
+(B[m[32m+        else {
+(B[m             panic!("initial current identity must pass preflight");
+         };
+         let invite = if change == Change::Promote {
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:54:
+[31m-            Some(f.persistence.create_invite(CreateCompanyInvite {
+(B[m[31m-                actor_id: f.owner, company_id: f.company.id, email: old.clone().into(),
+(B[m[31m-                role: CompanyAccessRole::Member, access_level: AccessLevel::try_from(1_i16).unwrap(),
+(B[m[31m-            }).await.unwrap())
+(B[m[31m-        } else { None };
+(B[m[32m+            Some(
+(B[m[32m+                f.persistence
+(B[m[32m+                    .create_invite(CreateCompanyInvite {
+(B[m[32m+                        actor_id: f.owner,
+(B[m[32m+                        company_id: f.company.id,
+(B[m[32m+                        email: old.clone().into(),
+(B[m[32m+                        role: CompanyAccessRole::Member,
+(B[m[32m+                        access_level: AccessLevel::try_from(1_i16).unwrap(),
+(B[m[32m+                    })
+(B[m[32m+                    .await
+(B[m[32m+                    .unwrap(),
+(B[m[32m+            )
+(B[m[32m+        } else {
+(B[m[32m+            None
+(B[m[32m+        };
+(B[m         if change == Change::Rekey {
+[31m-            f.persistence.save_pending_account_change(PendingAccountChange {
+(B[m[31m-                user_id: user, change: AccountChange::Email(&new), confirmation_code_hash: "race-code",
+(B[m[31m-                expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
+(B[m[31m-            }).await.unwrap();
+(B[m[32m+            f.persistence
+(B[m[32m+                .save_pending_account_change(PendingAccountChange {
+(B[m[32m+                    user_id: user,
+(B[m[32m+                    change: AccountChange::Email(&new),
+(B[m[32m+                    confirmation_code_hash: "race-code",
+(B[m[32m+                    expires_at: chrono::Utc::now() + chrono::Duration::minutes(15),
+(B[m[32m+                })
+(B[m[32m+                .await
+(B[m[32m+                .unwrap();
+(B[m         }
+         let mut barrier = f.pool().begin().await.unwrap();
+         if matches!(change, Change::Rekey | Change::Promote) {
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:67:
+             let identity = qualified_email_identity(old.clone()).unwrap();
+[31m-            crate::adapters::persistence::participant::lock_identity_key(&mut barrier, f.company.id, &identity).await.unwrap();
+(B[m[32m+            crate::adapters::persistence::participant::lock_identity_key(
+(B[m[32m+                &mut barrier,
+(B[m[32m+                f.company.id,
+(B[m[32m+                &identity,
+(B[m[32m+            )
+(B[m[32m+            .await
+(B[m[32m+            .unwrap();
+(B[m         } else {
+             sqlx::query("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR UPDATE")
+[31m-                .bind(f.company.id).bind(target).execute(&mut *barrier).await.unwrap();
+(B[m[32m+                .bind(f.company.id)
+(B[m[32m+                .bind(target)
+(B[m[32m+                .execute(&mut *barrier)
+(B[m[32m+                .await
+(B[m[32m+                .unwrap();
+(B[m         }
+         // Erased futures keep these production transaction chains out of the test frame/debug type.
+[31m-        let mail: BoxFuture<'static, Outcome> = Box::pin(async move {
+(B[m[31m-            Outcome::Mail(service.commit_prepared_inbound(*prepared).await)
+(B[m[31m-        });
+(B[m[32m+        let mail: BoxFuture<'static, Outcome> =
+(B[m[32m+            Box::pin(
+(B[m[32m+                async move { Outcome::Mail(service.commit_prepared_inbound(*prepared).await) },
+(B[m[32m+            );
+(B[m         let store = f.persistence.clone();
+         let company = f.company.id;
+         let next = new.clone();
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:80:
+         let mutation: BoxFuture<'static, Outcome> = Box::pin(async move {
+             match change {
+                 Change::Rekey => {
+[31m-                    let key = auth_attempt_key("direct-race", "account-change-code:v1", &[user.as_bytes()]);
+(B[m[31m-                    let result = store.confirm_pending_account_change(user, AccountChangeKind::Email, "race-code", &key)
+(B[m[31m-                        .await.expect("real confirmed rekey must commit").expect("confirmation consumed");
+(B[m[32m+                    let key = auth_attempt_key(
+(B[m[32m+                        "direct-race",
+(B[m[32m+                        "account-change-code:v1",
+(B[m[32m+                        &[user.as_bytes()],
+(B[m[32m+                    );
+(B[m[32m+                    let result = store
+(B[m[32m+                        .confirm_pending_account_change(
+(B[m[32m+                            user,
+(B[m[32m+                            AccountChangeKind::Email,
+(B[m[32m+                            "race-code",
+(B[m[32m+                            &key,
+(B[m[32m+                        )
+(B[m[32m+                        .await
+(B[m[32m+                        .expect("real confirmed rekey must commit")
+(B[m[32m+                        .expect("confirmation consumed");
+(B[m                     assert_eq!(result.email, next.as_str());
+                     assert!(result.email_verified_at.is_some());
+                 }
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:89:
+                 Change::Promote => {
+[31m-                    assert!(store.accept_pending_invite(invite.unwrap().id, user, &old)
+(B[m[31m-                        .await.expect("actual invitation promotion must commit").is_some());
+(B[m[32m+                    assert!(
+(B[m[32m+                        store
+(B[m[32m+                            .accept_pending_invite(invite.unwrap().id, user, &old)
+(B[m[32m+                            .await
+(B[m[32m+                            .expect("actual invitation promotion must commit")
+(B[m[32m+                            .is_some()
+(B[m[32m+                    );
+(B[m                 }
+                 Change::Rename => {
+[31m-                    assert!(store.rename_person_address(user, company, &ChannelSlug::from("renamed-person"))
+(B[m[31m-                        .await.expect("rename must commit").is_some());
+(B[m[32m+                    assert!(
+(B[m[32m+                        store
+(B[m[32m+                            .rename_person_address(
+(B[m[32m+                                user,
+(B[m[32m+                                company,
+(B[m[32m+                                &ChannelSlug::from("renamed-person")
+(B[m[32m+                            )
+(B[m[32m+                            .await
+(B[m[32m+                            .expect("rename must commit")
+(B[m[32m+                            .is_some()
+(B[m[32m+                    );
+(B[m                 }
+[31m-                Change::Remove => { store.remove_member(company, user).await.expect("removal must commit"); }
+(B[m[32m+                Change::Remove => {
+(B[m[32m+                    store
+(B[m[32m+                        .remove_member(company, user)
+(B[m[32m+                        .await
+(B[m[32m+                        .expect("removal must commit");
+(B[m[32m+                }
+(B[m             }
+             Outcome::Change
+         });
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:101:
+         let mut tasks = JoinSet::new();
+         match first {
+[31m-            First::Mail => { tasks.spawn(mail); waiting(&f, 1).await; tasks.spawn(mutation); }
+(B[m[31m-            First::Change => { tasks.spawn(mutation); waiting(&f, 1).await; tasks.spawn(mail); }
+(B[m[32m+            First::Mail => {
+(B[m[32m+                tasks.spawn(mail);
+(B[m[32m+                waiting(&f, 1).await;
+(B[m[32m+                tasks.spawn(mutation);
+(B[m[32m+            }
+(B[m[32m+            First::Change => {
+(B[m[32m+                tasks.spawn(mutation);
+(B[m[32m+                waiting(&f, 1).await;
+(B[m[32m+                tasks.spawn(mail);
+(B[m[32m+            }
+(B[m         }
+         waiting(&f, 2).await;
+         barrier.commit().await.unwrap();
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:108:
+         let results = tokio::time::timeout(Duration::from_secs(10), async {
+             let mut outcomes = Vec::new();
+[31m-            while let Some(result) = tasks.join_next().await { outcomes.push(result.expect("no production panic/abort")); }
+(B[m[32m+            while let Some(result) = tasks.join_next().await {
+(B[m[32m+                outcomes.push(result.expect("no production panic/abort"));
+(B[m[32m+            }
+(B[m             outcomes
+[31m-        }).await;
+(B[m[32m+        })
+(B[m[32m+        .await;
+(B[m         let results = match results {
+             Ok(results) => results,
+[31m-            Err(_) => { tasks.shutdown().await; panic!("both contenders must finish without deadlock/timeout victims"); }
+(B[m[32m+            Err(_) => {
+(B[m[32m+                tasks.shutdown().await;
+(B[m[32m+                panic!("both contenders must finish without deadlock/timeout victims");
+(B[m[32m+            }
+(B[m         };
+         assert_eq!(results.len(), 2);
+         let mut changes = 0;
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:122:
+                 Outcome::Change => changes += 1,
+                 Outcome::Mail(result) => {
+                     if first == First::Change && change != Change::Promote {
+[31m-                        assert!(matches!(result, Err(AppError::Superseded(_))), "obsolete input must be controlled refusal: {result:?}");
+(B[m[32m+                        assert!(
+(B[m[32m+                            matches!(result, Err(AppError::Superseded(_))),
+(B[m[32m+                            "obsolete input must be controlled refusal: {result:?}"
+(B[m[32m+                        );
+(B[m                     } else {
+                         assert!(result.expect("current mail must commit normally").accepted);
+                         admitted += 1;
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:133:
+         assert_eq!(changes, 1);
+         let counts: (i64,i64,i64,i64) = sqlx::query_as("SELECT (SELECT count(*) FROM threads WHERE company_id=$1), (SELECT count(*) FROM messages WHERE company_id=$1), (SELECT count(*) FROM workflow_message_intents WHERE company_id=$1), (SELECT count(*) FROM notification_events WHERE company_id=$1)")
+             .bind(company).fetch_one(f.pool()).await.unwrap();
+[31m-        assert_eq!(counts, (admitted,admitted,admitted,if change==Change::Promote {0} else {admitted}));
+(B[m[32m+        assert_eq!(
+(B[m[32m+            counts,
+(B[m[32m+            (
+(B[m[32m+                admitted,
+(B[m[32m+                admitted,
+(B[m[32m+                admitted,
+(B[m[32m+                if change == Change::Promote {
+(B[m[32m+                    0
+(B[m[32m+                } else {
+(B[m[32m+                    admitted
+(B[m[32m+                }
+(B[m[32m+            )
+(B[m[32m+        );
+(B[m         if change == Change::Rekey {
+             let refused = threads(&f).ingest(input).await.unwrap();
+[31m-            assert!(!refused.accepted, "retired sender never regains personal authority");
+(B[m[32m+            assert!(
+(B[m[32m+                !refused.accepted,
+(B[m[32m+                "retired sender never regains personal authority"
+(B[m[32m+            );
+(B[m             let current = email(&f, target, new.as_str(), "current-identity", "new-root").await;
+             assert!(threads(&f).ingest(current).await.unwrap().accepted);
+             let current_person: Uuid = sqlx::query_scalar("SELECT principal_id FROM participant_identities WHERE company_id=$1 AND transport='email' AND subject=$2 AND status='verified'")
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/identity_races.rs:145:
+         }
+         if change == Change::Promote {
+             let person = f.principal_of(user).await;
+[31m-            let author: Uuid = sqlx::query_scalar("SELECT author_principal_id FROM messages WHERE company_id=$1")
+(B[m[31m-                .bind(company).fetch_one(f.pool()).await.unwrap();
+(B[m[31m-            assert_eq!(author, person, "promotion preserves canonical attribution in either order");
+(B[m[32m+            let author: Uuid =
+(B[m[32m+                sqlx::query_scalar("SELECT author_principal_id FROM messages WHERE company_id=$1")
+(B[m[32m+                    .bind(company)
+(B[m[32m+                    .fetch_one(f.pool())
+(B[m[32m+                    .await
+(B[m[32m+                    .unwrap();
+(B[m[32m+            assert_eq!(
+(B[m[32m+                author, person,
+(B[m[32m+                "promotion preserves canonical attribution in either order"
+(B[m[32m+            );
+(B[m         }
+     })
+ }
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/adapters/persistence/address_tests/ingress.rs:17:
+ #[path = "validation.rs"]
+ mod validation;
+ 
+[31m-#[path = "notifications.rs"]
+(B[m[31m-mod notifications;
+(B[m #[path = "identity_races.rs"]
+ mod identity_races;
+[32m+#[path = "notifications.rs"]
+(B[m[32m+mod notifications;
+(B[m 
+ const DOMAIN: &str = "direct.test";
+ 
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/ingest/routing.rs:33:
+     use_cases::{
+         channel::find_similar_channel_slugs,
+         thread::{
+[31m-            BounceInfo, AddressDirectoryEntry, PrincipalRefusal, ThreadUseCases,
+(B[m[32m+            AddressDirectoryEntry, BounceInfo, PrincipalRefusal, ThreadUseCases,
+(B[m             ingest::{
+                 commit::{PreparedChannel, PreparedChannels},
+                 policy::{
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/ingest/routing.rs:829:
+         entries.sort_by(|a, b| (a.0, &a.1.address).cmp(&(b.0, &b.1.address)));
+         let mut entries: Vec<_> = entries.into_iter().map(|(_, entry)| entry).collect();
+         if let Some(sender) = context.principal_id
+[31m-            && let Some(person) = self.participant_persistence.principal_by_id(company.id, sender).await?
+(B[m[32m+            && let Some(person) = self
+(B[m[32m+                .participant_persistence
+(B[m[32m+                .principal_by_id(company.id, sender)
+(B[m[32m+                .await?
+(B[m             && let Some(user) = person.user_id
+         {
+[31m-            for inbox in self.participant_persistence.direct_inboxes(company.id, user, 201).await? {
+(B[m[31m-                if !inbox.principal.direct_access(context).authorized { continue; }
+(B[m[31m-                let Some(slug) = inbox.slug else { continue; };
+(B[m[32m+            for inbox in self
+(B[m[32m+                .participant_persistence
+(B[m[32m+                .direct_inboxes(company.id, user, 201)
+(B[m[32m+                .await?
+(B[m[32m+            {
+(B[m[32m+                if !inbox.principal.direct_access(context).authorized {
+(B[m[32m+                    continue;
+(B[m[32m+                }
+(B[m[32m+                let Some(slug) = inbox.slug else {
+(B[m[32m+                    continue;
+(B[m[32m+                };
+(B[m                 entries.push(AddressDirectoryEntry {
+                     target: crate::entities::address::AddressTarget::Principal(inbox.principal.id),
+                     address: Channel::address_for(&slug, &company.slug, &self.settings.mail_domain),
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/mod.rs:86:
+ pub use reads::{InboxReadScope, ThreadReadScope};
+ mod support;
+ pub use notices::{
+[31m-    BounceInfo, BounceSuggestion, AddressDirectoryEntry, PrincipalBounce, PrincipalRefusal,
+(B[m[32m+    AddressDirectoryEntry, BounceInfo, BounceSuggestion, PrincipalBounce, PrincipalRefusal,
+(B[m     bounce_cause, format_bounce_email_body, format_help_email_body,
+ };
+ 
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/notices.rs:189:
+         return;
+     }
+ 
+[31m-    let desks: Vec<_> = entries.iter().filter(|entry| entry.target.desk_id().is_some()).collect();
+(B[m[31m-    let principals: Vec<_> = entries.iter().filter(|entry| entry.target.principal_id().is_some()).collect();
+(B[m[32m+    let desks: Vec<_> = entries
+(B[m[32m+        .iter()
+(B[m[32m+        .filter(|entry| entry.target.desk_id().is_some())
+(B[m[32m+        .collect();
+(B[m[32m+    let principals: Vec<_> = entries
+(B[m[32m+        .iter()
+(B[m[32m+        .filter(|entry| entry.target.principal_id().is_some())
+(B[m[32m+        .collect();
+(B[m     if !desks.is_empty() {
+         body.push_str("Desks you can write to:\n");
+     }
+Diff in /Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot/src/application/use_cases/thread/notices.rs:243:
+ ) -> String {
+     let domain_part = format!("{company_slug}.{app_domain}");
+     let example = entries
+[31m-        .iter().find(|entry| entry.target.desk_id().is_some())
+(B[m[32m+        .iter()
+(B[m[32m+        .find(|entry| entry.target.desk_id().is_some())
+(B[m         .map(|entry| {
+             entry
+                 .address

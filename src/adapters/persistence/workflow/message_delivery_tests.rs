@@ -291,6 +291,7 @@ async fn attention_lists_a_dead_workflow_delivery_for_its_run_actor() {
             visible_channel_ids: &visible,
             manager: true,
             company_items: true,
+            direct_items: true,
             view,
             cursor: None,
             limit: 100,
@@ -339,7 +340,7 @@ async fn attention_lists_a_dead_workflow_delivery_for_its_run_actor() {
         1
     );
     assert_eq!(
-        p.operational_summary(company, &visible)
+        p.operational_summary(company, &visible, owner)
             .await
             .unwrap()
             .permanent_delivery_failure_count,
@@ -420,7 +421,10 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
     };
     assert_eq!(recipient.user_id, setup.owner);
     assert_eq!(recipient.run_id, Some(setup.scope().run.as_uuid()));
-    assert_eq!(recipient.channel_id, Some(channel));
+    assert_eq!(
+        recipient.inbox,
+        Some(crate::entities::address::AddressTarget::Desk(channel))
+    );
     assert!(recipient.thread_id.is_some());
     assert!(!projection.should_email());
     let (outcome, _) = p
@@ -429,6 +433,7 @@ async fn a_dead_workflow_delivery_notifies_its_run_actor_once() {
             expected: &projection,
             email: None,
             agent_message_key: None,
+            agent_recipient: None,
             escalation_ack_hours: Default::default(),
         })
         .await
@@ -556,7 +561,7 @@ async fn run_counts_group_open_runs_by_state_and_readable_channel() {
     );
 
     let here = p
-        .run_counts(company.as_uuid(), &[setup.channel])
+        .run_counts(company.as_uuid(), &[setup.channel], setup.owner)
         .await
         .unwrap();
     assert_eq!(
@@ -578,7 +583,11 @@ async fn run_counts_group_open_runs_by_state_and_readable_channel() {
         "the company-wide run counts; the unreadable channel's does not"
     );
     let both = p
-        .run_counts(company.as_uuid(), &[setup.channel, setup.other])
+        .run_counts(
+            company.as_uuid(),
+            &[setup.channel, setup.other],
+            setup.owner,
+        )
         .await
         .unwrap();
     assert_eq!(both.channels[&setup.other].pending, 1);

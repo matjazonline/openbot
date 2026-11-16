@@ -27,7 +27,7 @@ impl Context {
             .unwrap()
             .unwrap();
         let hello = JournalHello {
-            version: 1,
+            version: 2,
             installation_id: fence.machine.installation_id,
             journal_id: journal,
             journal_sequence: 0,
@@ -96,6 +96,7 @@ impl Context {
     }
     pub fn create(&self, session_id: SessionId) -> LocalCommand {
         LocalCommand::Create {
+            harness: crate::domain::local_agents::NativeHarnessSelection::Unconfigured,
             session_id,
             selection: self.session.profile.selection.clone(),
             prompt: LocalPrompt::try_from("new native thread".to_owned()).unwrap(),
@@ -150,7 +151,7 @@ impl Context {
             .connect_journal(
                 fence,
                 &JournalHello {
-                    version: 1,
+                    version: 2,
                     installation_id: fence.machine.installation_id,
                     journal_id: journal,
                     journal_sequence: sequence,

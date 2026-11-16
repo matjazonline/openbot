@@ -1,0 +1,39 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0584]: found a documentation comment that doesn't document anything
+   --> src/adapters/persistence/onboarding.rs:249:5
+    |
+249 |     /// The agent's default desk, as its creation recorded it.
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ this doc comment doesn't document anything
+    |
+    = help: doc comments must come before what they document, if a comment was intended use `//`
+
+warning: unused imports: `WorkflowActor`, `domain::workflow::CompanyId`, and `provisioning::AssistantChannels`
+  --> src/adapters/http/routes/onboarding.rs:15:29
+   |
+15 |     application::workflow::{WorkflowActor, provisioning::AssistantChannels},
+   |                             ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     domain::workflow::CompanyId,
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+error[E0609]: no field `mail_domain` on type `std::sync::Arc<infra::config::AppConfig>`
+   --> src/adapters/http/routes/onboarding.rs:265:102
+    |
+265 |                     address: created_address(&company, &created.agent, created.principal_id, &config.mail_domain),
+    |                                                                                                      ^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `escalation_ack_hours`, `knowledge_model_dir`, `knowledge_search_limit`, `jwt_secret`, `auth_attempt_secret` ... and 25 others
+
+error[E0609]: no field `mail_domain` on type `std::sync::Arc<infra::config::AppConfig>`
+   --> src/adapters/http/routes/onboarding.rs:312:90
+    |
+312 |         address: created_address(&company, &created.agent, created.principal_id, &config.mail_domain),
+    |                                                                                          ^^^^^^^^^^^ unknown field
+    |
+    = note: available fields are: `escalation_ack_hours`, `knowledge_model_dir`, `knowledge_search_limit`, `jwt_secret`, `auth_attempt_secret` ... and 25 others
+
+Some errors have detailed explanations: E0584, E0609.
+For more information about an error, try `rustc --explain E0584`.
+warning: `open_bots` (lib) generated 1 warning
+error: could not compile `open_bots` (lib) due to 3 previous errors; 1 warning emitted

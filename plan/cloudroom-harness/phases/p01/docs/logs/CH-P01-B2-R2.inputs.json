@@ -1,0 +1,36 @@
+{
+  "phase": "p01",
+  "batch": "B2",
+  "stage": "single combined correction recheck",
+  "artifact": "b6c8d018ef4d17eabb1808b1cf4ee5672e659d89844f6aa6333dfd4dcf0d5aae",
+  "phase_start": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "review_base": "abac7038a08a355156b7680a01d2f79f3de756fd",
+  "head": "2c477c9dd8cae4d1a7881d377dcea8ce038dae13",
+  "exclusions": [
+    "plan/cloudroom-harness/COORDINATION.md",
+    "plan/cloudroom-harness/phases/p01/docs"
+  ],
+  "coordination": {
+    "revision": 3,
+    "notices": [],
+    "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-coordination.md",
+    "sha256": "41b64d5e053759107a73e880143623b11b6c05fdffe715ccdf12e5a7e7adb408"
+  },
+  "architecture": {
+    "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-M2-r2.md",
+    "sha256": "08357154aecaa1b044a42688a0f25230eff0e7ca2f9ca56d7bb7989889be9403"
+  },
+  "source_runtime_identity": {
+    "path": "plan/cloudroom-harness/phases/p01/docs/logs/CH-P01-B2-R2-runtime-identity.json",
+    "sha256": "0886415232e1249ab6f1582fab69b98f71f85d86648e9c93d24a6a1fdcca73c2"
+  },
+  "frozen": true,
+  "finding_ids": [
+    "CH-P01-B2-F1",
+    "CH-P01-B2-F2",
+    "CH-P01-B2-F3",
+    "CH-P01-B2-F4"
+  ],
+  "prior_artifact": "a71abff5242d2b22bb709629bef778c14ee799acbca9c0f417163f42bc7f9793",
+  "evidence": "CH-P01-B2-R2.evidence.json"
+}

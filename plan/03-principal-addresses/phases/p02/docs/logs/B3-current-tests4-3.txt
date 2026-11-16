@@ -1,0 +1,51 @@
+
+running 27 tests
+test adapters::http::routes::attention::tests::a_run_change_wakes_the_work_list_it_could_change ... ok
+test adapters::http::pages::attention::tests::a_source_without_a_page_has_no_link ... ok
+test adapters::http::pages::attention::tests::list_escapes_source_text_and_links ... ok
+test adapters::http::routes::live_updates::tests::the_mailbox_streams_wake_for_messages_and_activity_and_not_for_attention ... ok
+test adapters::http::pages::attention::tests::the_page_reconciles_its_list_live_and_in_order ... ok
+test adapters::http::pages::attention::tests::department_views_attention_groups_and_keeps_the_department ... ok
+test adapters::http::routes::ui::stream_tests::message_source_tests::security_email_identity_unverified_team_keeps_attention_and_internal_notes ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_reads_only_the_departments_desks ... ok
+test adapters::http::routes::attention::authorization_tests::department_views_attention_department_must_be_the_companys ... ok
+test adapters::http::routes::attention::authorization_tests::attention_application_gating_refuses_team_work_and_hides_foreign_tenants ... ok
+2026-11-15T06:26:19.199432Z ERROR open_bots::adapters::http::app_error_impl: Request failed error_kind="not_found"
+test adapters::http::routes::attention::authorization_tests::department_views_a_member_filters_only_by_departments_they_may_see ... ok
+test adapters::persistence::attention::tests::the_working_set_is_bounded_and_the_company_scoped ... ok
+test adapters::persistence::attention::tests::a_run_awaiting_reconciliation_is_unassigned_team_work ... ok
+test domain::entities::attention::tests::cursor_rejects_unknown_ranks_and_trailing_data ... ok
+test domain::entities::attention::tests::cursor_round_trips_every_sort_component ... ok
+test domain::entities::attention::tests::legacy_source_kinds_do_not_parse ... ok
+test adapters::persistence::attention::tests::department_views_company_items_are_left_out_of_a_department_view ... ok
+
+thread 'adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope' (15538819) panicked at src/adapters/persistence/workflow/direct_workflow_read_tests.rs:92:86:
+called `Result::unwrap()` on an `Err` value: Database(PgDatabaseError { severity: Error, code: "23514", message: "new row for relation \"workflow_runs\" violates check constraint \"workflow_run_terminal_execution_shape\"", detail: Some("Failing row contains (null, 9, 0, f, 1a242b6b-dbc6-4d17-afea-f25db4460dbe, aeb34e08-beea-4da9-acf6-5b54abe6a433, 7bc8469e-27a8-4f68-9f30-b1bd71c13113, 1, 00000000-0000-0000-0000-000000000001, dd49613d-3303-47db-b856-992b148e16ac, null, 94f6457f-8c7f-4dbe-a681-de6cc1396456, null, 44b2197a-bcdf-486c-aa74-5325bf8ef66c, 4ccac544-7ddd-4e2d-aea2-034577c8588c, 4cae79c9-d606-4f71-a605-6abbe615679b, \\xc833390742e79fa6fd727b746b298301cdcb6b69445e306c8865ca9d034311..., {\"value\": 1}, {}, {}, 100, 65536, 2026-11-16 06:26:21.394823+00, 2026-11-15 06:26:21.394823+00, failed, null, null, null, null, null, 4, null, deliver, 2026-11-15 06:26:21.442191+00)."), hint: None, position: None, where: None, schema: Some("public"), table: Some("workflow_runs"), column: None, data_type: None, constraint: Some("workflow_run_terminal_execution_shape"), file: Some("execMain.c"), line: Some(2097), routine: Some("ExecConstraints") })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope ... FAILED
+2026-11-15T06:26:22.556803Z  WARN open_bots::application::services::notification_worker: Notification projection failed event_id=03ae85d0-487a-4be5-8f10-ecb4441969de error=Database error: error returned from database: invalid input syntax for type uuid: "escalation_notice"
+2026-11-15T06:26:22.591099Z  WARN open_bots::application::services::notification_worker: Notification projection failed event_id=856f4aa9-fe3a-4ada-a786-0e31265b675e error=Database error: error returned from database: invalid input syntax for type uuid: "escalation_notice"
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::attention::workflow_escalation_attention_actual_retirement_hands_waiting_work_to_the_company_owner ... ok
+test adapters::persistence::workflow::tests::admission_tests::attention_decision_tests::attention_lists_a_failed_run_for_its_actor_until_it_is_rerun ... ok
+test adapters::persistence::workflow::tests::admission_tests::attention_decision_tests::attention_lists_a_decision_for_its_reviewers_and_once_in_team_work ... ok
+2026-11-15T06:26:24.277280Z  WARN open_bots::application::services::notification_worker: Notification projection failed event_id=4b182437-f969-4859-9814-7f2a9347ab80 error=Database error: error returned from database: invalid input syntax for type uuid: "escalation_notice"
+2026-11-15T06:26:24.328575Z  WARN open_bots::application::services::notification_worker: Notification projection failed event_id=cc17ff01-5d55-45ef-8a77-af8e99eaee59 error=Database error: error returned from database: invalid input syntax for type uuid: "escalation_notice"
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::commands::attention::workflow_escalation_attention_lists_only_current_assignments_and_removes_settled_work ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_recipients::person_notices::workflow_escalation_person_all_retired_recipients_expedite_the_existing_control_to_owner_attention ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::attention_lists_a_dead_workflow_delivery_for_its_run_actor ... ok
+2026-11-15T06:26:26.307418Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=76c1deff-28d3-4090-8a7e-8bc380545d62 binding_id=2815870f-2cb3-467f-98b0-052d031489a1 intent_id=c11f5054-c4fa-456a-8f41-f539a083e8d7 reason="unavailable"
+2026-11-15T06:26:26.354438Z  WARN open_bots::application::workflow::message_admission: A workflow binding did not admit an accepted message company_id=76c1deff-28d3-4090-8a7e-8bc380545d62 binding_id=2815870f-2cb3-467f-98b0-052d031489a1 intent_id=9d2b560e-1b34-4222-9eb6-840a5ce9bede reason="unavailable"
+observed gated transaction pids=[68308] blocker=68324 elapsed_ms=582
+test adapters::persistence::workflow::tests::message_tests::intent_tests::attention_groups_a_bindings_refusals_into_one_team_work_row ... ok
+2026-11-15T06:26:27.086057Z  WARN open_bots::adapters::persistence::workflow::knowledge_release: Workflow release refused company_id=2f783976-d45a-4c27-b96e-cfbac3cf2d95 run_id=ecc399b1-7f56-4fab-a10f-7a0646093ed7 execution_id=f639f046-5595-4976-a6d2-4c99e3314389 step_id=start content_level=5 destination_level=0 code="knowledge.audience_below_content"
+test adapters::persistence::workflow::tests::message_tests::knowledge_views::knowledge_view_refusal_attention_and_native_constraints_keep_only_historical_levels ... ok
+observed gated transaction pids=[68445] blocker=68479 elapsed_ms=537
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::knowledge_e2e::races::knowledge_e2e_cc_and_member_demotion_mid_reply_refuse_delivery_and_show_typed_attention ... ok
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::admission_tests::direct_reads::direct_workflow_attention_summary_and_counts_never_treat_personal_work_as_company_scope
+
+test result: FAILED. 26 passed; 1 failed; 0 ignored; 0 measured; 4555 filtered out; finished in 10.49s
+

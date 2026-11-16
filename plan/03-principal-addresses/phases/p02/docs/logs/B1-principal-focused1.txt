@@ -1,0 +1,23 @@
+
+running 18 tests
+test adapters::persistence::address_tests::address_namespace_kind_guard_fires_only_when_a_target_changes ... ok
+test adapters::persistence::address_tests::address_namespace_demotion_of_an_agent_principal_drops_its_address ... ok
+test adapters::persistence::address_tests::address_namespace_refuses_external_and_system_principals_and_a_second_address ... ok
+test adapters::persistence::address_tests::address_namespace_rejects_a_target_from_another_company ... ok
+test domain::entities::participant::direct_tests::direct_thread_person_is_private_to_self_and_owner ... ok
+test domain::entities::participant::direct_tests::direct_thread_public_agent_admits_mail_without_granting_reads ... ok
+test domain::entities::participant::direct_tests::direct_thread_retired_person_keeps_only_owner_history_access ... ok
+test adapters::persistence::address_tests::direct::direct_public_settings_principal_round_trip_revision_and_kind_constraint ... ok
+test adapters::persistence::address_tests::address_namespace_deleting_an_account_drops_its_addresses ... ok
+test adapters::persistence::address_tests::address_namespace_a_slug_names_one_desk_or_person_per_company ... ok
+test adapters::persistence::address_tests::address_namespace_person_paths_leave_exactly_one_address ... ok
+test adapters::persistence::address_tests::direct::direct_thread_personal_ownership_survives_removal_rejoin_and_email_reuse ... ok
+test adapters::persistence::address_tests::direct::direct_thread_policy_sql_matches_domain_for_live_and_archived_targets ... ok
+test adapters::persistence::department::tests::lead_desks::address_namespace_a_department_desk_cannot_take_a_persons_address ... ok
+test adapters::persistence::address_tests::address_namespace_competing_desk_and_join_at_one_slug_leave_one_owner ... ok
+test adapters::persistence::address_tests::address_namespace_competing_self_edit_and_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_competing_held_edit_then_removal_leave_no_address_on_an_outsider ... ok
+test adapters::persistence::address_tests::address_namespace_competing_insert_and_demotion_leave_no_address_on_an_outsider ... ok
+
+test result: ok. 18 passed; 0 failed; 0 ignored; 0 measured; 4492 filtered out; finished in 3.53s
+

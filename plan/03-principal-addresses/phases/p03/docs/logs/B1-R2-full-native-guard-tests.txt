@@ -1,0 +1,8 @@
+
+running 3 tests
+test adapters::persistence::workflow::tests::message_tests::sender_tests::relay_identity_native_forged_workflow_agent_author_rolls_back_publication ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::agent_address_create_actual_default_binding_answers_a_direct_message ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::channel_reply_e2e::private_agent::direct_history_teardown::direct_company_teardown_removes_populated_agent_history_notes_and_transport ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 4607 filtered out; finished in 14.67s
+

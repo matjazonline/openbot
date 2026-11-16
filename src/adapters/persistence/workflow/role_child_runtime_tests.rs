@@ -193,7 +193,8 @@ async fn assert_role_board(d: &Deployment, binding: BindingTarget, agent: &RoleA
         1,
         "the role board counts its root once"
     );
-    let visible = crate::application::workflow::board::VisibleChannels {
+    let visible = crate::application::workflow::board::VisibleInboxes {
+        principals: Vec::new(),
         channels: vec![d.channel],
         company: true,
     };

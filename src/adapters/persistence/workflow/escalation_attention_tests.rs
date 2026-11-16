@@ -18,6 +18,7 @@ async fn listed(
             visible_channel_ids: channels,
             manager: false,
             company_items: false,
+            direct_items: true,
             view,
             cursor: None,
             limit: 100,
@@ -86,7 +87,7 @@ async fn workflow_escalation_attention_lists_only_current_assignments_and_remove
     );
     assert_eq!(
         f.p()
-            .operational_summary(f.scope.company.as_uuid(), &channels)
+            .operational_summary(f.scope.company.as_uuid(), &channels, owner)
             .await
             .unwrap()
             .open_decision_count,
@@ -133,7 +134,7 @@ async fn workflow_escalation_attention_lists_only_current_assignments_and_remove
     );
     assert_eq!(
         f.p()
-            .operational_summary(f.scope.company.as_uuid(), &channels)
+            .operational_summary(f.scope.company.as_uuid(), &channels, owner)
             .await
             .unwrap()
             .open_decision_count,

@@ -1,0 +1,7 @@
+Scope: 3 of 97 workspace projects
+apps/host-daemon typecheck$ tsc --noEmit
+packages/plugin-sdk typecheck$ tsc --noEmit
+packages/plugin-sdk typecheck: Done
+apps/host-daemon typecheck: Done
+apps/server typecheck$ tsc --noEmit
+apps/server typecheck: Done

@@ -1,0 +1,822 @@
+{
+  "accepted_B1_artifact": "30f6b67395ab9b9ec3235a5ca1d80bc78e2b596cebd8fc3ea19bec49a5edc7bb",
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "files": [
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "before_source": "accepted-B1",
+      "before": "fcac089d7cd308613ebeb7ffdfcab5dcfeb95a3d0bb3f5ae5ddab04a2cbd75e5",
+      "after": "0ef9252828355e62911297d03b48dbf90dd7b804a42ce0a1bfab609cd463950a"
+    },
+    {
+      "path": "src/adapters/http/pages/desk_wording_tests.rs",
+      "before_source": "HEAD",
+      "before": "58b9a71e994e8e46f46ba9f8b3a6d409f1feaeaf2e38ddc0334aab4910b05924",
+      "after": "e510048ab0b5861d3a6816de8a06cadaea3a4e0e78299697daf646c2234f499a"
+    },
+    {
+      "path": "src/adapters/http/pages/knowledge_view_tests.rs",
+      "before_source": "HEAD",
+      "before": "0c1a971c2dae430982b3f4bd908535af8432f9a2a24cb4431a261be09b0d8947",
+      "after": "24a65f1d92a45acf6663c70d7ce4f8815a4c06f35b70599ca685354e32a41333"
+    },
+    {
+      "path": "src/adapters/http/pages/local_agents/mod.rs",
+      "before_source": "HEAD",
+      "before": "25d06034a1064b815d19b44ed34f85df4e9eefe7a460878b879db3aeeb51b3a1",
+      "after": "bdde60ee76386abb02d05d50cb2744faa75fd9ec657f8c323ce83e7aea4cd8db"
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "before_source": "HEAD",
+      "before": "cf858600a5907d4ab93f71f715fe18239a563fed581631d2fd7d6d3b2148bda3",
+      "after": "d63ef95ec4749b238680295896d5ca408afec27cdcea9131c43d9d78e8f51615"
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox/inbox.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "c076a0aa2cbe705b5bc1a3f88b9446563c3cd882f20b5b8aa6a9051a36b5c4ac"
+    },
+    {
+      "path": "src/adapters/http/pages/notifications.rs",
+      "before_source": "HEAD",
+      "before": "b1fcc11cc6bd30dc119cc63e9fc551f5589bc9d12db173278f4d4aec9d155d43",
+      "after": "1464c445db2bfcbbe9bbebafdc49218fc15acc550c7093abf5b0a4ee43e097ee"
+    },
+    {
+      "path": "src/adapters/http/pages/tests.rs",
+      "before_source": "accepted-B1",
+      "before": "a1207579b3f6cc49b6db21af349b26d171ad4f74ca8c869fccfc7c1d95ad4070",
+      "after": "2fd414ffe85184aadc68693db84885c1c8435bb49aad2a96ab432dd55c6ecc32"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_conversation_tests.rs",
+      "before_source": "HEAD",
+      "before": "48395f0ca4b94ea39ca53c2aaa072f410687fb0be16090b0c21a6ce31c68a5dd",
+      "after": "7bdd01790c9dde56f5a0814f5093287853d37e3694e1d1f978ee2294ca072975"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "before_source": "HEAD",
+      "before": "356f632ccfda93d823c46c200065841d18e98998e7a75e22a15ce1554ec9d43d",
+      "after": "a20cd0e9180030c90e2c84170e552276f0878ff6163ac4d67da744c27c8efa1d"
+    },
+    {
+      "path": "src/adapters/http/routes/authorization_test_support.rs",
+      "before_source": "accepted-B1",
+      "before": "91f401a4ce7cbe72d4f585519588857f23ebc64ed2cca8e42a276629e2be98b9",
+      "after": "3b040e554d2e84a823ed151da38cba612ecda31f741e36911276632aac19138d"
+    },
+    {
+      "path": "src/adapters/http/routes/channel.rs",
+      "before_source": "accepted-B1",
+      "before": "d9f58975ee4c091b5c38ae0534b6603b834112be14ea15ca9d319b82786c07a1",
+      "after": "371efbb1cd721f9da427eb34100cc152f14eea79e3f48037ffb3eff41b324f12"
+    },
+    {
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "before_source": "accepted-B1",
+      "before": "025de38dd8f3ddc88401f18ae384d5e4527a3a3012816a93ffebad84dc00f967",
+      "after": "4870b6f9239612381db4533d97b4d0517e553d503cd699c056b20520b1352e51"
+    },
+    {
+      "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+      "before_source": "HEAD",
+      "before": "8a2bc5f6f2d2c99e7de0afeebbf2453ac588bfcced6530bff3464c31bee7a443",
+      "after": "04c674cafa53f7ddf39b7b36db49f4e7e33a7858af03c7da8d359353d1373a47"
+    },
+    {
+      "path": "src/adapters/http/routes/live_updates.rs",
+      "before_source": "HEAD",
+      "before": "6de2ebf6efad289cfb4821242100c145353667b8818caddf9c28d5c03c45ad29",
+      "after": "6ba29eb521c0cbe7fbcf6559d68ac2eaa06b5738de91b4c15a1fd9e70d85df4d"
+    },
+    {
+      "path": "src/adapters/http/routes/ui.rs",
+      "before_source": "HEAD",
+      "before": "18efeba4528cc9350f25b77077715f6a711e469127194e8af768bba642486e56",
+      "after": "487a8d49097888e2a86e30dd2786958b92ec7b68e8123db07fb758d8b8201ec2"
+    },
+    {
+      "path": "src/adapters/http/routes/ui/inbox.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "ed6f5969131e0821a163a569acd6130c9f11fbfaeb056a67aa8414fbfff7eab4"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "before_source": "HEAD",
+      "before": "01c4dde836632efc01c03cdf0c8f6664b13bc53508efe08469f1ef974a8240de",
+      "after": "40a6987e7f514dd0ac7bbca4ba7c9f8555486f42434deebc28541e63404c41d0"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+      "before_source": "HEAD",
+      "before": "794c0671c89ab0cc6bad3c1c6adbebc449845f219f1344c2e042b9eae862f9d0",
+      "after": "f9852f1909439ce8309e0accbdb1e4a98abaf9eda39ff7bc96ad47bf57d8acd4"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_asset_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "5a6a1dc747852817f9dd146ed1ff3634b44da7f282548545fb3dc6718e7eae5a"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "5aac4b1773f66f66bbf42ad0c3b3f6ab569d49dee858cb68ea7a9f252af05a63"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_internal_notes.rs",
+      "before_source": "HEAD",
+      "before": "781c51662bad26b219a3be929fb650789be3066c1fa674720ba59c63cfd5426b",
+      "after": "19bd79be42f158cfae58e3ef7fe4e909a293edcdf01e8a983eb80d1d17212a4d"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "before_source": "HEAD",
+      "before": "76a5536dc6995745c01a6b93d58e1376fb7b63e592c00187fc0ceccf87880265",
+      "after": "27f1470863f3b098e99e33cef93e6f95614bd08233b5a4e9ab1ec788a9dc6c6f"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents.rs",
+      "before_source": "HEAD",
+      "before": "40f97094f86ed94170bf11846d04e34b347a8150c3bbeac5169ca20f3ff60a32",
+      "after": "d610835f2270b166ef56d177fd0611b42c4ddc19de882dd33dc7a7b00ed380ba"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents_tests.rs",
+      "before_source": "HEAD",
+      "before": "03473891e0495cfdd883177e02d2e1148534b32c4bdef1fe02457cd3bf861759",
+      "after": "eaf882048cdbb4fbf74e0155e58583a2fc458e09161c7f8e534a66f368d67a8c"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message.rs",
+      "before_source": "HEAD",
+      "before": "c3dfe5da46eecaba4a93fa2a6c0a305bd214e85e501ed7c556ef496857171234",
+      "after": "2a6fb998a3c4781486e5044ea0f3a40fde0cc5aeeb19b07cde795c74e004d019"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_diagnostics.rs",
+      "before_source": "HEAD",
+      "before": "94a6bc2ca79c5fe6bb85d3176af9c894faf89289f0b9dce34321926e0fed1da8",
+      "after": "173e0e1ebbe2f2dc7c0eb307cacc22d4a6d83771e1ce64e88fd7efdc908a56c9"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "before_source": "HEAD",
+      "before": "f350350d7e9836e2e2808fddb737a22e150a709f162f557bc8c8378a274b23d5",
+      "after": "2b2b8a93906174dd2f5435e81f3b8305b810c067f1daebf041ebcec2f75ffb13"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "before_source": "HEAD",
+      "before": "10882c48fbfeb01fccdf9e6fb271b2cde2e2d140994bc5c0977d59c9be408f18",
+      "after": "1e77444177671cab73ef7d896e2458b22cd8e3e435b4f74ff54e29ba679fd20f"
+    },
+    {
+      "path": "src/adapters/persistence/account_identity.rs",
+      "before_source": "accepted-B1",
+      "before": "c97a2efb597b21cf0701999afe4140d7529cb92172963b2ee73d9a78d4544ef6",
+      "after": "695ac03fc8fe0efa6982af2737fb710eddeebb71c003b1023a1c0d6245acde41"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/bindings.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "08bac87d348adfa79879ae07ac4dc11d1239130ae1843531d9d4b0ce357f6db5"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/direct.rs",
+      "before_source": "accepted-B1",
+      "before": "ae128957783a903f0c0a9dddca71736fd68948c7e351d7b2c9f0a7cac3ae1f0b",
+      "after": "c1f018ebae67ecaedf315a9985062d5b5457bb21d86b7439a4b2472479fa857e"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/identity_races.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "6ea806fb609682ddb198b5270135628c90788df1a921dae2dd44c2ee5ab1536f"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/ingress.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "b7984b225ccf7bf4fb39ab22a1a2146f6e78f3a06161a0f34257c1b8c7f8fa1f"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_authority_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "4879564f643798033689ec47741720926ed9f21b9cb321bd9f4195600bda3053"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_race_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "968e1572fe30d664f32fbfcca142111654dea022fb13b1b27df78959431e29e6"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notifications.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "4099ad3feb5147bcd25f3deb96ff92025ea9a5fdbd990609a4ac82304abd5246"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/rejoin.rs",
+      "before_source": "accepted-B1",
+      "before": "22be3009b1ccf404b37d47d248773172d3a63739c51dd5bd807e57e86639d24d",
+      "after": "23c017aaf65411896b3d0833db1d340286b419090f5e11b4d19910012b822cbd"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/status.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "e9dc91aba0e10438a0069518a88a60a4ff826e93f4b5274b34be11c6e6497d9c"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/validation.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "564dd0a499afeedc6cd86325a11026195fa775e4b2b73c27f4d694795eac0516"
+    },
+    {
+      "path": "src/adapters/persistence/channel.rs",
+      "before_source": "accepted-B1",
+      "before": "76010ff9266de98fbb332b509efbec709bc8b711dcdbb50bf6d35845be5f0591",
+      "after": "ff1cde81a4953e7a61f11d3484c2ed7d9dafea0b55940d8674e84a9dcfe55ee4"
+    },
+    {
+      "path": "src/adapters/persistence/dashboard_tests.rs",
+      "before_source": "HEAD",
+      "before": "015bfad9852bd4d87467b4211cba5a82d9c3437903d61cff01389a54dd7c78be",
+      "after": "c535021dfbfec731279ced2429b93c47036571b9c38ed04811db868aaf33b1f0"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/tests.rs",
+      "before_source": "HEAD",
+      "before": "2c621d3e848744b2535abbbc3f8aaa807e68b0b458ae6c45c371b9c088995e73",
+      "after": "9548fcd26f8f5344947bdd2785de34ba2f5adc086fa4874452d013eb7bf086ba"
+    },
+    {
+      "path": "src/adapters/persistence/integration/binding.rs",
+      "before_source": "HEAD",
+      "before": "9af1610975082289935a449f632df93c9860a0da9b0dce58f507adda13fc68d0",
+      "after": "f9dde7fd0832e87e177938334edc9ba161139a543e7028b4aee0cc32ea0c4de3"
+    },
+    {
+      "path": "src/adapters/persistence/integration/email_binding.rs",
+      "before_source": "HEAD",
+      "before": "841e727d1f23e213261e2071bc7cc9f1e46680a3a5c08b649bbd414056c42e53",
+      "after": "8e6e7cd6e4890e3f5a6489ac3e20a6f0c59ad99b09bb5e8259cc20d9e1b9459b"
+    },
+    {
+      "path": "src/adapters/persistence/integration/mod.rs",
+      "before_source": "HEAD",
+      "before": "da118137796aa5b6e53052cdb71fa87137ef6423dea56ddb24789de06e080929",
+      "after": "96b87eea05277d103a4c09aab5178280875c677014a87194a44e3b9e0171d214"
+    },
+    {
+      "path": "src/adapters/persistence/integration/tests.rs",
+      "before_source": "accepted-B1",
+      "before": "69150153ff5fb4b1a1be6e19630ca1c55da1b398bff2f7c25579fe128dd112b5",
+      "after": "5ac48fff5fd10df5905bd8b87be347b5ddfa1fe11be450fd809aa73a435e852f"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/management/tests.rs",
+      "before_source": "HEAD",
+      "before": "398f27f4fb019babe3fa910cbdeaffb285b24d4274dfa7c9b38cfe00faa73bdb",
+      "after": "ac80d11660330db39bceef75725bd8f92068c00939bceb1710ea6d624428380e"
+    },
+    {
+      "path": "src/adapters/persistence/notification.rs",
+      "before_source": "HEAD",
+      "before": "65a27c5a2000098e97c06ead092e155d6280ecad53c408dbef41dfa106030ed4",
+      "after": "62fbddbb10db81694abb7d785d14bc074aa6c8ec9e725d8dab4e70ead94c4e08"
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_message.rs",
+      "before_source": "HEAD",
+      "before": "94678c761c361d45973c145b578769cbf1ff44544a7c259d1382447d6c66e79f",
+      "after": "4099930ecfcaae63441ca259c505c57889a892d6d02eecfa0da89ac738523812"
+    },
+    {
+      "path": "src/adapters/persistence/notification/direct_message.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "0398e450751aa3f7208cfc092b6925c8717c01b8d852ee80b1cefaa3f093d029"
+    },
+    {
+      "path": "src/adapters/persistence/notification/escalation_notice.rs",
+      "before_source": "HEAD",
+      "before": "fc8a68c81f271d4fd8bf5aa80574ecc545e8af3920d580e9184f7e53d55885b8",
+      "after": "1ad5c1e6275491180794a0c7ab3f5fb1f4c81f0c3e487ba1b50e66694f95c2d8"
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection.rs",
+      "before_source": "HEAD",
+      "before": "5aa65ba5888e72e040aa1681201aa610281fdba0fe2f116c402d19c3174c8f8d",
+      "after": "b4033ad23fe851dc325595d2584d083768ae3d87394ef060bd27194d2a62e78d"
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection_lock.rs",
+      "before_source": "HEAD",
+      "before": "dd294546bfedc0f3c4cbd543cff36c2db0b3e349866a3ba4811721894117941a",
+      "after": "9d21791c4b0f3c20b87b60ab2ec620c81838b40dc979bd41fced2cc255598f8c"
+    },
+    {
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "before_source": "HEAD",
+      "before": "e7822e6d9705b5552164451ffb61254ca4dd8e67cff1e05f09c128d09aec8e02",
+      "after": "fe5f45d336db8881ccc0b81683211816f9852a067a952799efcc18c4c56d7b05"
+    },
+    {
+      "path": "src/adapters/persistence/participant.rs",
+      "before_source": "accepted-B1",
+      "before": "58680f603694205fe3aebe9f54189979ee2af23ab9ca1b083db9f8e38b186312",
+      "after": "be8dd7169448363614c972a1361242a1694e28024d06365ace5b3c374ae5ab92"
+    },
+    {
+      "path": "src/adapters/persistence/test_support.rs",
+      "before_source": "HEAD",
+      "before": "4f2bc22e4f17547733fe098dc052168ae98fc3a18bab4236ddb46fe9b1c7b7aa",
+      "after": "a15985b444f310a82ee02338e25138143ffa22fcb46c5f7a91084c6648e281bf"
+    },
+    {
+      "path": "src/adapters/persistence/thread/external.rs",
+      "before_source": "HEAD",
+      "before": "6b8bf243ac11568d8a1b70ad7ad715c2615ba1afdfb6e6b33074285d782b7237",
+      "after": "8db0260718310b98a9d429377ad765a431dad9f1d6f6ccbcec9b7070d7dd33b8"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "before_source": "HEAD",
+      "before": "03bad590e5899377e6fb84a2a73cfdb57c09f261d9b4d65f97a82e6e0e20a216",
+      "after": "05c521419064aacb09d58e007c6e83cf4d8af58a7b559b335e9c392cd61966f7"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+      "before_source": "HEAD",
+      "before": "b1fb44dc48c351dad97c31a001bff5a36ae442d091b50ac9e19e2cdfb0d5f5be",
+      "after": "eabd7e4c51e61913d0a72c980c4cd61e6556193d78c132629882daca8a9c63d9"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_target.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "8db3f63be59697c4aaa8acf7c034c1d5405ac905bbecc10d46d8270de4a85960"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "before_source": "HEAD",
+      "before": "8c51d96d68dac651fe44bc899303286031add11a914d28281d4b742667b1fb30",
+      "after": "aa61c43fd5dc941a872647de28f303e671af231e632d07d1050234d9435e1364"
+    },
+    {
+      "path": "src/adapters/persistence/thread/internal_note.rs",
+      "before_source": "HEAD",
+      "before": "0b069c9efe9549383773c0bfba294c064ac7af4dca9ad3c9eba43b6e2763f04b",
+      "after": "5fe473000219bf07bdeda099721123efc0095dedf10a0ef83f078ea793ea30cb"
+    },
+    {
+      "path": "src/adapters/persistence/thread/message.rs",
+      "before_source": "HEAD",
+      "before": "63e5e6b355486a50e815ef38213edaef977bb5a79cd12c051489887d11ff2254",
+      "after": "cdd6f159f5eca0b88a225962617f13efa82c61ac8def854487f160c726d56cd8"
+    },
+    {
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "before_source": "HEAD",
+      "before": "74ac4636c9459bf2a61d3224f1d055790c871ece20c0594ad86bb14431cb7d38",
+      "after": "93cbff786dbb5215c4750a8d82a3f984ee57c89755acb0243dc8276f8643ce07"
+    },
+    {
+      "path": "src/adapters/persistence/thread/read_tests.rs",
+      "before_source": "HEAD",
+      "before": "01ff3f9035489aff24de189adb03a2721f5c174979775cdd8c9e4161e6dbf9b7",
+      "after": "2112e4262744d34aa264ddd00e72d72243d15f55984be36b4ce88c20737e91e4"
+    },
+    {
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "before_source": "HEAD",
+      "before": "afe35192df27635b6c3f2b340c15791a974eaeb11d9b58ae8fe7c60a8bf50fa0",
+      "after": "9c56c71c4d7cac31783e4fd3ad5859979cd27c9fb74ea38fef86888583582dff"
+    },
+    {
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "before_source": "HEAD",
+      "before": "6cc406dbf85bdf9699bdb3ece63589cfa099932adaf4fdf46dc82e3253ff6f31",
+      "after": "10bf21635b0dc1f6b6ef19250838beffcd6725b76e0cb160032049c6d6b5848c"
+    },
+    {
+      "path": "src/adapters/persistence/thread/view_tests.rs",
+      "before_source": "HEAD",
+      "before": "bf9a141f8b74543095d80d31568e06bfbd83d4f20f7007a7568889fa91b427f6",
+      "after": "5b1899bc78dc9a5175c3b4118b4b4c1739e747d726b7d86278531d43f6313228"
+    },
+    {
+      "path": "src/adapters/persistence/thread/views.rs",
+      "before_source": "HEAD",
+      "before": "25283c20aaec66245d3823648489f73c7d1d2585f795bf2c6db3e0fc063ac00c",
+      "after": "16e5cc4cd87f2807c0bc309b1cca1b8e19b82cd85e12cde1374f7e290aa54a8c"
+    },
+    {
+      "path": "src/adapters/persistence/user.rs",
+      "before_source": "accepted-B1",
+      "before": "24b28ae156b9ba485f6118f0354dd647ae18fded8b03bc90a2dd7762d0c18948",
+      "after": "069a9c39c56796570b9de6033abe823bffedbf80cbed14b406d0ee0f76504582"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_capacity_tests.rs",
+      "before_source": "HEAD",
+      "before": "f946d140686a861295548dec324217dfdd3b38baf3352f870e459a83d7ec13c8",
+      "after": "4cafbbc40a4517952b09e16b1db2fff9ac7fb8a88fe72f4ca3564b3ca46c5a38"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+      "before_source": "HEAD",
+      "before": "df82c5e4bb31b15334158d1439ffe8292adf58ab1def8e929ac3896e7826d23e",
+      "after": "999ec9538be7ce8281418ce259eb492c653adcecbe4172d27298693a35c509dc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_membership_tests.rs",
+      "before_source": "HEAD",
+      "before": "978ff8228cf5c0b3099240426b26ae2ff6bb0ffd1f3dabe21cc7041cf4cbf611",
+      "after": "624d3159369a034a37d772d981bedc1ea4008621f2dd4cde77fb4a5af741a715"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs",
+      "before_source": "HEAD",
+      "before": "4a9f6562714656444ffc3c2ebd013fe1edb5ea92ada9912a43d0939049d2094f",
+      "after": "519061408783faba107be0388f4eecedccfaf1aad7e403113d9c4937f6930647"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_binding_tests.rs",
+      "before_source": "HEAD",
+      "before": "2d328210fc44bfc295e01a3346d2945a9aab15207fa306bf6d8c6acd4e2ff668",
+      "after": "ae9469a3ba64915e7670d09a8a8a26e4d2bb563df76a1ba0f1b3a0d09f5f9e1c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "before_source": "accepted-B1",
+      "before": "f85f839de642cde3f044adcda0b8f49649113eb2ca14adb09521bdee7d40a2b7",
+      "after": "ae741efbd39051d014f599e81eba1f9e213007cccf09a39802fec3b5fd29bed8"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_tests.rs",
+      "before_source": "HEAD",
+      "before": "b7894928aef12f3075f2c15bcb7868d8b8b9bca147b36a32868efea419475fe4",
+      "after": "7f894f9c36c92c6787c247ebcc59e12d92d89010039eb2f2b516ca260c39aa15"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "before_source": "accepted-B1",
+      "before": "c295185cd7c46a4f488cfe1a4281d77d1b5f66d59a67d7e3a3a789920df835ed",
+      "after": "4e91e0efbd1ddc211f425b40e53dddd8bdd39047171ba6cc1578f9c1664a950e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_delivery_tests.rs",
+      "before_source": "HEAD",
+      "before": "0656fc3b16dca709b6db1992f47ac040fec23899bea09cd6b2e5a2f2b4318dd6",
+      "after": "ad0ae6066f3329e87581d8f9b47f180a9405a9fd2810b1717c172fce6b8f89ff"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "before_source": "HEAD",
+      "before": "d82d448ebce62fc4a6d232dd187b4d24f9aa521da7377efc929810e0dfdcb2f1",
+      "after": "b3acb8c91efb985d4ef56655b6248042e50560faf448a67e54f154ddcaf42c09"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "before_source": "HEAD",
+      "before": "11a7790a8c344d661c2fbb07ebc04cc4131719806eedcd58729b55dfc088b000",
+      "after": "37291ecaa2466819ff62dac2caa024b9489493ea3cd0180f1522f8f1192d7479"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "before_source": "HEAD",
+      "before": "5b6c0b151b53960ee0332a4a9f1a124e040f12b6c3b00d23acf705abfbf0fc2a",
+      "after": "e2b2538a3fa92f43ff1bf39644f23eb270b1bdf550908ed3e889d4de176690b4"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress.rs",
+      "before_source": "accepted-B1",
+      "before": "3b52e103f25571300052c860c8e04ca674856117903c187fb8c873939fb8af89",
+      "after": "73511f4743117feb4e9b290cb75858cec5a7530b54635ffb6542035aaec98342"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "before_source": "accepted-B1",
+      "before": "3560759cb11888c68bee421fc6efe78c22ac413ff8ca8ffb862600a67b98ad62",
+      "after": "c0ba10714996d40a36f0e3b9162df73d707ad072e6216d92d5a53bcc5479030b"
+    },
+    {
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "before_source": "accepted-B1",
+      "before": "82bf844c056d8e35428eae1d55e921c0b2a33b78694ae8b76ac48a9c3a413ecd",
+      "after": "3114e80f91c6ca2462c1c1c1ad602a97f02861bf901ce1bef7baa40b9eb1134c"
+    },
+    {
+      "path": "src/adapters/protocols/email/parser.rs",
+      "before_source": "HEAD",
+      "before": "825532d3041d20c5831709b7ba7e689482567ada9564bed747730ce412c87b46",
+      "after": "241c6dfe74f1dd8e833fd474119ebc0c379db694bb1277085473c7f9040e37a0"
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support.rs",
+      "before_source": "HEAD",
+      "before": "2f5b93a790f464934a4bff2121e474d7f7ddbdd5a0c2c9fbe0fc4b27b8a691fd",
+      "after": "950b0856e2ddceffa34f0f0f3fa065b487a366a927a4b1645895ef878303a960"
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_egress_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "9fbb66dd185a6149ce91e884bce1c2bb5171c246bfd6cd9033da1d15e4b501e0"
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_tests.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "b856d497138d72811887266e05d2b143baf8e52269c4e518ab9ac1a202e53862"
+    },
+    {
+      "path": "src/adapters/smtp/server.rs",
+      "before_source": "accepted-B1",
+      "before": "8e088eb880d679623c8b748d6d56b40b701ae259a692a6296d81a2ecac11ca66",
+      "after": "dcb63b3ad2631c90699b0c0ba12688e5ed5e76354d229dae8589228f19316b3c"
+    },
+    {
+      "path": "src/application/ports/channel.rs",
+      "before_source": "accepted-B1",
+      "before": "ebb13396e63d18757b6ff67012dec2d16282f64258a681142644c1bde25bf3bc",
+      "after": "ec8c27cf8a3121737d3bcaee28e4ea166e7f0695b5d095f86fdd5b869d35eea9"
+    },
+    {
+      "path": "src/application/ports/integration.rs",
+      "before_source": "HEAD",
+      "before": "d892d0d058b82049ca025473b5adddacbb46daefc3b09ce8ec997000147126e1",
+      "after": "6ce04ce792f22998b6d0f8efa2ccf4b83eb3b9dc789d54eec5f42c6d6786751e"
+    },
+    {
+      "path": "src/application/ports/participant.rs",
+      "before_source": "accepted-B1",
+      "before": "0f8ec520dcf3e1e681d4ff4e03a2d6c5802e9bea2ce78d1451e3747213a4e575",
+      "after": "851fffeb4c966f7b90f50d03580c3226df082cab07c511cd094c7dae7cf662fd"
+    },
+    {
+      "path": "src/application/ports/thread/mod.rs",
+      "before_source": "HEAD",
+      "before": "fb803c1cbd075ce8e757f42183f252e0da21862318b40fd6f46f6150aa52f891",
+      "after": "8a29d70304737f7ec84af5ab21419e7b95f147b5e54c60205f431a1c2a718c96"
+    },
+    {
+      "path": "src/application/services/test_support.rs",
+      "before_source": "accepted-B1",
+      "before": "700e45dd475c415b8709a909f076f700e579dd55206c12f940ee29ccec65ab08",
+      "after": "65c1fad6f0e130469cd73b964bd09801fb1d0f46263ffe5048a8ea70c0c388ea"
+    },
+    {
+      "path": "src/application/transport/compose.rs",
+      "before_source": "HEAD",
+      "before": "e0a7a279807bb5a7320f4d833e91d31067ea3f1bf4670e39352c358cf019cea3",
+      "after": "1f81e57eebfa0999b21979c2112d5b0f4592d10aa504bfc36faf001374ca0cb2"
+    },
+    {
+      "path": "src/application/transport/delivery.rs",
+      "before_source": "HEAD",
+      "before": "6795eefbaf6bf452cd01f8aa492dfc5d627b8a25fa42ff0b322ecb1ca321a721",
+      "after": "4c27f76cb26b5410f05cf4ee48d851cd7e43213f8b9e5dba10774d71d8b30adc"
+    },
+    {
+      "path": "src/application/transport/ingress.rs",
+      "before_source": "accepted-B1",
+      "before": "8ad2df7bafd30346a4ee1af4effe9b8ba0d1ae4ffcb41508c6bbb3bd28782d73",
+      "after": "9a6d2113600cd1aea8ddfd1c7fdfed70fdd88df0e54db3648c7a11f2d1029e02"
+    },
+    {
+      "path": "src/application/transport/mod.rs",
+      "before_source": "HEAD",
+      "before": "642f3d564dc134920d8fd3f57b9e35a6fb2e220a4fe11d0a9cb8bb4ecf8d872f",
+      "after": "fa76f11c9c6e2a0355fc6a1c0e72d30e90bd2ef083e2b334efd6c69e093db132"
+    },
+    {
+      "path": "src/application/transport/ports.rs",
+      "before_source": "accepted-B1",
+      "before": "4bcaf3f747554bd49dc2e7ed6f740ab0e0ea7f56eb67f2f5e2926f0c09396935",
+      "after": "d391f7447b03167078e16bf56465f5a3c87f32c24a4f75a1855217faa7bccfd9"
+    },
+    {
+      "path": "src/application/transport/tests.rs",
+      "before_source": "HEAD",
+      "before": "6105cd0110b6d15d1a9641fff3b5384d16c78b16ba5725b1ec53977b9848f8de",
+      "after": "24aa4135214bfe6973959bbbb48079aae21c04fe114340b1ef540305670dc877"
+    },
+    {
+      "path": "src/application/use_cases/channel.rs",
+      "before_source": "accepted-B1",
+      "before": "28d8fe4c5d7c4b453c0e06e8477a6badfec7a62a981a2cd26eb193fe34960e73",
+      "after": "0f3cd6a2c991709de3fb2a04944f457e8e86ee72ac443fca6be4480cfefaa461"
+    },
+    {
+      "path": "src/application/use_cases/integration.rs",
+      "before_source": "HEAD",
+      "before": "feff9c593defd11740675b6c472b216596b0d15c88fdb477e4ce792d7cc20975",
+      "after": "d84eb5808ec6e2e8ef644b5edf1c52e03d26f3090f1f48b849edd18fef619ba3"
+    },
+    {
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "before_source": "accepted-B1",
+      "before": "70f15c34a785c8019eaca3094d5fa92e7a7bb0f32e57e623ea06da26582eb375",
+      "after": "f79a216623b9ba4c9e2e1e330c9e4114ee77bbf5bdf4ef9a3570652759232c25"
+    },
+    {
+      "path": "src/application/use_cases/thread/address_grouping_tests.rs",
+      "before_source": "HEAD",
+      "before": "02f1629ba72058fe7ac0865d1d13eada0e251cf7efa09fead74e73f330565f49",
+      "after": "a1a940bf991b3fa587d4d0c0fae80a7d2a031e905bbf707e6eee39ad19f274aa"
+    },
+    {
+      "path": "src/application/use_cases/thread/address_resolution_tests.rs",
+      "before_source": "accepted-B1",
+      "before": "745332e0faf1e8221f7dd1e059d011989ea9505410138a2975e3e00ec0478011",
+      "after": "d588658091e086153830a97144a96429b214d4facf6d391a5946df91de60726e"
+    },
+    {
+      "path": "src/application/use_cases/thread/department_desk_relay_tests.rs",
+      "before_source": "HEAD",
+      "before": "946a324001a35cc38531cc048588176270ada3d590ca9fab40061d414befcf10",
+      "after": "8ad652d6b6dc24a7ada68caca63d9d77c45df684b35e6b146066c1e82e47f416"
+    },
+    {
+      "path": "src/application/use_cases/thread/inbox.rs",
+      "before_source": "new",
+      "before": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after": "5a938c29568f673f0df44631e0f9f32c0061fc296c7455cbe79839f74979f710"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "before_source": "accepted-B1",
+      "before": "53b6251541af1cf1f43b443830a71bd6b387f698b47dce523fadc213648c9cc6",
+      "after": "85f2226457f3bd7bca1248798c1cde13982cfa92af16dbb4e9c8408cc7032722"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "before_source": "HEAD",
+      "before": "bca445e1a318326da9bde33c309994f287ea05257fbac70358b907c38597202e",
+      "after": "9d3fb4b9613cd40f3558b8e336883be5d9c4eafbb92e022b731175f7241ef707"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "before_source": "accepted-B1",
+      "before": "06a38ea4af982cf2c3f6f180fcafddf72f03c76655fcfdc9b33fc2ef270841a8",
+      "after": "74681684720df685806213d550682fd3d34c4cf7c452b0f7a4a50b436249a01c"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "before_source": "accepted-B1",
+      "before": "3198026d33bfba381fb7848ed14aeea443ff6e51a248da61c6faf41273deaa52",
+      "after": "a2e7034ebf23a3beb012bc0bfb883bfcc5e2d2b30eb105b9f9fb5649bf470e15"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "before_source": "accepted-B1",
+      "before": "51092914a824946d230aa11d09a8fe65c1b59406a51da443f63e61a9955249bd",
+      "after": "5739b53bd459ef71fc14c6b49742daa27a6a9ad64c8f5b90c6a2cdab271385c0"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "before_source": "accepted-B1",
+      "before": "7d4286afd8c76c17303eafb2972611c3d58d0c098a56ccac8061ebedf489d8ad",
+      "after": "b2104b58196e652e82615e47afed5ff3aa01ca334cb10ce58594a6fef1d6ef1d"
+    },
+    {
+      "path": "src/application/use_cases/thread/mod.rs",
+      "before_source": "accepted-B1",
+      "before": "4b666777ac59000f54b17450d06c6b478cec7b6525148ea0a225468353cc53d7",
+      "after": "1c3efeceb2ad944f7424f8e1551622448278d96ff9196b36cc6062723805ccde"
+    },
+    {
+      "path": "src/application/use_cases/thread/notices.rs",
+      "before_source": "accepted-B1",
+      "before": "6d10fddacf6e722d00625db9d2c2a9db2a13e7b6bd505e5175c2a4847d0ac043",
+      "after": "e011f74a2f4936e06afd1cc8a477fb7396a71f3bf38710e5b0a580fe0a3cbbb8"
+    },
+    {
+      "path": "src/application/use_cases/thread/reads.rs",
+      "before_source": "HEAD",
+      "before": "45e47435f34c0c78ad77b40ddfd5bc06af99020a35b6b6ed10f2ce5d0fda0734",
+      "after": "804c65553d12e3ac803d68171cdc49384be60dbac681d8e5c0efd616d96ff970"
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "before_source": "HEAD",
+      "before": "c92bebd79857906984dbe2678748a0b41bf6684ae730206c8dfd0733ab9c7347",
+      "after": "0da3ec61366bce493f5b5248e5ec79b014160119fb219f3e383a35db5e776d24"
+    },
+    {
+      "path": "src/application/use_cases/thread/tests.rs",
+      "before_source": "accepted-B1",
+      "before": "9e33db1077f7437cf693df15effda1159abdf7432198834cff7ee015c7b8f98e",
+      "after": "1d8f26d71d29d44072a547e3587f6016c0d18b38af82c2da1d9d17bd707234d9"
+    },
+    {
+      "path": "src/application/workflow/authorization.rs",
+      "before_source": "HEAD",
+      "before": "a79bfa870b162f85aa2c0091e050c1628cb4ea727bad85e03185c4c5f5d2f0cf",
+      "after": "945139d6ec177940ccf7abf3bbad43b9fbcee299d733c5bfb826de3ef8deb778"
+    },
+    {
+      "path": "src/application/workflow/message.rs",
+      "before_source": "HEAD",
+      "before": "d9af78ed290aea2c685a0267fee40232bf9cf3fb3d0a08b9b8ff32df7b9ae312",
+      "after": "1591186ca1cc18dfb51547105afa72b3d249e8a6c8ffe35a4f186aa7b660165c"
+    },
+    {
+      "path": "src/application/workflow/message_planner.rs",
+      "before_source": "HEAD",
+      "before": "9101c6896dc54ad9c0aaa304ef5c385ba9be89edf71a5ef9ec57bb2d6599a46a",
+      "after": "67d499ffd1e5c4cbbb96d35ea6cd68a6ccee89b69567dce65ce3baee2e07d09a"
+    },
+    {
+      "path": "src/application/workflow/templates/test_support.rs",
+      "before_source": "accepted-B1",
+      "before": "478508772222659cfd3793015d9c2cbc9cab66a970860d5fa5e1545713eba46a",
+      "after": "028745ad77e5daf105855381af7f7a93c27580a4455920f1222435ea740a7845"
+    },
+    {
+      "path": "src/application/workflow/tests.rs",
+      "before_source": "accepted-B1",
+      "before": "319791f522a65db22062d1d299c597cc1fed0d6bb88a2bcc05bdf4432b435bd8",
+      "after": "f0dd700bbe60484a92e0983da41c877805a8415ef3b3356c149adcd9392b3ba0"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/association.rs",
+      "before_source": "HEAD",
+      "before": "46558ce0dc4074545cc2fba7b77da5c7032b89027bb9704e72f67ad67e2d341b",
+      "after": "9fd6348fa962412104c3e5e245e4d6c845d8ab59131cf1a4e6e05f9d00b134ea"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/cancellation.rs",
+      "before_source": "HEAD",
+      "before": "0861ecb62e13ea176fe4fc30d96471cfaacf99bf6df64e7e856b27c8b8598ff5",
+      "after": "350265180344033958bdee8b350c365edbac3161cc30e96bc47ac7eb9c0cb57a"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/mod.rs",
+      "before_source": "HEAD",
+      "before": "416cd745a17f588b885351feccef073d029d5408c5172d6c63b9880a1a3e0d20",
+      "after": "021f78ae5f219ea973c7c1a04dac4871c33d71c4ed1c51902a75058d87b277a0"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/reader_errors.rs",
+      "before_source": "HEAD",
+      "before": "a33c3455846801d559e955ac8b9e4edd6374e7b5021adea30862d8b4c663f9ef",
+      "after": "213b228ef32ba918c5b7e4a7ce10b6be79ff1e39c02346805a67358721c5f5ba"
+    },
+    {
+      "path": "src/domain/entities/address.rs",
+      "before_source": "accepted-B1",
+      "before": "1c722bd37602e11c14f7f9c81a7fa968e343af694846d700da59c3138e1b1ad3",
+      "after": "2c1da6a121552249fed4de236bcbaa3eeaf86fb2c94ae984c645819e7f89901b"
+    },
+    {
+      "path": "src/domain/entities/internal_note.rs",
+      "before_source": "HEAD",
+      "before": "2d5e357d1948330d0548f4556c3e287c4fa828094554f568437e090551cc247e",
+      "after": "22ea26e2ac15de3c9a4e936774ad1a6983678fc3116c098136d400aa6ccd47eb"
+    },
+    {
+      "path": "src/domain/entities/message_view.rs",
+      "before_source": "HEAD",
+      "before": "3b12a3637939fe5e675a06d4a0ba2f41e4b27ac0f159796f970d057f8ec0980c",
+      "after": "9a93d0b6e1a4a2a9dcb241cb3dd473c21514528c3339939e35a4c6acf14d6e32"
+    },
+    {
+      "path": "src/domain/entities/notification.rs",
+      "before_source": "HEAD",
+      "before": "aff2db4c86b62ec226c4720e871598ed293bfd241ea60d43a1c1f9fa8ef8dce7",
+      "after": "b2be2abeea55c3e5b0d559126ed53b9cc1f1cd2e8bb24c0174ddd7fa0fb8ebfc"
+    },
+    {
+      "path": "src/domain/entities/thread.rs",
+      "before_source": "HEAD",
+      "before": "9fcfa33dc42597945a68fc3b4ac2804aabe6540edbb5d8381b6ed91856af6a93",
+      "after": "e1afb396ce9e4d36a2086788e0fc12c97304522bc64bf193fe3012e618b245b1"
+    },
+    {
+      "path": "src/domain/entities/transport/integration.rs",
+      "before_source": "HEAD",
+      "before": "402f988d5e90dea28dd93a829a4b1d68e16a0cb7fd98971ffea6306b029b0158",
+      "after": "08a909ec33561afc2b39e05ce2f1266142b58472f5284558315ba1a349dbf3f5"
+    },
+    {
+      "path": "src/infra/events.rs",
+      "before_source": "HEAD",
+      "before": "9716e745b525ed677f4645049321e296a97ae88037f59df577c776b880e1f92f",
+      "after": "e1e35c8063d9210692a355bfb7adec5a09a5ae439cd730288a51ffd6ee0fc059"
+    }
+  ]
+}

@@ -1,20 +1,27 @@
 //! Relay preparation operates on ingress delivery data. It does not expose stored message views.
 //! Typed internal transport ingress, without a MIME round trip.
 use super::super::*;
-struct RelaySource {
-    channel: Channel,
-    company: Company,
-}
+use crate::entities::address::AddressTarget;
 #[async_trait]
 impl InternalMailRelay for ThreadUseCases {
     async fn relay_internal(&self, mail: &InternalRelayMail<'_>) -> AppResult<RelayDisposition> {
-        // A recipient outside this deployment, or one whose channel this source may not address,
-        // is not a fault: it is the ordinary case, and the sender posts it over SMTP.
-        let Some((selector, company_id)) = self.authorize_relay(mail).await? else {
-            return Ok(RelayDisposition::NotInternal);
+        if mail.hop_count > crate::transport::MAX_INGRESS_HOPS {
+            return Ok(RelayDisposition::Refused(
+                IngestRejection::HopLimitReached.as_str().into(),
+            ));
+        }
+        if mail.trace.len() > crate::transport::MAX_TRACE_TARGETS {
+            return Ok(RelayDisposition::Refused(
+                "Relay trace exceeds its hop budget".into(),
+            ));
+        }
+        let (selector, source) = match self.authorize_relay(mail).await {
+            Ok(value) => value,
+            Err(AppError::Forbidden(reason)) => return Ok(RelayDisposition::Refused(reason)),
+            Err(error) => return Err(error),
         };
 
-        let message = self.internal_inbound_message(mail, &selector, company_id)?;
+        let message = self.internal_inbound_message(mail, &selector, source)?;
         let ingest = match self.ingest(message).await {
             Ok(ingest) => ingest,
             // The commit refused the hop's delivery proof. A claim that does not match the stored
@@ -39,67 +46,6 @@ impl InternalMailRelay for ThreadUseCases {
 }
 
 impl ThreadUseCases {
-    async fn resolve_internal_destination(
-        &self,
-        source_channel_id: Uuid,
-        selector: &ChannelSelector,
-    ) -> AppResult<Option<RelaySource>> {
-        let source = self
-            .channel_persistence
-            .get_by_id(source_channel_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Internal source channel was not found".into()))?;
-        let target = match selector {
-            ChannelSelector::CurrentCompany(channel_slug) => self
-                .channel_persistence
-                .list_by_company_id(source.company_id)
-                .await?
-                .into_iter()
-                .find(|channel| channel.matches_slug(channel_slug)),
-            ChannelSelector::Qualified { company, channel } => {
-                self.channel_persistence
-                    .get_by_company_slug_and_channel_slug(company, channel)
-                    .await?
-            }
-        }
-        .ok_or_else(|| {
-            AppError::Internal(format!("Platform channel does not exist: {selector}"))
-        })?;
-        if source.company_id != target.company_id {
-            return Err(AppError::Internal(
-                "Cross-company internal channel delivery is not allowed".into(),
-            ));
-        }
-        if source.id == target.id {
-            return Err(AppError::Internal(
-                "A channel cannot deliver an internal message to itself".into(),
-            ));
-        }
-        if !target.enabled {
-            return Err(AppError::Internal(format!(
-                "Target channel '{}' is disabled",
-                target.slug
-            )));
-        }
-        let company = self
-            .company_persistence
-            .get_by_id(source.company_id)
-            .await?
-            .ok_or_else(|| AppError::Internal("Internal source company was not found".into()))?;
-        if selector
-            .company()
-            .is_some_and(|selected| !company.slug.eq_ignore_ascii_case(selected))
-        {
-            return Err(AppError::Internal(
-                "Internal recipient company does not match the source company".into(),
-            ));
-        }
-        Ok(Some(RelaySource {
-            channel: source,
-            company,
-        }))
-    }
-
     /// The canonical inbound message one internal hop produces.
     ///
     /// Every provider key is derived from the relay's own RFC ids, so the receiving channel
@@ -107,8 +53,8 @@ impl ThreadUseCases {
     fn internal_inbound_message(
         &self,
         mail: &InternalRelayMail<'_>,
-        selector: &ChannelSelector,
-        company_id: Uuid,
+        selector: &AddressSelector,
+        source: crate::transport::AuthenticatedRelaySource,
     ) -> AppResult<InboundMessage> {
         let metadata = EmailMessageMetadata::new(mail.message_id.clone())
             .in_reply_to(mail.in_reply_to.cloned())
@@ -157,9 +103,9 @@ impl ThreadUseCases {
             attachments: BoundedVec::empty(),
             directives: IngressDirectives {
                 hop_count: mail.hop_count,
-                trace_channels: BoundedVec::parse("trace channels", mail.trace.clone())?,
+                trace_targets: BoundedVec::parse("trace channels", mail.trace.clone())?,
                 disposition,
-                source_channel_id: Some(mail.source_channel_id),
+                source_target: Some(mail.source_target),
                 target_thread_id: None,
                 reply_to_message_id: None,
                 // An agent answering another agent is machine-generated by construction; the guard
@@ -181,9 +127,10 @@ impl ThreadUseCases {
         Ok(InboundMessage::arriving(
             draft,
             routing,
-            IngressOrigin::InternalChannel {
-                company_id,
-                channel_id: mail.source_channel_id,
+            IngressOrigin::Internal {
+                company_id: source.company_id,
+                source_target: source.source_target,
+                agent_principal: source.agent_principal,
                 proof: mail.proof,
             },
         ))
@@ -193,27 +140,88 @@ impl ThreadUseCases {
     ///
     /// The sender address is checked against the channel the mail *claims* to come from, so a
     /// relayed message cannot borrow another channel's identity: the ingress guard trusts
-    /// [`IngressOrigin::InternalChannel`] absolutely, and this is what earns that trust.
+    /// [`IngressOrigin::Internal`] absolutely, and this is what earns that trust.
     async fn authorize_relay(
         &self,
         mail: &InternalRelayMail<'_>,
-    ) -> AppResult<Option<(ChannelSelector, Uuid)>> {
-        let Some(RelaySource {
-            channel: source,
-            company,
-        }) = self
-            .resolve_internal_destination(mail.source_channel_id, mail.target)
+    ) -> AppResult<(AddressSelector, crate::transport::AuthenticatedRelaySource)> {
+        let source = self
+            .committer
+            .authenticate_internal_relay(mail)
             .await?
-        else {
-            return Ok(None);
-        };
-        let expected_sender =
-            Channel::address_for(&source.slug, &company.slug, &self.settings.mail_domain);
-        if !mail.from.eq_ignore_ascii_case(&expected_sender) {
-            return Err(AppError::Internal(
-                "Internal sender address does not match its source channel".into(),
+            .ok_or_else(|| {
+                AppError::Forbidden("Internal source proof does not match its delivery".into())
+            })?;
+        let company = self
+            .company_persistence
+            .get_by_id(source.company_id)
+            .await?
+            .ok_or_else(|| AppError::Forbidden("Internal source company was not found".into()))?;
+        if !self.relay_sender_matches(mail, &source, &company).await? {
+            return Err(AppError::Forbidden(
+                "Internal sender address does not match its authority".into(),
             ));
         }
-        Ok(Some((mail.target.clone(), company.id)))
+        // The sender and frozen source are authenticated before any recipient lookup.
+        if mail
+            .target
+            .company()
+            .is_some_and(|slug| !company.slug.eq_ignore_ascii_case(slug))
+        {
+            return Err(AppError::Forbidden(
+                "Cross-company internal delivery is not allowed".into(),
+            ));
+        }
+        let address = self
+            .channel_persistence
+            .address_targets(company.id, std::slice::from_ref(mail.target.channel()))
+            .await?
+            .into_iter()
+            .next()
+            .ok_or_else(|| AppError::Forbidden("Platform address does not exist".into()))?;
+        if address.target == source.source_target {
+            return Err(AppError::Forbidden(
+                "An inbox cannot relay a message to itself".into(),
+            ));
+        }
+        if let AddressTarget::Desk(id) = address.target {
+            let target = self
+                .channel_persistence
+                .get_by_id(id)
+                .await?
+                .filter(|desk| desk.company_id == company.id && desk.enabled)
+                .ok_or_else(|| AppError::Forbidden("Internal target desk is unavailable".into()))?;
+            let _ = target;
+        }
+        Ok((mail.target.clone(), source))
+    }
+
+    async fn relay_sender_matches(
+        &self,
+        mail: &InternalRelayMail<'_>,
+        source: &crate::transport::AuthenticatedRelaySource,
+        company: &Company,
+    ) -> AppResult<bool> {
+        let mut targets = Vec::with_capacity(2);
+        if let AddressTarget::Desk(_) = source.source_target {
+            targets.push(source.source_target);
+        }
+        if let Some(agent) = source.agent_principal {
+            targets.push(AddressTarget::Principal(agent));
+        }
+        for target in targets {
+            if let Some(address) = self
+                .channel_persistence
+                .address_for_target(company.id, target)
+                .await?
+            {
+                let expected =
+                    Channel::address_for(&address.slug, &company.slug, &self.settings.mail_domain);
+                if mail.from.eq_ignore_ascii_case(&expected) {
+                    return Ok(true);
+                }
+            }
+        }
+        Ok(false)
     }
 }

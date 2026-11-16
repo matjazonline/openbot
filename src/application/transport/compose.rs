@@ -48,7 +48,7 @@ use crate::transport::ports::TransportRenderers;
 #[derive(Debug, Clone)]
 pub struct DeliveryRequest<'a> {
     pub company_id: Uuid,
-    pub channel_id: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     /// The canonical message this delivery exposes. Minted by the producer, which is what lets it
     /// write the message and the delivery in one transaction.
     pub message_id: CanonicalMessageId,
@@ -174,7 +174,7 @@ impl DeliveryComposer {
             delivery: NewDelivery {
                 id,
                 company_id: request.company_id,
-                channel_id: request.channel_id,
+                target: request.target,
                 message_id: request.message_id,
                 message_audience: MessageAudience::ExternalConversation,
                 source_binding_id: binding.id,
@@ -236,14 +236,14 @@ impl DeliveryComposer {
         transport: TransportKind,
     ) -> AppResult<ChannelBinding> {
         self.bindings
-            .active_bindings_for_channel(request.company_id, request.channel_id)
+            .active_bindings_for_target(request.company_id, request.target)
             .await?
             .into_iter()
             .find(|binding| binding.transport == transport)
             .ok_or_else(|| {
                 AppError::Internal(format!(
-                    "Channel {} has no active {transport} interface to deliver through",
-                    request.channel_id
+                    "Inbox {} has no active {transport} interface to deliver through",
+                    request.target
                 ))
             })
     }

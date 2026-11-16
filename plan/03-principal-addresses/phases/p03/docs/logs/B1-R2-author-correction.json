@@ -1,0 +1,46 @@
+{
+  "base_artifact": "63dc835d92424c643cafcea862aa1afd127e3d121f3f5c9e2de2a14c9a48f866",
+  "baseline": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa03-b1-r1-ftki0yks",
+  "changes": [
+    {
+      "path": "src/adapters/persistence/agent_direct_lifecycle_tests.rs",
+      "before_sha256": "27c0c4e21584e5e7fb1ab11908c09ea678ae158727b7063a0f9e77ba62f83885",
+      "after_sha256": "3ef2e18b889b81c4e58f7faf8b9c94c918fe935bbc8e0606b6904e14f7d30d31"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_agent_history_teardown_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "24ec094320b7d1bc31b3245fd4e94a36f5b3cc1804914b0a553949bdc5162010"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_tests.rs",
+      "before_sha256": "55f13eb4438ff4ae710a073f2b190550d09930c5b164f2feb3270b78d1bc79ee",
+      "after_sha256": "0b2127a2e18df4a1fc165404fd11284b97ca1b6acbc4bad023bcac4072879327"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_tests.rs",
+      "before_sha256": "439a28d40e59ab73f510c4b484f61d16d4e5e3228bd6aaca83b323f6a3294677",
+      "after_sha256": "100496917535ac5775d48c3efad4c1c789fba43d23ae6fe4bda889080430a506"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/relay_authority_race_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "5cbbe71511c0c88a349beca58a4447ee62dfe05bf64109ab00a3536a51e9e417"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/relay_identity_tests.rs",
+      "before_sha256": "c32ef9203459588c582a73537d97904d98f3d4ae18a195f982ecc94bd1d69ee0",
+      "after_sha256": "8ce3aa9b64128cecbfe593c97374a6284ee339c1982f25f0f3779c83efa38c39"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/relay_private_agent_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "aa8ecd114929e9cd38b3550201100564db6b613374fca8ec3ecf6f409f780c2d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/workflow_message_sender_tests.rs",
+      "before_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "after_sha256": "001a0f4543ce8b4d4a90286e1e0c3404e0deae19b4f57f5ac727e53e7efd84be"
+    }
+  ]
+}

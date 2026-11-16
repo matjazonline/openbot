@@ -29,6 +29,7 @@ async fn publish_after_park(
         scope.company.as_uuid(),
         skill.id,
         SkillWrite {
+            files: None,
             slug: skill.slug.as_str().into(),
             name: skill.name,
             description: skill.description,

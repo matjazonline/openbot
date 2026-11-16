@@ -133,6 +133,22 @@ fn restored_context(rows: &[Exchange], request: &Value) {
     assert!(!rows[2].input.to_string().contains(PRIVATE));
 }
 
+async fn current_calls(journey: &mut SalesJourney, expected: usize) -> Vec<Value> {
+    let observed = journey.d.llm.observed();
+    if observed.len() != expected {
+        let failures: Value = sqlx::query_scalar(
+            "SELECT COALESCE(jsonb_agg(jsonb_build_object('status',attempt.status,'failure',attempt.workflow_failure_code)), '[]'::jsonb) FROM task_attempts AS attempt JOIN background_tasks AS job ON job.id=attempt.task_id WHERE job.company_id=$1"
+        ).bind(journey.d.fixture.target.company.as_uuid()).fetch_one(journey.d.p().pool()).await.unwrap();
+        panic!(
+            "expected {expected} current model calls, got {}; facts={}; attempts={failures}; {}",
+            observed.len(),
+            journey.facts().await,
+            journey.d.diagnostics().await
+        );
+    }
+    observed
+}
+
 #[tokio::test]
 async fn agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_restricts_inspection()
  {
@@ -158,7 +174,7 @@ async fn agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_r
             .unwrap()
             .id;
     j.drive(1).await;
-    assert_eq!(j.d.llm.observed().len(), 2);
+    current_calls(&mut j, 2).await;
     assert_eq!(j.facts().await["content"], 5);
     let second =
         j.d.email(incoming(&j, &member, Turn::Public))
@@ -168,8 +184,7 @@ async fn agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_r
             .id;
     assert_eq!(second, first);
     j.drive(2).await;
-    let public = j.d.llm.observed();
-    assert_eq!(public.len(), 2);
+    let public = current_calls(&mut j, 2).await;
     assert!(public.iter().all(|request| {
         let value = request.to_string();
         !value.contains(PRIVATE) && !value.contains("P07_FLOOR_QUERY")
@@ -188,8 +203,7 @@ async fn agent_history_e2e_real_knowledge_cc_removal_restores_private_seed_and_r
         first
     );
     j.drive(3).await;
-    let restored = j.d.llm.observed();
-    assert_eq!(restored.len(), 1);
+    let restored = current_calls(&mut j, 1).await;
     let rows = exchanges(&j).await;
     restored_context(&rows, &restored[0]);
     restricted_inspection(

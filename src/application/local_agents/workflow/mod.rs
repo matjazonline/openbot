@@ -47,6 +47,7 @@ pub struct FrozenLocalRun {
     pub session_id: Option<SessionId>,
     pub approval: Option<Value>,
     pub selection: ExecutionSelection,
+    pub harness: crate::domain::local_agents::NativeHarnessSelection,
     pub deadline: DateTime<Utc>,
 }
 

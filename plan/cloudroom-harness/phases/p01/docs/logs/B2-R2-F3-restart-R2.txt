@@ -1,0 +1,33 @@
+
+ RUN  v4.1.1 /private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server
+
+ ❯ |@cloudroom/server| test/threads/required-agent-configuration.test.ts (7 tests | 1 failed | 6 skipped) 468ms
+   × retains required ownership and queued work after a real on-disk server restart without its plugin state 467ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |@cloudroom/server| test/threads/required-agent-configuration.test.ts > retains required ownership and queued work after a real on-disk server restart without its plugin state
+AssertionError: expected [Function] to throw error including 'Required agent configuration' but got 'This message cannot be sent yet: the …'
+
+Expected: "Required agent configuration"
+Received: "This message cannot be sent yet: the "Test Host" host is not ready."
+
+ ❯ test/threads/required-agent-configuration.test.ts:154:111
+    152|     expect(getRequiredAgentConfigurationOwner(second.db,thread.id)).to…
+    153|     expect(getQueuedThreadMessage(second.db,queued.id)).not.toBeNull();
+    154|     await expect(sendQueuedMessageNow(second.deps,{threadId:thread.id,…
+       |                                                                                                               ^
+    155|     expect(getQueuedThreadMessage(second.db,queued.id)).not.toBeNull();
+    156|     expect(listQueuedThreadCommands(second,"thread.start",thread.id)).…
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 6 skipped (7)
+   Start at  18:54:19
+   Duration  3.59s (transform 2.02s, setup 678ms, import 2.35s, tests 468ms, environment 0ms)
+
+undefined
+/private/tmp/openbot-cloudroom-harness-t1gfnhz1/cloudroom/gui/apps/server:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config vitest.config.ts test/threads/required-agent-configuration.test.ts -t real on-disk server restart

@@ -78,7 +78,8 @@ pub enum AgentBuiltinTool {
     MessageSend,
     MessageReply,
     ListCompanyAgents,
-    CreateAgentChannel,
+    CreateAgent,
+    CreateDeskForAgent,
     SearchKnowledge,
     /// The memory service tools (phase 05 E5), offered only while memory is enabled.
     SearchMemory,
@@ -94,7 +95,8 @@ impl AgentBuiltinTool {
             Self::MessageSend => "message.send",
             Self::MessageReply => "message.reply",
             Self::ListCompanyAgents => "list_company_agents",
-            Self::CreateAgentChannel => "create_agent_channel",
+            Self::CreateAgent => "create_agent",
+            Self::CreateDeskForAgent => "create_desk_for_agent",
             Self::SearchKnowledge => "search_knowledge",
             Self::SearchMemory => "search_memory",
             Self::MemoryTimeline => "memory_timeline",
@@ -109,7 +111,8 @@ impl AgentBuiltinTool {
             "message.send" => Some(Self::MessageSend),
             "message.reply" => Some(Self::MessageReply),
             "list_company_agents" => Some(Self::ListCompanyAgents),
-            "create_agent_channel" => Some(Self::CreateAgentChannel),
+            "create_agent" => Some(Self::CreateAgent),
+            "create_desk_for_agent" => Some(Self::CreateDeskForAgent),
             "search_knowledge" => Some(Self::SearchKnowledge),
             "search_memory" => Some(Self::SearchMemory),
             "memory_timeline" => Some(Self::MemoryTimeline),
@@ -121,7 +124,10 @@ impl AgentBuiltinTool {
         }
     }
     pub const fn is_provisioning(self) -> bool {
-        matches!(self, Self::ListCompanyAgents | Self::CreateAgentChannel)
+        matches!(
+            self,
+            Self::ListCompanyAgents | Self::CreateAgent | Self::CreateDeskForAgent
+        )
     }
     pub const fn is_memory(self) -> bool {
         matches!(

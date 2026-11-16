@@ -24,12 +24,13 @@ use uuid::Uuid;
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         correlation::CorrelationId,
         message::CanonicalMessageId,
         transport::{
             ChannelBindingId, DeliveryCancellation, DeliveryCancellationReason, DeliveryId,
             DeliveryPartId, DeliveryPartStatus, DeliveryPurpose, DeliveryStatus,
-            ExternalDestination, ExternalMessageKey, FailureClass, TransportKind,
+            ExternalDestination, ExternalMessageKey, FailureClass, PrincipalId, TransportKind,
         },
     },
     transport::{
@@ -41,7 +42,7 @@ use crate::{
 
 /// The columns every read of a delivery selects, named once so the claim, the paging read and the
 /// single-row read cannot select different shapes.
-pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, message_id,
+pub(crate) const DELIVERY_COLUMNS: &str = r#"id, company_id, channel_id, principal_id, message_id,
     source_binding_id, destination_binding_id, external_destination, depends_on_delivery_id, correlation_id, transport, purpose, idempotency_key, status,
     attempt_count, max_attempts, available_at, last_error_class, last_error_detail,
     execution_id, owner_worker_id, locked_at, lock_expires_at, delivered_at,
@@ -143,6 +144,7 @@ pub(crate) struct DeliveryDb {
     pub id: Uuid,
     pub company_id: Uuid,
     pub channel_id: Option<Uuid>,
+    pub principal_id: Option<Uuid>,
     pub message_id: Option<Uuid>,
     pub source_binding_id: Option<Uuid>,
     pub destination_binding_id: Option<Uuid>,
@@ -225,20 +227,24 @@ impl DeliveryDb {
                 ))
             })?;
         let attribution = match (
-            self.channel_id,
+            AddressTarget::from_parts(self.channel_id, self.principal_id.map(PrincipalId::new)),
             self.message_id,
             self.source_binding_id,
             self.destination_binding_id,
         ) {
-            (Some(channel), Some(message), Some(source), Some(destination)) => {
+            (Some(target), Some(message), Some(source), Some(destination)) => {
                 Some(DeliveryAttribution {
-                    channel_id: channel,
+                    target,
                     message_id: CanonicalMessageId::new(message),
                     source_binding_id: ChannelBindingId::new(source),
                     destination_binding_id: ChannelBindingId::new(destination),
                 })
             }
-            (None, None, None, None) => None,
+            (None, None, None, None)
+                if self.channel_id.is_none() && self.principal_id.is_none() =>
+            {
+                None
+            }
             _ => {
                 return Err(AppError::Internal(format!(
                     "Delivery {} has partial canonical attribution",

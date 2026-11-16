@@ -44,16 +44,18 @@ pub trait ThreadPersistence: Send + Sync {
     ) -> AppResult<std::collections::HashMap<Uuid, crate::entities::access_level::AccessLevel>>;
     async fn create_thread(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         subject: &str,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
 
-    async fn get_thread_by_id(&self, id: Uuid) -> AppResult<Option<Thread>>;
+    async fn get_thread_by_id(&self, company_id: Uuid, id: Uuid) -> AppResult<Option<Thread>>;
 
-    async fn list_threads_by_channel_id(
+    async fn list_threads_by_target(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         before: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>>;
@@ -74,20 +76,23 @@ pub trait ThreadPersistence: Send + Sync {
     /// reflected yet. `None` means from the start of the channel.
     async fn list_threads_updated_after(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         after: Option<ThreadCursor>,
         limit: usize,
     ) -> AppResult<Vec<Thread>>;
 
     async fn update_thread_participants(
         &self,
+        company_id: Uuid,
         id: Uuid,
         participant_emails: &[EmailAddress],
     ) -> AppResult<Thread>;
 
     async fn find_thread_by_thread_index(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         thread_index: &ThreadIndex,
     ) -> AppResult<Option<Thread>>;
 
@@ -107,7 +112,8 @@ pub trait ThreadPersistence: Send + Sync {
     /// Find the thread containing this message within a given channel, if any.
     async fn find_thread_for_message(
         &self,
-        channel_id: Uuid,
+        company_id: Uuid,
+        target: crate::entities::address::AddressTarget,
         message_id: CanonicalMessageId,
     ) -> AppResult<Option<Thread>>;
 

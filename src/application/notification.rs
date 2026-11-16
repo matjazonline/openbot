@@ -47,6 +47,8 @@ pub struct NotificationProjectionCommit<'a> {
     pub email: Option<&'a NewStandaloneDelivery>,
     /// The message key of an agent notice, minted by [`agent_notice_key`].
     pub agent_message_key: Option<&'a ExternalMessageKey>,
+    /// Current route rendered by its transport; never an authorization credential.
+    pub agent_recipient: Option<&'a crate::entities::transport::QualifiedIdentity>,
     /// Captured only when an escalation control creates its first hop.
     pub escalation_ack_hours: crate::application::workflow::binding::EscalationAckHours,
 }

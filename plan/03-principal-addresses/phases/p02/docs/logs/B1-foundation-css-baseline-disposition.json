@@ -1,0 +1,26 @@
+{
+  "classification": "confirmed inherited p01 generated-CSS mismatch; unrelated to B1 controls",
+  "baseline_profile_sha256": "dbbec5d479422f697bab1f3ea710300253308c06dd39dd92cd81ff594c0f6187",
+  "baseline_css_sha256": "ec104f55e6cbe856e03f489d61f2c1a867064517d64ef4c4f5bce2fc955fed80",
+  "generated_css_sha256": "f6933c505d2a1f727d3b7f1020aff15a42eba0b6fd1d1a43c854ba04644f7a17",
+  "added_tokens": [
+    [
+      ".pb-10{",
+      1
+    ],
+    [
+      "padding-bottom:calc(var(--spacing)*10)}",
+      1
+    ],
+    [
+      ".lg\\:px-10{",
+      1
+    ],
+    [
+      "padding-inline:calc(var(--spacing)*10)}",
+      1
+    ]
+  ],
+  "removed_tokens": [],
+  "disposition": "Restore only our regeneration delta; retain baseline stylesheet. p04 combined integration must regenerate CSS as already required. B1 controls use existing CSS utilities."
+}

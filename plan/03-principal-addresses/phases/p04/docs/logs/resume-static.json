@@ -1,0 +1,34 @@
+[
+  {
+    "command": [
+      "scripts/tests/deploy.sh"
+    ],
+    "exit": 0,
+    "log": "resume-static-1.txt"
+  },
+  {
+    "command": [
+      "scripts/tests/credential-key-rotation.sh"
+    ],
+    "exit": 0,
+    "log": "resume-static-2.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/tests/workflow-evidence.py"
+    ],
+    "exit": 0,
+    "log": "resume-static-3.txt"
+  },
+  {
+    "command": [
+      "python3",
+      "scripts/check-workflow-evidence.py",
+      "--tracked-manifests",
+      "--require-tracked"
+    ],
+    "exit": 0,
+    "log": "resume-static-4.txt"
+  }
+]

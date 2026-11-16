@@ -221,10 +221,12 @@ pub fn agent_usage_card(card: &AgentUsageCard<'_>) -> String {
                 },
                 association = escape_html_text(&match summary.association {
                     RelatedAssociation::Company => "Company-wide".to_owned(),
+                    RelatedAssociation::Principal(_) => "Direct address".to_owned(),
                     RelatedAssociation::Channel(_) => format!(
                         "Desk {}",
                         binding.channel_name.as_deref().unwrap_or("(unnamed)")
                     ),
+                    RelatedAssociation::Thread { target: crate::entities::address::AddressTarget::Principal(_), .. } => "A direct thread".to_owned(),
                     RelatedAssociation::Thread { .. } => format!(
                         "One thread of desk {}",
                         binding.channel_name.as_deref().unwrap_or("(unnamed)")

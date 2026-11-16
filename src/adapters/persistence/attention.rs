@@ -22,6 +22,7 @@ struct AttentionRow {
     source_id: Uuid,
     company_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     run_id: Option<Uuid>,
     correlation_id: Option<Uuid>,
@@ -49,7 +50,16 @@ impl TryFrom<AttentionRow> for AttentionItem {
             source_kind: row.source_kind.parse().map_err(AppError::Internal)?,
             source_id: row.source_id,
             company_id: row.company_id,
-            channel_id: row.channel_id,
+            target: match (row.channel_id, row.principal_id) {
+                (None, None) => None,
+                (desk, principal) => Some(
+                    crate::entities::address::AddressTarget::from_parts(
+                        desk,
+                        principal.map(PrincipalId::new),
+                    )
+                    .ok_or_else(|| AppError::Internal("Invalid attention target".into()))?,
+                ),
+            },
             thread_id: row.thread_id,
             run_id: row.run_id,
             correlation_id: row.correlation_id.map(CorrelationId::from),
@@ -98,7 +108,7 @@ WITH params AS (
     -- probed on the reviewer key, so the work stays bounded by open decisions however many the
     -- viewer has reviewed before.
     SELECT 'decision'::text AS source_kind, decision.id AS source_id, decision.company_id,
-           run.channel_id, run.thread_id, run.id AS run_id, run.correlation_id,
+           run.channel_id, run.principal_id, run.thread_id, run.id AS run_id, run.correlation_id,
            'open'::text AS state,
            viewer.id AS responsible_principal_id, 'principal'::text AS responsibility_kind,
            viewer.display_label AS responsibility_label,
@@ -126,12 +136,14 @@ WITH params AS (
     WHERE $4 = 'my_work' AND viewer.company_id = $1 AND viewer.id = $3
       AND viewer.kind = 'person'
       AND decision.submitted_at IS NULL AND wait.state = 'waiting'
-      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
+      AND (run.channel_id = ANY($2)
+           OR ($15 AND principal_direct_can_view(run.company_id,run.principal_id,$3))
+           OR (run.channel_id IS NULL AND run.principal_id IS NULL AND $14))
 
     UNION ALL
 
     -- Team work: every open decision, one row each, whoever reviews it.
-    SELECT 'decision', decision.id, decision.company_id, run.channel_id, run.thread_id, run.id,
+    SELECT 'decision', decision.id, decision.company_id, run.channel_id, run.principal_id, run.thread_id, run.id,
            run.correlation_id, 'open', NULL::uuid, 'channel_team',
            (SELECT CASE COUNT(*) WHEN 1 THEN '1 reviewer' ELSE COUNT(*) || ' reviewers' END
             FROM workflow_decision_reviewers AS reviewer
@@ -155,14 +167,16 @@ WITH params AS (
       ON version.company_id = run.company_id AND version.id = run.version_id
     WHERE $4 = 'team_work' AND decision.company_id = $1
       AND decision.submitted_at IS NULL AND wait.state = 'waiting'
-      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
+      AND (run.channel_id = ANY($2)
+           OR ($15 AND principal_direct_can_view(run.company_id,run.principal_id,$3))
+           OR (run.channel_id IS NULL AND run.principal_id IS NULL AND $14))
 
     UNION ALL
 
     -- One current assignment in Team work; assigned people (or the final company owner)
     -- also see it in My work. Historical/settled assignments never reappear.
     SELECT 'escalation_decision', assignment.id, assignment.company_id,
-           COALESCE(run.channel_id, refusal.channel_id), COALESCE(run.thread_id, refusal.thread_id),
+           COALESCE(run.channel_id, refusal.channel_id), COALESCE(run.principal_id, refusal.principal_id), COALESCE(run.thread_id, refusal.thread_id),
            run.id, run.correlation_id, progress.state,
            CASE WHEN $4='my_work' THEN viewer.id ELSE NULL::uuid END,
            CASE WHEN $4='my_work' THEN 'principal' ELSE 'channel_team' END,
@@ -186,7 +200,9 @@ WITH params AS (
     WHERE progress.company_id=$1 AND progress.state IN ('waiting','manual','owner_waiting')
       AND assignment.settled_at IS NULL AND $4 IN ('my_work','team_work')
       AND (COALESCE(run.channel_id,refusal.channel_id)=ANY($2)
-           OR (COALESCE(run.channel_id,refusal.channel_id) IS NULL AND $14))
+           OR ($15 AND principal_direct_can_view(progress.company_id,COALESCE(run.principal_id,refusal.principal_id),$3))
+           OR (COALESCE(run.channel_id,refusal.channel_id) IS NULL
+               AND COALESCE(run.principal_id,refusal.principal_id) IS NULL AND $14))
       AND ($4='team_work'
            OR (progress.state='owner_waiting' AND viewer.user_id=company.user_id AND member.role='owner')
            OR (progress.state<>'owner_waiting' AND EXISTS (
@@ -196,9 +212,9 @@ WITH params AS (
 
     UNION ALL
 
-    SELECT 'run_reconciliation', run.id, run.company_id, run.channel_id, run.thread_id, run.id,
+    SELECT 'run_reconciliation', run.id, run.company_id, run.channel_id, run.principal_id, run.thread_id, run.id,
            run.correlation_id, run.state, NULL::uuid, 'channel_team',
-           CASE WHEN run.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
+           CASE WHEN run.principal_id IS NOT NULL THEN 'Direct inbox' WHEN run.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
            version.title, 'Check whether the uncertain action took effect', 'normal',
            run.deadline, NULL::timestamptz, run.revision, run.created_at, run.created_at
     FROM workflow_runs AS run
@@ -206,16 +222,18 @@ WITH params AS (
       ON version.company_id = run.company_id AND version.id = run.version_id
     WHERE $4 <> 'my_work' AND run.company_id = $1
       AND run.state = 'waiting' AND run.waiting_reason = 'reconciliation'
-      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
+      AND (run.channel_id = ANY($2)
+           OR ($15 AND principal_direct_can_view(run.company_id,run.principal_id,$3))
+           OR (run.channel_id IS NULL AND run.principal_id IS NULL AND $14))
 
     UNION ALL
 
     -- The run actor's work while they are a member; nobody's otherwise.
-    SELECT 'run_failure', run.id, run.company_id, run.channel_id, run.thread_id, run.id,
+    SELECT 'run_failure', run.id, run.company_id, run.channel_id, run.principal_id, run.thread_id, run.id,
            run.correlation_id, run.state, actor.id,
            CASE WHEN actor.id IS NULL THEN 'channel_team' ELSE 'principal' END,
            COALESCE(actor.display_label,
-                    CASE WHEN run.channel_id IS NULL THEN 'Owners and admins'
+                    CASE WHEN run.principal_id IS NOT NULL THEN 'Direct inbox' WHEN run.channel_id IS NULL THEN 'Owners and admins'
                          ELSE 'Channel team' END),
            version.title,
            CASE WHEN refusal.workflow_failure_code = 'knowledge.audience_below_content'
@@ -250,7 +268,9 @@ WITH params AS (
       AND run.created_at >= params.as_of - interval '7 days'
       AND NOT EXISTS (SELECT 1 FROM workflow_runs AS rerun
                       WHERE rerun.company_id = run.company_id AND rerun.rerun_of_run_id = run.id)
-      AND (run.channel_id = ANY($2) OR (run.channel_id IS NULL AND $14))
+      AND (run.channel_id = ANY($2)
+           OR ($15 AND principal_direct_can_view(run.company_id,run.principal_id,$3))
+           OR (run.channel_id IS NULL AND run.principal_id IS NULL AND $14))
       AND ($4 <> 'my_work' OR actor.id = $3)
       AND ($4 <> 'unassigned' OR actor.id IS NULL)
 
@@ -258,9 +278,9 @@ WITH params AS (
 
     -- One row per binding. Refusals create no run and no event, so this refreshes on the page's
     -- periodic tick.
-    SELECT 'binding_refusal', binding.id, binding.company_id, binding.channel_id, NULL::uuid,
+    SELECT 'binding_refusal', binding.id, binding.company_id, binding.channel_id, binding.principal_id, NULL::uuid,
            NULL::uuid, NULL::uuid, 'refused', NULL::uuid, 'channel_team',
-           CASE WHEN binding.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
+           CASE WHEN binding.principal_id IS NOT NULL THEN 'Direct inbox' WHEN binding.channel_id IS NULL THEN 'Owners and admins' ELSE 'Channel team' END,
            COALESCE(version.title, 'Workflow binding'),
            refusal.refused || CASE WHEN refusal.refused = 1 THEN ' refusal' ELSE ' refusals' END
                || ' in the last 7 days; latest: ' || refusal.latest_reason,
@@ -296,13 +316,15 @@ WITH params AS (
     LEFT JOIN workflow_versions AS version
       ON version.company_id = revision.company_id AND version.id = revision.version_id
     WHERE $4 = 'team_work'
-      AND (binding.channel_id = ANY($2) OR (binding.channel_id IS NULL AND $14))
+      AND (binding.channel_id = ANY($2)
+           OR ($15 AND principal_direct_can_view(binding.company_id,binding.principal_id,$3))
+           OR (binding.channel_id IS NULL AND binding.principal_id IS NULL AND $14))
 
     UNION ALL
 
     -- A workflow delivery is its run actor's work while they are a member; any other company
     -- delivery (a person's mailbox send) is the channel team's.
-    SELECT 'delivery_failure', delivery.id, delivery.company_id, delivery.channel_id,
+    SELECT 'delivery_failure', delivery.id, delivery.company_id, delivery.channel_id, delivery.principal_id,
            destination.thread_id, run.id, delivery.correlation_id, delivery.status, actor.id,
            CASE WHEN actor.id IS NULL THEN 'channel_team' ELSE 'principal' END,
            COALESCE(actor.display_label, 'Channel team'),
@@ -323,7 +345,8 @@ WITH params AS (
      AND actor.kind = 'person'
      AND EXISTS (SELECT 1 FROM company_members AS member
                  WHERE member.company_id = run.company_id AND member.user_id = run.actor_id)
-    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+    WHERE delivery.company_id = $1 AND (delivery.channel_id = ANY($2)
+      OR ($15 AND principal_direct_can_view(delivery.company_id,delivery.principal_id,$3)))
       AND delivery.status IN ('outcome_unknown', 'dead_letter')
       AND delivery.last_error_class IS DISTINCT FROM 'superseded'
       AND ($4 <> 'my_work' OR actor.id = $3)
@@ -359,7 +382,7 @@ ORDER BY due_rank, priority_rank, created_at, source_kind, source_id
 LIMIT $13
 "#;
 
-/// Bind a feed statement to the fourteen parameters `query` implies, examining at most
+/// Bind a feed statement to the fifteen parameters `query` implies, examining at most
 /// `working_set` eligible rows after the cursor.
 ///
 /// Takes the statement rather than naming `ATTENTION_SQL` so a test can hold a reference
@@ -392,6 +415,7 @@ fn bind_attention<'q>(
         .bind((working_set + 1) as i64)
         .bind((query.clamped_limit() + 1) as i64)
         .bind(query.company_items)
+        .bind(query.direct_items)
 }
 
 /// Stable destinations; their routes independently authorize company and channel access.
@@ -487,6 +511,7 @@ impl AttentionPersistence for PostgresPersistence {
         &self,
         company_id: Uuid,
         visible_channel_ids: &[Uuid],
+        viewer: PrincipalId,
     ) -> AppResult<OperationalSummary> {
         #[derive(sqlx::FromRow)]
         struct SummaryRow {
@@ -511,7 +536,9 @@ impl AttentionPersistence for PostgresPersistence {
                    ON run.company_id = decision.company_id AND run.id = decision.run_id
                  WHERE decision.company_id = $1 AND decision.submitted_at IS NULL
                    AND wait.state = 'waiting'
-                    AND (run.channel_id = ANY($2) OR run.channel_id IS NULL)
+                    AND (run.channel_id = ANY($2)
+                           OR principal_direct_can_view(run.company_id,run.principal_id,$3)
+                           OR (run.channel_id IS NULL AND run.principal_id IS NULL))
                   UNION ALL
                   SELECT assignment.created_at
                   FROM workflow_escalation_progress AS progress
@@ -525,7 +552,9 @@ impl AttentionPersistence for PostgresPersistence {
                   WHERE progress.company_id=$1 AND progress.state IN ('waiting','manual','owner_waiting')
                     AND assignment.settled_at IS NULL
                     AND (COALESCE(run.channel_id,refusal.channel_id)=ANY($2)
-                         OR COALESCE(run.channel_id,refusal.channel_id) IS NULL)
+                         OR principal_direct_can_view(progress.company_id,COALESCE(run.principal_id,refusal.principal_id),$3)
+                         OR (COALESCE(run.channel_id,refusal.channel_id) IS NULL
+                             AND COALESCE(run.principal_id,refusal.principal_id) IS NULL))
                )
                SELECT clock.as_of,
                  (SELECT COUNT(*) FROM open_decisions) AS open_decision_count,
@@ -534,7 +563,9 @@ impl AttentionPersistence for PostgresPersistence {
                  (SELECT COUNT(*) FROM workflow_runs AS run
                     WHERE run.company_id = $1 AND run.state = 'waiting'
                       AND run.waiting_reason = 'reconciliation'
-                      AND (run.channel_id = ANY($2) OR run.channel_id IS NULL))
+                      AND (run.channel_id = ANY($2)
+                           OR principal_direct_can_view(run.company_id,run.principal_id,$3)
+                           OR (run.channel_id IS NULL AND run.principal_id IS NULL)))
                     AS runs_awaiting_reconciliation,
                  (SELECT COUNT(*) FROM workflow_runs AS run
                     WHERE run.company_id = $1 AND run.state = 'failed'
@@ -542,7 +573,9 @@ impl AttentionPersistence for PostgresPersistence {
                       AND NOT EXISTS (SELECT 1 FROM workflow_runs AS rerun
                                       WHERE rerun.company_id = run.company_id
                                         AND rerun.rerun_of_run_id = run.id)
-                      AND (run.channel_id = ANY($2) OR run.channel_id IS NULL))
+                      AND (run.channel_id = ANY($2)
+                           OR principal_direct_can_view(run.company_id,run.principal_id,$3)
+                           OR (run.channel_id IS NULL AND run.principal_id IS NULL)))
                     AS failed_run_count,
                  (SELECT COUNT(*) FROM (
                       SELECT intent_binding.binding_id
@@ -558,10 +591,13 @@ impl AttentionPersistence for PostgresPersistence {
                     ) AS recent
                     JOIN workflow_bindings AS binding
                       ON binding.company_id = $1 AND binding.id = recent.binding_id
-                    WHERE binding.channel_id = ANY($2) OR binding.channel_id IS NULL)
+                    WHERE binding.channel_id = ANY($2)
+                       OR principal_direct_can_view(binding.company_id,binding.principal_id,$3)
+                       OR (binding.channel_id IS NULL AND binding.principal_id IS NULL))
                     AS binding_refusal_count,
                  (SELECT COUNT(*) FROM message_deliveries AS delivery
-                    WHERE delivery.company_id = $1 AND delivery.channel_id = ANY($2)
+                    WHERE delivery.company_id = $1 AND (delivery.channel_id = ANY($2)
+                      OR principal_direct_can_view(delivery.company_id,delivery.principal_id,$3))
                       AND delivery.status = 'dead_letter'
                       AND delivery.last_error_class IS DISTINCT FROM 'superseded')
                     AS permanent_delivery_failure_count
@@ -569,6 +605,7 @@ impl AttentionPersistence for PostgresPersistence {
         )
         .bind(company_id)
         .bind(visible_channel_ids)
+        .bind(viewer.as_uuid())
         .fetch_one(&self.pool)
         .await
         .map_err(AppError::from)?;

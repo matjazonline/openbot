@@ -1,22 +1,20 @@
 use super::*;
-use crate::adapters::persistence::channel_gate::{
-    ChannelGateAccess, ChannelGateKey, acquire_channel_gates_on,
-};
 use crate::adapters::persistence::workflow::{association, authority};
-use crate::application::workflow::{RelatedAssociation, RelatedChannelId, RelatedThreadId};
-use crate::entities::value_objects::EmailAddress;
+use crate::application::workflow::RelatedAssociation;
+use crate::entities::transport::PrincipalId;
+use crate::entities::value_objects::ChannelSlug;
 
 #[derive(Debug, Clone, PartialEq, Eq, sqlx::FromRow)]
 pub(super) struct Route {
     pub agent_id: Uuid,
-    pub desk_id: Uuid,
+    pub principal_id: Uuid,
     pub binding_id: Uuid,
     pub binding_revision: i64,
     pub run_as_user_id: Uuid,
     pub settings_revision: i64,
     pub transport_binding_id: Uuid,
     #[sqlx(try_from = "String")]
-    pub address: EmailAddress,
+    pub address_slug: ChannelSlug,
 }
 
 pub(super) async fn read_on(
@@ -25,8 +23,8 @@ pub(super) async fn read_on(
     principal: Uuid,
 ) -> AppResult<Option<Route>> {
     Ok(sqlx::query_as(
-        "SELECT agent_id,desk_id,binding_id,binding_revision,run_as_user_id, \
-        settings_revision,transport_binding_id,address FROM workflow_escalation_agent_route($1,$2)",
+        "SELECT agent_id,principal_id,binding_id,binding_revision,run_as_user_id, \
+        settings_revision,transport_binding_id,address_slug FROM workflow_escalation_agent_route($1,$2)",
     )
     .bind(event.company_id)
     .bind(principal)
@@ -45,19 +43,9 @@ pub(super) async fn lock_on(
     company: Uuid,
     hint: Option<&Route>,
 ) -> AppResult<Ownership> {
-    if let Some(route) = hint {
-        match acquire_channel_gates_on(
-            db,
-            [ChannelGateKey::new(company, route.desk_id)],
-            ChannelGateAccess::Admit,
-        )
-        .await
-        {
-            Ok(()) => {}
-            Err(AppError::DatabaseTimeout(_)) => return Ok(Ownership::Busy),
-            Err(error) => return Err(error),
-        }
-    }
+    sqlx::query("SET LOCAL lock_timeout = '5s'")
+        .execute(&mut *db)
+        .await?;
     match lock_rows_on(db, company, hint).await {
         Ok(owned) => Ok(if owned {
             Ownership::Owned
@@ -76,6 +64,17 @@ async fn lock_rows_on(
     company: Uuid,
     hint: Option<&Route>,
 ) -> Result<bool, sqlx::Error> {
+    if let Some(route) = hint {
+        let locked: Option<Uuid> =
+            sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND id=$2 FOR SHARE")
+                .bind(company)
+                .bind(route.principal_id)
+                .fetch_optional(&mut *db)
+                .await?;
+        if locked.is_none() {
+            return Ok(false);
+        }
+    }
     let accounts: Vec<_> = hint.iter().map(|route| route.run_as_user_id).collect();
     let locked: Vec<Uuid> =
         sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE NOWAIT")
@@ -107,19 +106,16 @@ pub(super) async fn eligible_on(
             db,
             company,
             actor,
-            RelatedAssociation::Channel(RelatedChannelId::new(route.desk_id)),
+            RelatedAssociation::Principal(PrincipalId::new(route.principal_id)),
         )
         .await?;
-        if let Some(channel) = scope.channel_id {
-            let association = match scope.thread_id {
-                Some(thread) => RelatedAssociation::Thread {
-                    channel_id: RelatedChannelId::new(channel),
-                    thread_id: RelatedThreadId::new(thread),
-                },
-                None => RelatedAssociation::Channel(RelatedChannelId::new(channel)),
-            };
-            association::authorize_association(db, company, actor, association).await?;
-        }
+        let source_association =
+            association::association_from_columns(association::AssociationColumns {
+                channel_id: scope.channel_id,
+                principal_id: scope.principal_id,
+                thread_id: scope.thread_id,
+            })?;
+        association::authorize_association(db, company, actor, source_association).await?;
         payload_access_on(db, &scope, actor).await
     }
     .await;

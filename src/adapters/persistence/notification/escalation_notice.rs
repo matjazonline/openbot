@@ -22,13 +22,23 @@ pub(super) async fn agent_disposition_on(
     if event.source_kind != NotificationSourceKind::EscalationNotice {
         return Ok(None);
     }
-    Ok(notice_on(db, event)
+    let Some(source) = notice_on(db, event)
         .await?
         .filter(|source| source.is_agent && source.active && !source.failed)
-        .map(|source| NotificationDisposition::Agent {
-            principal_id: source.principal_id,
-            company: source.company_slug.into(),
-        }))
+    else {
+        return Ok(None);
+    };
+    let address_slug: Option<String> =
+        sqlx::query_scalar("SELECT address_slug FROM workflow_escalation_agent_route($1,$2)")
+            .bind(event.company_id)
+            .bind(source.principal_id)
+            .fetch_optional(db)
+            .await?;
+    Ok(Some(NotificationDisposition::Agent {
+        principal_id: source.principal_id,
+        company: source.company_slug.into(),
+        address_slug: address_slug.map(Into::into),
+    }))
 }
 
 #[derive(sqlx::FromRow)]
@@ -104,7 +114,14 @@ pub(super) async fn source_on(
         SourceLifecycle::Withdrawn
     };
     Ok(Some(SourceSnapshot {
-        channel_id: scope.channel_id,
+        inbox: super::super::workflow::association::association_from_columns(
+            super::super::workflow::association::AssociationColumns {
+                channel_id: scope.channel_id,
+                principal_id: scope.principal_id,
+                thread_id: scope.thread_id,
+            },
+        )?
+        .target(),
         thread_id: scope.thread_id,
         run_id: scope.run_id,
         correlation_id: scope.correlation_id,

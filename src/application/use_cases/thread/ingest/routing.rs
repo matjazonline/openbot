@@ -8,10 +8,12 @@
 use std::collections::{HashMap, HashSet};
 
 use tracing::warn;
+use uuid::Uuid;
 
 use crate::{
     app_error::{AppError, AppResult},
     entities::{
+        address::AddressTarget,
         channel::Channel,
         company::Company,
         email_message::EmailMessageMetadata,
@@ -19,19 +21,19 @@ use crate::{
         participant::{PrincipalAccessContext, ThreadPrincipalRole},
         thread::Thread,
         transport::{
-            ChannelBindingId, ChannelSelector, DeliveryPurpose, QualifiedIdentity, TransportKind,
+            AddressSelector, ChannelBindingId, DeliveryPurpose, QualifiedIdentity, TransportKind,
         },
         value_objects::{ChannelSlug, EmailAddress},
     },
     transport::{
-        CanonicalContent, DeliveryContext, EmailDeliveryContext, EmailThreading, InboundDraft,
-        InboundRouting, PipelineStep, RecipientRole, StandaloneDeliveryRequest, SystemAddress,
-        ThreadTarget,
+        AddressedRecipient, CanonicalContent, DeliveryContext, EmailDeliveryContext,
+        EmailThreading, InboundDraft, InboundRouting, MessageDisposition, PipelineStep,
+        RecipientRole, StandaloneDeliveryRequest, SystemAddress, ThreadTarget,
     },
     use_cases::{
         channel::find_similar_channel_slugs,
         thread::{
-            BounceInfo, ChannelDirectoryEntry, ThreadUseCases,
+            AddressDirectoryEntry, BounceInfo, PrincipalRefusal, ThreadUseCases,
             ingest::{
                 commit::{PreparedChannel, PreparedChannels},
                 policy::{
@@ -55,7 +57,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub(crate) struct ChannelCandidate {
     pub company: Company,
-    pub channel: Channel,
+    pub inbox: super::super::Inbox,
     pub binding_id: ChannelBindingId,
     /// The slug the envelope actually named -- an alias, or the channel's canonical slug.
     pub matched_slug: ChannelSlug,
@@ -98,15 +100,34 @@ enum ThreadAccess {
 pub(crate) struct ThreadSender<'a> {
     pub handle: &'a QualifiedIdentity,
     pub context: PrincipalAccessContext,
+    origin: IngressOrigin,
 }
 
 impl<'a> ThreadSender<'a> {
     pub fn new(handle: &'a QualifiedIdentity, context: PrincipalAccessContext) -> Self {
-        Self { handle, context }
+        Self {
+            handle,
+            context,
+            origin: IngressOrigin::ExternalTransport,
+        }
     }
 
     pub fn address(self) -> &'a str {
         self.handle.subject().as_str()
+    }
+
+    fn principal_intent(
+        self,
+        identity: QualifiedIdentity,
+        role: ThreadPrincipalRole,
+    ) -> Option<crate::transport::ThreadPrincipalIntent> {
+        if self.origin.is_internal() && identity == *self.handle {
+            self.context.principal_id.map(|principal| {
+                crate::transport::ThreadPrincipalIntent::principal(principal, role)
+            })
+        } else {
+            Some(crate::transport::ThreadPrincipalIntent::new(identity, role))
+        }
     }
 
     /// Whether this sender is already a party to the thread. A handle that resolved to no
@@ -140,8 +161,10 @@ impl ThreadUseCases {
         let mut unauthorized = 0usize;
         let mut undeliverable = UndeliverableSlugs::default();
         let mut matched_company: Option<Company> = None;
+        self.load_addressed_namespace(routing, origin, directory)
+            .await?;
 
-        for (recipient, selectors) in routing.channel_pipelines() {
+        for (recipient, selectors) in routing.platform_pipelines() {
             let total = selectors.len();
             for (index, selector) in selectors.iter().enumerate() {
                 let Some(company) = self.selector_company(selector, origin, directory).await?
@@ -161,42 +184,44 @@ impl ThreadUseCases {
                 }
                 matched_company = Some(company.clone());
 
-                let available = directory.channels(company.id).await?;
                 let slug = selector.channel().clone();
-                let Some(channel) = available
-                    .iter()
-                    .find(|candidate| candidate.matches_slug(&slug))
-                    .cloned()
+                let context = match origin.internal_context() {
+                    Some(context) => context,
+                    None => directory.access_context(company.id, &draft.author).await?,
+                };
+                let Some(inbox) = self
+                    .addressed_inbox(
+                        company.id,
+                        &slug,
+                        recipient,
+                        context,
+                        directory,
+                        &mut undeliverable,
+                    )
+                    .await?
                 else {
+                    continue;
+                };
+                if !seen_channels.insert(inbox.target()) {
+                    continue;
+                }
+                let Some(binding_id) = self.inbound_binding(&company, &inbox).await? else {
+                    let available = directory.channels(company.id).await?;
                     undeliverable
                         .unknown(slug.clone(), find_similar_channel_slugs(&slug, &available));
                     continue;
                 };
-
-                // Disabled is undeliverable for everyone, so it is decided before the ACL, which
-                // rules only on *this sender's* access.
-                if !channel.enabled {
-                    warn!(channel_id = %channel.id, "Bouncing a message for a disabled channel");
-                    undeliverable.disabled(slug);
-                    continue;
-                }
-                if !seen_channels.insert(channel.id) {
-                    continue;
-                }
-
-                let binding_id = self.inbound_binding(&company, &channel).await?;
-                let context = directory.access_context(company.id, &draft.author).await?;
                 match self
-                    .authorize_channel(&channel, binding_id, draft, origin, context)
+                    .authorize_channel(&inbox, binding_id, draft, origin, context)
                     .await?
                 {
                     ChannelVerdict::Reject(rejection) => return Ok(Err(rejection)),
                     ChannelVerdict::Unauthorized => unauthorized += 1,
                     ChannelVerdict::Accept => {
-                        let access = channel.participant_access(context);
+                        let access = inbox.participant_access(context);
                         candidates.push(ChannelCandidate {
                             company: company.clone(),
-                            channel,
+                            inbox,
                             binding_id,
                             matched_slug: slug,
                             handle: recipient.handle.clone(),
@@ -230,11 +255,82 @@ impl ThreadUseCases {
         }))
     }
 
+    async fn addressed_inbox(
+        &self,
+        company_id: Uuid,
+        slug: &ChannelSlug,
+        recipient: &AddressedRecipient,
+        context: PrincipalAccessContext,
+        directory: &mut DirectoryCache<'_>,
+        undeliverable: &mut UndeliverableSlugs,
+    ) -> AppResult<Option<super::super::Inbox>> {
+        let target = directory.address_target(company_id, slug);
+        if let Some(AddressTarget::Principal(id)) = target {
+            let principal = self
+                .participant_persistence
+                .principal_by_id(company_id, id)
+                .await?;
+            let Some(principal) =
+                principal.filter(|principal| principal.direct_access(context).authorized)
+            else {
+                let available = directory.channels(company_id).await?;
+                undeliverable.unknown(slug.clone(), find_similar_channel_slugs(slug, &available));
+                return Ok(None);
+            };
+            if recipient.disposition == MessageDisposition::FileOnly {
+                undeliverable.principal(slug.clone(), PrincipalRefusal::ContextSuffix);
+                return Ok(None);
+            }
+            return Ok(Some(super::super::Inbox::Direct {
+                principal: Box::new(principal),
+                slug: slug.clone(),
+            }));
+        }
+        let available = directory.channels(company_id).await?;
+        let outcome = addressed_slug(
+            target,
+            &available,
+            slug,
+            recipient,
+            context.membership.is_team(),
+        );
+        Ok(record_undeliverable(undeliverable, slug.clone(), outcome)
+            .map(|desk| super::super::Inbox::Desk(Box::new(desk))))
+    }
+
     /// The company a selector names: the one it qualified, or -- for an unqualified selector, which
     /// only a trusted internal relay can produce -- the sender's own.
+    /// Read every slug this message names in each company it names, one statement per company,
+    /// so the whole message is routed against one snapshot of the address namespace.
+    async fn load_addressed_namespace(
+        &self,
+        routing: &InboundRouting,
+        origin: IngressOrigin,
+        directory: &mut DirectoryCache<'_>,
+    ) -> AppResult<()> {
+        let mut slugs: Vec<(Uuid, Vec<ChannelSlug>)> = Vec::new();
+        for (_, selectors) in routing.platform_pipelines() {
+            for selector in selectors {
+                let Some(company) = self.selector_company(selector, origin, directory).await?
+                else {
+                    continue;
+                };
+                let slug = selector.channel().clone();
+                match slugs.iter_mut().find(|(id, _)| *id == company.id) {
+                    Some((_, named)) => named.push(slug),
+                    None => slugs.push((company.id, vec![slug])),
+                }
+            }
+        }
+        for (company_id, named) in slugs {
+            directory.load_addresses(company_id, &named).await?;
+        }
+        Ok(())
+    }
+
     async fn selector_company(
         &self,
-        selector: &ChannelSelector,
+        selector: &AddressSelector,
         origin: IngressOrigin,
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<Option<Company>> {
@@ -255,20 +351,22 @@ impl ThreadUseCases {
     async fn inbound_binding(
         &self,
         company: &Company,
-        channel: &Channel,
-    ) -> AppResult<ChannelBindingId> {
-        self.binding_persistence
-            .active_bindings_for_channel(company.id, channel.id)
+        inbox: &super::super::Inbox,
+    ) -> AppResult<Option<ChannelBindingId>> {
+        let binding = self
+            .binding_persistence
+            .active_bindings_for_target(company.id, inbox.target())
             .await?
             .iter()
             .find(|binding| binding.transport == TransportKind::Email)
-            .map(|binding| binding.id)
-            .ok_or_else(|| {
-                AppError::Internal(format!(
-                    "Channel '{}' has no active email interface to receive mail on",
-                    channel.slug
-                ))
-            })
+            .map(|binding| binding.id);
+        if binding.is_none() && inbox.desk().is_some() {
+            return Err(AppError::Internal(format!(
+                "Channel '{}' has no active email interface to receive mail on",
+                inbox.slug()
+            )));
+        }
+        Ok(binding)
     }
 
     /// Phase 3: loop protection, ACL and spam scoring for one candidate channel.
@@ -277,7 +375,7 @@ impl ThreadUseCases {
     /// directory outage must not read as "this sender is an outsider".
     async fn authorize_channel(
         &self,
-        channel: &Channel,
+        inbox: &super::super::Inbox,
         binding_id: ChannelBindingId,
         draft: &InboundDraft,
         origin: IngressOrigin,
@@ -286,18 +384,23 @@ impl ThreadUseCases {
         let sender = ThreadSender::new(&draft.author, context);
 
         // A channel never appears twice in one relay trace: that is a routing cycle.
-        if origin.is_internal() && draft.directives.trace_channels.contains(&channel.id) {
-            warn!(channel_id = %channel.id, "Refusing an inter-channel routing cycle");
+        if origin.is_internal() && draft.directives.trace_targets.contains(&inbox.target()) {
+            warn!(target = ?inbox.target(), "Refusing a routing cycle");
             return Ok(ChannelVerdict::Reject(IngestRejection::LoopCycle));
         }
 
-        let access = channel.participant_access(context);
+        let access = inbox.participant_access(context);
 
         // Someone who isn't on the channel ACL may still be a party to an existing thread.
         let mut thread_authorized = false;
-        if !access.authorized && !origin.is_internal() {
+        if !access.authorized && !origin.is_internal() && inbox.desk().is_some() {
             match self
-                .thread_access_for(channel, binding_id, draft, sender)
+                .thread_access_for(
+                    inbox.desk().expect("desk branch"),
+                    binding_id,
+                    draft,
+                    sender,
+                )
                 .await?
             {
                 ThreadAccess::Denied => {}
@@ -305,13 +408,13 @@ impl ThreadUseCases {
             }
         }
 
-        if !access.authorized && !thread_authorized && !origin.is_internal() {
-            warn!(channel_id = %channel.id, "Sender is not authorized for this channel");
+        if !access.authorized && !thread_authorized {
+            warn!(target = ?inbox.target(), "Sender is not authorized for this inbox");
             return Ok(ChannelVerdict::Unauthorized);
         }
 
         if exceeds_spam_threshold(&draft.policy, access, self.settings.max_spam_score) {
-            warn!(channel_id = %channel.id, "Refusing a message over the spam-score threshold");
+            warn!(target = ?inbox.target(), "Refusing a message over the spam-score threshold");
             return Ok(ChannelVerdict::Reject(IngestRejection::SpamScore));
         }
 
@@ -328,7 +431,12 @@ impl ThreadUseCases {
         sender: ThreadSender<'_>,
     ) -> AppResult<ThreadAccess> {
         let Some(thread) = self
-            .find_ancestor_thread(channel, binding_id, draft)
+            .find_ancestor_thread(
+                channel.company_id,
+                AddressTarget::Desk(channel.id),
+                binding_id,
+                draft,
+            )
             .await?
         else {
             return Ok(ThreadAccess::Denied);
@@ -353,9 +461,9 @@ impl ThreadUseCases {
         if let Some(target_thread_id) = draft.directives.target_thread_id
             && let Some(thread) = self
                 .thread_persistence
-                .get_thread_by_id(target_thread_id)
+                .get_thread_by_id(candidate.company.id, target_thread_id)
                 .await?
-            && thread.channel_id == candidate.channel.id
+            && thread.belongs_to(candidate.company.id, candidate.inbox.target())
         {
             return Ok(Some(thread));
         }
@@ -363,9 +471,13 @@ impl ThreadUseCases {
         if let Some(reply_to_id) = draft.directives.reply_to_message_id
             && let Some(thread) = self
                 .thread_persistence
-                .find_thread_for_message(candidate.channel.id, reply_to_id)
+                .find_thread_for_message(
+                    candidate.company.id,
+                    candidate.inbox.target(),
+                    reply_to_id,
+                )
                 .await?
-            && thread.channel_id == candidate.channel.id
+            && thread.belongs_to(candidate.company.id, candidate.inbox.target())
         {
             return Ok(Some(thread));
         }
@@ -374,14 +486,22 @@ impl ThreadUseCases {
             .correlation_store
             .thread_for_thread_keys(candidate.binding_id, &draft.reply_thread_keys)
             .await?
-            && let Some(thread) = self.thread_persistence.get_thread_by_id(thread_id).await?
-            && thread.channel_id == candidate.channel.id
+            && let Some(thread) = self
+                .thread_persistence
+                .get_thread_by_id(candidate.company.id, thread_id)
+                .await?
+            && thread.belongs_to(candidate.company.id, candidate.inbox.target())
         {
             return Ok(Some(thread));
         }
 
         if let Some(thread) = self
-            .find_ancestor_thread(&candidate.channel, candidate.binding_id, draft)
+            .find_ancestor_thread(
+                candidate.company.id,
+                candidate.inbox.target(),
+                candidate.binding_id,
+                draft,
+            )
             .await?
         {
             return Ok(Some(thread));
@@ -393,16 +513,17 @@ impl ThreadUseCases {
         };
         Ok(self
             .thread_persistence
-            .find_thread_by_thread_index(candidate.channel.id, &index)
+            .find_thread_by_thread_index(candidate.company.id, candidate.inbox.target(), &index)
             .await?
-            .filter(|thread| thread.channel_id == candidate.channel.id))
+            .filter(|thread| thread.belongs_to(candidate.company.id, candidate.inbox.target())))
     }
 
     /// The thread already holding one of the messages this one names -- including itself, so a
     /// redelivery lands back where its first delivery did -- nearest ancestor first.
     async fn find_ancestor_thread(
         &self,
-        channel: &Channel,
+        company_id: Uuid,
+        target: AddressTarget,
         binding_id: ChannelBindingId,
         draft: &InboundDraft,
     ) -> AppResult<Option<Thread>> {
@@ -419,9 +540,9 @@ impl ThreadUseCases {
         };
         Ok(self
             .thread_persistence
-            .get_thread_by_id(thread_id)
+            .get_thread_by_id(company_id, thread_id)
             .await?
-            .filter(|thread| thread.channel_id == channel.id))
+            .filter(|thread| thread.belongs_to(company_id, target)))
     }
 
     /// Phases 4 and 5: give every authorized channel a thread and decide what it may do.
@@ -430,12 +551,21 @@ impl ThreadUseCases {
         draft: &InboundDraft,
         routing: &InboundRouting,
         resolved: &ResolvedAddresses,
+        origin: IngressOrigin,
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<Result<PreparedChannels, IngestRejection>> {
-        let sender_context = directory
-            .access_context(resolved.company.id, &draft.author)
-            .await?;
-        let sender = ThreadSender::new(&draft.author, sender_context);
+        let sender_context = match origin.internal_context() {
+            Some(context) => context,
+            None => {
+                directory
+                    .access_context(resolved.company.id, &draft.author)
+                    .await?
+            }
+        };
+        let sender = ThreadSender {
+            origin,
+            ..ThreadSender::new(&draft.author, sender_context)
+        };
         let third_parties = third_party_handles(routing, sender.handle);
 
         let mut existing_threads = Vec::with_capacity(resolved.candidates.len());
@@ -520,19 +650,25 @@ impl ThreadUseCases {
 
         // A third party joins the thread only when the sender is trusted *and* the channel
         // permits it: the flag can narrow who gets pulled in, never widen it.
-        let pull_third_parties = candidate.access.trusted && candidate.channel.add_3rd_party;
+        let pull_third_parties = candidate.access.trusted
+            && candidate
+                .inbox
+                .desk()
+                .is_some_and(|desk| desk.add_3rd_party);
         let participant_identities =
             thread_participants(&[], sender.handle, third_parties, true, pull_third_parties);
         let mut principals = Vec::with_capacity(participant_identities.len() + 1);
         for identity in participant_identities {
             if matches!(target, ThreadTarget::Create { .. }) && identity == draft.author {
-                principals.push(crate::transport::ThreadPrincipalIntent::new(
-                    identity.clone(),
-                    ThreadPrincipalRole::Author,
-                ));
+                principals
+                    .extend(sender.principal_intent(identity.clone(), ThreadPrincipalRole::Author));
             }
-            principals.push(crate::transport::ThreadPrincipalIntent::new(
-                identity,
+            principals.extend(sender.principal_intent(identity, ThreadPrincipalRole::Participant));
+        }
+
+        if let AddressTarget::Principal(principal) = candidate.inbox.target() {
+            principals.push(crate::transport::ThreadPrincipalIntent::principal(
+                principal,
                 ThreadPrincipalRole::Participant,
             ));
         }
@@ -580,6 +716,7 @@ impl ThreadUseCases {
                 sender.address()
             ))],
             disabled_slugs: vec![],
+            principals: vec![],
             suggestions: vec![],
             // This bounce fires *because* the sender has no standing on the thread, so it must not
             // hand them the company's channel directory.
@@ -623,18 +760,20 @@ impl ThreadUseCases {
 
     /// Whether the body names the channel, an alias, its address, or the handle it was reached at.
     fn channel_was_mentioned(&self, candidate: &ChannelCandidate, body: &str) -> bool {
-        let canonical_address = candidate
-            .channel
-            .inbound_address(&candidate.company.slug, &self.settings.mail_domain);
+        let canonical_address = crate::entities::address::address_for(
+            candidate.inbox.slug(),
+            &candidate.company.slug,
+            &self.settings.mail_domain,
+        );
         body_mentions_email(body, candidate.handle.subject().as_str())
             || body_mentions_email(body, &canonical_address)
             || body_mentions_slug(body, &candidate.matched_slug)
-            || body_mentions_slug(body, &candidate.channel.slug)
-            || candidate
-                .channel
-                .alias_slugs
-                .iter()
-                .any(|slug| body_mentions_slug(body, slug))
+            || body_mentions_slug(body, candidate.inbox.slug())
+            || candidate.inbox.desk().is_some_and(|desk| {
+                desk.alias_slugs
+                    .iter()
+                    .any(|slug| body_mentions_slug(body, slug))
+            })
     }
 
     /// The bounce an undeliverable address earns, with the directory the sender is allowed to see.
@@ -647,7 +786,7 @@ impl ThreadUseCases {
         directory: &mut DirectoryCache<'_>,
     ) -> AppResult<IngestRejection> {
         let available_channels = self
-            .writable_channel_directory(company, &draft.author, directory)
+            .writable_address_directory(company, &draft.author, directory)
             .await?;
         Ok(IngestRejection::Undeliverable(Box::new(
             UndeliverableReason {
@@ -669,12 +808,12 @@ impl ThreadUseCases {
     /// channel name must not learn the company's directory from the bounce they earn. Eligibility
     /// is decided by [`Channel::participant_access`] -- the same predicate the delivery path
     /// applies -- so the list can never advertise an address that would bounce in turn.
-    pub(crate) async fn writable_channel_directory(
+    pub(crate) async fn writable_address_directory(
         &self,
         company: &Company,
         sender: &QualifiedIdentity,
         directory: &mut DirectoryCache<'_>,
-    ) -> AppResult<Vec<ChannelDirectoryEntry>> {
+    ) -> AppResult<Vec<AddressDirectoryEntry>> {
         let context = directory.access_context(company.id, sender).await?;
         if !context.membership.is_team() {
             return Ok(Vec::new());
@@ -700,7 +839,8 @@ impl ThreadUseCases {
                 .map(|(rank, name)| (*rank, name.clone()));
             entries.push((
                 owner.as_ref().map_or(usize::MAX, |(rank, _)| *rank),
-                ChannelDirectoryEntry {
+                AddressDirectoryEntry {
+                    target: crate::entities::address::AddressTarget::Desk(channel.id),
                     address: channel.inbound_address(&company.slug, &self.settings.mail_domain),
                     name: channel.name.clone(),
                     description: channel.description.clone(),
@@ -709,7 +849,35 @@ impl ThreadUseCases {
             ));
         }
         entries.sort_by(|a, b| (a.0, &a.1.address).cmp(&(b.0, &b.1.address)));
-        Ok(entries.into_iter().map(|(_, entry)| entry).collect())
+        let mut entries: Vec<_> = entries.into_iter().map(|(_, entry)| entry).collect();
+        if let Some(sender) = context.principal_id
+            && let Some(person) = self
+                .participant_persistence
+                .principal_by_id(company.id, sender)
+                .await?
+            && let Some(user) = person.user_id
+        {
+            for inbox in self
+                .participant_persistence
+                .direct_inboxes(company.id, user, 201)
+                .await?
+            {
+                if !inbox.principal.direct_access(context).authorized {
+                    continue;
+                }
+                let Some(slug) = inbox.slug else {
+                    continue;
+                };
+                entries.push(AddressDirectoryEntry {
+                    target: crate::entities::address::AddressTarget::Principal(inbox.principal.id),
+                    address: Channel::address_for(&slug, &company.slug, &self.settings.mail_domain),
+                    name: inbox.principal.display_label,
+                    description: None,
+                    department: None,
+                });
+            }
+        }
+        Ok(entries)
     }
 
     /// Reply to every reserved address the message named, reporting whether any answer went out.
@@ -746,7 +914,7 @@ impl ThreadUseCases {
                 continue;
             }
             let entries = self
-                .writable_channel_directory(&company, &draft.author, directory)
+                .writable_address_directory(&company, &draft.author, directory)
                 .await?;
             self.send_system_reply(draft, &company, system, entries)
                 .await?;
@@ -763,7 +931,7 @@ impl ThreadUseCases {
         draft: &InboundDraft,
         company: &Company,
         system: SystemAddress,
-        entries: Vec<ChannelDirectoryEntry>,
+        entries: Vec<AddressDirectoryEntry>,
     ) -> AppResult<()> {
         let body = match system {
             SystemAddress::Help => crate::use_cases::thread::format_help_email_body(
@@ -851,4 +1019,52 @@ fn third_party_handles(
 
 fn email_metadata(draft: &InboundDraft) -> Option<&EmailMessageMetadata> {
     draft.extension.email_metadata()
+}
+
+/// What one addressed slug reaches, decided from what routing has already read.
+enum AddressedSlug {
+    /// Boxed: a desk dwarfs the other outcomes.
+    Desk(Box<Channel>),
+    /// Disabled is undeliverable for everyone, so it is decided before the ACL, which rules only
+    /// on *this sender's* access.
+    DisabledDesk(Uuid),
+    /// Nothing the sender may learn about: a slug that names nothing, a desk this list no longer
+    /// holds, or a principal's address mailed by a stranger -- who is told exactly what a slug
+    /// that names nothing tells them, so a member's address cannot be confirmed by mailing it.
+    Unknown(Vec<ChannelSlug>),
+}
+
+fn addressed_slug(
+    target: Option<AddressTarget>,
+    available: &[Channel],
+    slug: &ChannelSlug,
+    _recipient: &AddressedRecipient,
+    _sender_is_team: bool,
+) -> AddressedSlug {
+    let desk = match target {
+        Some(AddressTarget::Desk(id)) => available.iter().find(|desk| desk.id == id),
+        Some(AddressTarget::Principal(_)) | None => None,
+    };
+    match desk {
+        Some(desk) if desk.enabled => AddressedSlug::Desk(Box::new(desk.clone())),
+        Some(desk) => AddressedSlug::DisabledDesk(desk.id),
+        None => AddressedSlug::Unknown(find_similar_channel_slugs(slug, available)),
+    }
+}
+
+/// The desk an addressed slug reaches, or `None` once its refusal is recorded for the bounce.
+fn record_undeliverable(
+    undeliverable: &mut UndeliverableSlugs,
+    slug: ChannelSlug,
+    outcome: AddressedSlug,
+) -> Option<Channel> {
+    match outcome {
+        AddressedSlug::Desk(channel) => return Some(*channel),
+        AddressedSlug::DisabledDesk(id) => {
+            warn!(channel_id = %id, "Bouncing a message for a disabled channel");
+            undeliverable.disabled(slug);
+        }
+        AddressedSlug::Unknown(suggestions) => undeliverable.unknown(slug, suggestions),
+    }
+    None
 }

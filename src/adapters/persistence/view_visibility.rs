@@ -90,3 +90,33 @@ pub(super) async fn message_levels_on<'e>(
     .await?;
     levels(rows)
 }
+
+/// Recheck the exact inbox and content ceiling together after delivery parts/diagnostics load.
+pub(super) async fn delivery_levels_on<'e>(
+    db: impl sqlx::Executor<'e, Database = Postgres>,
+    company: CompanyId,
+    viewer: WorkflowActor,
+    deliveries: &[Uuid],
+) -> AppResult<HashMap<Uuid, PayloadVisibility>> {
+    let rows = sqlx::query_as::<_, VisibilityRow>(
+        r#"SELECT delivery.id, message.access_level::smallint AS content_level,
+                  member.role AS membership, member.access_level::smallint AS access_level,
+                  company.user_id=account.id AS is_owner
+           FROM message_deliveries AS delivery
+           JOIN messages AS message ON (message.company_id,message.id)=(delivery.company_id,delivery.message_id)
+           JOIN companies AS company ON company.id=delivery.company_id
+           JOIN users AS account ON account.id=$3
+           LEFT JOIN company_members AS member ON (member.company_id,member.user_id)=(delivery.company_id,account.id)
+           LEFT JOIN principals AS principal ON principal.company_id=delivery.company_id
+               AND principal.user_id=account.id AND principal.kind='person'
+           WHERE delivery.company_id=$1 AND delivery.id=ANY($2)
+               AND (company.user_id=account.id OR member.user_id IS NOT NULL)
+               AND (delivery.principal_id IS NULL OR principal_direct_can_view(delivery.company_id,delivery.principal_id,principal.id))"#,
+    )
+    .bind(company.as_uuid())
+    .bind(deliveries)
+    .bind(viewer.user_id())
+    .fetch_all(db)
+    .await?;
+    levels(rows)
+}

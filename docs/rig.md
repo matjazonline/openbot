@@ -23,7 +23,8 @@ have a model connection and an enabled model; credentials are not part of this b
 ```json
 {
   "name": "Assistant",
-  "slug": "assistant"
+  "slug": "assistant",
+  "native_permissions": "full"
 }
 ```
 

@@ -90,3 +90,103 @@ async fn assert_inspection(d: &Deployment, binding: BindingTarget, run: RunId, a
     assert!(!run.detail.summary.role_holders_truncated);
     assert!(run.dependencies.is_none());
 }
+
+#[tokio::test]
+async fn workflow_role_native_selector_refuses_each_busy_capture_without_changing_selection() {
+    use crate::adapters::persistence::workflow::{agent_manifest, row_locks::RowLocks};
+    use crate::application::workflow::actions::ActionScope;
+    use crate::application::workflow::publication::restore_bundle;
+    let mut d = Box::pin(Deployment::new(vec![LlmTurn::text(r#""role selection""#)])).await;
+    let a = agent(&d, "native-role").await;
+    let desk = desk(&d, "native-role-team", &a).await;
+    d.channel = desk.id;
+    let binding = d.bind(source("agent.run"), None).await;
+    let run = admit(&d, binding, &desk, "native-role-selection", Uuid::new_v4()).await;
+    Box::pin(d.run_until(
+        "role-selected source executes and freezes its inputs",
+        async || settled(&d, run).await,
+    ))
+    .await;
+    let execution: Uuid = sqlx::query_scalar(
+        "SELECT id FROM workflow_executions WHERE company_id=$1 AND run_id=$2 AND step_id='start'",
+    )
+    .bind(binding.company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_one(d.p().pool())
+    .await
+    .unwrap();
+    let bytes: Vec<u8> = sqlx::query_scalar(
+        "SELECT blob.bundle FROM workflow_runs AS run JOIN workflow_bundles AS blob \
+         ON blob.company_id=run.company_id AND blob.digest=run.bundle_digest \
+         WHERE run.company_id=$1 AND run.id=$2",
+    )
+    .bind(binding.company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_one(d.p().pool())
+    .await
+    .unwrap();
+    let bundle = restore_bundle(
+        &bytes,
+        &crate::adapters::workflow_source::WorkflowSourceDecoder,
+    )
+    .unwrap();
+    let scope = ActionScope {
+        company: binding.company,
+        run,
+        execution: crate::domain::workflow::ExecutionId::new(execution),
+    };
+    // This is the production selector used by native agent-origin continuation.
+    // Ordinary admission/runtime above establishes its real sealed role capture.
+    for table in [
+        "run_dependency_manifests",
+        "workflow_run_role_bindings",
+        "agent_manifest_revisions",
+    ] {
+        let mut competitor = d.p().pool().begin().await.unwrap();
+        sqlx::query(&format!(
+            "SELECT company_id FROM {table} WHERE company_id=$1 FOR UPDATE"
+        ))
+        .bind(binding.company.as_uuid())
+        .execute(&mut *competitor)
+        .await
+        .unwrap();
+        let mut tx = d.p().pool().begin().await.unwrap();
+        let result = tokio::time::timeout(
+            Duration::from_secs(2),
+            agent_manifest::execution_selection_with_locks_on(
+                &mut tx,
+                scope,
+                binding.actor,
+                &bundle,
+                RowLocks::NoWait,
+            ),
+        )
+        .await
+        .expect("captured role selection must never wait for a native continuation");
+        let error = result.err().expect("busy captured role must refuse");
+        assert!(matches!(error, AppError::DatabaseTimeout(_)), "{error:?}");
+        tx.rollback().await.unwrap();
+        competitor.rollback().await.unwrap();
+        let mut tx = d.p().pool().begin().await.unwrap();
+        let selected = agent_manifest::execution_selection_with_locks_on(
+            &mut tx,
+            scope,
+            binding.actor,
+            &bundle,
+            RowLocks::NoWait,
+        )
+        .await
+        .unwrap();
+        assert_eq!(selected.agent().agent_id.as_uuid(), a.id);
+        assert_eq!(selected.revision().id.as_uuid(), a.revision);
+        tx.rollback().await.unwrap();
+    }
+    let dispatches: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM workflow_action_dispatches WHERE company_id=$1")
+            .bind(binding.company.as_uuid())
+            .fetch_one(d.p().pool())
+            .await
+            .unwrap();
+    assert_eq!(dispatches, 0);
+    assert_eq!(d.llm.finish().await.unwrap(), 1);
+}

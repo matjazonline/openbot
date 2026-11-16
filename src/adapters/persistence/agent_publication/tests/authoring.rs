@@ -194,10 +194,7 @@ async fn autonomous_agent_authoring_refuses_builder_spoofing_reserved_aliases_an
     let mut forged = request(&f).await;
     forged.write.name = "Agent Builder".into();
     forged.write.slug = "agent-builder".into();
-    forged.tools = Some(vec![tool(
-        "create_agent_channel",
-        AgentBuiltinTool::CreateAgentChannel,
-    )]);
+    forged.tools = Some(vec![tool("create_agent", AgentBuiltinTool::CreateAgent)]);
     assert!(matches!(
         f.p.save_company_agent(forged).await,
         Err(AppError::BadRequest(_))

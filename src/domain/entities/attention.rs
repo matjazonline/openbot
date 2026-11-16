@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
-use crate::entities::{correlation::CorrelationId, transport::PrincipalId};
+use crate::entities::{address::AddressTarget, correlation::CorrelationId, transport::PrincipalId};
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -127,8 +127,8 @@ pub struct AttentionItem {
     pub source_kind: AttentionSourceKind,
     pub source_id: Uuid,
     pub company_id: Uuid,
-    /// `None` for a company-associated run or binding, which only owners and admins see.
-    pub channel_id: Option<Uuid>,
+    /// `None` only for company-associated work, which owners and admins see.
+    pub target: Option<AddressTarget>,
     pub thread_id: Option<Uuid>,
     pub run_id: Option<Uuid>,
     pub correlation_id: Option<CorrelationId>,
@@ -256,6 +256,8 @@ pub struct AttentionQuery<'a> {
     /// Whether company-associated items (no channel) are listed: an owner's or admin's, as on
     /// the decision page, unless the list is narrowed to one department's desks.
     pub company_items: bool,
+    /// Direct inboxes are excluded from a view narrowed to one department's desks.
+    pub direct_items: bool,
     pub view: AttentionView,
     pub cursor: Option<&'a AttentionCursor>,
     pub limit: usize,

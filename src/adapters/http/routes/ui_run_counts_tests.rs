@@ -197,7 +197,12 @@ impl ControlledReader {
 
 #[async_trait::async_trait]
 impl RunCountsReader for ControlledReader {
-    async fn run_counts(&self, _company_id: Uuid, ids: &[Uuid]) -> AppResult<RunCountSnapshot> {
+    async fn run_counts(
+        &self,
+        _company_id: Uuid,
+        ids: &[Uuid],
+        _viewer_user_id: Uuid,
+    ) -> AppResult<RunCountSnapshot> {
         let result = self.runs.snapshot(ids);
         let initial = self.calls.fetch_add(1, Ordering::SeqCst) == 0;
         if initial && self.block_initial {
@@ -233,7 +238,7 @@ fn workspace(
 fn wake(events: &MailboxEvents, f: &CountsFixture) {
     events.publish(MailboxEvent::WorkflowRunChanged(RunScope {
         company_id: f.company_id,
-        channel_id: Some(f.channels[0]),
+        target: Some(crate::entities::address::AddressTarget::Desk(f.channels[0])),
         thread_id: None,
         run_id: Uuid::new_v4(),
     }));

@@ -6,6 +6,7 @@ use crate::entities::notification::NotificationTarget;
 struct ReviewerSource {
     decision_id: Uuid,
     channel_id: Option<Uuid>,
+    target_principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     run_id: Uuid,
     correlation_id: Uuid,
@@ -19,7 +20,7 @@ pub(super) async fn source_on(
     event: &NotificationEvent,
 ) -> AppResult<Option<SourceSnapshot>> {
     let source:Option<ReviewerSource>=sqlx::query_as(
-        "SELECT notice.decision_id,run.channel_id,run.thread_id,run.id AS run_id,run.correlation_id,notice.principal_id, \
+        "SELECT notice.decision_id,run.channel_id,run.principal_id AS target_principal_id,run.thread_id,run.id AS run_id,run.correlation_id,notice.principal_id, \
          workflow_follow_is_open(notice.company_id,notice.decision_id) AS open, \
          EXISTS (SELECT 1 FROM workflow_decision_reviewers AS current \
              WHERE current.company_id=notice.company_id AND current.decision_id=notice.decision_id \
@@ -32,23 +33,35 @@ pub(super) async fn source_on(
         .bind(event.company_id).bind(event.source_id).bind(event.id.as_uuid())
         .bind(i64::try_from(event.source_generation).map_err(|_|AppError::BadRequest("Invalid notice generation".into()))?)
         .fetch_optional(db).await?;
-    Ok(source.map(|source| SourceSnapshot {
-        channel_id: source.channel_id,
-        thread_id: source.thread_id,
-        run_id: Some(source.run_id),
-        correlation_id: Some(source.correlation_id),
-        responsible_principal_id: Some(source.principal_id),
-        target: NotificationTarget::WorkflowDecision {
-            decision_id: source.decision_id,
-        },
-        lifecycle: if !source.open {
-            SourceLifecycle::Resolved
-        } else if !source.current_reviewer {
-            SourceLifecycle::Withdrawn
-        } else {
-            SourceLifecycle::Active
-        },
-    }))
+    source
+        .map(|source| {
+            let inbox = super::super::workflow::association::association_from_columns(
+                super::super::workflow::association::AssociationColumns {
+                    channel_id: source.channel_id,
+                    principal_id: source.target_principal_id,
+                    thread_id: source.thread_id,
+                },
+            )?
+            .target();
+            Ok(SourceSnapshot {
+                inbox,
+                thread_id: source.thread_id,
+                run_id: Some(source.run_id),
+                correlation_id: Some(source.correlation_id),
+                responsible_principal_id: Some(source.principal_id),
+                target: NotificationTarget::WorkflowDecision {
+                    decision_id: source.decision_id,
+                },
+                lifecycle: if !source.open {
+                    SourceLifecycle::Resolved
+                } else if !source.current_reviewer {
+                    SourceLifecycle::Withdrawn
+                } else {
+                    SourceLifecycle::Active
+                },
+            })
+        })
+        .transpose()
 }
 
 pub(super) async fn lock_source_on(

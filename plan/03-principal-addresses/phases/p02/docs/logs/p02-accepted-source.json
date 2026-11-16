@@ -1,0 +1,1369 @@
+{
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "accepted_artifact": "1f4af6f63e8f51cd33c0c777ffd62fbeb05d218830a9dbc5b1c6f5a8451398aa",
+  "cache_baseline": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa02-complete-w28o3_jt",
+  "archive_sha256": "60222466760ff53f1ea99b6f478a828bedc347ae049dad8ac4302ca57400a860",
+  "scope": "Material project source delta from HEAD; omitted paths retain HEAD bytes. Unrelated user/configuration paths are preserved outside this comparison export.",
+  "files": [
+    {
+      "path": "Cargo.lock",
+      "sha256": "27c551ad8be5becaeebf87dc8d3e049fe50b556af60734f5632603a948b19863"
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "349179ed2973c86a38cb092dcc4d04f014f9c8b28d524e2cd90ec7e5a7746fce"
+    },
+    {
+      "path": "docs/system_addresses.md",
+      "sha256": "764ae373e7a7df50a13a032d3503209e2c7299ce0a7743d1bab8567bf32aebdb"
+    },
+    {
+      "path": "migrations/20260817000000_init_schema.sql",
+      "sha256": "14c9b02a0cb6b838820d5a4f8840748f40aa7bcc3d80f25723893ba49ba17c1b"
+    },
+    {
+      "path": "scripts/tests/run-list-query-plan.py",
+      "sha256": "23866f3c0a30720fdcb064350edc6f0affa99b9518ad89a500e6589e061b7ea9"
+    },
+    {
+      "path": "src/adapters/http/pages/agent_settings.rs",
+      "sha256": "a19a20843a1a87f68fe3bb3a6a8c6f367100a1d776d4b525f4856ee1032f50e9"
+    },
+    {
+      "path": "src/adapters/http/pages/agents.rs",
+      "sha256": "f746cd340b9ff9bad869dd31fc02876a4a8ca20c7b2740a6883e495ce646de6e"
+    },
+    {
+      "path": "src/adapters/http/pages/attention.rs",
+      "sha256": "0da9e35c694805d0ae9c6886e086d19c96a23f4f8efb6b173db7634cc424781f"
+    },
+    {
+      "path": "src/adapters/http/pages/deliveries.rs",
+      "sha256": "5c15bd08deced3f475c9407eec91ab7ff75b39067ebd22ae175faea6804b9c79"
+    },
+    {
+      "path": "src/adapters/http/pages/desk_wording_tests.rs",
+      "sha256": "e510048ab0b5861d3a6816de8a06cadaea3a4e0e78299697daf646c2234f499a"
+    },
+    {
+      "path": "src/adapters/http/pages/knowledge_view_tests.rs",
+      "sha256": "24a65f1d92a45acf6663c70d7ce4f8815a4c06f35b70599ca685354e32a41333"
+    },
+    {
+      "path": "src/adapters/http/pages/local_agents/mod.rs",
+      "sha256": "bdde60ee76386abb02d05d50cb2744faa75fd9ec657f8c323ce83e7aea4cd8db"
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox.rs",
+      "sha256": "d63ef95ec4749b238680295896d5ca408afec27cdcea9131c43d9d78e8f51615"
+    },
+    {
+      "path": "src/adapters/http/pages/mailbox/inbox.rs",
+      "sha256": "c076a0aa2cbe705b5bc1a3f88b9446563c3cd882f20b5b8aa6a9051a36b5c4ac"
+    },
+    {
+      "path": "src/adapters/http/pages/mod.rs",
+      "sha256": "4b48c74bda7a7f17214aa6cad0e70195ede37686632b9504c7aa952f387959c9"
+    },
+    {
+      "path": "src/adapters/http/pages/notifications.rs",
+      "sha256": "1464c445db2bfcbbe9bbebafdc49218fc15acc550c7093abf5b0a4ee43e097ee"
+    },
+    {
+      "path": "src/adapters/http/pages/profile.rs",
+      "sha256": "dbbec5d479422f697bab1f3ea710300253308c06dd39dd92cd81ff594c0f6187"
+    },
+    {
+      "path": "src/adapters/http/pages/tests.rs",
+      "sha256": "0db8055f7cb08d6109982b5fb6a80da06a554c8964990a444473af811287598e"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/tools.rs",
+      "sha256": "89b9825c9040d15e69ec248853e81a2430444d8353a583dccb64a85dc2ccdefa"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_authoring/versions.rs",
+      "sha256": "94f8ec5f3d47e4ba8c8c4733a16e6aae66bb158a227c4131981088ff94f98fe5"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_conversation_tests.rs",
+      "sha256": "7bdd01790c9dde56f5a0814f5093287853d37e3694e1d1f978ee2294ca072975"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_decision.rs",
+      "sha256": "a20cd0e9180030c90e2c84170e552276f0878ff6163ac4d67da744c27c8efa1d"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/detail.rs",
+      "sha256": "85da4e53f3d267ad1628a8699f441de2f9970f81197d40890ea52f3a4750fc22"
+    },
+    {
+      "path": "src/adapters/http/pages/workflow_runs/responses.rs",
+      "sha256": "11b17ee1bea99bdd89fc467318bed1385c7959a3f0477c33e4d8cfdfd8450ddd"
+    },
+    {
+      "path": "src/adapters/http/routes/agent.rs",
+      "sha256": "31226ab754f9b1eab02c490119fd01210b0ef435ca9886bb0f83079c5f71e7ce"
+    },
+    {
+      "path": "src/adapters/http/routes/agent_api_tests.rs",
+      "sha256": "e321d49b56d40ed28cc40322efa0090a9e592f2ef14acdabdef1ea83367550fb"
+    },
+    {
+      "path": "src/adapters/http/routes/agent_api_tests/public_settings.rs",
+      "sha256": "ed7e260e616b6fa15e5e244221c48cccc7ba810a17468b2de91c1f1029a98dfa"
+    },
+    {
+      "path": "src/adapters/http/routes/agent_library.rs",
+      "sha256": "f3cc82e87676080559b5d0ac5d82b72b9dac2441bfbf423cdf61aa87e834e91a"
+    },
+    {
+      "path": "src/adapters/http/routes/attention.rs",
+      "sha256": "69a540ea560d25aa89fe137a1a862380c10a070de74ffd2e7169775363290836"
+    },
+    {
+      "path": "src/adapters/http/routes/attention_authorization_tests.rs",
+      "sha256": "2dbc4f73b971f7523653a769da846f6a3ea5b970edf77fb837d53989a7f46bb4"
+    },
+    {
+      "path": "src/adapters/http/routes/authorization_test_support.rs",
+      "sha256": "3b040e554d2e84a823ed151da38cba612ecda31f741e36911276632aac19138d"
+    },
+    {
+      "path": "src/adapters/http/routes/channel.rs",
+      "sha256": "371efbb1cd721f9da427eb34100cc152f14eea79e3f48037ffb3eff41b324f12"
+    },
+    {
+      "path": "src/adapters/http/routes/channel/simulation.rs",
+      "sha256": "4870b6f9239612381db4533d97b4d0517e553d503cd699c056b20520b1352e51"
+    },
+    {
+      "path": "src/adapters/http/routes/channel_authorization_tests.rs",
+      "sha256": "04c674cafa53f7ddf39b7b36db49f4e7e33a7858af03c7da8d359353d1373a47"
+    },
+    {
+      "path": "src/adapters/http/routes/live_updates.rs",
+      "sha256": "112d26be497fadfc7897e9577cb12139555584ca283b78a8a45c88e0aee6752b"
+    },
+    {
+      "path": "src/adapters/http/routes/onboarding.rs",
+      "sha256": "c49d90fe7ccbc9c3577a79c6040befe78a2842720f990bfaf593693eecdf9c91"
+    },
+    {
+      "path": "src/adapters/http/routes/ui.rs",
+      "sha256": "117bec48c56a1fc5f2761d19fa98f540375009d070cf4264c3b95f0e4a4761c2"
+    },
+    {
+      "path": "src/adapters/http/routes/ui/inbox.rs",
+      "sha256": "ed6f5969131e0821a163a569acd6130c9f11fbfaeb056a67aa8414fbfff7eab4"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_agents.rs",
+      "sha256": "a8f1c0578522ce3a5b58968d2fd5b33e38b6f943710f4ccf7f93bd487789a990"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_attachments.rs",
+      "sha256": "40a6987e7f514dd0ac7bbca4ba7c9f8555486f42434deebc28541e63404c41d0"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_conversation_stream_tests.rs",
+      "sha256": "f9852f1909439ce8309e0accbdb1e4a98abaf9eda39ff7bc96ad47bf57d8acd4"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_deliveries.rs",
+      "sha256": "6ee939727238f0280ef0a9b8b7133cb71d39a8ca07cf1ef0b3aa9372ae3c3827"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_asset_tests.rs",
+      "sha256": "5a6a1dc747852817f9dd146ed1ff3634b44da7f282548545fb3dc6718e7eae5a"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_revocation_tests.rs",
+      "sha256": "22a6eb10c5ce54db091d138ddf4cd55cda3840dd620641d799056ca5e7c34d45"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_direct_tests.rs",
+      "sha256": "cb8ae62067c42b2f2e4c031fa0364ee3b163e83fa31fc98b953654da52d94eb3"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_internal_notes.rs",
+      "sha256": "19bd79be42f158cfae58e3ef7fe4e909a293edcdf01e8a983eb80d1d17212a4d"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_knowledge_view_tests.rs",
+      "sha256": "27f1470863f3b098e99e33cef93e6f95614bd08233b5a4e9ab1ec788a9dc6c6f"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents.rs",
+      "sha256": "d610835f2270b166ef56d177fd0611b42c4ddc19de882dd33dc7a7b00ed380ba"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_local_agents_tests.rs",
+      "sha256": "eaf882048cdbb4fbf74e0155e58583a2fc458e09161c7f8e534a66f368d67a8c"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message.rs",
+      "sha256": "25985d0d508f98215090713212c7301d535eb5c9a67d8a2cf52d3eaca5e258d9"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_diagnostics.rs",
+      "sha256": "173e0e1ebbe2f2dc7c0eb307cacc22d4a6d83771e1ce64e88fd7efdc908a56c9"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_message_tests.rs",
+      "sha256": "2b2b8a93906174dd2f5435e81f3b8305b810c067f1daebf041ebcec2f75ffb13"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_profile.rs",
+      "sha256": "7dfc1f9cc0bb206674f2b2a679e3344b667289005eb0b33538e181d83b1b2d33"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_profile_session_tests.rs",
+      "sha256": "fa603deaf1f237a3f6b9518ee9c7acccac35bbe749523283635cd87832d31981"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_run_counts.rs",
+      "sha256": "7f03e8d527b0e46b5c6d4cbaddb73fa48ce5c116fbc46b5f083705302a31e621"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_run_counts_tests.rs",
+      "sha256": "b1a30cb35edd9c8d650387a6bac654d42b38caeeb179be88481b06520f4c1d7e"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_stream_tests.rs",
+      "sha256": "b94b01ffb739bdf90a2b5bfb6b361dd96d95b8d1523fc9b1b27646aaf3948e54"
+    },
+    {
+      "path": "src/adapters/http/routes/ui_vault.rs",
+      "sha256": "00c1600905a23df68cde0eaf4511d99f82c9cdec279b774de0ae22346663cb97"
+    },
+    {
+      "path": "src/adapters/http/routes/user_tests.rs",
+      "sha256": "191d1f48bf722b249fcbef3f9bf12285f970ddc8c3afdedb409140ddf2ef0ef7"
+    },
+    {
+      "path": "src/adapters/http/routes/webhooks/resend_api.rs",
+      "sha256": "4d444433e389f0a1e34d7a27729ad5b6b410bf90ff78a4fc760b4fcbecc1a09f"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/bindings.rs",
+      "sha256": "e64477050aea477312becff9e7332b6f2433e98909f384ab145d82d9f1b08347"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/board.rs",
+      "sha256": "5094448947b74f627f6888d1bccc214bdc7b9bcbbca187a987d00781589c196a"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/channel_replies.rs",
+      "sha256": "5c249c1ed4e757f38d57ddb3807d914fa7866051504a65af5c050b4f8bee8711"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/mod.rs",
+      "sha256": "8a3034440de273ac059f0d07754048e8a761cb60f0443909dae856dd5b9fe7fd"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/tool_tests.rs",
+      "sha256": "0537d47bc3603308e121dd5f6f1aefdb94ddeedc1397486529418e51e3e26e5d"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+      "sha256": "41a217ff061d8f55abd0812ebd63b3cf8cd88e988b2db0a551874481788972c5"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response.rs",
+      "sha256": "5a591e4413fd02168c985f74dea7cc1635948e88cddc742048e1cae59da004c5"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/channel_response_tests.rs",
+      "sha256": "6d6d34ac2f4aa4d46d3a728def53a445647be3f219c714b60a08c17a9714003a"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/authoring/tests.rs",
+      "sha256": "377d4dbbb0c779a1cb61417b21b5d860f9abcb6ba2bf5ad9a782d67087e8e5f1"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/board_view_tests.rs",
+      "sha256": "bbdeb25bfc2dec11f8ab0f3548eda2ca1123f37c8905156d4c5d3bd09d9c6778"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/events.rs",
+      "sha256": "fc41ad6478ad6f7b3025d6195822697987c13322d89ffe24447332e016dfd095"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/events_tests.rs",
+      "sha256": "e8dba040ef4262f95f5aa95abf9b4695cf1d3928ccfe25dd8c4a9c201619c5ed"
+    },
+    {
+      "path": "src/adapters/http/routes/workflows/ui/runs/runs_tests.rs",
+      "sha256": "bb2ad251641e35c93e77f2f613d565df4c7e7592458c1bd5220f37ede6abdf3d"
+    },
+    {
+      "path": "src/adapters/persistence/account_identity.rs",
+      "sha256": "695ac03fc8fe0efa6982af2737fb710eddeebb71c003b1023a1c0d6245acde41"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests.rs",
+      "sha256": "c38c7d98b3485c5de1b93b6c4c51b8aac0157648a8ac666597b718f6e58236fa"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/bindings.rs",
+      "sha256": "08bac87d348adfa79879ae07ac4dc11d1239130ae1843531d9d4b0ce357f6db5"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/direct.rs",
+      "sha256": "c1f018ebae67ecaedf315a9985062d5b5457bb21d86b7439a4b2472479fa857e"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/identity_races.rs",
+      "sha256": "6ea806fb609682ddb198b5270135628c90788df1a921dae2dd44c2ee5ab1536f"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/ingress.rs",
+      "sha256": "780f33aa6343b2e105d0782e07b51d6357d77ec70a95af8501da6f661e7bc399"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_authority_tests.rs",
+      "sha256": "4879564f643798033689ec47741720926ed9f21b9cb321bd9f4195600bda3053"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notification_race_tests.rs",
+      "sha256": "968e1572fe30d664f32fbfcca142111654dea022fb13b1b27df78959431e29e6"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/notifications.rs",
+      "sha256": "4099ad3feb5147bcd25f3deb96ff92025ea9a5fdbd990609a4ac82304abd5246"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/rejoin.rs",
+      "sha256": "23c017aaf65411896b3d0833db1d340286b419090f5e11b4d19910012b822cbd"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/status.rs",
+      "sha256": "e9dc91aba0e10438a0069518a88a60a4ff826e93f4b5274b34be11c6e6497d9c"
+    },
+    {
+      "path": "src/adapters/persistence/address_tests/validation.rs",
+      "sha256": "564dd0a499afeedc6cd86325a11026195fa775e4b2b73c27f4d694795eac0516"
+    },
+    {
+      "path": "src/adapters/persistence/agent.rs",
+      "sha256": "e574512655cf1be6d02ec540fc47f7f0d222277d2815062016c82e9c938f28a1"
+    },
+    {
+      "path": "src/adapters/persistence/attention.rs",
+      "sha256": "5faa2a88e8633e8ba12c160ad2ac557ac00933bd8be322ee571f60d6df92c4a6"
+    },
+    {
+      "path": "src/adapters/persistence/attention_tests.rs",
+      "sha256": "a3ffb78e1af0cf9a82bcd795efee3506901d9bceb6e06e9a0de38fec06b571c6"
+    },
+    {
+      "path": "src/adapters/persistence/channel.rs",
+      "sha256": "ff1cde81a4953e7a61f11d3484c2ed7d9dafea0b55940d8674e84a9dcfe55ee4"
+    },
+    {
+      "path": "src/adapters/persistence/company_agent.rs",
+      "sha256": "06ea1b78c2fe42e0f93c5d4e36bce37314712a2f00552fd669d1d696259717d9"
+    },
+    {
+      "path": "src/adapters/persistence/dashboard_tests.rs",
+      "sha256": "c535021dfbfec731279ced2429b93c47036571b9c38ed04811db868aaf33b1f0"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/enqueue.rs",
+      "sha256": "1443267b9b66615dc11ae1bda3bc3e7872c91cdf9eb582be797e901fb79fe721"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/mod.rs",
+      "sha256": "4f7b9f5f3821a58c1f4621c2045f291f641495ace2913ac3bf6fd00810e20369"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/read.rs",
+      "sha256": "4206c5d91afe8a92ecd383d21d6c08cd22c21bc04a38676c3374325474a8e266"
+    },
+    {
+      "path": "src/adapters/persistence/delivery/tests.rs",
+      "sha256": "9548fcd26f8f5344947bdd2785de34ba2f5adc086fa4874452d013eb7bf086ba"
+    },
+    {
+      "path": "src/adapters/persistence/department.rs",
+      "sha256": "79ce4188fde2173b235f33b878ea0edace2a39249c91612f102b12aa805bf2f3"
+    },
+    {
+      "path": "src/adapters/persistence/department/lifecycle.rs",
+      "sha256": "02cb21ee26df8d96a221d97872fb6bf21ad2ac2927d2c25edd8d064471cbbfa5"
+    },
+    {
+      "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+      "sha256": "5fdc909d2203c8a349057b8bda8a00107020cd30517132d90c05a38884427d1c"
+    },
+    {
+      "path": "src/adapters/persistence/department_desks_tests.rs",
+      "sha256": "65977b7f02d7cbf4b3b1144da6a4a228d903a1e51f8c16bdb921ced34e66a155"
+    },
+    {
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "sha256": "66cc51fa75a2f15c1f786cd27c08c3bc75d2cfe8c767fff28172e76f79a2d9e5"
+    },
+    {
+      "path": "src/adapters/persistence/department_roster.rs",
+      "sha256": "53791824d9183ba3b4c26b6f8288ced6a602286c7dc089faa73c223b30a3e88f"
+    },
+    {
+      "path": "src/adapters/persistence/integration/binding.rs",
+      "sha256": "f9dde7fd0832e87e177938334edc9ba161139a543e7028b4aee0cc32ea0c4de3"
+    },
+    {
+      "path": "src/adapters/persistence/integration/email_binding.rs",
+      "sha256": "8e6e7cd6e4890e3f5a6489ac3e20a6f0c59ad99b09bb5e8259cc20d9e1b9459b"
+    },
+    {
+      "path": "src/adapters/persistence/integration/mod.rs",
+      "sha256": "96b87eea05277d103a4c09aab5178280875c677014a87194a44e3b9e0171d214"
+    },
+    {
+      "path": "src/adapters/persistence/integration/tests.rs",
+      "sha256": "5ac48fff5fd10df5905bd8b87be347b5ddfa1fe11be450fd809aa73a435e852f"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/management/mod.rs",
+      "sha256": "2f557423248912d554163eddfbcb5ad761788b82385cfc68efde95e0f56ae777"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/management/tests.rs",
+      "sha256": "ac80d11660330db39bceef75725bd8f92068c00939bceb1710ea6d624428380e"
+    },
+    {
+      "path": "src/adapters/persistence/local_agents/protocol/commands.rs",
+      "sha256": "9639facedff06da40f804899c162ed95acce1911e943ac1129ff1ed5bd10c631"
+    },
+    {
+      "path": "src/adapters/persistence/mod.rs",
+      "sha256": "d72a46f915be9a8aac231a34f5cd4203ca64bd659961f45eb1bbdda1138a6c0d"
+    },
+    {
+      "path": "src/adapters/persistence/notification.rs",
+      "sha256": "62fbddbb10db81694abb7d785d14bc074aa6c8ec9e725d8dab4e70ead94c4e08"
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_message.rs",
+      "sha256": "4099930ecfcaae63441ca259c505c57889a892d6d02eecfa0da89ac738523812"
+    },
+    {
+      "path": "src/adapters/persistence/notification/agent_notice_route.rs",
+      "sha256": "daeac140347290e3c823d254638597ee4a725ba5697c1a085b261f907c8faf4e"
+    },
+    {
+      "path": "src/adapters/persistence/notification/direct_message.rs",
+      "sha256": "0398e450751aa3f7208cfc092b6925c8717c01b8d852ee80b1cefaa3f093d029"
+    },
+    {
+      "path": "src/adapters/persistence/notification/escalation_notice.rs",
+      "sha256": "ded3d89f06f5bb8c1aeccd80dedfe32a4ab57cd0a0e644807bbd2b4c2b8f5c17"
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection.rs",
+      "sha256": "0bc6b4d5e09e095705f6667bedfb6fad9e52db0a46ca45b76427539584c79858"
+    },
+    {
+      "path": "src/adapters/persistence/notification/projection_lock.rs",
+      "sha256": "9d21791c4b0f3c20b87b60ab2ec620c81838b40dc979bd41fced2cc255598f8c"
+    },
+    {
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "sha256": "28ac8b35324c884f302799c50eca117c6ffa64ed903cb93f35d64980a1c20d06"
+    },
+    {
+      "path": "src/adapters/persistence/onboarding/tests.rs",
+      "sha256": "3b8f78a5d1eb8208db85e4ad56780fc0a23f1ed08b30e9a45071057ec2cb56f5"
+    },
+    {
+      "path": "src/adapters/persistence/participant.rs",
+      "sha256": "be8dd7169448363614c972a1361242a1694e28024d06365ace5b3c374ae5ab92"
+    },
+    {
+      "path": "src/adapters/persistence/participant/person.rs",
+      "sha256": "39f4ca79035fff9ebc72b65b18e9bebe2739796d0efc5a8f14b7a1ffd5a7e6b8"
+    },
+    {
+      "path": "src/adapters/persistence/run_counts.rs",
+      "sha256": "78cd32fd4eca096d96600bd7e3158982b6b5851b3ba0a1e5dccdbb33d261b1a3"
+    },
+    {
+      "path": "src/adapters/persistence/test_support.rs",
+      "sha256": "40745edeb5ca23683df9d90238ced9c9869c5f4a7d1efb6c2f99a9d7af70cc05"
+    },
+    {
+      "path": "src/adapters/persistence/thread/external.rs",
+      "sha256": "8db0260718310b98a9d429377ad765a431dad9f1d6f6ccbcec9b7070d7dd33b8"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound.rs",
+      "sha256": "42246f9f578c39796fd071a811dc6af3824cef34dfcd8a5a1678f62ccae6dac3"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_multi_task_tests.rs",
+      "sha256": "eabd7e4c51e61913d0a72c980c4cd61e6556193d78c132629882daca8a9c63d9"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_target.rs",
+      "sha256": "8db3f63be59697c4aaa8acf7c034c1d5405ac905bbecc10d46d8270de4a85960"
+    },
+    {
+      "path": "src/adapters/persistence/thread/inbound_tests.rs",
+      "sha256": "aa61c43fd5dc941a872647de28f303e671af231e632d07d1050234d9435e1364"
+    },
+    {
+      "path": "src/adapters/persistence/thread/internal_note.rs",
+      "sha256": "5fe473000219bf07bdeda099721123efc0095dedf10a0ef83f078ea793ea30cb"
+    },
+    {
+      "path": "src/adapters/persistence/thread/message.rs",
+      "sha256": "cdd6f159f5eca0b88a225962617f13efa82c61ac8def854487f160c726d56cd8"
+    },
+    {
+      "path": "src/adapters/persistence/thread/mod.rs",
+      "sha256": "93cbff786dbb5215c4750a8d82a3f984ee57c89755acb0243dc8276f8643ce07"
+    },
+    {
+      "path": "src/adapters/persistence/thread/read_tests.rs",
+      "sha256": "2112e4262744d34aa264ddd00e72d72243d15f55984be36b4ce88c20737e91e4"
+    },
+    {
+      "path": "src/adapters/persistence/thread/test_support.rs",
+      "sha256": "9c56c71c4d7cac31783e4fd3ad5859979cd27c9fb74ea38fef86888583582dff"
+    },
+    {
+      "path": "src/adapters/persistence/thread/tests.rs",
+      "sha256": "10bf21635b0dc1f6b6ef19250838beffcd6725b76e0cb160032049c6d6b5848c"
+    },
+    {
+      "path": "src/adapters/persistence/thread/view_tests.rs",
+      "sha256": "5b1899bc78dc9a5175c3b4118b4b4c1739e747d726b7d86278531d43f6313228"
+    },
+    {
+      "path": "src/adapters/persistence/thread/views.rs",
+      "sha256": "16e5cc4cd87f2807c0bc309b1cca1b8e19b82cd85e12cde1374f7e290aa54a8c"
+    },
+    {
+      "path": "src/adapters/persistence/user.rs",
+      "sha256": "069a9c39c56796570b9de6033abe823bffedbf80cbed14b406d0ee0f76504582"
+    },
+    {
+      "path": "src/adapters/persistence/view_visibility.rs",
+      "sha256": "5b98ae7c45fe5ab55e9a4d04eed8f16a8681e5641278d27b8159ee89a4960bb0"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/action_reconciliation_association_tests.rs",
+      "sha256": "264a01a615e1ea3d1528778b7f87423ee9ea2c37fec5b89f32367a8fb05a4189"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission.rs",
+      "sha256": "3a429fe2a52acdfc59c919023b1d3d568ebebeadeae4c413cb67ad6908eddb26"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_history.rs",
+      "sha256": "ab3f0d0c9ab3a502071ad0f54f320107c393d7a9fcf63e36b9eccab6c73c6668"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_history_tests.rs",
+      "sha256": "b955bd9900139cbbb6f63a5abd6c1ae995411c24381e10aa2a9ca6ad82ada9b9"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_refusal.rs",
+      "sha256": "9a06ba17ccf50b42a2f1bd74d049c62296fcdeeb6aaf373859290559580216ff"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_replay.rs",
+      "sha256": "b634e735a967e28032f16c340feb4b96182068ef70e72385aa3eb3bd368fd36f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_source.rs",
+      "sha256": "c49a975fd7708065417573782f37f10e5e67b31c5ce255819698dab522095b1d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_source_tests.rs",
+      "sha256": "a759287610866e745f9ae936e376aee89b2e7a32b0ca3b90f3b4e53fe819c040"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_tests.rs",
+      "sha256": "32cd0414a250d09f364b0e20f36cea894b7295a81a73c4f84bd327c23a4c1f7b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/admission_write.rs",
+      "sha256": "c243d5ffafcc6eeae12eadbea50911c7c45f5e65624e7a1a6869713a5a180875"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/frozen.rs",
+      "sha256": "63f2ff18ceee78f20fd24ac925a0d72f2c69df08bf17ac347c01aea5ec89b089"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/mod.rs",
+      "sha256": "6d3cf221b8f68fbf7c6910869c3fea4ce9d578d38992a1fae8f47db1a8c5cdff"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/preparation.rs",
+      "sha256": "400e6710047b3b6a98dcffea6197a7bcb19af5212481f205e540b3a973ad9b30"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history/scope.rs",
+      "sha256": "73ab84ed149e23bafa865ceabea32711f32942139cd066dc927d8d8845255137"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_capacity_tests.rs",
+      "sha256": "4cafbbc40a4517952b09e16b1db2fff9ac7fb8a88fe72f4ca3564b3ca46c5a38"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_e2e_tests.rs",
+      "sha256": "316aa65aae132d6fbd62c44bc8d074bea8c8b2cab79c5f625c30475b3f43e7c1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_knowledge_e2e_tests.rs",
+      "sha256": "0528b3546068a6b8ef277a9d592b83b4cf225f800aecec89ea3c5c97ea8b121f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_private_context_tests.rs",
+      "sha256": "9b570934aaeabedd6aebedd784c943c73cbb97143a78e7a67225ad0b8e43922f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_private_fixture.rs",
+      "sha256": "53008ee3ce5a37daf4b3c338df88f65ace2a0a7270786ae3f5b7b78189fab14a"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_session_tests.rs",
+      "sha256": "c095d3939c8a8201ee09da28167db4ddc5b481f8008ef89d2aaf63de30c982a2"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_sessions.rs",
+      "sha256": "5c89248ac41cc49264f45f4978dbe7e65154a2d0a96168e443ba02c6b3160b13"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_thread_tests.rs",
+      "sha256": "529b19174ec5ea890da50e13a7e7137961eaa3f65442bcce3a1a801a8318fed7"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_views/mod.rs",
+      "sha256": "0849e2d6c392e29d085fc0cf5d65ac7d1741bb5528dedbca0af6c9c8b9ef9410"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_history_views/rows.rs",
+      "sha256": "6808c0767bfeb5b2f88fad78adf9c9b53dfea7cce73dc37c3bb68c0a5e8e252f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/mod.rs",
+      "sha256": "212656b9136bb65911cba6d7286b8180b20ff64a6446561366731ff20e656f1e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "sha256": "4bafff836f16cc310f08e2172ce6c8a42391b3fca2494ca7488a92c07bb0f209"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/agent_preparation.rs",
+      "sha256": "ae27ff461a0616633b1f55ca96c49a632706d1d3f3f101a799da8e5823542613"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/association.rs",
+      "sha256": "6ecb20b492f7f3bb216089d53619e2ff220149b2e1620818f231668d74189968"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/attention_decision_tests.rs",
+      "sha256": "be4293f622fb9ee3fa38a3fd8833ec5ea45c22f2beb59e480f6789dc18573234"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/authoring_reads.rs",
+      "sha256": "8442af97d11f17c2ff423b9abcc13e31fd3c2d165d9c82a463a8ed59c5cdb217"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/binding_association_tests.rs",
+      "sha256": "abbe34a7582196c5f6b3e194afb732d342b3ce8bb465efe6b506494f3439a3c2"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/binding_rows.rs",
+      "sha256": "7420d075df70e312e6122cb1c03af2685e30947164b65df069741faf2e883dcc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/bindings.rs",
+      "sha256": "da04855bed183a1c50f74d701056fb910b0bcabd2d845d9f0de67f9402b9b6d1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/board_reads.rs",
+      "sha256": "5d1d5666e3f5b6afe946c6b6869ae79ca5b883e0ba29d8a84bc187555a2bb0fc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_child_tests.rs",
+      "sha256": "5c542f96b9cc7bcf688a2957f33707fd07a8c1f1a1c95324251af5476adc0768"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_question_tests.rs",
+      "sha256": "bbcca62c3971a9da9dab9a9eb31de5c289d91c5f21577cc6ca4f332255dd4022"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply.rs",
+      "sha256": "867337f183c50225743c8417e0124b38fd6878ef735bdbef172c844b9defba08"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_authority.rs",
+      "sha256": "fc8f64708b387049abbca6c7be0c822bb6ca512a8962cbbe6739459e06da8685"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_integrity_tests.rs",
+      "sha256": "cbb41b615a46feab6a3b076b0b24f030b4e43dc9f03d980dc561d8a03d85a29c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_binding_tests.rs",
+      "sha256": "90ec6b56c426469f6c6f2049f25b610c184ac2357880904a8158afdfa2a85896"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion.rs",
+      "sha256": "525c00316435abec6e65fd6becc4204d46c245f428edf902c59aa45502f0dbfd"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_completion_tests.rs",
+      "sha256": "9c250a55942ce3b4d88fa52bc79b5d53758e54af16f4281c26d8d1766008b059"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_delivery.rs",
+      "sha256": "7540b307b10bc477e8b6103fa1e6df277ae8881d9a7caa99185e915ccc16eb8b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_e2e_tests.rs",
+      "sha256": "ec60818cf12a44fa551e544ff15ab21479bf1c7965679169b354bb4bddb0fc98"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_membership_tests.rs",
+      "sha256": "c3f2308d572aef19d04dd77f2c2d2ec6f80e011011d7b586d348627bc91c91dc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_native_tests.rs",
+      "sha256": "f6761351cbab15570ec8b7f9a478becc68aa9139bdd8c662d949783590b01685"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_policy_tests.rs",
+      "sha256": "2490abfee8178156864aeedd8cac42e157885e76a7be6522ec5b2dcec3ae5716"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publication_authority_tests.rs",
+      "sha256": "774ae56888b0c3621c877f9de3a1d5c80b6b8ffacf05dc2e2fcb1eddf2886a6c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish.rs",
+      "sha256": "ab627a74a5a0753a6ba7f996e88609635362261e8d3212f380c25a4785500dd8"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publish_plan.rs",
+      "sha256": "514d4931506b63dbf892118d360fffe277e8e25165acf97bc019e99f6e482241"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_publisher_lifecycle_tests.rs",
+      "sha256": "519061408783faba107be0388f4eecedccfaf1aad7e403113d9c4937f6930647"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.rs",
+      "sha256": "e4913b54739a279e2cc30889f99a370a151e5ba2f78eed330267cf2b681026be"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views.sql",
+      "sha256": "343398df57aeba5e00e185cb183df6a1ac6a583fcec058897b0ad2d1edaa1382"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/channel_reply_views_tests.rs",
+      "sha256": "8a9b531dfb93ccfcafa272665fadd15a4744be815c3471c9cc1e555f09eb5cc5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/children.rs",
+      "sha256": "8b5755be5ce491b41f950e951255a9d33463b983612a0d02b93f6eab07341be7"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "sha256": "b34b3a4c39f31a16f0bc885d0ba2e112a3ec90d827b88dae6175a016e8662954"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_delivery_privacy_tests.rs",
+      "sha256": "3df5913a7162dfc4f1e6c57d37d1c4a77b8fbb7d83c763f311313441c2309c67"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_delivery_tests.rs",
+      "sha256": "92b9cad2a4dd24effb8135ae1a001f521e580f564f8e4f56ab3fa9b3c7db054f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_role_admission_tests.rs",
+      "sha256": "2e244a04b86b72a3c5864892b1f66b6fd3b0a3a0734533aa0ec34d55e480fe7a"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_role_binding_tests.rs",
+      "sha256": "746c8aeeb1f243f368d81edb4258cca4dead1902ff02d71d80b74c85d4462265"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_policy_tests.rs",
+      "sha256": "674c9e01a5583cf0a7d076c4a0c2a37357037bf210411567d497f010809415cc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_read_tests.rs",
+      "sha256": "05cdbdf4ba72de4fbf18b0f50e69e29f23239f6b31bb6279c104f341e5415583"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/direct_workflow_tests.rs",
+      "sha256": "236c1781af978ea0961f38fde4af80e15d30ed3fa05f2f278624c2f8640a809f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_access.rs",
+      "sha256": "140602506dc0de153f22a89bd9234c09a54253f37bb3397d44dd502551aa1d17"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_binding_tests.rs",
+      "sha256": "ae9469a3ba64915e7670d09a8a8a26e4d2bb563df76a1ba0f1b3a0d09f5f9e1c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_guard_tests.rs",
+      "sha256": "0208b296df1825a4adb3f7feb8c786c5fc5fa54c5f881d3c1d428baa03450b04"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs",
+      "sha256": "82a37adb9d8240f2230f22a488ccef15b2e8061601b46516055498651e4ad6e1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_attention_tests.rs",
+      "sha256": "f40d2ee730e6842871a142475d708af9d82f132871f2afd925f0e2ba7511315c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_decisions.rs",
+      "sha256": "0fb2eb0c6dad3a2456d4d5f4a9241832c5f2408c9dc7cb68760cd6a3d4155e5f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs",
+      "sha256": "40556b89222fc8bd750b4f9aa229364a6a4b247405ec95934705be22c4e4a872"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "sha256": "c70dccc65b591d35f0cfd482737d1f5adba6505795f1bd5b9aca50c864acc7db"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/escalation_person_tests.rs",
+      "sha256": "bfdf5e476568639cf087fd05ec7423491a69bc1f22d0fea440b197aafb95ba66"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/inspection.rs",
+      "sha256": "0060886e2e457e8b71eba949b5d4f1e8dbb4759f32f35eb1104c86acc0e9fc61"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_assets.rs",
+      "sha256": "ecd46435aec133c1f8354d44d9590ae97ed31744e7cba5ca603116a1ebf5b687"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/jev_authorization.rs",
+      "sha256": "3d91f87870c92386691bc6a88a3abcfed7475d48d90f9e41eac5be74f895db5d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge.rs",
+      "sha256": "66c711b8cae0707f81910b6c00f3a6b2b0ae1a0295b0aa7a9fa1c53465333b39"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_race_tests.rs",
+      "sha256": "a7eb82b1558d87dcd4ed0e137ac3fe292dc031a0b258fca77af8d12c58335538"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_e2e_tests.rs",
+      "sha256": "7f894f9c36c92c6787c247ebcc59e12d92d89010039eb2f2b516ca260c39aa15"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_message_tests.rs",
+      "sha256": "4339a6da7241b69ad6aac684970b28a482cb3c8571d29011edfe0639b396bc3b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/knowledge_view_tests.rs",
+      "sha256": "c920146f88bfdccd46dab04280c6d16a2c63d920752e671eb81f6f456d965efe"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_continuation_tests.rs",
+      "sha256": "ee4897c8ce8ddd5dc56e47e642779a04379adce0d675b11f268f0a4295be3653"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agent_tests.rs",
+      "sha256": "ffa8d0c1e2f7ccb8b65063f1ee028a477404156035f396e122ac0bd2cfc599e7"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/local_agents/mod.rs",
+      "sha256": "fce7dbcebe79284959a05fc7690e50ff038f7a896fcd1cd4a58ce294c5cccf32"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message.rs",
+      "sha256": "ef6c924980cdc9016c6499ea9876189782aef492cf6a887f794c82401316e428"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_delivery_tests.rs",
+      "sha256": "33e166045ab09ed0d54885324521b9b2191e4a8b64e7adfb629058176e20a888"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_ingress_tests.rs",
+      "sha256": "05c6bee95eb4f14cab4da040845d9f74ad89ee9381ec047d1606486d07ac4df1"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intent_tests.rs",
+      "sha256": "a06d5603b3cc0541b160ce83278ebacfba35bd2ca2ecdeaafc69d4c110e70cc8"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_intents.rs",
+      "sha256": "393603c186726c7d07e917db1b054b1dd229c9708a8d15f795cf85b88978d1f6"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_publish.rs",
+      "sha256": "e8fba532b2ff97652ea216cf534d994086438eb776f671328ba2be4722bfbf3d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_reply_tests.rs",
+      "sha256": "dd184c20a9c4e51b2ec6fba667d8a977484849d6bf75fa0f1935dc803b1cc27c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_thread_tests.rs",
+      "sha256": "197c70f884304e3df655cc03dc6f10fae68186194c5ecd7dda9b927592714679"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/message_writer.rs",
+      "sha256": "8494fc7e93eb70b9333d275360648cad1eedfd0f6e822604cdcd3c541896a97e"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/mod.rs",
+      "sha256": "c1c3f296e2ba342c1d39f8797c8af5ba49ff3c4f1aa837afdddaa6185844ebda"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning.rs",
+      "sha256": "fd07b77bae6cb94adadd36005f521e0e8f04c4f97b4aca8a311270fddcc2b77b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_department.rs",
+      "sha256": "b3c5cc567eb047d926cf66cf2199ef3271179ad05a77dd12839f98b0c6895cdc"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_dispatch_tests.rs",
+      "sha256": "df81543d1dc53a01120907e8d1a986247c846b03c83ca2dc8256abf9324f39ee"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/provisioning_native.rs",
+      "sha256": "5ddd3cfe9221e6cacd60cad05fd1bc732e96c870fd48824995a0a592919e66f4"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_smtp_tests.rs",
+      "sha256": "e89a3aaa065dd8646ad2e1b39b49b402fa56679e0f4ae9acd6890c0dd96a800c"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_tests.rs",
+      "sha256": "2bfc951fb984c5a8a039502c7809117a47fdf411052ad6f55d32d68e37c0a34b"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/public_desk_private_agent_webhook_tests.rs",
+      "sha256": "63093c6b668e6628fafc7c1d62564fb1ae6295a1906893618df93352275f534a"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reads.rs",
+      "sha256": "c038c05cb1c0695464d3193bebfc5dd1724a65d91a4612e1382b9fddef65f0ce"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/reads_tests.rs",
+      "sha256": "034842131ca98726fbc9803acd498a5a065c8011580d40471e130a8addcd75fd"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_binding.rs",
+      "sha256": "3ec2e1e7f21208b2ba607e7de0ebe91e8a542eeb9ddc6c7a7febdb1a50eeb9dd"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+      "sha256": "a64d2bc2a84906b495fcbf7386e385543e87a93250e0b22f73fb3e4c5adc9fa5"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "sha256": "b886ae3f46849dd12eaa2f2aae5aeb459f7a9aa4098961ba521bfef52e2b67cb"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "sha256": "914483e18fc2f0670fff172378056a39e2a901e93edc60b4b47a415bbcabe89d"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/run_board_tests.rs",
+      "sha256": "38c0307bec867b15c5e0888a62607c4e31f9e7f7c56dcb15fcbb397ccaac994f"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/schedules.rs",
+      "sha256": "f967082910269a56191d84e1d36c24fc33220ac0d607e69929aca8e48879aab6"
+    },
+    {
+      "path": "src/adapters/persistence/workflow/vault_tests/owner_browser.rs",
+      "sha256": "2af4899f7c5bb8447c763ecce968995f5bcc360327884c898ba4c4ef19701d28"
+    },
+    {
+      "path": "src/adapters/protocols/email/authentication.rs",
+      "sha256": "f1b52ceb043458135bbc9f75a077ab2b6ec2d7be8d72e5a7fc4b17746952e972"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress.rs",
+      "sha256": "1d50441057086f0e51d52e153a7f81bf37ce02decce9451ab4d66de6e0e2d37e"
+    },
+    {
+      "path": "src/adapters/protocols/email/egress_tests.rs",
+      "sha256": "cd1eb9fa2b36f188c0d09b683086861e421bfe9e6a40a68c19fb40a9be69441a"
+    },
+    {
+      "path": "src/adapters/protocols/email/ingress.rs",
+      "sha256": "0760a7e8caa24753a5ba12ef7cdf5a69a0c254338a236309a95ecfed8855f8ed"
+    },
+    {
+      "path": "src/adapters/protocols/email/mod.rs",
+      "sha256": "bbe14edd316cec2b452f5092e6240c0e19b6fb26c09783de00ad4ad3470b7e73"
+    },
+    {
+      "path": "src/adapters/protocols/email/parser.rs",
+      "sha256": "4a08f465429990002c4e05503fe6e38ff2a5080094bf53a1d3e7ba61497dbd8a"
+    },
+    {
+      "path": "src/adapters/protocols/email/selector.rs",
+      "sha256": "3be4987fbac6e725cb1ee7ae747edf37841d87b66a02126fa08b062f8cfb633c"
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support.rs",
+      "sha256": "468a0ce6a8698d0db7e45b86db3709c7285f6b2bbc1f6069fb3b85ee75271848"
+    },
+    {
+      "path": "src/adapters/protocols/email/test_support/dns.rs",
+      "sha256": "15c5aaef25d9ec5ab44187b184064583a2970ab6df59b2e33dfb55a2292f4278"
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_egress_tests.rs",
+      "sha256": "9b29d2e7327dfc408dec3b071bc5093d25c5fc31ae810e741db30a651500fa38"
+    },
+    {
+      "path": "src/adapters/protocols/email/trace_tests.rs",
+      "sha256": "b856d497138d72811887266e05d2b143baf8e52269c4e518ab9ac1a202e53862"
+    },
+    {
+      "path": "src/adapters/protocols/email/types.rs",
+      "sha256": "b6745d6b1e36e25ac24f2499e497fb640529c9b62d17f1e6693e5aa48a079cd7"
+    },
+    {
+      "path": "src/adapters/resend_api/accounts.rs",
+      "sha256": "3384b22e2fe878de6add6d1286f2b1e0c0e5629c8acb2b80e0f9f7d4031bdc54"
+    },
+    {
+      "path": "src/adapters/resend_api/inbound.rs",
+      "sha256": "9706f29b58c3e00c4387cf3c9a006cda4db45ca52aac61f3de6bf04dbe466812"
+    },
+    {
+      "path": "src/adapters/resend_api/inbound_tests.rs",
+      "sha256": "370f8806e61672c083f39f2971b3cd5568db62f8119e0cd25668884a8d36067e"
+    },
+    {
+      "path": "src/adapters/sendgrid/inbound.rs",
+      "sha256": "7627bb32e918178c529a5488dc5a126cffbb6e9234d9c6e12c2b9936daa11b3f"
+    },
+    {
+      "path": "src/adapters/smtp/server.rs",
+      "sha256": "e420399a08db5b2cdbfa8834a45338dc32189da16fd6b805d7f826a5e9799c46"
+    },
+    {
+      "path": "src/application/attention.rs",
+      "sha256": "30f9b4ffd03621ed47c2ce194623981d6f492c9e7a5ec6e4027cef9cf3d250a3"
+    },
+    {
+      "path": "src/application/ports/channel.rs",
+      "sha256": "ec8c27cf8a3121737d3bcaee28e4ea166e7f0695b5d095f86fdd5b869d35eea9"
+    },
+    {
+      "path": "src/application/ports/integration.rs",
+      "sha256": "6ce04ce792f22998b6d0f8efa2ccf4b83eb3b9dc789d54eec5f42c6d6786751e"
+    },
+    {
+      "path": "src/application/ports/participant.rs",
+      "sha256": "851fffeb4c966f7b90f50d03580c3226df082cab07c511cd094c7dae7cf662fd"
+    },
+    {
+      "path": "src/application/ports/thread/mod.rs",
+      "sha256": "8a29d70304737f7ec84af5ab21419e7b95f147b5e54c60205f431a1c2a718c96"
+    },
+    {
+      "path": "src/application/run_counts.rs",
+      "sha256": "cc72c972753525d82a068fddeb0bdec70ca75b84d04938e6b400450b6a9c89b8"
+    },
+    {
+      "path": "src/application/services/delivery_worker_tests.rs",
+      "sha256": "5215f261acc4736c488511262bdc45a693ad298baaf64bf8c2f6f0ab30bd1ba6"
+    },
+    {
+      "path": "src/application/services/test_support.rs",
+      "sha256": "65c1fad6f0e130469cd73b964bd09801fb1d0f46263ffe5048a8ea70c0c388ea"
+    },
+    {
+      "path": "src/application/transport/compose.rs",
+      "sha256": "5d1b983e1fa86659aaf0837d52111b1773a6abc5f6608e1c3c44d58659d29740"
+    },
+    {
+      "path": "src/application/transport/delivery.rs",
+      "sha256": "af9d07567d1d3c2688e56057f6809d3504ff000fab40487d35014a1c579b3603"
+    },
+    {
+      "path": "src/application/transport/ingress.rs",
+      "sha256": "50ac63b2c117b40e0ee140c1c2054d1ff33f47f7e1afa2b18a549f075b79b778"
+    },
+    {
+      "path": "src/application/transport/mod.rs",
+      "sha256": "fa76f11c9c6e2a0355fc6a1c0e72d30e90bd2ef083e2b334efd6c69e093db132"
+    },
+    {
+      "path": "src/application/transport/ports.rs",
+      "sha256": "6aca0f7e2a642deed3c28f7043bd26a2360b50ea54522b3d705da371ae59d799"
+    },
+    {
+      "path": "src/application/transport/queue.rs",
+      "sha256": "71a32d21b1dced7f7ab4e277108750ab383dc626876e0e3bde4be207f6165d18"
+    },
+    {
+      "path": "src/application/transport/tests.rs",
+      "sha256": "6d99cb62805ebffa84ce91d3d847800b2850a86dfe6985e565b8ab3169290e2f"
+    },
+    {
+      "path": "src/application/use_cases/agent.rs",
+      "sha256": "21c8de5e5de39b54cc6f637d41f550d5e8cc75ab046ad6ad093c7a4ec42d3ffa"
+    },
+    {
+      "path": "src/application/use_cases/agent_tests.rs",
+      "sha256": "4df77b3f7bd03f1272bf16fc0b0bbe26091e373751d3f7fcca331c600ac817cd"
+    },
+    {
+      "path": "src/application/use_cases/channel.rs",
+      "sha256": "0f3cd6a2c991709de3fb2a04944f457e8e86ee72ac443fca6be4480cfefaa461"
+    },
+    {
+      "path": "src/application/use_cases/channel/public_settings_tests.rs",
+      "sha256": "5fdf23b6ff06a84bcfa4e9a6ce63ffb2c7ea8f8f1165e5c3d6010bb3ca42df6b"
+    },
+    {
+      "path": "src/application/use_cases/delivery.rs",
+      "sha256": "f2d87af04eb7988ebacf34f89b88c43db77e9f7dba797d9aad9acfe027286872"
+    },
+    {
+      "path": "src/application/use_cases/integration.rs",
+      "sha256": "d84eb5808ec6e2e8ef644b5edf1c52e03d26f3090f1f48b849edd18fef619ba3"
+    },
+    {
+      "path": "src/application/use_cases/onboarding.rs",
+      "sha256": "90acfc0f7dd6915443252077151c1133bfbb3937b2005f16010ffb1253a8f4a8"
+    },
+    {
+      "path": "src/application/use_cases/participant/test_support.rs",
+      "sha256": "f79a216623b9ba4c9e2e1e330c9e4114ee77bbf5bdf4ef9a3570652759232c25"
+    },
+    {
+      "path": "src/application/use_cases/thread/address_grouping_tests.rs",
+      "sha256": "a1a940bf991b3fa587d4d0c0fae80a7d2a031e905bbf707e6eee39ad19f274aa"
+    },
+    {
+      "path": "src/application/use_cases/thread/address_resolution_tests.rs",
+      "sha256": "d588658091e086153830a97144a96429b214d4facf6d391a5946df91de60726e"
+    },
+    {
+      "path": "src/application/use_cases/thread/department_desk_relay_tests.rs",
+      "sha256": "8ad652d6b6dc24a7ada68caca63d9d77c45df684b35e6b146066c1e82e47f416"
+    },
+    {
+      "path": "src/application/use_cases/thread/inbox.rs",
+      "sha256": "5a938c29568f673f0df44631e0f9f32c0061fc296c7455cbe79839f74979f710"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/canonical.rs",
+      "sha256": "32daed04219079a471a96937d66ba1b60b51da7f80e39f44453681e0b8012e8f"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/commit.rs",
+      "sha256": "9d3fb4b9613cd40f3558b8e336883be5d9c4eafbb92e022b731175f7241ef707"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/mod.rs",
+      "sha256": "74681684720df685806213d550682fd3d34c4cf7c452b0f7a4a50b436249a01c"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/policy.rs",
+      "sha256": "a2c7af2d751351169aa5afb811301238e7824d423c028a5b1b75896dd11fa3af"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/relay.rs",
+      "sha256": "a777d11ef8887b15e8210b8d02c3b010f610a7be521481b8ffa74a48e06476aa"
+    },
+    {
+      "path": "src/application/use_cases/thread/ingest/routing.rs",
+      "sha256": "b2104b58196e652e82615e47afed5ff3aa01ca334cb10ce58594a6fef1d6ef1d"
+    },
+    {
+      "path": "src/application/use_cases/thread/mod.rs",
+      "sha256": "1c3efeceb2ad944f7424f8e1551622448278d96ff9196b36cc6062723805ccde"
+    },
+    {
+      "path": "src/application/use_cases/thread/notices.rs",
+      "sha256": "e011f74a2f4936e06afd1cc8a477fb7396a71f3bf38710e5b0a580fe0a3cbbb8"
+    },
+    {
+      "path": "src/application/use_cases/thread/reads.rs",
+      "sha256": "cbb71e8a20db75b4344719d10e3566e5e9b3f424ba0f4e9dcad9ea72d47d65cc"
+    },
+    {
+      "path": "src/application/use_cases/thread/support.rs",
+      "sha256": "9f322fbcffa065d7050f7905513b61ce3fd7bd470f1f418c3c4eab79b343333b"
+    },
+    {
+      "path": "src/application/use_cases/thread/test_support.rs",
+      "sha256": "173370013cc17047a6de51df4557ce8ec736a5d8679f82cbe461eaefbd9ad749"
+    },
+    {
+      "path": "src/application/use_cases/thread/tests.rs",
+      "sha256": "d6dce80bf45b25a9890b73ddda03f47238b5cc917e9652f5d01352f4755e5079"
+    },
+    {
+      "path": "src/application/use_cases/user/mod.rs",
+      "sha256": "b091429189dd9dcc1b79a72d2ac34d672619f3c1bfa1bee986bbbcbec6c88728"
+    },
+    {
+      "path": "src/application/use_cases/user/ports.rs",
+      "sha256": "7f0c5c31daad719f9eef0cf9fe66f9aad3cac1ff3c20c377c3cfad26088cdd76"
+    },
+    {
+      "path": "src/application/use_cases/user/tests.rs",
+      "sha256": "e84c5aa940a40b3d56e69a6ef7c35419bcc1f52a6314630431d3d99c70d9b3a7"
+    },
+    {
+      "path": "src/application/workflow/agent_history/identity.rs",
+      "sha256": "c3354205c3692485e0e06404418f41dba9c223d86bbfb779fe2a457f14467ca9"
+    },
+    {
+      "path": "src/application/workflow/authorization.rs",
+      "sha256": "c28871a5171e8224b5d160ecd2e5508e26ff22e62c3cbb81e14ca9ad10032a70"
+    },
+    {
+      "path": "src/application/workflow/board.rs",
+      "sha256": "1ab79940c5f492bc517558850e4ea139fc04fc7502a01aa22d245cd11212c6bd"
+    },
+    {
+      "path": "src/application/workflow/board_tests.rs",
+      "sha256": "7386a2087079ce5bca9c4187fc48557c2f11677f77884c78cbc860d6017ac0df"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/mod.rs",
+      "sha256": "0d1992c9ceb3f021c370505b8c66520d50b9aeecbef44ac0dad474cb73a8147d"
+    },
+    {
+      "path": "src/application/workflow/channel_reply/outcomes.rs",
+      "sha256": "c2ee56db111e4f0c783209c6d20767c6dfdc2480474b36bffbdc341093b45a0b"
+    },
+    {
+      "path": "src/application/workflow/message.rs",
+      "sha256": "d9a3c6278077afe4f155295063b971469cd99ef4deb85d63b079db2e5b5a7690"
+    },
+    {
+      "path": "src/application/workflow/message_admission.rs",
+      "sha256": "a6e54771e7a0f9002342df0db63c77d4cf310652a5c3e71969b8f90e137d611a"
+    },
+    {
+      "path": "src/application/workflow/message_planner.rs",
+      "sha256": "e585ad15d2f9e47b23d591000fdee175276ba8e4e31ff6b1f6cdf446086a2aa3"
+    },
+    {
+      "path": "src/application/workflow/reads.rs",
+      "sha256": "9a2d9060f796e2ff7fe271ced915fa6c7b55a161f940366df00dcc6c76f3e242"
+    },
+    {
+      "path": "src/application/workflow/templates/test_support.rs",
+      "sha256": "028745ad77e5daf105855381af7f7a93c27580a4455920f1222435ea740a7845"
+    },
+    {
+      "path": "src/application/workflow/tests.rs",
+      "sha256": "f0dd700bbe60484a92e0983da41c877805a8415ef3b3356c149adcd9392b3ba0"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/association.rs",
+      "sha256": "9234aa1f4eb3a139433f5be26914946b0084d1d8155dc67c450d9117402b630e"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/cancellation.rs",
+      "sha256": "773429dac14242eeaa4c5e04460210af8d73bc8ea1ce8cbd96c5d805baba4500"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/mod.rs",
+      "sha256": "021f78ae5f219ea973c7c1a04dac4871c33d71c4ed1c51902a75058d87b277a0"
+    },
+    {
+      "path": "src/application/workflow/tests/authorization_cases/reader_errors.rs",
+      "sha256": "11fe832aed854b944dbe6ed30f22a4533cc0c29f3e8546b4cbfd9187c9540dee"
+    },
+    {
+      "path": "src/domain/entities/address.rs",
+      "sha256": "2c1da6a121552249fed4de236bcbaa3eeaf86fb2c94ae984c645819e7f89901b"
+    },
+    {
+      "path": "src/domain/entities/agent.rs",
+      "sha256": "f37f412617e46f53dd777379be237982ed46a0e51a264c694ad8a8d4e5db3ba0"
+    },
+    {
+      "path": "src/domain/entities/attention.rs",
+      "sha256": "1862dff0be9e7354437384468109117911fd22465d0d81926f777e2f62f13fcc"
+    },
+    {
+      "path": "src/domain/entities/channel.rs",
+      "sha256": "42094a86e1d3fc4ef43b1bb7751a4f2b8fde921f1275291e668d13428f9b0e54"
+    },
+    {
+      "path": "src/domain/entities/delivery.rs",
+      "sha256": "cb73640f74ae2ab242f98bf33896db704958790ecbc5c268d0a3ca10698db254"
+    },
+    {
+      "path": "src/domain/entities/internal_note.rs",
+      "sha256": "22ea26e2ac15de3c9a4e936774ad1a6983678fc3116c098136d400aa6ccd47eb"
+    },
+    {
+      "path": "src/domain/entities/message_view.rs",
+      "sha256": "9a93d0b6e1a4a2a9dcb241cb3dd473c21514528c3339939e35a4c6acf14d6e32"
+    },
+    {
+      "path": "src/domain/entities/mod.rs",
+      "sha256": "d812b8b639bff892bb47cc4596206fadca2e4e3ae2f466bcd5181635a3426dd1"
+    },
+    {
+      "path": "src/domain/entities/notification.rs",
+      "sha256": "b2be2abeea55c3e5b0d559126ed53b9cc1f1cd2e8bb24c0174ddd7fa0fb8ebfc"
+    },
+    {
+      "path": "src/domain/entities/participant.rs",
+      "sha256": "5916553157bcdf6a6244281095ae6e4b76c0f6a55e1198de649b4fb8853b2870"
+    },
+    {
+      "path": "src/domain/entities/participant/direct_tests.rs",
+      "sha256": "bf0b8b60d6ba8e3c22b5d8726a3d7608e4966a0529c0c2888e8b415f3f4eb370"
+    },
+    {
+      "path": "src/domain/entities/thread.rs",
+      "sha256": "e1afb396ce9e4d36a2086788e0fc12c97304522bc64bf193fe3012e618b245b1"
+    },
+    {
+      "path": "src/domain/entities/transport/integration.rs",
+      "sha256": "08a909ec33561afc2b39e05ce2f1266142b58472f5284558315ba1a349dbf3f5"
+    },
+    {
+      "path": "src/domain/entities/transport/mod.rs",
+      "sha256": "3cc20e16e6cc0021a9287bd67b591abad4bd30e926a68c2bc97343e6fa83639c"
+    },
+    {
+      "path": "src/infra/events.rs",
+      "sha256": "0d06f32074ef01c62fa02e7195a029754671a24efd302b8d30b4740c54fb3141"
+    },
+    {
+      "path": "src/infra/setup/accounts.rs",
+      "sha256": "571596829075be956cf37ce563d97698414b30118b43877194be6f6aac48f2f7"
+    },
+    {
+      "path": "src/infra/setup/foundation.rs",
+      "sha256": "f16264a7036b7f906e4ff94f85c8e48ff1768e9b96edb8b911f3a6b93d54fe41"
+    },
+    {
+      "path": "src/infra/setup/inbound.rs",
+      "sha256": "11b6e99cd476a5267520956b460fad341028044498b4dfc13e4cf7407e609475"
+    },
+    {
+      "path": "src/infra/setup/workers.rs",
+      "sha256": "da033353466b99c017ad52f9029263f362a131bf3a66ef61c9655e934782df86"
+    }
+  ]
+}

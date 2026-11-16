@@ -234,12 +234,12 @@ async fn autonomous_agent_workflow_reference_rename_cannot_redirect_an_existing_
     let setup = Box::pin(agent_setup(&origin)).await;
     let p = &setup.fixture.persistence;
     let old = selected(&setup, setup.claim.fence.scope.run).await;
-    sqlx::query("UPDATE agents SET slug='renamed-assistant' WHERE company_id=$1 AND id=$2")
-        .bind(scope(&setup).company.as_uuid())
-        .bind(setup.agent)
-        .execute(p.pool())
-        .await
-        .unwrap();
+    crate::adapters::persistence::test_support::rename_native_agent(
+        p,
+        scope(&setup),
+        "renamed-assistant",
+    )
+    .await;
     let original = setup.fixture.publish_agent(setup.agent).await;
     let replacement = AgentPersistence::create(
         p,

@@ -1,0 +1,73 @@
+✔ an explicit A descriptor keeps A ownership after B replaces the mapping pointer and cannot borrow a counter (22.785583ms)
+✔ exact acknowledged identity is required before creating an intent and duplicate request mappings refuse (5.005375ms)
+✔ physical SQLite reopen preserves immutable invocation, receipt and original absolute deadline (5.316458ms)
+✔ record and byte bounds refuse before a second admission while saved identity remains recoverable (7.406292ms)
+✔ unresolved effects pin exact source through collection; resolved collection refuses a later old callback (25.202792ms)
+✔ MCP native preflight refuses an older core before any provider mutation; instructions-only still launch (60.063583ms)
+✖ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (12.267708ms)
+✖ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (8030.009334ms)
+✖ native abort cancels the immutable invocation even when the admission response was lost (6.666459ms)
+✔ MCP HTTPS transport refuses oversized replies, redirects, invalid metadata and an individual request deadline (101.634ms)
+✔ native immutable cache preserves namespaced YAML, exact assets, modes and tree hashes, and checks server authority on every hit (65.00025ms)
+✔ native cache bytes refuses without reconstructing a mapped bundle (31.154125ms)
+✔ native cache mode refuses without reconstructing a mapped bundle (29.319958ms)
+✔ native cache symlink refuses without reconstructing a mapped bundle (28.858458ms)
+✔ native cache missing refuses without reconstructing a mapped bundle (27.588916ms)
+✔ native cache capacity refuses before writes and the download/materialization slot is bounded (3.864833ms)
+✔ configured spawn holds before positive mapping, durably binds its receipt, then rechecks and supplies full required configuration (31.40575ms)
+✔ configured lost spawn receipt never recovers authority from editable metadata or repeats a spawn (24.898792ms)
+✔ native cache cancellation joins owned writes without publishing a partial bundle (2.633042ms)
+✔ native cache keeps command and session references through acknowledgement and retires only the confirmed unchanged mapping (35.697375ms)
+✔ native cache abort during materialization removes its owned temporary directory before returning (11.114333ms)
+✔ native cache inventory rejects unexpected bytes in another bundle before admitting new materialization (26.189042ms)
+✔ native handoff rejects case-colliding directory components before writes and preserves identical repeated parents (25.581916ms)
+✔ MCP contracts retain exact schema bytes and reject substituted binding/source identities before cache writes (23.599125ms)
+ℹ tests 24
+ℹ suites 0
+ℹ pass 21
+ℹ fail 3
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 16232.140917
+
+✖ failing tests:
+
+test at build-tests/mcp-proxy.test.js:2164:1
+✖ registered MCP proxy lists and describes the exact frozen contract without creating effect intents (12.267708ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  + actual - expected
+  
+  + {
+  +   content: [
+  +     {
+  +       text: 'Openbot company MCP could not complete this request. Check the linked Openbot run or connector status before trying another effect.',
+  +       type: 'text'
+  +     }
+  +   ],
+  +   isError: true
+  + }
+  - '{"binding":{"id":"6169cef8-cc95-408d-8036-32aef2ef03b0","alias":"crm","source":{"kind":"mcp","connection":"6978cb29-a373-495e-aec9-38097df29ee8","operation":"lookup","reviewed_version":"30e89418-aceb-41d4-919f-b26e97e46e2e","remote_name":"lookup"}},"input_schema":{"type":"object","maximum":18446744073709551615},"output_schema":true,"policy":{"capability":"mcp.call","policy_revision":1,"effect":"write","recovery":"reconcile"},"approval_required":true}'
+  
+      at TestContext.<anonymous> (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin/build-tests/mcp-proxy.test.js:2172:13)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: { isError: true, content: [ [Object] ] },
+    expected: '{"binding":{"id":"6169cef8-cc95-408d-8036-32aef2ef03b0","alias":"crm","source":{"kind":"mcp","connection":"6978cb29-a373-495e-aec9-38097df29ee8","operation":"lookup","reviewed_version":"30e89418-aceb-41d4-919f-b26e97e46e2e","remote_name":"lookup"}},"input_schema":{"type":"object","maximum":18446744073709551615},"output_schema":true,"policy":{"capability":"mcp.call","policy_revision":1,"effect":"write","recovery":"reconcile"},"approval_required":true}',
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at build-tests/mcp-proxy.test.js:2182:1
+✖ TLS proxy journals before POST, retries a lost response with the same owner, rotates credentials and holds through pending approval (8030.009334ms)
+  Error: fixture condition timed out
+      at waitFor (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin/build-tests/mcp-proxy.test.js:2120:36)
+      at async TestContext.<anonymous> (file:///private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree/integrations/cloudroom-plugin/build-tests/mcp-proxy.test.js:2228:5)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7)
+
+test at build-tests/mcp-proxy.test.js:2251:1
+✖ native abort cancels the immutable invocation even when the admission response was lost (6.666459ms)
+  [AssertionError [ERR_ASSERTION]: Missing expected rejection.] { generatedMessage: false, code: 'ERR_ASSERTION', actual: undefined, expected: undefined, operator: 'rejects', diff: 'simple' }

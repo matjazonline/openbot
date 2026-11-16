@@ -219,6 +219,7 @@ struct ParentRun {
     content_exact: bool,
     actor_id: Uuid,
     channel_id: Option<Uuid>,
+    principal_id: Option<Uuid>,
     thread_id: Option<Uuid>,
     correlation_id: Uuid,
     delivery_policy: String,
@@ -234,14 +235,18 @@ pub(super) async fn create_on(
     start: &ChildStart<'_>,
 ) -> AppResult<ParkedWorkflow> {
     let parent = sqlx::query_as::<_, ParentRun>(
-        "SELECT actor_id, channel_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level, content_exact FROM workflow_runs \
+        "SELECT actor_id, channel_id, principal_id, thread_id, correlation_id, delivery_policy, knowledge_ceiling::smallint AS knowledge_ceiling, content_level::smallint AS content_level, content_exact FROM workflow_runs \
          WHERE company_id=$1 AND id=$2",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
     .fetch_one(&mut *db)
     .await?;
-    let association = binding_rows::association_from_columns(parent.channel_id, parent.thread_id)?;
+    let association = association::association_from_columns(association::AssociationColumns {
+        channel_id: parent.channel_id,
+        principal_id: parent.principal_id,
+        thread_id: parent.thread_id,
+    })?;
     let child = RunId::new(Uuid::new_v4());
     let coordinates = child_coordinates(scope, start)?;
     let trigger = TriggerRef::new(
@@ -354,6 +359,7 @@ async fn insert_child_on(
             rerun_of: None,
             // A simulation's child is a simulation too: it cannot send what its parent may not.
             delivery_policy: DeliveryPolicy::parse(&parent.delivery_policy)?,
+            native_mcp_call: None,
         },
     )
     .await?;

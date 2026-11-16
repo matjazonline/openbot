@@ -63,7 +63,7 @@ pub struct HumanPromptOutcome {
 pub struct ChannelResponseOutcome {
     pub run: RunId,
     pub source: CanonicalMessageId,
-    pub channel: Uuid,
+    pub target: crate::entities::address::AddressTarget,
     pub thread: Uuid,
     pub execution: RunStateName,
     pub waiting_for_review: bool,

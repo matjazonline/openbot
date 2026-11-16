@@ -13,7 +13,7 @@ import { waitFor, server, write } from './connection-support.js';
 
 test('real trusted WSS reconnect rewraps immutable outbox and native tracking continues offline without duplicate SDK calls', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
-  const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); const connector = new Connector(new Dispatcher(f.journal, n.sdk));
   const stop = new AbortController(); const op = operation(command);
   let generation = 0; let delivered = false; let cut = false; let terminal = false;
@@ -22,7 +22,7 @@ test('real trusted WSS reconnect rewraps immutable outbox and native tracking co
     try {
       assert.equal(request.headers.authorization, `Bearer ${'a'.repeat(64)}`);
       assert.equal(request.headers['x-openbot-installation-id'], f.binding.installation_id);
-      assert.equal(request.headers['x-openbot-protocol-version'], '1'); assert.equal(request.url, '/v1/local-machines/connect');
+      assert.equal(request.headers['x-openbot-protocol-version'], '2'); assert.equal(request.url, '/v1/local-machines/connect');
     } catch (error) { failures.push(error); }
     const identity: Identity = { installation_id: f.binding.installation_id, credential_generation: 1, connection_generation: ++generation };
     const assembler = new FrameAssembler(); let through = 0;
@@ -31,6 +31,7 @@ test('real trusted WSS reconnect rewraps immutable outbox and native tracking co
         const message = assembler.push(data as Buffer) as Record<string, any> | undefined;
         if (!message) return;
         if (message.kind === 'hello') {
+          assert.equal(message.hello.version, 2);
           assert.equal(message.hello.journal_id, f.binding.journal_id);
           // Replay the last unacknowledged observation after the deliberate cut.
           through = f.journal.acknowledged();
@@ -117,7 +118,7 @@ for (const invalid of ['stale_identity', 'changed_digest', 'binary', 'unknown_fi
 }
 test('public plugin service reload joins SDK work before storage closes and settings changes stop admission', async () => {
   const s = await server(); const f = fixture({ initialized: false }); f.binding.origin = s.origin; f.journal.initialize(f.binding);
-  const command = send(); f.journal.bindSession(command.session_id, command.thread_id, f.selection);
+  const command = send(); f.journal.bindSession({sessionId:command.session_id,threadId:command.thread_id,selection:f.selection,harness:{kind:'unconfigured'},operationId:'00000000-0000-4000-8000-000000000001',hostId:null});
   const n = nativeFixture(f.journal, f.selection); n.state.held = true; const op = operation(command);
   let changed: (next: any, prev: any) => void = () => {};
   let start!: (signal: AbortSignal) => Promise<void>; let runCli!: (argv: string[], context: {}) => Promise<any>;

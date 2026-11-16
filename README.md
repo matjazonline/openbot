@@ -261,17 +261,57 @@ sqlx migrate run
 
 ### Running Checks
 
-`scripts/check.sh` runs every CI gate locally, in CI's order: generated CSS, frontend and
-deployment script tests, formatting, the transport boundary, offline compilation, Clippy, SQLx
-metadata, the network-isolated database-backed test suite and the stack budget. It ends with a
-pass/fail summary; add `--fail-fast` to stop at the first failure.
+`scripts/check.sh` runs the required local equivalents of the CI suites: root Rust and script
+tests, native-markup browser protocols, Cloudroom plugin tests and packaging, stack and lease
+budgets, the independent memory and attribution service suites, contracts, backup/restore,
+service integration journeys, production images, and managed Doop acceptance. It ends with a
+pass/fail summary; `--fail-fast` marks later gates skipped after the first failure. Missing
+prerequisites fail their gates rather than silently omitting coverage. Attribution gates apply
+on branches containing its service directory or CI workflow; a declared service with missing
+source fails its gates.
 
 ```bash
 ./scripts/check.sh
 ```
 
-It needs the local database running, `sqlx-cli` installed and `npm ci` run once. `DATABASE_URL`
-defaults to `postgres://$(whoami)@localhost:5432/open_bots`, which migrations are applied to. The
-test suites run against a database the script creates for the run and drops on exit, so a
-`cargo test` started elsewhere against the shared `open_bots_test` cannot truncate fixtures out
-from under it.
+Prerequisites are PostgreSQL 18 with pgvector, a maintenance superuser, matching PostgreSQL
+client tools, `sqlx-cli` 0.8.6, the repository's Rust toolchains (including 1.95.0), Docker,
+Node 24.21.0/npm 11.19.0, Python, OpenSSL, rsync and an installed sandboxed system Chrome.
+Set `DOOP_TEST_UI_CHROME` to that Chrome executable. `MEMORY_PG_BIN` can select the directory
+containing PostgreSQL 18's `pg_dump`, `pg_restore` and `psql` when it is not on `PATH`.
+
+Install the locked JavaScript and contract dependencies and both pinned Chromium versions first:
+
+```bash
+npm ci
+npm --prefix integrations/cloudroom-plugin ci
+node_modules/.bin/playwright install chromium
+if [ -d services/attribution ]; then
+  npm --prefix services/attribution/browser ci
+  services/attribution/browser/node_modules/.bin/playwright install chromium
+  python3 -m venv tmp/attribution-contract-env
+  tmp/attribution-contract-env/bin/pip install --require-hashes -r services/attribution/contract/requirements.lock
+  export ATTRIBUTION_CONTRACT_PYTHON="$PWD/tmp/attribution-contract-env/bin/python"
+fi
+```
+
+The PostgreSQL server must preload `pg_stat_statements`, with `pg_stat_statements.track=top`,
+`pg_stat_statements.track_utility=off`, `log_parameter_max_length=0`, and
+`log_parameter_max_length_on_error=0`. Configure/restart your test server explicitly; the runner
+checks these settings without changing them. Model preparation and managed-service/image builds
+use the network; the Rust suites run with external network access denied.
+
+`DATABASE_URL` supplies maintenance access and defaults to
+`postgres://$(whoami)@localhost:5432/postgres`. The runner creates a UUID-named database, applies
+migrations and validates SQLx metadata there, then runs the root tests there and drops it on exit.
+It does not migrate the configured database. Service runners create their own isolated resources;
+`MEMORY_TEST_DATABASE_URL` and `ATTRIBUTION_TEST_ADMIN_URL` default to the same server's `postgres`
+database. `MEMORY_INTEGRATION_ADMIN_URL` must use the same server as the root test database.
+
+`scripts/tests/check-runner.py` fails when a script test is added without registration. The three
+explicit manual exceptions are `run-list-query-plan.py`, `workflow-authoring-browser.cjs` and
+`workflow-runs-browser.cjs`, which require an explicitly selected database or application.
+Paid-provider smoke tests, optional public-DNS checks, manual performance measurements and native
+Cloudroom acceptance requiring a separately owned patched checkout remain opt-in. Ignored browser
+fixtures and the required service integration tests are selected explicitly; the runner never
+enables every ignored test indiscriminately.

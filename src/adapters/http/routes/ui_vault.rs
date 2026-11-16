@@ -109,6 +109,8 @@ async fn page(
         user: &viewer,
         company: None,
         pane_html: &content,
+        // The vault is its own page under the profile shell; the addresses live on the profile.
+        addresses_html: "",
     })))
 }
 #[derive(Deserialize)]

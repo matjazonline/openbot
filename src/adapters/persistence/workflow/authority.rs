@@ -47,24 +47,34 @@ pub(crate) async fn authorize_company(
     company: CompanyId,
     actor: WorkflowActor,
 ) -> AppResult<crate::entities::access_level::LevelActor> {
+    authorize_company_with_locks(db, company, actor, super::row_locks::RowLocks::Wait).await
+}
+
+pub(in crate::adapters::persistence) async fn authorize_company_with_locks(
+    db: &mut PgConnection,
+    company: CompanyId,
+    actor: WorkflowActor,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<crate::entities::access_level::LevelActor> {
     use crate::adapters::persistence::participant::{membership_from_db, reader_level};
     use crate::entities::access_level::LevelActor;
-    let owner: Uuid =
-        sqlx::query_scalar("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE")
-            .bind(company.as_uuid())
-            .fetch_optional(&mut *db)
-            .await?
-            .ok_or_else(missing)?;
+    let owner: Uuid = sqlx::query_scalar(
+        &locks.sql("SELECT user_id FROM companies WHERE id = $1 FOR NO KEY UPDATE"),
+    )
+    .bind(company.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .ok_or_else(missing)?;
     #[derive(sqlx::FromRow)]
     struct MemberAuthority {
         role: String,
         access_level: i16,
     }
     let facts=sqlx::query_as::<_,MemberAuthority>(
-        "SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
+        &locks.sql("SELECT member.role, member.access_level::smallint AS access_level FROM company_members AS member \
          JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id \
          WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' \
-         FOR SHARE OF member,principal")
+         FOR SHARE OF member,principal"))
         .bind(company.as_uuid()).bind(actor.user_id()).fetch_optional(db).await?.ok_or_else(missing)?;
     let membership = membership_from_db(Some(&facts.role))?;
     if membership.is_owner() != (owner == actor.user_id()) {

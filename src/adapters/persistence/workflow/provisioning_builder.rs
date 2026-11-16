@@ -1,4 +1,4 @@
-//! The Agent Builder's `create_agent_channel` (01DEP-P03-D5): a company agent through the shared
+//! The Agent Builder's `create_agent` (01DEP-P03-D5): a company agent through the shared
 //! creation, then its default desk as the answer or another desk beside it, in one savepoint.
 use std::str::FromStr;
 
@@ -12,12 +12,12 @@ use crate::use_cases::agent::AgentPlacement;
 /// the creation answers for the request (a conflict, an invalid or missing reference), or one
 /// left behind by a slug another creator took meanwhile. Anything else propagates, so the action
 /// transaction rolls back (F046).
-pub(super) async fn create_agent_channel_on(
+pub(super) async fn create_agent_on(
     tx: &mut Transaction<'_, Postgres>,
     templates: &ProvisioningDeployment,
     company: CompanyId,
     requester: WorkflowActor,
-    spec: &CreateAgentChannel,
+    spec: &CreateAgent,
     invocation: Uuid,
 ) -> AppResult<Provisioned<Value>> {
     let mut savepoint = sqlx::Acquire::begin(&mut **tx).await?;
@@ -60,7 +60,7 @@ async fn builder_on(
     templates: &ProvisioningDeployment,
     company: CompanyId,
     requester: WorkflowActor,
-    spec: &CreateAgentChannel,
+    spec: &CreateAgent,
     invocation: Uuid,
 ) -> AppResult<Provisioned<Value>> {
     let created_by = CreationProvenance::user(requester.user_id());
@@ -73,16 +73,6 @@ async fn builder_on(
     }
     if let Some(refusal) = malformed("agent slug", &write.slug) {
         return Ok(Err(refusal));
-    }
-    let desk_slug = spec
-        .channel_slug
-        .as_deref()
-        .map_or_else(|| write.slug.clone(), |slug| slug.trim().to_lowercase());
-    let default_desk = desk_slug == write.slug;
-    if default_desk && !answers_as_default_desk(spec, &write.name) {
-        return Ok(Err(ProvisioningRefusal::Invalid(
-            "The agent's own address is its autonomous default desk; choose another address for a reviewed desk, custom steps or another name".into(),
-        )));
     }
     let placement = match placement_on(tx, company, requester, spec).await? {
         Ok(placement) => placement,
@@ -104,27 +94,23 @@ async fn builder_on(
         },
     ))
     .await?;
-    let answer = if default_desk {
-        created.desk
-    } else {
-        let provisioning = Provisioning {
-            company,
-            requester,
-            agent_slug,
-            channel_slug: desk_slug,
-            channel_name: spec
-                .channel_name
-                .clone()
-                .unwrap_or_else(|| spec.name.clone()),
-            reply_mode: spec.reply_mode,
-            steps: spec.steps.clone(),
-            key,
-        };
-        match Box::pin(provision_on(tx, templates, &provisioning)).await? {
-            Ok(provisioned) => provisioned.to_json(),
-            Err(refusal) => return Ok(Err(refusal)),
-        }
-    };
+    let company_slug: String = sqlx::query_scalar("SELECT slug::text FROM companies WHERE id=$1")
+        .bind(company.as_uuid())
+        .fetch_one(&mut **tx)
+        .await?;
+    let address = crate::entities::channel::Channel::address_for(
+        &crate::entities::value_objects::ChannelSlug::from(agent_slug.as_str()),
+        &crate::entities::value_objects::CompanySlug::from(company_slug),
+        &templates.app_domain,
+    );
+    let answer = json!({
+        "agent": {"id": key.id("agent"), "slug": agent_slug},
+        "principal_id": created.principal,
+        "address": address,
+        "workflow_id": created.workflow.workflow.as_uuid(),
+        "version_id": created.workflow.version.as_uuid(),
+        "binding_id": created.workflow.binding.as_uuid(),
+    });
     if let Some(placement) = placement {
         place_in_department_on(
             tx,
@@ -140,24 +126,13 @@ async fn builder_on(
     Ok(Ok(answer))
 }
 
-/// Whether the requested desk is exactly the agent's default one: autonomous, no added steps, and
-/// the agent's own name.
-fn answers_as_default_desk(spec: &CreateAgentChannel, agent_name: &str) -> bool {
-    spec.reply_mode == ReplyMode::Autonomous
-        && spec.steps.is_empty()
-        && spec
-            .channel_name
-            .as_deref()
-            .is_none_or(|name| name.trim() == agent_name)
-}
-
 /// The department the agent joins: the named one, or the requester's own when they belong to
 /// exactly one (plan 01-departments 03C item 0). A role needs a named department.
 async fn placement_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
     requester: WorkflowActor,
-    spec: &CreateAgentChannel,
+    spec: &CreateAgent,
 ) -> AppResult<Provisioned<Option<AgentPlacement>>> {
     let role = match spec.role.as_deref().map(DepartmentRole::from_str) {
         None => None,
@@ -220,12 +195,12 @@ async fn placement_on(
     ))
 }
 
-/// After an unexpected error: the conflict refusal when the agent's slug or either desk address
+/// After an unexpected error: the conflict refusal when the agent's slug or direct address
 /// was taken by a creator that does not hold the company lock.
 async fn taken_by_another(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
-    spec: &CreateAgentChannel,
+    spec: &CreateAgent,
 ) -> AppResult<Option<ProvisioningRefusal>> {
     let taken: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT 1 FROM agents WHERE company_id = $1 AND slug = $2)",
@@ -243,8 +218,5 @@ async fn taken_by_another(
     if let Some(refusal) = taken_slug(tx, company, &spec.slug).await? {
         return Ok(Some(refusal));
     }
-    match spec.channel_slug.as_deref() {
-        Some(slug) => taken_slug(tx, company, slug).await,
-        None => Ok(None),
-    }
+    Ok(None)
 }

@@ -35,6 +35,7 @@ pub trait AttentionPersistence: Send + Sync {
         &self,
         company_id: uuid::Uuid,
         visible_channel_ids: &[uuid::Uuid],
+        viewer: PrincipalId,
     ) -> AppResult<OperationalSummary>;
 }
 
@@ -165,6 +166,7 @@ impl AttentionUseCases {
                 visible_channel_ids,
                 manager,
                 company_items,
+                direct_items: request.department.is_none(),
                 view: request.view,
                 cursor: request.cursor,
                 limit: request.limit.unwrap_or(AttentionQuery::DEFAULT_LIMIT),
@@ -193,7 +195,11 @@ impl AttentionUseCases {
         let started = Instant::now();
         let summary = self
             .attention
-            .operational_summary(company_id, &context.visible_channel_ids)
+            .operational_summary(
+                company_id,
+                &context.visible_channel_ids,
+                context.principal_id,
+            )
             .await?;
         self.monitoring.record_histogram(
             "operational_summary_query_duration",

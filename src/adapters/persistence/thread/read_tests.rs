@@ -46,7 +46,11 @@ async fn thread_index_lookup_uses_binary_ancestors_and_channel_scope() {
     assert_eq!(
         fixture
             .persistence
-            .find_thread_by_thread_index(fixture.channel_id, &direct_reply)
+            .find_thread_by_thread_index(
+                fixture.company_id,
+                crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+                &direct_reply
+            )
             .await
             .unwrap()
             .unwrap()
@@ -66,7 +70,11 @@ async fn thread_index_lookup_uses_binary_ancestors_and_channel_scope() {
     assert_eq!(
         fixture
             .persistence
-            .find_thread_by_thread_index(fixture.channel_id, &third_reply)
+            .find_thread_by_thread_index(
+                fixture.company_id,
+                crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+                &third_reply
+            )
             .await
             .unwrap()
             .unwrap()
@@ -87,7 +95,11 @@ async fn thread_index_lookup_uses_binary_ancestors_and_channel_scope() {
     assert_eq!(
         fixture
             .persistence
-            .find_thread_by_thread_index(foreign_channel, &third_reply)
+            .find_thread_by_thread_index(
+                fixture.company_id,
+                crate::entities::address::AddressTarget::Desk(foreign_channel),
+                &third_reply
+            )
             .await
             .unwrap()
             .unwrap()
@@ -106,7 +118,11 @@ async fn invalid_thread_index_returns_before_database_access() {
     let persistence = PostgresPersistence::new(pool);
 
     let found = persistence
-        .find_thread_by_thread_index(Uuid::new_v4(), &ThreadIndex::from("not-base64"))
+        .find_thread_by_thread_index(
+            Uuid::new_v4(),
+            crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
+            &ThreadIndex::from("not-base64"),
+        )
         .await
         .unwrap();
     assert!(found.is_none());
@@ -249,7 +265,12 @@ async fn list_threads_updated_after_reads_forward_from_a_cursor() {
 
     let all = fixture
         .persistence
-        .list_threads_updated_after(fixture.channel_id, None, 50)
+        .list_threads_updated_after(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            None,
+            50,
+        )
         .await
         .unwrap();
     assert_eq!(all.len(), 3, "no cursor means the whole channel");
@@ -261,14 +282,24 @@ async fn list_threads_updated_after_reads_forward_from_a_cursor() {
 
     let after_first = fixture
         .persistence
-        .list_threads_updated_after(fixture.channel_id, Some(all[0].cursor()), 50)
+        .list_threads_updated_after(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            Some(all[0].cursor()),
+            50,
+        )
         .await
         .unwrap();
     assert_eq!(after_first.len(), 2);
 
     let caught_up = fixture
         .persistence
-        .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+        .list_threads_updated_after(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            Some(all[2].cursor()),
+            50,
+        )
         .await
         .unwrap();
     assert!(caught_up.is_empty());
@@ -282,7 +313,12 @@ async fn list_threads_updated_after_reads_forward_from_a_cursor() {
 
     let bumped = fixture
         .persistence
-        .list_threads_updated_after(fixture.channel_id, Some(all[2].cursor()), 50)
+        .list_threads_updated_after(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            Some(all[2].cursor()),
+            50,
+        )
         .await
         .unwrap();
     assert_eq!(
@@ -345,8 +381,9 @@ async fn committing_a_message_notifies_listeners() {
     .await
     .expect("expected a notification for this thread within 5s");
 
+    assert_eq!(payload["target"]["kind"], "desk");
     assert_eq!(
-        payload["channel_id"].as_str().unwrap(),
+        payload["target"]["id"].as_str().unwrap(),
         fixture.channel_id.to_string()
     );
     assert_eq!(
@@ -410,7 +447,12 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
     let author = EmailAddress::from("Author@Partner.test");
     let thread = fixture
         .persistence
-        .create_thread(fixture.channel_id, "Subject", std::slice::from_ref(&author))
+        .create_thread(
+            fixture.company_id,
+            crate::entities::address::AddressTarget::Desk(fixture.channel_id),
+            "Subject",
+            std::slice::from_ref(&author),
+        )
         .await
         .unwrap();
     assert_eq!(thread.participant_principal_ids.len(), 1);
@@ -434,6 +476,7 @@ async fn a_thread_records_its_parties_as_principals_and_projects_their_addresses
     let joined = fixture
         .persistence
         .update_thread_participants(
+            fixture.company_id,
             thread.id,
             &[author.clone(), EmailAddress::from("cc@partner.test")],
         )

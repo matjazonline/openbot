@@ -1,8 +1,8 @@
 //! Company-agent creation against PostgreSQL (01-departments p03, 01DEP-P03-D1..D3):
-//! `agent_default_desk_` for what one creation commits or refuses, its placement and its guards,
-//! and `agent_default_desk_competing_` for creators racing one slug.
+//! `agent_direct_address_` for what one creation commits or refuses, its placement and its guards,
+//! and `agent_direct_address_competing_` for creators racing one slug.
 use super::*;
-use crate::adapters::persistence::company_agent::{CompanyAgentService, default_desk_key};
+use crate::adapters::persistence::company_agent::CompanyAgentService;
 use crate::adapters::persistence::test_support::provisioning_templates;
 use crate::application::ports::channel::{ChannelOwnershipWrite, ChannelPersistence, ChannelWrite};
 use crate::entities::participant::PrincipalCapability;
@@ -10,6 +10,9 @@ use crate::use_cases::agent::{
     AgentPersistence, AgentPlacement, AgentWrite, CompanyAgents, CreatedAgent,
 };
 use crate::use_cases::company::{CompanyModelConnectionWrite, CompanyPersistence};
+
+#[path = "agent_direct_lifecycle_tests.rs"]
+mod direct_lifecycle;
 
 fn service(f: &Departments) -> CompanyAgentService {
     CompanyAgentService::new(f.persistence.clone(), provisioning_templates())
@@ -67,7 +70,7 @@ async fn written(f: &Departments) -> serde_json::Value {
            'workflows', (SELECT count(*) FROM workflow_definitions \
              WHERE company_id = $1 AND template_origin IS NOT NULL), \
            'bindings', (SELECT count(*) FROM workflow_bindings \
-             WHERE company_id = $1 AND channel_id IS NOT NULL AND active), \
+             WHERE company_id = $1 AND active), \
            'commands', (SELECT count(*) FROM workflow_provisioning_commands WHERE company_id = $1), \
            'members', (SELECT count(*) FROM department_members WHERE company_id = $1), \
            'roles', (SELECT count(*) FROM department_roles WHERE company_id = $1), \
@@ -96,27 +99,20 @@ fn grew(before: &serde_json::Value, after: &serde_json::Value) -> serde_json::Va
     )
 }
 
-const ONE_AGENT: &str = r#"{"agents": 1, "principals": 1, "revisions": 1, "desks": 1,
-    "workflows": 1, "bindings": 1, "commands": 1}"#;
+const ONE_AGENT: &str = r#"{"agents": 1, "principals": 1, "revisions": 1,
+    "workflows": 1, "bindings": 1}"#;
 
 fn one_agent() -> serde_json::Value {
     serde_json::from_str(ONE_AGENT).unwrap()
 }
 
-/// The desk at `desk`: its primary address, name, access mode, owning department and mode.
-async fn desk_row(f: &Departments, desk: Uuid) -> (String, String, String, Option<Uuid>, bool) {
-    sqlx::query_as(
-        "SELECT slug.slug::text, channel.name, channel.access_mode, channel.department_id, \
-                channel.members_only \
-           FROM channels AS channel \
-           JOIN channel_slugs AS slug ON slug.channel_id = channel.id AND slug.is_primary \
-          WHERE channel.company_id = $1 AND channel.id = $2",
-    )
-    .bind(f.company)
-    .bind(desk)
-    .fetch_one(f.pool())
-    .await
-    .unwrap()
+async fn direct_address(f: &Departments, principal: PrincipalId) -> String {
+    sqlx::query_scalar("SELECT slug::text FROM addresses WHERE company_id=$1 AND principal_id=$2")
+        .bind(f.company)
+        .bind(principal.as_uuid())
+        .fetch_one(f.pool())
+        .await
+        .unwrap()
 }
 
 async fn principal_of(f: &Departments, agent: Uuid) -> PrincipalId {
@@ -135,7 +131,7 @@ async fn principal_of(f: &Departments, agent: Uuid) -> PrincipalId {
 /// the `agent:{id}` command that records which desk it was. An omitted model is pinned to the
 /// keyed default connection's first model (D3).
 #[tokio::test]
-async fn agent_default_desk_creation_commits_the_agent_with_its_desk() {
+async fn agent_direct_address_creation_commits_the_agent_with_its_principal_binding() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -150,38 +146,29 @@ async fn agent_default_desk_creation_commits_the_agent_with_its_desk() {
         ),
         (Some("openai"), Some("gpt-4o-mini"))
     );
+    assert_eq!(direct_address(&f, created.principal_id).await, "helper");
     assert_eq!(
-        desk_row(&f, created.desk_id).await,
-        (
-            "helper".into(),
-            "Agent helper".into(),
-            "team".into(),
-            None,
-            false
-        )
+        principal_of(&f, created.agent.id).await,
+        created.principal_id
     );
-    let (command, actor): (serde_json::Value, Uuid) = sqlx::query_as(
-        "SELECT result, actor_id FROM workflow_provisioning_commands \
-         WHERE company_id = $1 AND command_key = $2",
-    )
-    .bind(f.company)
-    .bind(default_desk_key(created.agent.id))
-    .fetch_one(f.pool())
-    .await
-    .unwrap();
-    assert_eq!(actor, f.owner);
-    assert_eq!(command["channel"]["id"], json!(created.desk_id.to_string()));
-    assert_eq!(command["agent"]["id"], json!(created.agent.id.to_string()));
-    assert_eq!(command["reply_mode"], json!("autonomous"));
-    let binding_channel: Uuid = sqlx::query_scalar(
-        "SELECT channel_id FROM workflow_bindings WHERE company_id = $1 AND id = $2 AND active",
-    )
-    .bind(f.company)
-    .bind(Uuid::parse_str(command["binding_id"].as_str().unwrap()).unwrap())
-    .fetch_one(f.pool())
-    .await
-    .unwrap();
-    assert_eq!(binding_channel, created.desk_id);
+    let exact: bool = sqlx::query_scalar(
+        "SELECT count(*)=1 AND bool_and(binding.channel_id IS NULL AND binding.active \
+         AND binding.principal_id=principal.id AND response.binding_id=binding.id \
+         AND response.binding_revision=binding.configuration_revision \
+         AND definition.owner_agent_id=principal.agent_id AND endpoint.status='active') \
+         FROM principals AS principal JOIN workflow_bindings AS binding \
+           ON binding.company_id=principal.company_id AND binding.principal_id=principal.id \
+         JOIN channel_reply_settings AS response ON response.company_id=binding.company_id AND response.principal_id=principal.id \
+         JOIN workflow_binding_revisions AS configuration ON configuration.company_id=binding.company_id AND configuration.binding_id=binding.id AND configuration.revision=binding.configuration_revision \
+         JOIN workflow_versions AS version ON version.company_id=configuration.company_id AND version.id=configuration.version_id \
+         JOIN workflow_definitions AS definition ON definition.company_id=version.company_id AND definition.id=version.workflow_id \
+         JOIN channel_bindings AS endpoint ON endpoint.company_id=principal.company_id AND endpoint.principal_id=principal.id \
+         WHERE principal.company_id=$1 AND principal.id=$2",
+    ).bind(f.company).bind(created.principal_id.as_uuid()).fetch_one(f.pool()).await.unwrap();
+    assert!(
+        exact,
+        "one active principal workflow, selected revision, owned definition and canonical endpoint"
+    );
 
     // An explicit model the keyed connection enables is kept.
     let explicit = create(
@@ -201,7 +188,7 @@ async fn agent_default_desk_creation_commits_the_agent_with_its_desk() {
 /// 03A.2, D3: with no model connection (none exists without a key) every creation is refused
 /// with the worded error and writes nothing; so is an explicit model the connections lack.
 #[tokio::test]
-async fn agent_default_desk_refuses_without_a_keyed_model() {
+async fn agent_direct_address_refuses_without_a_keyed_model() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -249,7 +236,7 @@ async fn agent_default_desk_refuses_without_a_keyed_model() {
 /// 03A.2, F5: a taken address (a desk already has the agent's slug) and a taken agent slug are
 /// conflicts, and nothing of the refused creation survives.
 #[tokio::test]
-async fn agent_default_desk_refuses_a_taken_address_or_slug() {
+async fn agent_direct_address_refuses_a_taken_address_or_slug() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -284,7 +271,7 @@ async fn agent_default_desk_refuses_a_taken_address_or_slug() {
 /// 03A.2: a publication prerequisite the company has not met -- a library skill that needs a
 /// company tool no binding supplies -- refuses the copy, skills and principal included.
 #[tokio::test]
-async fn agent_default_desk_refuses_a_library_copy_it_cannot_publish() {
+async fn agent_direct_address_refuses_a_library_copy_it_cannot_publish() {
     use crate::domain::workflow::TypeName;
     use crate::use_cases::skill::{SkillManagementPersistence, SkillWrite};
     let Some(f) = Departments::new().await else {
@@ -299,6 +286,7 @@ async fn agent_default_desk_refuses_a_library_copy_it_cannot_publish() {
             description: "Requires a company tool".into(),
             instructions: "Use support.lookup.".into(),
             required_tools: Some(vec![TypeName::parse("support.lookup").unwrap()]),
+            files: None,
             created_by: None,
         },
     )
@@ -332,7 +320,7 @@ async fn agent_default_desk_refuses_a_library_copy_it_cannot_publish() {
 
 /// 03A.2: a library definition has no company and no desk; its copy gets one like any agent.
 #[tokio::test]
-async fn agent_default_desk_library_definitions_have_none_and_copies_do() {
+async fn agent_direct_address_library_definitions_have_none_and_copies_do() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -342,13 +330,12 @@ async fn agent_default_desk_library_definitions_have_none_and_copies_do() {
     let library = AgentPersistence::create_library(&f.persistence, agent(&slug))
         .await
         .unwrap();
-    let library_desks: i64 = sqlx::query_scalar(
-        "SELECT count(*) FROM workflow_provisioning_commands WHERE command_key = $1",
-    )
-    .bind(default_desk_key(library.id))
-    .fetch_one(f.pool())
-    .await
-    .unwrap();
+    let library_desks: i64 =
+        sqlx::query_scalar("SELECT count(*) FROM principals WHERE agent_id = $1")
+            .bind(library.id)
+            .fetch_one(f.pool())
+            .await
+            .unwrap();
     assert_eq!(library_desks, 0);
     assert_eq!(grew(&before, &written(&f).await), json!({}));
     let copy = service(&f)
@@ -362,13 +349,13 @@ async fn agent_default_desk_library_definitions_have_none_and_copies_do() {
         .await
         .unwrap();
     assert_eq!(grew(&before, &written(&f).await), one_agent());
-    assert_eq!(desk_row(&f, copy.desk_id).await.0, "copied");
+    assert_eq!(direct_address(&f, copy.principal_id).await, "copied");
 }
 
 /// 03C.0 with C002: an agent created as a department's lead is a member and its lead, and the
 /// derived grants reach its own department's members-only desk, its parent's and its child's.
 #[tokio::test]
-async fn agent_default_desk_places_the_agent_and_its_lead_role_with_grants() {
+async fn agent_direct_address_places_the_agent_and_its_lead_role_with_grants() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -444,8 +431,8 @@ async fn agent_default_desk_places_the_agent_and_its_lead_role_with_grants() {
             "desk {desk}"
         );
     }
-    // The agent's own desk stays a plain team desk; membership does not choose its owner.
-    assert_eq!(desk_row(&f, created.desk_id).await.3, None);
+    // Its principal address remains independent of all department desks.
+    assert_eq!(direct_address(&f, created.principal_id).await, "lead");
 
     // A department of another company, or none, refuses the whole creation.
     let before = written(&f).await;
@@ -468,25 +455,32 @@ async fn agent_default_desk_places_the_agent_and_its_lead_role_with_grants() {
 /// 03A.3: an agent with a default desk is guarded as before -- its published version refuses
 /// deletion -- and the desk and its binding stay.
 #[tokio::test]
-async fn agent_default_desk_deletion_guards_are_unchanged() {
+async fn agent_direct_address_unused_deletion_removes_owned_workflow() {
     let Some(f) = Departments::new().await else {
         return;
     };
     connect(&f).await;
-    let created = create(&f, agent("helper"), None).await.unwrap();
     let before = written(&f).await;
-    assert!(matches!(
-        AgentPersistence::delete(&f.persistence, created.agent.id).await,
-        Err(AppError::Conflict(_))
-    ));
-    assert_eq!(grew(&before, &written(&f).await), json!({}));
-    assert_eq!(desk_row(&f, created.desk_id).await.0, "helper");
+    let created = create(&f, agent("helper"), None).await.unwrap();
+    AgentPersistence::delete(&f.persistence, created.agent.id)
+        .await
+        .unwrap();
+    assert_eq!(written(&f).await, before);
+    let remaining: i64 = sqlx::query_scalar(
+        "SELECT count(*) FROM addresses WHERE company_id=$1 AND principal_id=$2",
+    )
+    .bind(f.company)
+    .bind(created.principal_id.as_uuid())
+    .fetch_one(f.pool())
+    .await
+    .unwrap();
+    assert_eq!(remaining, 0);
 }
 
 /// Two creators of one slug, the second waiting on the company write lock the first holds: one
 /// agent and one desk, and the loser is a conflict that wrote nothing.
 #[tokio::test]
-async fn agent_default_desk_competing_creators_of_one_slug_make_one_agent() {
+async fn agent_direct_address_competing_creators_of_one_slug_make_one_agent() {
     let Some(f) = Departments::new().await else {
         return;
     };
@@ -527,7 +521,7 @@ async fn agent_default_desk_competing_creators_of_one_slug_make_one_agent() {
 /// holding no other gate, so a second admission into the department's own desk goes through
 /// rather than closing a cycle; when the first admission commits, the creation completes.
 #[tokio::test]
-async fn agent_default_desk_competing_lead_creation_takes_its_desk_gates_once() {
+async fn agent_direct_address_competing_lead_creation_takes_its_desk_gates_once() {
     use crate::adapters::persistence::channel_gate::{
         ChannelGateAccess, ChannelGateKey, acquire_channel_gate_on,
     };

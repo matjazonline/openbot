@@ -1,0 +1,4711 @@
+[
+    {
+        "table": "addresses",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "slug",
+                "type": "USER-DEFINED",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "target_kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "is_primary",
+                "type": "boolean",
+                "default": "false",
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "addresses_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "addresses_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "addresses_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "addresses_is_primary_not_null",
+                "type": "n",
+                "definition": "NOT NULL is_primary"
+            },
+            {
+                "name": "addresses_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, slug)"
+            },
+            {
+                "name": "addresses_principal_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "addresses_slug_format",
+                "type": "c",
+                "definition": "CHECK ((((slug)::text = lower((slug)::text)) AND ((slug)::text ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'::text)))"
+            },
+            {
+                "name": "addresses_slug_not_null",
+                "type": "n",
+                "definition": "NOT NULL slug"
+            },
+            {
+                "name": "addresses_target_check",
+                "type": "c",
+                "definition": "CHECK ((((target_kind = 'desk'::text) AND (channel_id IS NOT NULL) AND (principal_id IS NULL)) OR ((target_kind = 'principal'::text) AND (principal_id IS NOT NULL) AND (channel_id IS NULL) AND is_primary)))"
+            },
+            {
+                "name": "addresses_target_kind_check",
+                "type": "c",
+                "definition": "CHECK ((target_kind = ANY (ARRAY['desk'::text, 'principal'::text])))"
+            },
+            {
+                "name": "addresses_target_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL target_kind"
+            }
+        ]
+    },
+    {
+        "table": "agent_history_conversations",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "agent_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "scope_kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "session_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "child_run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            },
+            {
+                "name": "last_exchange_order",
+                "type": "bigint",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "active_exchange_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "expired_count",
+                "type": "bigint",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "expired_through_order",
+                "type": "bigint",
+                "default": "0",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "agent_history_conversations_agent_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL agent_id"
+            },
+            {
+                "name": "agent_history_conversations_check",
+                "type": "c",
+                "definition": "CHECK (((expired_count >= 0) AND (expired_count <= last_exchange_order)))"
+            },
+            {
+                "name": "agent_history_conversations_check1",
+                "type": "c",
+                "definition": "CHECK (((expired_through_order >= 0) AND (expired_through_order <= last_exchange_order)))"
+            },
+            {
+                "name": "agent_history_conversations_check2",
+                "type": "c",
+                "definition": "CHECK ((((scope_kind = 'thread'::text) AND (channel_id IS NOT NULL) AND (thread_id IS NOT NULL) AND (session_id IS NULL) AND (child_run_id IS NULL)) OR ((scope_kind = 'private_session'::text) AND (session_id IS NOT NULL) AND (channel_id IS NULL) AND (thread_id IS NULL) AND (child_run_id IS NULL)) OR ((scope_kind = 'child_branch'::text) AND (child_run_id IS NOT NULL) AND (channel_id IS NULL) AND (thread_id IS NULL) AND (session_id IS NULL))))"
+            },
+            {
+                "name": "agent_history_conversations_company_id_agent_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, agent_id) REFERENCES agents(company_id, id)"
+            },
+            {
+                "name": "agent_history_conversations_company_id_agent_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, agent_id, id)"
+            },
+            {
+                "name": "agent_history_conversations_company_id_channel_id_thread_i_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id)"
+            },
+            {
+                "name": "agent_history_conversations_company_id_child_run_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, child_run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "agent_history_conversations_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "agent_history_conversations_company_id_id_active_exchange__fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, id, active_exchange_id) REFERENCES agent_history_exchanges(company_id, conversation_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "agent_history_conversations_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "agent_history_conversations_company_id_session_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, session_id) REFERENCES agent_history_sessions(company_id, id)"
+            },
+            {
+                "name": "agent_history_conversations_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "agent_history_conversations_expired_count_not_null",
+                "type": "n",
+                "definition": "NOT NULL expired_count"
+            },
+            {
+                "name": "agent_history_conversations_expired_through_order_not_null",
+                "type": "n",
+                "definition": "NOT NULL expired_through_order"
+            },
+            {
+                "name": "agent_history_conversations_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "agent_history_conversations_last_exchange_order_check",
+                "type": "c",
+                "definition": "CHECK ((last_exchange_order >= 0))"
+            },
+            {
+                "name": "agent_history_conversations_last_exchange_order_not_null",
+                "type": "n",
+                "definition": "NOT NULL last_exchange_order"
+            },
+            {
+                "name": "agent_history_conversations_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "agent_history_conversations_scope_kind_check",
+                "type": "c",
+                "definition": "CHECK ((scope_kind = ANY (ARRAY['thread'::text, 'private_session'::text, 'child_branch'::text])))"
+            },
+            {
+                "name": "agent_history_conversations_scope_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL scope_kind"
+            },
+            {
+                "name": "agent_history_turn_conversation_agreement",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            }
+        ]
+    },
+    {
+        "table": "agent_history_sessions",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "creator_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "live_creator_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "creator_user_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "agent_history_sessions_check",
+                "type": "c",
+                "definition": "CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL)))"
+            },
+            {
+                "name": "agent_history_sessions_company_id_channel_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id)"
+            },
+            {
+                "name": "agent_history_sessions_company_id_channel_id_thread_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id)"
+            },
+            {
+                "name": "agent_history_sessions_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "agent_history_sessions_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "agent_history_sessions_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "agent_history_sessions_creator_principal_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL creator_principal_id"
+            },
+            {
+                "name": "agent_history_sessions_creator_user_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL creator_user_id"
+            },
+            {
+                "name": "agent_history_sessions_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "agent_history_sessions_live_creator_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, live_creator_principal_id) REFERENCES principals(company_id, id) ON DELETE SET NULL (live_creator_principal_id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "agent_history_sessions_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            }
+        ]
+    },
+    {
+        "table": "background_tasks",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "correlation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "status",
+                "type": "text",
+                "default": "'pending'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "retry_count",
+                "type": "integer",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "continuation_count",
+                "type": "smallint",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "attempt_ordinal",
+                "type": "integer",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "max_retries",
+                "type": "integer",
+                "default": "3",
+                "nullable": "NO"
+            },
+            {
+                "name": "worker_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "execution_generation",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "locked_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "lock_expires_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "run_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "workflow_execution_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "background_tasks_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "background_tasks_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "background_tasks_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "background_tasks_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "background_tasks_continuation_count_check",
+                "type": "c",
+                "definition": "CHECK (((continuation_count >= 0) AND (continuation_count <= workflow_job_continuation_limit())))"
+            },
+            {
+                "name": "background_tasks_continuation_count_not_null",
+                "type": "n",
+                "definition": "NOT NULL continuation_count"
+            },
+            {
+                "name": "background_tasks_correlation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL correlation_id"
+            },
+            {
+                "name": "background_tasks_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "background_tasks_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "background_tasks_lease_check",
+                "type": "c",
+                "definition": "CHECK ((((status = 'processing'::text) AND (worker_id IS NOT NULL) AND (execution_generation IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'processing'::text) AND (worker_id IS NULL) AND (execution_generation IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL))))"
+            },
+            {
+                "name": "background_tasks_max_retries_check",
+                "type": "c",
+                "definition": "CHECK ((max_retries > 0))"
+            },
+            {
+                "name": "background_tasks_max_retries_not_null",
+                "type": "n",
+                "definition": "NOT NULL max_retries"
+            },
+            {
+                "name": "background_tasks_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "background_tasks_retry_count_check",
+                "type": "c",
+                "definition": "CHECK (((retry_count >= 0) AND (retry_count <= max_retries)))"
+            },
+            {
+                "name": "background_tasks_retry_count_not_null",
+                "type": "n",
+                "definition": "NOT NULL retry_count"
+            },
+            {
+                "name": "background_tasks_run_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL run_at"
+            },
+            {
+                "name": "background_tasks_status_check",
+                "type": "c",
+                "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'processing'::text, 'completed'::text, 'failed'::text])))"
+            },
+            {
+                "name": "background_tasks_status_not_null",
+                "type": "n",
+                "definition": "NOT NULL status"
+            },
+            {
+                "name": "background_tasks_thread_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id) ON DELETE SET NULL (thread_id)"
+            },
+            {
+                "name": "background_tasks_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            },
+            {
+                "name": "background_tasks_workflow_execution_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, workflow_execution_id) REFERENCES workflow_executions(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "background_tasks_workflow_execution_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL workflow_execution_id"
+            },
+            {
+                "name": "workflow_action_job_scope_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, workflow_execution_id, id)"
+            },
+            {
+                "name": "workflow_control_retry_guard",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_fenced_completion_guard",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_fenced_retirement_guard",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            }
+        ]
+    },
+    {
+        "table": "channel_bindings",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "installation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "transport",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "namespace",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "external_endpoint_key",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "display_label",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "access_policy",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "delivery_policy",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "status",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "disabled_reason",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_by",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "access_snapshot",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_bindings_access_policy_check",
+                "type": "c",
+                "definition": "CHECK ((access_policy = ANY (ARRAY['channel_acl'::text, 'conversation_members_read_and_participate'::text])))"
+            },
+            {
+                "name": "channel_bindings_access_policy_not_null",
+                "type": "n",
+                "definition": "NOT NULL access_policy"
+            },
+            {
+                "name": "channel_bindings_access_snapshot_check",
+                "type": "c",
+                "definition": "CHECK (((jsonb_typeof(access_snapshot) = 'object'::text) AND ((access_snapshot -> 'version'::text) = '1'::jsonb) AND (jsonb_typeof((access_snapshot -> 'kind'::text)) = 'string'::text) AND ((access_snapshot ->> 'kind'::text) = ANY (ARRAY['deployment_endpoint'::text, 'provider_conversation'::text])) AND (octet_length((access_snapshot)::text) <= 4096)))"
+            },
+            {
+                "name": "channel_bindings_access_snapshot_not_null",
+                "type": "n",
+                "definition": "NOT NULL access_snapshot"
+            },
+            {
+                "name": "channel_bindings_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_bindings_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "channel_bindings_channel_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, channel_id, id)"
+            },
+            {
+                "name": "channel_bindings_channel_transport_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, channel_id, id, transport)"
+            },
+            {
+                "name": "channel_bindings_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "channel_bindings_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "channel_bindings_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "channel_bindings_created_by_check",
+                "type": "c",
+                "definition": "CHECK (valid_creation_provenance(created_by))"
+            },
+            {
+                "name": "channel_bindings_created_by_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_by"
+            },
+            {
+                "name": "channel_bindings_delivery_policy_check",
+                "type": "c",
+                "definition": "CHECK ((delivery_policy = ANY (ARRAY['reply_only'::text, 'reply_and_initiate'::text])))"
+            },
+            {
+                "name": "channel_bindings_delivery_policy_not_null",
+                "type": "n",
+                "definition": "NOT NULL delivery_policy"
+            },
+            {
+                "name": "channel_bindings_disabled_reason_check",
+                "type": "c",
+                "definition": "CHECK ((((status = ANY (ARRAY['disabled'::text, 'orphaned'::text])) = (disabled_reason IS NOT NULL)) AND ((disabled_reason IS NULL) OR valid_binding_change_reason(disabled_reason))))"
+            },
+            {
+                "name": "channel_bindings_display_label_check",
+                "type": "c",
+                "definition": "CHECK (((btrim(display_label) <> ''::text) AND (octet_length(display_label) <= 255)))"
+            },
+            {
+                "name": "channel_bindings_display_label_not_null",
+                "type": "n",
+                "definition": "NOT NULL display_label"
+            },
+            {
+                "name": "channel_bindings_endpoint_key_check",
+                "type": "c",
+                "definition": "CHECK (((btrim(external_endpoint_key) <> ''::text) AND (octet_length(external_endpoint_key) <= 512)))"
+            },
+            {
+                "name": "channel_bindings_external_endpoint_key_not_null",
+                "type": "n",
+                "definition": "NOT NULL external_endpoint_key"
+            },
+            {
+                "name": "channel_bindings_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "channel_bindings_installation_coherence_check",
+                "type": "c",
+                "definition": "CHECK ((transport_requires_installation(transport) = (installation_id IS NOT NULL)))"
+            },
+            {
+                "name": "channel_bindings_installation_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, installation_id, transport) REFERENCES integration_installations(company_id, id, transport) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_bindings_namespace_check",
+                "type": "c",
+                "definition": "CHECK (((btrim(namespace) <> ''::text) AND (octet_length(namespace) <= 255)))"
+            },
+            {
+                "name": "channel_bindings_namespace_not_null",
+                "type": "n",
+                "definition": "NOT NULL namespace"
+            },
+            {
+                "name": "channel_bindings_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "channel_bindings_status_check",
+                "type": "c",
+                "definition": "CHECK ((status = ANY (ARRAY['active'::text, 'paused'::text, 'disabled'::text, 'orphaned'::text])))"
+            },
+            {
+                "name": "channel_bindings_status_not_null",
+                "type": "n",
+                "definition": "NOT NULL status"
+            },
+            {
+                "name": "channel_bindings_transport_check",
+                "type": "c",
+                "definition": "CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))"
+            },
+            {
+                "name": "channel_bindings_transport_not_null",
+                "type": "n",
+                "definition": "NOT NULL transport"
+            },
+            {
+                "name": "channel_bindings_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "channel_principal_grants",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "capability",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "provenance",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_principal_grants_capability_check",
+                "type": "c",
+                "definition": "CHECK ((capability = ANY (ARRAY['participate'::text, 'view'::text])))"
+            },
+            {
+                "name": "channel_principal_grants_capability_not_null",
+                "type": "n",
+                "definition": "NOT NULL capability"
+            },
+            {
+                "name": "channel_principal_grants_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_principal_grants_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "channel_principal_grants_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "channel_principal_grants_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "channel_principal_grants_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, channel_id, principal_id, capability, provenance)"
+            },
+            {
+                "name": "channel_principal_grants_principal_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_principal_grants_principal_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL principal_id"
+            },
+            {
+                "name": "channel_principal_grants_provenance_check",
+                "type": "c",
+                "definition": "CHECK ((provenance = ANY (ARRAY['configured_allowlist'::text, 'manager'::text, 'conversation_membership'::text, 'system'::text, 'department_membership'::text])))"
+            },
+            {
+                "name": "channel_principal_grants_provenance_not_null",
+                "type": "n",
+                "definition": "NOT NULL provenance"
+            }
+        ]
+    },
+    {
+        "table": "channel_reply_contexts",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "intent_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "responder_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "actor_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "delivery_policy",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "settings_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "approval_policy",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "contract",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "source",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_reply_contexts_actor_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (actor_id) REFERENCES users(id)"
+            },
+            {
+                "name": "channel_reply_contexts_actor_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL actor_id"
+            },
+            {
+                "name": "channel_reply_contexts_approval_policy_check",
+                "type": "c",
+                "definition": "CHECK (valid_channel_reply_approval(approval_policy))"
+            },
+            {
+                "name": "channel_reply_contexts_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "channel_reply_contexts_binding_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_revision"
+            },
+            {
+                "name": "channel_reply_contexts_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_binding_id_binding_revis_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id, binding_revision) REFERENCES workflow_binding_revisions(company_id, binding_id, revision) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_channel_id_thread_id_mes_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_intent_id_binding_id_bind_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, intent_id, binding_id, binding_revision)"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_intent_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, intent_id) REFERENCES workflow_message_intents(company_id, id) ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "channel_reply_contexts_company_id_responder_principal_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, responder_principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_contexts_contract_check",
+                "type": "c",
+                "definition": "CHECK (((jsonb_typeof(contract) = 'object'::text) AND (octet_length((contract)::text) <= 16384) AND (((contract -> 'format_version'::text) = '1'::jsonb) IS TRUE)))"
+            },
+            {
+                "name": "channel_reply_contexts_contract_not_null",
+                "type": "n",
+                "definition": "NOT NULL contract"
+            },
+            {
+                "name": "channel_reply_contexts_delivery_policy_check",
+                "type": "c",
+                "definition": "CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text])))"
+            },
+            {
+                "name": "channel_reply_contexts_delivery_policy_not_null",
+                "type": "n",
+                "definition": "NOT NULL delivery_policy"
+            },
+            {
+                "name": "channel_reply_contexts_intent_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL intent_id"
+            },
+            {
+                "name": "channel_reply_contexts_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "channel_reply_contexts_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, intent_id)"
+            },
+            {
+                "name": "channel_reply_contexts_settings_revision_check",
+                "type": "c",
+                "definition": "CHECK ((settings_revision > 0))"
+            },
+            {
+                "name": "channel_reply_contexts_settings_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL settings_revision"
+            },
+            {
+                "name": "channel_reply_contexts_source_check",
+                "type": "c",
+                "definition": "CHECK (((jsonb_typeof(source) = 'object'::text) AND (octet_length((source)::text) <= 16384)))"
+            },
+            {
+                "name": "channel_reply_contexts_source_not_null",
+                "type": "n",
+                "definition": "NOT NULL source"
+            },
+            {
+                "name": "channel_reply_contexts_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            }
+        ]
+    },
+    {
+        "table": "channel_reply_settings",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "binding_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "contract",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "approval_policy",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "YES"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_reply_settings_approval_policy_check",
+                "type": "c",
+                "definition": "CHECK (valid_channel_reply_approval(approval_policy))"
+            },
+            {
+                "name": "channel_reply_settings_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "channel_reply_settings_check",
+                "type": "c",
+                "definition": "CHECK ((num_nonnulls(binding_id, binding_revision, contract) = ANY (ARRAY[0, 3])))"
+            },
+            {
+                "name": "channel_reply_settings_company_id_binding_id_binding_revis_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id, binding_revision) REFERENCES workflow_binding_revisions(company_id, binding_id, revision) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_settings_company_id_channel_id_binding_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, binding_id) REFERENCES workflow_bindings(company_id, channel_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "channel_reply_settings_company_id_channel_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_reply_settings_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_reply_settings_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "channel_reply_settings_contract_check",
+                "type": "c",
+                "definition": "CHECK (((contract IS NULL) OR ((jsonb_typeof(contract) = 'object'::text) AND (octet_length((contract)::text) <= 16384) AND (((contract -> 'format_version'::text) = '1'::jsonb) IS TRUE))))"
+            },
+            {
+                "name": "channel_reply_settings_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, channel_id)"
+            },
+            {
+                "name": "channel_reply_settings_revision_check",
+                "type": "c",
+                "definition": "CHECK ((revision > 0))"
+            },
+            {
+                "name": "channel_reply_settings_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL revision"
+            }
+        ]
+    },
+    {
+        "table": "channel_schedules",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "binding_company_wide",
+                "type": "boolean",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "name",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "schedule_type",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "interval_seconds",
+                "type": "bigint",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "timezone",
+                "type": "text",
+                "default": "'UTC'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "enabled",
+                "type": "boolean",
+                "default": "true",
+                "nullable": "NO"
+            },
+            {
+                "name": "last_run_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "next_run_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "last_error",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_schedules_binding_channel_check",
+                "type": "c",
+                "definition": "CHECK (((binding_channel_id IS NULL) OR (binding_channel_id = channel_id)))"
+            },
+            {
+                "name": "channel_schedules_binding_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_channel_id, binding_id) REFERENCES workflow_bindings(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_schedules_binding_company_wide_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_company_wide"
+            },
+            {
+                "name": "channel_schedules_binding_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id, binding_company_wide) REFERENCES workflow_bindings(company_id, id, company_wide) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_schedules_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "channel_schedules_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_schedules_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "channel_schedules_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "channel_schedules_company_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "channel_schedules_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "channel_schedules_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "channel_schedules_enabled_not_null",
+                "type": "n",
+                "definition": "NOT NULL enabled"
+            },
+            {
+                "name": "channel_schedules_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "channel_schedules_interval_check",
+                "type": "c",
+                "definition": "CHECK ((((schedule_type = 'interval'::text) AND (interval_seconds IS NOT NULL) AND (interval_seconds >= 60)) OR ((schedule_type = 'one_off'::text) AND (interval_seconds IS NULL))))"
+            },
+            {
+                "name": "channel_schedules_name_not_blank",
+                "type": "c",
+                "definition": "CHECK ((btrim(name) <> ''::text))"
+            },
+            {
+                "name": "channel_schedules_name_not_null",
+                "type": "n",
+                "definition": "NOT NULL name"
+            },
+            {
+                "name": "channel_schedules_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "channel_schedules_schedule_type_not_null",
+                "type": "n",
+                "definition": "NOT NULL schedule_type"
+            },
+            {
+                "name": "channel_schedules_timezone_check",
+                "type": "c",
+                "definition": "CHECK (((now() AT TIME ZONE timezone) IS NOT NULL))"
+            },
+            {
+                "name": "channel_schedules_timezone_not_null",
+                "type": "n",
+                "definition": "NOT NULL timezone"
+            },
+            {
+                "name": "channel_schedules_type_check",
+                "type": "c",
+                "definition": "CHECK ((schedule_type = ANY (ARRAY['interval'::text, 'one_off'::text])))"
+            },
+            {
+                "name": "channel_schedules_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "external_threads",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "external_thread_key",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "external_threads_binding_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, binding_id) REFERENCES channel_bindings(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "external_threads_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "external_threads_binding_key_key",
+                "type": "u",
+                "definition": "UNIQUE (binding_id, external_thread_key)"
+            },
+            {
+                "name": "external_threads_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "external_threads_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "external_threads_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "external_threads_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "external_threads_external_thread_key_not_null",
+                "type": "n",
+                "definition": "NOT NULL external_thread_key"
+            },
+            {
+                "name": "external_threads_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "external_threads_key_check",
+                "type": "c",
+                "definition": "CHECK (((btrim(external_thread_key) <> ''::text) AND (octet_length(external_thread_key) <= 998)))"
+            },
+            {
+                "name": "external_threads_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "external_threads_thread_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "external_threads_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            },
+            {
+                "name": "external_threads_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "internal_notes",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_audience",
+                "type": "text",
+                "default": "'internal_only'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "command_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "command_fingerprint",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "author_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "provenance",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "supersedes_note_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "internal_notes_author_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, author_principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "internal_notes_author_principal_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL author_principal_id"
+            },
+            {
+                "name": "internal_notes_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "internal_notes_command_fingerprint_not_null",
+                "type": "n",
+                "definition": "NOT NULL command_fingerprint"
+            },
+            {
+                "name": "internal_notes_command_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL command_id"
+            },
+            {
+                "name": "internal_notes_company_command_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, command_id)"
+            },
+            {
+                "name": "internal_notes_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "internal_notes_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "internal_notes_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "internal_notes_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "internal_notes_message_audience_check",
+                "type": "c",
+                "definition": "CHECK ((message_audience = 'internal_only'::text))"
+            },
+            {
+                "name": "internal_notes_message_audience_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_audience"
+            },
+            {
+                "name": "internal_notes_message_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, message_id, message_audience) REFERENCES messages(company_id, id, audience) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "internal_notes_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "internal_notes_message_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, message_id)"
+            },
+            {
+                "name": "internal_notes_no_self_supersession",
+                "type": "c",
+                "definition": "CHECK ((id IS DISTINCT FROM supersedes_note_id))"
+            },
+            {
+                "name": "internal_notes_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "internal_notes_provenance_check",
+                "type": "c",
+                "definition": "CHECK ((provenance = ANY (ARRAY['human_ui'::text, 'api'::text, 'integration'::text, 'email_quiet_ingress'::text])))"
+            },
+            {
+                "name": "internal_notes_provenance_not_null",
+                "type": "n",
+                "definition": "NOT NULL provenance"
+            },
+            {
+                "name": "internal_notes_supersedes_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, supersedes_note_id) REFERENCES internal_notes(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "internal_notes_supersedes_key",
+                "type": "u",
+                "definition": "UNIQUE (supersedes_note_id)"
+            },
+            {
+                "name": "internal_notes_thread_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "internal_notes_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            },
+            {
+                "name": "internal_notes_thread_message_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id) DEFERRABLE INITIALLY DEFERRED"
+            }
+        ]
+    },
+    {
+        "table": "local_agent_sessions",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "machine_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "installation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "profile_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "selection",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "conversation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "workflow_run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "local_agent_sessions_check",
+                "type": "c",
+                "definition": "CHECK ((((jsonb_typeof(selection) = 'object'::text) AND ((selection ->> 'machine_id'::text) = (machine_id)::text)) IS TRUE))"
+            },
+            {
+                "name": "local_agent_sessions_check1",
+                "type": "c",
+                "definition": "CHECK ((num_nonnulls(conversation_id, workflow_run_id) = 1))"
+            },
+            {
+                "name": "local_agent_sessions_company_id_conversation_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, conversation_id) REFERENCES threads(company_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_company_id_machine_id_installation_id__key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, machine_id, installation_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_company_id_machine_id_installation_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, machine_id, installation_id) REFERENCES local_machines(company_id, id, installation_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "local_agent_sessions_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "local_agent_sessions_company_id_profile_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, profile_id) REFERENCES local_agent_profiles(company_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_company_id_profile_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, profile_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_company_id_workflow_run_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, workflow_run_id) REFERENCES workflow_runs(company_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "local_agent_sessions_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "local_agent_sessions_installation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL installation_id"
+            },
+            {
+                "name": "local_agent_sessions_installation_id_thread_id_key",
+                "type": "u",
+                "definition": "UNIQUE (installation_id, thread_id)"
+            },
+            {
+                "name": "local_agent_sessions_machine_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL machine_id"
+            },
+            {
+                "name": "local_agent_sessions_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "local_agent_sessions_profile_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL profile_id"
+            },
+            {
+                "name": "local_agent_sessions_selection_not_null",
+                "type": "n",
+                "definition": "NOT NULL selection"
+            },
+            {
+                "name": "local_agent_sessions_thread_id_check",
+                "type": "c",
+                "definition": "CHECK ((thread_id ~ '^[A-Za-z0-9_.:-]{1,128}$'::text))"
+            }
+        ]
+    },
+    {
+        "table": "message_deliveries",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "source_binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "destination_binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "external_destination",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "depends_on_delivery_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "correlation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "transport",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "purpose",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "idempotency_key",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "status",
+                "type": "text",
+                "default": "'pending'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "attempt_count",
+                "type": "integer",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "max_attempts",
+                "type": "integer",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "available_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "last_error_class",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "last_error_detail",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "execution_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "owner_worker_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "locked_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "lock_expires_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "delivered_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "message_audience",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "cancellation_requested_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "cancellation_reason",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "settled_evidence_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "reopen_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "message_deliveries_attempt_check",
+                "type": "c",
+                "definition": "CHECK (((attempt_count >= 0) AND (max_attempts > 0) AND (attempt_count <= max_attempts)))"
+            },
+            {
+                "name": "message_deliveries_attempt_count_not_null",
+                "type": "n",
+                "definition": "NOT NULL attempt_count"
+            },
+            {
+                "name": "message_deliveries_attribution_check",
+                "type": "c",
+                "definition": "CHECK ((((channel_id IS NOT NULL) AND (message_id IS NOT NULL) AND (source_binding_id IS NOT NULL) AND (destination_binding_id IS NOT NULL)) OR ((channel_id IS NULL) AND (message_id IS NULL) AND (source_binding_id IS NULL) AND (destination_binding_id IS NULL) AND (depends_on_delivery_id IS NULL) AND (external_destination IS NOT NULL) AND (purpose = 'notification'::text))))"
+            },
+            {
+                "name": "message_deliveries_available_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL available_at"
+            },
+            {
+                "name": "message_deliveries_cancellation_check",
+                "type": "c",
+                "definition": "CHECK ((((cancellation_requested_at IS NULL) = (cancellation_reason IS NULL)) AND ((cancellation_reason IS NULL) OR (cancellation_reason = ANY (ARRAY['workflow_cancelled'::text, 'workflow_expired'::text, 'workflow_revoked'::text, 'recipient_revoked'::text, 'evidence_conflict'::text, 'question_closed'::text]))) AND ((cancellation_requested_at IS NULL) OR (status <> ALL (ARRAY['pending'::text, 'retryable'::text])))))"
+            },
+            {
+                "name": "message_deliveries_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "message_deliveries_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "message_deliveries_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "message_deliveries_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "message_deliveries_company_message_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, message_id)"
+            },
+            {
+                "name": "message_deliveries_correlation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL correlation_id"
+            },
+            {
+                "name": "message_deliveries_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "message_deliveries_delivered_at_check",
+                "type": "c",
+                "definition": "CHECK (((status = 'delivered'::text) = (delivered_at IS NOT NULL)))"
+            },
+            {
+                "name": "message_deliveries_dependency_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, depends_on_delivery_id) REFERENCES message_deliveries(company_id, id) ON DELETE SET NULL (depends_on_delivery_id)"
+            },
+            {
+                "name": "message_deliveries_destination_binding_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, destination_binding_id, transport) REFERENCES channel_bindings(company_id, channel_id, id, transport) ON DELETE CASCADE"
+            },
+            {
+                "name": "message_deliveries_destination_key_key",
+                "type": "u",
+                "definition": "UNIQUE (destination_binding_id, idempotency_key)"
+            },
+            {
+                "name": "message_deliveries_error_check",
+                "type": "c",
+                "definition": "CHECK ((((last_error_class IS NULL) OR valid_delivery_failure_class(last_error_class)) AND ((last_error_detail IS NULL) OR ((octet_length(last_error_detail) <= 512) AND (last_error_class IS NOT NULL))) AND ((status <> ALL (ARRAY['retryable'::text, 'dead_letter'::text])) OR (last_error_class IS NOT NULL))))"
+            },
+            {
+                "name": "message_deliveries_external_destination_check",
+                "type": "c",
+                "definition": "CHECK (((external_destination IS NULL) OR ((btrim(external_destination) <> ''::text) AND (octet_length(external_destination) <= 998))))"
+            },
+            {
+                "name": "message_deliveries_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "message_deliveries_idempotency_key_check",
+                "type": "c",
+                "definition": "CHECK (((btrim(idempotency_key) <> ''::text) AND (octet_length(idempotency_key) <= 512)))"
+            },
+            {
+                "name": "message_deliveries_idempotency_key_not_null",
+                "type": "n",
+                "definition": "NOT NULL idempotency_key"
+            },
+            {
+                "name": "message_deliveries_lease_check",
+                "type": "c",
+                "definition": "CHECK ((((status = 'sending'::text) AND (execution_id IS NOT NULL) AND (owner_worker_id IS NOT NULL) AND (locked_at IS NOT NULL) AND (lock_expires_at IS NOT NULL) AND (lock_expires_at > locked_at)) OR ((status <> 'sending'::text) AND (execution_id IS NULL) AND (owner_worker_id IS NULL) AND (locked_at IS NULL) AND (lock_expires_at IS NULL))))"
+            },
+            {
+                "name": "message_deliveries_max_attempts_not_null",
+                "type": "n",
+                "definition": "NOT NULL max_attempts"
+            },
+            {
+                "name": "message_deliveries_message_audience_check",
+                "type": "c",
+                "definition": "CHECK ((((message_id IS NULL) AND (message_audience IS NULL)) OR ((message_id IS NOT NULL) AND (message_audience = 'external_conversation'::text))))"
+            },
+            {
+                "name": "message_deliveries_message_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, message_id, message_audience) REFERENCES messages(company_id, id, audience) ON DELETE CASCADE"
+            },
+            {
+                "name": "message_deliveries_no_self_dependency_check",
+                "type": "c",
+                "definition": "CHECK (((depends_on_delivery_id IS NULL) OR (depends_on_delivery_id <> id)))"
+            },
+            {
+                "name": "message_deliveries_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "message_deliveries_purpose_check",
+                "type": "c",
+                "definition": "CHECK ((purpose = ANY (ARRAY['notification'::text, 'workflow_send'::text, 'workflow_reply'::text])))"
+            },
+            {
+                "name": "message_deliveries_purpose_not_null",
+                "type": "n",
+                "definition": "NOT NULL purpose"
+            },
+            {
+                "name": "message_deliveries_reopen",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, reopen_id) REFERENCES workflow_message_delivery_reopens(company_id, id) ON DELETE SET NULL (reopen_id)"
+            },
+            {
+                "name": "message_deliveries_settled_evidence",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, settled_evidence_id) REFERENCES workflow_action_evidence(company_id, id) ON DELETE SET NULL (settled_evidence_id)"
+            },
+            {
+                "name": "message_deliveries_source_binding_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, source_binding_id) REFERENCES channel_bindings(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "message_deliveries_status_check",
+                "type": "c",
+                "definition": "CHECK ((status = ANY (ARRAY['pending'::text, 'sending'::text, 'retryable'::text, 'delivered'::text, 'outcome_unknown'::text, 'dead_letter'::text])))"
+            },
+            {
+                "name": "message_deliveries_status_not_null",
+                "type": "n",
+                "definition": "NOT NULL status"
+            },
+            {
+                "name": "message_deliveries_transport_check",
+                "type": "c",
+                "definition": "CHECK ((transport = ANY (ARRAY['email'::text, 'slack'::text])))"
+            },
+            {
+                "name": "message_deliveries_transport_not_null",
+                "type": "n",
+                "definition": "NOT NULL transport"
+            },
+            {
+                "name": "message_deliveries_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "notifications",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": "gen_random_uuid()",
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "recipient_user_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "recipient_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "event_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "source_kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "source_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "action_kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "source_generation",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "state",
+                "type": "text",
+                "default": "'active'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "read_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "state_changed_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "email_delivery_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "notifications_action_kind_check",
+                "type": "c",
+                "definition": "CHECK ((((source_kind = 'delivery'::text) AND (action_kind = 'delivery_failure'::text)) OR ((source_kind = 'decision_reviewer'::text) AND (action_kind = 'decision_review'::text)) OR ((source_kind = 'escalation_notice'::text) AND (action_kind = 'escalation_review'::text) AND (source_generation = 1))))"
+            },
+            {
+                "name": "notifications_action_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL action_kind"
+            },
+            {
+                "name": "notifications_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "notifications_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "notifications_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "notifications_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "notifications_email_delivery_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, email_delivery_id) REFERENCES message_deliveries(company_id, id) ON DELETE SET NULL (email_delivery_id)"
+            },
+            {
+                "name": "notifications_email_delivery_key",
+                "type": "u",
+                "definition": "UNIQUE (email_delivery_id)"
+            },
+            {
+                "name": "notifications_event_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL event_id"
+            },
+            {
+                "name": "notifications_event_identity_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, event_id, source_kind, source_id, action_kind, source_generation) REFERENCES notification_events(company_id, id, source_kind, source_id, action_kind, source_generation) ON DELETE CASCADE"
+            },
+            {
+                "name": "notifications_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "notifications_identity_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, recipient_user_id, source_kind, source_id, action_kind, source_generation)"
+            },
+            {
+                "name": "notifications_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "notifications_recipient_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, recipient_principal_id) REFERENCES principals(company_id, id) ON DELETE SET NULL (recipient_principal_id)"
+            },
+            {
+                "name": "notifications_recipient_member_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, recipient_user_id) REFERENCES company_members(company_id, user_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "notifications_recipient_user_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL recipient_user_id"
+            },
+            {
+                "name": "notifications_source_generation_check",
+                "type": "c",
+                "definition": "CHECK ((source_generation > 0))"
+            },
+            {
+                "name": "notifications_source_generation_not_null",
+                "type": "n",
+                "definition": "NOT NULL source_generation"
+            },
+            {
+                "name": "notifications_source_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL source_id"
+            },
+            {
+                "name": "notifications_source_kind_check",
+                "type": "c",
+                "definition": "CHECK ((source_kind = ANY (ARRAY['delivery'::text, 'decision_reviewer'::text, 'escalation_notice'::text])))"
+            },
+            {
+                "name": "notifications_source_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL source_kind"
+            },
+            {
+                "name": "notifications_state_changed_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL state_changed_at"
+            },
+            {
+                "name": "notifications_state_check",
+                "type": "c",
+                "definition": "CHECK ((state = ANY (ARRAY['active'::text, 'resolved'::text, 'withdrawn'::text])))"
+            },
+            {
+                "name": "notifications_state_not_null",
+                "type": "n",
+                "definition": "NOT NULL state"
+            },
+            {
+                "name": "notifications_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "schedule_runs",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "schedule_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "scheduled_for",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "command_key",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "refusal",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "last_error",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "materialization_status",
+                "type": "text",
+                "default": "'pending'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "materialization_attempts",
+                "type": "integer",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "materialization_available_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "materialization_worker_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "materialization_generation",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "materialization_locked_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "materialization_lock_expires_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "role_refusal",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "YES"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "schedule_runs_binding_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id) REFERENCES workflow_bindings(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "schedule_runs_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "schedule_runs_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "schedule_runs_channel_scope_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "schedule_runs_command_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, schedule_id, command_key)"
+            },
+            {
+                "name": "schedule_runs_command_key_check",
+                "type": "c",
+                "definition": "CHECK (((command_key IS NULL) OR ((length(command_key) >= 1) AND (length(command_key) <= 200))))"
+            },
+            {
+                "name": "schedule_runs_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "schedule_runs_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "schedule_runs_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "schedule_runs_materialization_attempts_check",
+                "type": "c",
+                "definition": "CHECK (((materialization_attempts >= 0) AND (materialization_attempts <= 5)))"
+            },
+            {
+                "name": "schedule_runs_materialization_attempts_not_null",
+                "type": "n",
+                "definition": "NOT NULL materialization_attempts"
+            },
+            {
+                "name": "schedule_runs_materialization_available_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL materialization_available_at"
+            },
+            {
+                "name": "schedule_runs_materialization_state_check",
+                "type": "c",
+                "definition": "CHECK ((((materialization_status = 'pending'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND (materialization_attempts < 5) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'materializing'::text) AND (run_id IS NULL) AND (refusal IS NULL) AND ((materialization_attempts >= 1) AND (materialization_attempts <= 5)) AND (materialization_worker_id IS NOT NULL) AND (materialization_generation IS NOT NULL) AND (materialization_locked_at IS NOT NULL) AND (materialization_lock_expires_at IS NOT NULL) AND (materialization_lock_expires_at > materialization_locked_at)) OR ((materialization_status = 'materialized'::text) AND (run_id IS NOT NULL) AND (refusal IS NULL) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL)) OR ((materialization_status = 'failed'::text) AND (run_id IS NULL) AND ((materialization_attempts = 5) OR (refusal IS NOT NULL)) AND (materialization_worker_id IS NULL) AND (materialization_generation IS NULL) AND (materialization_locked_at IS NULL) AND (materialization_lock_expires_at IS NULL))))"
+            },
+            {
+                "name": "schedule_runs_materialization_status_not_null",
+                "type": "n",
+                "definition": "NOT NULL materialization_status"
+            },
+            {
+                "name": "schedule_runs_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "schedule_runs_refusal_check",
+                "type": "c",
+                "definition": "CHECK ((((refusal IS NULL) OR (refusal = ANY (ARRAY['unavailable'::text, 'input_rejected'::text, 'key_conflict'::text])) OR ((role_refusal IS NOT NULL) AND valid_workflow_role_refusal(role_refusal) AND (refusal = workflow_role_refusal_code(role_refusal)))) IS TRUE))"
+            },
+            {
+                "name": "schedule_runs_run_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, run_id, binding_id) REFERENCES workflow_runs(company_id, id, binding_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "schedule_runs_schedule_company_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, schedule_id) REFERENCES channel_schedules(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "schedule_runs_schedule_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (schedule_id) REFERENCES channel_schedules(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "schedule_runs_schedule_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL schedule_id"
+            },
+            {
+                "name": "schedule_runs_scheduled_for_not_null",
+                "type": "n",
+                "definition": "NOT NULL scheduled_for"
+            },
+            {
+                "name": "schedule_runs_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            },
+            {
+                "name": "workflow_schedule_role_refusal",
+                "type": "c",
+                "definition": "CHECK ((((role_refusal IS NULL) OR (valid_workflow_role_refusal(role_refusal) AND (materialization_status = 'failed'::text) AND (refusal = workflow_role_refusal_code(role_refusal)))) IS TRUE))"
+            }
+        ]
+    },
+    {
+        "table": "thread_messages",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "entry_kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "thread_messages_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "thread_messages_channel_message_key",
+                "type": "u",
+                "definition": "UNIQUE (channel_id, message_id)"
+            },
+            {
+                "name": "thread_messages_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "thread_messages_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "thread_messages_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "thread_messages_entry_kind_check",
+                "type": "c",
+                "definition": "CHECK ((entry_kind = ANY (ARRAY['conversation'::text, 'note'::text, 'delegation'::text, 'system_event'::text])))"
+            },
+            {
+                "name": "thread_messages_entry_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL entry_kind"
+            },
+            {
+                "name": "thread_messages_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "thread_messages_message_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, message_id) REFERENCES messages(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "thread_messages_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "thread_messages_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "thread_messages_thread_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "thread_messages_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            },
+            {
+                "name": "thread_messages_thread_message_key",
+                "type": "u",
+                "definition": "UNIQUE (thread_id, message_id)"
+            },
+            {
+                "name": "thread_messages_workflow_history_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, channel_id, thread_id, message_id)"
+            }
+        ]
+    },
+    {
+        "table": "thread_principals",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "role",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "thread_principals_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "thread_principals_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "thread_principals_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "thread_principals_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, channel_id, thread_id, principal_id, role)"
+            },
+            {
+                "name": "thread_principals_principal_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "thread_principals_principal_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL principal_id"
+            },
+            {
+                "name": "thread_principals_role_check",
+                "type": "c",
+                "definition": "CHECK ((role = ANY (ARRAY['author'::text, 'participant'::text])))"
+            },
+            {
+                "name": "thread_principals_role_not_null",
+                "type": "n",
+                "definition": "NOT NULL role"
+            },
+            {
+                "name": "thread_principals_thread_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "thread_principals_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            }
+        ]
+    },
+    {
+        "table": "threads",
+        "columns": [
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "subject",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "threads_channel_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "threads_channel_id_key",
+                "type": "u",
+                "definition": "UNIQUE (channel_id, id)"
+            },
+            {
+                "name": "threads_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "threads_company_channel_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, channel_id, id)"
+            },
+            {
+                "name": "threads_company_id_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id)"
+            },
+            {
+                "name": "threads_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "threads_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "threads_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "threads_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (id)"
+            },
+            {
+                "name": "threads_subject_not_null",
+                "type": "n",
+                "definition": "NOT NULL subject"
+            },
+            {
+                "name": "threads_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "workflow_admission_refusals",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "source_key",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "request_fingerprint",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "role_refusal",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "workflow_admission_refusals_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "workflow_admission_refusals_binding_revision_check",
+                "type": "c",
+                "definition": "CHECK ((binding_revision > 0))"
+            },
+            {
+                "name": "workflow_admission_refusals_binding_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_revision"
+            },
+            {
+                "name": "workflow_admission_refusals_check",
+                "type": "c",
+                "definition": "CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_binding_id_binding__fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id, binding_revision) REFERENCES workflow_binding_revisions(company_id, binding_id, revision)"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_binding_id_source_ke_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, binding_id, source_key)"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_channel_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id)"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_channel_id_thread_i_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id)"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_id_binding_id_bindin_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, binding_id, binding_revision)"
+            },
+            {
+                "name": "workflow_admission_refusals_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_admission_refusals_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "workflow_admission_refusals_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "workflow_admission_refusals_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "workflow_admission_refusals_request_fingerprint_check",
+                "type": "c",
+                "definition": "CHECK ((request_fingerprint ~ '^[0-9a-f]{64}$'::text))"
+            },
+            {
+                "name": "workflow_admission_refusals_request_fingerprint_not_null",
+                "type": "n",
+                "definition": "NOT NULL request_fingerprint"
+            },
+            {
+                "name": "workflow_admission_refusals_role_refusal_check",
+                "type": "c",
+                "definition": "CHECK (valid_workflow_role_refusal(role_refusal))"
+            },
+            {
+                "name": "workflow_admission_refusals_role_refusal_not_null",
+                "type": "n",
+                "definition": "NOT NULL role_refusal"
+            },
+            {
+                "name": "workflow_admission_refusals_source_key_check",
+                "type": "c",
+                "definition": "CHECK (((octet_length(source_key) >= 1) AND (octet_length(source_key) <= 512)))"
+            },
+            {
+                "name": "workflow_admission_refusals_source_key_not_null",
+                "type": "n",
+                "definition": "NOT NULL source_key"
+            }
+        ]
+    },
+    {
+        "table": "workflow_bindings",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "state_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "configuration_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "active",
+                "type": "boolean",
+                "default": "false",
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "activated_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "company_wide",
+                "type": "boolean",
+                "default": null,
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "workflow_bindings_activation_shape",
+                "type": "c",
+                "definition": "CHECK ((active = (activated_at IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_bindings_active_not_null",
+                "type": "n",
+                "definition": "NOT NULL active"
+            },
+            {
+                "name": "workflow_bindings_channel_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, channel_id, id)"
+            },
+            {
+                "name": "workflow_bindings_check",
+                "type": "c",
+                "definition": "CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_bindings_company_id_channel_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id)"
+            },
+            {
+                "name": "workflow_bindings_company_id_channel_id_thread_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id)"
+            },
+            {
+                "name": "workflow_bindings_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_bindings_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_bindings_company_wide_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_wide"
+            },
+            {
+                "name": "workflow_bindings_configuration_revision_check",
+                "type": "c",
+                "definition": "CHECK ((configuration_revision > 0))"
+            },
+            {
+                "name": "workflow_bindings_configuration_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL configuration_revision"
+            },
+            {
+                "name": "workflow_bindings_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "workflow_bindings_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "workflow_bindings_scope_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, company_wide)"
+            },
+            {
+                "name": "workflow_bindings_selected_revision_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, id, configuration_revision) REFERENCES workflow_binding_revisions(company_id, binding_id, revision) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_bindings_state_revision_check",
+                "type": "c",
+                "definition": "CHECK ((state_revision > 0))"
+            },
+            {
+                "name": "workflow_bindings_state_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL state_revision"
+            }
+        ]
+    },
+    {
+        "table": "workflow_history_members",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "ordinal",
+                "type": "integer",
+                "default": null,
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "workflow_history_members_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "workflow_history_members_company_id_channel_id_thread_id_m_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id)"
+            },
+            {
+                "name": "workflow_history_members_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_history_members_company_id_run_id_channel_id_thre_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, run_id, channel_id, thread_id) REFERENCES workflow_runs(company_id, id, channel_id, thread_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_history_members_company_id_run_id_ordinal_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, run_id, ordinal)"
+            },
+            {
+                "name": "workflow_history_members_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "workflow_history_members_ordinal_check",
+                "type": "c",
+                "definition": "CHECK (((ordinal >= 1) AND (ordinal <= 256)))"
+            },
+            {
+                "name": "workflow_history_members_ordinal_not_null",
+                "type": "n",
+                "definition": "NOT NULL ordinal"
+            },
+            {
+                "name": "workflow_history_members_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, run_id, message_id)"
+            },
+            {
+                "name": "workflow_history_members_run_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL run_id"
+            },
+            {
+                "name": "workflow_history_members_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            }
+        ]
+    },
+    {
+        "table": "workflow_message_destinations",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "invocation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "ordinal",
+                "type": "smallint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "kind",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "destination_channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "destination_user_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "replied_message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "destination_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "delivery_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "recipient_address",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            },
+            {
+                "name": "in_app",
+                "type": "boolean",
+                "default": null,
+                "nullable": "YES"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "workflow_destination_notification_origin_complete",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_destination_action",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, invocation_id) REFERENCES workflow_message_actions(company_id, invocation_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_message_destination_channel",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, destination_channel_id) REFERENCES channels(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_destination_delivery",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, delivery_id, message_id) REFERENCES message_deliveries(company_id, id, message_id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_destination_message",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id)"
+            },
+            {
+                "name": "workflow_message_destination_owner",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_message_destination_principal",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, principal_id) REFERENCES principals(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_destination_replied",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, replied_message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id)"
+            },
+            {
+                "name": "workflow_message_destination_user",
+                "type": "f",
+                "definition": "FOREIGN KEY (destination_user_id) REFERENCES users(id)"
+            },
+            {
+                "name": "workflow_message_destinations_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "workflow_message_destinations_check",
+                "type": "c",
+                "definition": "CHECK ((((kind = 'channel'::text) AND (delivery_id IS NULL) AND (principal_id IS NULL) AND (recipient_address IS NULL)) OR ((kind = 'user'::text) AND (principal_id IS NOT NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL))) OR ((kind = 'reply'::text) AND (principal_id IS NULL) AND ((delivery_id IS NULL) = (recipient_address IS NULL)))))"
+            },
+            {
+                "name": "workflow_message_destinations_company_id_delivery_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, delivery_id)"
+            },
+            {
+                "name": "workflow_message_destinations_company_id_invocation_id_kind_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, invocation_id, kind, destination_id)"
+            },
+            {
+                "name": "workflow_message_destinations_company_id_invocation_id_ordi_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, invocation_id, ordinal, delivery_id)"
+            },
+            {
+                "name": "workflow_message_destinations_company_id_message_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, message_id)"
+            },
+            {
+                "name": "workflow_message_destinations_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_message_destinations_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "workflow_message_destinations_destination_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL destination_id"
+            },
+            {
+                "name": "workflow_message_destinations_invocation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL invocation_id"
+            },
+            {
+                "name": "workflow_message_destinations_kind_check",
+                "type": "c",
+                "definition": "CHECK ((kind = ANY (ARRAY['channel'::text, 'user'::text, 'reply'::text])))"
+            },
+            {
+                "name": "workflow_message_destinations_kind_not_null",
+                "type": "n",
+                "definition": "NOT NULL kind"
+            },
+            {
+                "name": "workflow_message_destinations_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "workflow_message_destinations_ordinal_check",
+                "type": "c",
+                "definition": "CHECK (((ordinal >= 0) AND (ordinal <= 19)))"
+            },
+            {
+                "name": "workflow_message_destinations_ordinal_not_null",
+                "type": "n",
+                "definition": "NOT NULL ordinal"
+            },
+            {
+                "name": "workflow_message_destinations_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, invocation_id, ordinal)"
+            },
+            {
+                "name": "workflow_message_destinations_recipient_address_check",
+                "type": "c",
+                "definition": "CHECK (((recipient_address IS NULL) OR ((btrim(recipient_address) <> ''::text) AND (octet_length(recipient_address) <= 998))))"
+            },
+            {
+                "name": "workflow_message_destinations_run_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL run_id"
+            },
+            {
+                "name": "workflow_message_destinations_target_check",
+                "type": "c",
+                "definition": "CHECK ((((kind = 'channel'::text) AND (destination_channel_id = channel_id) AND (destination_user_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'user'::text) AND (destination_user_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (replied_message_id IS NULL)) OR ((kind = 'reply'::text) AND (replied_message_id IS NOT NULL) AND (destination_channel_id IS NULL) AND (destination_user_id IS NULL))))"
+            },
+            {
+                "name": "workflow_message_destinations_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            }
+        ]
+    },
+    {
+        "table": "workflow_message_intents",
+        "columns": [
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "role",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "mentioned",
+                "type": "boolean",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "admissible",
+                "type": "boolean",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "origin",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "reply_to_message_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "reply_settled",
+                "type": "boolean",
+                "default": "false",
+                "nullable": "NO"
+            },
+            {
+                "name": "responder_principal_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "hop_count",
+                "type": "integer",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "trace_channels",
+                "type": "ARRAY",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "delivery_policy",
+                "type": "text",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "correlation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "state",
+                "type": "text",
+                "default": "'pending'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "attempts",
+                "type": "smallint",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "available_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            },
+            {
+                "name": "worker_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "claim_generation",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "lease_expires_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "outcome",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "matched_run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            },
+            {
+                "name": "updated_at",
+                "type": "timestamp with time zone",
+                "default": "clock_timestamp()",
+                "nullable": "NO"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "message_internal_relay_proved",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_intent_association",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id, message_id) REFERENCES thread_messages(company_id, channel_id, thread_id, message_id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_message_intent_attempts",
+                "type": "c",
+                "definition": "CHECK (((attempts >= 0) AND (attempts <= 5)))"
+            },
+            {
+                "name": "workflow_message_intent_company",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_message_intent_delivery_policy",
+                "type": "c",
+                "definition": "CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text])))"
+            },
+            {
+                "name": "workflow_message_intent_hops",
+                "type": "c",
+                "definition": "CHECK (((hop_count >= 0) AND (hop_count <= 64) AND (cardinality(trace_channels) <= 5)))"
+            },
+            {
+                "name": "workflow_message_intent_matched_run",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, matched_run_id) REFERENCES workflow_runs(company_id, id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_message_intent_origin",
+                "type": "c",
+                "definition": "CHECK ((origin = ANY (ARRAY['external'::text, 'internal'::text, 'application'::text])))"
+            },
+            {
+                "name": "workflow_message_intent_outcome",
+                "type": "c",
+                "definition": "CHECK ((((outcome IS NULL) OR (outcome = ANY (ARRAY['matched'::text, 'admitted'::text, 'none'::text, 'notification_source_retired'::text]))) AND ((outcome = 'matched'::text) = (matched_run_id IS NOT NULL))))"
+            },
+            {
+                "name": "workflow_message_intent_reply_settled",
+                "type": "c",
+                "definition": "CHECK (((NOT reply_settled) OR ((reply_to_message_id IS NOT NULL) AND (outcome IS DISTINCT FROM 'matched'::text))))"
+            },
+            {
+                "name": "workflow_message_intent_reply_to",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, reply_to_message_id) REFERENCES messages(company_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_message_intent_responder",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, responder_principal_id) REFERENCES principals(company_id, id) ON DELETE SET NULL (responder_principal_id)"
+            },
+            {
+                "name": "workflow_message_intent_role",
+                "type": "c",
+                "definition": "CHECK ((role = ANY (ARRAY['to'::text, 'cc'::text])))"
+            },
+            {
+                "name": "workflow_message_intent_state",
+                "type": "c",
+                "definition": "CHECK ((((state = 'pending'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts < 5)) OR ((state = 'claimed'::text) AND (worker_id IS NOT NULL) AND (claim_generation IS NOT NULL) AND (lease_expires_at IS NOT NULL) AND (outcome IS NULL) AND (attempts >= 1)) OR ((state = 'done'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NOT NULL)) OR ((state = 'failed'::text) AND (worker_id IS NULL) AND (claim_generation IS NULL) AND (lease_expires_at IS NULL) AND (outcome IS NULL) AND (attempts = 5))))"
+            },
+            {
+                "name": "workflow_message_intents_admissible_not_null",
+                "type": "n",
+                "definition": "NOT NULL admissible"
+            },
+            {
+                "name": "workflow_message_intents_association_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, message_id, channel_id)"
+            },
+            {
+                "name": "workflow_message_intents_attempts_not_null",
+                "type": "n",
+                "definition": "NOT NULL attempts"
+            },
+            {
+                "name": "workflow_message_intents_available_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL available_at"
+            },
+            {
+                "name": "workflow_message_intents_channel_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL channel_id"
+            },
+            {
+                "name": "workflow_message_intents_company_id_id_message_id_channel_i_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, message_id, channel_id)"
+            },
+            {
+                "name": "workflow_message_intents_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_message_intents_correlation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL correlation_id"
+            },
+            {
+                "name": "workflow_message_intents_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "workflow_message_intents_delivery_policy_not_null",
+                "type": "n",
+                "definition": "NOT NULL delivery_policy"
+            },
+            {
+                "name": "workflow_message_intents_hop_count_not_null",
+                "type": "n",
+                "definition": "NOT NULL hop_count"
+            },
+            {
+                "name": "workflow_message_intents_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "workflow_message_intents_mentioned_not_null",
+                "type": "n",
+                "definition": "NOT NULL mentioned"
+            },
+            {
+                "name": "workflow_message_intents_message_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL message_id"
+            },
+            {
+                "name": "workflow_message_intents_origin_not_null",
+                "type": "n",
+                "definition": "NOT NULL origin"
+            },
+            {
+                "name": "workflow_message_intents_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "workflow_message_intents_reply_settled_not_null",
+                "type": "n",
+                "definition": "NOT NULL reply_settled"
+            },
+            {
+                "name": "workflow_message_intents_role_not_null",
+                "type": "n",
+                "definition": "NOT NULL role"
+            },
+            {
+                "name": "workflow_message_intents_state_not_null",
+                "type": "n",
+                "definition": "NOT NULL state"
+            },
+            {
+                "name": "workflow_message_intents_thread_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL thread_id"
+            },
+            {
+                "name": "workflow_message_intents_trace_channels_not_null",
+                "type": "n",
+                "definition": "NOT NULL trace_channels"
+            },
+            {
+                "name": "workflow_message_intents_updated_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL updated_at"
+            }
+        ]
+    },
+    {
+        "table": "workflow_runs",
+        "columns": [
+            {
+                "name": "escalation",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "knowledge_ceiling",
+                "type": "smallint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "content_level",
+                "type": "smallint",
+                "default": "0",
+                "nullable": "NO"
+            },
+            {
+                "name": "content_exact",
+                "type": "boolean",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "company_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "binding_revision",
+                "type": "bigint",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "workflow_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "version_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "channel_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "thread_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "actor_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "trigger_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "correlation_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "bundle_digest",
+                "type": "bytea",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "input",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "params",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "resources",
+                "type": "jsonb",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "max_steps",
+                "type": "integer",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "max_context_bytes",
+                "type": "integer",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "deadline",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "NO"
+            },
+            {
+                "name": "created_at",
+                "type": "timestamp with time zone",
+                "default": "CURRENT_TIMESTAMP",
+                "nullable": "NO"
+            },
+            {
+                "name": "state",
+                "type": "text",
+                "default": "'queued'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "waiting_reason",
+                "type": "text",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "terminal_execution_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "parent_run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "parent_execution_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "terminal_wakeup_sequence",
+                "type": "bigint",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "revision",
+                "type": "bigint",
+                "default": "1",
+                "nullable": "NO"
+            },
+            {
+                "name": "rerun_of_run_id",
+                "type": "uuid",
+                "default": null,
+                "nullable": "YES"
+            },
+            {
+                "name": "delivery_policy",
+                "type": "text",
+                "default": "'deliver'::text",
+                "nullable": "NO"
+            },
+            {
+                "name": "finished_at",
+                "type": "timestamp with time zone",
+                "default": null,
+                "nullable": "YES"
+            }
+        ],
+        "constraints": [
+            {
+                "name": "channel_reply_success_decision",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "guard_workflow_token_reopen",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_child_parent_wait",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_notification_run_origin_complete",
+                "type": "t",
+                "definition": "TRIGGER DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_parent_shape",
+                "type": "c",
+                "definition": "CHECK ((((parent_run_id IS NULL) AND (parent_execution_id IS NULL)) OR ((parent_run_id IS NOT NULL) AND (parent_execution_id IS NOT NULL) AND (parent_run_id <> id))))"
+            },
+            {
+                "name": "workflow_rerun_original_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, rerun_of_run_id, workflow_id) REFERENCES workflow_runs(company_id, id, workflow_id)"
+            },
+            {
+                "name": "workflow_rerun_shape",
+                "type": "c",
+                "definition": "CHECK (((rerun_of_run_id IS NULL) OR ((parent_run_id IS NULL) AND (rerun_of_run_id <> id))))"
+            },
+            {
+                "name": "workflow_run_budget_parent_identity",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, parent_run_id)"
+            },
+            {
+                "name": "workflow_run_delivery_policy",
+                "type": "c",
+                "definition": "CHECK ((delivery_policy = ANY (ARRAY['deliver'::text, 'in_app_only'::text])))"
+            },
+            {
+                "name": "workflow_run_escalation_policy",
+                "type": "c",
+                "definition": "CHECK (((escalation IS NULL) OR workflow_escalation_policy_valid(escalation)))"
+            },
+            {
+                "name": "workflow_run_finished_shape",
+                "type": "c",
+                "definition": "CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text, 'cancelled'::text])) = (finished_at IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_run_parent_identity",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, parent_run_id, parent_execution_id)"
+            },
+            {
+                "name": "workflow_run_parent_link_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, id, parent_run_id, parent_execution_id) REFERENCES workflow_run_parents(company_id, child_run_id, parent_run_id, parent_execution_id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_run_state",
+                "type": "c",
+                "definition": "CHECK ((state = ANY (ARRAY['queued'::text, 'running'::text, 'waiting'::text, 'succeeded'::text, 'failed'::text, 'cancelled'::text])))"
+            },
+            {
+                "name": "workflow_run_terminal_execution_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, id, terminal_execution_id) REFERENCES workflow_executions(company_id, run_id, id) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_run_terminal_execution_shape",
+                "type": "c",
+                "definition": "CHECK (((state = ANY (ARRAY['succeeded'::text, 'failed'::text])) = (terminal_execution_id IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_run_waiting_shape",
+                "type": "c",
+                "definition": "CHECK ((((state = 'waiting'::text) AND (waiting_reason IS NOT NULL) AND (waiting_reason = ANY (ARRAY['decision'::text, 'event'::text, 'timer'::text, 'child_run'::text, 'effect'::text, 'reconciliation'::text, 'agent_turn'::text]))) OR ((state <> 'waiting'::text) AND (waiting_reason IS NULL))))"
+            },
+            {
+                "name": "workflow_run_workflow_identity",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, workflow_id)"
+            },
+            {
+                "name": "workflow_runs_actor_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL actor_id"
+            },
+            {
+                "name": "workflow_runs_binding_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_id"
+            },
+            {
+                "name": "workflow_runs_binding_revision_check",
+                "type": "c",
+                "definition": "CHECK ((binding_revision > 0))"
+            },
+            {
+                "name": "workflow_runs_binding_revision_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, binding_id, binding_revision) REFERENCES workflow_binding_revisions(company_id, binding_id, revision)"
+            },
+            {
+                "name": "workflow_runs_binding_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL binding_revision"
+            },
+            {
+                "name": "workflow_runs_bundle_digest_not_null",
+                "type": "n",
+                "definition": "NOT NULL bundle_digest"
+            },
+            {
+                "name": "workflow_runs_bundle_fk",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, bundle_digest) REFERENCES workflow_bundles(company_id, digest) DEFERRABLE INITIALLY DEFERRED"
+            },
+            {
+                "name": "workflow_runs_check",
+                "type": "c",
+                "definition": "CHECK (((thread_id IS NULL) OR (channel_id IS NOT NULL)))"
+            },
+            {
+                "name": "workflow_runs_check1",
+                "type": "c",
+                "definition": "CHECK ((deadline > created_at))"
+            },
+            {
+                "name": "workflow_runs_company_id_channel_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id) REFERENCES channels(company_id, id)"
+            },
+            {
+                "name": "workflow_runs_company_id_channel_id_thread_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, channel_id, thread_id) REFERENCES threads(company_id, channel_id, id)"
+            },
+            {
+                "name": "workflow_runs_company_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id) REFERENCES companies(id) ON DELETE CASCADE"
+            },
+            {
+                "name": "workflow_runs_company_id_id_binding_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, binding_id)"
+            },
+            {
+                "name": "workflow_runs_company_id_id_channel_id_thread_id_key",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, channel_id, thread_id)"
+            },
+            {
+                "name": "workflow_runs_company_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL company_id"
+            },
+            {
+                "name": "workflow_runs_company_id_workflow_id_version_id_fkey",
+                "type": "f",
+                "definition": "FOREIGN KEY (company_id, workflow_id, version_id) REFERENCES workflow_versions(company_id, workflow_id, id)"
+            },
+            {
+                "name": "workflow_runs_content_exact_not_null",
+                "type": "n",
+                "definition": "NOT NULL content_exact"
+            },
+            {
+                "name": "workflow_runs_content_level_not_null",
+                "type": "n",
+                "definition": "NOT NULL content_level"
+            },
+            {
+                "name": "workflow_runs_correlation_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL correlation_id"
+            },
+            {
+                "name": "workflow_runs_created_at_not_null",
+                "type": "n",
+                "definition": "NOT NULL created_at"
+            },
+            {
+                "name": "workflow_runs_deadline_not_null",
+                "type": "n",
+                "definition": "NOT NULL deadline"
+            },
+            {
+                "name": "workflow_runs_delivery_policy_not_null",
+                "type": "n",
+                "definition": "NOT NULL delivery_policy"
+            },
+            {
+                "name": "workflow_runs_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL id"
+            },
+            {
+                "name": "workflow_runs_input_check",
+                "type": "c",
+                "definition": "CHECK ((octet_length((input)::text) <= 4194304))"
+            },
+            {
+                "name": "workflow_runs_input_not_null",
+                "type": "n",
+                "definition": "NOT NULL input"
+            },
+            {
+                "name": "workflow_runs_knowledge_bounds",
+                "type": "c",
+                "definition": "CHECK (((content_level)::smallint <= (knowledge_ceiling)::smallint))"
+            },
+            {
+                "name": "workflow_runs_knowledge_ceiling_not_null",
+                "type": "n",
+                "definition": "NOT NULL knowledge_ceiling"
+            },
+            {
+                "name": "workflow_runs_max_context_bytes_check",
+                "type": "c",
+                "definition": "CHECK (((max_context_bytes >= 1) AND (max_context_bytes <= 1048576)))"
+            },
+            {
+                "name": "workflow_runs_max_context_bytes_not_null",
+                "type": "n",
+                "definition": "NOT NULL max_context_bytes"
+            },
+            {
+                "name": "workflow_runs_max_steps_check",
+                "type": "c",
+                "definition": "CHECK (((max_steps >= 1) AND (max_steps <= 100000)))"
+            },
+            {
+                "name": "workflow_runs_max_steps_not_null",
+                "type": "n",
+                "definition": "NOT NULL max_steps"
+            },
+            {
+                "name": "workflow_runs_params_check",
+                "type": "c",
+                "definition": "CHECK ((octet_length((params)::text) <= 4194304))"
+            },
+            {
+                "name": "workflow_runs_params_not_null",
+                "type": "n",
+                "definition": "NOT NULL params"
+            },
+            {
+                "name": "workflow_runs_pkey",
+                "type": "p",
+                "definition": "PRIMARY KEY (company_id, id)"
+            },
+            {
+                "name": "workflow_runs_resources_check",
+                "type": "c",
+                "definition": "CHECK (((jsonb_typeof(resources) = 'object'::text) AND (octet_length((resources)::text) <= 262144)))"
+            },
+            {
+                "name": "workflow_runs_resources_not_null",
+                "type": "n",
+                "definition": "NOT NULL resources"
+            },
+            {
+                "name": "workflow_runs_revision_check",
+                "type": "c",
+                "definition": "CHECK ((revision > 0))"
+            },
+            {
+                "name": "workflow_runs_revision_not_null",
+                "type": "n",
+                "definition": "NOT NULL revision"
+            },
+            {
+                "name": "workflow_runs_state_not_null",
+                "type": "n",
+                "definition": "NOT NULL state"
+            },
+            {
+                "name": "workflow_runs_terminal_wakeup_sequence_check",
+                "type": "c",
+                "definition": "CHECK ((terminal_wakeup_sequence > 0))"
+            },
+            {
+                "name": "workflow_runs_trigger_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL trigger_id"
+            },
+            {
+                "name": "workflow_runs_version_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL version_id"
+            },
+            {
+                "name": "workflow_runs_workflow_id_not_null",
+                "type": "n",
+                "definition": "NOT NULL workflow_id"
+            },
+            {
+                "name": "workflow_usage_version_identity",
+                "type": "u",
+                "definition": "UNIQUE (company_id, id, workflow_id, version_id)"
+            }
+        ]
+    }
+]

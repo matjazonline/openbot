@@ -1,0 +1,9 @@
+{
+  "root_locale": "en_US.UTF-8",
+  "root_digest": "d36ece5064ce6cb57c89af50aa4a5231b7ac857aeda6ec7220708e8eb6e1583a",
+  "canonical_locale": "C",
+  "canonical_digest": "0ea4417d9fa23af60da326f0838d95cdbe867d7f9f4c0918e805d848299d4604",
+  "file_sets_identical": true,
+  "paths": 1537,
+  "explanation": "GNU sort collation of untracked file hash stream; no material file has mtime after original freeze. Repeated root UTF-8 snapshot retained same digest; C snapshot matches reviewer. Future snapshots explicitly LC_ALL=C LANG=C; test locale remains en_US.UTF-8."
+}

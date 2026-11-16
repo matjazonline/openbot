@@ -1,0 +1,18 @@
+{
+  "head": "830561e2a7a4fb859f389fbaf6995a756badb561",
+  "worktree": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/pa02-clippy-head-ym7rf4x2",
+  "purpose": "Read-only clippy baseline proof; primary worktree and user changes untouched",
+  "target_dir": "/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target",
+  "command": [
+    "cargo",
+    "clippy",
+    "--locked",
+    "--offline",
+    "--all-targets",
+    "--",
+    "-D",
+    "warnings"
+  ],
+  "exit": 101,
+  "seconds": 116.38
+}

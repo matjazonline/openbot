@@ -1,0 +1,11 @@
+    Checking open_bots v0.1.0 (/Users/mac02/.gui-cloudroom/plugins/environment-git-worktree/host-data/worktrees/thr_jt43h4qc8d-1/openbot)
+error[E0609]: no field `channel_id` on type `&domain::entities::attention::AttentionItem`
+    --> src/adapters/persistence/workflow/message_intent_tests.rs:1382:20
+     |
+1382 |     assert_eq!(row.channel_id, Some(s.channel));
+     |                    ^^^^^^^^^^ unknown field
+     |
+     = note: available fields are: `source_kind`, `source_id`, `company_id`, `target`, `thread_id` ... and 14 others
+
+For more information about this error, try `rustc --explain E0609`.
+error: could not compile `open_bots` (lib test) due to 1 previous error

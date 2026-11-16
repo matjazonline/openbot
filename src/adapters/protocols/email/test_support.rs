@@ -74,9 +74,9 @@ pub fn relayed_part(
         internal_target: None,
         correlation_id: CorrelationId::new(),
         relay: Some(OutboundRelayV1 {
-            source_channel_id,
+            source_target: crate::entities::address::AddressTarget::Desk(source_channel_id),
             hop_count: 0,
-            trace_channels: Vec::new(),
+            trace_targets: Vec::new(),
         }),
     };
     RenderedPart {
@@ -87,3 +87,5 @@ pub fn relayed_part(
         digest: ContentDigest::sha256_of(body.as_bytes()),
     }
 }
+#[path = "test_support/dns.rs"]
+pub(crate) mod dns;

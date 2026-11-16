@@ -31,12 +31,20 @@ pub(super) async fn lock_users_on(
     db: &mut PgConnection,
     accounts: &mut Vec<Uuid>,
 ) -> AppResult<Vec<Uuid>> {
+    lock_users_with_locks_on(db, accounts, super::row_locks::RowLocks::Wait).await
+}
+
+pub(super) async fn lock_users_with_locks_on(
+    db: &mut PgConnection,
+    accounts: &mut Vec<Uuid>,
+    locks: super::row_locks::RowLocks,
+) -> AppResult<Vec<Uuid>> {
     accounts.sort_unstable();
     accounts.dedup();
     if accounts.len() > registry::MAX_REVIEWERS * 5 + 3 {
         return Err(invalid());
     }
-    sqlx::query_scalar("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE")
+    sqlx::query_scalar(&locks.sql("SELECT id FROM users WHERE id=ANY($1) ORDER BY id FOR SHARE"))
         .bind(accounts.as_slice())
         .fetch_all(db)
         .await

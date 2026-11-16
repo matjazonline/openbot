@@ -19,7 +19,7 @@
 
 use tracing::warn;
 
-use crate::adapters::protocols::email::EmailChannelSelectorParser;
+use crate::adapters::protocols::email::EmailAddressParser;
 use crate::adapters::protocols::email::EmailIdentity;
 use crate::adapters::protocols::email::EmailMessageKey;
 use crate::adapters::protocols::email::EmailRecipientDestination;
@@ -108,6 +108,8 @@ impl EmailIngressTrust {
 /// them.
 #[derive(Debug, thiserror::Error)]
 pub enum EmailIngressError {
+    #[error("unusable relay trace")]
+    RelayTrace,
     #[error("unusable {field} address: {source}")]
     Address {
         field: &'static str,
@@ -228,14 +230,14 @@ impl PendingEmailAttachments {
 #[derive(Debug, Clone)]
 pub struct EmailIngressAdapter {
     app_domain: String,
-    selector: EmailChannelSelectorParser,
+    selector: EmailAddressParser,
 }
 
 impl EmailIngressAdapter {
     pub fn new(app_domain: impl AsRef<str>) -> Self {
         Self {
             app_domain: app_domain.as_ref().trim().to_ascii_lowercase(),
-            selector: EmailChannelSelectorParser::new(app_domain),
+            selector: EmailAddressParser::new(app_domain),
         }
     }
 
@@ -319,11 +321,11 @@ impl EmailIngressAdapter {
         }
         match self.selector.classify(EmailAddress::from(address.trim())) {
             EmailRecipientDestination::Channel(selection) => {
-                AddressedTarget::Channels(selection.into_selectors())
+                AddressedTarget::Platform(selection.into_selectors())
             }
             // A platform-domain address that names no channel is nobody: it is not an outsider to
             // copy onto a thread, and it is not a channel to deliver to.
-            EmailRecipientDestination::InvalidPlatformAddress => AddressedTarget::Channels(vec![]),
+            EmailRecipientDestination::InvalidPlatformAddress => AddressedTarget::Platform(vec![]),
             EmailRecipientDestination::External(_) => AddressedTarget::Outsider,
         }
     }
@@ -355,6 +357,9 @@ impl EmailIngressAdapter {
         routing: &InboundRouting,
         trust: EmailIngressTrust,
     ) -> Result<InboundDraft, EmailIngressError> {
+        if parsed.trace_invalid {
+            return Err(EmailIngressError::RelayTrace);
+        }
         let metadata = email_metadata(parsed);
         let author = self.identity("sender", &parsed.sender)?;
 
@@ -391,9 +396,9 @@ impl EmailIngressAdapter {
             attachments: BoundedVec::parse("attachments", parsed.attachments.clone())?,
             directives: IngressDirectives {
                 hop_count: parsed.hop_count,
-                trace_channels: BoundedVec::parse("trace channels", parsed.trace_channels.clone())?,
+                trace_targets: BoundedVec::parse("trace channels", parsed.trace_targets.clone())?,
                 disposition,
-                source_channel_id: parsed.channel_id_header,
+                source_target: parsed.source_target_header,
                 target_thread_id: if matches!(trust, EmailIngressTrust::Application) {
                     parsed.thread_id_header
                 } else {
@@ -501,7 +506,7 @@ mod tests {
 
         let pipelines: Vec<_> = accepted
             .routing
-            .channel_pipelines()
+            .platform_pipelines()
             .map(|(recipient, selectors)| {
                 (
                     recipient.role,
@@ -687,3 +692,7 @@ mod tests {
         );
     }
 }
+
+#[cfg(test)]
+#[path = "trace_tests.rs"]
+mod trace_tests;

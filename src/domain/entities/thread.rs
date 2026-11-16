@@ -1,13 +1,15 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+use crate::entities::address::AddressTarget;
 use crate::entities::cursor::ThreadCursor;
 use crate::entities::transport::{PrincipalId, QualifiedIdentity, TransportKind};
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Thread {
     pub id: Uuid,
-    pub channel_id: Uuid,
+    pub company_id: Uuid,
+    pub target: AddressTarget,
     pub subject: String,
     pub participant_principal_ids: Vec<PrincipalId>,
     /// Adapter/read-side identities for rendering and email delivery. Business authorization
@@ -35,7 +37,11 @@ impl ThreadParticipantProjection {
 }
 
 impl Thread {
-    /// This thread's position in its channel's newest-first column — where paging continues from,
+    pub fn belongs_to(&self, company_id: Uuid, target: AddressTarget) -> bool {
+        self.company_id == company_id && self.target == target
+    }
+
+    /// This thread's position in its target's newest-first column — where paging continues from,
     /// and where a live column resumes from.
     pub fn cursor(&self) -> ThreadCursor {
         ThreadCursor::new(self.updated_at, self.id)
@@ -63,7 +69,8 @@ mod tests {
     fn thread_with_subject(subject: &str) -> Thread {
         Thread {
             id: Uuid::new_v4(),
-            channel_id: Uuid::new_v4(),
+            company_id: Uuid::new_v4(),
+            target: crate::entities::address::AddressTarget::Desk(Uuid::new_v4()),
             subject: subject.to_string(),
             participant_principal_ids: vec![],
             participant_projection: ThreadParticipantProjection::default(),

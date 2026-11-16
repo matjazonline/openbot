@@ -143,7 +143,7 @@ fn message_registry_reply_wait_takes_the_standard_payload_and_a_message_correlat
 /// supply a contract of that name; an `mcp.call` of that name is the server's own tool.
 #[test]
 fn provisioning_names_are_not_step_tools() {
-    use crate::application::workflow::provisioning::{CREATE_AGENT_CHANNEL, LIST_COMPANY_AGENTS};
+    use crate::application::workflow::provisioning::{CREATE_AGENT, LIST_COMPANY_AGENTS};
     let renamed = |kind: &str, name: &str| {
         let mut example = example(kind).unwrap();
         changed(&mut example, |v| {
@@ -160,7 +160,7 @@ fn provisioning_names_are_not_step_tools() {
         }
         compile_example(&example)
     };
-    for name in [LIST_COMPANY_AGENTS, CREATE_AGENT_CHANNEL] {
+    for name in [LIST_COMPANY_AGENTS, CREATE_AGENT] {
         assert_eq!(
             renamed("tool.call", name).err().unwrap().code,
             "registry.tool"

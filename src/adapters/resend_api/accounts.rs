@@ -45,6 +45,8 @@ pub struct CompanyResendApiClients {
     /// Built once and cloned per company: a clone shares the connection pool, so a deployment with
     /// a hundred tenants still keeps one set of connections to the API rather than a hundred.
     http: reqwest::Client,
+    #[cfg(test)]
+    test_api: Option<Arc<dyn ResendApi>>,
 }
 
 impl CompanyResendApiClients {
@@ -59,6 +61,8 @@ impl CompanyResendApiClients {
             accounts,
             config,
             http,
+            #[cfg(test)]
+            test_api: None,
         })
     }
 
@@ -75,14 +79,23 @@ impl CompanyResendApiClients {
         let Some(credentials) = self.accounts.account_credentials(company_id).await? else {
             return Ok(None);
         };
+        let api: Arc<dyn ResendApi> = Arc::new(ReqwestResendApiClient::new(
+            &self.http,
+            &self.config,
+            credentials.api_key,
+        ));
+        #[cfg(test)]
+        let api = self.test_api.clone().unwrap_or(api);
         Ok(Some(CompanyResendApiAccount {
-            api: Arc::new(ReqwestResendApiClient::new(
-                &self.http,
-                &self.config,
-                credentials.api_key,
-            )),
+            api,
             authserv_id: credentials.authserv_id,
         }))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn with_api_for_test(mut self, api: Arc<dyn ResendApi>) -> Self {
+        self.test_api = Some(api);
+        self
     }
 }
 

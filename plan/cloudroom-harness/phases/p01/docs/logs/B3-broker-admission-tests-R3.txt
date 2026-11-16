@@ -1,0 +1,10 @@
+   Compiling open_bots v0.1.0 (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/worktree)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 05s
+     Running unittests src/lib.rs (/private/tmp/openbot-cloudroom-harness-t1gfnhz1/target/debug/deps/open_bots-6467f0b3ff334015)
+
+running 2 tests
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_competing_invocations_publish_one_real_linked_run_and_job ... ok
+test adapters::persistence::local_agents::management::tests::native_mcp_tests::native_mcp_bad_input_or_unacknowledged_turn_never_publishes_work ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 4078 filtered out; finished in 1.18s
+

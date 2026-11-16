@@ -1,0 +1,19 @@
+BEGIN
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+INSERT 0 1
+INSERT 0 1
+INSERT 0 4
+DELETE 1
+DO
+INSERT 0 1
+DO
+DELETE 1
+DO
+ROLLBACK
+                                                            review_result                                                            
+-------------------------------------------------------------------------------------------------------------------------------------
+ PASS: generated FK child retains direct row/read state, cascades other families, rejects caller override, account deletion cascades
+(1 row)
+

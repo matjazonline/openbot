@@ -14,9 +14,12 @@ pub struct Agent {
     pub company_id: Option<Uuid>,
     pub name: String,
     pub slug: String,
+    /// Admission to the principal address, independent of any desk this agent staffs.
+    pub open_to_public: bool,
     pub provider: Option<String>,
     pub model: Option<String>,
     pub system_prompt: Option<String>,
+    pub native_permissions: crate::domain::local_agents::LocalPermissions,
     /// A short statement of what this agent is for, shown to other agents in the same company by
     /// the agent directory tool. Not part of the prompt.
     pub description: Option<String>,

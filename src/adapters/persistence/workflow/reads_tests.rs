@@ -235,7 +235,11 @@ fn board_parameters(shape: &BoardShape) -> Vec<(&'static str, &'static str)> {
             parameters.push(("company", "FROM workflow_runs WHERE company_id = "));
         }
         parameters.push(("channels", " AND (channel_id = ANY("));
-        parameters.push(("company_visible", ") OR (channel_id IS NULL AND "));
+        parameters.push(("principals", ") OR principal_id = ANY("));
+        parameters.push((
+            "company_visible",
+            ") OR (channel_id IS NULL AND principal_id IS NULL AND ",
+        ));
         if !state.is_open() {
             parameters.push(("cutoff", " AND finished_at >= "));
         }
@@ -256,7 +260,8 @@ fn board_statement(shape: &BoardShape) -> String {
             .sql()
             .to_owned();
     }
-    let visible = VisibleChannels {
+    let visible = VisibleInboxes {
+        principals: Vec::new(),
         channels: vec![Uuid::from_u128(5)],
         company: true,
     };

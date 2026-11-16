@@ -237,25 +237,28 @@ fn facts(view: &RunPaneView<'_>) -> String {
     let workflow = summary.workflow.as_uuid();
     let association = match summary.association {
         RelatedAssociation::Company => "Company-wide".to_owned(),
+        RelatedAssociation::Principal(_) => "Direct address".to_owned(),
         RelatedAssociation::Channel(_) => format!(
             "Desk {}",
             run.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
+        RelatedAssociation::Thread {
+            target: crate::entities::address::AddressTarget::Principal(_),
+            ..
+        } => "A direct thread".to_owned(),
         RelatedAssociation::Thread { .. } => format!(
             "A thread of desk {}",
             run.channel_name.as_deref().unwrap_or("(unnamed)")
         ),
     };
     let thread = match (summary.association, run.trigger_message) {
-        (
-            RelatedAssociation::Thread {
-                channel_id,
-                thread_id,
+        (RelatedAssociation::Thread { target, thread_id }, message) => format!(
+            r#"<li>Conversation: <a class="link" href="/ui?company_id={company_id}&amp;{inbox}&amp;thread_id={thread}">open the thread</a>{message}</li>"#,
+            inbox = match target {
+                crate::entities::address::AddressTarget::Desk(id) => format!("channel_id={id}"),
+                crate::entities::address::AddressTarget::Principal(id) =>
+                    format!("principal_id={id}"),
             },
-            message,
-        ) => format!(
-            r#"<li>Conversation: <a class="link" href="/ui?company_id={company_id}&amp;channel_id={channel}&amp;thread_id={thread}">open the thread</a>{message}</li>"#,
-            channel = channel_id.as_uuid(),
             thread = thread_id.as_uuid(),
             message = message
                 .map(|message| format!(

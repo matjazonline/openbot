@@ -549,7 +549,7 @@ impl AgentSettingsView<'_> {
             .await
     }
 
-    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::Skill>> {
+    async fn skills(&self) -> AppResult<Vec<crate::entities::skill::SkillSummary>> {
         Ok(self
             .skill_use_cases
             .list_company_page(
@@ -599,7 +599,7 @@ impl AgentSettingsView<'_> {
                     .get_company(self.user_id, self.company.id, *skill_id)
                     .await?
             {
-                skills.push(skill);
+                skills.push(skill.into());
             }
         }
         // Nothing to start from means no Easy tab, so a request that asked for it lands on Simple.
@@ -660,13 +660,16 @@ impl AgentSettingsView<'_> {
         let mut skills = self.skills().await?;
         for selected in &capabilities.skills {
             if !skills.iter().any(|skill| skill.id == selected.id) {
-                skills.push(selected.clone());
+                skills.push(selected.into());
             }
         }
         let stored = pages::AgentDraft {
             name: &agent.name,
             slug: &agent.slug,
+            open_to_public: agent.open_to_public,
+            confirm_spam_disabled: false,
             system_prompt: agent.system_prompt.as_deref().unwrap_or(""),
+            native_permissions: agent.native_permissions,
             description: agent.description.as_deref().unwrap_or(""),
             provider: agent.provider.as_deref().unwrap_or(""),
             model: agent.model.as_deref().unwrap_or(""),
@@ -796,9 +799,12 @@ impl SubmittedAgent {
             tool_bindings: None,
             name: self.form.name.clone(),
             slug: self.slug.clone(),
+            open_to_public: self.form.open_to_public,
+            confirm_spam_disabled: self.form.confirm_spam_disabled,
             provider: self.form.provider.clone(),
             model: self.form.model.clone(),
             system_prompt: self.form.system_prompt.clone(),
+            native_permissions: self.form.native_permissions,
             description: self.form.description.clone(),
             skill_ids: capabilities.skill_ids,
             avatar_url: self.avatar_url.clone()?,
@@ -823,7 +829,10 @@ impl SubmittedAgent {
         pages::AgentDraft {
             name: &self.form.name,
             slug: &self.slug,
+            open_to_public: self.form.open_to_public,
+            confirm_spam_disabled: self.form.confirm_spam_disabled,
             system_prompt: self.form.system_prompt.as_deref().unwrap_or(""),
+            native_permissions: self.form.native_permissions,
             description: self.form.description.as_deref().unwrap_or(""),
             provider: self.form.provider.as_deref().unwrap_or(""),
             model: self.form.model.as_deref().unwrap_or(""),

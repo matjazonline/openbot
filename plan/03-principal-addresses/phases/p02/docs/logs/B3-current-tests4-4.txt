@@ -1,0 +1,17 @@
+
+running 11 tests
+test domain::entities::run_counts::tests::folds_open_runs_by_channel_and_company ... ok
+test adapters::http::pages::run_counts::tests::snapshot_protocol_renders_typed_keys_and_only_nonzero_badges ... ok
+test adapters::http::routes::ui_run_counts::tests::slow_reads_keep_queued_wakes_and_skip_missed_ticks ... ok
+test adapters::http::routes::ui_run_counts::tests::throttle_collapses_wakes_and_lag_without_delaying_eligible_work ... ok
+test adapters::http::routes::ui_run_counts::tests::sustained_spaced_wakes_cannot_debounce_the_refresh ... ok
+test adapters::persistence::workflow::tests::message_tests::delivery_tests::run_counts_group_open_runs_by_state_and_readable_channel ... ok
+test adapters::http::routes::ui_run_counts::tests::a_resync_reconciles_a_change_no_event_named ... ok
+test adapters::http::routes::ui_run_counts::tests::subscribe_before_query_preserves_a_change_after_the_initial_snapshot_was_captured ... ok
+test adapters::http::routes::ui_run_counts::tests::unchanged_pass_is_suppressed_and_lag_reconciles_after_the_cooldown ... ok
+test adapters::http::routes::ui_run_counts::tests::permissions_are_shared_rechecked_and_scoped_to_the_managed_company ... ok
+test adapters::http::routes::ui_run_counts::tests::periodic_recheck_recovers_a_database_change_without_any_wake has been running for over 60 seconds
+test adapters::http::routes::ui_run_counts::tests::periodic_recheck_recovers_a_database_change_without_any_wake ... ok
+
+test result: ok. 11 passed; 0 failed; 0 ignored; 0 measured; 4571 filtered out; finished in 60.34s
+

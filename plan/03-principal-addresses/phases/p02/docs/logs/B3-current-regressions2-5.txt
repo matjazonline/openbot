@@ -1,0 +1,11 @@
+
+running 6 tests
+test infra::events::tests::the_two_event_kinds_are_matched_separately ... ok
+test infra::events::tests::malformed_payloads_are_errors_not_panics ... ok
+test infra::events::tests::publishing_with_no_subscribers_is_not_an_error ... ok
+test infra::events::tests::parses_the_payload_the_triggers_build ... ok
+test infra::events::tests::published_events_reach_every_subscriber ... ok
+test infra::events::tests::the_listener_resyncs_on_start_and_reconnect_and_drops_a_bad_run_payload ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 4572 filtered out; finished in 0.84s
+

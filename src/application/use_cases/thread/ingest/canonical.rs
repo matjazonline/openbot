@@ -4,7 +4,7 @@ use super::super::*;
 use crate::transport::ingress::MAX_REPLY_CANDIDATES;
 struct Target {
     company: Company,
-    channel: Channel,
+    inbox: Inbox,
     thread: Option<Thread>,
 }
 struct EmailHeaders {
@@ -45,13 +45,15 @@ impl ThreadUseCases {
             parent.as_ref(),
             &ingress.text_body,
         )?;
-        let address = target
-            .channel
-            .inbound_address(&target.company.slug, &self.settings.mail_domain);
+        let address = crate::entities::address::address_for(
+            target.inbox.slug(),
+            &target.company.slug,
+            &self.settings.mail_domain,
+        );
         let recipient = qualified_email_identity(address)?;
-        let selector = ChannelSelector::Qualified {
+        let selector = AddressSelector::Qualified {
             company: target.company.slug,
-            channel: target.channel.slug,
+            channel: target.inbox.slug().clone(),
         };
         let routing =
             super::single_channel_routing(recipient.clone(), selector, ingress.disposition)?;
@@ -94,22 +96,43 @@ impl ThreadUseCases {
             .ok_or_else(|| {
                 AppError::NotFound(format!("Company {} not found", ingress.company_id))
             })?;
-        let channel = self
+        let address = self
             .channel_persistence
-            .get_by_id(ingress.channel_id)
-            .await?
-            .ok_or_else(|| {
-                AppError::NotFound(format!(
-                    "Channel {} not found in company {}",
-                    ingress.channel_id, ingress.company_id
-                ))
-            })?;
-        if channel.company_id != company.id {
+            .address_for_target(company.id, ingress.target)
+            .await?;
+        let Some(address) = address else {
             return Ok(None);
-        }
+        };
+        let inbox = match ingress.target {
+            crate::entities::address::AddressTarget::Desk(id) => {
+                let Some(desk) = self
+                    .channel_persistence
+                    .get_by_id(id)
+                    .await?
+                    .filter(|desk| desk.company_id == company.id)
+                else {
+                    return Ok(None);
+                };
+                Inbox::Desk(Box::new(desk))
+            }
+            crate::entities::address::AddressTarget::Principal(id) => {
+                let Some(principal) = self
+                    .participant_persistence
+                    .principal_by_id(company.id, id)
+                    .await?
+                else {
+                    return Ok(None);
+                };
+                Inbox::Direct {
+                    principal: Box::new(principal),
+                    slug: address.slug,
+                }
+            }
+        };
         let thread = self
             .resolve_target_thread(
-                channel.id,
+                company.id,
+                inbox.target(),
                 ingress.target_thread_id,
                 ingress.reply_to_message_id,
             )
@@ -121,7 +144,7 @@ impl ThreadUseCases {
         }
         Ok(Some(Target {
             company,
-            channel,
+            inbox,
             thread,
         }))
     }
@@ -178,9 +201,9 @@ fn canonical_directives(
 ) -> IngressDirectives {
     IngressDirectives {
         hop_count: 0,
-        trace_channels: BoundedVec::empty(),
+        trace_targets: BoundedVec::empty(),
         disposition: ingress.disposition,
-        source_channel_id: None,
+        source_target: None,
         target_thread_id: target,
         reply_to_message_id: ingress.reply_to_message_id,
         is_auto_reply: false,
