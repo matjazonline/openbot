@@ -150,29 +150,82 @@ def exercise(wrappers, directory, address, port, expect_control=True):
 def sudo_shim(directory, mode, stage):
     shim = directory / "shim"
     shim.mkdir(exist_ok=True)
-    # Run the actual privileged operation first for signal/deadline cases. The
-    # signal handshake holds a successful creator before its shell can publish it.
-    # The deadline case execs sudo, retaining the real production process tree.
-    (shim / "sudo").write_text("#!" + sys.executable + "\n" +
-        "import os, signal, subprocess, sys, time\nfrom pathlib import Path\n" +
-        "mode, stage, real, gate = " + repr((mode, stage, shutil.which("sudo"), str(directory))) + "\n" +
-        "args = sys.argv[1:]\n" +
-        "target = stage in args and (stage != 'iptables' and stage != 'ip6tables' or '-N' in args)\n" +
-        "if mode == 'failure' and target: raise SystemExit(73)\n" +
-        "if mode == 'slow' and target:\n" +
-        "    position = args.index('groupdel')\n" +
-        "    group = args[position + 1]\n" +
-        "    script = 'groupdel \"$1\"; echo \"$$\" > \"$2\"; sleep 30; touch \"$3\"'\n" +
-        "    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group, str(Path(gate, 'privileged-pid')), str(Path(gate, 'late-effect'))]\n" +
-        "    os.execv(real, [real, *args])\n" +
-        "if not target: os.execv(real, [real, *args])\n" +
-        "result = subprocess.run([real, *args]).returncode\n" +
-        "if result == 0 and target and mode == 'signal':\n" +
-        "    Path(gate, 'created').touch()\n" +
-        "    deadline = time.monotonic() + 10\n" +
-        "    while not Path(gate, 'return').exists():\n" +
-        "        assert time.monotonic() < deadline\n        time.sleep(0.01)\n" +
-        "raise SystemExit(result)\n")
+    # Only creator-acknowledgement fixtures keep a parent after the real operation.
+    # Deadline/ordinary paths exec sudo and preserve its production process tree.
+    source = "#!" + sys.executable + "\n" + (
+        "mode, stage, real, gate = " +
+        repr((mode, stage, shutil.which("sudo"), str(directory))) + "\n") + r"""
+import os, subprocess, sys, time
+from pathlib import Path
+args = sys.argv[1:]
+gate = Path(gate)
+if 'groupadd' in args:
+    (gate / 'planned-group').write_text(args[-1])
+if '-N' in args and any(fw in args for fw in ('iptables', 'ip6tables')):
+    (gate / 'planned-chain').write_text(args[args.index('-N') + 1])
+
+def fixture_admin(*command):
+    return subprocess.run([real, '-n', 'env', '--default-signal=INT,TERM', 'timeout',
+                           '--kill-after=1s', '3s', *command],
+                          capture_output=True, text=True, timeout=6, check=True)
+
+if mode == 'foreign-group' and 'getent' in args and not (gate / 'foreign-group').exists():
+    name = args[-1]
+    fixture_admin('groupadd', '--system', name)
+    (gate / 'foreign-group').write_text(name)
+    (gate / 'foreign-before').write_text(fixture_admin('getent', 'group', name).stdout)
+if mode in ('foreign-chain', 'foreign-probe-error') and 'iptables' in args and '-S' in args:
+    if not (gate / 'foreign-chain').exists():
+        group = (gate / 'planned-group').read_text()
+        chain = 'OB_TEST_' + group.removeprefix('obnet_')
+        fixture_admin('iptables', '-w', '1', '-N', chain)
+        fixture_admin('iptables', '-w', '1', '-A', chain, '-m', 'comment',
+                      '--comment', 'foreign-fixture', '-j', 'RETURN')
+        (gate / 'foreign-chain').write_text(chain)
+        (gate / 'foreign-before').write_text(fixture_admin('iptables', '-w', '1', '-S', chain).stdout)
+    if mode == 'foreign-probe-error':
+        raise SystemExit(73)
+if stage == 'hook':
+    target = 'iptables' in args and '-I' in args
+elif stage == 'probe':
+    target = 'iptables' in args and '-S' in args
+else:
+    target = stage in args and (stage not in ('iptables', 'ip6tables') or '-N' in args)
+if mode == 'failure' and target:
+    raise SystemExit(73)
+if mode == 'slow' and target:
+    position = args.index('groupdel')
+    group = args[position + 1]
+    script = 'groupdel "$1"; echo "$$" > "$2"; sleep 30; touch "$3"'
+    args[position:] = ['sh', '-c', script, 'cleanup-fixture', group,
+                      str(gate / 'privileged-pid'), str(gate / 'late-effect')]
+    os.execv(real, [real, *args])
+if not target or mode in ('foreign-group', 'foreign-chain', 'foreign-probe-error'):
+    os.execv(real, [real, *args])
+result = subprocess.run([real, *args]).returncode
+if result == 0 and mode in ('post-error', 'post-timeout'):
+    if stage == 'groupadd':
+        fixture_admin('getent', 'group', args[-1])
+    elif stage in ('iptables', 'ip6tables'):
+        fixture_admin(stage, '-w', '1', '-S', args[args.index('-N') + 1])
+    else:
+        jump = args[args.index('-I') + 1:]
+        assert jump[1] == '1'
+        del jump[1]
+        fixture_admin('iptables', '-w', '1', '-C', *jump)
+    (gate / 'applied').touch()
+    if mode == 'post-error':
+        raise SystemExit(73)
+    time.sleep(30)
+if result == 0 and mode == 'signal':
+    (gate / 'created').touch()
+    deadline = time.monotonic() + 10
+    while not (gate / 'return').exists():
+        assert time.monotonic() < deadline
+        time.sleep(0.01)
+raise SystemExit(result)
+"""
+    (shim / "sudo").write_text(source)
     (shim / "sudo").chmod(0o755)
     return dict(os.environ, PATH=str(shim) + ":" + os.environ["PATH"])
 
@@ -272,6 +325,121 @@ def cleanup_deadline(wrappers, directory):
         print(f"PASS: cleanup deadline and visible failure for entrypoint{index} ({elapsed:.2f}s)", flush=True)
 
 
+def admin(*arguments, check=True):
+    return subprocess.run(["sudo", "-n", "env", "--default-signal=INT,TERM", "timeout",
+                           "--kill-after=1s", "3s", *arguments],
+                          capture_output=True, text=True, timeout=6, check=check)
+
+
+def remove_planned(directory):
+    # These exact names came from this fixture's own real creator calls. This is
+    # failure teardown, never prefix-wide cleanup or a source of production truth.
+    group_file = directory / "planned-group"
+    chain_file = directory / "planned-chain"
+    group = group_file.read_text() if group_file.exists() else None
+    chain = chain_file.read_text() if chain_file.exists() else None
+    if chain:
+        row = admin("getent", "group", group, check=False) if group else None
+        gid = row.stdout.split(":")[2] if row and row.returncode == 0 else None
+        for firewall in ("iptables", "ip6tables"):
+            if gid:
+                admin(firewall, "-w", "1", "-D", "OUTPUT", "-m", "owner",
+                      "--gid-owner", gid, "-j", chain, check=False)
+            admin(firewall, "-w", "1", "-F", chain, check=False)
+            admin(firewall, "-w", "1", "-X", chain, check=False)
+    if group:
+        admin("groupdel", group, check=False)
+
+
+def after_effect_case(wrapper, directory, mode, stage):
+    before = owned_resources()
+    marker = directory / "must-not-run"
+    environment = sudo_shim(directory, mode, stage)
+    try:
+        result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
+                                env=environment, capture_output=True, text=True, timeout=18)
+        assert (directory / "applied").exists(), result.stdout + result.stderr
+        expected = 73 if mode == "post-error" else 124
+        assert result.returncode == expected, result.stdout + result.stderr
+        assert not marker.exists(), "uncertain setup executed the target command"
+        assert owned_resources() == before, "post-mutation acquisition leaked resources"
+    finally:
+        remove_planned(directory)
+    assert owned_resources() == before, "fixture teardown left resources behind"
+
+
+def setup_after_effect(wrappers, directory):
+    baseline = owned_resources()
+    suffix = f"{os.getpid()}_{os.urandom(3).hex()}"
+    group = "obnet_f_" + suffix
+    chain = "OB_TEST_F_" + suffix
+    admin("groupadd", "--system", group)
+    try:
+        admin("iptables", "-w", "1", "-N", chain)
+        admin("iptables", "-w", "1", "-A", chain, "-m", "comment",
+              "--comment", "unrelated-fixture", "-j", "RETURN")
+        for index, wrapper in enumerate(wrappers):
+            for mode in ("post-error", "post-timeout"):
+                for stage in ("groupadd", "ip6tables", "hook"):
+                    case = directory / f"after-{index}-{mode}-{stage}"
+                    case.mkdir()
+                    after_effect_case(wrapper, case, mode, stage)
+        print("PASS: real group/chain/hook mutations followed by error/timeout clean both entrypoints and preserve unrelated objects", flush=True)
+    finally:
+        admin("iptables", "-w", "1", "-F", chain, check=False)
+        admin("iptables", "-w", "1", "-X", chain, check=False)
+        admin("groupdel", group, check=False)
+    assert owned_resources() == baseline
+
+
+def foreign_acquisitions(wrappers, directory):
+    baseline = owned_resources()
+    for index, wrapper in enumerate(wrappers):
+        for mode in ("foreign-group", "foreign-chain", "foreign-probe-error"):
+            case = directory / f"foreign-{index}-{mode}"
+            case.mkdir()
+            environment = sudo_shim(case, mode, "probe")
+            marker = case / "must-not-run"
+            try:
+                result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
+                                        env=environment, capture_output=True, text=True, timeout=18)
+                assert result.returncode != 0, result.stdout + result.stderr
+                assert not marker.exists()
+                if mode == "foreign-group":
+                    name = (case / "foreign-group").read_text()
+                    assert admin("getent", "group", name).stdout == (case / "foreign-before").read_text()
+                    assert not (case / "planned-group").exists(), "foreign group was acquired before checking absence"
+                else:
+                    name = (case / "foreign-chain").read_text()
+                    assert admin("iptables", "-w", "1", "-S", name).stdout == (case / "foreign-before").read_text()
+                    assert not (case / "planned-chain").exists(), "foreign/error lookup authorized a chain mutation"
+                    own_group = (case / "planned-group").read_text()
+                    assert admin("getent", "group", own_group, check=False).returncode == 2
+            finally:
+                remove_planned(case)
+                if (case / "foreign-group").exists():
+                    admin("groupdel", (case / "foreign-group").read_text(), check=False)
+                if (case / "foreign-chain").exists():
+                    name = (case / "foreign-chain").read_text()
+                    admin("iptables", "-w", "1", "-F", name, check=False)
+                    admin("iptables", "-w", "1", "-X", name, check=False)
+            assert owned_resources() == baseline
+        for stage in ("getent", "probe"):
+            case = directory / f"probe-error-{index}-{stage}"
+            case.mkdir()
+            environment = sudo_shim(case, "failure", stage)
+            marker = case / "must-not-run"
+            try:
+                result = subprocess.run(["bash", str(wrapper), "touch", str(marker)],
+                                        env=environment, capture_output=True, text=True, timeout=18)
+                assert result.returncode == 73, result.stdout + result.stderr
+                assert not marker.exists()
+                assert owned_resources() == baseline, "failed absence probe claimed resources"
+            finally:
+                remove_planned(case)
+    print("PASS: preexisting groups/chains survive and failed absence probes never authorize mutation", flush=True)
+
+
 class Fixture(socketserver.TCPServer):
     allow_reuse_address = True
 
@@ -308,6 +476,8 @@ def main():
             interrupted_creators(wrappers, directory)
             print("PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints", flush=True)
             cleanup_deadline(wrappers, directory)
+            setup_after_effect(wrappers, directory)
+            foreign_acquisitions(wrappers, directory)
             setup_failures(wrappers, directory)
             print("PASS: setup, partial firewall and guarded-preflight failures leave no command or resources", flush=True)
         finally:
