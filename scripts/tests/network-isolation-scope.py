@@ -16,6 +16,7 @@ import sys
 import tempfile
 import threading
 import time
+import traceback
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,7 +71,7 @@ def owned_resources():
               if "OB_TEST_" in line or "RIG_TEST_" in line or "MEMORY_TEST_" in line] for rule in rules])
 
 
-def extracted_wrapper(directory, memory=False, old_selector=False, broken_preflight=False):
+def extracted_wrapper(directory, memory=False, old_selector=False, broken_preflight=False, inherited_signals=False):
     directory.mkdir()
     scripts = directory / "scripts"
     scripts.mkdir()
@@ -86,6 +87,9 @@ def extracted_wrapper(directory, memory=False, old_selector=False, broken_prefli
     if old_selector:
         assert '--gid-owner "$test_gid"' in mechanism
         mechanism = mechanism.replace('--gid-owner "$test_gid"', '--uid-owner "$test_uid"')
+    if inherited_signals:
+        assert "env --default-signal=INT,TERM " in mechanism
+        mechanism = mechanism.replace("env --default-signal=INT,TERM ", "")
     helper.write_text(mechanism)
     relative = Path("network-isolation.py") if memory else Path("tests/network-isolation.py")
     preflight = scripts / relative
@@ -241,15 +245,25 @@ def cleanup_deadline(wrappers, directory):
         assert elapsed < 12, f"cleanup did not honor its own deadline: {elapsed}"
         assert owned_resources() == before
         child_pid = int((gate / "privileged-pid").read_text())
-        deadline = time.monotonic() + 2
-        while True:
-            state = subprocess.run(["ps", "-p", str(child_pid), "-o", "stat="],
-                                   capture_output=True, text=True, timeout=3).stdout.strip()
-            if not state or state.startswith("Z"):
-                break
-            assert time.monotonic() < deadline, "privileged cleanup child survived the wrapper deadline"
-            time.sleep(0.02)
-        assert not (gate / "late-effect").exists(), "cleanup continued after its deadline"
+        try:
+            deadline = time.monotonic() + 2
+            while True:
+                state = subprocess.run(["ps", "-p", str(child_pid), "-o", "stat="],
+                                       capture_output=True, text=True, timeout=3).stdout.strip()
+                if not state or state.startswith("Z"):
+                    break
+                assert time.monotonic() < deadline, "privileged cleanup child survived the wrapper deadline"
+                time.sleep(0.02)
+            assert not (gate / "late-effect").exists(), "cleanup continued after its deadline"
+        finally:
+            # A deliberately broken counterexample must not leave privileged work alive.
+            command = subprocess.run(["ps", "-p", str(child_pid), "-o", "args="],
+                                     capture_output=True, text=True, timeout=3).stdout
+            if str(gate / "privileged-pid") in command:
+                children = subprocess.run(["ps", "-o", "pid=", "--ppid", str(child_pid)],
+                                          capture_output=True, text=True, timeout=3).stdout.split()
+                subprocess.run(["sudo", "-n", "kill", "-KILL", *children, str(child_pid)],
+                               capture_output=True, timeout=3)
         print(f"PASS: cleanup deadline and visible failure for entrypoint{index} ({elapsed:.2f}s)", flush=True)
 
 
@@ -289,6 +303,16 @@ def main():
             interrupted_creators(wrappers, directory)
             print("PASS: INT/TERM after actual group/chain creation preserve status and clean both entrypoints", flush=True)
             cleanup_deadline(wrappers, directory)
+            inherited = extracted_wrapper(directory / "inherited-signal-wrapper", inherited_signals=True)
+            inherited_case = directory / "inherited-signal-case"
+            inherited_case.mkdir()
+            try:
+                cleanup_deadline([inherited], inherited_case)
+            except AssertionError as error:
+                assert str(error) == "privileged cleanup child survived the wrapper deadline", str(error)
+            else:
+                raise AssertionError("inherited ignored-signal counterexample did not expose the surviving child")
+            print("PASS: ignored owner signals propagate without explicit child reset; privileged work survives", flush=True)
             setup_failures(wrappers, directory)
             print("PASS: setup, partial firewall and guarded-preflight failures leave no command or resources", flush=True)
         finally:
@@ -304,4 +328,10 @@ if __name__ == "__main__":
         assert os.getgid() == int(sys.argv[4])
         refused(sys.argv[2], int(sys.argv[3]))
     else:
-        main()
+        try:
+            main()
+        except Exception:
+            if os.environ.get("GITHUB_ACTIONS") == "true":
+                message = traceback.format_exc().replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                print("::error::" + message, flush=True)
+            raise
