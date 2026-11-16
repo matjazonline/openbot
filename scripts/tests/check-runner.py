@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check suite registration and runner failures without launching real gates or databases."""
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -152,13 +154,23 @@ class DoopRunnerTests(unittest.TestCase):
             def failing_run(*args, **kwargs):
                 calls.append((args, kwargs))
                 if "typecheck" in args:
+                    kwargs["stdout"].write(b"early diagnostic marker" + b"x" * 32_768
+                                           + b"final diagnostic %\r\n")
                     raise subprocess.CalledProcessError(1, args)
 
+            captured = io.StringIO()
             with patch.dict(os.environ, {"UNRELATED_PRIVATE_TOKEN": "must-not-reach-service"}), \
-                    patch.object(module, "run", side_effect=failing_run):
+                    patch.object(module, "run", side_effect=failing_run), \
+                    contextlib.redirect_stdout(captured):
                 with self.assertRaises(subprocess.CalledProcessError):
                     module.service_gate(runner, root / "setup", root, "/chrome", "postgres://fixture/owned")
             self.assertEqual(len(calls), 3)
+            annotations = [line for line in captured.getvalue().splitlines()
+                           if line.startswith("::error::")]
+            self.assertEqual(len(annotations), 1)
+            self.assertIn("final diagnostic %25%0D%0A", annotations[0])
+            self.assertNotIn("early diagnostic marker", annotations[0])
+            self.assertLessEqual(len(annotations[0]), 17_408)
             for _, arguments in calls:
                 self.assertNotIn("UNRELATED_PRIVATE_TOKEN", arguments["env"])
                 self.assertEqual(arguments["env"]["DOOP_TEST_DATABASE_URL"], "postgres://fixture/owned")

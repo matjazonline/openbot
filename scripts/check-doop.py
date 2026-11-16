@@ -10,6 +10,7 @@ import shutil
 import subprocess
 
 ROOT = Path(__file__).resolve().parent.parent
+SERVICE_FAILURE_TAIL_BYTES = 16_384
 
 
 def run(*args, **kwargs):
@@ -28,9 +29,22 @@ def service_gate(runner, setup, output, chrome, database):
     commands = [[bun, "install", "--frozen-lockfile", "--ignore-scripts"]]
     commands += [[bun, "run", name] + (["--", "--maxWorkers=2"] if name == "test" else [])
                  for name in ("format:check", "typecheck", "lint", "doc-lint", "test", "build")]
-    for command in commands:
+    for index, command in enumerate(commands):
         print("Doop gate:", " ".join(command), flush=True)
-        run(*command, cwd=source, env=environment, timeout=1200)
+        log_path = output / f"service-gate-{index}.log"
+        with log_path.open("wb") as log:
+            try:
+                run(*command, cwd=source, env=environment, timeout=1200,
+                    stdout=log, stderr=subprocess.STDOUT)
+            except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+                log.flush()
+                with log_path.open("rb") as failure:
+                    failure.seek(max(0, log_path.stat().st_size - SERVICE_FAILURE_TAIL_BYTES))
+                    tail = failure.read(SERVICE_FAILURE_TAIL_BYTES).decode(errors="replace")
+                message = "Doop service gate failed: " + " ".join(command) + "\n" + tail
+                message = message.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                print("::error::" + message, flush=True)
+                raise
     runner.reviewed_source(source, identity["fingerprint"], manifest)
 
 
@@ -86,8 +100,15 @@ def main():
         "dxflrs/garage:v2.5.0@sha256:677e5b758e4425a325b811c425c026bf35a4bf42f7ddbaa773de3f4fd779a5a5",
     ):
         run("docker", "pull", image)
-    run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
-        "--output", str(output / "image"))
+    try:
+        run("python3", "scripts/doop-test.py", "image", "--managed", "--directory", str(setup),
+            "--output", str(output / "image"))
+    except subprocess.CalledProcessError:
+        for name in ("build.log", "load.log"):
+            log = output / "image" / name
+            if log.is_file():
+                print(log.read_text(errors="replace"), flush=True)
+        raise
     run("python3", "scripts/doop-test.py", "acceptance", "--directory", str(setup),
         "--image", str(output / "image/image.json"), "--output", str(output / "acceptance"),
         "--openbot-test-binary", str(helper), "--openbot-test-database", database, "--ui-chrome", chrome)

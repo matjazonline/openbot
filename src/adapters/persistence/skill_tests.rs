@@ -202,6 +202,8 @@ async fn capability_selection_is_scoped_and_updates_atomically() {
     let agent = AgentPersistence::create(&persistence, company_id, agent_write("atomic-agent"))
         .await
         .unwrap();
+    crate::adapters::persistence::test_support::register_native_agent_address(&persistence, &agent)
+        .await;
 
     let mut selected = agent_write("atomic-agent");
     selected.skill_ids = vec![skill.id];
