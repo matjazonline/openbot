@@ -155,6 +155,11 @@ gate "Deployment script tests" deployment_script_tests
 gate "Knowledge artifact preparation tests" python3 scripts/tests/knowledge-model-prepare.py
 gate "Doop runner boundaries" python3 scripts/tests/doop-test.py
 gate "Doop probe protocols" node --test scripts/tests/doop-probe.mjs
+if [[ "$(uname -s)" == Linux ]]; then
+  gate "Network isolation preserves the supervisor" python3 -I scripts/tests/network-isolation-scope.py
+else
+  echo "Linux network-isolation scope: NOT EXERCISED locally; required in CI"
+fi
 gate "Formatting" cargo fmt --all -- --check
 gate "Patch whitespace" git diff HEAD --check
 gate "Transport abstraction boundary" transport_boundary

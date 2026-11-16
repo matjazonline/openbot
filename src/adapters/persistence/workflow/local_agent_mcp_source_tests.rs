@@ -11,6 +11,8 @@ use crate::entities::agent_capability::{AgentBindingId, AgentRevisionId, Depende
 use crate::entities::message::{MessageDirection, MessageRole};
 use crate::entities::transport::PrincipalId;
 use std::future::Future;
+#[path = "local_agent_mcp_entry_tests.rs"]
+mod entry_tests;
 
 struct Source {
     local: Setup,
@@ -53,6 +55,10 @@ async fn effects(s: &Setup) -> EffectState {
 async fn source() -> Source {
     let mut local = Box::pin(Setup::new()).await;
     configure(&mut local, "http://127.0.0.1:9").await;
+    Box::pin(start_source(local)).await
+}
+
+async fn start_source(mut local: Setup) -> Source {
     let p = &local.fixture.persistence;
     let requester: Uuid = sqlx::query_scalar(
         "SELECT user_id FROM company_members WHERE company_id=$1 AND role='admin' LIMIT 1",
@@ -222,10 +228,11 @@ async fn admit_message(
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 enum Owner {
     Account(Uuid),
     Revision(Uuid),
+    Run(Uuid),
 }
 
 fn owners(source: &Source) -> [Owner; 3] {
@@ -255,6 +262,14 @@ async fn competitor(source: &Source, owner: Owner) -> sqlx::Transaction<'static,
         }
         Owner::Revision(id) => {
             sqlx::query("SELECT id FROM agent_revisions WHERE company_id=$1 AND id=$2 FOR UPDATE")
+                .bind(source.local.scope.company.as_uuid())
+                .bind(id)
+                .execute(&mut *tx)
+                .await
+                .unwrap();
+        }
+        Owner::Run(id) => {
+            sqlx::query("SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE")
                 .bind(source.local.scope.company.as_uuid())
                 .bind(id)
                 .execute(&mut *tx)

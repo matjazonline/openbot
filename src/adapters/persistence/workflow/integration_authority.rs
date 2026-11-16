@@ -155,7 +155,7 @@ struct HostDispatchAuthority {
 }
 impl HostDispatchAuthority {
     async fn current(&self, tx: &mut Transaction<'_, Postgres>) -> AppResult<FrozenAction> {
-        let actor = action_authority::prelock_accounts_on(
+        let prefix = action_authority::prelock_live_on(
             tx,
             self.request.scope(),
             Some(WorkflowActor::authenticated(self.owner)?),
@@ -167,7 +167,7 @@ impl HostDispatchAuthority {
             NoLocal,
         );
         let authorized = dispatch
-            .authorize_prelocked_on(tx, &self.request, Duration::from_secs(2), actor)
+            .authorize_prelocked_on(tx, &self.request, Duration::from_secs(2), prefix)
             .await?;
         if authorized.approval_required
             || authorized.action.request().context.origin != ToolCallOrigin::Workflow
@@ -201,8 +201,9 @@ impl HostDispatchAuthority {
         if !permitted {
             return Err(missing());
         }
-        let member:Option<Uuid>=sqlx::query_scalar("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal")
-            .bind(self.request.scope().company.as_uuid()).bind(self.owner).fetch_optional(&mut **tx).await?;
+        let member:Option<Uuid>=sqlx::query_scalar(&prefix.locks.sql("SELECT member.user_id FROM company_members AS member JOIN principals AS principal ON principal.company_id=member.company_id AND principal.user_id=member.user_id WHERE member.company_id=$1 AND member.user_id=$2 AND principal.kind='person' FOR SHARE OF member,principal"))
+            .bind(self.request.scope().company.as_uuid()).bind(self.owner).fetch_optional(&mut **tx).await
+            .map_err(|error| prefix.error(error.into()))?;
         if member.is_none() {
             return Err(missing());
         }

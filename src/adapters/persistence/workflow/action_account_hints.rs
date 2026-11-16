@@ -1,8 +1,25 @@
 //! One sorted account union precedes company ownership, including real message user FKs.
 use super::super::approval_accounts::ActionApprovalAccounts;
+use super::super::row_locks::RowLocks;
 use super::*;
 use crate::application::workflow::decisions::DecisionNotices;
 use crate::application::workflow::message::{DestinationKind, MessagePlan};
+
+/// The live caller carries the chosen lock policy through its subsequent run ownership.
+#[derive(Clone, Copy)]
+pub(in crate::adapters::persistence::workflow) struct AccountPrefix {
+    pub(in crate::adapters::persistence::workflow) actor: Option<WorkflowActor>,
+    pub(in crate::adapters::persistence::workflow) locks: RowLocks,
+}
+
+impl AccountPrefix {
+    pub(in crate::adapters::persistence::workflow) fn error(self, error: AppError) -> AppError {
+        match self.locks {
+            RowLocks::NoWait => super::super::native_mcp::busy(error),
+            RowLocks::Wait => error,
+        }
+    }
+}
 
 #[derive(Clone, Copy)]
 enum Purpose<'a> {
@@ -170,14 +187,86 @@ pub(in crate::adapters::persistence::workflow) fn prelock_dispatch_on<'a>(
     db: &'a mut PgConnection,
     request: &'a ActionDispatchRequest,
     notices: Option<&'a DecisionNotices>,
-) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + 'a {
-    prelock(
+) -> impl std::future::Future<Output = AppResult<AccountPrefix>> + 'a {
+    live_prefix(
         db,
         request.scope(),
         None,
         Purpose::Dispatch { request, notices },
-        super::super::row_locks::RowLocks::Wait,
     )
+}
+
+pub(in crate::adapters::persistence::workflow) fn prelock_live_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
+) -> impl std::future::Future<Output = AppResult<AccountPrefix>> + '_ {
+    live_prefix(db, scope, reviewer, Purpose::Effect)
+}
+
+pub(in crate::adapters::persistence::workflow) async fn prelock_native_on(
+    db: &mut PgConnection,
+    scope: ActionScope,
+) -> AppResult<Option<AccountPrefix>> {
+    let Some(native) = super::super::native_mcp::account_hints_on(db, scope).await? else {
+        return Ok(None);
+    };
+    current_prefix(db, scope, None, Purpose::Effect, Some(native))
+        .await
+        .map(Some)
+}
+
+async fn live_prefix(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
+    purpose: Purpose<'_>,
+) -> AppResult<AccountPrefix> {
+    let native = super::super::native_mcp::account_hints_on(db, scope).await?;
+    current_prefix(db, scope, reviewer, purpose, native).await
+}
+
+async fn current_prefix(
+    db: &mut PgConnection,
+    scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
+    purpose: Purpose<'_>,
+    native: Option<super::super::native_mcp::NativeAccounts>,
+) -> AppResult<AccountPrefix> {
+    let prefix = AccountPrefix {
+        actor: None,
+        locks: if native.is_some() {
+            RowLocks::NoWait
+        } else {
+            RowLocks::Wait
+        },
+    };
+    // Box the full account/source union seam so native preparation does not grow the poll stack.
+    let actor = Box::pin(prelock_with_native(
+        db,
+        scope,
+        reviewer,
+        purpose,
+        prefix.locks,
+        native,
+    ))
+    .await
+    .map_err(|error| prefix.error(error))?;
+    if matches!(prefix.locks, RowLocks::NoWait) {
+        actor.ok_or_else(missing)?;
+        // Shared fence readers take this run before job/attempt ownership. Pin it NOWAIT
+        // here so an earlier generic fence helper cannot introduce a waiting native edge.
+        sqlx::query_scalar::<_, Uuid>(
+            "SELECT id FROM workflow_runs WHERE company_id=$1 AND id=$2 FOR UPDATE NOWAIT",
+        )
+        .bind(scope.company.as_uuid())
+        .bind(scope.run.as_uuid())
+        .fetch_optional(db)
+        .await
+        .map_err(|error| prefix.error(error.into()))?
+        .ok_or_else(missing)?;
+    }
+    Ok(AccountPrefix { actor, ..prefix })
 }
 
 pub(in crate::adapters::persistence::workflow) async fn actor_hints_on(
@@ -263,18 +352,33 @@ async fn message_source_on(
     Ok(MessageSource::FreshMessage(users))
 }
 
-async fn prelock(
+fn prelock<'a>(
+    db: &'a mut PgConnection,
+    scope: ActionScope,
+    reviewer: Option<WorkflowActor>,
+    purpose: Purpose<'a>,
+    locks: RowLocks,
+) -> impl std::future::Future<Output = AppResult<Option<WorkflowActor>>> + 'a {
+    prelock_with_native(db, scope, reviewer, purpose, locks, None)
+}
+
+async fn prelock_with_native(
     db: &mut PgConnection,
     scope: ActionScope,
     reviewer: Option<WorkflowActor>,
     purpose: Purpose<'_>,
-    locks: super::super::row_locks::RowLocks,
+    locks: RowLocks,
+    native: Option<super::super::native_mcp::NativeAccounts>,
 ) -> AppResult<Option<WorkflowActor>> {
     let Some(hints) = actor_hints_on(db, scope, reviewer).await? else {
         return Ok(None);
     };
     let mut source = source_on(db, scope, purpose).await?;
-    let mut accounts = hints.users().chain(source.users()).collect();
+    let mut accounts = hints
+        .users()
+        .chain(source.users())
+        .chain(native.iter().flat_map(|native| native.users()))
+        .collect();
     let locked =
         super::super::reviewer_accounts::lock_users_with_locks_on(db, &mut accounts, locks).await?;
     if locked != accounts {
@@ -286,6 +390,10 @@ async fn prelock(
             || !hints
                 .users()
                 .all(|user| locked.binary_search(&user).is_ok())
+            || native
+                .iter()
+                .flat_map(|native| native.users())
+                .any(|user| locked.binary_search(&user).is_err())
         {
             return Err(missing());
         }
@@ -294,6 +402,11 @@ async fn prelock(
     match authority::authorize_company_with_locks(db, scope.company, actor, locks).await {
         Ok(_) => {
             if actor_hints_on(db, scope, reviewer).await?.as_ref() != Some(&hints) {
+                return Err(missing());
+            }
+            if native.is_some()
+                && super::super::native_mcp::account_hints_on(db, scope).await? != native
+            {
                 return Err(missing());
             }
             let current = source_on(db, scope, purpose).await?;

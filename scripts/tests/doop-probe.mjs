@@ -39,10 +39,12 @@ for (const [name, mutate] of [
 
 async function browserOwnerFixture(action) {
   const temporary = mkdtempSync(join(tmpdir(), 'openbot-browser-owner-'));
-  const names = ['DOOP_TEST_PRIVATE_RUNTIME', 'DOOP_TEST_PRIVATE_OWNER', 'DOOP_TEST_UI_CHROME', 'DOOP_TEST_TLS_SPKI'];
+  const names = ['DOOP_TEST_PRIVATE_RUNTIME', 'DOOP_TEST_PRIVATE_OWNER', 'DOOP_TEST_UI_CHROME', 'DOOP_TEST_TLS_SPKI',
+    'TMPDIR', 'DOOP_TEST_BROWSER_ENV_MARKER'];
   const previous = Object.fromEntries(names.map((name) => [name, process.env[name]]));
   Object.assign(process.env, { DOOP_TEST_PRIVATE_RUNTIME: temporary, DOOP_TEST_PRIVATE_OWNER: 'a'.repeat(32),
-    DOOP_TEST_UI_CHROME: '/explicit/fixture/chrome', DOOP_TEST_TLS_SPKI: 'fixture-SPKI' });
+    DOOP_TEST_UI_CHROME: '/explicit/fixture/chrome', DOOP_TEST_TLS_SPKI: 'fixture-SPKI',
+    TMPDIR: join(temporary, 'long-parent-temp'), DOOP_TEST_BROWSER_ENV_MARKER: 'preserved' });
   try { await action(temporary); }
   finally {
     for (const [name, value] of Object.entries(previous)) {
@@ -61,6 +63,11 @@ test('competing browser launches create one process with the existing profile an
       assert.equal(options.userDataDir, join(directory, 'ui-profile'));
       assert.deepEqual(options.args, ['--ignore-certificate-errors-spki-list=fixture-SPKI']);
       assert.equal(options.executablePath, '/explicit/fixture/chrome');
+      assert.equal(options.env.TMPDIR, '/tmp');
+      assert.equal(options.env.HOME, process.env.HOME);
+      assert.equal(options.env.DOOP_TEST_BROWSER_ENV_MARKER, 'preserved');
+      assert.equal(options.env.DOOP_TEST_TLS_SPKI, 'fixture-SPKI');
+      assert.equal(process.env.TMPDIR, join(directory, 'long-parent-temp'));
       const pending = JSON.parse(readFileSync(join(directory, 'browser-process.json')));
       assert.deepEqual(pending, { version: 1, phase: 'pending', pid: null, owner: 'a'.repeat(32) });
       return { process: () => ({ pid: 424242 }), async close() { closes++; } };
