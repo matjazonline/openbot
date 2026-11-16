@@ -114,6 +114,11 @@ gate "Generated CSS is current" generated_css_is_current
 gate "SSE navigation lifecycle" \
   node --test scripts/tests/sse-navigation.mjs scripts/tests/agent-runtime.mjs scripts/tests/channel-response-authoring.mjs
 gate "Deployment script tests" deployment_script_tests
+if [[ "$(uname -s)" == Linux ]]; then
+  gate "Network isolation preserves the supervisor" python3 -I scripts/tests/network-isolation-scope.py
+else
+  echo "Linux network-isolation scope: NOT EXERCISED locally; required in CI"
+fi
 gate "Formatting" cargo fmt --all -- --check
 gate "Patch whitespace" git diff HEAD --check
 gate "Transport abstraction boundary" transport_boundary

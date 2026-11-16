@@ -33,16 +33,26 @@ impl ActionIntents for PostgresPersistence {
         let scope = action.scope();
         // Authority before run, matching dispatch and company/member writers. Existing immutable
         // intents can replay even after closure; only a new freeze needs current authority.
-        if read(&mut tx, action).await?.is_none() {
-            super::action_authority::prelock_on(&mut tx, scope)
-                .await?
-                .ok_or_else(missing)?;
-        }
+        let prefix = if read(&mut tx, action).await?.is_none() {
+            let prefix = super::action_authority::prelock_live_on(&mut tx, scope, None).await?;
+            prefix.actor.ok_or_else(missing)?;
+            Some(prefix)
+        } else {
+            None
+        };
+        let locks = prefix
+            .map(|prefix| prefix.locks)
+            .unwrap_or(super::row_locks::RowLocks::Wait);
         let active: bool = sqlx::query_scalar(
-            "SELECT state IN ('queued','running') AND deadline > clock_timestamp() AND NOT EXISTS(SELECT 1 FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2 AND execution_id=$3) FROM workflow_runs \
-             WHERE company_id=$1 AND id=$2 FOR UPDATE",
+            &locks.sql("SELECT state IN ('queued','running') AND deadline > clock_timestamp() AND NOT EXISTS(SELECT 1 FROM channel_reply_proposals WHERE company_id=$1 AND run_id=$2 AND execution_id=$3) FROM workflow_runs \
+             WHERE company_id=$1 AND id=$2 FOR UPDATE"),
         ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid())
-            .fetch_optional(&mut *tx).await?.ok_or_else(missing)?;
+            .fetch_optional(&mut *tx).await.map_err(|error| {
+                match prefix {
+                    Some(prefix) => prefix.error(error.into()),
+                    None => error.into(),
+                }
+            })?.ok_or_else(missing)?;
         let existing = read(&mut tx, action).await?;
         let replayed = existing.is_some();
         if existing.is_none() && !active {

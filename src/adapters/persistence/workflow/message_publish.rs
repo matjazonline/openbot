@@ -294,8 +294,16 @@ impl<L: SqlLocalAction> PostgresActionDispatch<MessageActionAuthority, L> {
             self.decision_notices.as_ref(),
         )
         .await?;
-        self.authorize_prelocked_on(tx, request, bound.server_timeout(), actor)
-            .await
+        self.authorize_prelocked_on(
+            tx,
+            request,
+            bound.server_timeout(),
+            action_authority::AccountPrefix {
+                actor,
+                locks: super::row_locks::RowLocks::Wait,
+            },
+        )
+        .await
     }
 
     async fn publish_on(

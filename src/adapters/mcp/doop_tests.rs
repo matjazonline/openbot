@@ -319,6 +319,23 @@ async fn doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing
         json!({"name":"export_frame", "arguments":arguments}),
         pdf,
     ));
+    let mut cancelled = ScriptedResponse::json_body(String::new());
+    cancelled.status = 202;
+    exchanges.push(ScriptedExchange::new(
+        |request| {
+            if request.method == "POST"
+                && request.path == "/"
+                && request.header_matches("authorization", &format!("Bearer {KEY}"))
+                && request.body["method"] == "notifications/cancelled"
+                && request.body["params"]["requestId"] == 1
+            {
+                Ok(())
+            } else {
+                Err("oversized result must cancel the original call, never retry it")
+            }
+        },
+        cancelled,
+    ));
     let server = scripted_scenario(exchanges).await;
     let adapter = client(&server.base_url);
     let session = adapter
@@ -335,7 +352,7 @@ async fn doop_contract_oversized_pdf_is_rejected_before_unbounded_result_parsing
     assert!(!error.to_string().contains(KEY));
     session.close().await.unwrap();
     adapter.shutdown().await.unwrap();
-    assert_eq!(server.finish().await, Ok(3));
+    assert_eq!(server.finish().await, Ok(4));
 }
 
 #[tokio::test]
