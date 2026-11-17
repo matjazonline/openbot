@@ -393,7 +393,7 @@ async fn memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identiti
     for owner in [
         NamespaceOwner::Principal(
             super::agent_principal_on(
-                &mut *f.pool().acquire().await.unwrap(),
+                &mut f.pool().acquire().await.unwrap(),
                 other_company,
                 foreign_agent,
             )
@@ -403,7 +403,7 @@ async fn memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identiti
         NamespaceOwner::Principal(PrincipalId::random()),
         NamespaceOwner::Principal(
             super::person_principal_on(
-                &mut *f.pool().acquire().await.unwrap(),
+                &mut f.pool().acquire().await.unwrap(),
                 other_company,
                 outsider,
             )
@@ -742,7 +742,7 @@ async fn memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_
     // Delete first: provisioning waits on the agent lock, then finds no agent.
     let second = super::tests::agent(&f.persistence, f.company).await;
     let second_principal =
-        super::agent_principal_on(&mut *f.pool().acquire().await.unwrap(), f.company, second)
+        super::agent_principal_on(&mut f.pool().acquire().await.unwrap(), f.company, second)
             .await
             .unwrap();
     let mut delete = f.pool().begin().await.unwrap();
@@ -975,7 +975,7 @@ async fn memory_scope_competing_agent_delete_and_company_delete_never_deadlock()
     f.ensure(NamespaceOwner::Principal(f.agent_principal)).await;
     let second = agent(&f.persistence, f.company).await;
     let second_principal =
-        super::agent_principal_on(&mut *f.pool().acquire().await.unwrap(), f.company, second)
+        super::agent_principal_on(&mut f.pool().acquire().await.unwrap(), f.company, second)
             .await
             .unwrap();
     f.ensure(NamespaceOwner::Principal(second_principal)).await;

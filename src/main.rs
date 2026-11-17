@@ -10,6 +10,8 @@ use tracing::{info, warn};
 /// than the platform's own kill timeout, so the process gets to exit on its own terms.
 const DRAIN_GRACE: Duration = Duration::from_secs(20);
 
+mod memory_subject;
+
 #[derive(Debug, PartialEq, Eq)]
 enum DrainOutcome {
     Forced,
@@ -35,9 +37,16 @@ use open_bots::{
 #[derive(Debug, PartialEq, Eq)]
 enum ProcessCommand {
     Serve,
-    CredentialStatus { required_version: Option<u32> },
+    CredentialStatus {
+        required_version: Option<u32>,
+    },
     CredentialRotate,
     KnowledgeModelCheck,
+    MemorySubject {
+        operation: memory_subject::SubjectOperation,
+        company: open_bots::domain::workflow::CompanyId,
+        subject: open_bots::entities::transport::PrincipalId,
+    },
     Help,
 }
 
@@ -62,6 +71,14 @@ fn main() -> anyhow::Result<()> {
         ProcessCommand::CredentialRotate => {
             operational_runtime()?.block_on(run_credential_rotation())
         }
+        ProcessCommand::MemorySubject {
+            operation,
+            company,
+            subject,
+        } => operational_runtime()?.block_on(async {
+            let persistence = postgres_persistence().await?;
+            memory_subject::run(&persistence, operation, company, subject).await
+        }),
         ProcessCommand::Help => {
             println!("{}", command_usage());
             Ok(())
@@ -109,6 +126,34 @@ fn parse_process_command(args: impl IntoIterator<Item = String>) -> anyhow::Resu
         [knowledge, check] if knowledge == "knowledge" && check == "model-check" => {
             Ok(ProcessCommand::KnowledgeModelCheck)
         }
+        [
+            memory,
+            subject_word,
+            operation,
+            company_flag,
+            company,
+            subject_flag,
+            subject,
+        ] if memory == "memory"
+            && subject_word == "subject"
+            && company_flag == "--company"
+            && subject_flag == "--subject" =>
+        {
+            let operation = match operation.as_str() {
+                "list" => memory_subject::SubjectOperation::List,
+                "purge" => memory_subject::SubjectOperation::Purge,
+                _ => anyhow::bail!("{}", command_usage()),
+            };
+            Ok(ProcessCommand::MemorySubject {
+                operation,
+                company: open_bots::domain::workflow::CompanyId::new(
+                    company.parse::<uuid::Uuid>()?,
+                ),
+                subject: open_bots::entities::transport::PrincipalId::new(
+                    subject.parse::<uuid::Uuid>()?,
+                ),
+            })
+        }
         [credentials, rotate] if credentials == "credentials" && rotate == "rotate" => {
             Ok(ProcessCommand::CredentialRotate)
         }
@@ -127,7 +172,7 @@ fn parse_required_version(value: &str) -> anyhow::Result<u32> {
 }
 
 fn command_usage() -> &'static str {
-    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate\n  open_bots knowledge model-check"
+    "Usage:\n  open_bots\n  open_bots credentials status [--require-version <N>]\n  open_bots credentials rotate\n  open_bots knowledge model-check\n  open_bots memory subject list --company <UUID> --subject <UUID>\n  open_bots memory subject purge --company <UUID> --subject <UUID>"
 }
 
 async fn run_credential_status(required_version: Option<u32>) -> anyhow::Result<()> {
@@ -602,6 +647,50 @@ mod tests {
     use super::*;
     use std::future::pending;
     use tokio::time::Instant;
+
+    #[test]
+    fn operational_subject_commands_validate_ids_before_startup() {
+        let company = uuid::Uuid::new_v4();
+        let subject = uuid::Uuid::new_v4();
+        for (operation, expected) in [
+            ("list", memory_subject::SubjectOperation::List),
+            ("purge", memory_subject::SubjectOperation::Purge),
+        ] {
+            let args = [
+                "memory",
+                "subject",
+                operation,
+                "--company",
+                &company.to_string(),
+                "--subject",
+                &subject.to_string(),
+            ]
+            .map(str::to_owned);
+            assert_eq!(
+                parse_process_command(args).unwrap(),
+                ProcessCommand::MemorySubject {
+                    operation: expected,
+                    company: open_bots::domain::workflow::CompanyId::new(company),
+                    subject: open_bots::entities::transport::PrincipalId::new(subject),
+                }
+            );
+        }
+        assert!(
+            parse_process_command(
+                [
+                    "memory",
+                    "subject",
+                    "purge",
+                    "--company",
+                    "not-a-uuid",
+                    "--subject",
+                    "not-a-uuid"
+                ]
+                .map(str::to_owned)
+            )
+            .is_err()
+        );
+    }
 
     #[test]
     fn operational_commands_are_parsed_before_server_startup() {

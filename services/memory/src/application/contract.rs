@@ -76,6 +76,9 @@ pub struct SaveItem {
     pub occurred_at: DateTime<Utc>,
     /// Truncated to microseconds, the stored precision.
     pub expires_at: Option<DateTime<Utc>>,
+    /// Opaque provenance only; never an authorization or classification input.
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub subject: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -886,4 +889,52 @@ pub struct AdminCredentialView {
     pub credential_id: Uuid,
     pub scope: AdminScope,
     pub revoked: bool,
+}
+
+/// Exact managed cleanup boundary, including expired stored observations.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectListRequest {
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub tenant: String,
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub namespace: String,
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub subject: String,
+    pub after: Option<Uuid>,
+    #[serde(default = "subject_page_limit")]
+    #[schemars(range(min = 1, max = 100))]
+    pub limit: u16,
+}
+fn subject_page_limit() -> u16 {
+    100
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SubjectDeleteRequest {
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub tenant: String,
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub namespace: String,
+    #[schemars(regex(pattern = ID_PATTERN))]
+    pub subject: String,
+    #[schemars(length(min = 1, max = 100))]
+    pub observation_ids: Vec<Uuid>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SubjectObservation {
+    pub observation_id: Uuid,
+    pub revision: i64,
+    pub access_level: AccessLevel,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SubjectPage {
+    pub items: Vec<SubjectObservation>,
+    pub next_after: Option<Uuid>,
+}
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct SubjectDeleted {
+    pub deleted: Vec<Uuid>,
 }

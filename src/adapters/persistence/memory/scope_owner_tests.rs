@@ -8,6 +8,50 @@ use crate::entities::department::DepartmentId;
 use crate::use_cases::agent::{AgentPersistence, AgentWrite};
 
 #[tokio::test]
+async fn memory_scope_subject_namespace_pages_include_retiring_units_and_exclude_principals() {
+    let f = Fixture::new().await.unwrap();
+    f.enable().await.unwrap();
+    for owner in [
+        NamespaceOwner::Unit(f.root),
+        NamespaceOwner::Principal(f.agent_principal),
+        NamespaceOwner::Principal(f.member_principal),
+    ] {
+        f.ensure(owner).await;
+    }
+    let id = f.namespaces(NamespaceOwner::Unit(f.root)).await[0].0;
+    let mut tx = f.pool().begin().await.unwrap();
+    retire_namespaces_on(&mut tx, f.company, NamespaceOwner::Unit(f.root))
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    let namespaces = f
+        .persistence
+        .memory_unit_namespace_page(f.scope(), None)
+        .await
+        .unwrap();
+    assert_eq!(
+        namespaces,
+        vec![crate::application::memory::NamespaceExternalId(id)]
+    );
+    assert!(
+        f.persistence
+            .memory_unit_namespace_page(f.scope(), Some(id))
+            .await
+            .unwrap()
+            .is_empty()
+    );
+    assert!(
+        f.persistence
+            .memory_unit_namespace_page(
+                crate::domain::workflow::CompanyId::new(Uuid::new_v4()),
+                None
+            )
+            .await
+            .is_err()
+    );
+}
+
+#[tokio::test]
 async fn memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_owners() {
     let f = Fixture::new().await.unwrap();
     f.enable().await.unwrap();
@@ -15,7 +59,7 @@ async fn memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_
     // mismatch from a merely missing owner.
     let other_company = super::tests::company(&f.persistence, f.owner).await;
     let foreign_root = crate::adapters::persistence::company::root_on(
-        &mut *f.pool().acquire().await.unwrap(),
+        &mut f.pool().acquire().await.unwrap(),
         crate::domain::workflow::CompanyId::new(other_company),
     )
     .await
@@ -23,7 +67,7 @@ async fn memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_
     let external: Uuid = sqlx::query_scalar("INSERT INTO principals (id,company_id,kind,display_label) VALUES (gen_random_uuid(),$1,'external','External') RETURNING id")
         .bind(f.company).fetch_one(f.pool()).await.unwrap();
     let system = crate::adapters::persistence::participant::ensure_system_principal_on(
-        &mut *f.pool().acquire().await.unwrap(),
+        &mut f.pool().acquire().await.unwrap(),
         f.company,
     )
     .await
@@ -209,7 +253,7 @@ async fn memory_scope_lifecycle_principal_creation_and_rollback_are_atomic() {
     .await
     .unwrap();
     let new = super::agent_principal_on(
-        &mut *f.pool().acquire().await.unwrap(),
+        &mut f.pool().acquire().await.unwrap(),
         f.company,
         created.id,
     )

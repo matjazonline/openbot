@@ -11,7 +11,8 @@ use super::*;
 use crate::adapters::persistence::memory::deliveries::{
     CaptureEnqueue, CaptureIntent, enqueue_capture_on,
 };
-use crate::application::memory::{MemoryCaptureKind, NamespaceOwner};
+use crate::application::memory::MemoryCaptureKind;
+use crate::application::workflow::memory_tools::{MemorySaveTarget, memory_write_scope};
 use serde_json::Value;
 
 #[derive(sqlx::FromRow)]
@@ -45,39 +46,21 @@ pub(super) async fn capture_on(
     .bind(exchange)
     .fetch_one(&mut *db)
     .await?;
+    let eligible =
+        super::super::checkpoints::memory_tools::eligible_on(db, scope.company, scope.run, agent)
+            .await?;
     let (kind, target) = match (conversation.scope_kind.as_str(), conversation.attached) {
-        ("thread", _) => (
-            MemoryCaptureKind::Threads,
-            NamespaceOwner::Principal(
-                crate::adapters::persistence::memory::agent_principal_on(
-                    db,
-                    scope.company.as_uuid(),
-                    agent,
-                )
-                .await?,
-            ),
-        ),
+        ("thread", _) => {
+            let Some(target) = memory_write_scope(&eligible, MemorySaveTarget::Default) else {
+                return Ok(CaptureEnqueue::Skipped("scope_unavailable"));
+            };
+            (MemoryCaptureKind::Threads, target.owner)
+        }
         ("private_session", Some(false)) => {
-            let Some(user) = super::super::checkpoints::memory_tools::user_scope_owner_on(
-                db,
-                scope.company,
-                scope.run,
-            )
-            .await?
-            else {
+            let Some(target) = eligible.iter().find(|scope| scope.private_person) else {
                 return Ok(CaptureEnqueue::Skipped("ineligible"));
             };
-            (
-                MemoryCaptureKind::PrivateSessions,
-                NamespaceOwner::Principal(
-                    crate::adapters::persistence::memory::person_principal_on(
-                        db,
-                        scope.company.as_uuid(),
-                        user,
-                    )
-                    .await?,
-                ),
-            )
+            (MemoryCaptureKind::PrivateSessions, target.owner)
         }
         _ => return Ok(CaptureEnqueue::Skipped("ineligible")),
     };

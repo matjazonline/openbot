@@ -12,7 +12,7 @@ use crate::application::memory::{
 use crate::application::workflow::memory_recall::MemoryRecall;
 use crate::application::workflow::memory_tools::{
     MemoryTool, MemoryToolCall, MemoryToolDispatch, MemoryToolPersistence, MemoryToolRuntime,
-    MemoryToolScope, memory_tool_schemas,
+    memory_tool_schemas,
 };
 use crate::entities::agent_capability::AgentBuiltinTool;
 use crate::infra::memory_config::{MemoryServiceConfig, ProvisionerToken};
@@ -50,6 +50,11 @@ impl Tools {
 
     async fn with_tools(level: AccessLevel, tools: &[AgentBuiltinTool]) -> Self {
         let s = Box::pin(SearchFixture::with_tools(level, None, tools)).await;
+        // Keep the shared fixture and fake-server setup behind separate boxed seams.
+        Box::pin(Self::from_search(s)).await
+    }
+
+    async fn from_search(s: SearchFixture) -> Self {
         let fake = ContractFake::start(ADMIN).await;
         let client = Arc::new(
             MemoryServiceHttp::new(&MemoryServiceConfig {
@@ -247,6 +252,12 @@ mod recall;
 #[path = "memory_capture_e2e_tests.rs"]
 mod capture;
 
+#[path = "memory_scope_proof_tests.rs"]
+mod scopes;
+
+#[path = "memory_scope_selector_tests.rs"]
+mod selectors;
+
 fn copy(call: &MemoryToolCall) -> MemoryToolCall {
     MemoryToolCall {
         origin: call.origin,
@@ -279,6 +290,7 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
     knowledge::exactness_fixture::mark_exact(t.p().pool(), scope.company, scope.run).await;
     let company = t.ready(t.root_owner().await).await;
     let agent = t.ready(t.agent_owner().await).await;
+    t.ready(t.person_owner(t.actor().await).await).await;
     let public = t.seed(
         company,
         0,
@@ -344,7 +356,7 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
                 .unwrap()
                 .keys()
                 .collect::<Vec<_>>(),
-            "{}: no namespace, tenant, user or level input",
+            "{}: exact published schema",
             tool.name()
         );
         assert_eq!(offered["parameters"]["additionalProperties"], false);
@@ -367,7 +379,7 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
         .iter()
         .map(|item| {
             (
-                item["scope"].as_str().unwrap().to_owned(),
+                item["namespace"].as_str().unwrap().to_owned(),
                 item["id"].as_str().unwrap().to_owned(),
                 item["access_level"].as_i64().unwrap(),
             )
@@ -375,9 +387,9 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
         .collect();
     recalled.sort();
     let mut expected = vec![
-        ("agent".to_owned(), own.to_string(), 3),
-        ("company".to_owned(), public.to_string(), 0),
-        ("company".to_owned(), private.to_string(), 5),
+        (agent.to_string(), own.to_string(), 3),
+        (company.to_string(), public.to_string(), 0),
+        (company.to_string(), private.to_string(), 5),
     ];
     expected.sort();
     assert_eq!(recalled, expected);
@@ -396,8 +408,10 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
     assert_eq!(
         delivery["principal"],
         json!(
-            crate::adapters::persistence::memory::namespace_columns(t.agent_owner().await)
-                .principal
+            crate::adapters::persistence::memory::namespace_columns(
+                t.person_owner(t.actor().await).await
+            )
+            .principal
         )
     );
     assert_eq!(delivery["state"], "pending");
@@ -409,9 +423,9 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
     assert_eq!(
         delivery["context"]["external_sources"],
         json!([
-            {"reference": format!("memory:company:{private}"), "access_level": 5},
-            {"reference": format!("memory:agent:{own}"), "access_level": 3},
-            {"reference": format!("memory:company:{public}"), "access_level": 0},
+            {"reference": format!("memory:{company}:{private}"), "access_level": 5},
+            {"reference": format!("memory:{agent}:{own}"), "access_level": 3},
+            {"reference": format!("memory:{company}:{public}"), "access_level": 0},
         ]),
         "distinct recalled observations, level desc then id"
     );
@@ -419,14 +433,14 @@ async fn memory_integration_agent_memory_tools_search_and_save_through_the_produ
         delivery["items"][0]["body"],
         "The customer wants short answers."
     );
-    // The run's actor started it in its own session: the user scope was eligible but not yet
-    // provisioned, so the search requested it in its own transaction and searched the rest.
+    // The run's actor started it in its own session, so the personal person namespace
+    // is both searched and used as the default save target.
     let (_, state) = t
         .namespace(t.person_owner(t.actor().await).await)
         .await
         .expect("user namespace requested");
-    assert_ne!(state, "ready");
-    assert_eq!(t.service_calls("observations/search"), 2);
+    assert_eq!(state, "ready");
+    assert_eq!(t.service_calls("observations/search"), 3);
     assert_eq!(
         t.service_calls("observations/save"),
         0,
@@ -447,16 +461,14 @@ async fn memory_access_level_agent_memory_search_is_ceilinged_recorded_once_and_
     let call = t
         .prepare(
             MemoryTool::Search,
-            json!({"query":"discount floor","scopes":["company"],"limit":10}),
+            json!({"query":"discount floor","scopes":["ancestors"],"limit":10}),
         )
         .await;
     let result = t.call(copy(&call)).await;
     assert_eq!(ids(&result), vec![low.to_string(), high.to_string()]);
-    assert!(
-        result["items"].as_array().unwrap().iter().all(|item| {
-            item["scope"] == "company" && item["access_level"].as_i64().unwrap() <= 5
-        })
-    );
+    assert!(result["items"].as_array().unwrap().iter().all(|item| {
+        item["scope"] == "unit:workflow-tests" && item["access_level"].as_i64().unwrap() <= 5
+    }));
     assert_eq!(t.invocation_result(&call).await, Some(result.clone()));
     let committed = t.committed().await;
     assert_eq!(committed.level, 5);
@@ -500,8 +512,8 @@ async fn memory_integration_agent_memory_details_and_timeline_stay_within_the_ce
     let details = t
         .prepare(
             MemoryTool::Details,
-            json!({"items":[{"scope":"agent","id":own},{"scope":"company","id":secret},
-                {"scope":"company","id":second}]}),
+            json!({"items":[{"namespace":agent,"id":own},{"namespace":company,"id":secret},
+                {"namespace":company,"id":second}]}),
         )
         .await;
     let result = t.call(details).await;
@@ -514,11 +526,11 @@ async fn memory_integration_agent_memory_details_and_timeline_stay_within_the_ce
     assert_eq!(committed.level, 4);
     let items = &committed.consumptions[0]["items"];
     assert_eq!(items[1]["content_sha256"], format!("{:064}", 4));
-    assert_eq!(items[0]["scope"], "agent");
+    assert_eq!(items[0]["namespace"], json!(agent));
     let timeline = t
         .prepare(
             MemoryTool::Timeline,
-            json!({"scope":"company","id":first,"before":0,"after":5}),
+            json!({"scopes":["ancestors"],"id":first,"before":0,"after":5}),
         )
         .await;
     let result = t.call(timeline).await;
@@ -526,7 +538,10 @@ async fn memory_integration_agent_memory_details_and_timeline_stay_within_the_ce
     assert_eq!(t.committed().await.consumptions.len(), 2);
     // An anchor the reader may not see is not found, and a refusal raises nothing.
     let hidden = t
-        .prepare(MemoryTool::Timeline, json!({"scope":"company","id":secret}))
+        .prepare(
+            MemoryTool::Timeline,
+            json!({"scopes":["ancestors"],"id":secret}),
+        )
         .await;
     let result = t.call(copy(&hidden)).await;
     assert_eq!(error_code(&result), "memory.not_found");
@@ -558,15 +573,15 @@ async fn memory_scope_user_memory_requires_the_actors_own_manual_session() {
     let search = t
         .prepare(
             MemoryTool::Search,
-            json!({"query":"prefers mornings","scopes":["user"]}),
+            json!({"query":"prefers mornings","scopes":["personal"]}),
         )
         .await;
     let result = t.call(search).await;
-    assert_eq!(result["items"][0]["scope"], "user");
+    assert_eq!(result["items"][0]["scope"], "personal");
     let save = t
         .prepare(
             MemoryTool::Save,
-            json!({"facts":["Prefers mornings."],"scope":"user"}),
+            json!({"facts":["Prefers mornings."],"scope":"personal"}),
         )
         .await;
     assert_eq!(t.call(save).await["status"], "accepted");
@@ -583,6 +598,7 @@ async fn memory_scope_user_memory_requires_the_actors_own_manual_session() {
 
     let t = Tools::new(AccessLevel::L5).await;
     let actor = t.actor().await;
+    t.ready(t.agent_owner().await).await;
     let scope = t.s.claim.fence.scope;
     // Stand-in for a schedule's root (fixture SQL): the same run, admitted from a schedule
     // occurrence. The admission identity is immutable, so the row is replaced.
@@ -601,31 +617,33 @@ async fn memory_scope_user_memory_requires_the_actors_own_manual_session() {
     let search = t
         .prepare(
             MemoryTool::Search,
-            json!({"query":"prefers mornings","scopes":["user"]}),
+            json!({"query":"prefers mornings","scopes":["personal"]}),
         )
         .await;
-    assert_eq!(
-        error_code(&t.call(search).await),
-        "memory.scope_unavailable"
-    );
+    let result = t.call(search).await;
+    assert!(ids(&result).is_empty());
     let save = t
         .prepare(
             MemoryTool::Save,
-            json!({"facts":["Prefers mornings."],"scope":"user"}),
+            json!({"facts":["Prefers mornings."],"scope":"personal"}),
         )
         .await;
-    assert_eq!(error_code(&t.call(save).await), "memory.scope_unavailable");
-    assert!(t.committed().await.deliveries.is_empty());
+    assert_eq!(t.call(save).await["status"], "accepted");
+    let committed = t.committed().await;
+    assert_eq!(committed.deliveries.len(), 1);
+    assert_eq!(
+        committed.deliveries[0]["principal"],
+        json!(
+            crate::adapters::persistence::memory::namespace_columns(t.agent_owner().await)
+                .principal
+        )
+    );
     assert!(
         t.namespace(t.person_owner(actor).await).await.is_none(),
         "an ineligible scope is never provisioned"
     );
-    assert!(
-        t.fake
-            .calls()
-            .iter()
-            .all(|call| !call.starts_with("observations/"))
-    );
+    assert_eq!(t.service_calls("observations/search"), 1);
+    assert_eq!(t.service_calls("observations/save"), 0);
 }
 
 /// A scope whose namespace is not provisioned is requested in its own transaction and answers
@@ -636,7 +654,7 @@ async fn memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready() {
     let search = t
         .prepare(
             MemoryTool::Search,
-            json!({"query":"anything","scopes":["agent"]}),
+            json!({"query":"anything","scopes":["personal"]}),
         )
         .await;
     assert_eq!(error_code(&t.call(search).await), "memory.not_ready");
@@ -755,7 +773,7 @@ async fn memory_access_level_competing_rise_and_tool_save_freeze_the_committed_l
     for exact in [true, false] {
         for rise_first in [true, false] {
             let t = Tools::new(AccessLevel::L9).await;
-            t.ready(t.agent_owner().await).await;
+            t.ready(t.person_owner(t.actor().await).await).await;
             let pool = t.p().pool().clone();
             let scope = t.s.claim.fence.scope;
             if exact {
@@ -782,8 +800,7 @@ async fn memory_access_level_competing_rise_and_tool_save_freeze_the_committed_l
                     p.save_memory(
                         fence,
                         &call,
-                        MemoryToolScope::Agent,
-                        vec!["Prefers mornings.".into()],
+                        personal_save(vec!["Prefers mornings.".into()]),
                     )
                     .await
                 })
@@ -856,7 +873,7 @@ async fn memory_access_level_tool_read_commits_its_rise_before_the_model_sees_it
     let search = t
         .prepare(
             MemoryTool::Search,
-            json!({"query":"escalation","scopes":["company"]}),
+            json!({"query":"escalation","scopes":["ancestors"]}),
         )
         .await;
     t.fake
@@ -949,6 +966,7 @@ async fn memory_integration_forged_calls_and_fences_refuse_before_the_service() 
         fences.push(fence);
     }
     let observation = || MemoryReadObservation {
+        namespaces: vec![crate::application::memory::NamespaceExternalId(company)],
         result: json!({"items":[]}),
         exposed: AccessLevel::PUBLIC,
         read_ceiling: AccessLevel::L5,
@@ -975,7 +993,7 @@ async fn memory_integration_forged_calls_and_fences_refuse_before_the_service() 
         );
         assert!(
             t.p()
-                .save_memory(fence, &call, MemoryToolScope::Agent, vec!["x".into()])
+                .save_memory(fence, &call, personal_save(vec!["x".into()]))
                 .await
                 .is_err()
         );
@@ -1001,7 +1019,7 @@ async fn memory_integration_forged_calls_and_fences_refuse_before_the_service() 
     other.tool = MemoryTool::Save;
     assert!(
         t.p()
-            .save_memory(original, &other, MemoryToolScope::Agent, vec!["x".into()])
+            .save_memory(original, &other, personal_save(vec!["x".into()]))
             .await
             .is_err(),
         "a save through a search invocation"
@@ -1044,7 +1062,7 @@ async fn memory_integration_forged_calls_and_fences_refuse_before_the_service() 
 async fn memory_integration_a_replacement_claim_fences_the_stale_saver_and_replays_one_intent() {
     use crate::application::workflow::lease::LeaseReleaseCause;
     let t = Tools::new(AccessLevel::L5).await;
-    t.ready(t.agent_owner().await).await;
+    t.ready(t.person_owner(t.actor().await).await).await;
     let call = t
         .prepare(MemoryTool::Save, json!({"facts":["Prefers mornings."]}))
         .await;
@@ -1073,7 +1091,7 @@ async fn memory_integration_a_replacement_claim_fences_the_stale_saver_and_repla
     assert_ne!(current.fence.generation, stale.generation);
     assert!(
         t.p()
-            .save_memory(stale, &call, MemoryToolScope::Agent, vec!["Again.".into()])
+            .save_memory(stale, &call, personal_save(vec!["Again.".into()]))
             .await
             .is_err(),
         "the stale owner freezes nothing"
@@ -1099,12 +1117,7 @@ async fn memory_integration_a_replacement_claim_fences_the_stale_saver_and_repla
     );
     let again = t
         .p()
-        .save_memory(
-            current.fence,
-            &call,
-            MemoryToolScope::Agent,
-            vec!["Changed.".into()],
-        )
+        .save_memory(current.fence, &call, personal_save(vec!["Changed.".into()]))
         .await
         .unwrap();
     assert!(matches!(
@@ -1137,7 +1150,7 @@ async fn memory_integration_service_auth_refusals_are_controlled_and_raise_nothi
         let call = t
             .prepare(
                 MemoryTool::Search,
-                json!({"query":"concise replies","scopes":["company"]}),
+                json!({"query":"concise replies","scopes":["ancestors"]}),
             )
             .await;
         let result = t.call(copy(&call)).await;
@@ -1234,7 +1247,7 @@ impl crate::application::workflow::memory_recall::MemoryRecallPersistence for To
     async fn provision_recall_scope(
         &self,
         fence: crate::application::workflow::lease::WorkflowFence,
-        scope: MemoryToolScope,
+        scope: NamespaceOwner,
     ) -> crate::app_error::AppResult<()> {
         self.0.provision_recall_scope(fence, scope).await
     }
@@ -1243,7 +1256,7 @@ impl crate::application::workflow::memory_recall::MemoryRecallPersistence for To
         &self,
         _claim: &ClaimedWorkflow,
         _policy: LeasePolicy,
-    ) -> crate::app_error::AppResult<Vec<MemoryToolScope>> {
+    ) -> crate::app_error::AppResult<Vec<NamespaceOwner>> {
         Ok(Vec::new())
     }
 
@@ -1274,4 +1287,12 @@ fn pausing(t: &Tools) -> WorkflowAgentRuntime<PostgresPersistence, PreparedOnly>
     );
     runtime.set_recall(recall(t));
     runtime
+}
+
+fn personal_save(facts: Vec<String>) -> crate::application::workflow::memory_tools::MemoryToolSave {
+    crate::application::workflow::memory_tools::MemoryToolSave {
+        target: crate::application::workflow::memory_tools::MemorySaveTarget::Personal,
+        facts,
+        subject: None,
+    }
 }

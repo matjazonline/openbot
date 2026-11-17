@@ -67,15 +67,14 @@ impl MemoryToolPersistence for PostgresPersistence {
         &self,
         fence: WorkflowFence,
         call: &MemoryToolCall,
-        scope: MemoryToolScope,
-        facts: Vec<String>,
+        save: MemoryToolSave,
     ) -> AppResult<MemorySaveOutcome> {
         let bound = WriteBound::start("memory.tool.save", policy()?);
         let attempt = bound
             .attempt(Box::pin(async {
                 let mut conn = bound.acquire(&self.pool).await?;
                 let mut tx = bound.begin(&mut conn).await?;
-                let result = save_on(&mut tx, fence, call, scope, &facts, &bound).await;
+                let result = save_on(&mut tx, fence, call, &save, &bound).await;
                 bound.end(tx, result).await
             }))
             .await;
@@ -105,7 +104,7 @@ impl MemoryToolPersistence for PostgresPersistence {
     async fn provision_memory_scope(
         &self,
         fence: WorkflowFence,
-        scope: MemoryToolScope,
+        owner: NamespaceOwner,
     ) -> AppResult<()> {
         // Resolve the owner in a short read, then provision in its own transaction (P7b).
         let bound = WriteBound::start("memory.tool.owner", policy()?);
@@ -115,11 +114,11 @@ impl MemoryToolPersistence for PostgresPersistence {
                 let mut tx = bound.begin(&mut conn).await?;
                 let frozen = super::knowledge::frozen_selection(&mut tx, fence).await?;
                 let agent = frozen.selection.agent().agent_id.as_uuid();
-                let owner = eligible_on(&mut tx, fence, agent)
+                let owner = eligible_on(&mut tx, fence.scope.company, fence.scope.run, agent)
                     .await?
                     .into_iter()
-                    .find(|(eligible, _)| *eligible == scope)
-                    .map(|(_, owner)| owner);
+                    .find(|eligible| eligible.owner == owner)
+                    .map(|eligible| eligible.owner);
                 bound.end(tx, Ok(End::Rollback(owner))).await
             }))
             .await;
@@ -183,61 +182,119 @@ async fn load_call(
     })
 }
 
-/// The scopes this run may use and their owners (E2): company always, the run's own agent,
-/// and the user only when the root run is bound to an unattached private session created by
-/// its actor. A missing identity omits the scope; it never widens to another.
+/// The exact sealed acting-agent group plus the independently admitted private person.
+/// Topology and lead roles are never read here.
 pub(in crate::adapters::persistence::workflow) async fn eligible_on(
     tx: &mut PgConnection,
-    fence: WorkflowFence,
+    company: CompanyId,
+    run: RunId,
     agent: Uuid,
-) -> AppResult<Vec<(MemoryToolScope, NamespaceOwner)>> {
-    let company = fence.scope.company;
-    let mut scopes = vec![
-        (
-            MemoryToolScope::Company,
-            NamespaceOwner::Unit(
-                crate::adapters::persistence::company::root_on(tx, company).await?,
-            ),
-        ),
-        (
-            MemoryToolScope::Agent,
-            NamespaceOwner::Principal(
-                crate::adapters::persistence::memory::agent_principal_on(
-                    tx,
-                    company.as_uuid(),
-                    agent,
-                )
-                .await?,
-            ),
-        ),
-    ];
-    if let Some(user) = private_session_user_on(tx, fence).await? {
-        scopes.push((
-            MemoryToolScope::User,
-            NamespaceOwner::Principal(
-                crate::adapters::persistence::memory::person_principal_on(
-                    tx,
-                    company.as_uuid(),
-                    user,
-                )
-                .await?,
-            ),
-        ));
+) -> AppResult<Vec<MemoryScope>> {
+    use crate::entities::{department::DepartmentId, transport::PrincipalId};
+    let principal =
+        crate::adapters::persistence::memory::agent_principal_on(tx, company.as_uuid(), agent)
+            .await?;
+    let mut rows = super::super::run_scopes::rows_on(tx, company, run, Some(principal)).await?;
+    if rows
+        .iter()
+        .any(|row| row.access == "personal" && row.acting_principal_id.is_none())
+    {
+        let person = current_private_person_on(tx, company, run).await?;
+        rows.retain(|row| {
+            row.access != "personal"
+                || row.acting_principal_id.is_some()
+                || row.principal_id == person
+        });
+    }
+    let has_person = rows
+        .iter()
+        .any(|row| row.access == "personal" && row.acting_principal_id.is_none());
+    let mut scopes = Vec::new();
+    for row in rows.iter().filter(|row| row.access != "write") {
+        if row.access == "personal" {
+            let person = row.acting_principal_id.is_none();
+            scopes.push(MemoryScope {
+                owner: NamespaceOwner::Principal(PrincipalId::new(
+                    row.principal_id.ok_or_else(invalid)?,
+                )),
+                label: "personal".into(),
+                selectors: vec![MemoryToolScope::Personal],
+                writable: person || !has_person,
+                private_person: person,
+            });
+        } else {
+            let unit = DepartmentId::new(row.unit_id.ok_or_else(invalid)?);
+            let mut selectors = Vec::new();
+            if row.own {
+                selectors.push(MemoryToolScope::Unit);
+            }
+            if row.ancestor {
+                selectors.push(MemoryToolScope::Ancestors);
+            }
+            if row.report {
+                selectors.push(MemoryToolScope::Reports);
+            }
+            let slug = row.unit_slug.as_deref().ok_or_else(invalid)?;
+            let origin = if row.own || row.ancestor {
+                "unit"
+            } else {
+                "reports"
+            };
+            scopes.push(MemoryScope {
+                owner: NamespaceOwner::Unit(unit),
+                label: format!("{origin}:{slug}"),
+                selectors,
+                writable: rows
+                    .iter()
+                    .any(|write| write.access == "write" && write.unit_id == row.unit_id),
+                private_person: false,
+            });
+        }
     }
     Ok(scopes)
 }
 
-/// The user whose private memory this run may reach (E2 with U4, `user_scope_owner`).
-async fn private_session_user_on(
-    tx: &mut PgConnection,
-    fence: WorkflowFence,
+/// The frozen person row also needs the existing own-session proof. Native brokers
+/// use their canonical workflow source, never the synthetic broker Manual trigger.
+async fn current_private_person_on(
+    db: &mut PgConnection,
+    company: CompanyId,
+    run: RunId,
 ) -> AppResult<Option<Uuid>> {
-    user_scope_owner_on(tx, fence.scope.company, fence.scope.run).await
+    let source = sqlx::query_scalar::<_, Option<Uuid>>(
+        "SELECT CASE WHEN run.native_mcp_call_id IS NULL THEN run.id ELSE source.id END
+         FROM workflow_runs AS run
+         LEFT JOIN native_mcp_calls AS call ON call.company_id=run.company_id
+            AND call.id=run.native_mcp_call_id AND call.run_id=run.id
+            AND call.actor_id=run.actor_id
+         LEFT JOIN local_agent_sessions AS session ON session.company_id=call.company_id
+            AND session.id=call.source_session_id
+         LEFT JOIN workflow_runs AS source ON source.company_id=session.company_id
+            AND source.id=session.workflow_run_id AND source.actor_id=run.actor_id
+         WHERE run.company_id=$1 AND run.id=$2",
+    )
+    .bind(company.as_uuid())
+    .bind(run.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?
+    .flatten();
+    let Some(source) = source else {
+        return Ok(None);
+    };
+    let Some(user) = user_scope_owner_on(db, company, RunId::new(source)).await? else {
+        return Ok(None);
+    };
+    sqlx::query_scalar(
+        "SELECT id FROM principals WHERE company_id=$1 AND user_id=$2 AND kind='person'",
+    )
+    .bind(company.as_uuid())
+    .bind(user)
+    .fetch_optional(db)
+    .await
+    .map_err(Into::into)
 }
 
-/// Reads the run's actor and its root's facts: the root found by the parent walk (≤ 64), its
-/// bound session and its admission source. Every admission binds a session, so a schedule's or
-/// a message's root is told apart by its source, never by the session.
+/// The user whose private memory this run may reach (E2 with U4, `user_scope_owner`).
 pub(in crate::adapters::persistence::workflow) async fn user_scope_owner_on(
     db: &mut PgConnection,
     company: CompanyId,
@@ -301,10 +358,11 @@ async fn context_on(
     bound: &WriteBound,
 ) -> AppResult<MemoryToolContext> {
     let loaded = load_call(tx, fence, call, bound).await?;
+    let eligible = eligible_on(tx, fence.scope.company, fence.scope.run, loaded.agent).await?;
     // A destination below what the run already consumed refuses here (E3).
     let read_ceiling = super::super::memory_steps::read_ceiling_for(tx, fence).await?;
     if let Some(result) = &loaded.completed {
-        replay_on(tx, fence, call, result, read_ceiling).await?;
+        replay_on(tx, fence, call, result, read_ceiling, &eligible).await?;
         return Ok(MemoryToolContext::Recorded(result.clone()));
     }
     token_budget::require_progression(tx, fence.scope).await?;
@@ -313,9 +371,14 @@ async fn context_on(
     }
     let mut scopes = Vec::new();
     let mut not_ready = Vec::new();
-    for (scope, owner) in eligible_on(tx, fence, loaded.agent).await? {
-        match super::super::memory_steps::namespace_on(persistence, tx, fence.scope.company, owner)
-            .await?
+    for scope in eligible {
+        match super::super::memory_steps::namespace_on(
+            persistence,
+            tx,
+            fence.scope.company,
+            scope.owner,
+        )
+        .await?
         {
             super::super::memory_steps::Namespace::Ready(namespace, credential) => {
                 scopes.push(ScopeAccess {
@@ -338,41 +401,76 @@ async fn context_on(
     }))
 }
 
-/// A completed read replays only while its recorded exposure still fits the current ceiling.
+/// A replay validates even a zero-hit query's exact namespace authority. A
+/// completed read never escapes through a competing refusal's replay path either.
 async fn replay_on(
     tx: &mut PgConnection,
     fence: WorkflowFence,
     call: &MemoryToolCall,
     result: &Value,
     read_ceiling: AccessLevel,
+    eligible: &[MemoryScope],
 ) -> AppResult<()> {
+    #[derive(sqlx::FromRow)]
+    struct ReadRow {
+        exposed: i16,
+        items: Value,
+        namespace_ids: Vec<Uuid>,
+    }
     let scope = fence.scope;
-    let exposed: Option<i16> = sqlx::query_scalar(
-        "SELECT max(exposed_level)::smallint FROM workflow_memory_consumptions \
-         WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND job_id=$4 AND invocation_id=$5",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .bind(scope.execution.as_uuid())
-    .bind(scope.job.0)
-    .bind(call.invocation()?.0)
-    .fetch_one(tx)
-    .await?;
-    match exposed {
-        // A recorded read: its exposure must still be within the ceiling.
-        Some(level) => {
-            if AccessLevel::try_from(level).map_err(|_| invalid())? > read_ceiling {
-                return Err(AppError::KnowledgeRelease {
-                    content: AccessLevel::try_from(level).map_err(|_| invalid())?,
-                    destination: read_ceiling,
-                });
-            }
+    let rows:Vec<ReadRow>=sqlx::query_as("SELECT exposed_level::smallint AS exposed,items,namespace_ids
+        FROM workflow_memory_consumptions WHERE company_id=$1 AND run_id=$2 AND execution_id=$3 AND job_id=$4 AND invocation_id=$5")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(scope.execution.as_uuid()).bind(scope.job.0)
+        .bind(call.invocation()?.0).fetch_all(&mut *tx).await?;
+    if rows.is_empty() {
+        return if call.tool == MemoryTool::Save || result.get("error").is_some() {
+            Ok(())
+        } else {
+            Err(missing())
+        };
+    }
+    let ready = ready_ids_on(tx, scope.company, eligible).await?;
+    for row in rows {
+        let exposed = AccessLevel::try_from(row.exposed).map_err(|_| invalid())?;
+        if exposed > read_ceiling {
+            return Err(AppError::KnowledgeRelease {
+                content: exposed,
+                destination: read_ceiling,
+            });
         }
-        // A save receipt or a refusal exposes no memory content.
-        None if call.tool == MemoryTool::Save || result.get("error").is_some() => {}
-        None => return Err(missing()),
+        let observation = MemoryReadObservation {
+            result: result.clone(),
+            exposed,
+            read_ceiling,
+            items: serde_json::from_value(row.items).map_err(|_| invalid())?,
+            namespaces: row
+                .namespace_ids
+                .into_iter()
+                .map(crate::application::memory::NamespaceExternalId)
+                .collect(),
+        };
+        observation.validate_items()?;
+        if observation
+            .namespaces
+            .iter()
+            .any(|namespace| !ready.contains(namespace))
+        {
+            return Err(crate::application::workflow::scopes::unavailable());
+        }
     }
     Ok(())
+}
+
+async fn ready_ids_on(
+    tx: &mut PgConnection,
+    company: CompanyId,
+    eligible: &[MemoryScope],
+) -> AppResult<Vec<crate::application::memory::NamespaceExternalId>> {
+    let owners: Vec<_> = eligible.iter().map(|scope| scope.owner).collect();
+    let ready = crate::adapters::persistence::memory::ready_for_owners_on(tx, company, &owners)
+        .await?
+        .ok_or_else(|| AppError::BadRequest("memory.not_enabled".into()))?;
+    Ok(ready.into_iter().map(|entry| entry.namespace).collect())
 }
 
 async fn observe_on(
@@ -383,9 +481,10 @@ async fn observe_on(
     bound: &WriteBound,
 ) -> AppResult<Value> {
     let loaded = load_call(tx, fence, call, bound).await?;
+    let eligible = eligible_on(tx, fence.scope.company, fence.scope.run, loaded.agent).await?;
     let read_ceiling = super::super::memory_steps::read_ceiling_for(tx, fence).await?;
     if let Some(result) = &loaded.completed {
-        replay_on(tx, fence, call, result, read_ceiling).await?;
+        replay_on(tx, fence, call, result, read_ceiling, &eligible).await?;
         return Ok(result.clone());
     }
     // The answer stays within the ceiling it was authorized at and the current one (E6).
@@ -396,6 +495,16 @@ async fn observe_on(
         });
     }
     validate_result(call.tool, &observation.result)?;
+    observation.validate_items()?;
+    let ready = ready_ids_on(tx, fence.scope.company, &eligible).await?;
+    if observation
+        .namespaces
+        .iter()
+        .any(|namespace| !ready.contains(namespace))
+    {
+        return Err(crate::application::workflow::scopes::unavailable());
+    }
+
     let write = WorkflowCheckpointWrite {
         fence,
         checkpoint: loaded.checkpoint.run_id,
@@ -410,6 +519,17 @@ async fn observe_on(
     if !matches!(changed, End::Commit(WriteOutcome::Applied(_))) {
         return Err(ownership_lost());
     }
+    record_read_on(tx, fence, call, observation).await?;
+    live(tx, fence, bound).await?;
+    Ok(observation.result.clone())
+}
+
+async fn record_read_on(
+    tx: &mut PgConnection,
+    fence: WorkflowFence,
+    call: &MemoryToolCall,
+    observation: &MemoryReadObservation,
+) -> AppResult<()> {
     let scope = fence.scope;
     super::super::knowledge::raise_content_level_on(
         tx,
@@ -421,11 +541,11 @@ async fn observe_on(
     let refs = serde_json::to_value(&observation.items).map_err(|_| invalid())?;
     sqlx::query(
         "INSERT INTO workflow_memory_consumptions (company_id,run_id,execution_id,job_id, \
-           attempt_number,invocation_id,read_ceiling,exposed_level,items) \
-         VALUES ($1,$2,$3,$4,$5,$6,$7::smallint,$8::smallint,$9) \
+           attempt_number,invocation_id,read_ceiling,exposed_level,items,namespace_ids) \
+         VALUES ($1,$2,$3,$4,$5,$6,$7::smallint,$8::smallint,$9,$10) \
          ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number,invocation_id) \
          DO UPDATE SET read_ceiling=EXCLUDED.read_ceiling, exposed_level=EXCLUDED.exposed_level, \
-           items=EXCLUDED.items",
+           items=EXCLUDED.items,namespace_ids=EXCLUDED.namespace_ids",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
@@ -436,10 +556,16 @@ async fn observe_on(
     .bind(observation.read_ceiling.as_i16())
     .bind(observation.exposed.as_i16())
     .bind(refs)
-    .execute(&mut **tx)
+    .bind(
+        observation
+            .namespaces
+            .iter()
+            .map(|namespace| namespace.0)
+            .collect::<Vec<_>>(),
+    )
+    .execute(&mut *tx)
     .await?;
-    live(tx, fence, bound).await?;
-    Ok(observation.result.clone())
+    Ok(())
 }
 
 async fn refuse_on(
@@ -451,6 +577,9 @@ async fn refuse_on(
 ) -> AppResult<Value> {
     let loaded = load_call(tx, fence, call, bound).await?;
     if let Some(completed) = &loaded.completed {
+        let eligible = eligible_on(tx, fence.scope.company, fence.scope.run, loaded.agent).await?;
+        let ceiling = super::super::memory_steps::read_ceiling_for(tx, fence).await?;
+        replay_on(tx, fence, call, completed, ceiling, &eligible).await?;
         return Ok(completed.clone());
     }
     // A refusal carries no memory content, so it raises no level.
@@ -483,22 +612,27 @@ async fn save_on(
     tx: &mut Transaction<'_, Postgres>,
     fence: WorkflowFence,
     call: &MemoryToolCall,
-    scope: MemoryToolScope,
-    facts: &[String],
+    save: &MemoryToolSave,
     bound: &WriteBound,
 ) -> AppResult<End<MemorySaveOutcome>> {
     let loaded = load_call(tx, fence, call, bound).await?;
     if let Some(result) = &loaded.completed {
         return Ok(End::Rollback(MemorySaveOutcome::Accepted(result.clone())));
     }
-    let owner = eligible_on(tx, fence, loaded.agent)
-        .await?
-        .into_iter()
-        .find(|(eligible, _)| *eligible == scope && scope != MemoryToolScope::Company)
-        .map(|(_, owner)| owner);
-    let Some(save_scope @ NamespaceOwner::Principal(_)) = owner else {
+    let eligible = eligible_on(tx, fence.scope.company, fence.scope.run, loaded.agent).await?;
+    let Some(selected) = memory_write_scope(&eligible, save.target) else {
         return Ok(End::Rollback(MemorySaveOutcome::ScopeNotAllowed));
     };
+    if !subject_visible_on(tx, fence, save.subject).await? {
+        return Ok(End::Rollback(MemorySaveOutcome::SubjectNotAllowed));
+    }
+    let save_scope = selected.owner;
+    let producer = crate::adapters::persistence::memory::agent_principal_on(
+        tx,
+        fence.scope.company.as_uuid(),
+        loaded.agent,
+    )
+    .await?;
     let run = fence.scope;
     let invocation = call.invocation()?.0;
     // One logical save per tool call: its key survives every retry of this invocation (E5).
@@ -511,7 +645,9 @@ async fn save_on(
         wait: None,
         scope: save_scope,
         key: &key,
-        facts,
+        facts: &save.facts,
+        producer,
+        subject: save.subject,
         external_sources: save_sources(recalled_on(tx, fence).await?),
     };
     use crate::adapters::persistence::memory::deliveries::SaveEnqueue;
@@ -520,7 +656,9 @@ async fn save_on(
     {
         SaveEnqueue::Enqueued { id, .. } => id,
         SaveEnqueue::NotEnabled => return Ok(End::Rollback(MemorySaveOutcome::NotEnabled)),
-        SaveEnqueue::NotReady => return Ok(End::Rollback(MemorySaveOutcome::NotReady(scope))),
+        SaveEnqueue::NotReady => {
+            return Ok(End::Rollback(MemorySaveOutcome::NotReady(selected.clone())));
+        }
         SaveEnqueue::TooLarge => {
             return Err(AppError::BadRequest("Memory save is too large".into()));
         }
@@ -543,6 +681,25 @@ async fn save_on(
     }
     live(tx, fence, bound).await?;
     Ok(End::Commit(MemorySaveOutcome::Accepted(receipt)))
+}
+
+pub(in crate::adapters::persistence::workflow) async fn subject_visible_on(
+    db: &mut PgConnection,
+    fence: WorkflowFence,
+    subject: Option<crate::entities::transport::PrincipalId>,
+) -> AppResult<bool> {
+    let Some(subject) = subject else {
+        return Ok(true);
+    };
+    Ok(sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM principals AS principal
+        WHERE principal.company_id=$1 AND principal.id=$3
+            AND ((principal.kind IN ('person','agent') AND EXISTS(SELECT 1 FROM addresses AS address
+                WHERE address.company_id=principal.company_id AND address.principal_id=principal.id AND address.target_kind='principal'))
+            OR EXISTS(SELECT 1 FROM workflow_runs AS run JOIN thread_principals AS participant
+                ON participant.company_id=run.company_id AND participant.thread_id=run.thread_id
+                WHERE run.company_id=$1 AND run.id=$2 AND participant.principal_id=principal.id)))")
+        .bind(fence.scope.company.as_uuid()).bind(fence.scope.run.as_uuid()).bind(subject.as_uuid())
+        .fetch_one(db).await?)
 }
 
 /// Every observation this execution showed the model, any attempt (a replayed checkpoint

@@ -1,0 +1,32 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: struct `ScopeRow` is never constructed
+  --> src/adapters/persistence/workflow/run_scopes.rs:13:19
+   |
+13 | pub(super) struct ScopeRow {
+   |                   ^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: function `rows_on` is never used
+   --> src/adapters/persistence/workflow/run_scopes.rs:244:21
+    |
+244 | pub(super) async fn rows_on(db: &mut PgConnection, company: CompanyId, run: RunId, actor: Option<PrincipalId>) -> AppResult<Vec<Sco...
+    |                     ^^^^^^^
+
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 3 warnings
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 25s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 4 tests
+test application::workflow::scopes::tests::run_scopes_resolve_overlapping_report_and_chain_is_one_unit_with_both_relations ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_absent_or_ambiguous_placement_is_readonly_root ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_chain_local_writes_and_only_the_acting_leads_direct_children ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_depth_cycle_chain_metadata_and_read_budget_fail_early ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 4755 filtered out; finished in 0.01s
+

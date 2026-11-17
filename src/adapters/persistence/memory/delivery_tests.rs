@@ -109,6 +109,8 @@ fn intent<'a>(
         key,
         facts,
         external_sources: Vec::new(),
+        producer: f.agent_principal,
+        subject: None,
     }
 }
 
@@ -344,7 +346,7 @@ async fn memory_integration_delivery_fences_competing_claimants_and_bounds_attem
     let (first, first_root) = (f.company, f.root);
     f.company = super::tests::company(&f.persistence, f.owner).await;
     f.root = crate::adapters::persistence::company::root_on(
-        &mut *f.pool().acquire().await.unwrap(),
+        &mut f.pool().acquire().await.unwrap(),
         f.scope(),
     )
     .await
@@ -584,6 +586,8 @@ async fn memory_integration_disable_races_save_and_capture_then_reenable() {
                 key: "ob.s.race-second",
                 facts: &facts,
                 external_sources: Vec::new(),
+                producer: f.agent_principal,
+                subject: None,
             };
             let saved = freeze_save_on(&mut tx, &intent, run(AccessLevel::L0, true))
                 .await
@@ -711,7 +715,7 @@ async fn memory_integration_delivery_claims_are_fair_across_companies() {
     let quiet = super::tests::company(&f.persistence, f.owner).await;
     f.company = quiet;
     f.root = crate::adapters::persistence::company::root_on(
-        &mut *f.pool().acquire().await.unwrap(),
+        &mut f.pool().acquire().await.unwrap(),
         f.scope(),
     )
     .await
@@ -892,7 +896,7 @@ async fn memory_integration_delivery_lanes_send_companies_concurrently() {
         .await;
         f.company = super::tests::company(&f.persistence, f.owner).await;
         f.root = crate::adapters::persistence::company::root_on(
-            &mut *f.pool().acquire().await.unwrap(),
+            &mut f.pool().acquire().await.unwrap(),
             f.scope(),
         )
         .await
@@ -1058,6 +1062,8 @@ async fn memory_integration_owner_removal_races_save_freeze_in_both_orders() {
                     key: "ob.s.owner-race",
                     facts: &facts,
                     external_sources: Vec::new(),
+                    producer: principal,
+                    subject: None,
                 };
                 let saved = freeze_save_on(&mut tx, &intent, run(AccessLevel::L0, true))
                     .await

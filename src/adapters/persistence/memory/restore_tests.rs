@@ -48,6 +48,8 @@ async fn save(f: &Fixture, key: &str) {
         key,
         facts: &facts,
         external_sources: Vec::new(),
+        producer: f.agent_principal,
+        subject: None,
     };
     let mut tx = f.pool().begin().await.unwrap();
     freeze_save_on(

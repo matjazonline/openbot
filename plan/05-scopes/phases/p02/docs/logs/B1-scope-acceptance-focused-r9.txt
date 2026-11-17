@@ -1,0 +1,57 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0277]: `application::workflow::lifecycle::contracts::BindingState` doesn't implement `std::fmt::Debug`
+   --> src/adapters/persistence/workflow/run_scope_admission_tests.rs:48:10
+    |
+ 48 |         .unwrap_err();
+    |          ^^^^^^^^^^ unsatisfied trait bound
+    |
+help: the trait `std::fmt::Debug` is not implemented for `application::workflow::lifecycle::contracts::BindingState`
+   --> src/application/workflow/lifecycle/contracts.rs:129:1
+    |
+129 | pub struct BindingState {
+    | ^^^^^^^^^^^^^^^^^^^^^^^
+    = note: add `#[derive(Debug)]` to `application::workflow::lifecycle::contracts::BindingState` or manually `impl std::fmt::Debug for application::workflow::lifecycle::contracts::BindingState`
+note: required by a bound in `std::result::Result::<T, E>::unwrap_err`
+   --> /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/result.rs:1323:4
+
+error[E0599]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/run_scope_admission_tests.rs:51:14
+   |
+50 | /         error
+51 | |             .to_string()
+   | |             -^^^^^^^^^ method cannot be called due to unsatisfied trait bounds
+   | |_____________|
+   |
+   |
+  ::: src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 |   pub enum LifecycleError {
+   |   ----------------------- method `to_string` not found for this enum because it doesn't satisfy `_: Display` or `_: ToString`
+   |
+   = note: the following trait bounds were not satisfied:
+           `application::workflow::lifecycle::contracts::LifecycleError: std::fmt::Display`
+           which is required by `application::workflow::lifecycle::contracts::LifecycleError: ToString`
+note: the trait `std::fmt::Display` must be implemented
+  --> /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/core/src/fmt/mod.rs:1187:0
+note: the method `to_string` exists on the type `application::app_error::AppError`
+  --> /rustc/58cf8f9c35b355199727627d07ae34a4e2846d67/library/alloc/src/string.rs:2917:4
+   = help: items from traits can only be used if the trait is implemented and in scope
+   = note: the following trait defines an item `to_string`, perhaps you need to implement it:
+           candidate #1: `ToString`
+
+error[E0277]: `application::workflow::lifecycle::contracts::LifecycleError` doesn't implement `std::fmt::Display`
+  --> src/adapters/persistence/workflow/run_scope_admission_tests.rs:53:10
+   |
+53 |         "{error}"
+   |          ^^^^^^^ `application::workflow::lifecycle::contracts::LifecycleError` cannot be formatted with the default formatter
+   |
+help: the trait `std::fmt::Display` is not implemented for `application::workflow::lifecycle::contracts::LifecycleError`
+  --> src/application/workflow/lifecycle/contracts.rs:7:1
+   |
+ 7 | pub enum LifecycleError {
+   | ^^^^^^^^^^^^^^^^^^^^^^^
+   = note: in format strings you may be able to use `{:?}` (or `{:#?}` for pretty-print) instead
+
+Some errors have detailed explanations: E0277, E0599.
+For more information about an error, try `rustc --explain E0277`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

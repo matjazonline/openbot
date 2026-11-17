@@ -76,6 +76,7 @@ pub(in crate::adapters::persistence) struct NativeMcpOwner {
     pub machine: MachineId,
     pub installation: InstallationId,
     pub session: SessionId,
+    pub source: crate::domain::local_agents::SessionAssociation,
     pub harness: NativeHarnessSelection,
     pub invocation: NativeMcpInvocation,
     pub association: RelatedAssociation,
@@ -131,6 +132,7 @@ pub(in crate::adapters::persistence) async fn admit_on(
         },
     )
     .await?;
+    super::run_scopes::native_on(db, owner, run).await?;
     admission_write::insert_first_job(
         db,
         &admission_write::FirstJob {

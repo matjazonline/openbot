@@ -208,6 +208,8 @@ async fn memory_integration_live_provisioning_save_recall_capture_and_disable() 
         key: "ob.s.live-save",
         facts: &facts,
         external_sources: Vec::new(),
+        producer: f.agent_principal,
+        subject: None,
     };
     let levels = LockedRun {
         ceiling: AccessLevel::L6,
@@ -514,6 +516,8 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
             key,
             facts: &facts,
             external_sources: Vec::new(),
+            producer: f.agent_principal,
+            subject: None,
         };
         let levels = LockedRun {
             ceiling: AccessLevel::L3,
@@ -578,3 +582,6 @@ async fn memory_integration_live_competing_delivery_workers_deliver_each_intent_
 
 #[path = "e2e_tests.rs"]
 mod e2e;
+
+#[path = "live_subject_tests.rs"]
+mod subjects;

@@ -26,6 +26,8 @@ async fn freeze(
         key,
         facts: &facts,
         external_sources: external,
+        producer: f.agent_principal,
+        subject: None,
     };
     let mut tx = f.pool().begin().await.unwrap();
     let enqueued = freeze_save_on(&mut tx, &intent, levels).await?;
@@ -56,7 +58,7 @@ fn run(ceiling: AccessLevel, content: AccessLevel, exact: bool) -> LockedRun {
 }
 
 /// Enable memory and provision the company and agent namespaces on the real service.
-async fn provisioned(f: &Fixture, live: &Live, http: &Arc<MemoryServiceHttp>) {
+pub(super) async fn provisioned(f: &Fixture, live: &Live, http: &Arc<MemoryServiceHttp>) {
     f.persistence
         .enable_memory(
             f.scope(),

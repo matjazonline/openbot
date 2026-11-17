@@ -2,6 +2,7 @@
 //! service's published contract (`services/memory/openapi.json`): no shared crate, no SQL pool.
 //! No redirects, no proxy, no retries, bounded bodies, and tokens only in sensitive headers.
 mod limits;
+const MAX_PARALLEL_SCOPE_REQUESTS: usize = 8;
 
 pub use limits::{MemoryPool, MemoryPools};
 
@@ -488,19 +489,23 @@ impl MemoryClient for MemoryServiceHttp {
             .pools
             .acquire(MemoryPool::Interactive, first.credential.tenant.0, deadline)
             .await?;
-        let answers = futures::future::join_all(searches.iter().map(|entry| async move {
-            let answer: WireSearchResponse = self
-                .send(
-                    entry.credential,
-                    "observations/search",
-                    &search_body(&entry.search),
-                    deadline,
-                )
-                .await?;
-            hits(answer, entry.search.read_ceiling)
-        }))
-        .await;
-        answers.into_iter().collect()
+        let mut answers = Vec::with_capacity(searches.len());
+        for batch in searches.chunks(MAX_PARALLEL_SCOPE_REQUESTS) {
+            let results = futures::future::join_all(batch.iter().map(|entry| async move {
+                let answer: WireSearchResponse = self
+                    .send(
+                        entry.credential,
+                        "observations/search",
+                        &search_body(&entry.search),
+                        deadline,
+                    )
+                    .await?;
+                hits(answer, entry.search.read_ceiling)
+            }))
+            .await;
+            answers.extend(results.into_iter().collect::<Result<Vec<_>, _>>()?);
+        }
+        Ok(answers)
     }
 
     async fn context_pack(
@@ -522,22 +527,26 @@ impl MemoryClient for MemoryServiceHttp {
             .pools
             .acquire(MemoryPool::Interactive, first.credential.tenant.0, deadline)
             .await?;
-        let answers = futures::future::join_all(packs.iter().map(|entry| async move {
-            let body = json!({
-                "namespaces": [entry.pack.namespace.0.hyphenated().to_string()],
-                "read_ceiling": entry.pack.read_ceiling,
-                "query": entry.pack.query,
-                "max_tokens": entry.pack.max_tokens,
-                "max_bytes": entry.pack.max_bytes,
-                "detail": "compact",
-            });
-            let answer: WirePack = self
-                .send(entry.credential, "context/pack", &body, deadline)
-                .await?;
-            pack(answer, entry.pack.read_ceiling)
-        }))
-        .await;
-        answers.into_iter().collect()
+        let mut answers = Vec::with_capacity(packs.len());
+        for batch in packs.chunks(MAX_PARALLEL_SCOPE_REQUESTS) {
+            let results = futures::future::join_all(batch.iter().map(|entry| async move {
+                let body = json!({
+                    "namespaces": [entry.pack.namespace.0.hyphenated().to_string()],
+                    "read_ceiling": entry.pack.read_ceiling,
+                    "query": entry.pack.query,
+                    "max_tokens": entry.pack.max_tokens,
+                    "max_bytes": entry.pack.max_bytes,
+                    "detail": "compact",
+                });
+                let answer: WirePack = self
+                    .send(entry.credential, "context/pack", &body, deadline)
+                    .await?;
+                pack(answer, entry.pack.read_ceiling)
+            }))
+            .await;
+            answers.extend(results.into_iter().collect::<Result<Vec<_>, _>>()?);
+        }
+        Ok(answers)
     }
 
     async fn context_validate(
@@ -707,6 +716,60 @@ fn tenant_ref(tenant: TenantExternalId) -> Value {
 
 #[async_trait]
 impl MemoryProvisioner for MemoryServiceHttp {
+    async fn list_subject(
+        &self,
+        scope: MemorySubjectScope,
+        after: Option<Uuid>,
+    ) -> Result<SubjectPage, MemoryServiceError> {
+        let body = json!({"tenant":scope.tenant.0,"namespace":scope.namespace.0,"subject":scope.subject.as_uuid(),"after":after,"limit":100});
+        let page: SubjectPage = self
+            .admin(scope.tenant.0, "observations/subject/list", &body)
+            .await?;
+        let mut previous = after;
+        if page.items.len() > 100 {
+            return Err(MemoryServiceError::Protocol);
+        }
+        for item in &page.items {
+            if item.revision < 1
+                || item.access_level > 9
+                || previous.is_some_and(|previous| item.observation_id <= previous)
+            {
+                return Err(MemoryServiceError::Protocol);
+            }
+            previous = Some(item.observation_id);
+        }
+        if page.next_after.is_some() && (page.items.len() != 100 || page.next_after != previous) {
+            return Err(MemoryServiceError::Protocol);
+        }
+        Ok(page)
+    }
+
+    async fn delete_subject(
+        &self,
+        scope: MemorySubjectScope,
+        observations: &[Uuid],
+    ) -> Result<Vec<Uuid>, MemoryServiceError> {
+        let wanted: std::collections::BTreeSet<_> = observations.iter().copied().collect();
+        if observations.is_empty() || observations.len() > 100 || wanted.len() != observations.len()
+        {
+            return Err(MemoryServiceError::Protocol);
+        }
+        let body = json!({"tenant":scope.tenant.0,"namespace":scope.namespace.0,"subject":scope.subject.as_uuid(),"observation_ids":observations});
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Deleted {
+            deleted: Vec<Uuid>,
+        }
+        let answer: Deleted = self
+            .admin(scope.tenant.0, "observations/subject/delete", &body)
+            .await?;
+        let deleted: std::collections::BTreeSet<_> = answer.deleted.iter().copied().collect();
+        if deleted.len() != answer.deleted.len() || !deleted.is_subset(&wanted) {
+            return Err(MemoryServiceError::Protocol);
+        }
+        Ok(answer.deleted)
+    }
+
     async fn create_tenant(
         &self,
         tenant: TenantExternalId,

@@ -14,6 +14,11 @@ use crate::{
     services::harness::runs::RunCheckpoint,
 };
 
+enum Placement {
+    Company,
+    LeadDesk,
+}
+
 pub(super) struct SearchFixture {
     pub(super) fixture: Fixture,
     pub(super) agent: Uuid,
@@ -39,16 +44,36 @@ impl SearchFixture {
 
     /// The agent bound to `tools`. Memory tools need memory enabled before the agent is
     /// registered, so the fixture enables it first when any is bound.
-    pub(super) async fn with_tools(
+    pub(super) fn with_tools(
         level: AccessLevel,
         budget: Option<u32>,
         tools: &[AgentBuiltinTool],
+    ) -> impl std::future::Future<Output = Self> + '_ {
+        Self::with_placement(level, budget, tools, Placement::Company)
+    }
+
+    pub(super) fn with_lead_desk_tools(
+        level: AccessLevel,
+        tools: &[AgentBuiltinTool],
+    ) -> impl std::future::Future<Output = Self> + '_ {
+        Self::with_placement(level, None, tools, Placement::LeadDesk)
+    }
+
+    async fn with_placement(
+        level: AccessLevel,
+        budget: Option<u32>,
+        tools: &[AgentBuiltinTool],
+        placement: Placement,
     ) -> Self {
         let mut fixture = Fixture::new().await;
-        fixture.persistence = PostgresPersistence::with_credential_cipher(
+        let persistence = PostgresPersistence::with_credential_cipher(
             fixture.persistence.pool().clone(),
             CredentialCipher::for_test(),
         );
+        fixture.persistence = match &placement {
+            Placement::Company => persistence,
+            Placement::LeadDesk => persistence.with_app_domain("agents.test"),
+        };
         sqlx::query("ALTER TABLE workflow_runs ENABLE TRIGGER workflow_run_snapshot_immutable")
             .execute(fixture.persistence.pool())
             .await
@@ -75,13 +100,15 @@ impl SearchFixture {
                 .unwrap();
         }
         let agent = configure_agent(&fixture, tools).await;
+        let association = match placement {
+            Placement::Company => RelatedAssociation::Company,
+            Placement::LeadDesk => Box::pin(lead_desk(&fixture, agent, actor)).await,
+        };
         let version = publish(&fixture, budget).await;
         let binding = BindingFixture::from_version(fixture, version);
-        let configured = binding
-            .service()
-            .configure(binding.request(None))
-            .await
-            .unwrap();
+        let mut request = binding.request(None);
+        request.association = association;
+        let configured = binding.service().configure(request).await.unwrap();
         binding
             .service()
             .activate(SetBindingActivity {
@@ -90,7 +117,12 @@ impl SearchFixture {
             })
             .await
             .unwrap();
-        let claim = admit(&binding, WorkflowActor::authenticated(actor).unwrap()).await;
+        let claim = admit(
+            &binding,
+            WorkflowActor::authenticated(actor).unwrap(),
+            association,
+        )
+        .await;
         let model = Arc::new(DeterministicTextEmbedder::default());
         let library = Arc::new(KnowledgeLibrary::new(
             Arc::new(binding.fixture.persistence.clone()),
@@ -187,8 +219,13 @@ impl SearchFixture {
         register_scripted_agent_base_url(self.agent, &llm.base_url);
         let outcome =
             Box::pin(runtime.execute(&WorkflowStepKind("agent.run".into()), &self.claim)).await;
+        let finished = llm.finish().await;
+        assert_eq!(
+            finished.as_ref().ok(),
+            Some(&1),
+            "provider preparation: {outcome:?}; script: {finished:?}"
+        );
         assert!(outcome.completed_result().is_err());
-        assert_eq!(llm.finish().await.unwrap(), 1);
         let checkpoint = self.checkpoint().await;
         let pending = checkpoint.pending_call().unwrap();
         let scope = self.claim.fence.scope;
@@ -325,7 +362,11 @@ pub(super) async fn publish(f: &Fixture, budget: Option<u32>) -> VersionId {
     version
 }
 
-async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflow {
+async fn admit(
+    binding: &BindingFixture,
+    actor: WorkflowActor,
+    association: RelatedAssociation,
+) -> ClaimedWorkflow {
     let f = &binding.fixture;
     let p = &f.persistence;
     let result = WorkflowService::new(p.clone(), p.clone(), p.clone(), p.clone(), Preflight)
@@ -333,7 +374,7 @@ async fn admit(binding: &BindingFixture, actor: WorkflowActor) -> ClaimedWorkflo
             history_session: None,
             company_id: f.target.company,
             actor,
-            association: RelatedAssociation::Company,
+            association,
             trigger: TriggerRef::new(
                 f.target.company,
                 TriggerId::new(Uuid::new_v4()),
@@ -399,4 +440,112 @@ pub(super) fn copy_call(call: &KnowledgeToolCall) -> KnowledgeToolCall {
         call: call.call.clone(),
         arguments: call.arguments.clone(),
     }
+}
+
+async fn lead_units(f: &Fixture, agent: Uuid) -> crate::entities::department::DepartmentId {
+    use crate::entities::department::DepartmentRole;
+    use crate::ports::department::DepartmentWrite;
+    let company = f.target.company;
+    let actor = f.target.actor.user_id();
+    let departments =
+        crate::adapters::persistence::test_support::department_use_cases(&f.persistence);
+    let root = crate::adapters::persistence::company::root_on(
+        &mut f.persistence.pool().acquire().await.unwrap(),
+        company,
+    )
+    .await
+    .unwrap();
+    let local = departments
+        .create_department(
+            actor,
+            company.as_uuid(),
+            DepartmentWrite {
+                name: "Memory local".into(),
+                slug: "memory-local".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap()
+        .id;
+    for (slug, parent) in [
+        ("report-a", local),
+        ("report-b", local),
+        ("root-report", root),
+    ] {
+        departments
+            .create_department(
+                actor,
+                company.as_uuid(),
+                DepartmentWrite {
+                    name: slug.into(),
+                    slug: slug.into(),
+                    parent_id: Some(parent),
+                    ..Default::default()
+                },
+                None,
+            )
+            .await
+            .unwrap();
+    }
+    let principal = crate::adapters::persistence::memory::agent_principal_on(
+        &mut f.persistence.pool().acquire().await.unwrap(),
+        company.as_uuid(),
+        agent,
+    )
+    .await
+    .unwrap();
+    // Local is both own and a child readable through the root lead. This makes
+    // the real consumer prove deduplication across overlapping selectors.
+    for unit in [root, local] {
+        departments
+            .assign_role(
+                actor,
+                company.as_uuid(),
+                unit,
+                DepartmentRole::Lead,
+                principal,
+            )
+            .await
+            .unwrap();
+    }
+    local
+}
+
+async fn lead_desk(f: &Fixture, agent: Uuid, viewer: Uuid) -> RelatedAssociation {
+    use crate::ports::channel::{ChannelPersistence, ChannelWrite};
+    // Box substantial topology setup separately from the shared agent fixture.
+    let local = Box::pin(lead_units(f, agent)).await;
+    let company = f.target.company;
+    let principal = crate::adapters::persistence::memory::person_principal_on(
+        &mut f.persistence.pool().acquire().await.unwrap(),
+        company.as_uuid(),
+        viewer,
+    )
+    .await
+    .unwrap();
+    crate::adapters::persistence::test_support::department_use_cases(&f.persistence)
+        .add_member(
+            f.target.actor.user_id(),
+            company.as_uuid(),
+            local,
+            principal,
+        )
+        .await
+        .unwrap();
+    let desk = ChannelPersistence::create(
+        &f.persistence,
+        company.as_uuid(),
+        ChannelWrite {
+            name: "Memory scope tools".into(),
+            slug: "memory-scope-tools".into(),
+            enabled: true,
+            department_id: Some(local),
+            ..Default::default()
+        },
+    )
+    .await
+    .unwrap();
+    RelatedAssociation::Channel(RelatedChannelId::new(desk.id))
 }

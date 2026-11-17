@@ -22,6 +22,34 @@ use uuid::Uuid;
 pub const LOAD: &str = "memory.load";
 pub const SAVE: &str = "memory.save";
 
+/// Root bindings and every pinned child require a concrete local placement when
+/// they name `own`, just as captured roles require an unambiguous department.
+pub fn needs_local_unit(bundle: &super::publication::PublishedBundle) -> bool {
+    let mut pending = vec![bundle];
+    let mut visited = std::collections::BTreeSet::new();
+    while let Some(bundle) = pending.pop() {
+        if !visited.insert(bundle.compiled().graph().definition().version_id) {
+            continue;
+        }
+        if bundle
+            .compiled()
+            .graph()
+            .definition()
+            .steps
+            .values()
+            .any(|step| {
+                step.step_type.as_str().starts_with("memory.")
+                    && matches!(step.inputs.get("scope"),
+                Some(crate::domain::workflow::Binding::Literal(scope)) if scope["unit"]=="own")
+            })
+        {
+            return true;
+        }
+        pending.extend(bundle.children().values().map(AsRef::as_ref));
+    }
+    false
+}
+
 /// Which namespace a step names; an agent scope is resolved to the bundle's agent.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UnitSelector {
@@ -34,18 +62,10 @@ pub enum MemoryStepScope {
     Unit(UnitSelector),
     Agent(Uuid),
 }
-impl MemoryStepScope {
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Unit(_) => "unit",
-            Self::Agent(_) => "agent",
-        }
-    }
-}
 
 /// What the host authorized for one `memory.load` attempt (rolled back; nothing committed).
 pub struct LoadAuthority {
-    pub scope: MemoryStepScope,
+    pub scope_label: String,
     pub namespace: NamespaceExternalId,
     pub credential: ClientCredential,
     /// `min(run ceiling, destination audience, grant)`, never a model-supplied value (E3).
@@ -68,6 +88,13 @@ pub enum SavePark {
     TooLarge,
 }
 
+pub struct MemoryLoadObservation<'a> {
+    pub namespace: NamespaceExternalId,
+    pub read_ceiling: AccessLevel,
+    pub exposed: AccessLevel,
+    pub items: &'a [MemoryDetail],
+}
+
 /// The persistence the memory steps need. Every method is a fenced, live-checked transition.
 #[async_trait]
 pub trait MemoryStepStore: Send + Sync {
@@ -77,9 +104,7 @@ pub trait MemoryStepStore: Send + Sync {
     async fn observe_memory_load(
         &self,
         claim: &ClaimedWorkflow,
-        read_ceiling: AccessLevel,
-        exposed: AccessLevel,
-        items: &[MemoryDetail],
+        observation: &MemoryLoadObservation<'_>,
     ) -> AppResult<()>;
     /// One transaction: the frozen request, its intent and the effect wait.
     async fn park_memory_save(&self, claim: &ClaimedWorkflow) -> AppResult<SavePark>;
@@ -134,6 +159,9 @@ fn host_failure(error: &AppError) -> WorkflowFailure {
             FailureClass::Terminal,
             crate::app_error::KNOWLEDGE_AUDIENCE_BELOW_CONTENT,
         ),
+        AppError::BadRequest(code) if code == "memory.scope_unavailable" => {
+            failure(FailureClass::Terminal, "memory.scope_unavailable")
+        }
         AppError::BadRequest(_) | AppError::NotFound(_) => {
             failure(FailureClass::Terminal, "memory.rejected")
         }
@@ -156,13 +184,13 @@ pub fn carried_level(exposed: AccessLevel, items: &[MemoryDetail]) -> Option<Acc
 /// rest counted in `omitted`. `exposed_level` is the level the run was raised to
 /// (`carried_level`), which covers omitted items too.
 pub fn load_output(
-    scope: MemoryStepScope,
+    scope_label: &str,
     items: &[MemoryDetail],
     exposed: AccessLevel,
     max_result_bytes: usize,
 ) -> Value {
     let item = |detail: &MemoryDetail| {
-        json!({"id": detail.observation_id, "scope": scope.label(), "kind": detail.kind,
+        json!({"id": detail.observation_id, "scope": scope_label, "kind": detail.kind,
             "title": detail.title, "content": detail.body,
             "occurred_at": detail.occurred_at.to_rfc3339(),
             "access_level": detail.access_level, "revision": detail.revision})
@@ -250,16 +278,26 @@ impl<P: MemoryStepStore> MemoryStepRuntime<P> {
         };
         let carried = carried_level(exposed, &items)
             .ok_or_else(|| failure(FailureClass::Terminal, "memory.refused"))?;
-        self.store
-            .observe_memory_load(claim, authority.read_ceiling, exposed, &items)
-            .await
-            .map_err(|error| host_failure(&error))?;
-        Ok(load_output(
-            authority.scope,
+        let output = load_output(
+            &authority.scope_label,
             &items,
             carried,
             claim.max_result_bytes,
-        ))
+        );
+        let shown = output["items"].as_array().map_or(0, Vec::len);
+        self.store
+            .observe_memory_load(
+                claim,
+                &MemoryLoadObservation {
+                    namespace: authority.namespace,
+                    read_ceiling: authority.read_ceiling,
+                    exposed: carried,
+                    items: &items[..shown],
+                },
+            )
+            .await
+            .map_err(|error| host_failure(&error))?;
+        Ok(output)
     }
 
     async fn not_ready(&self, claim: &ClaimedWorkflow, owner: NamespaceOwner) -> WorkflowFailure {

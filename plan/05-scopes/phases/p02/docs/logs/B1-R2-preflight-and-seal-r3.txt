@@ -1,0 +1,39 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0433]: cannot find type `Duration` in this scope
+  --> src/adapters/persistence/workflow/run_scope_race_tests.rs:11:26
+   |
+11 |     tokio::time::timeout(Duration::from_secs(5), async {
+   |                          ^^^^^^^^ use of undeclared type `Duration`
+   |
+   = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+   |
+ 1 + use std::time::Duration;
+   |
+
+error[E0433]: cannot find type `Duration` in this scope
+  --> src/adapters/persistence/workflow/run_scope_race_tests.rs:24:32
+   |
+24 |             tokio::time::sleep(Duration::from_millis(10)).await;
+   |                                ^^^^^^^^ use of undeclared type `Duration`
+   |
+   = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+   |
+ 1 + use std::time::Duration;
+   |
+
+error[E0433]: cannot find type `Duration` in this scope
+   --> src/adapters/persistence/workflow/run_scope_race_tests.rs:105:56
+    |
+105 |     let ((admitted, moved), ()) = tokio::time::timeout(Duration::from_secs(15), async {
+    |                                                        ^^^^^^^^ use of undeclared type `Duration`
+    |
+    = note: struct `crate::infra::workflow::tests::Duration` exists but is inaccessible
+help: consider importing this struct
+    |
+  1 + use std::time::Duration;
+    |
+
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

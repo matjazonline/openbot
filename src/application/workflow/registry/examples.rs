@@ -83,9 +83,9 @@ fn values(name: &str) -> Value {
     let deadline = "2030-01-01T00:00:00Z";
     match name {
         "context.history" => json!({"max_tokens":1000}),
-        "memory.load" => json!({"scope":{"kind":"company"},"query":"preferences","limit":10}),
+        "memory.load" => json!({"scope":{"unit":"root"},"query":"preferences","limit":10}),
         "memory.save" => {
-            json!({"scope":{"kind":"company"},"facts":["Prefers concise replies"]})
+            json!({"scope":{"unit":"root"},"facts":["Prefers concise replies"]})
         }
         "jev.evaluate" => {
             json!({"connection":"service","model":"jev-1.14.0","state":{"ticket":"Payment failed"},"questions":{

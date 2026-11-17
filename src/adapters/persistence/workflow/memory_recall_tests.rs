@@ -323,7 +323,10 @@ async fn memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen()
         // Fetched under a ceiling the run no longer has.
         read_ceiling: AccessLevel::L6,
         packs: vec![(
-            MemoryToolScope::Company,
+            crate::application::workflow::memory_recall::RecallNamespace {
+                namespace: crate::application::memory::NamespaceExternalId(Uuid::new_v4()),
+                label: "unit:root".into(),
+            },
             crate::application::memory::MemoryPack {
                 items: vec![item],
                 exposed_level: 5,
@@ -474,7 +477,7 @@ async fn memory_preparation_resumed_attempts_revalidate_recorded_tool_items() {
         let search = t
             .prepare(
                 MemoryTool::Search,
-                json!({"query":"escalation","scopes":["company"]}),
+                json!({"query":"escalation","scopes":["ancestors"]}),
             )
             .await;
         assert_eq!(ids(&t.call(search).await), vec![note.to_string()]);

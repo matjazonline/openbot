@@ -1,0 +1,36 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+error[E0599]: no method named `preamble` found for struct `std::boxed::Box<AgentLaunch>` in the current scope
+  --> src/adapters/persistence/workflow/memory_scope_proof_tests.rs:13:22
+   |
+13 |     assert!(prepared.preamble().contains("Memory write scope: personal"));
+   |                      ^^^^^^^^ method not found in `std::boxed::Box<AgentLaunch>`
+   |
+help: one of the expressions' fields has a method of the same name
+   |
+13 |     assert!(prepared.prepared.preamble().contains("Memory write scope: personal"));
+   |                      +++++++++
+
+error[E0599]: no method named `spec` found for struct `std::boxed::Box<AgentLaunch>` in the current scope
+  --> src/adapters/persistence/workflow/memory_scope_proof_tests.rs:14:25
+   |
+14 |     let spec = prepared.spec(t.s.claim.fence).unwrap();
+   |                         ^^^^ method not found in `std::boxed::Box<AgentLaunch>`
+   |
+help: one of the expressions' fields has a method of the same name
+   |
+14 |     let spec = prepared.prepared.spec(t.s.claim.fence).unwrap();
+   |                         +++++++++
+
+error[E0599]: no method named `spec` found for struct `std::boxed::Box<AgentLaunch>` in the current scope
+  --> src/adapters/persistence/workflow/memory_scope_proof_tests.rs:23:25
+   |
+23 |     assert_eq!(restored.spec(t.s.claim.fence).unwrap().prepared, spec.prepared);
+   |                         ^^^^ method not found in `std::boxed::Box<AgentLaunch>`
+   |
+help: one of the expressions' fields has a method of the same name
+   |
+23 |     assert_eq!(restored.prepared.spec(t.s.claim.fence).unwrap().prepared, spec.prepared);
+   |                         +++++++++
+
+For more information about this error, try `rustc --explain E0599`.
+error: could not compile `open_bots` (lib test) due to 3 previous errors

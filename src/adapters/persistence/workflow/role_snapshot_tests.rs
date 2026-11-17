@@ -22,6 +22,9 @@ mod escalation_refusals;
 #[path = "direct_role_admission_tests.rs"]
 mod direct;
 
+#[path = "run_scope_admission_tests.rs"]
+mod scopes;
+
 struct RoleFixture {
     admission: AdmissionFixture,
     department: DepartmentId,
@@ -335,21 +338,21 @@ async fn memory_scope_admission_step_own_uses_the_captured_department() {
         .execute(&mut *tx)
         .await
         .unwrap();
-    let own = crate::adapters::persistence::workflow::memory_steps::step_owner_on(
+    let own = crate::adapters::persistence::workflow::memory_steps::step_scope_access_on(
         &mut tx,
         scope,
         MemoryStepScope::Unit(UnitSelector::Own),
     )
     .await
     .unwrap();
-    assert_eq!(own, NamespaceOwner::Unit(f.department));
-    let company = crate::adapters::persistence::workflow::memory_steps::step_owner_on(
+    assert_eq!(own.owner, NamespaceOwner::Unit(f.department));
+    let company = crate::adapters::persistence::workflow::memory_steps::step_scope_access_on(
         &mut tx,
         scope,
         MemoryStepScope::Unit(UnitSelector::Root),
     )
     .await
     .unwrap();
-    assert_eq!(company, NamespaceOwner::Unit(root));
+    assert_eq!(company.owner, NamespaceOwner::Unit(root));
     tx.rollback().await.unwrap();
 }

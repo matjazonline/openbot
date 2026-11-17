@@ -37,6 +37,8 @@ pub(crate) struct SaveIntent<'a> {
     pub scope: NamespaceOwner,
     pub key: &'a str,
     pub facts: &'a [String],
+    pub producer: crate::entities::transport::PrincipalId,
+    pub subject: Option<crate::entities::transport::PrincipalId>,
     pub external_sources: Vec<ExternalSourceRef>,
 }
 
@@ -210,6 +212,7 @@ pub(crate) async fn freeze_save_on(
                 title: fact_title(fact),
                 body: fact.clone(),
                 occurred_at: now,
+                subject: intent.subject.map(|subject| subject.as_uuid().to_string()),
             })
             .collect(),
     };
@@ -221,8 +224,8 @@ pub(crate) async fn freeze_save_on(
     sqlx::query(
         "INSERT INTO memory_deliveries (company_id, id, namespace_id, kind, run_id, execution_id, \
            invocation_id, wait_id, idempotency_key, expires_at, request, disable_epoch, state, \
-           available_at, unit_id, principal_id) \
-         VALUES ($1, $2, $3, 'save', $4, $5, $6, $7, $8, $9, $10, $11, 'pending', clock_timestamp(), $12, $13)",
+           available_at, unit_id, principal_id, subject_principal_id) \
+         VALUES ($1, $2, $3, 'save', $4, $5, $6, $7, $8, $9, $10, $11, 'pending', clock_timestamp(), $12, $13, $14)",
     )
     .bind(company)
     .bind(id)
@@ -236,7 +239,8 @@ pub(crate) async fn freeze_save_on(
     .bind(&frozen)
     .bind(epoch)
     .bind(owner_key.unit)
-    .bind(owner_key.principal)
+    .bind(intent.producer.as_uuid())
+    .bind(intent.subject.map(|subject|subject.as_uuid()))
     .execute(&mut *db)
     .await?;
     Ok(SaveEnqueue::Enqueued {
@@ -413,6 +417,7 @@ pub(crate) async fn freeze_capture_on(
     if frozen.to_string().len() > MAX_FROZEN_SAVE_BYTES {
         return Ok(CaptureEnqueue::Skipped("too_large"));
     }
+    let producer = super::agent_principal_on(db, company, intent.agent).await?;
     let id = Uuid::new_v4();
     sqlx::query(
         "INSERT INTO memory_deliveries (company_id, id, namespace_id, kind, run_id, execution_id, \
@@ -431,7 +436,7 @@ pub(crate) async fn freeze_capture_on(
     .bind(&frozen)
     .bind(epoch)
     .bind(owner_key.unit)
-    .bind(owner_key.principal)
+    .bind(producer.as_uuid())
     .execute(&mut *db)
     .await?;
     Ok(CaptureEnqueue::Enqueued {

@@ -928,8 +928,7 @@ mod tests {
             publish(&engine, fresh(), example(kind)).await.unwrap();
         }
         let mut ghost = example("memory.save");
-        ghost["steps"]["start"]["with"]["scope"] =
-            serde_json::json!({"literal":{"kind":"agent","agent":"ghost"}});
+        ghost["steps"]["start"]["with"]["scope"] = serde_json::json!({"literal":{"agent":"ghost"}});
         let refused = publish(&engine, fresh(), ghost).await;
         assert!(
             matches!(&refused, Err(LifecycleError::Validation(diagnostic))

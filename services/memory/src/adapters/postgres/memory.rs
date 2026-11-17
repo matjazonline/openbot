@@ -919,9 +919,9 @@ impl PgStore {
             sqlx::query!(
                 "INSERT INTO observations (tenant_id, namespace_id, id, session_id, kind, title, body, \
                  access_level, producing_ceiling, watermark_kind, watermark_level, source_max_level, \
-                 origin, occurred_at, expires_at) \
+                 origin, occurred_at, expires_at, subject) \
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8::smallint, $9::smallint, $10, $11::smallint, \
-                         $12::smallint, 'explicit', $13, $14)",
+                         $12::smallint, 'explicit', $13, $14, $15)",
                 write.tenant_id,
                 write.namespace_id,
                 id,
@@ -936,6 +936,7 @@ impl PgStore {
                 label.source_max_level().as_i16(),
                 item.occurred_at,
                 item.expires_at,
+                item.subject,
             )
             .execute(&mut *tx)
             .await?;

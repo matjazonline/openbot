@@ -2,7 +2,7 @@
 
 - Authority: /Users/mac02/orca/workspaces/openbot/plan03-04/plan/05-scopes/COORDINATION.md
 - Writer: /root in /Users/mac02/orca/workspaces/openbot/plan03-04
-- Revision: 5
+- Revision: 10
 
 ## Plan-wide instructions
 
@@ -42,7 +42,7 @@
 | Phase | Owner/session | Worktree | Authoritative records |
 | --- | --- | --- | --- |
 | p01 accepted in phase; main integration pending | root/A /root; B /root/p05_reviewer | /Users/mac02/orca/workspaces/openbot/plan03-04 | phases/p01/docs/{TASK,HANDOFF}.md |
-| p02 planned | /root | same sequential checkout | phases/p02/docs/ when started |
+| p02 accepted in phase; local commit pending; main integration at03 | root/A /root; B /root/p05_reviewer | same sequential checkout | phases/p02/docs/{TASK,HANDOFF}.md |
 | p03 planned | /root | same sequential checkout | phases/p03/docs/ when started |
 | p04 planned | /root | same sequential checkout | phases/p04/docs/ when started |
 
@@ -110,3 +110,64 @@
   rootaccepted. Commit identity recorded in01HANDOFF aftercommit. P02may build on
   this accepted foundation. Source not published until03checkpoint; wire/tool/scope/
   subject and knowledge obligations still02/03, fullgate03. No notice changed.
+
+- P01 accepted foundation commit e6eb5bc8fff93492f23935b9c84114905801824c
+  (source0713361f…90dabf; independent05SC-P01-B1-R1/N1 PASS). Local only;
+  origin/main remains Plan04 until03publication. P02ACK C001–C004/r1 on entry.
+
+### 05SC-C005 / r1
+- State: proposed; pending independent p02 D2/r1 architecture review.
+- Origin: p02TASK D2/r1 (shared snapshot, selector/ref and opaque subject contracts).
+- Targets: p02/p03/p04 and publication owner.
+- Instruction/change: p03 knowledge must read p02's exact sealed per-acting-principal
+  unit set, with a base group for static steps and no principal-owned knowledge.
+  Root/child/native admission and own-session person scopes are explicit; runtime
+  tenant/incarnation/classification/audience/source/fence checks remain independent.
+  Namespace-aware consumption/recall references replace category-only identity;
+  p04 documents actual vocabulary and the managed subject list/purge boundary.
+- Dependencies/order: activate only after D2 PASS, implement/review02 before03;
+  subject contract C004 still requires real cross-service proof. Final source gate
+  precedes03main publication. No new user permission or production purge authorized.
+- Evidence/review: p02 D2/r1 proposed; B review pending.
+- Verification: sealed/immutable SQL and competing admissions, per-actor no-widening,
+  strict writes, namespaces/ref replay, subject/service/CLI tests described in02TASK;
+  p03 current unit/level SQL filtering/consumption and move invariants gated there.
+- Responses: p02/root proposed/ACK scope;03/04 must evaluate after activation.
+
+### 05SC-C005 / r2
+- State: active; supersedes proposed r1; activated after independent D2/r2 PASS.
+- Origin: p02 D2/r2 correcting05SC-P02-D2-R1-F1/F2.
+- Targets: p02/p03/p04 and publication owner.
+- Instruction/change: preserve r1shared snapshot/ref obligations; distinguish fresh
+  owner validation from exact historical parent copies. Workflow-origin native
+  brokers use only their canonical source's sealed per-harness/base projection;
+  missing context becomes sealed-unavailable with zero scope authority, preserving
+  separately authorized current MCP-only actions. Conversation origins may capture
+  fresh. No private-person inheritance without existing actual own-session proof.
+  Snapshot seal uses existing read prefix and run mutex with NOWAIT, not a new
+  waiting company writer. Runtime current identity/owner/level/fence checks remain.
+- Dependencies/order: activate after independent D2/r2 PASS;02proof/review before03;
+  C004real service subject proof and C003source gate/publication timing still apply.
+- Evidence/review: independent 05SC-P02-D2-R2-N1 PASS at decision level; F1/F2
+  resolved at decision level. Source cc06127e…eb484 and revision8 reproduced
+  exactly by root before activation. Implementation and proof remain pending.
+- Verification: historical rename/delete copies, forged/foreign/missing-source
+  refusals, native workflow versus conversation variants and no live widening,
+  zero-authority unavailable consumers, and competing append/seal/native contention.
+- Responses: p02/root ACK r2 and revision9; future03/04 evaluate on entry.
+
+
+## Accepted p02 prerequisite
+
+- p02source7a555e95283fa22b7face97a1463d8efdfb6cf8c2ab92a3b77e5eae734ab51a5,
+  base/HEAD e6eb5bc8fff93492f23935b9c84114905801824c, independent05SC-P02-B1-R2-N1
+  PASS and root acceptance. F1/F2/F3 resolved; original failures retained. Commit
+  identity follows in p02HANDOFF. Source accepted locally, not published;03may now
+  depend on sealed per-actor/base scopes and the subject service extension.
+- p02satisfies C004/r1 actual subject/service/operator proof and C005/r2snapshot
+  contract, with current identity/classification/credential/source/fence boundaries
+  unchanged. Future03/04acknowledge these active notices on entry. C001/C003push
+  timing/full gate/STOP and separate Doop constraints remain unchanged.
+- Revision10changes execution/prerequisite status only; no applicable requirement
+  changed after p02's pinned revision9independent review. Source digest excludes
+  this exact mutable coordination file; no source changed after B's PASS.

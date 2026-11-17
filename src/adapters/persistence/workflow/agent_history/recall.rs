@@ -3,12 +3,16 @@
 //! (level raise and consumption record in the preparation transaction), and the scopes a
 //! resumed attempt revalidates against.
 use super::*;
-use crate::application::workflow::memory_recall::Revalidation;
+use crate::application::memory::MemoryPack;
+use crate::application::workflow::memory_recall::{RecallNamespace, Revalidation};
 use crate::application::workflow::{
     agent::{FrozenMemory, PreparedAgent, RecallState, RecalledMemory},
     lease::{ClaimedWorkflow, LeasePolicy},
     memory_recall::{FetchedRecall, MemoryRecallPersistence, RecallPlan, RecallRequest},
-    memory_tools::{MemoryRecallRef, MemoryToolPersistence, MemoryToolScope, ScopeAccess},
+    memory_tools::{
+        MemoryRecallRef, MemorySaveTarget, MemoryScope, MemoryToolPersistence, ScopeAccess,
+        memory_write_scope,
+    },
 };
 use crate::entities::access_level::AccessLevel;
 use serde_json::Value;
@@ -40,17 +44,17 @@ impl MemoryRecallPersistence for PostgresPersistence {
     async fn provision_recall_scope(
         &self,
         fence: WorkflowFence,
-        scope: MemoryToolScope,
+        owner: crate::application::memory::NamespaceOwner,
     ) -> AppResult<()> {
         // The same owner resolution and own-transaction provisioning as the tools (P7b).
-        self.provision_memory_scope(fence, scope).await
+        self.provision_memory_scope(fence, owner).await
     }
 
     async fn capture_targets(
         &self,
         claim: &ClaimedWorkflow,
         policy: LeasePolicy,
-    ) -> AppResult<Vec<MemoryToolScope>> {
+    ) -> AppResult<Vec<crate::application::memory::NamespaceOwner>> {
         let bound = WriteBound::start("memory.capture.targets", policy);
         let attempt = bound
             .attempt(Box::pin(async {
@@ -154,7 +158,7 @@ async fn capture_targets_on(
     claim: &ClaimedWorkflow,
     bound: &WriteBound,
     domain: Option<&str>,
-) -> AppResult<Vec<MemoryToolScope>> {
+) -> AppResult<Vec<crate::application::memory::NamespaceOwner>> {
     let candidate = Box::pin(preparation::candidate_on(tx, claim, bound, domain)).await?;
     if candidate.context.is_none() {
         return Ok(Vec::new());
@@ -175,14 +179,18 @@ async fn capture_targets_on(
         return Ok(Vec::new());
     }
     let mut targets = Vec::new();
-    for (scope, owner) in checkpoints::memory_tools::eligible_on(tx, fence, agent).await? {
-        let wanted = match scope {
-            MemoryToolScope::Agent => kinds.iter().any(|kind| kind == "threads"),
-            MemoryToolScope::User => kinds.iter().any(|kind| kind == "private_sessions"),
-            MemoryToolScope::Company => false,
+    let eligible =
+        checkpoints::memory_tools::eligible_on(tx, fence.scope.company, fence.scope.run, agent)
+            .await?;
+    let default = memory_write_scope(&eligible, MemorySaveTarget::Default).map(|scope| scope.owner);
+    for scope in eligible {
+        let wanted = if scope.private_person {
+            kinds.iter().any(|kind| kind == "private_sessions")
+        } else {
+            Some(scope.owner) == default && kinds.iter().any(|kind| kind == "threads")
         };
-        if wanted && !namespace_ready_on(tx, fence.scope.company, owner).await? {
-            targets.push(scope);
+        if wanted && !namespace_ready_on(tx, fence.scope.company, scope.owner).await? {
+            targets.push(scope.owner);
         }
     }
     Ok(targets)
@@ -216,13 +224,21 @@ async fn ready_scopes_on(
     tx: &mut PgConnection,
     fence: WorkflowFence,
     prepared: &PreparedAgent,
-) -> AppResult<(Option<Vec<ScopeAccess>>, Vec<MemoryToolScope>)> {
+) -> AppResult<(Option<Vec<ScopeAccess>>, Vec<MemoryScope>)> {
     let agent = prepared.selection().agent().agent_id.as_uuid();
     let mut scopes = Vec::new();
     let mut not_ready = Vec::new();
-    for (scope, owner) in checkpoints::memory_tools::eligible_on(tx, fence, agent).await? {
-        match super::super::memory_steps::namespace_on(persistence, tx, fence.scope.company, owner)
+    for scope in
+        checkpoints::memory_tools::eligible_on(tx, fence.scope.company, fence.scope.run, agent)
             .await?
+    {
+        match super::super::memory_steps::namespace_on(
+            persistence,
+            tx,
+            fence.scope.company,
+            scope.owner,
+        )
+        .await?
         {
             super::super::memory_steps::Namespace::Ready(namespace, credential) => {
                 scopes.push(ScopeAccess {
@@ -286,6 +302,7 @@ async fn query_on(
 pub(super) async fn freeze_memory_on(
     db: &mut PgConnection,
     fence: WorkflowFence,
+    agent: Uuid,
     fetched: FetchedRecall,
 ) -> AppResult<FrozenMemory> {
     let ceiling = super::super::memory_steps::read_ceiling_for(db, fence).await?;
@@ -303,15 +320,83 @@ pub(super) async fn freeze_memory_on(
         }
         FetchedRecall::Packs { packs, .. } => packs,
     };
+    let eligible =
+        checkpoints::memory_tools::eligible_on(db, fence.scope.company, fence.scope.run, agent)
+            .await?;
+    let owners: Vec<_> = eligible.iter().map(|scope| scope.owner).collect();
+    let Some(ready) =
+        crate::adapters::persistence::memory::ready_for_owners_on(db, fence.scope.company, &owners)
+            .await?
+    else {
+        return Ok(FrozenMemory::without_items(
+            RecallState::Unavailable {
+                code: "not_enabled".into(),
+            },
+            ceiling,
+        ));
+    };
+    for (scope, _) in &packs {
+        let selected = ready
+            .iter()
+            .find(|entry| entry.namespace == scope.namespace)
+            .ok_or_else(crate::application::workflow::scopes::unavailable)?;
+        if !eligible
+            .iter()
+            .any(|entry| entry.owner == selected.owner && entry.label == scope.label)
+        {
+            return Err(crate::application::workflow::scopes::unavailable());
+        }
+    }
+    let memory = assemble_memory(packs, ceiling)?;
+    let scope = fence.scope;
+    super::super::knowledge::raise_content_level_on(
+        db,
+        scope.company,
+        scope.run,
+        memory.exposed_level,
+    )
+    .await?;
+    let refs: Vec<MemoryRecallRef> = memory.items.iter().map(MemoryRecallRef::from).collect();
+    sqlx::query(
+        "INSERT INTO workflow_memory_consumptions (company_id,run_id,execution_id,job_id, \
+           attempt_number,invocation_id,read_ceiling,exposed_level,items,namespace_ids) \
+         VALUES ($1,$2,$3,$4,$5,'00000000-0000-0000-0000-000000000000',$6::smallint,$7::smallint,$8,$9) \
+         ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number,invocation_id) \
+         DO UPDATE SET read_ceiling=EXCLUDED.read_ceiling, exposed_level=EXCLUDED.exposed_level, \
+           items=EXCLUDED.items,namespace_ids=EXCLUDED.namespace_ids",
+    )
+    .bind(scope.company.as_uuid())
+    .bind(scope.run.as_uuid())
+    .bind(scope.execution.as_uuid())
+    .bind(scope.job.0)
+    .bind(fence.attempt.0)
+    .bind(ceiling.as_i16())
+    .bind(memory.exposed_level.as_i16())
+    .bind(serde_json::to_value(&refs).map_err(|_| invalid())?)
+    .bind(memory.namespaces.iter().map(|namespace|namespace.0).collect::<Vec<_>>())
+    .execute(&mut *db)
+    .await?;
+    Ok(memory)
+}
+
+fn assemble_memory(
+    packs: Vec<(RecallNamespace, MemoryPack)>,
+    ceiling: AccessLevel,
+) -> AppResult<FrozenMemory> {
     let level = |value: u8| AccessLevel::try_from(i16::from(value)).map_err(|_| invalid());
     let mut memory = FrozenMemory::without_items(RecallState::Included, ceiling);
     for (scope, pack) in packs {
+        memory.namespaces.push(scope.namespace);
         memory.exposed_level = memory.exposed_level.max(level(pack.exposed_level)?);
         for item in pack.items {
             let access_level = level(item.access_level)?;
             memory.exposed_level = memory.exposed_level.max(access_level);
+            if memory.items.len() >= 64 {
+                continue;
+            }
             memory.items.push(RecalledMemory {
-                scope,
+                namespace: scope.namespace,
+                scope: scope.label.clone(),
                 observation_id: item.observation_id,
                 kind: item.kind,
                 title: item.title,
@@ -329,39 +414,23 @@ pub(super) async fn freeze_memory_on(
             (left, right) => left.or(right),
         };
     }
+    while serde_json::to_vec(&memory).map_err(|_| invalid())?.len()
+        > crate::application::workflow::agent::MAX_RECALL_BYTES as usize
+        && !memory.items.is_empty()
+    {
+        memory.items.pop();
+    }
+    if serde_json::to_vec(&memory).map_err(|_| invalid())?.len()
+        > crate::application::workflow::agent::MAX_RECALL_BYTES as usize
+    {
+        return Err(invalid());
+    }
     if memory.exposed_level > ceiling {
         return Err(AppError::KnowledgeRelease {
             content: memory.exposed_level,
             destination: ceiling,
         });
     }
-    let scope = fence.scope;
-    super::super::knowledge::raise_content_level_on(
-        db,
-        scope.company,
-        scope.run,
-        memory.exposed_level,
-    )
-    .await?;
-    let refs: Vec<MemoryRecallRef> = memory.items.iter().map(MemoryRecallRef::from).collect();
-    sqlx::query(
-        "INSERT INTO workflow_memory_consumptions (company_id,run_id,execution_id,job_id, \
-           attempt_number,invocation_id,read_ceiling,exposed_level,items) \
-         VALUES ($1,$2,$3,$4,$5,'00000000-0000-0000-0000-000000000000',$6::smallint,$7::smallint,$8) \
-         ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number,invocation_id) \
-         DO UPDATE SET read_ceiling=EXCLUDED.read_ceiling, exposed_level=EXCLUDED.exposed_level, \
-           items=EXCLUDED.items",
-    )
-    .bind(scope.company.as_uuid())
-    .bind(scope.run.as_uuid())
-    .bind(scope.execution.as_uuid())
-    .bind(scope.job.0)
-    .bind(fence.attempt.0)
-    .bind(ceiling.as_i16())
-    .bind(memory.exposed_level.as_i16())
-    .bind(serde_json::to_value(&refs).map_err(|_| invalid())?)
-    .execute(&mut *db)
-    .await?;
     Ok(memory)
 }
 
@@ -383,8 +452,13 @@ async fn scopes_on(
     .await?;
     let read_ceiling = super::super::memory_steps::read_ceiling_for(tx, claim.fence).await?;
     let scope = claim.fence.scope;
-    let rows: Vec<Value> = sqlx::query_scalar(
-        "SELECT consumption.items FROM workflow_memory_consumptions AS consumption \
+    #[derive(sqlx::FromRow)]
+    struct Consumption {
+        items: Value,
+        namespace_ids: Vec<Uuid>,
+    }
+    let rows:Vec<Consumption> = sqlx::query_as(
+        "SELECT consumption.items,consumption.namespace_ids FROM workflow_memory_consumptions AS consumption \
          WHERE consumption.company_id=$1 AND consumption.run_id=$2 \
            AND consumption.execution_id=$3 AND consumption.job_id=$4 \
            AND consumption.invocation_id <> '00000000-0000-0000-0000-000000000000'",
@@ -396,15 +470,24 @@ async fn scopes_on(
     .fetch_all(&mut **tx)
     .await?;
     let mut tool_items = Vec::new();
-    for items in rows {
-        let items: Vec<MemoryRecallRef> = serde_json::from_value(items).map_err(|_| invalid())?;
+    let mut tool_namespaces = std::collections::BTreeSet::new();
+    for row in rows {
+        tool_namespaces.extend(
+            row.namespace_ids
+                .into_iter()
+                .map(crate::application::memory::NamespaceExternalId),
+        );
+        let items: Vec<MemoryRecallRef> =
+            serde_json::from_value(row.items).map_err(|_| invalid())?;
         tool_items.extend(items);
     }
-    if tool_items.is_empty() && !candidate.prepared.binds_memory() {
+    let tool_namespaces: Vec<_> = tool_namespaces.into_iter().collect();
+    if tool_items.is_empty() && tool_namespaces.is_empty() && !candidate.prepared.binds_memory() {
         return Ok(Revalidation {
             read_ceiling,
             scopes: Vec::new(),
             tool_items,
+            tool_namespaces,
         });
     }
     let (scopes, _) = ready_scopes_on(persistence, tx, claim.fence, &candidate.prepared).await?;
@@ -412,5 +495,59 @@ async fn scopes_on(
         read_ceiling,
         scopes: scopes.unwrap_or_default(),
         tool_items,
+        tool_namespaces,
     })
+}
+
+#[cfg(test)]
+mod freeze_bounds {
+    use super::*;
+    use crate::application::memory::{MemoryPackItem, NamespaceExternalId};
+
+    #[test]
+    fn memory_preparation_frozen_byte_bound_preserves_whole_items_and_the_carried_label() {
+        let pack = MemoryPack {
+            items: (0..60)
+                .map(|_| MemoryPackItem {
+                    observation_id: uuid::Uuid::new_v4(),
+                    kind: "fact".into(),
+                    title: "Whole item".into(),
+                    text: "x".repeat(2000),
+                    occurred_at: chrono::Utc::now(),
+                    access_level: 2,
+                    revision: 1,
+                    content_sha256: "a".repeat(64),
+                    sources_sha256: "b".repeat(64),
+                })
+                .collect(),
+            exposed_level: 7,
+            pack_digest: "c".repeat(64),
+            token_count: 8192,
+            valid_until: None,
+            omitted: 0,
+        };
+        let memory = assemble_memory(
+            vec![(
+                RecallNamespace {
+                    namespace: NamespaceExternalId(uuid::Uuid::new_v4()),
+                    label: "unit:example".into(),
+                },
+                pack,
+            )],
+            AccessLevel::L8,
+        )
+        .unwrap();
+        assert!(!memory.items.is_empty());
+        assert!(memory.items.len() < 60);
+        assert!(memory.items.iter().all(|item| item.text.len() == 2000));
+        assert!(
+            serde_json::to_vec(&memory).unwrap().len()
+                <= crate::application::workflow::agent::MAX_RECALL_BYTES as usize
+        );
+        assert_eq!(
+            memory.exposed_level,
+            AccessLevel::L7,
+            "trimming facts cannot lower the label already exposed by the service"
+        );
+    }
 }

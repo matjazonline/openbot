@@ -250,6 +250,16 @@ pub(super) async fn candidate_on(
         .await?;
         prepared = prepared.with_department(department)?;
     }
+    if facts.kind == ModelStep::AgentRun {
+        let scopes = super::super::run_scopes::context_on(
+            tx,
+            claim.fence.scope.company,
+            claim.fence.scope.run,
+            prepared.selection().agent().agent_id,
+        )
+        .await?;
+        prepared = prepared.with_scope_context(Some(scopes))?;
+    }
     let context = if agent_history_eligible(facts.kind) {
         let action = ActionScope {
             company: claim.fence.scope.company,

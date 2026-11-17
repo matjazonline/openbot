@@ -1,0 +1,133 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4m 24s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 59 tests
+test adapters::persistence::agent_authoring::catalog::memory_tests::memory_scope_catalog_offers_memory_tools_only_while_enabled ... ok
+test adapters::memory_service::tests::subject::memory_scope_subject_admin_never_treats_foreign_management_as_an_empty_page ... ok
+test adapters::memory_service::tests::memory_scope_foreign_managed_tenant_is_conflict_on_create_and_not_found_on_delete ... ok
+test adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion ... FAILED
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_fences_stolen_and_superseded_claims ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_competing_claimants_get_distinct_rows ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_deleted_tenant_conflict_mints_no_new_namespaces ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_company_delete_creates_then_deletes_and_only_a_200_completes ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_failed_provisioning_is_redriven_not_permanent ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_deletion_survives_an_outage ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_completion_racing_company_delete_is_lost ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_mismatch_refuses_tenant_and_namespace_deletion ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_disable_and_enable_follow_the_desired_state ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_foreign_managed_tenant_never_completes_deletion ... ok
+test adapters::http::routes::workflows::ui::authoring::tests::memory_tests::memory_scope_company_settings_form_is_owner_admin_only_and_revision_checked ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_refuses_a_changed_provisioner_credential_id ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_revokes_strays_and_removes_an_absent_namespace ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_superseded_generation_starts_a_fresh_attempt_budget ... ok
+test adapters::persistence::memory::lifecycle_tests::memory_scope_reconciler_turns_present_into_absent_when_the_owner_is_gone ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_existing_principal_upsert_and_delete_compete_in_both_orders ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_principal_creation_and_rollback_are_atomic ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_lifecycle_units_create_reparent_membership_retire_and_recreate ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_delivery_retains_target_and_subject_provenance ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_shape_rejects_foreign_ineligible_mismatched_and_duplicate_owners ... ok
+test adapters::persistence::memory::scope_owner_tests::memory_scope_subject_namespace_pages_include_retiring_units_and_exclude_principals ... ok
+test adapters::persistence::memory::tests::memory_scope_account_deletion_retires_owned_tenants_and_member_namespaces ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_lazy_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_disable_enable_and_provisioning_serialize ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_member_removal_and_provisioning_serialize_in_both_orders ... ok
+test adapters::persistence::memory::tests::memory_scope_lazy_provisioning_maps_scopes_and_refuses_missing_identities ... ok
+test adapters::persistence::memory::tests::memory_scope_lazy_redrive_skips_definite_failures_and_replaces_a_conflict ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_lease_checks_refuse_incoherent_rows ... ok
+test adapters::persistence::memory::tests::memory_scope_lifecycle_resurrection_is_refused ... ok
+test adapters::persistence::memory::tests::memory_scope_owner_or_admin_opt_in_with_revision_and_disable_epoch ... ok
+test adapters::persistence::memory::tests::memory_scope_owner_removal_retires_namespaces_and_upserts_absent_lifecycles ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_account_deletion_and_company_delete_never_deadlock ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_agent_delete_and_company_delete_never_deadlock ... ok
+test adapters::persistence::memory::tests::memory_scope_returning_member_gets_a_new_namespace_id ... ok
+test adapters::persistence::memory::tests::memory_scope_competing_company_delete_and_enable_serialize_in_both_orders ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels ... ok
+test application::workflow::memory_tools::builtin::tests::memory_scope_builtin_snapshots_are_reserved_and_exactly_trusted ... ok
+test application::workflow::memory_tools::builtin::tests::memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds ... FAILED
+test application::workflow::memory_tools::builtin::tests::memory_scope_user_scope_eligibility_matrix ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tool_arguments_parse_strictly_with_documented_defaults ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tools_query_proofs_bind_empty_results_and_exact_namespace_references ... ok
+test application::workflow::registry::runtime_tests::memory_scope_step_scope_must_be_a_literal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_authoring_catalog_lists_memory_tools_only_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_memory_tools_publish_only_while_memory_is_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data ... FAILED
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace ... FAILED
+test adapters::persistence::workflow::tests::message_tests::memory_scope_a_manual_run_in_a_channel_has_no_user_scope ... ok
+
+failures:
+
+---- adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion stdout ----
+
+thread 'adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion' (30342837) panicked at src/adapters/memory_service/subject_tests.rs:29:53:
+called `Result::unwrap()` on an `Err` value: NotFound
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- application::workflow::memory_tools::builtin::tests::memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds stdout ----
+
+thread 'application::workflow::memory_tools::builtin::tests::memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds' (30345674) panicked at src/application/workflow/memory_tools/builtin_tests.rs:50:5:
+assertion failed: valid(&search, &json!({"query":"x","scopes":["company","user"],"limit":10}))
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope' (30345342) panicked at src/adapters/persistence/workflow/agent_history_children_integration_tests.rs:61:14:
+called `Result::unwrap()` on an `Err` value: WorkflowFailure { failure: StepFailure { knowledge_refusal: None, class: Retryable, code: FailureCode("agent.unresolved"), diagnostic: None }, safety: SafeToRetry }
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled' (30345364) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready' (30345430) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session' (30345449) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls' (30345457) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data' (30345488) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace' (30345598) panicked at src/adapters/persistence/workflow/knowledge_search_support.rs:191:39:
+called `Result::unwrap()` on an `Err` value: "unused required exchanges: completed 0 of 1"
+
+
+failures:
+    adapters::memory_service::tests::subject::memory_scope_subject_admin_uses_exact_provenance_and_reports_ambiguous_deletion
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_agent_memory_tools_refuse_once_memory_is_disabled
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_unprovisioned_scope_is_requested_and_refuses_not_ready
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace
+    application::workflow::memory_tools::builtin::tests::memory_scope_tool_inputs_carry_no_authority_and_enforce_their_bounds
+
+test result: FAILED. 50 passed; 9 failed; 0 ignored; 0 measured; 4712 filtered out; finished in 28.78s
+
+error: test failed, to rerun pass `--lib`

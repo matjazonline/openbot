@@ -340,6 +340,20 @@ impl Store for StaticStore {
     async fn set_tenant_cap(&self, _: Actor, _: &str, _: u64) -> Result<TenantView, ServiceError> {
         Err(down())
     }
+    async fn list_subject(
+        &self,
+        _: Actor,
+        _: &SubjectListRequest,
+    ) -> Result<SubjectPage, ServiceError> {
+        Err(down())
+    }
+    async fn delete_subject(
+        &self,
+        _: Actor,
+        _: &SubjectDeleteRequest,
+    ) -> Result<SubjectDeleted, ServiceError> {
+        Err(down())
+    }
     async fn create_namespace(
         &self,
         _: Actor,

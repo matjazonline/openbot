@@ -38,6 +38,9 @@ pub(super) async fn restore_on(
         serde_json::from_value(saved["department"].clone()).map_err(|_| invalid())?;
     let prepared = prepared
         .with_department(department)?
+        .with_scope_context(
+            serde_json::from_value(saved["scope_context"].clone()).map_err(|_| invalid())?,
+        )?
         .with_frozen_history(history)?;
     if serde_json::to_value(&prepared).map_err(|_| invalid())? != saved {
         return Err(AppError::Conflict(
@@ -65,7 +68,9 @@ pub(super) async fn freeze_on(
     let prepared = prepared.with_capture(capture);
     let prepared = match recall {
         Some(fetched) if prepared.binds_memory() => {
-            prepared.with_memory(super::recall::freeze_memory_on(db, fence, fetched).await?)?
+            let memory =
+                super::recall::freeze_memory_on(db, fence, prepared.agent_id(), fetched).await?;
+            prepared.with_memory(memory)?
         }
         _ => prepared,
     };

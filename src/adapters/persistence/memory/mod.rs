@@ -9,7 +9,9 @@ mod owners;
 mod retention;
 mod tenants;
 
-pub(crate) use namespaces::{columns as namespace_columns, ensure_on, retire_namespaces_on};
+pub(crate) use namespaces::{
+    columns as namespace_columns, ensure_on, ready_for_owners_on, retire_namespaces_on,
+};
 pub(crate) use owners::{agent_principal_on, person_principal_on};
 pub(crate) use tenants::retire_company_on;
 

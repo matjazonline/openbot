@@ -50,6 +50,107 @@ async fn lock_owner(
     )
 }
 
+impl super::super::PostgresPersistence {
+    /// Operator cleanup includes retiring unit namespaces, and never principal
+    /// namespaces. A missing company is an error, rather than an empty success.
+    pub async fn memory_unit_namespace_page(
+        &self,
+        company: crate::domain::workflow::CompanyId,
+        after: Option<Uuid>,
+    ) -> AppResult<Vec<crate::application::memory::NamespaceExternalId>> {
+        let exists: bool = sqlx::query_scalar("SELECT EXISTS(SELECT 1 FROM companies WHERE id=$1)")
+            .bind(company.as_uuid())
+            .fetch_one(&self.pool)
+            .await?;
+        if !exists {
+            return Err(AppError::NotFound("Memory company".into()));
+        }
+        let ids: Vec<Uuid> = sqlx::query_scalar(
+            "SELECT id FROM memory_namespaces
+            WHERE company_id=$1 AND scope_kind='unit' AND ($2::uuid IS NULL OR id>$2)
+            ORDER BY id LIMIT 100",
+        )
+        .bind(company.as_uuid())
+        .bind(after)
+        .fetch_all(&self.pool)
+        .await?;
+        Ok(ids
+            .into_iter()
+            .map(crate::application::memory::NamespaceExternalId)
+            .collect())
+    }
+}
+
+pub(crate) struct ReadyNamespace {
+    pub namespace: crate::application::memory::NamespaceExternalId,
+    pub owner: NamespaceOwner,
+}
+
+/// Caller owns its company/run authority prefix. Keep tenant before namespaces,
+/// just as ordinary reads do, and never confuse a retired owner with provisioning.
+pub(crate) async fn ready_for_owners_on(
+    db: &mut PgConnection,
+    company: crate::domain::workflow::CompanyId,
+    owners: &[NamespaceOwner],
+) -> AppResult<Option<Vec<ReadyNamespace>>> {
+    let enabled: Option<bool> = sqlx::query_scalar(
+        "SELECT state='enabled' FROM memory_tenants WHERE company_id=$1 FOR SHARE",
+    )
+    .bind(company.as_uuid())
+    .fetch_optional(&mut *db)
+    .await?;
+    if enabled != Some(true) {
+        return Ok(None);
+    }
+    let units: Vec<_> = owners
+        .iter()
+        .filter_map(|owner| match owner {
+            NamespaceOwner::Unit(id) => Some(id.as_uuid()),
+            _ => None,
+        })
+        .collect();
+    let principals: Vec<_> = owners
+        .iter()
+        .filter_map(|owner| match owner {
+            NamespaceOwner::Principal(id) => Some(id.as_uuid()),
+            _ => None,
+        })
+        .collect();
+    #[derive(sqlx::FromRow)]
+    struct Row {
+        id: Uuid,
+        unit_id: Option<Uuid>,
+        principal_id: Option<Uuid>,
+    }
+    let rows:Vec<Row>=sqlx::query_as("SELECT namespace.id,namespace.unit_id,namespace.principal_id FROM memory_namespaces AS namespace
+        WHERE namespace.company_id=$1 AND namespace.state='ready'
+            AND ((namespace.scope_kind='unit' AND namespace.unit_id=ANY($2) AND EXISTS(
+                SELECT 1 FROM departments AS owner WHERE owner.company_id=namespace.company_id AND owner.id=namespace.unit_id))
+            OR (namespace.scope_kind='principal' AND namespace.principal_id=ANY($3) AND EXISTS(
+                SELECT 1 FROM principals AS owner WHERE owner.company_id=namespace.company_id AND owner.id=namespace.principal_id AND owner.kind IN ('person','agent'))))
+        ORDER BY namespace.id FOR SHARE OF namespace")
+        .bind(company.as_uuid()).bind(units).bind(principals).fetch_all(db).await?;
+    let ready = rows
+        .into_iter()
+        .map(|row| {
+            let owner = match (row.unit_id, row.principal_id) {
+                (Some(id), None) => {
+                    NamespaceOwner::Unit(crate::entities::department::DepartmentId::new(id))
+                }
+                (None, Some(id)) => {
+                    NamespaceOwner::Principal(crate::entities::transport::PrincipalId::new(id))
+                }
+                _ => return Err(AppError::Internal("Invalid memory namespace owner".into())),
+            };
+            Ok(ReadyNamespace {
+                namespace: crate::application::memory::NamespaceExternalId(row.id),
+                owner,
+            })
+        })
+        .collect::<AppResult<_>>()?;
+    Ok(Some(ready))
+}
+
 pub(crate) async fn ensure_on(
     db: &mut PgConnection,
     company: Uuid,

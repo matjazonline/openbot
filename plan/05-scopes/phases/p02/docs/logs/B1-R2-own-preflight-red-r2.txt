@@ -1,0 +1,29 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 13s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 2 tests
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_accepts_a_real_desk_context ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects ... FAILED
+
+failures:
+
+---- adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects stdout ----
+
+thread 'adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects' (30779002) panicked at src/adapters/persistence/workflow/autonomous_memory_scope_tests.rs:59:5:
+root admission must refuse before any effect: Ok(Created(RunId(c5aeb1cd-35f3-4da6-8d67-25af90cd5a99)))
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::memory_scopes::memory_scope_admission_agent_workflow_tool_own_refuses_before_root_effects
+
+test result: FAILED. 1 passed; 1 failed; 0 ignored; 0 measured; 4785 filtered out; finished in 2.63s
+
+error: test failed, to rerun pass `--lib`

@@ -8,20 +8,21 @@ use super::*;
 use crate::adapters::persistence::credentials::CredentialContext;
 use crate::adapters::persistence::memory::deliveries::{self, SaveEnqueue, SaveIntent};
 use crate::application::memory::{
-    ClientCredential, MemoryDetail, MemoryNamespaces, MemorySaveReceipt, NamespaceExternalId,
-    NamespaceOwner, TenantExternalId,
+    ClientCredential, MemoryNamespaces, MemorySaveReceipt, NamespaceExternalId, NamespaceOwner,
+    TenantExternalId,
 };
 use crate::application::workflow::{
     actions::ActionScope,
     activation::ActivationRequest,
     lease::{ClaimedWorkflow, LeasePolicy},
     memory::{
-        LOAD, LoadAuthority, LoadAuthorization, MemoryStepScope, SAVE, SavePark, UnitSelector,
+        LOAD, LoadAuthority, LoadAuthorization, MemoryLoadObservation, MemoryStepScope, SAVE,
+        SavePark, UnitSelector,
     },
     polling::WorkflowStepKind,
 };
 use crate::entities::access_level::AccessLevel;
-use serde_json::{Value, json};
+use serde_json::Value;
 
 fn bound(name: &'static str, claim: &ClaimedWorkflow) -> AppResult<WriteBound> {
     let policy = LeasePolicy::new(std::time::Duration::from_secs(6))?;
@@ -47,58 +48,87 @@ fn action(claim: &ClaimedWorkflow) -> ActionScope {
 
 /// The step's literal scope, its agent resolved against the frozen bundle (E4).
 fn step_scope(bundle: &PublishedBundle, inputs: &Value) -> AppResult<MemoryStepScope> {
-    match inputs["scope"]["kind"].as_str() {
-        Some("company") => Ok(MemoryStepScope::Unit(UnitSelector::Root)),
-        Some("agent") => {
-            let key = inputs["scope"]["agent"].as_str().ok_or_else(invalid)?;
-            bundle
-                .snapshots()
-                .agents
-                .iter()
-                .find(|agent| agent.key.as_str() == key)
-                .map(|agent| MemoryStepScope::Agent(agent.agent_id.as_uuid()))
-                .ok_or_else(|| {
-                    AppError::BadRequest("Memory scope agent is not in this bundle".into())
-                })
-        }
-        _ => Err(invalid()),
+    let scope = inputs["scope"]
+        .as_object()
+        .filter(|scope| scope.len() == 1)
+        .ok_or_else(invalid)?;
+    if let Some(unit) = scope.get("unit") {
+        return match unit.as_str() {
+            Some("own") => Ok(MemoryStepScope::Unit(UnitSelector::Own)),
+            Some("root") => Ok(MemoryStepScope::Unit(UnitSelector::Root)),
+            _ => Err(invalid()),
+        };
     }
+    let key = scope
+        .get("agent")
+        .and_then(Value::as_str)
+        .ok_or_else(invalid)?;
+    bundle
+        .snapshots()
+        .agents
+        .iter()
+        .find(|agent| agent.key.as_str() == key)
+        .map(|agent| MemoryStepScope::Agent(agent.agent_id.as_uuid()))
+        .ok_or_else(|| AppError::BadRequest("Memory scope agent is not in this bundle".into()))
 }
 
-pub(super) async fn step_owner_on(
+pub(super) struct StepScopeAccess {
+    pub owner: NamespaceOwner,
+    pub label: String,
+    pub writable: bool,
+}
+
+pub(super) async fn step_scope_access_on(
     db: &mut PgConnection,
     scope: ActivationRequest,
     selector: MemoryStepScope,
-) -> AppResult<NamespaceOwner> {
+) -> AppResult<StepScopeAccess> {
     match selector {
-        MemoryStepScope::Unit(UnitSelector::Root) => Ok(NamespaceOwner::Unit(
-            crate::adapters::persistence::company::root_on(db, scope.company).await?,
-        )),
-        MemoryStepScope::Unit(UnitSelector::Own) => {
-            // Role admission already captures the desk/direct target's exact department.
-            // Never infer `own` from the live tree while an admitted run executes.
-            let unit: Option<Uuid> = sqlx::query_scalar(
-                "SELECT manifest.role_context_department_id FROM run_dependency_manifests AS ownership \
-                 JOIN agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id \
-                 WHERE ownership.company_id=$1 AND ownership.run_id=$2",
-            ).bind(scope.company.as_uuid()).bind(scope.run.as_uuid())
-                .fetch_optional(db).await?.flatten();
-            unit.map(crate::entities::department::DepartmentId::new)
-                .map(NamespaceOwner::Unit)
-                .ok_or_else(|| AppError::NotFound("Memory own-unit scope is unavailable".into()))
+        MemoryStepScope::Unit(selector) => {
+            let root = crate::adapters::persistence::company::root_on(db, scope.company).await?;
+            let rows = super::run_scopes::rows_on(db, scope.company, scope.run, None).await?;
+            let read = rows
+                .iter()
+                .find(|row| {
+                    row.access == "read"
+                        && match selector {
+                            UnitSelector::Own => row.own,
+                            UnitSelector::Root => row.unit_id == Some(root.as_uuid()),
+                        }
+                })
+                .ok_or_else(crate::application::workflow::scopes::unavailable)?;
+            let unit = read.unit_id.ok_or_else(invalid)?;
+            Ok(StepScopeAccess {
+                owner: NamespaceOwner::Unit(crate::entities::department::DepartmentId::new(unit)),
+                label: format!("unit:{}", read.unit_slug.as_deref().ok_or_else(invalid)?),
+                writable: rows
+                    .iter()
+                    .any(|row| row.access == "write" && row.unit_id == Some(unit)),
+            })
         }
-        MemoryStepScope::Agent(agent) => Ok(NamespaceOwner::Principal(
-            crate::adapters::persistence::memory::agent_principal_on(
+        MemoryStepScope::Agent(agent) => {
+            let principal = crate::adapters::persistence::memory::agent_principal_on(
                 db,
                 scope.company.as_uuid(),
                 agent,
             )
-            .await?,
-        )),
+            .await?;
+            let rows =
+                super::run_scopes::rows_on(db, scope.company, scope.run, Some(principal)).await?;
+            if !rows.iter().any(|row| {
+                row.access == "personal" && row.principal_id == Some(principal.as_uuid())
+            }) {
+                return Err(crate::application::workflow::scopes::unavailable());
+            }
+            Ok(StepScopeAccess {
+                owner: NamespaceOwner::Principal(principal),
+                label: "personal".into(),
+                writable: true,
+            })
+        }
     }
 }
 
-/// Opened under the fence: the tenant must be enabled and the scope's namespace ready.
 pub(super) enum Namespace {
     Ready(NamespaceExternalId, ClientCredential),
     NotReady,
@@ -113,6 +143,15 @@ pub(super) async fn namespace_on(
     company: CompanyId,
     owner: NamespaceOwner,
 ) -> AppResult<Namespace> {
+    let live=match owner {
+        NamespaceOwner::Unit(unit)=>sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM departments WHERE company_id=$1 AND id=$2)")
+            .bind(company.as_uuid()).bind(unit.as_uuid()).fetch_one(&mut *db).await?,
+        NamespaceOwner::Principal(principal)=>sqlx::query_scalar::<_,bool>("SELECT EXISTS(SELECT 1 FROM principals WHERE company_id=$1 AND id=$2 AND kind IN ('person','agent'))")
+            .bind(company.as_uuid()).bind(principal.as_uuid()).fetch_one(&mut *db).await?,
+    };
+    if !live {
+        return Err(crate::application::workflow::scopes::unavailable());
+    }
     let enabled: Option<bool> = sqlx::query_scalar(
         "SELECT tenant.state = 'enabled' FROM memory_tenants AS tenant \
          WHERE tenant.company_id=$1 FOR SHARE",
@@ -205,7 +244,8 @@ async fn authorize_on(
     live(tx, claim, bound).await?;
     let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(LOAD.into())).await?;
     let scope = step_scope(&facts.bundle, &inputs)?;
-    let owner = step_owner_on(tx, claim.fence.scope, scope).await?;
+    let access = step_scope_access_on(tx, claim.fence.scope, scope).await?;
+    let owner = access.owner;
     let read_ceiling = read_ceiling_on(tx, claim).await?;
     let query = inputs["query"].as_str().ok_or_else(invalid)?.to_owned();
     let limit = inputs["limit"]
@@ -218,7 +258,7 @@ async fn authorize_on(
             Namespace::NotReady => LoadAuthorization::NotReady(owner),
             Namespace::Ready(namespace, credential) => {
                 LoadAuthorization::Ready(Box::new(LoadAuthority {
-                    scope,
+                    scope_label: access.label,
                     namespace,
                     credential,
                     read_ceiling,
@@ -233,9 +273,7 @@ async fn authorize_on(
 async fn observe_on(
     tx: &mut Transaction<'_, Postgres>,
     claim: &ClaimedWorkflow,
-    used: AccessLevel,
-    exposed: AccessLevel,
-    items: &[MemoryDetail],
+    observation: &MemoryLoadObservation<'_>,
     bound: &WriteBound,
 ) -> AppResult<()> {
     let facts = runtime::facts(tx, action(claim)).await?;
@@ -243,35 +281,53 @@ async fn observe_on(
         return Err(ownership_lost());
     }
     live(tx, claim, bound).await?;
-    runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(LOAD.into())).await?;
-    // The answer must stay within the ceiling the request was authorized at (E6).
-    if exposed > used
-        || items
-            .iter()
-            .any(|item| i16::from(item.access_level) > used.as_i16())
+    let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(LOAD.into())).await?;
+    let access =
+        step_scope_access_on(tx, claim.fence.scope, step_scope(&facts.bundle, &inputs)?).await?;
+    let ready = crate::adapters::persistence::memory::ready_for_owners_on(
+        tx,
+        claim.fence.scope.company,
+        &[access.owner],
+    )
+    .await?
+    .ok_or_else(|| AppError::BadRequest("memory.not_enabled".into()))?;
+    if !ready
+        .iter()
+        .any(|entry| entry.namespace == observation.namespace)
     {
+        return Err(crate::application::workflow::scopes::unavailable());
+    }
+    let used = observation.read_ceiling;
+    let items = observation.items;
+    let carried = crate::application::workflow::memory::carried_level(observation.exposed, items)
+        .ok_or_else(invalid)?;
+    let ceiling = used.min(read_ceiling_on(tx, claim).await?);
+    if carried > ceiling {
         return Err(AppError::KnowledgeRelease {
-            content: exposed.max(used),
-            destination: used,
+            content: carried,
+            destination: ceiling,
         });
     }
     let scope = claim.fence.scope;
     // The answer's own label and every returned item's (review F11), the same level the step
     // output reports.
-    let carried =
-        crate::application::workflow::memory::carried_level(exposed, items).ok_or_else(invalid)?;
     knowledge::raise_content_level_on(tx, scope.company, scope.run, carried).await?;
-    let refs: Vec<Value> = items
+    let refs = items
         .iter()
-        .map(|item| json!({"id": item.observation_id, "revision": item.revision, "content_sha256": item.content_sha256}))
-        .collect();
+        .map(|item| {
+            crate::application::workflow::memory_tools::MemoryRecallRef::detail(
+                observation.namespace,
+                item,
+            )
+        })
+        .collect::<AppResult<Vec<_>>>()?;
     sqlx::query(
         "INSERT INTO workflow_memory_consumptions (company_id,run_id,execution_id,job_id, \
-           attempt_number,invocation_id,read_ceiling,exposed_level,items) \
-         VALUES ($1,$2,$3,$4,$5,'00000000-0000-0000-0000-000000000000',$6::smallint,$7::smallint,$8) \
+           attempt_number,invocation_id,read_ceiling,exposed_level,items,namespace_ids) \
+         VALUES ($1,$2,$3,$4,$5,'00000000-0000-0000-0000-000000000000',$6::smallint,$7::smallint,$8,$9) \
          ON CONFLICT (company_id,run_id,execution_id,job_id,attempt_number,invocation_id) \
          DO UPDATE SET read_ceiling=EXCLUDED.read_ceiling, exposed_level=EXCLUDED.exposed_level, \
-           items=EXCLUDED.items",
+           items=EXCLUDED.items,namespace_ids=EXCLUDED.namespace_ids",
     )
     .bind(scope.company.as_uuid())
     .bind(scope.run.as_uuid())
@@ -280,7 +336,8 @@ async fn observe_on(
     .bind(claim.fence.attempt.0)
     .bind(used.as_i16())
     .bind(carried.as_i16())
-    .bind(Value::Array(refs))
+    .bind(serde_json::to_value(refs).map_err(|_|invalid())?)
+    .bind(vec![observation.namespace.0])
     .execute(&mut **tx)
     .await?;
     live(tx, claim, bound).await
@@ -298,7 +355,11 @@ async fn park_on(
     live(tx, claim, bound).await?;
     let inputs = runtime::frozen_inputs(tx, &facts, claim, &WorkflowStepKind(SAVE.into())).await?;
     let step = step_scope(&facts.bundle, &inputs)?;
-    let owner = step_owner_on(tx, claim.fence.scope, step).await?;
+    let access = step_scope_access_on(tx, claim.fence.scope, step).await?;
+    if !access.writable {
+        return Err(crate::application::workflow::scopes::unavailable());
+    }
+    let owner = access.owner;
     let facts_text: Vec<String> = inputs["facts"]
         .as_array()
         .ok_or_else(invalid)?
@@ -309,6 +370,10 @@ async fn park_on(
     let wait = Uuid::new_v4();
     // One logical save per execution: its key survives every retry of this step (E4).
     let key = format!("ob.s.{}", scope.execution.as_uuid().simple());
+    let producer: Uuid = sqlx::query_scalar("SELECT principal.id FROM workflow_runs AS run
+        JOIN principals AS principal ON principal.company_id=run.company_id AND principal.user_id=run.actor_id
+            AND principal.kind='person' WHERE run.company_id=$1 AND run.id=$2")
+        .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).fetch_one(&mut **tx).await?;
     let intent = SaveIntent {
         company: scope.company,
         run: scope.run,
@@ -318,6 +383,8 @@ async fn park_on(
         scope: owner,
         key: &key,
         facts: &facts_text,
+        producer: crate::entities::transport::PrincipalId::new(producer),
+        subject: None,
         external_sources: Vec::new(),
     };
     match deliveries::enqueue_save_on(tx, &intent).await? {
@@ -413,16 +480,14 @@ impl crate::application::workflow::memory::MemoryStepStore for PostgresPersisten
     async fn observe_memory_load(
         &self,
         claim: &ClaimedWorkflow,
-        read_ceiling: AccessLevel,
-        exposed: AccessLevel,
-        items: &[MemoryDetail],
+        observation: &MemoryLoadObservation<'_>,
     ) -> AppResult<()> {
         let bound = bound("memory.consume", claim)?;
         let attempt = bound
             .attempt(Box::pin(async {
                 let mut conn = bound.acquire(&self.pool).await?;
                 let mut tx = bound.begin(&mut conn).await?;
-                let result = observe_on(&mut tx, claim, read_ceiling, exposed, items, &bound)
+                let result = observe_on(&mut tx, claim, observation, &bound)
                     .await
                     .map(End::Commit);
                 bound.end(tx, result).await

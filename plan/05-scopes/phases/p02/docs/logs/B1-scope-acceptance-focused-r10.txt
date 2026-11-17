@@ -1,0 +1,41 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 36s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 28 tests
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::subject_visibility::memory_scope_tools_subject_visibility_accepts_current_thread_externals_and_refuses_other_threads ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_company_wide_own_binding_refuses_activation ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_ancestor_read_never_authorizes_a_root_save_effect ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_active_own_binding_refuses_zero_or_ambiguous_placement ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_same_agent_on_two_desks_keeps_their_local_units_separate ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_child_seal_rejects_a_corrupted_copy_and_rolls_back_before_retry ... ok
+test application::workflow::memory_tools::runtime::tests::memory_scope_tools_query_proofs_bind_empty_results_and_exact_namespace_references ... ok
+test application::workflow::publication::tests::agent_tests::history_preparation::memory_scope_tools_host_context_is_frozen_and_counts_before_history ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_absent_or_ambiguous_placement_is_readonly_root ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_chain_local_writes_and_only_the_acting_leads_direct_children ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_depth_cycle_chain_metadata_and_read_budget_fail_early ... ok
+test application::workflow::scopes::tests::run_scopes_resolve_overlapping_report_and_chain_is_one_unit_with_both_relations ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_scope_a_manual_roots_child_inherits_the_user_scope ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::capture::memory_capture_an_accepted_private_session_exchange_is_captured_for_its_creator ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_bounds_consumption_across_ready_namespaces ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_automatic_freeze_refuses_a_foreign_namespace_even_for_an_empty_pack ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_details_reject_a_namespace_outside_the_snapshot_before_service_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_empty_read_retains_namespace_authority_and_refusal_cannot_replay_revoked_data ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_preparation_freezes_host_scopes_before_provider_calls ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::scopes::memory_scope_tools_subject_is_frozen_with_the_producer_and_never_selects_the_target_namespace ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_real_child_keeps_historical_report_ids_and_labels_after_rename_or_delete ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::memory_scope_user_memory_requires_the_actors_own_manual_session ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 4757 filtered out; finished in 15.75s
+

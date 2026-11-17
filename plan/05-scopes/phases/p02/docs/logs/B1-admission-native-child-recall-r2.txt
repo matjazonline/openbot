@@ -1,0 +1,51 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan03-04)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1m 27s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/thr_jt43h4qc8d/target/debug/deps/open_bots-02d27053f1db6889)
+
+running 25 tests
+test adapters::memory_service::tests::memory_preparation_adapter_packs_and_validates_through_the_contract ... ok
+test adapters::memory_service::tests::memory_preparation_two_concurrent_recalls_in_one_company_both_succeed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_recall_past_its_deadline_continues_without_memory ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_children_same_agent_private_branch_completes_without_parent_transcript ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_seal_refuses_updates_deletes_late_rows_and_missing_or_foreign_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_freezes_per_actor_reports_and_retained_labels ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::agent_history_level_child_branch_inherits_content_and_result_taints_parent ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_changed_ceiling_discards_the_fetched_pack_unseen ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::memory_scope_admission_step_own_uses_the_captured_department ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_competing_append_and_seal_share_the_run_mutex ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::memory_capture_a_child_branch_is_never_captured ... ok
+test application::workflow::memory_recall::tests::memory_preparation_namespace_metadata_stays_below_its_budget_at_the_scope_limit ... ok
+test application::workflow::memory_recall::tests::memory_preparation_optional_failures_are_distinct_from_refusals ... ok
+test application::workflow::memory_recall::tests::memory_preparation_recall_budget_shares ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::scopes::memory_scope_admission_same_agent_on_two_desks_keeps_their_local_units_separate ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_attempt_replays_the_pack_and_validates_once ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_resumed_pack_without_a_configured_service_is_unavailable ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::autonomous_graph::descendants::history_integration::scope_snapshots::memory_scope_admission_real_child_keeps_historical_report_ids_and_labels_after_rename_or_delete ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_freezes_a_ceilinged_pack_into_the_untrusted_context ... ok
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes ... FAILED
+test adapters::persistence::workflow::tests::local_agent_tests::native_mcp::native_mcp_workflow_created_origin_obeys_original_knowledge_ceiling_and_parent_run_locks ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_a_revoked_or_unverifiable_pack_stops_the_resumed_attempt ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_optional_unavailability_continues_and_refusal_fails_closed ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_recall_applies_only_to_memory_search_agents_while_enabled ... ok
+test adapters::persistence::workflow::tests::http_tests::agent_runtime_tests::knowledge_search::memory_tools::recall::memory_preparation_resumed_attempts_revalidate_recorded_tool_items ... ok
+
+failures:
+
+---- adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes stdout ----
+
+thread 'adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes' (30503279) panicked at src/adapters/persistence/workflow/local_agent_graph_support.rs:21:10:
+called `Result::unwrap()` on an `Err` value: Validation(Diagnostic { code: "memory.unknown_agent", message: "A memory scope agent must be an agent this workflow runs", field_path: "/steps/later/with/scope/agent", span: SourceSpan { start: 310, end: 331, line: 1, column: 311 }, instance_path: None, schema_path: None })
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    adapters::persistence::workflow::tests::local_agent_tests::native_mcp::scopes::memory_scope_admission_native_workflow_keeps_the_source_projection_after_placement_changes
+
+test result: FAILED. 24 passed; 1 failed; 0 ignored; 0 measured; 4752 filtered out; finished in 18.02s
+
+error: test failed, to rerun pass `--lib`

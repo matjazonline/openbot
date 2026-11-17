@@ -17,6 +17,7 @@ async fn autonomous_agent_admission_capacity_refuses_before_lookup_or_retaining_
             .collect(),
         deadline: Instant::now() + Duration::from_secs(5),
         association: RelatedAssociation::Company,
+        context_department_id: None,
         role_facts: None,
         roles: BTreeMap::new(),
     };

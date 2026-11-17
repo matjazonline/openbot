@@ -28,7 +28,7 @@ async fn agent_save_setup() -> AgentSetup {
         |source, _| {
             source["steps"]["run"] = source["steps"]["start"].clone();
             source["steps"]["start"] = json!({"type":"memory.save","with":{
-                "scope":{"literal":{"kind":"agent","agent":"assistant"}},
+                "scope":{"literal":{"agent":"assistant"}},
                 "facts":{"literal":["The customer prefers concise replies."]}},
                 "routes":{"success":"run"}});
         },
@@ -45,7 +45,7 @@ async fn ready(setup: &AgentSetup) -> (ContractFake, Arc<MemoryServiceHttp>) {
         .await
         .unwrap();
     let principal = crate::adapters::persistence::memory::agent_principal_on(
-        &mut *p.pool().acquire().await.unwrap(),
+        &mut p.pool().acquire().await.unwrap(),
         company.as_uuid(),
         setup.agent,
     )

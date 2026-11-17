@@ -14788,7 +14788,7 @@ RETURNS boolean LANGUAGE sql VOLATILE AS $$
         WHERE checkpoint.company_id=exchange.company_id AND checkpoint.id=exchange.checkpoint_id
             AND checkpoint.task_id=exchange.job_id AND checkpoint.workflow_run_id=exchange.run_id
             AND checkpoint.workflow_execution_id=exchange.execution_id AND checkpoint.agent_id=exchange.agent_id
-            AND checkpoint.workflow_prepared->>'version'='7'
+            AND checkpoint.workflow_prepared->>'version'='8'
             AND ((exchange.payload_retained AND checkpoint.workflow_prepared=exchange.frozen_preparation)
                 OR (NOT exchange.payload_retained AND exchange.preparation_digest=sha256(convert_to(checkpoint.workflow_prepared::text,'UTF8'))))
             AND checkpoint.checkpoint->'seed'=checkpoint.workflow_prepared->'history'->'seed'
@@ -14860,7 +14860,7 @@ BEGIN
           AND execution.completed_at IS NULL FOR SHARE OF run NOWAIT;
     PERFORM 1 FROM public.agent_history_conversations WHERE company_id=owner.company_id
         AND id=owner.conversation_id AND active_exchange_id=owner.id FOR UPDATE;
-    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '7'
+    IF NOT FOUND OR document->>'version' IS DISTINCT FROM '8'
         OR document->>'mcp_error_policy' NOT IN ('observe','fail_step')
         OR document->>'mcp_error_policy' IS DISTINCT FROM
             (CASE WHEN source.frozen_inputs ? 'mcp_error_policy'
@@ -16090,6 +16090,8 @@ CREATE TABLE public.workflow_memory_consumptions (
     invocation_id uuid NOT NULL,
     read_ceiling public.access_level NOT NULL,
     exposed_level public.access_level NOT NULL,
+    namespace_ids uuid[] NOT NULL CHECK (cardinality(namespace_ids) BETWEEN 1 AND 258
+        AND array_position(namespace_ids,NULL) IS NULL),
     items jsonb NOT NULL CHECK (jsonb_typeof(items) = 'array' AND jsonb_array_length(items) <= 64
         AND octet_length(items::text) <= 65536),
     created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
@@ -19974,3 +19976,204 @@ BEGIN
 END $$;
 CREATE TRIGGER attribution_outbox_immutable BEFORE UPDATE ON public.attribution_lifecycle_outbox
     FOR EACH ROW EXECUTE FUNCTION public.guard_attribution_outbox_payload();
+
+-- Plan05 p02: an admission seals all actors' memory/knowledge topology together.
+-- Retained owner IDs intentionally have no live-owner FK: historical snapshots
+-- survive rename/retirement, and current readers still require a live owner.
+CREATE TABLE public.workflow_run_scope_snapshots (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    state text NOT NULL CHECK (state IN ('available','unavailable')),
+    reason text,
+    created_at timestamptz NOT NULL DEFAULT clock_timestamp(),
+    PRIMARY KEY (company_id,run_id),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_runs(company_id,id) ON DELETE CASCADE,
+    CHECK ((state='available' AND reason IS NULL)
+        OR (state='unavailable' AND reason='source_scope_unavailable'))
+);
+
+CREATE TABLE public.workflow_run_scopes (
+    company_id uuid NOT NULL,
+    run_id uuid NOT NULL,
+    acting_principal_id uuid,
+    unit_id uuid,
+    principal_id uuid,
+    access text NOT NULL CHECK (access IN ('read','write','personal')),
+    unit_slug text,
+    chain_depth smallint CHECK (chain_depth BETWEEN 0 AND 7),
+    own boolean NOT NULL DEFAULT false,
+    ancestor boolean NOT NULL DEFAULT false,
+    report boolean NOT NULL DEFAULT false,
+    UNIQUE NULLS NOT DISTINCT (company_id,run_id,acting_principal_id,unit_id,principal_id,access),
+    FOREIGN KEY (company_id,run_id) REFERENCES public.workflow_run_scope_snapshots(company_id,run_id)
+        ON DELETE CASCADE DEFERRABLE INITIALLY DEFERRED,
+    CHECK ((access='personal' AND principal_id IS NOT NULL AND unit_id IS NULL
+            AND unit_slug IS NULL AND chain_depth IS NULL AND NOT own AND NOT ancestor AND NOT report)
+        OR (access IN ('read','write') AND unit_id IS NOT NULL AND principal_id IS NULL
+            AND unit_slug IS NOT NULL AND octet_length(unit_slug) BETWEEN 1 AND 63
+            AND unit_slug ~ '^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$'
+            AND (own OR ancestor OR report)
+            AND own=(chain_depth IS NOT NULL AND chain_depth=0)
+            AND (NOT own OR NOT ancestor)
+            AND (chain_depth IS NULL OR chain_depth=0 OR ancestor)
+            AND (access<>'write' OR own)))
+);
+CREATE INDEX workflow_run_scopes_actor ON public.workflow_run_scopes(company_id,run_id,acting_principal_id);
+
+-- One retained tuple representation also handles NULL base actors exactly.
+CREATE FUNCTION public.workflow_scope_tuples(tenant uuid, selected_run uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.acting_principal_id,scope.unit_id,scope.principal_id,scope.access,
+        scope.unit_slug,scope.chain_depth,scope.own,scope.ancestor,scope.report
+    FROM public.workflow_run_scopes AS scope WHERE scope.company_id=tenant AND scope.run_id=selected_run
+$$;
+
+-- A broker's canonical native session supplies the source and harness. No caller
+-- can nominate an arbitrary source run or another actor's report group.
+CREATE FUNCTION public.workflow_native_scope_tuples(tenant uuid, source_run uuid, harness uuid, actor uuid)
+RETURNS TABLE(acting_principal_id uuid,unit_id uuid,principal_id uuid,access text,
+    unit_slug text,chain_depth smallint,own boolean,ancestor boolean,report boolean)
+LANGUAGE sql STABLE AS $$
+    SELECT scope.* FROM public.workflow_scope_tuples(tenant,source_run) AS scope
+    WHERE scope.acting_principal_id=harness
+        OR (scope.acting_principal_id IS NULL AND (scope.access<>'personal' OR EXISTS (
+            SELECT 1 FROM public.workflow_runs AS source
+            JOIN public.principals AS person ON person.company_id=source.company_id
+                AND person.id=scope.principal_id AND person.historical_person_user_id=actor
+            WHERE source.company_id=tenant AND source.id=source_run AND source.actor_id=actor)))
+$$;
+
+CREATE FUNCTION public.guard_workflow_scope_row() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope snapshot is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    -- Read prefix matches native NOWAIT authority; the new run is the seal mutex.
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    PERFORM 1 FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND OR EXISTS (SELECT 1 FROM public.workflow_run_scope_snapshots
+        WHERE company_id=NEW.company_id AND run_id=NEW.run_id) THEN
+        RAISE EXCEPTION 'run scope cannot be appended after its seal' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_row';
+    END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_row_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scopes
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_row();
+
+CREATE FUNCTION public.guard_workflow_scope_seal() RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE admitted public.workflow_runs%ROWTYPE; inherited uuid; harness uuid; native_source uuid;
+    source_state text; expected_available boolean;
+BEGIN
+    IF TG_OP='DELETE' AND NOT EXISTS (
+        SELECT 1 FROM public.workflow_runs WHERE company_id=OLD.company_id AND id=OLD.run_id
+    ) THEN RETURN OLD; END IF;
+    IF TG_OP<>'INSERT' THEN
+        RAISE EXCEPTION 'run scope seal is immutable' USING ERRCODE='23514',
+            CONSTRAINT='workflow_guard:guard_workflow_scope_seal';
+    END IF;
+    PERFORM 1 FROM public.companies WHERE id=NEW.company_id FOR SHARE NOWAIT;
+    SELECT * INTO admitted FROM public.workflow_runs
+        WHERE company_id=NEW.company_id AND id=NEW.run_id FOR UPDATE NOWAIT;
+    IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no run' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    inherited := admitted.parent_run_id;
+    IF admitted.native_mcp_call_id IS NOT NULL THEN
+        SELECT session.workflow_run_id,principal.id INTO native_source,harness
+        FROM public.native_mcp_calls AS call
+        JOIN public.local_agent_sessions AS session ON session.company_id=call.company_id
+            AND session.id=call.source_session_id
+        LEFT JOIN public.principals AS principal ON principal.company_id=session.company_id
+            AND principal.agent_id=session.agent_id AND principal.kind='agent'
+        WHERE call.company_id=NEW.company_id AND call.id=admitted.native_mcp_call_id
+            AND call.run_id=admitted.id AND call.actor_id=admitted.actor_id;
+        IF NOT FOUND THEN RAISE EXCEPTION 'scope seal has no canonical native source' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF inherited IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=inherited;
+        IF source_state IS DISTINCT FROM 'available' OR NEW.state<>'available'
+            OR admitted.actor_id IS DISTINCT FROM (SELECT actor_id FROM public.workflow_runs WHERE company_id=NEW.company_id AND id=inherited) OR EXISTS (
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited))
+            UNION ALL
+            (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,inherited)
+                EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+        ) THEN RAISE EXCEPTION 'child scopes must exactly copy its sealed parent' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSIF native_source IS NOT NULL THEN
+        SELECT state INTO source_state FROM public.workflow_run_scope_snapshots
+            WHERE company_id=NEW.company_id AND run_id=native_source;
+        expected_available := source_state='available' AND harness IS NOT NULL AND EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id
+                AND run_id=native_source AND acting_principal_id=harness AND access='personal'
+                AND principal_id=harness);
+        IF COALESCE(expected_available,false) THEN
+            IF NEW.state<>'available' OR EXISTS (
+                (SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id)
+                    EXCEPT SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id))
+                UNION ALL
+                (SELECT * FROM public.workflow_native_scope_tuples(NEW.company_id,native_source,harness,admitted.actor_id)
+                    EXCEPT SELECT * FROM public.workflow_scope_tuples(NEW.company_id,NEW.run_id))
+            ) THEN RAISE EXCEPTION 'native scopes must copy its canonical harness projection' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+        ELSIF NEW.state<>'unavailable' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+        ) THEN RAISE EXCEPTION 'missing native source scope confers zero authority' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    ELSE
+        -- Fresh admission validates live owner identity, never a historical slug.
+        IF NEW.state<>'available' OR EXISTS (
+            SELECT 1 FROM public.workflow_run_scopes AS scope
+            LEFT JOIN public.departments AS unit ON unit.company_id=scope.company_id AND unit.id=scope.unit_id
+            LEFT JOIN public.principals AS person ON person.company_id=scope.company_id AND person.id=scope.principal_id
+            LEFT JOIN public.principals AS acting ON acting.company_id=scope.company_id AND acting.id=scope.acting_principal_id
+            WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                AND ((scope.unit_id IS NOT NULL AND (unit.id IS NULL OR unit.slug::text<>scope.unit_slug))
+                    OR (scope.principal_id IS NOT NULL AND (person.id IS NULL OR person.kind NOT IN ('person','agent')))
+                    OR (scope.acting_principal_id IS NOT NULL AND (acting.id IS NULL OR acting.kind<>'agent'))
+                    OR (scope.acting_principal_id IS NOT NULL AND scope.access='personal'
+                        AND scope.principal_id<>scope.acting_principal_id)
+                    OR (scope.acting_principal_id IS NULL AND scope.access='personal' AND (
+                        person.kind IS DISTINCT FROM 'person' OR person.user_id IS DISTINCT FROM admitted.actor_id
+                        OR NOT EXISTS (SELECT 1 FROM public.workflow_agent_sessions AS bound
+                            JOIN public.agent_history_sessions AS session ON session.company_id=bound.company_id AND session.id=bound.session_id
+                            JOIN public.workflow_admissions AS admission ON admission.company_id=bound.company_id AND admission.run_id=bound.run_id
+                            WHERE bound.company_id=NEW.company_id AND bound.run_id=NEW.run_id
+                                AND session.creator_user_id=admitted.actor_id AND session.channel_id IS NULL AND session.thread_id IS NULL
+                                AND jsonb_array_length(substring(admission.source_key FROM 4)::jsonb)=2
+                                AND substring(admission.source_key FROM 4)::jsonb->>0='manual')))))
+            OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS scope
+                JOIN public.departments AS root ON root.company_id=scope.company_id AND root.id=scope.unit_id AND root.is_root
+                WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id
+                    AND scope.acting_principal_id IS NULL AND scope.access='read')
+        THEN RAISE EXCEPTION 'fresh scope seal requires valid live owners and base root' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    END IF;
+    IF EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.acting_principal_id IS NOT NULL
+            AND (NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS personal
+                WHERE personal.company_id=scope.company_id AND personal.run_id=scope.run_id
+                    AND personal.acting_principal_id=scope.acting_principal_id AND personal.access='personal'
+                    AND personal.principal_id=scope.acting_principal_id)
+                OR NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                    JOIN public.departments AS root ON root.company_id=readable.company_id AND root.id=readable.unit_id AND root.is_root
+                    WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                        AND readable.acting_principal_id=scope.acting_principal_id AND readable.access='read'))
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes AS scope
+        WHERE scope.company_id=NEW.company_id AND scope.run_id=NEW.run_id AND scope.access='write'
+            AND NOT EXISTS (SELECT 1 FROM public.workflow_run_scopes AS readable
+                WHERE readable.company_id=scope.company_id AND readable.run_id=scope.run_id
+                    AND readable.acting_principal_id IS NOT DISTINCT FROM scope.acting_principal_id
+                    AND readable.unit_id=scope.unit_id AND readable.access='read' AND readable.own)
+    ) OR EXISTS (
+        SELECT 1 FROM public.workflow_run_scopes WHERE company_id=NEW.company_id AND run_id=NEW.run_id
+            AND access='read' GROUP BY acting_principal_id HAVING count(*)>256
+    ) THEN RAISE EXCEPTION 'invalid write authority or read scope budget' USING ERRCODE='23514',CONSTRAINT='workflow_guard:guard_workflow_scope_seal'; END IF;
+    RETURN NEW;
+END $$;
+CREATE TRIGGER workflow_scope_seal_guard BEFORE INSERT OR UPDATE OR DELETE ON public.workflow_run_scope_snapshots
+    FOR EACH ROW EXECUTE FUNCTION public.guard_workflow_scope_seal();
