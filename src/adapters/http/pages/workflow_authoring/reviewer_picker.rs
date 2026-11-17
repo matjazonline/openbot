@@ -68,7 +68,7 @@ pub fn workflow_reviewer_picker(view: &WorkflowReviewerPicker<'_>) -> String {
     );
     format!(
         r##"<section id="workflow-reviewer-picker" data-workflow-reviewer-picker class="space-y-3 rounded-box border border-base-300 p-4">
-        <h3 class="font-semibold">Choose reviewers</h3><p class="text-xs opacity-70">{current}</p>
+        <h3 class="font-semibold">Choose reviewers</h3><p class="text-xs opacity-70">{current}</p><p class="text-xs opacity-70">Sponsor uses one deciding person for human approval. Other sponsors are informed and cannot settle. agent.run, decision.agent and ai.classify need an agent decider.</p>
         <form hx-post="/ui/workflows/{workflow}/reviewer-picker?company_id={company}" hx-include="#workflow-source" hx-target="#workflow-reviewer-picker" hx-swap="outerHTML" hx-sync="#workflow-reviewer-picker:replace" hx-indicator="#workflow-reviewer-progress" hx-disabled-elt="#workflow-reviewer-picker button" class="space-y-3">
         <label class="form-control">Review step<select name="step" class="select" hx-post="/ui/workflows/{workflow}/reviewer-picker?company_id={company}" hx-params="source,step,desk">{steps}</select></label>
         <label class="form-control">Reviewer<select name="reviewer" class="select" hx-post="/ui/workflows/{workflow}/reviewer-picker?company_id={company}"><option value="" disabled{placeholder}>Choose a person or role</option><optgroup label="People">{people}</optgroup><optgroup label="Role">{roles}</optgroup></select></label>
@@ -157,8 +157,13 @@ fn holder_preview(view: &WorkflowReviewerPicker<'_>) -> String {
         .iter()
         .map(|preview| {
             format!(
-                "<li>{role}: {holders}</li>",
+                "<li>{role}{decider}: {holders}</li>",
                 role = preview.role,
+                decider = if preview.role == DepartmentRole::Sponsor {
+                    " · decides"
+                } else {
+                    ""
+                },
                 holders = preview
                     .refusal
                     .map(escape_html_text)

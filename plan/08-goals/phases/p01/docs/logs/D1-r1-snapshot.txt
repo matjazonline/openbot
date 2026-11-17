@@ -1,0 +1,4 @@
+base:   8fdb892b6e279ed0c09150e2336bbdc7462f877d
+digest: 70a35e16397e0e6fc0eae14ceaf625e4e9381e9a0b50c3845ce50c10688df5c2
+files:
+  plan/08-goals/COORDINATION.md

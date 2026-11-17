@@ -455,6 +455,7 @@ mod tests {
     fn department_views_attention_groups_and_keeps_the_department() {
         use crate::entities::department::{Department, DepartmentId};
         let sales = Department {
+            escalation: None,
             id: DepartmentId::new(Uuid::new_v4()),
             company_id: Uuid::nil(),
             name: "Sales <team>".into(),

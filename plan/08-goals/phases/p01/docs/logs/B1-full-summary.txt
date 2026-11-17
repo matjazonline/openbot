@@ -1,0 +1,41 @@
+PASS 0s    Runner test coverage
+PASS 23s   Local-agent plugin tests and guards
+FAIL 0s    Reproducible plugin package and runtime install
+PASS 0s    Generated CSS is current
+PASS 47s   Frontend protocols
+PASS 1s    Deployment script tests
+PASS 0s    Knowledge artifact preparation tests
+FAIL 7s    Doop runner boundaries
+PASS 2s    Doop probe protocols
+PASS 4s    Formatting
+PASS 0s    Patch whitespace
+PASS 8s    Transport abstraction boundary
+PASS 0s    Workflow sample boundary tests
+PASS 0s    Workflow sample boundary
+PASS 1s    Integration boundary tests
+PASS 1s    Integration boundary
+PASS 0s    Integration documentation
+PASS 2s    Workflow evidence validator fixtures
+PASS 67s   Retained workflow evidence
+PASS 1s    Fetch locked Rust dependencies
+PASS 118s  Offline compilation
+PASS 125s  Clippy
+PASS 0s    Test database for this run
+PASS 1s    Migrations
+PASS 128s  SQLx metadata matches migrated schema
+PASS 218s  Compile tests
+PASS 0s    Query statistics prerequisites
+PASS 4s    Integration conformance families are registered
+FAIL 2888s Database-backed test suite (isolated network)
+PASS 4s    Ignored browser fixture producers
+FAIL 587s  Browser protocols using native markup
+FAIL 2359s Stack budget
+PASS 266s  Lease budget
+FAIL 1s    Knowledge production image
+PASS 66s   Memory model preparation
+FAIL 4s    Memory extracted service suite
+FAIL 57s   Memory backup and restore
+FAIL 19s   Memory standalone journey
+FAIL 1s    OpenBot and memory integration
+FAIL 0s    Memory production image
+FAIL 0s    Managed Doop service and private integration

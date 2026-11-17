@@ -1,0 +1,6 @@
+{
+  "cluster_stopped": true,
+  "port": 15481,
+  "disposable_cluster_directory_removed": "/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/pg-statistics",
+  "shared_postgres_5432_reconfigured": false
+}

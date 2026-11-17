@@ -62,14 +62,16 @@ pub(super) async fn admission_refused_on(
          (company_id,id,source_kind,admission_refusal_id,binding_id,binding_revision, \
           origin_department_id,policy,reason_code,step_id,role) \
          SELECT refusal.company_id,gen_random_uuid(),'admission',refusal.id, \
-                refusal.binding_id,refusal.binding_revision,channel.department_id,configuration.escalation, \
+                refusal.binding_id,refusal.binding_revision,origin.department_id,chosen.policy, \
                 workflow_role_refusal_code(refusal.role_refusal),refusal.role_refusal->>'step', \
                 refusal.role_refusal->>'role' \
          FROM workflow_admission_refusals AS refusal \
          JOIN workflow_binding_revisions AS configuration ON configuration.company_id=refusal.company_id \
            AND configuration.binding_id=refusal.binding_id AND configuration.revision=refusal.binding_revision \
          LEFT JOIN channels AS channel ON channel.company_id=refusal.company_id AND channel.id=refusal.channel_id \
-         WHERE refusal.company_id=$1 AND refusal.id=$2 AND configuration.escalation IS NOT NULL \
+         CROSS JOIN LATERAL (SELECT workflow_escalation_origin(refusal.company_id,refusal.channel_id,refusal.principal_id,NULL,NULL) AS department_id) AS origin \
+         CROSS JOIN LATERAL (SELECT workflow_effective_escalation_policy(refusal.company_id,origin.department_id,configuration.escalation) AS policy) AS chosen \
+         WHERE refusal.company_id=$1 AND refusal.id=$2 AND chosen.policy IS NOT NULL \
          ON CONFLICT (company_id,admission_refusal_id) WHERE admission_refusal_id IS NOT NULL \
          DO NOTHING RETURNING id",
     )
@@ -115,13 +117,15 @@ pub(super) async fn run_failed_on(
          (company_id,id,source_kind,run_id,execution_id,binding_id,binding_revision, \
           origin_department_id,policy,reason_code,step_id) \
          SELECT run.company_id,gen_random_uuid(),'run',run.id,execution.id,run.binding_id,run.binding_revision, \
-                manifest.role_context_department_id,run.escalation,$4,execution.step_id \
+                origin.department_id,chosen.policy,$4,execution.step_id \
          FROM workflow_runs AS run \
          JOIN workflow_executions AS execution ON execution.company_id=run.company_id \
            AND execution.run_id=run.id AND execution.id=$3 \
          JOIN run_dependency_manifests AS ownership ON ownership.company_id=run.company_id AND ownership.run_id=run.id \
          JOIN agent_dependency_manifests AS manifest ON manifest.company_id=ownership.company_id AND manifest.id=ownership.manifest_id \
-         WHERE run.company_id=$1 AND run.id=$2 AND run.state='failed' AND run.escalation IS NOT NULL \
+         CROSS JOIN LATERAL (SELECT workflow_escalation_origin(run.company_id,run.channel_id,run.principal_id,manifest.role_context_department_id,run.escalation) AS department_id) AS origin \
+         CROSS JOIN LATERAL (SELECT workflow_effective_escalation_policy(run.company_id,origin.department_id,run.escalation) AS policy) AS chosen \
+         WHERE run.company_id=$1 AND run.id=$2 AND run.state='failed' AND chosen.policy IS NOT NULL \
            AND run.terminal_execution_id=execution.id AND run.parent_run_id IS NULL \
          ON CONFLICT (company_id,run_id) WHERE run_id IS NOT NULL DO NOTHING RETURNING id",
     )

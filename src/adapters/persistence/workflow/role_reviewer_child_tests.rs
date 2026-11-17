@@ -70,8 +70,11 @@ async fn replace_people(f: &PeopleFixture) -> PrincipalId {
                 owner,
                 f.role.company().as_uuid(),
                 f.role.department,
-                DepartmentRole::Reviewer,
-                *principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: *principal,
+                    successor: None,
+                },
             )
             .await
             .unwrap();
@@ -82,8 +85,11 @@ async fn replace_people(f: &PeopleFixture) -> PrincipalId {
             owner,
             f.role.company().as_uuid(),
             f.role.department,
-            DepartmentRole::Reviewer,
-            today,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal: today,
+                decider: false,
+            },
         )
         .await
         .unwrap();

@@ -3,6 +3,7 @@
 //! Managing needs the authority managing channels needs: the company's owner or an admin. A plain
 //! member is refused exactly like a stranger, with `NotFound`, so a department id cannot be probed.
 //! Persistence re-checks that authority under the company write lock.
+use crate::application::ports::department::{DepartmentRoleAssignment, DepartmentRoleRemoval};
 use std::sync::Arc;
 
 use tracing::{info, instrument};
@@ -21,7 +22,7 @@ use crate::{
         creation::CreationProvenance,
         department::{
             Department, DepartmentDesk, DepartmentId, DepartmentMember, DepartmentPrincipal,
-            DepartmentRole, DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,
+            DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,
             MAX_DEPARTMENT_PRINCIPAL_CHOICES,
         },
         transport::PrincipalId,
@@ -219,13 +220,12 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        assignment: DepartmentRoleAssignment,
     ) -> AppResult<()> {
         let scope = self.managed(user_id, company_id).await?;
-        info!(%company_id, %department, %role, %principal, "Assigning department role");
+        info!(%company_id, %department, role=%assignment.role, principal=%assignment.principal, "Assigning department role");
         self.departments
-            .assign_role(scope, department, role, principal)
+            .assign_role(scope, department, assignment)
             .await
     }
 
@@ -235,13 +235,12 @@ impl DepartmentUseCases {
         user_id: Uuid,
         company_id: Uuid,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        removal: DepartmentRoleRemoval,
     ) -> AppResult<()> {
         let scope = self.managed(user_id, company_id).await?;
-        info!(%company_id, %department, %role, %principal, "Clearing department role");
+        info!(%company_id, %department, role=%removal.role, principal=%removal.principal, "Clearing department role");
         self.departments
-            .clear_role(scope, department, role, principal)
+            .clear_role(scope, department, removal)
             .await
     }
 

@@ -44,8 +44,11 @@ async fn workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_pr
             owner,
             company,
             department.id,
-            crate::entities::department::DepartmentRole::Reviewer,
-            prepared.retiring_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: crate::entities::department::DepartmentRole::Reviewer,
+                principal: prepared.retiring_principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();

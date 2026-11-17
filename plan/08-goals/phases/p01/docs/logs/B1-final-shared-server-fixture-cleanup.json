@@ -1,0 +1,12 @@
+[
+  {
+    "database": "openbot_08gp01_mac02",
+    "status": "dropped owned disposable fixture",
+    "connections_before_drop": 0
+  },
+  {
+    "database": "openbot_08gp01_mac02_test",
+    "status": "dropped owned disposable fixture",
+    "connections_before_drop": 0
+  }
+]

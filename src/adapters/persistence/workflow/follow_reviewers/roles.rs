@@ -85,12 +85,14 @@ fn later_resolution(
         context_department_id: DepartmentId::new(current.context_department_id),
         department_id: None,
         principals: Vec::new(),
+        informed: Vec::new(),
         refusal: None,
     };
     match live {
         Ok(resolved) => {
             value.department_id = Some(resolved.department);
             value.principals = resolved.principals.clone();
+            value.informed = resolved.informed.clone();
         }
         Err(refusal) => value.refusal = Some(*refusal),
     }
@@ -100,6 +102,7 @@ fn later_resolution(
 struct SelectedPeople {
     department: Option<DepartmentId>,
     principals: Vec<PrincipalId>,
+    informed: Vec<PrincipalId>,
     refusal: Option<RoleRefusalKind>,
 }
 
@@ -107,6 +110,7 @@ struct SelectedPeople {
 struct AdmissionMember {
     department_id: Uuid,
     principal_id: Uuid,
+    capacity: String,
 }
 
 async fn selected_on(
@@ -117,7 +121,7 @@ async fn selected_on(
     match revision {
         SelectedPeopleRevision::Admission => {
             let rows:Vec<AdmissionMember>=sqlx::query_as(
-                "SELECT department_id,principal_id FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2 \
+                "SELECT department_id,principal_id,capacity FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2 \
                  AND manifest_id=$3 AND version_id=$4 AND step=$5 AND role=$6 AND resolution_revision=0 \
                  AND agent_id IS NULL AND agent_revision_id IS NULL ORDER BY principal_id LIMIT 17")
                 .bind(key.company.as_uuid()).bind(key.root.as_uuid()).bind(key.manifest.as_uuid())
@@ -129,6 +133,12 @@ async fn selected_on(
                 department: Some(DepartmentId::new(rows[0].department_id)),
                 principals: rows
                     .iter()
+                    .filter(|row| row.capacity == "decides")
+                    .map(|row| PrincipalId::new(row.principal_id))
+                    .collect(),
+                informed: rows
+                    .iter()
+                    .filter(|row| row.capacity == "informed")
                     .map(|row| PrincipalId::new(row.principal_id))
                     .collect(),
                 refusal: None,
@@ -139,6 +149,7 @@ async fn selected_on(
             Ok(SelectedPeople {
                 department: value.department_id,
                 principals: value.principals,
+                informed: value.informed,
                 refusal: value.refusal,
             })
         }
@@ -151,6 +162,7 @@ fn same_resolution(before: &SelectedPeople, live: &Result<ResolvedRole, RoleRefu
             before.refusal.is_none()
                 && before.department == Some(value.department)
                 && before.principals == value.principals
+                && before.informed == value.informed
         }
         Err(refusal) => before.principals.is_empty() && before.refusal == Some(*refusal),
     }

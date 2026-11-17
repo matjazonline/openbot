@@ -115,8 +115,11 @@ async fn department_competing_lead_assignments_leave_one_holder() {
                         f.owner,
                         f.company,
                         department.id,
-                        DepartmentRole::Lead,
-                        principal,
+                        crate::application::ports::department::DepartmentRoleAssignment {
+                            role: DepartmentRole::Lead,
+                            principal,
+                            decider: false,
+                        },
                     )
                     .await
             })

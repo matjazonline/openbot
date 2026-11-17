@@ -69,7 +69,16 @@ async fn department_context_roster_lists_the_desks_around_the_department() {
         .unwrap();
     let closer = company_agent(&f.persistence, f.company, f.owner, "closer").await;
     f.use_cases
-        .assign_role(f.owner, f.company, sales.id, DepartmentRole::Lead, closer)
+        .assign_role(
+            f.owner,
+            f.company,
+            sales.id,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: closer,
+                decider: false,
+            },
+        )
         .await
         .unwrap();
     f.use_cases

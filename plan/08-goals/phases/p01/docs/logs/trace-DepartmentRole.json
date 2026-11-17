@@ -1,0 +1,3889 @@
+{
+  "pattern": "DepartmentRole",
+  "filesSearched": 2066,
+  "totalHits": 291,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_person_tests.rs#pending",
+        "name": "pending",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_person_tests.rs",
+        "span": "L12-L38"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_person_tests.rs",
+      "inDegree": 8,
+      "hits": [
+        {
+          "line": 19,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#lead",
+        "name": "lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L152-L161"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".assign_role(by, f.company, department, DepartmentRole::Lead, principal)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L35-L37"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 6,
+      "hits": [
+        {
+          "line": 36,
+          "text": "Self::with_role(DepartmentRole::Lead)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#fixture",
+        "name": "fixture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L8-L20"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 15,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#clear",
+        "name": "clear",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L22-L33"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 28,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#assert_refused",
+        "name": "assert_refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L35-L41"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 38,
+          "text": "kind:RoleRefusalKind::NoHolder,role:DepartmentRole::Lead,step,.."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewer_assignment.rs#from_selectors",
+        "name": "from_selectors",
+        "kind": "function",
+        "path": "src/application/workflow/reviewer_assignment.rs",
+        "span": "L75-L86"
+      },
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 77,
+          "text": "let mut roles = Vec::with_capacity(DepartmentRole::ALL.len());"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/escalation_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/escalation_tests.rs",
+        "span": "L21-L180"
+      },
+      "path": "src/adapters/http/routes/workflows/escalation_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 71,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#held_department",
+        "name": "held_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L19-L60"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 54,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#load_context_on",
+        "name": "load_context_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L62-L91"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 67,
+          "text": "let vocabulary: Vec<_> = DepartmentRole::ALL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_tests.rs#pending_agent_from_run_with_tools",
+        "name": "pending_agent_from_run_with_tools",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+        "span": "L121-L157"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 131,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#assign",
+        "name": "assign",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L14-L31"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 26,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#clear_reviewers",
+        "name": "clear_reviewers",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L83-L97"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 91,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/people_resolution_tests.rs#document",
+        "name": "document",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+        "span": "L16-L36"
+      },
+      "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 29,
+          "text": "role: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#with_tracking",
+        "name": "with_tracking",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L35-L94"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 83,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles.rs#resolve_role",
+        "name": "resolve_role",
+        "kind": "function",
+        "path": "src/application/workflow/roles.rs",
+        "span": "L54-L98"
+      },
+      "path": "src/application/workflow/roles.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 56,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#assign_lead",
+        "name": "assign_lead",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L593-L625"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 608,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/agent_picker.rs#role",
+        "name": "role",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker.rs",
+        "span": "L45-L54"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 45,
+          "text": "fn role(&self) -> AppResult<Option<crate::entities::department::DepartmentRole>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#place_in_department_on",
+        "name": "place_in_department_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L336-L359"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 343,
+          "text": "role: Option<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#follow_lead_on",
+        "name": "follow_lead_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L363-L380"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 369,
+          "text": "role: DepartmentRole,"
+        },
+        {
+          "line": 372,
+          "text": "if role != DepartmentRole::Lead {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#write_placement_on",
+        "name": "write_placement_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L385-L456"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 391,
+          "text": "role: Option<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_tests.rs#pending_agent_with_tools",
+        "name": "pending_agent_with_tools",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+        "span": "L30-L48"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 37,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_control_tests.rs#refused",
+        "name": "refused",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_control_tests.rs",
+        "span": "L20-L37"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_control_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 28,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_guard_tests.rs#policy",
+        "name": "policy",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_guard_tests.rs",
+        "span": "L28-L33"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_guard_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 30,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs#configure_caller",
+        "name": "configure_caller",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs",
+        "span": "L28-L83"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_origin_inheritance_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 70,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#selection",
+        "name": "selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L33-L64"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 39,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#clear",
+        "name": "clear",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L70-L81"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 76,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipient_tests.rs#department",
+        "name": "department",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipient_tests.rs",
+        "span": "L6-L19"
+      },
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 13,
+          "text": "role: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipients.rs#resolve_notification_recipients",
+        "name": "resolve_notification_recipients",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipients.rs",
+        "span": "L48-L98"
+      },
+      "path": "src/application/workflow/escalation_recipients.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 50,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/department.rs#role_from_path",
+        "name": "role_from_path",
+        "kind": "function",
+        "path": "src/adapters/http/routes/department.rs",
+        "span": "L90-L96"
+      },
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 90,
+          "text": "fn role_from_path(role: &str) -> AppResult<DepartmentRole> {"
+        },
+        {
+          "line": 92,
+          "text": "|error: crate::entities::department::InvalidDepartmentRole| {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_desks_tests.rs#lead",
+        "name": "lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_desks_tests.rs",
+        "span": "L176-L187"
+      },
+      "path": "src/adapters/persistence/department_desks_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 182,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_desks.rs#eligible_on",
+        "name": "eligible_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_desks.rs",
+        "span": "L186-L199"
+      },
+      "path": "src/adapters/persistence/department_desks.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 196,
+          "text": ".bind(DepartmentRole::Lead.as_str())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L276-L281"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 276,
+          "text": "async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#stored_role",
+        "name": "stored_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L122-L125"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 122,
+          "text": "fn stored_role(role: &str) -> AppResult<DepartmentRole> {"
+        },
+        {
+          "line": 123,
+          "text": "DepartmentRole::from_str(role)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#assign_department_role_on",
+        "name": "assign_department_role_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L308-L329"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 314,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department/lifecycle.rs#create_department_with_id_on",
+        "name": "create_department_with_id_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department/lifecycle.rs",
+        "span": "L28-L88"
+      },
+      "path": "src/adapters/persistence/department/lifecycle.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 82,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs#edit_role",
+        "name": "edit_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs",
+        "span": "L39-L50"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 45,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_tests.rs#provision_handler",
+        "name": "provision_handler",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+        "span": "L50-L115"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 91,
+          "text": "role: Some(DepartmentRole::Reviewer),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_binding_tests.rs#policy",
+        "name": "policy",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+        "span": "L6-L11"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 6,
+          "text": "fn policy(role: DepartmentRole, hops: u8) -> EscalationPolicy {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs#answering_binding",
+        "name": "answering_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+        "span": "L49-L81"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_origin_relay_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 68,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#people",
+        "name": "people",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L7-L45"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 22,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 32,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 40,
+          "text": "notify: DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs#clear_lead",
+        "name": "clear_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+        "span": "L10-L21"
+      },
+      "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 16,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#with_role",
+        "name": "with_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L39-L49"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 39,
+          "text": "async fn with_role(role: DepartmentRole) -> Self {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#from_binding",
+        "name": "from_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L51-L122"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 81,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/role_selection.rs#select_role_reference",
+        "name": "select_role_reference",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/role_selection.rs",
+        "span": "L43-L56"
+      },
+      "path": "src/application/workflow/compiler/role_selection.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 47,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/roles.rs#contains_role",
+        "name": "contains_role",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/roles.rs",
+        "span": "L131-L151"
+      },
+      "path": "src/application/workflow/compiler/roles.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 136,
+          "text": ".parse::<crate::entities::department::DepartmentRole>()"
+        },
+        {
+          "line": 141,
+          "text": "role.parse::<crate::entities::department::DepartmentRole>()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/people_resolution.rs#resolution",
+        "name": "resolution",
+        "kind": "function",
+        "path": "src/application/workflow/people_resolution.rs",
+        "span": "L120-L138"
+      },
+      "path": "src/application/workflow/people_resolution.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 128,
+          "text": "role: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewer_assignment.rs#validate",
+        "name": "validate",
+        "kind": "function",
+        "path": "src/application/workflow/reviewer_assignment.rs",
+        "span": "L141-L171"
+      },
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 143,
+          "text": "|| self.roles.len() > DepartmentRole::ALL.len()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewer_assignment.rs#assignment",
+        "name": "assignment",
+        "kind": "function",
+        "path": "src/application/workflow/reviewer_assignment.rs",
+        "span": "L222-L253"
+      },
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 234,
+          "text": "role: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#holder",
+        "name": "holder",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L15-L21"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 15,
+          "text": "fn holder(role: DepartmentRole, kind: PrincipalKind) -> RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/agent_picker.rs#agent_options",
+        "name": "agent_options",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/agent_picker.rs",
+        "span": "L113-L156"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/agent_picker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 140,
+          "text": "let roles = crate::entities::department::DepartmentRole::ALL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs#picker_options",
+        "name": "picker_options",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+        "span": "L102-L153"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 126,
+          "text": "let roles = DepartmentRole::ALL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/agent.rs#json_placement",
+        "name": "json_placement",
+        "kind": "function",
+        "path": "src/adapters/http/routes/agent.rs",
+        "span": "L581-L614"
+      },
+      "path": "src/adapters/http/routes/agent.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 599,
+          "text": "role.parse::<crate::entities::department::DepartmentRole>()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs#export_reviewer_browser",
+        "name": "export_reviewer_browser",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs",
+        "span": "L374-L500"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 377,
+          "text": "use crate::entities::department::DepartmentRole;"
+        },
+        {
+          "line": 390,
+          "text": "let role = ReviewerSelector::Role(DepartmentRole::Reviewer);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs#escalation_of",
+        "name": "escalation_of",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+        "span": "L114-L131"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/bindings.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 118,
+          "text": "use crate::entities::department::DepartmentRole;"
+        },
+        {
+          "line": 121,
+          "text": "\"lead:1\" => (DepartmentRole::Lead, 1),"
+        },
+        {
+          "line": 122,
+          "text": "\"lead:2\" => (DepartmentRole::Lead, 2),"
+        },
+        {
+          "line": 123,
+          "text": "\"reviewer:1\" => (DepartmentRole::Reviewer, 1),"
+        },
+        {
+          "line": 124,
+          "text": "\"reviewer:2\" => (DepartmentRole::Reviewer, 2),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs#preview_desk",
+        "name": "preview_desk",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+        "span": "L15-L79"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 57,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs#preview",
+        "name": "preview",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+        "span": "L206-L263"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 244,
+          "text": "Ok(DepartmentRole::ALL"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#clear_department_role_on",
+        "name": "clear_department_role_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L459-L491"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 465,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#facts_from_rows",
+        "name": "facts_from_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L93-L136"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 119,
+          "text": "let role = row.role.parse::<DepartmentRole>().map_err(|_| invalid())?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#resolve_people_on",
+        "name": "resolve_people_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L298-L309"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 302,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#notification_recipients_on",
+        "name": "notification_recipients_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L311-L330"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 315,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#notification_department_recipients_on",
+        "name": "notification_department_recipients_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L332-L350"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 336,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs#enable_handler_escalation",
+        "name": "enable_handler_escalation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs",
+        "span": "L8-L56"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_terminal_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 43,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_decisions.rs#restore_view",
+        "name": "restore_view",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_decisions.rs",
+        "span": "L228-L284"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_decisions.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 254,
+          "text": ".map(|role| role.parse::<DepartmentRole>())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_hops.rs#select_on",
+        "name": "select_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_hops.rs",
+        "span": "L58-L90"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_hops.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 62,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_origin_cleanup_tests.rs#source_binding",
+        "name": "source_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_origin_cleanup_tests.rs",
+        "span": "L33-L51"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_origin_cleanup_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 47,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#assign",
+        "name": "assign",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L82-L93"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 88,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_builder.rs#placement_on",
+        "name": "placement_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+        "span": "L131-L196"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 137,
+          "text": "let role = match spec.role.as_deref().map(DepartmentRole::from_str) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_action_tests.rs#role_department",
+        "name": "role_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+        "span": "L109-L176"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 147,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs#replace_people",
+        "name": "replace_people",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs",
+        "span": "L64-L91"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 73,
+          "text": "DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 85,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_runtime_race_support.rs#admit_while_reassigning",
+        "name": "admit_while_reassigning",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_runtime_race_support.rs",
+        "span": "L14-L70"
+      },
+      "path": "src/adapters/persistence/workflow/role_runtime_race_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 46,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_runtime_tests.rs#desk",
+        "name": "desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+        "span": "L77-L124"
+      },
+      "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 97,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_views.rs#holder",
+        "name": "holder",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_views.rs",
+        "span": "L19-L28"
+      },
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 23,
+          "text": "role: self.role.parse::<DepartmentRole>().map_err(|_| invalid())?,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#assign_role",
+        "name": "assign_role",
+        "kind": "function",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L217-L230"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 222,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#clear_role",
+        "name": "clear_role",
+        "kind": "function",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L233-L246"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 238,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/provisioning_schemas.rs#listing",
+        "name": "listing",
+        "kind": "function",
+        "path": "src/application/workflow/provisioning_schemas.rs",
+        "span": "L17-L62"
+      },
+      "path": "src/application/workflow/provisioning_schemas.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 36,
+          "text": "\"roles\": {\"type\": \"array\", \"items\": {\"enum\": DepartmentRole::ALL"
+        },
+        {
+          "line": 37,
+          "text": ".map(DepartmentRole::as_str)}}"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/roles.rs#agent_or_role",
+        "name": "agent_or_role",
+        "kind": "function",
+        "path": "src/application/workflow/registry/roles.rs",
+        "span": "L5-L39"
+      },
+      "path": "src/application/workflow/registry/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 22,
+          "text": ".and_then(|value| value.parse::<DepartmentRole>().ok())"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/roles.rs#selector_contract",
+        "name": "selector_contract",
+        "kind": "function",
+        "path": "src/application/workflow/registry/roles.rs",
+        "span": "L42-L56"
+      },
+      "path": "src/application/workflow/registry/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 44,
+          "text": "json!({\"enum\": DepartmentRole::ALL.map(DepartmentRole::as_str)});"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/app_error_impl.rs#role_tests",
+        "name": "role_tests",
+        "kind": "module",
+        "path": "src/adapters/http/app_error_impl.rs",
+        "span": "L93-L117"
+      },
+      "path": "src/adapters/http/app_error_impl.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "use crate::entities::department::{DepartmentRole, RoleAdmissionRefusal, RoleRefusalKind};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/app_error_impl.rs#workflow_role_http_refusal_is_a_bounded_named_bad_request",
+        "name": "workflow_role_http_refusal_is_a_bounded_named_bad_request",
+        "kind": "function",
+        "path": "src/adapters/http/app_error_impl.rs",
+        "span": "L99-L116"
+      },
+      "path": "src/adapters/http/app_error_impl.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/company_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "Department, DepartmentDesk, DepartmentId, DepartmentPrincipal, DepartmentRole, department_tree,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/company_departments.rs#lead_card",
+        "name": "lead_card",
+        "kind": "function",
+        "path": "src/adapters/http/pages/company_departments.rs",
+        "span": "L450-L512"
+      },
+      "path": "src/adapters/http/pages/company_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 457,
+          "text": ".find(|holder| holder.role == DepartmentRole::Lead);"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "DepartmentRole, DepartmentRoleHolder, department_tree,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/department_ui_tests.rs#department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "name": "department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "kind": "function",
+        "path": "src/adapters/http/pages/department_ui_tests.rs",
+        "span": "L119-L234"
+      },
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "roles: vec![DepartmentRoleHolder {"
+        },
+        {
+          "line": 143,
+          "text": "role: DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/department_ui_tests.rs#department_ui_agent_settings_show_its_direct_address_and_departments",
+        "name": "department_ui_agent_settings_show_its_direct_address_and_departments",
+        "kind": "function",
+        "path": "src/adapters/http/pages/department_ui_tests.rs",
+        "span": "L574-L637"
+      },
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 588,
+          "text": "roles: vec![DepartmentRole::Lead],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/agent_picker.rs#WorkflowAgentPicker",
+        "name": "WorkflowAgentPicker",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/workflow_authoring/agent_picker.rs",
+        "span": "L6-L15"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/agent_picker.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "pub selected_role: Option<crate::entities::department::DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs#ReviewerRolePreview",
+        "name": "ReviewerRolePreview",
+        "kind": "struct",
+        "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+        "span": "L7-L11"
+      },
+      "path": "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/provenance.rs#role_tests",
+        "name": "role_tests",
+        "kind": "module",
+        "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+        "span": "L177-L210"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 181,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/provenance.rs#workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers",
+        "name": "workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+        "span": "L185-L209"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "role: DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "department::{Department, DepartmentId, DepartmentRole},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments_tests.rs#department_ui_foreign_ids_under_the_owners_path_change_nothing",
+        "name": "department_ui_foreign_ids_under_the_owners_path_change_nothing",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments_tests.rs",
+        "span": "L429-L620"
+      },
+      "path": "src/adapters/http/routes/ui_departments_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 474,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 32,
+          "text": "department::{DepartmentId, DepartmentRole},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#clear_lead",
+        "name": "clear_lead",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L630-L656"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 642,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "use crate::entities::{department::DepartmentRole, transport::PrincipalId};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs#dump_autonomous_workflow_agent_picker_browser_fixtures",
+        "name": "dump_autonomous_workflow_agent_picker_browser_fixtures",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs",
+        "span": "L316-L372"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/agent_picker_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 363,
+          "text": "\"role_applied\":crate::application::workflow::compiler::select_role_reference(&crate::adapters::workflow_source::WorkflowSourceDecoder,&unsaved,&crate::domain::w"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::entities::department::{DepartmentRole, MAX_DEPARTMENT_DEPTH};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_agent_desks_tests.rs#agent_direct_address_places_the_agent_and_its_lead_role_with_grants",
+        "name": "agent_direct_address_places_the_agent_and_its_lead_role_with_grants",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+        "span": "L358-L453"
+      },
+      "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 397,
+          "text": "role: Some(DepartmentRole::Lead),"
+        },
+        {
+          "line": 410,
+          "text": "vec![(DepartmentRole::Lead, principal)]"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_agent_desks_tests.rs#agent_direct_address_competing_lead_creation_takes_its_desk_gates_once",
+        "name": "agent_direct_address_competing_lead_creation_takes_its_desk_gates_once",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+        "span": "L524-L616"
+      },
+      "path": "src/adapters/persistence/department_agent_desks_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 589,
+          "text": "role: Some(DepartmentRole::Lead),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_competing_tests.rs#department_competing_lead_assignments_leave_one_holder",
+        "name": "department_competing_lead_assignments_leave_one_holder",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_competing_tests.rs",
+        "span": "L101-L136"
+      },
+      "path": "src/adapters/persistence/department_competing_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 118,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_desks_tests.rs#department_desk_members_only_reaches_one_step_up_and_down",
+        "name": "department_desk_members_only_reaches_one_step_up_and_down",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_desks_tests.rs",
+        "span": "L403-L477"
+      },
+      "path": "src/adapters/persistence/department_desks_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 466,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department_desks.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_with_an_agent_lead_answers_on_it",
+        "name": "department_lead_desk_with_an_agent_lead_answers_on_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L167-L209"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 204,
+          "text": "vec![DepartmentRoleHolder {"
+        },
+        {
+          "line": 205,
+          "text": "role: DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_follows_person_and_agent_leads_with_one_binding",
+        "name": "department_lead_desk_follows_person_and_agent_leads_with_one_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L431-L505"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 499,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_follows_an_agent_created_as_its_lead",
+        "name": "department_lead_desk_follows_an_agent_created_as_its_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L661-L713"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 680,
+          "text": "role: Some(DepartmentRole::Lead),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant",
+        "name": "workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L145-L251"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 194,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle",
+        "name": "workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L391-L487"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 452,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_roster_tests.rs#department_context_roster_lists_the_desks_around_the_department",
+        "name": "department_context_roster_lists_the_desks_around_the_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_roster_tests.rs",
+        "span": "L58-L170"
+      },
+      "path": "src/adapters/persistence/department_roster_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 72,
+          "text": ".assign_role(f.owner, f.company, sales.id, DepartmentRole::Lead, closer)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department_roster.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 22,
+          "text": "department::DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_roster.rs#AgentDepartment",
+        "name": "AgentDepartment",
+        "kind": "struct",
+        "path": "src/adapters/persistence/department_roster.rs",
+        "span": "L134-L140"
+      },
+      "path": "src/adapters/persistence/department_roster.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 139,
+          "text": "pub roles: Vec<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_assigns_replaces_and_clears_the_lead",
+        "name": "department_write_assigns_replaces_and_clears_the_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L491-L572"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 506,
+          "text": "vec![DepartmentRoleHolder {"
+        },
+        {
+          "line": 507,
+          "text": "role: DepartmentRole::Lead,"
+        },
+        {
+          "line": 518,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 529,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 546,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 559,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_refuses_members_and_strangers_with_not_found",
+        "name": "department_write_refuses_members_and_strangers_with_not_found",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L736-L824"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 762,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 770,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_shows_a_member_only_their_departments",
+        "name": "department_write_shows_a_member_only_their_departments",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L827-L891"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 843,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "name": "department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L897-L976"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 911,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 948,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 955,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#assign_role",
+        "name": "assign_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L631-L651"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 635,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#clear_role",
+        "name": "clear_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L653-L673"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 657,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L769-L791"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 773,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>> {"
+        },
+        {
+          "line": 785,
+          "text": "Ok(DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#roles_held",
+        "name": "roles_held",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L810-L832"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 814,
+          "text": ") -> AppResult<Vec<HeldDepartmentRole>> {"
+        },
+        {
+          "line": 826,
+          "text": "Ok(HeldDepartmentRole {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH, RoleAdmissionRefusal, RoleRefusalKind,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#RoleCaptureKey",
+        "name": "RoleCaptureKey",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L20-L24"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_binding_tests.rs#workflow_escalation_binding_requires_department_without_role_steps",
+        "name": "workflow_escalation_binding_requires_department_without_role_steps",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+        "span": "L14-L36"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 18,
+          "text": "request.escalation = Some(policy(DepartmentRole::Lead, 2));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_binding_tests.rs#workflow_escalation_binding_roundtrip_update_and_both_detach_writers",
+        "name": "workflow_escalation_binding_roundtrip_update_and_both_detach_writers",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+        "span": "L39-L114"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "let first = policy(DepartmentRole::Reviewer, 2);"
+        },
+        {
+          "line": 91,
+          "text": "request.escalation = Some(policy(DepartmentRole::Lead, 1));"
+        },
+        {
+          "line": 95,
+          "text": "Some(policy(DepartmentRole::Lead, 1))"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs#workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "name": "workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+        "span": "L19-L95"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs#workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged",
+        "name": "workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+        "span": "L98-L166"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_hops.rs#create_on",
+        "name": "create_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_hops.rs",
+        "span": "L3-L56"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_hops.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": "DepartmentRole::Lead"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#workflow_escalation_control_real_repair_seals_sixteen_maximum_escaped_labels",
+        "name": "workflow_escalation_control_real_repair_seals_sixteen_maximum_escaped_labels",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L100-L172"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 108,
+          "text": "notify: DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 116,
+          "text": "matches!(failure,AppError::WorkflowRole(refusal) if refusal.role==DepartmentRole::Reviewer && refusal.kind==RoleRefusalKind::NoHolder)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair",
+        "name": "workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L79-L104"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/escalations.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalations.rs#recipients_on",
+        "name": "recipients_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalations.rs",
+        "span": "L26-L39"
+      },
+      "path": "src/adapters/persistence/workflow/escalations.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source",
+        "name": "workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L98-L118"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 106,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write",
+        "name": "workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L166-L189"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 178,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_retirement_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+        "span": "L4-L80"
+      },
+      "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 34,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/people_resolutions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/people_resolutions.rs#ResolutionKey",
+        "name": "ResolutionKey",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/people_resolutions.rs",
+        "span": "L8-L15"
+      },
+      "path": "src/adapters/persistence/workflow/people_resolutions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/provisioning_builder.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_directory_tests.rs#department_directory_lists_departments_roles_and_desks",
+        "name": "department_directory_lists_departments_roles_and_desks",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+        "span": "L75-L190"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 83,
+          "text": "role: Some(DepartmentRole::Lead),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_directory_tests.rs#department_directory_filters_by_one_department",
+        "name": "department_directory_filters_by_one_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+        "span": "L214-L262"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 224,
+          "text": "agent(&f, \"closer\", placed(sales, DepartmentRole::Lead)).await;"
+        },
+        {
+          "line": 234,
+          "text": "agent(&f, \"helper\", placed(support, DepartmentRole::Lead)).await;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_directory_tests.rs#department_directory_picker_entries_name_departments_and_the_desk",
+        "name": "department_directory_picker_entries_name_departments_and_the_desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+        "span": "L267-L316"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_directory_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 275,
+          "text": "role: Some(DepartmentRole::Lead),"
+        },
+        {
+          "line": 295,
+          "text": "roles: vec![DepartmentRole::Lead],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#department_lead_desk_answers_through_its_current_lead",
+        "name": "department_lead_desk_answers_through_its_current_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L630-L758"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 635,
+          "text": "use crate::entities::department::DepartmentRole;"
+        },
+        {
+          "line": 705,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, leads[0].1)"
+        },
+        {
+          "line": 731,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, leads[1].1)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#department_context_reaches_the_lead_on_its_department_desk",
+        "name": "department_context_reaches_the_lead_on_its_department_desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L776-L914"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 781,
+          "text": "use crate::entities::department::DepartmentRole;"
+        },
+        {
+          "line": 843,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, created[0].1)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+        "span": "L17-L87"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "crate::entities::department::DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_action_escalation_tests.rs#policy",
+        "name": "policy",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_action_escalation_tests.rs",
+        "span": "L8-L13"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_action_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_action_tests.rs#workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority",
+        "name": "workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+        "span": "L179-L226"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 192,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_binding_tests.rs#workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders",
+        "name": "workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+        "span": "L211-L269"
+      },
+      "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 245,
+          "text": "DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 263,
+          "text": ".filter(|holder| holder.role == DepartmentRole::Reviewer)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_child_runtime_tests.rs#workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "name": "workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+        "span": "L6-L76"
+      },
+      "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 21,
+          "text": "DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 45,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs#refusal",
+        "name": "refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+        "span": "L23-L29"
+      },
+      "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_missing_holder_refuses_before_run",
+        "name": "workflow_role_reviewer_missing_holder_refuses_before_run",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L212-L227"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 216,
+          "text": "matches!(f.role.p().admit(&command).await,Err(AppError::WorkflowRole(refusal)) if refusal.kind==RoleRefusalKind::NoHolder && refusal.role==DepartmentRole::Revie"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park",
+        "name": "workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L230-L280"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 240,
+          "text": "DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 257,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen",
+        "name": "workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L283-L347"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 308,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "name": "workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L411-L449"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 422,
+          "text": "DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_agent",
+        "name": "workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_agent",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L458-L508"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 498,
+          "text": "&[ReviewerSelector::Role(DepartmentRole::Reviewer)],"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs#workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it",
+        "name": "workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+        "span": "L125-L170"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_every_domain_kind",
+        "name": "workflow_role_admission_sql_refusal_codes_and_bounded_payload_match_every_domain_kind",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L13-L61"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "for role in DepartmentRole::ALL {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation",
+        "name": "workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L283-L332"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 299,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 307,
+          "text": "matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind == RoleRefusalKind::WrongKind && refusal.role == DepartmentRole::Lead)"
+        },
+        {
+          "line": 310,
+          "text": "let f = RoleFixture::with_role(DepartmentRole::Reviewer).await;"
+        },
+        {
+          "line": 320,
+          "text": "DepartmentRole::Reviewer,"
+        },
+        {
+          "line": 329,
+          "text": "matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind == RoleRefusalKind::Ambiguous && refusal.role == DepartmentRole::Reviewer)"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole, RoleRefusalKind};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_captures_exact_principal_revision_and_canonical_membership",
+        "name": "workflow_role_admission_captures_exact_principal_revision_and_canonical_membership",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L200-L225"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 207,
+          "text": "assert_eq!(role.role, DepartmentRole::Lead);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "name": "workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L228-L272"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": "DepartmentRole::Lead,"
+        },
+        {
+          "line": 244,
+          "text": "matches!(error, AppError::WorkflowRole(ref refusal) if refusal.kind==RoleRefusalKind::NoHolder && refusal.step.as_str()==\"start\" && refusal.role==DepartmentRole"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/authoring_reads.rs#DepartmentRef",
+        "name": "DepartmentRef",
+        "kind": "struct",
+        "path": "src/application/agent/authoring_reads.rs",
+        "span": "L158-L164"
+      },
+      "path": "src/application/agent/authoring_reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 163,
+          "text": "pub roles: Vec<crate::entities::department::DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/agent/manifest.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 6,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/manifest.rs#RoleResolution",
+        "name": "RoleResolution",
+        "kind": "struct",
+        "path": "src/application/agent/manifest.rs",
+        "span": "L40-L46"
+      },
+      "path": "src/application/agent/manifest.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#assign_role",
+        "name": "assign_role",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L70-L76"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 74,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#clear_role",
+        "name": "clear_role",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L77-L83"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L110-L114"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>>;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#roles_held",
+        "name": "roles_held",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L120-L124"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 124,
+          "text": ") -> AppResult<Vec<HeldDepartmentRole>>;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "department::{DepartmentId, DepartmentRole},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/agent.rs#AgentPlacement",
+        "name": "AgentPlacement",
+        "kind": "struct",
+        "path": "src/application/use_cases/agent.rs",
+        "span": "L135-L138"
+      },
+      "path": "src/application/use_cases/agent.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 137,
+          "text": "pub role: Option<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "DepartmentRole, DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#DepartmentDetail",
+        "name": "DepartmentDetail",
+        "kind": "struct",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L119-L124"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": "pub roles: Vec<DepartmentRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/binding/escalation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/binding/escalation.rs#EscalationPolicy",
+        "name": "EscalationPolicy",
+        "kind": "struct",
+        "path": "src/application/workflow/binding/escalation.rs",
+        "span": "L7-L10"
+      },
+      "path": "src/application/workflow/binding/escalation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "pub notify: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/agent_selection.rs#AgentReferenceStep",
+        "name": "AgentReferenceStep",
+        "kind": "struct",
+        "path": "src/application/workflow/compiler/agent_selection.rs",
+        "span": "L7-L12"
+      },
+      "path": "src/application/workflow/compiler/agent_selection.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 11,
+          "text": "pub role: Option<crate::entities::department::DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/compiler/role_selection_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/role_selection_tests.rs#workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor",
+        "name": "workflow_role_picker_model_selection_preserves_other_inputs_and_enforces_xor",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/role_selection_tests.rs",
+        "span": "L13-L59"
+      },
+      "path": "src/application/workflow/compiler/role_selection_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 25,
+          "text": "select_role_reference(&WorkflowSourceDecoder, &source, &step, DepartmentRole::Lead)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/role_selection_tests.rs#workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication",
+        "name": "workflow_role_picker_reviewers_roundtrip_and_principal_selector_deduplication",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/role_selection_tests.rs",
+        "span": "L62-L90"
+      },
+      "path": "src/application/workflow/compiler/role_selection_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "ReviewerSelector::Role(DepartmentRole::Reviewer),"
+        },
+        {
+          "line": 68,
+          "text": "ReviewerSelector::Role(DepartmentRole::Lead),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/compiler/role_selection.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 9,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipient_tests.rs#workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor",
+        "name": "workflow_escalation_notification_selection_keeps_all_kinds_and_local_ineligible_shadows_ancestor",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipient_tests.rs",
+        "span": "L22-L55"
+      },
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 41,
+          "text": "} = resolve_notification_recipients(&chain, DepartmentRole::Reviewer)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipient_tests.rs#workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery",
+        "name": "workflow_escalation_notification_selection_bounds_the_whole_set_without_a_partial_delivery",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipient_tests.rs",
+        "span": "L58-L83"
+      },
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "matches!(resolve_notification_recipients(&[permitted],DepartmentRole::Reviewer),"
+        },
+        {
+          "line": 69,
+          "text": "DepartmentRole::Reviewer"
+        },
+        {
+          "line": 77,
+          "text": "resolve_notification_recipients(&[department(&[])], DepartmentRole::Reviewer),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipient_tests.rs#workflow_escalation_notification_selection_does_not_change_agent_or_people_modes",
+        "name": "workflow_escalation_notification_selection_does_not_change_agent_or_people_modes",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipient_tests.rs",
+        "span": "L86-L124"
+      },
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "resolve_role(&agents, DepartmentRole::Reviewer, RoleNeed::Agent),"
+        },
+        {
+          "line": 93,
+          "text": "resolve_role(&agents, DepartmentRole::Reviewer, RoleNeed::People),"
+        },
+        {
+          "line": 97,
+          "text": "matches!(resolve_notification_recipients(&agents,DepartmentRole::Reviewer),NotificationRecipients::Holders { holders,.. } if holders.len()==2)"
+        },
+        {
+          "line": 101,
+          "text": "resolve_notification_recipients(&chain, DepartmentRole::Reviewer),"
+        },
+        {
+          "line": 109,
+          "text": "resolve_notification_recipients(&chain, DepartmentRole::Reviewer),"
+        },
+        {
+          "line": 118,
+          "text": "resolve_notification_recipients(&cycle, DepartmentRole::Reviewer),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/escalation_recipients.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/escalation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation.rs#EscalationReason",
+        "name": "EscalationReason",
+        "kind": "struct",
+        "path": "src/application/workflow/escalation.rs",
+        "span": "L182-L187"
+      },
+      "path": "src/application/workflow/escalation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 186,
+          "text": "pub role: Option<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation.rs#workflow_escalation_ladder_stops_after_its_configured_hops",
+        "name": "workflow_escalation_ladder_stops_after_its_configured_hops",
+        "kind": "function",
+        "path": "src/application/workflow/escalation.rs",
+        "span": "L301-L391"
+      },
+      "path": "src/application/workflow/escalation.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 315,
+          "text": "notify: DepartmentRole::Reviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/people_resolution.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 5,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole, RoleRefusalKind};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/people_resolution.rs#PeopleResolution",
+        "name": "PeopleResolution",
+        "kind": "struct",
+        "path": "src/application/workflow/people_resolution.rs",
+        "span": "L51-L66"
+      },
+      "path": "src/application/workflow/people_resolution.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 58,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/provisioning.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 20,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/role_tests.rs#workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind",
+        "name": "workflow_role_source_selectors_are_exclusive_static_and_fixed_for_every_model_kind",
+        "kind": "function",
+        "path": "src/application/workflow/publication/role_tests.rs",
+        "span": "L24-L71"
+      },
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 28,
+          "text": "assert_eq!(compiled.role_references()[0].role, DepartmentRole::Lead);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/role_tests.rs#workflow_role_source_sample_and_help_explain_the_same_requirement",
+        "name": "workflow_role_source_sample_and_help_explain_the_same_requirement",
+        "kind": "function",
+        "path": "src/application/workflow/publication/role_tests.rs",
+        "span": "L119-L149"
+      },
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 132,
+          "text": "DepartmentRole::Lead"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/role_tests.rs#workflow_role_model_and_people_requirements_coexist_on_one_step_without_selector_confusion",
+        "name": "workflow_role_model_and_people_requirements_coexist_on_one_step_without_selector_confusion",
+        "kind": "function",
+        "path": "src/application/workflow/publication/role_tests.rs",
+        "span": "L152-L179"
+      },
+      "path": "src/application/workflow/publication/role_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 162,
+          "text": ".any(|reference| reference.role == DepartmentRole::Lead"
+        },
+        {
+          "line": 168,
+          "text": ".any(|reference| reference.role == DepartmentRole::Reviewer"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/publication/types.rs#RoleReference",
+        "name": "RoleReference",
+        "kind": "struct",
+        "path": "src/application/workflow/publication/types.rs",
+        "span": "L37-L41"
+      },
+      "path": "src/application/workflow/publication/types.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub role: crate::entities::department::DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reads.rs#RunRoleHolder",
+        "name": "RunRoleHolder",
+        "kind": "struct",
+        "path": "src/application/workflow/reads.rs",
+        "span": "L112-L119"
+      },
+      "path": "src/application/workflow/reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 115,
+          "text": "pub role: crate::entities::department::DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/registry/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 8,
+          "text": "use crate::entities::department::{DepartmentId, DepartmentRole};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewer_assignment.rs#ReviewerSelection",
+        "name": "ReviewerSelection",
+        "kind": "struct",
+        "path": "src/application/workflow/reviewer_assignment.rs",
+        "span": "L68-L71"
+      },
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "pub roles: Vec<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewer_assignment.rs#AssignmentRoleReference",
+        "name": "AssignmentRoleReference",
+        "kind": "struct",
+        "path": "src/application/workflow/reviewer_assignment.rs",
+        "span": "L91-L94"
+      },
+      "path": "src/application/workflow/reviewer_assignment.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 92,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/reviewers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 4,
+          "text": "use crate::entities::department::DepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewers.rs#MAX_REVIEWER_SELECTORS",
+        "name": "MAX_REVIEWER_SELECTORS",
+        "kind": "constant",
+        "path": "src/application/workflow/reviewers.rs",
+        "span": "L9-L10"
+      },
+      "path": "src/application/workflow/reviewers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "super::registry::MAX_REVIEWERS + DepartmentRole::ALL.len();"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reviewers.rs#ReviewerSelector",
+        "name": "ReviewerSelector",
+        "kind": "enum",
+        "path": "src/application/workflow/reviewers.rs",
+        "span": "L13-L16"
+      },
+      "path": "src/application/workflow/reviewers.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "Role(DepartmentRole),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through",
+        "name": "workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L24-L68"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 25,
+          "text": "for role in DepartmentRole::ALL {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_resolve_missing_depth_and_cycle_are_bounded",
+        "name": "workflow_role_resolve_missing_depth_and_cycle_are_bounded",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L71-L105"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 73,
+          "text": "resolve_role(&[], DepartmentRole::Lead, RoleNeed::Agent),"
+        },
+        {
+          "line": 80,
+          "text": "resolve_role(&chain, DepartmentRole::Lead, RoleNeed::Agent),"
+        },
+        {
+          "line": 87,
+          "text": ".push(holder(DepartmentRole::Lead, PrincipalKind::Agent));"
+        },
+        {
+          "line": 89,
+          "text": "resolve_role(&chain, DepartmentRole::Lead, RoleNeed::Agent)"
+        },
+        {
+          "line": 96,
+          "text": "resolve_role(&chain, DepartmentRole::Lead, RoleNeed::Agent),"
+        },
+        {
+          "line": 102,
+          "text": "resolve_role(&chain, DepartmentRole::Lead, RoleNeed::Agent),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents",
+        "name": "workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L108-L149"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 109,
+          "text": "let role = DepartmentRole::Reviewer;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_admission_input_preparation_uses_the_frozen_requirement_and_sample_refuses_contextless_execution",
+        "name": "workflow_role_admission_input_preparation_uses_the_frozen_requirement_and_sample_refuses_contextless_execution",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L152-L192"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 189,
+          "text": "if refusal.step == step && refusal.role == DepartmentRole::Lead && refusal.kind == RoleRefusalKind::MissingDepartment)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals",
+        "name": "workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L195-L231"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 199,
+          "text": "DepartmentRole::Lead,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 3,
+          "text": "DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH, RoleRefusalKind,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles.rs#RoleHolder",
+        "name": "RoleHolder",
+        "kind": "struct",
+        "path": "src/application/workflow/roles.rs",
+        "span": "L15-L19"
+      },
+      "path": "src/application/workflow/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 16,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#DepartmentRole",
+        "name": "DepartmentRole",
+        "kind": "enum",
+        "path": "src/domain/entities/department.rs",
+        "span": "L47-L50"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "pub enum DepartmentRole {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 52,
+          "text": "impl DepartmentRole {"
+        },
+        {
+          "line": 72,
+          "text": "impl fmt::Display for DepartmentRole {"
+        },
+        {
+          "line": 81,
+          "text": "impl fmt::Display for InvalidDepartmentRole {"
+        },
+        {
+          "line": 87,
+          "text": "impl std::error::Error for InvalidDepartmentRole {}"
+        },
+        {
+          "line": 89,
+          "text": "impl FromStr for DepartmentRole {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#InvalidDepartmentRole",
+        "name": "InvalidDepartmentRole",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L79-L79"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 79,
+          "text": "pub struct InvalidDepartmentRole(String);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#Err",
+        "name": "Err",
+        "kind": "type",
+        "path": "src/domain/entities/department.rs",
+        "span": "L90-L90"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "type Err = InvalidDepartmentRole;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#from_str",
+        "name": "from_str",
+        "kind": "function",
+        "path": "src/domain/entities/department.rs",
+        "span": "L92-L98"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 96,
+          "text": "_ => Err(InvalidDepartmentRole(value.to_string())),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#DepartmentRoleHolder",
+        "name": "DepartmentRoleHolder",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L103-L106"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "pub struct DepartmentRoleHolder {"
+        },
+        {
+          "line": 104,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#RoleAdmissionRefusal",
+        "name": "RoleAdmissionRefusal",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L137-L142"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 140,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/domain/entities/department.rs",
+        "span": "L151-L162"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 153,
+          "text": "role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#HeldDepartmentRole",
+        "name": "HeldDepartmentRole",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L179-L182"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 179,
+          "text": "pub struct HeldDepartmentRole {"
+        },
+        {
+          "line": 181,
+          "text": "pub role: DepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#HeldDepartment",
+        "name": "HeldDepartment",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L192-L197"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 196,
+          "text": "pub roles: Vec<DepartmentRole>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#every_department_role_round_trips_through_its_stored_string",
+        "name": "every_department_role_round_trips_through_its_stored_string",
+        "kind": "function",
+        "path": "src/domain/entities/department.rs",
+        "span": "L332-L340"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 333,
+          "text": "for role in DepartmentRole::ALL {"
+        },
+        {
+          "line": 334,
+          "text": "assert_eq!(role.as_str().parse::<DepartmentRole>(), Ok(role));"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#an_unknown_department_role_is_refused_by_name",
+        "name": "an_unknown_department_role_is_refused_by_name",
+        "kind": "function",
+        "path": "src/domain/entities/department.rs",
+        "span": "L343-L347"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 344,
+          "text": "let error = \"manager\".parse::<DepartmentRole>().unwrap_err();"
+        },
+        {
+          "line": 346,
+          "text": "assert!(\"Lead\".parse::<DepartmentRole>().is_err(), \"case matters\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#the_lead_has_a_single_holder",
+        "name": "the_lead_has_a_single_holder",
+        "kind": "function",
+        "path": "src/domain/entities/department.rs",
+        "span": "L350-L353"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 351,
+          "text": "assert!(DepartmentRole::Lead.is_single_holder());"
+        },
+        {
+          "line": 352,
+          "text": "assert!(!DepartmentRole::Reviewer.is_single_holder());"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 91,
+    "baselineChars": 1116756
+  }
+}

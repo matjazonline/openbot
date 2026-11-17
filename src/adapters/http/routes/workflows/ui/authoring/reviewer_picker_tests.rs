@@ -49,16 +49,21 @@ async fn preview_desk(f: &Fixture) -> Uuid {
         )
         .await
         .unwrap();
-    ui.departments
-        .assign_role(
-            f.owner,
-            f.company,
-            department.id,
-            DepartmentRole::Reviewer,
-            crate::entities::transport::PrincipalId::new(principal),
-        )
-        .await
-        .unwrap();
+    for role in [DepartmentRole::Reviewer, DepartmentRole::Sponsor] {
+        ui.departments
+            .assign_role(
+                f.owner,
+                f.company,
+                department.id,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role,
+                    principal: crate::entities::transport::PrincipalId::new(principal),
+                    decider: false,
+                },
+            )
+            .await
+            .unwrap();
+    }
     let desk = ChannelPersistence::create(
         &f.persistence,
         f.company,
@@ -104,6 +109,8 @@ async fn workflow_role_reviewer_picker_previews_scoped_holders_escapes_and_prese
     assert!(
         html.contains("reviewer: Reviewer &lt;/option&gt;&lt;img") && !html.contains("<img src=x")
     );
+    assert!(html.contains("<li>sponsor · decides: Reviewer &lt;/option&gt;&lt;img"));
+    assert!(html.contains("value=\"role:sponsor\""));
     assert!(
         html.contains("data-workflow-reviewer-picker")
             && html.contains("Updating reviewer selection")

@@ -1,0 +1,517 @@
+{
+  "pattern": "workflow_run_role_bindings",
+  "filesSearched": 2066,
+  "totalHits": 41,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#assert_one_refusal",
+        "name": "assert_one_refusal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L51-L76"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 63,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/storage.rs#agent_for_step_with_locks_on",
+        "name": "agent_for_step_with_locks_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+        "span": "L214-L275"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 250,
+          "text": "JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reads.rs#push_role_agent_scope",
+        "name": "push_role_agent_scope",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reads.rs",
+        "span": "L234-L255"
+      },
+      "path": "src/adapters/persistence/workflow/reads.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 245,
+          "text": "JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_runtime_tests.rs#assert_selection",
+        "name": "assert_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+        "span": "L241-L260"
+      },
+      "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 247,
+          "text": "let selected: Selected = sqlx::query_as(\"SELECT agent_id,agent_revision_id FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department/lifecycle.rs#guard_department_delete_on",
+        "name": "guard_department_delete_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department/lifecycle.rs",
+        "span": "L152-L196"
+      },
+      "path": "src/adapters/persistence/department/lifecycle.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 187,
+          "text": "\"SELECT EXISTS (SELECT 1 FROM workflow_run_role_bindings WHERE company_id=$1 AND department_id=$2)\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/roles.rs#selected_on",
+        "name": "selected_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/roles.rs",
+        "span": "L112-L146"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 120,
+          "text": "\"SELECT department_id,principal_id FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2 \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_views.rs#for_step",
+        "name": "for_step",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_views.rs",
+        "span": "L70-L89"
+      },
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 81,
+          "text": "JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/storage.rs#persist_on",
+        "name": "persist_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+        "span": "L3-L38"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/storage.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": "sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) VA"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_history_tests.rs#workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history",
+        "name": "workflow_escalation_decision_raw_source_member_retirement_preserves_command_and_role_history",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_history_tests.rs",
+        "span": "L5-L77"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_history_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 12,
+          "text": "\"SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND principal_id=$2\","
+        },
+        {
+          "line": 51,
+          "text": "\"SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND principal_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/people_resolution_tests.rs#workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_changing_zero",
+        "name": "workflow_reviewer_follow_storage_seals_later_and_empty_sets_without_changing_zero",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+        "span": "L64-L128"
+      },
+      "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "let counts: Value = sqlx::query_scalar(\"SELECT jsonb_build_object('admission',(SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2"
+        },
+        {
+          "line": 112,
+          "text": "\"DELETE FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2 AND resolution_revision=1\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/people_resolution_tests.rs#workflow_reviewer_follow_storage_refuses_missing_extra_and_foreign_members",
+        "name": "workflow_reviewer_follow_storage_refuses_missing_extra_and_foreign_members",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+        "span": "L131-L171"
+      },
+      "path": "src/adapters/persistence/workflow/people_resolution_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 150,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,resolution_revision,department_id,principal_i"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/people_resolutions.rs#persist_on",
+        "name": "persist_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/people_resolutions.rs",
+        "span": "L40-L70"
+      },
+      "path": "src/adapters/persistence/workflow/people_resolutions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 61,
+          "text": "\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role, \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_resolution.rs#resolve_on",
+        "name": "resolve_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_resolution.rs",
+        "span": "L20-L73"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_resolution.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": "JOIN workflow_run_role_bindings AS captured ON captured.company_id=ownership.company_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_child_runtime_tests.rs#workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "name": "workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+        "span": "L6-L76"
+      },
+      "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 65,
+          "text": "let selections: Vec<(Uuid, String)> = sqlx::query_as(\"SELECT version_id,step FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2 ORDER BY version_"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_model_runtime_tests.rs#workflow_role_native_selector_refuses_each_busy_capture_without_changing_selection",
+        "name": "workflow_role_native_selector_refuses_each_busy_capture_without_changing_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_model_runtime_tests.rs",
+        "span": "L95-L192"
+      },
+      "path": "src/adapters/persistence/workflow/role_model_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs#workflow_role_admission_message_refusal_is_definite_named_visible_and_admits_nothing",
+        "name": "workflow_role_admission_message_refusal_is_definite_named_visible_and_admits_nothing",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+        "span": "L32-L101"
+      },
+      "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 89,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission",
+        "name": "workflow_role_reviewer_sql_missing_one_captured_person_rolls_back_admission",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L350-L375"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 354,
+          "text": "\"CREATE FUNCTION omit_one_person() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN IF NEW.principal_id='{omitted}'::uuid THEN RETURN NULL; END IF; RETURN NEW; END "
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set",
+        "name": "workflow_role_reviewer_sql_late_person_cannot_extend_the_sealed_member_set",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L378-L408"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 388,
+          "text": "sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id) SELECT company_id,run_id,mani"
+        },
+        {
+          "line": 400,
+          "text": "\"SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_sql_rows_and_future_resolution_revision_are_immutable",
+        "name": "workflow_role_admission_sql_rows_and_future_resolution_revision_are_immutable",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L64-L95"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 68,
+          "text": "\"UPDATE workflow_run_role_bindings SET step='replacement' WHERE company_id=$1 AND run_id=$2\","
+        },
+        {
+          "line": 69,
+          "text": "\"DELETE FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\","
+        },
+        {
+          "line": 70,
+          "text": "\"UPDATE workflow_run_role_bindings SET resolution_revision=1 WHERE company_id=$1 AND run_id=$2\","
+        },
+        {
+          "line": 80,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,resolution_revision,department_id,principal_i"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root",
+        "name": "workflow_role_admission_sql_missing_members_and_canonical_requirements_roll_back_the_root",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L98-L141"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 104,
+          "text": "CREATE TRIGGER omit_role_members BEFORE INSERT ON workflow_run_role_bindings FOR EACH ROW EXECUTE FUNCTION omit_role_members()\")"
+        },
+        {
+          "line": 112,
+          "text": "sqlx::query(\"DROP TRIGGER omit_role_members ON workflow_run_role_bindings\")"
+        },
+        {
+          "line": 119,
+          "text": "CREATE TRIGGER omit_role_members BEFORE INSERT ON workflow_run_role_bindings FOR EACH ROW EXECUTE FUNCTION omit_role_members()\")"
+        },
+        {
+          "line": 130,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_sql_company_teardown_releases_the_complete_capture",
+        "name": "workflow_role_admission_sql_company_teardown_releases_the_complete_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L144-L167"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_sql_capture_refuses_foreign_principals_and_unselected_revisions",
+        "name": "workflow_role_admission_sql_capture_refuses_foreign_principals_and_unselected_revisions",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L335-L371"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 339,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_rev"
+        },
+        {
+          "line": 341,
+          "text": "FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\")"
+        },
+        {
+          "line": 344,
+          "text": "let revision_fk: String = sqlx::query_scalar(\"SELECT conname FROM pg_constraint WHERE conrelid='workflow_run_role_bindings'::regclass AND contype='f' AND confre"
+        },
+        {
+          "line": 347,
+          "text": "sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) \\"
+        },
+        {
+          "line": 349,
+          "text": "FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_captures_exact_principal_revision_and_canonical_membership",
+        "name": "workflow_role_admission_captures_exact_principal_revision_and_canonical_membership",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L200-L225"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 213,
+          "text": "\"SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "name": "workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L228-L272"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 249,
+          "text": "\"workflow_run_role_bindings\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_sealed_set_rejects_late_people_and_extra_requirements",
+        "name": "workflow_role_admission_sealed_set_rejects_late_people_and_extra_requirements",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L275-L314"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 287,
+          "text": "sqlx::query(\"INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) \\"
+        },
+        {
+          "line": 290,
+          "text": "FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\")"
+        },
+        {
+          "line": 303,
+          "text": "\"SELECT count(*) FROM workflow_run_role_bindings WHERE company_id=$1 AND run_id=$2\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_views.rs#populate",
+        "name": "populate",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_views.rs",
+        "span": "L32-L68"
+      },
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "JOIN workflow_run_role_bindings AS role_binding ON role_binding.company_id=ownership.company_id \\"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 17,
+    "baselineChars": 175453
+  }
+}

@@ -47,8 +47,8 @@ pub(crate) async fn create_department_with_id_on(
     .map_err(|error| AppError::Internal(error.to_string()))?;
     let department = sqlx::query_as::<_, DepartmentDb>(&format!(
         "INSERT INTO departments AS department \
-             (id, company_id, name, slug, description, charter, parent_id, created_by) \
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING {DEPARTMENT_COLUMNS}"
+             (id, company_id, name, slug, description, charter, parent_id, created_by, escalation) \
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING {DEPARTMENT_COLUMNS}"
     ))
     .bind(id.as_uuid())
     .bind(company.as_uuid())
@@ -58,6 +58,13 @@ pub(crate) async fn create_department_with_id_on(
     .bind(&write.charter)
     .bind(write.parent_id.map(DepartmentId::as_uuid))
     .bind(created_by)
+    .bind(
+        write
+            .escalation
+            .map(serde_json::to_value)
+            .transpose()
+            .map_err(|error| AppError::Internal(error.to_string()))?,
+    )
     .fetch_one(&mut **tx)
     .await
     .map_err(|error| slug_conflict(error, &write.slug))?;
@@ -79,8 +86,11 @@ pub(crate) async fn create_department_with_id_on(
             company,
             actor,
             department.id,
-            DepartmentRole::Lead,
-            lead,
+            DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: lead,
+                decider: false,
+            },
         )
         .await?;
     }
@@ -109,6 +119,7 @@ pub(crate) async fn update_department_on(
         .clone()
         .unwrap_or_else(|| current.charter.clone());
     let parent_id = edit.parent_id.unwrap_or(current.parent_id);
+    let escalation = edit.escalation.unwrap_or(current.escalation);
     if parent_id != current.parent_id
         && let Some(parent) = parent_id
     {
@@ -117,7 +128,7 @@ pub(crate) async fn update_department_on(
     }
     let updated = sqlx::query_as::<_, DepartmentDb>(&format!(
         "UPDATE departments AS department \
-            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7 \
+            SET name = $3, slug = $4, description = $5, charter = $6, parent_id = $7, escalation = $8 \
           WHERE department.company_id = $1 AND department.id = $2 \
          RETURNING {DEPARTMENT_COLUMNS}"
     ))
@@ -128,6 +139,7 @@ pub(crate) async fn update_department_on(
     .bind(&description)
     .bind(&charter)
     .bind(parent_id.map(DepartmentId::as_uuid))
+    .bind(escalation.map(serde_json::to_value).transpose().map_err(|error| AppError::Internal(error.to_string()))?)
     .fetch_one(&mut **tx)
     .await
     .map_err(|error| slug_conflict(error, &slug))?;

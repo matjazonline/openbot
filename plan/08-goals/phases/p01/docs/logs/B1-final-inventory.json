@@ -1,0 +1,394 @@
+{
+  ".trail/learnings/2026-11-16-compile-shipped-workflow-samples-in-focused-mac02.md": {
+    "sha256": "63eaebfc2db5e0c3f465529a12e4bacef1def0d79f6cfba08e99aa9dcfaebfca",
+    "executable": false
+  },
+  ".trail/learnings/2026-11-16-keep-sponsor-information-notices-on-deferred-mac02.md": {
+    "sha256": "11e7a6f8ac97f61cf300b0d027834dcebccc5377dd9c24dad1e24efe5d219d30",
+    "executable": false
+  },
+  ".trail/learnings/2026-11-16-serialize-sqlx-metadata-generation-with-offline-mac02.md": {
+    "sha256": "01d5dbf0f48c308edbd0056671bef3ff41bfb124484f07763fd34decec764701",
+    "executable": false
+  },
+  "docs/departments.md": {
+    "sha256": "600875f163d7791bf91ce0182d4958faca2d4857fd1d41e423a1f5f7b4c9f0f5",
+    "executable": false
+  },
+  "docs/workflow-language-v1.md": {
+    "sha256": "92483d40b8737d9969a671bc744fe76986cac56e269721ddfd922aa90f9820fc",
+    "executable": false
+  },
+  "migrations/20260817000000_init_schema.sql": {
+    "sha256": "47cc11ee0f824c69f7e2738624ad3b1c820419ca77f9c403e1e391444db325b0",
+    "executable": false
+  },
+  "plan/08-goals/COORDINATION.md": {
+    "sha256": "5b5be282a3a9b27d688b93dec595986a145d8c8c53cb3e65f96f7319719ad8a7",
+    "executable": false
+  },
+  "src/adapters/http/pages/attention.rs": {
+    "sha256": "611c05a8f20f47459dc22de8248f292ee3e778d647a0412e4ab24ab43e8c099a",
+    "executable": false
+  },
+  "src/adapters/http/pages/company_departments.rs": {
+    "sha256": "989e6cc10b964eeba107571c9431725f1a26eb469544f5d9b8a086011df777e5",
+    "executable": false
+  },
+  "src/adapters/http/pages/company_departments/roles.rs": {
+    "sha256": "909ae09668fc5bb5626d810267b56a69c0fee45ae01fe18b8c749c52ec79d571",
+    "executable": false
+  },
+  "src/adapters/http/pages/dashboard.rs": {
+    "sha256": "2c991b978e2063b6d780cf73642ae2c953d8c06f9bc1b5471883346d876b8d7e",
+    "executable": false
+  },
+  "src/adapters/http/pages/department_ui_tests.rs": {
+    "sha256": "e4b390490db84ca8a5ceaba2d001101709a6556af7da6a04f6920da0530a1f0e",
+    "executable": false
+  },
+  "src/adapters/http/pages/workflow_authoring/bindings.rs": {
+    "sha256": "d39517ab21a6c73eb426bb929137239227a56f9252539565829df350d6f60358",
+    "executable": false
+  },
+  "src/adapters/http/pages/workflow_authoring/reviewer_picker.rs": {
+    "sha256": "911103f205da6c004172b10b8fe5dae2d669438cf737616279dfff9df6046517",
+    "executable": false
+  },
+  "src/adapters/http/pages/workflow_runs/provenance.rs": {
+    "sha256": "c72a7a7b76a25eab5dff25d41ee17af8952fa1fc2ae0de5b899890e1981d6481",
+    "executable": false
+  },
+  "src/adapters/http/routes/department.rs": {
+    "sha256": "199cfe2482fe38b6af458beeb1b2768e409e0137bae425336db232a3c5c66bbe",
+    "executable": false
+  },
+  "src/adapters/http/routes/department_tests.rs": {
+    "sha256": "25cac3f929e3e7829bdce04c470d70bb3061b4281e43d9b0f7c0043565b01c43",
+    "executable": false
+  },
+  "src/adapters/http/routes/ui_departments.rs": {
+    "sha256": "e7e73ffeab7b81c3e000d652b46726cf16fd564b06d781470e0c6a18ee596d04",
+    "executable": false
+  },
+  "src/adapters/http/routes/ui_departments_tests.rs": {
+    "sha256": "fad773d24c2a1b5f112aafcb42691f5e4be8172b02d2795c3f6276f460034daa",
+    "executable": false
+  },
+  "src/adapters/http/routes/workflows/escalation_tests.rs": {
+    "sha256": "6921bd8a4740912afa58b8c29093b5a1d7b0e337c6f4e2e750dd8e05db8f252d",
+    "executable": false
+  },
+  "src/adapters/http/routes/workflows/ui/authoring/bindings.rs": {
+    "sha256": "0199a7ab1bee9926a597e6088bec9f5820a9c966140a6895a53c857be84a3fa6",
+    "executable": false
+  },
+  "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs": {
+    "sha256": "bdabc6a15a8888a328ca8087f8c436d51488ab44b12f15b109668f2a74b09aa2",
+    "executable": false
+  },
+  "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs": {
+    "sha256": "6f481872b25febaaa10ec859c6b557cb1465441e89ef85cc658a84821ef78b8d",
+    "executable": false
+  },
+  "src/adapters/persistence/department.rs": {
+    "sha256": "cb13046eca71b3c35a2e492e38dda3994893a0fabce544664ee6248c4412ad08",
+    "executable": false
+  },
+  "src/adapters/persistence/department/lifecycle.rs": {
+    "sha256": "737dc939f1ce8a31701b3e36ebf7b137f33bbef261983143f93fe6f3ae2e79fd",
+    "executable": false
+  },
+  "src/adapters/persistence/department/roles.rs": {
+    "sha256": "0d8adfadbbe9430e7229b0953ccd4a11c8436b7a13267991992e6402e2b6dc27",
+    "executable": false
+  },
+  "src/adapters/persistence/department_competing_tests.rs": {
+    "sha256": "4f94f8d0b2f8c938072dd912bd44e51ed274b11ad55df4e2eb98ff0acea79d5f",
+    "executable": false
+  },
+  "src/adapters/persistence/department_desks_tests.rs": {
+    "sha256": "519478468dc11d5803501dc5859577c0397edcecd6bfde8dbd83716aa5316800",
+    "executable": false
+  },
+  "src/adapters/persistence/department_lead_desk_tests.rs": {
+    "sha256": "1164cb08ec49dabad0a4cc2be355ca67e309d95a11781f2ab95aceecf2a7af21",
+    "executable": false
+  },
+  "src/adapters/persistence/department_retirement_audit_tests.rs": {
+    "sha256": "08892191fe68f365f68e4ba798fd3950055c628b40a0080d7875505f0cdd8252",
+    "executable": false
+  },
+  "src/adapters/persistence/department_roster_tests.rs": {
+    "sha256": "a07d7da8ecbc254144139749f01151aebfa0944715b679b3f704ece2b91c753d",
+    "executable": false
+  },
+  "src/adapters/persistence/department_sponsor_tests.rs": {
+    "sha256": "12a36bc1425505c035f5f49fb743762204c6f7962bd90af6fbf8d8e90cc6a8c8",
+    "executable": false
+  },
+  "src/adapters/persistence/department_tests.rs": {
+    "sha256": "7dd4c7e4325ec309fcec9ee3e63c371dbe758a302ba301e6a47850772e030002",
+    "executable": false
+  },
+  "src/adapters/persistence/notification/projection.rs": {
+    "sha256": "c18054cc16810fec94a194304336c8395fc23993633fd9bd8a530c8e1081d4b6",
+    "executable": false
+  },
+  "src/adapters/persistence/notification/projection_lock.rs": {
+    "sha256": "69259ac90b135161500bbf8b9632052fed4158f7c14d9d362e03515ca3c40f1f",
+    "executable": false
+  },
+  "src/adapters/persistence/notification/reviewer_notice.rs": {
+    "sha256": "75b9559334056b0f652ad26ec466b8de4f0c00c79108f3b714c24a0cf0713d8b",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/agent_manifest/roles.rs": {
+    "sha256": "7b2fe7437d03c47a903b73b876e1364434e57b2870a8e6319cb4dfd744764eac",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/agent_manifest/storage.rs": {
+    "sha256": "b27ea3f8241a38d57f8ece8d527f6625b382c631220a76859ea0890b37af8ad1",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/decision_information.rs": {
+    "sha256": "69166d8b268c324e6354dc9f08e6d36e2c35a242ad123e3a7dabe4e422b87a2b",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/decisions.rs": {
+    "sha256": "125b17017877d6280610784a8c7aea17fbdcccd02397735d938b42258193254e",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs": {
+    "sha256": "b2740bcba052986744a714d60f8d80481d35d61cd4904413e36a2f20e10fa7aa",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_cancellation_tests.rs": {
+    "sha256": "67e32a94ccd5539d89e68daf1b6860d6db01bd082d3018bd70822261b3b27ad9",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_default_tests.rs": {
+    "sha256": "a31c7c36015e06e42db032f9fdff722c39713126a2c834363a0ecd9847c1233d",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_follow.rs": {
+    "sha256": "3b4634674eda03d6d60fc380a753a592ca544ccbd9c1f9d71830a80f035a35b0",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_guard_tests.rs": {
+    "sha256": "d7ac4c22c8fb0878b747411c5a8076561527722eae0e8548ec2c3478541450b9",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs": {
+    "sha256": "0a01e7323385cea9822e489f743a755f6e5c182b6047a22769aaaa1a44bce879",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalation_refusal_tests.rs": {
+    "sha256": "b6f1e8641690254da62898fab64fb700256c7d8dfc3e59e580d32916358f0ead",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/escalations.rs": {
+    "sha256": "ef5d7087b36373c1c3bcb3e3957e1b305302e9a7573dcc948021397074caa391",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/follow_escalation_tests.rs": {
+    "sha256": "b340c0baaf5479014f4f298ba344d7db934c3d166c5bb373913bde33f520107f",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/follow_retirement_tests.rs": {
+    "sha256": "aca46823954ddb52e11f9b74f400ed0ac3a19611bd032dcdb7cb5cecf5d03609",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/follow_reviewer_tests.rs": {
+    "sha256": "4d72dd6501e6cabc3e2e9b111c98a90f9c4f886af2439fd5fc12de711c80ecf4",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/follow_reviewers/mod.rs": {
+    "sha256": "13d453ed2994a9a28550a5f1aeae6ecf5787e09023d7b20e18a5532564c5ada1",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/follow_reviewers/roles.rs": {
+    "sha256": "71b25a22698dbbe2f8da067258bb067b083621367dda3b753c96fcfc3e326ec5",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/mod.rs": {
+    "sha256": "e0e5827e93e6b64a247fbb654b4446f231b497fe56833a86d6b393293d754ac5",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/people_resolution_tests.rs": {
+    "sha256": "b34503e7c72629f17e689dd437a91d3023f89523d6ae10926945990af0079e31",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/people_resolutions.rs": {
+    "sha256": "d5ff5bfd901d5ea243e067603dc59b499f41ca9384ecd3ca5022c06ff4a3fc60",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/people_sponsor_resolution_tests.rs": {
+    "sha256": "526b5383d71f586306f1c7e76032bbcdde951bdf1584a6c05f9663e43b17cc6d",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/provisioning_runtime_tests.rs": {
+    "sha256": "a56b6490ef2be01b8cc174f94cc30f2e1d8fddd94c7da75eebc78768f995b90c",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/reviewer_account_race_tests.rs": {
+    "sha256": "2cb228ae900b834bc8644013c4767891aa4937f98cfef7331810c0a2a8e306f6",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/reviewer_action_tests.rs": {
+    "sha256": "661830f44c1a221a881374b4d2b7b1d1e931cc4cca7276645dc58de54e3c48ad",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/reviewer_resolution.rs": {
+    "sha256": "c230efbf87b0ccef178f43ff526ea49a962e424f8d7f3f858cb4bdadd998f125",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_binding_tests.rs": {
+    "sha256": "4d4bd188f833d811dedb96dd3915a56ef3a08530a9fffd29dfb62735fd19728a",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_child_runtime_tests.rs": {
+    "sha256": "538e8f0338399c19d607064c269fcfa341427ced22388a4c1e4ed48863052581",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs": {
+    "sha256": "fb1d5e549698f7a3e8ad0e15efdd462fc20813b62e70ad49d5b57763e946aec0",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_reviewer_child_tests.rs": {
+    "sha256": "6b0a36b0492e53ba1947fe30cd37c271bfe7e69bfd4edc269771458ff2811e92",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_reviewer_tests.rs": {
+    "sha256": "899b6e16d89a5c6a686825859452612f65bbaec3f9741d00ec32afd83be47d0d",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_runtime_race_support.rs": {
+    "sha256": "47f45d2ddea2522e157a95af025a67bdf0efdf02ae0d32e70ad6a3309253f5ba",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_runtime_tests.rs": {
+    "sha256": "453f4bfb06904ac56d8864c1b08977fe43e7db4b97e9a53213d216bdfb0fb888",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_snapshot_race_tests.rs": {
+    "sha256": "55f034b9055420b18acb50fd548a6067c0465d170036fc8d433720fdaaba8bcd",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs": {
+    "sha256": "c2419ad55fa44c6dbc64a9d221e894b31f8cdd700f2ba9532ce494d715a56c11",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_snapshot_tests.rs": {
+    "sha256": "ee9dc0b316833cbb651160a60dc73aa95b8b905042d1972aaa28f1976601e99f",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_sponsor_runtime_tests.rs": {
+    "sha256": "b0587942c8d7876e902c333ca201e8856803de69239916219ab3e49dd196afcd",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/role_views.rs": {
+    "sha256": "2e0f79021ebfe56860491064d20a8882889b7d26e5a89242b3a309ce9ca260b0",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/sponsor_agent_snapshot_tests.rs": {
+    "sha256": "1ef9227640cb3f63971d472b2a8dab1951d22b9612d87a7ec7c13d974fc07e4e",
+    "executable": false
+  },
+  "src/adapters/persistence/workflow/sponsor_notice_tests.rs": {
+    "sha256": "de6062e9860af195848ded4694bc45fb799fb2e3b53b0510b13c6585ab77cde1",
+    "executable": false
+  },
+  "src/application/agent/manifest.rs": {
+    "sha256": "a1c4647d71e155bb22f34df2118ce28071fc103dd4c538899e6913b52abbf1c0",
+    "executable": false
+  },
+  "src/application/ports/department.rs": {
+    "sha256": "b700dede03bffbb5bd1c2ac6a61eee48251248d452ab3c3d990834f84c8d002a",
+    "executable": false
+  },
+  "src/application/services/notification_worker.rs": {
+    "sha256": "67c48bf5179cbb499795e651e90286c914a889a08db4585bf3e4e716b4260e82",
+    "executable": false
+  },
+  "src/application/use_cases/department.rs": {
+    "sha256": "6b228837fe574afdaeaf38f2de9057e276adf841698d9dbd785e85dc5018bd01",
+    "executable": false
+  },
+  "src/application/use_cases/onboarding.rs": {
+    "sha256": "edb194df307ec0a3a8bd8c816aab92943d99a572c81ef0c2f284c4f099bbb836",
+    "executable": false
+  },
+  "src/application/use_cases/thread/tests.rs": {
+    "sha256": "b436810639214b040dc60593c7e09420096622aca68d409096b11f80a5af1ede",
+    "executable": false
+  },
+  "src/application/workflow/binding/escalation.rs": {
+    "sha256": "18b4c71de7732912042ea3c7e75004f94ddde0966ba13854d8e0e9ac191247fd",
+    "executable": false
+  },
+  "src/application/workflow/compiler/roles.rs": {
+    "sha256": "1265cafb595633ff02787e84a68d8e1dea7e74907b8e1adf19ce64eb64d50ee8",
+    "executable": false
+  },
+  "src/application/workflow/escalation_recipient_tests.rs": {
+    "sha256": "9b9ed49017cdba254139d78359eefd112a0f1725422284ef0ca90939067b34bd",
+    "executable": false
+  },
+  "src/application/workflow/escalation_recipients.rs": {
+    "sha256": "1d9f373b67104a1c9b3080e052472d9c801ae0ed6d1b2cc164250f13111297e9",
+    "executable": false
+  },
+  "src/application/workflow/fixtures/mod.rs": {
+    "sha256": "3926345ea42dcb3a30ffcda77df7646bfa2e70ce25b81f6c4e205152ad1479e1",
+    "executable": false
+  },
+  "src/application/workflow/fixtures/role-sponsor-approval.yaml": {
+    "sha256": "7454ce9e2ccc6f994a8bbaaebf06ba2acc6976611075e08b37078ce67782ce81",
+    "executable": false
+  },
+  "src/application/workflow/people_resolution.rs": {
+    "sha256": "07dba8b36d24a1328b06396ab2a58b08a9a0b5a7b491d172f0dbae9da253cef2",
+    "executable": false
+  },
+  "src/application/workflow/publication/role_tests.rs": {
+    "sha256": "ae4d956746a6c3d41a2a92c69b4d3de4986315132420289d68ae4a55778d60a1",
+    "executable": false
+  },
+  "src/application/workflow/reads.rs": {
+    "sha256": "bc41cfdb1a142269554a5d09b258ceea776b7b76e4790d3d2ec600379e70a5e6",
+    "executable": false
+  },
+  "src/application/workflow/registry/help.rs": {
+    "sha256": "703778ed4d26ff22a7f552cd8c43cb12f560d0e2408601d860af470a0683a293",
+    "executable": false
+  },
+  "src/application/workflow/registry/roles.rs": {
+    "sha256": "916148590a624b64bb3fc65e6bf6c164be7f580db98511ab51844646c3d7159a",
+    "executable": false
+  },
+  "src/application/workflow/registry/schemas.rs": {
+    "sha256": "97dbfae6600f4aa07f1109df971b18a9fc2accbec1c85cd76fcc02af0473bb93",
+    "executable": false
+  },
+  "src/application/workflow/roles.rs": {
+    "sha256": "edc286af84a4cd0ea410c61143fe4896e851fbed602119a51bdc242a3d96315e",
+    "executable": false
+  },
+  "src/application/workflow/roles_tests.rs": {
+    "sha256": "8d826b5c38f63a216150da588820ac3e2319c36700395790dfc456e34b74dc31",
+    "executable": false
+  },
+  "src/domain/entities/department.rs": {
+    "sha256": "fa3d4fc457ffe1ceeb85d7d75b30e3ad416c85b6b5ee005973dd76e196e401eb",
+    "executable": false
+  },
+  "src/domain/entities/notification.rs": {
+    "sha256": "3f7f8fb0748b056b6627993864fbe63f18a73074e94c1f0179e31e77313101f5",
+    "executable": false
+  },
+  "src/domain/entities/workflow_escalation.rs": {
+    "sha256": "6d32124a6e7ebb5307b788da94e919ce16610386fbdd08b704864967d785b610",
+    "executable": false
+  }
+}

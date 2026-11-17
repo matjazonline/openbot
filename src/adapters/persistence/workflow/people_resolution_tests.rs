@@ -7,6 +7,9 @@ use crate::application::workflow::people_resolution::{
 use crate::entities::agent_capability::DependencyManifestId;
 use crate::entities::department::RoleRefusalKind;
 
+#[path = "people_sponsor_resolution_tests.rs"]
+mod sponsors;
+
 #[derive(sqlx::FromRow)]
 struct RootIdentity {
     manifest_id: Uuid,
@@ -20,6 +23,7 @@ async fn document(f: &PeopleFixture, run: RunId) -> PeopleResolution {
          WHERE ownership.company_id=$1 AND ownership.run_id=$2",
     ).bind(f.role.company().as_uuid()).bind(run.as_uuid()).fetch_one(f.role.p().pool()).await.unwrap();
     PeopleResolution {
+        informed: Vec::new(),
         format: PeopleResolutionFormat::V1,
         company_id: f.role.company(),
         root_run_id: run,

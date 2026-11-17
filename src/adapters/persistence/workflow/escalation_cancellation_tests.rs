@@ -36,8 +36,11 @@ async fn workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_r
             f.people.role.admission.binding.target.actor.user_id(),
             f.scope.company.as_uuid(),
             f.people.role.department,
-            DepartmentRole::Reviewer,
-            f.people.principals[0],
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Reviewer,
+                principal: f.people.principals[0],
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -109,8 +112,11 @@ async fn workflow_escalation_decision_admission_refusal_has_no_run_control_and_c
             binding.target.actor.user_id(),
             people.role.company().as_uuid(),
             people.role.department,
-            DepartmentRole::Reviewer,
-            people.principals[0],
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Reviewer,
+                principal: people.principals[0],
+                successor: None,
+            },
         )
         .await
         .unwrap();

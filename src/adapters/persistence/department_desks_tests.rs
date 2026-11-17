@@ -179,8 +179,11 @@ async fn lead(f: &Departments, department: DepartmentId, principal: PrincipalId)
             f.owner,
             f.company,
             department,
-            DepartmentRole::Lead,
-            principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -463,8 +466,11 @@ async fn department_desk_members_only_reaches_one_step_up_and_down() {
             f.owner,
             f.company,
             middle.id,
-            DepartmentRole::Lead,
-            middle_lead,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: middle_lead,
+                successor: None,
+            },
         )
         .await
         .unwrap();

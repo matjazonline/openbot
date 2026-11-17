@@ -1,0 +1,15 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 13m 43s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/target/debug/deps/open_bots-6145e191a69c5cd2)
+
+running 1 test
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_two_units_freeze_deciders_information_and_settlement_authority ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 4730 filtered out; finished in 58.94s
+

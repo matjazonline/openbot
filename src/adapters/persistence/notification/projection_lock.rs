@@ -52,7 +52,7 @@ pub(super) async fn lock_on(
             .execute(&mut *db)
             .await?;
         }
-        NotificationSourceKind::DecisionReviewer => {
+        NotificationSourceKind::DecisionReviewer | NotificationSourceKind::DecisionInformation => {
             super::reviewer_notice::lock_source_on(db, event).await?
         }
         NotificationSourceKind::EscalationControl => {

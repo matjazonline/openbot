@@ -15,6 +15,7 @@ use crate::use_cases::department::{DepartmentDetail, DepartmentView};
 
 fn department(company_id: Uuid, name: &str, slug: &str, parent: Option<&Department>) -> Department {
     Department {
+        escalation: None,
         id: DepartmentId::new(Uuid::new_v4()),
         company_id,
         name: name.into(),
@@ -131,6 +132,7 @@ fn department_ui_pane_indents_the_tree_and_shows_the_selected_department() {
     let view = DepartmentView {
         detail: DepartmentDetail {
             department: Department {
+                escalation: None,
                 charter: Some("Win and <keep> customers.".into()),
                 description: Some("Closes <new> business.".into()),
                 ..tree.sales.clone()
@@ -140,6 +142,7 @@ fn department_ui_pane_indents_the_tree_and_shows_the_selected_department() {
                 created_at: Utc::now(),
             }],
             roles: vec![DepartmentRoleHolder {
+                decider: false,
                 role: DepartmentRole::Lead,
                 principal_id: lead.principal_id,
             }],
@@ -262,6 +265,7 @@ fn department_ui_member_sees_their_departments_without_forms() {
     assert!(!html.contains(">Revenue<"));
     // Its parent is one the member is not in, so it is not named.
     assert!(html.contains("A department you are not in"));
+    assert!(html.contains("No local default; an ancestor may supply one."));
     for write in ["hx-put=", "hx-post=", "hx-delete=", "New department"] {
         assert!(!html.contains(write), "{write} in {html}");
     }
@@ -776,4 +780,74 @@ fn department_views_usage_page_groups_by_department() {
     let none = html.find("No department").expect("the unowned row");
     assert!(sales < none);
     assert!(!html.contains("Sales <team>"));
+}
+
+#[test]
+fn department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation() {
+    let mut tree = tree();
+    tree.revenue.escalation = Some(crate::entities::workflow_escalation::EscalationPolicy {
+        notify: DepartmentRole::Sponsor,
+        hops: crate::entities::workflow_escalation::EscalationHops::try_from(2).unwrap(),
+    });
+    let deciding = principal(
+        PrincipalKind::Person,
+        "Sponsor <decides>",
+        "sponsor@example.test",
+    );
+    let informed = principal(PrincipalKind::Agent, "Agent <informed>", "agent");
+    let view = DepartmentView {
+        detail: DepartmentDetail {
+            department: tree.inside.clone(),
+            members: Vec::new(),
+            roles: vec![
+                DepartmentRoleHolder {
+                    role: DepartmentRole::Sponsor,
+                    principal_id: deciding.principal_id,
+                    decider: true,
+                },
+                DepartmentRoleHolder {
+                    role: DepartmentRole::Sponsor,
+                    principal_id: informed.principal_id,
+                    decider: false,
+                },
+            ],
+        },
+        principals: vec![deciding.clone(), informed.clone()],
+        desks: Vec::new(),
+    };
+    let all = tree.all();
+    let html = section(
+        &tree,
+        &all,
+        DepartmentDetailPane::Department {
+            view: &view,
+            draft: None,
+        },
+        &[deciding, informed],
+        true,
+        None,
+    );
+    assert!(html.contains("Sponsor &lt;decides&gt;"));
+    assert!(html.contains(">decides</span>"));
+    assert!(html.contains(">informed</span>"));
+    assert!(html.contains("Mark decides"));
+    assert!(html.contains("Remove sponsor"));
+    assert!(html.contains("name=\"successor\""));
+    assert!(html.contains("When work stalls, tell"));
+    assert!(html.contains("Inherited from Revenue: tell sponsor"));
+    assert!(html.contains("data-pending-label=\"Saving…\""));
+    assert!(!html.contains("Sponsor <decides>"));
+    let readonly = section(
+        &tree,
+        &all,
+        DepartmentDetailPane::Department {
+            view: &view,
+            draft: None,
+        },
+        &[],
+        false,
+        None,
+    );
+    assert!(!readonly.contains("Mark decides"));
+    assert!(!readonly.contains("Remove sponsor"));
 }

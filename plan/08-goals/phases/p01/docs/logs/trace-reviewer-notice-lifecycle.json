@@ -1,0 +1,138 @@
+{
+  "pattern": "workflow_reviewer_notices",
+  "filesSearched": 2066,
+  "totalHits": 8,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/storage.rs#insert_reviewer_on",
+        "name": "insert_reviewer_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+        "span": "L113-L129"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 122,
+          "text": "sqlx::query(\"INSERT INTO workflow_reviewer_notices(company_id,id,decision_id,principal_id,assignment_revision,event_id) VALUES($1,$2,$3,$4,$5,$6)\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/storage.rs#withdraw_on",
+        "name": "withdraw_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+        "span": "L138-L170"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 146,
+          "text": "JOIN workflow_reviewer_notices AS source ON source.company_id=reviewer.company_id AND source.decision_id=reviewer.decision_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/reviewer_notice.rs#source_on",
+        "name": "source_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+        "span": "L18-L65"
+      },
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "FROM workflow_reviewer_notices AS notice \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/reviewer_notice.rs#lock_source_on",
+        "name": "lock_source_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+        "span": "L67-L88"
+      },
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 72,
+          "text": "\"SELECT decision.run_id FROM workflow_reviewer_notices AS notice \\"
+        },
+        {
+          "line": 82,
+          "text": "sqlx::query(\"SELECT decision.id FROM workflow_decisions AS decision JOIN workflow_reviewer_notices AS notice \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/reviewer_notice.rs#record_receipt_on",
+        "name": "record_receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+        "span": "L91-L112"
+      },
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 107,
+          "text": "FROM workflow_reviewer_notices AS source LEFT JOIN notifications AS notification \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_retirement_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+        "span": "L4-L80"
+      },
+      "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": "AND NOT EXISTS(SELECT 1 FROM workflow_reviewer_notices WHERE company_id=$2)\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal",
+        "name": "workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L118-L207"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 151,
+          "text": "\"SELECT count(*) FROM workflow_reviewer_notices WHERE company_id=$1 AND decision_id=$2\","
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 38382
+  }
+}

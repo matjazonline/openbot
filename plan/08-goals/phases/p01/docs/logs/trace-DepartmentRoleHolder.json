@@ -1,0 +1,199 @@
+{
+  "pattern": "DepartmentRoleHolder",
+  "filesSearched": 2066,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L276-L281"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 276,
+          "text": "async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "DepartmentRole, DepartmentRoleHolder, department_tree,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/department_ui_tests.rs#department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "name": "department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "kind": "function",
+        "path": "src/adapters/http/pages/department_ui_tests.rs",
+        "span": "L119-L234"
+      },
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "roles: vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_with_an_agent_lead_answers_on_it",
+        "name": "department_lead_desk_with_an_agent_lead_answers_on_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L167-L209"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 204,
+          "text": "vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_assigns_replaces_and_clears_the_lead",
+        "name": "department_write_assigns_replaces_and_clears_the_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L491-L572"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 506,
+          "text": "vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L769-L791"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 773,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>> {"
+        },
+        {
+          "line": 785,
+          "text": "Ok(DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L110-L114"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>>;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "DepartmentRole, DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#DepartmentDetail",
+        "name": "DepartmentDetail",
+        "kind": "struct",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L119-L124"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": "pub roles: Vec<DepartmentRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#DepartmentRoleHolder",
+        "name": "DepartmentRoleHolder",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L103-L106"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "pub struct DepartmentRoleHolder {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 7,
+    "baselineChars": 161628
+  }
+}

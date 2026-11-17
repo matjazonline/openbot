@@ -1,0 +1,28 @@
+
+> bb-plugin-openbot-local@0.2.0 package
+> node scripts/package.mjs /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//openbot-check.MWDLY0/plugin
+
+node:internal/modules/run_main:107
+    triggerUncaughtException(
+    ^
+
+AssertionError [ERR_ASSERTION]: use the pinned Node runtime
++ actual - expected
+
++ 'v24.22.3'
+- 'v24.21.0'
+        ^
+
+    at file:///Users/mac02/orca/workspaces/openbot/plan08_ph1/integrations/cloudroom-plugin/scripts/package.mjs:10:8
+    at ModuleJob.run (node:internal/modules/esm/module_job:561:25)
+    at async node:internal/modules/esm/loader:647:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  generatedMessage: false,
+  code: 'ERR_ASSERTION',
+  actual: 'v24.22.3',
+  expected: 'v24.21.0',
+  operator: 'strictEqual',
+  diff: 'simple'
+}
+
+Node.js v24.22.3

@@ -231,3 +231,6 @@ async fn workflow_escalation_trigger_guard_without_an_opted_in_policy_creates_no
         json!({"state":"failed","runs":1,"cases":0,"controls":0,"hops":0,"notices":0,"guard_events":1})
     );
 }
+
+#[path = "escalation_default_tests.rs"]
+mod defaults;

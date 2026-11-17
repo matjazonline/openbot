@@ -588,11 +588,13 @@ fn escalation_field(
         .map(|policy| format!("{}:{}", policy.notify, policy.hops.get()))
         .unwrap_or_default();
     let options: String = [
-        ("", "Disabled"),
+        ("", "Use unit default"),
         ("lead:1", "Lead, one hop"),
         ("lead:2", "Lead, then parent lead"),
         ("reviewer:1", "Reviewers, one hop"),
         ("reviewer:2", "Reviewers, then parent lead"),
+        ("sponsor:1", "Sponsor decider, one hop"),
+        ("sponsor:2", "Sponsor decider, then parent lead"),
     ]
     .into_iter()
     .map(|(value, label)| {

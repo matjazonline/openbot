@@ -702,7 +702,15 @@ async fn department_lead_desk_answers_through_its_current_lead() {
         .await
         .unwrap();
     departments
-        .assign_role(scope, department.id, DepartmentRole::Lead, leads[0].1)
+        .assign_role(
+            scope,
+            department.id,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: leads[0].1,
+                decider: false,
+            },
+        )
         .await
         .unwrap();
     let binding: Uuid = sqlx::query_scalar(
@@ -728,7 +736,15 @@ async fn department_lead_desk_answers_through_its_current_lead() {
     }))
     .await;
     departments
-        .assign_role(scope, department.id, DepartmentRole::Lead, leads[1].1)
+        .assign_role(
+            scope,
+            department.id,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: leads[1].1,
+                decider: false,
+            },
+        )
         .await
         .unwrap();
     write(
@@ -840,7 +856,15 @@ async fn department_context_reaches_the_lead_on_its_department_desk() {
         .await
         .unwrap();
     departments
-        .assign_role(scope, department.id, DepartmentRole::Lead, created[0].1)
+        .assign_role(
+            scope,
+            department.id,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: created[0].1,
+                decider: false,
+            },
+        )
         .await
         .unwrap();
     departments

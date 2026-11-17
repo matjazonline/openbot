@@ -27,11 +27,11 @@ pub(in crate::adapters::persistence::workflow) async fn persist_on(
         .bind(company).bind(root).bind(id.as_uuid()).execute(&mut *db).await?;
     for role in &manifest.roles {
         for principal in &role.principals {
-            sqlx::query("INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)")
+            sqlx::query("INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role,department_id,principal_id,agent_id,agent_revision_id,capacity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)")
                 .bind(company).bind(root).bind(id.as_uuid()).bind(role.version_id.as_uuid())
                 .bind(role.step.as_str()).bind(role.role.as_str()).bind(role.department_id.as_uuid())
                 .bind(principal.principal_id.as_uuid()).bind(principal.agent_id.map(|agent| agent.as_uuid()))
-                .bind(principal.revision_id.map(|revision| revision.as_uuid())).execute(&mut *db).await?;
+                .bind(principal.revision_id.map(|revision| revision.as_uuid())).bind(principal.capacity.as_str()).execute(&mut *db).await?;
         }
     }
     Ok(id)
@@ -254,7 +254,7 @@ async fn agent_for_step_with_locks_on(
                AND selection.revision_id=role_binding.agent_revision_id \
              WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND role_binding.version_id=$3 \
                AND role_binding.step=$4 AND role_binding.role=$5 AND role_binding.resolution_revision=0 \
-               AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection"),
+               AND role_binding.capacity='decides' AND role_binding.agent_id IS NOT NULL FOR SHARE OF ownership,role_binding,selection"),
         ).bind(company.as_uuid()).bind(run.as_uuid()).bind(definition.version_id.as_uuid())
             .bind(step.as_str()).bind(reference.role.as_str()).fetch_optional(db).await?.ok_or_else(missing)?;
         return Ok(AgentId::new(agent));

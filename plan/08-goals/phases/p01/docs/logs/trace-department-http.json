@@ -1,0 +1,172 @@
+{
+  "pattern": "DepartmentDraft|DepartmentEdit",
+  "filesSearched": 197,
+  "totalHits": 13,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/department.rs#update_department_json",
+        "name": "update_department_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/department.rs",
+        "span": "L156-L181"
+      },
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 162,
+          "text": "let edit = DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#draft",
+        "name": "draft",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L255-L264"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 255,
+          "text": "fn draft(&self) -> DepartmentDraft {"
+        },
+        {
+          "line": 256,
+          "text": "DepartmentDraft {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_companies.rs#departments_pane",
+        "name": "departments_pane",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_companies.rs",
+        "span": "L343-L380"
+      },
+      "path": "src/adapters/http/routes/ui_companies.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 352,
+          "text": "_ if creating => DepartmentSelection::Create(pages::DepartmentDraft::default()),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#edit",
+        "name": "edit",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L293-L306"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 293,
+          "text": "fn edit(&self) -> AppResult<DepartmentEdit> {"
+        },
+        {
+          "line": 294,
+          "text": "Ok(DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#new_department",
+        "name": "new_department",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L352-L367"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 361,
+          "text": "DepartmentSelection::Create(DepartmentDraft::default()),"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "application::ports::department::{DepartmentEdit, DepartmentWrite},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments_tests.rs#department_ui_owner_writes_render_and_refusals_land_on_their_form",
+        "name": "department_ui_owner_writes_render_and_refusals_land_on_their_form",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments_tests.rs",
+        "span": "L207-L424"
+      },
+      "path": "src/adapters/http/routes/ui_departments_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 276,
+          "text": "crate::application::ports::department::DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 26,
+          "text": "pages::{self, DepartmentDetailPane, DepartmentDraft, DepartmentForm},"
+        },
+        {
+          "line": 29,
+          "text": "application::ports::department::{DepartmentEdit, DepartmentWrite},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#DepartmentSelection",
+        "name": "DepartmentSelection",
+        "kind": "enum",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L79-L86"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 81,
+          "text": "Create(DepartmentDraft),"
+        },
+        {
+          "line": 84,
+          "text": "draft: Option<DepartmentDraft>,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 4,
+    "baselineChars": 87019
+  }
+}

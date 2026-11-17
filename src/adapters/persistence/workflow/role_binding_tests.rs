@@ -242,8 +242,11 @@ async fn workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders(
                 f.target.actor.user_id(),
                 f.target.company.as_uuid(),
                 department,
-                DepartmentRole::Reviewer,
-                PrincipalId::new(holder),
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal: PrincipalId::new(holder),
+                    decider: false,
+                },
             )
             .await
             .unwrap();

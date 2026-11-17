@@ -2861,6 +2861,7 @@ fn use_cases_with_departments(
         .enumerate()
         .map(
             |(index, (name, parent))| crate::entities::department::Department {
+                escalation: None,
                 id: ids[index],
                 company_id,
                 name: (*name).to_string(),

@@ -1,0 +1,5 @@
+pg_stat_statements
+top
+off
+0
+0

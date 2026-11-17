@@ -471,8 +471,11 @@ async fn department_ui_foreign_ids_under_the_owners_path_change_nothing() {
             f.stranger.id,
             f.foreign.id,
             theirs,
-            DepartmentRole::Lead,
-            PrincipalId::new(their_person),
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: PrincipalId::new(their_person),
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -617,4 +620,117 @@ async fn department_ui_foreign_ids_under_the_owners_path_change_nothing() {
     assert_eq!(untouched.members.len(), 1);
     assert_eq!(untouched.roles.len(), 1);
     assert_eq!(untouched.members[0].principal_id.as_uuid(), their_person);
+}
+
+#[tokio::test]
+async fn department_sponsor_ui_mutations_hide_unauthorized_and_foreign_units() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let mine = create(&f, "Sponsor routes", "sponsor-routes").await;
+    let principal = person(&f, &f.owner).await;
+    for user in [&f.member, &f.stranger] {
+        denied(
+            assign_sponsor(
+                workspace(&f, user),
+                Path((f.company.id, mine.as_uuid())),
+                Form(SponsorForm {
+                    principal_id: principal,
+                    decider: Some(true),
+                    successor: None,
+                }),
+            )
+            .await,
+            StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+        denied(
+            set_escalation(
+                workspace(&f, user),
+                Path((f.company.id, mine.as_uuid())),
+                Form(EscalationForm {
+                    notify: "sponsor".into(),
+                    hops: 2,
+                }),
+            )
+            .await,
+            StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+        denied(
+            remove_sponsor(
+                workspace(&f, user),
+                Path((f.company.id, mine.as_uuid())),
+                Form(SponsorForm {
+                    principal_id: principal,
+                    decider: None,
+                    successor: None,
+                }),
+            )
+            .await,
+            StatusCode::NOT_FOUND,
+            &f.company.name,
+        )
+        .await;
+    }
+    let foreign = f
+        .departments()
+        .create_department(
+            f.stranger.id,
+            f.foreign.id,
+            DepartmentWrite {
+                name: "Foreign sponsor unit".into(),
+                slug: "foreign-sponsor-unit".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    denied(
+        assign_sponsor(
+            workspace(&f, &f.owner),
+            Path((f.company.id, foreign.id.as_uuid())),
+            Form(SponsorForm {
+                principal_id: principal,
+                decider: Some(true),
+                successor: None,
+            }),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.foreign.name,
+    )
+    .await;
+    denied(
+        set_escalation(
+            workspace(&f, &f.owner),
+            Path((f.company.id, foreign.id.as_uuid())),
+            Form(EscalationForm {
+                notify: "sponsor".into(),
+                hops: 2,
+            }),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.foreign.name,
+    )
+    .await;
+    denied(
+        remove_sponsor(
+            workspace(&f, &f.owner),
+            Path((f.company.id, foreign.id.as_uuid())),
+            Form(SponsorForm {
+                principal_id: principal,
+                decider: None,
+                successor: None,
+            }),
+        )
+        .await,
+        StatusCode::NOT_FOUND,
+        &f.foreign.name,
+    )
+    .await;
 }

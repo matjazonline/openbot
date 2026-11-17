@@ -13,8 +13,11 @@ async fn clear_lead(d: &Deployment, desk: &RoleDesk, agent: &RoleAgent) {
             d.fixture.target.actor.user_id(),
             d.fixture.target.company.as_uuid(),
             desk.department,
-            DepartmentRole::Lead,
-            agent.principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: agent.principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();

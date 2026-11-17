@@ -1,0 +1,77 @@
+{
+  "pattern": "RolePrincipalSelection",
+  "filesSearched": 2066,
+  "totalHits": 4,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#finish_roles_on",
+        "name": "finish_roles_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L211-L272"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 263,
+          "text": ".map(|principal| RolePrincipalSelection {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::application::agent::{RolePrincipalSelection, RoleResolution};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/manifest.rs#RolePrincipalSelection",
+        "name": "RolePrincipalSelection",
+        "kind": "struct",
+        "path": "src/application/agent/manifest.rs",
+        "span": "L32-L36"
+      },
+      "path": "src/application/agent/manifest.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 32,
+          "text": "pub struct RolePrincipalSelection {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/agent/manifest.rs#RoleResolution",
+        "name": "RoleResolution",
+        "kind": "struct",
+        "path": "src/application/agent/manifest.rs",
+        "span": "L40-L46"
+      },
+      "path": "src/application/agent/manifest.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 45,
+          "text": "pub principals: Vec<RolePrincipalSelection>,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 2,
+    "baselineChars": 19527
+  }
+}

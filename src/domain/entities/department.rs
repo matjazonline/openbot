@@ -36,26 +36,29 @@ pub struct Department {
     /// What the department is for, shown to its members and leads so they share one framing.
     pub charter: Option<String>,
     pub parent_id: Option<DepartmentId>,
+    pub escalation: Option<super::workflow_escalation::EscalationPolicy>,
     pub created_by: CreationProvenance,
     pub created_at: DateTime<Utc>,
 }
 
-/// A role a principal holds in a department. `Lead` has exactly one holder; later plans add
-/// roles that may have several.
+/// A role a principal holds in a department. Lead has at most one holder; reviewer and sponsor
+/// may have several. Sponsor selects one deciding holder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum DepartmentRole {
     Lead,
     Reviewer,
+    Sponsor,
 }
 
 impl DepartmentRole {
-    pub const ALL: [Self; 2] = [Self::Lead, Self::Reviewer];
+    pub const ALL: [Self; 3] = [Self::Lead, Self::Reviewer, Self::Sponsor];
 
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::Lead => "lead",
             Self::Reviewer => "reviewer",
+            Self::Sponsor => "sponsor",
         }
     }
 
@@ -64,7 +67,7 @@ impl DepartmentRole {
     pub const fn is_single_holder(self) -> bool {
         match self {
             Self::Lead => true,
-            Self::Reviewer => false,
+            Self::Reviewer | Self::Sponsor => false,
         }
     }
 }
@@ -93,6 +96,7 @@ impl FromStr for DepartmentRole {
         match value {
             "lead" => Ok(Self::Lead),
             "reviewer" => Ok(Self::Reviewer),
+            "sponsor" => Ok(Self::Sponsor),
             _ => Err(InvalidDepartmentRole(value.to_string())),
         }
     }
@@ -103,6 +107,24 @@ impl FromStr for DepartmentRole {
 pub struct DepartmentRoleHolder {
     pub role: DepartmentRole,
     pub principal_id: PrincipalId,
+    pub decider: bool,
+}
+
+/// A frozen role holder's authority. Information never grants execution or settlement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoleCapacity {
+    Decides,
+    Informed,
+}
+
+impl RoleCapacity {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Decides => "decides",
+            Self::Informed => "informed",
+        }
+    }
 }
 
 /// A bounded admission refusal. It deliberately carries no holder identities or labels.
@@ -110,6 +132,7 @@ pub struct DepartmentRoleHolder {
 #[serde(rename_all = "snake_case")]
 pub enum RoleRefusalKind {
     NoHolder,
+    NoDecider,
     WrongKind,
     Ambiguous,
     DepthBound,
@@ -122,6 +145,7 @@ impl RoleRefusalKind {
     pub const fn code(self) -> &'static str {
         match self {
             Self::NoHolder => "workflow.role_no_holder",
+            Self::NoDecider => "workflow.role_no_decider",
             Self::WrongKind => "workflow.role_wrong_kind",
             Self::Ambiguous => "workflow.role_ambiguous",
             Self::DepthBound => "workflow.role_depth_bound",

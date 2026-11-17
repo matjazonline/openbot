@@ -110,6 +110,7 @@ pub struct RunSummary {
 /// Initial role holders from the sealed root capture, never today's role assignments.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunRoleHolder {
+    pub capacity: crate::entities::department::RoleCapacity,
     pub version: VersionId,
     pub step: crate::domain::workflow::StepId,
     pub role: crate::entities::department::DepartmentRole,

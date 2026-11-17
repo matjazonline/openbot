@@ -1783,6 +1783,7 @@ mod tests {
     fn desk_departments() -> (DeskDepartments, [Uuid; 3], DepartmentId, DepartmentId) {
         use crate::entities::department::Department;
         let department = |name: &str, parent: Option<DepartmentId>| Department {
+            escalation: None,
             id: DepartmentId::new(Uuid::new_v4()),
             company_id: Uuid::nil(),
             name: name.into(),

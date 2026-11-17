@@ -1,0 +1,4 @@
+    Blocking waiting for file lock on build directory
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+    Finished `dev` profile [unoptimized] target(s) in 3m 41s
+query data written to .sqlx in the current directory; please check this into version control

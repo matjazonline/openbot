@@ -42,8 +42,11 @@ async fn edit_role(f: &AgentCase) {
             f.people.users[0],
             f.people.role.company().as_uuid(),
             f.people.role.department,
-            DepartmentRole::Reviewer,
-            f.people.principals[0],
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal: f.people.principals[0],
+                decider: false,
+            },
         )
         .await
         .unwrap();

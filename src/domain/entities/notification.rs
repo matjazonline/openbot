@@ -21,6 +21,7 @@ uuid_id!(NotificationEventId);
 pub enum NotificationSourceKind {
     Delivery,
     DecisionReviewer,
+    DecisionInformation,
     EscalationControl,
     EscalationNotice,
     DirectMessage,
@@ -31,6 +32,7 @@ impl NotificationSourceKind {
         match self {
             Self::Delivery => "delivery",
             Self::DecisionReviewer => "decision_reviewer",
+            Self::DecisionInformation => "decision_information",
             Self::EscalationControl => "escalation_control",
             Self::EscalationNotice => "escalation_notice",
             Self::DirectMessage => "direct_message",
@@ -45,6 +47,7 @@ impl FromStr for NotificationSourceKind {
         match value {
             "delivery" => Ok(Self::Delivery),
             "decision_reviewer" => Ok(Self::DecisionReviewer),
+            "decision_information" => Ok(Self::DecisionInformation),
             "escalation_control" => Ok(Self::EscalationControl),
             "escalation_notice" => Ok(Self::EscalationNotice),
             "direct_message" => Ok(Self::DirectMessage),
@@ -64,15 +67,17 @@ impl fmt::Display for NotificationSourceKind {
 pub enum NotificationActionKind {
     DeliveryFailure,
     DecisionReview,
+    DecisionInformation,
     EscalationControl,
     EscalationReview,
     DirectMessageReceived,
 }
 
 impl NotificationActionKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::DeliveryFailure,
         Self::DecisionReview,
+        Self::DecisionInformation,
         Self::EscalationControl,
         Self::EscalationReview,
         Self::DirectMessageReceived,
@@ -82,6 +87,7 @@ impl NotificationActionKind {
         match self {
             Self::DeliveryFailure => "delivery_failure",
             Self::DecisionReview => "decision_review",
+            Self::DecisionInformation => "decision_information",
             Self::EscalationControl => "escalation_control",
             Self::EscalationReview => "escalation_review",
             Self::DirectMessageReceived => "direct_message_received",
@@ -92,6 +98,7 @@ impl NotificationActionKind {
         match self {
             Self::DeliveryFailure => "Delivery needs failure recovery",
             Self::DecisionReview => "Workflow decision needs your review",
+            Self::DecisionInformation => "Workflow decision — for information only",
             Self::EscalationControl => "Advance workflow escalation",
             Self::EscalationReview => "Workflow escalation needs your attention",
             Self::DirectMessageReceived => "New direct message",
@@ -101,7 +108,9 @@ impl NotificationActionKind {
     pub const fn email_preference(self, preferences: NotificationPreferences) -> bool {
         match self {
             Self::DeliveryFailure => preferences.delivery_failure_email_enabled,
-            Self::DecisionReview | Self::EscalationReview => preferences.decision_email_enabled,
+            Self::DecisionReview | Self::DecisionInformation | Self::EscalationReview => {
+                preferences.decision_email_enabled
+            }
             Self::EscalationControl | Self::DirectMessageReceived => false,
         }
     }
@@ -114,6 +123,7 @@ impl FromStr for NotificationActionKind {
         match value {
             "delivery_failure" => Ok(Self::DeliveryFailure),
             "decision_review" => Ok(Self::DecisionReview),
+            "decision_information" => Ok(Self::DecisionInformation),
             "escalation_control" => Ok(Self::EscalationControl),
             "escalation_review" => Ok(Self::EscalationReview),
             "direct_message_received" => Ok(Self::DirectMessageReceived),
@@ -385,6 +395,7 @@ mod followed_notice_tests {
                     let expected = match action {
                         NotificationActionKind::DeliveryFailure => delivery,
                         NotificationActionKind::DecisionReview
+                        | NotificationActionKind::DecisionInformation
                         | NotificationActionKind::EscalationReview => decision,
                         NotificationActionKind::EscalationControl
                         | NotificationActionKind::DirectMessageReceived => false,

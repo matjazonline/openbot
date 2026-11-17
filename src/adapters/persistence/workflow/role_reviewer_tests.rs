@@ -80,8 +80,11 @@ impl PeopleFixture {
                     role.admission.binding.target.actor.user_id(),
                     role.company().as_uuid(),
                     role.department,
-                    DepartmentRole::Reviewer,
-                    *principal,
+                    crate::application::ports::department::DepartmentRoleAssignment {
+                        role: DepartmentRole::Reviewer,
+                        principal: *principal,
+                        decider: false,
+                    },
                 )
                 .await
                 .unwrap();
@@ -237,8 +240,11 @@ async fn workflow_role_reviewer_frozen_members_survive_role_reassignment_before_
                 f.role.admission.binding.target.actor.user_id(),
                 f.role.company().as_uuid(),
                 f.role.department,
-                DepartmentRole::Reviewer,
-                *principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: *principal,
+                    successor: None,
+                },
             )
             .await
             .unwrap();
@@ -254,8 +260,11 @@ async fn workflow_role_reviewer_frozen_members_survive_role_reassignment_before_
             f.role.admission.binding.target.actor.user_id(),
             f.role.company().as_uuid(),
             f.role.department,
-            DepartmentRole::Reviewer,
-            principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -305,8 +314,11 @@ async fn workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses
                 f.role.admission.binding.target.actor.user_id(),
                 f.role.company().as_uuid(),
                 f.role.department,
-                DepartmentRole::Lead,
-                lead,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal: lead,
+                    decider: false,
+                },
             )
             .await
             .unwrap();
@@ -419,8 +431,11 @@ async fn workflow_reviewer_principal_owner_and_missing_member_removal_keep_revie
             owner,
             f.role.company().as_uuid(),
             f.role.department,
-            DepartmentRole::Reviewer,
-            principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -509,3 +524,6 @@ async fn workflow_role_reviewer_people_approval_does_not_replace_a_pinned_model_
 
 #[path = "follow_reviewer_tests.rs"]
 mod follow_tests;
+
+#[path = "sponsor_notice_tests.rs"]
+mod sponsor_notices;

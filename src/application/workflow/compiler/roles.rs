@@ -32,7 +32,7 @@ pub(super) fn references(parsed: &ParsedWorkflow) -> Result<Vec<RoleReference>, 
                     parsed,
                     step,
                     "role",
-                    "Choose a literal department role: lead or reviewer",
+                    "Choose a literal department role: lead, reviewer or sponsor",
                 )
             })?;
             roles.push(RoleReference {

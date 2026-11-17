@@ -31,8 +31,11 @@ async fn workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_
             owner,
             f.scope.company.as_uuid(),
             f.people.role.department,
-            DepartmentRole::Reviewer,
-            principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();

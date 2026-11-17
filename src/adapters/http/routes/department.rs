@@ -56,6 +56,7 @@ pub struct DepartmentCreatePayload {
     pub parent_id: Option<Uuid>,
     /// The principal to hold the `lead` role from the start.
     pub lead: Option<Uuid>,
+    pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
 }
 
 /// Only the fields present change. `null` clears an optional field; for `parent_id` it makes the
@@ -70,6 +71,8 @@ pub struct DepartmentUpdatePayload {
     pub charter: Option<Option<String>>,
     #[serde(default, deserialize_with = "present")]
     pub parent_id: Option<Option<Uuid>>,
+    #[serde(default, deserialize_with = "present")]
+    pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
 }
 
 /// A field that is present, even as `null`, is `Some`; an absent one stays `None` via `default`.
@@ -124,6 +127,7 @@ async fn create_department_json(
         charter: payload.charter,
         parent_id: payload.parent_id.map(DepartmentId::new),
         created_by: None,
+        escalation: payload.escalation,
     };
     let department = departments
         .create_department(
@@ -160,6 +164,7 @@ async fn update_department_json(
     Json(payload): Json<DepartmentUpdatePayload>,
 ) -> AppResult<impl IntoResponse> {
     let edit = DepartmentEdit {
+        escalation: payload.escalation,
         name: payload.name,
         slug: payload.slug,
         description: payload.description,
@@ -223,10 +228,21 @@ async fn remove_member_json(
     Ok(StatusCode::NO_CONTENT)
 }
 
+#[derive(Deserialize)]
+struct RoleAssignmentPayload {
+    decider: bool,
+}
+
+#[derive(Default, Deserialize)]
+struct RoleRemovalQuery {
+    successor: Option<Uuid>,
+}
+
 async fn assign_role_json(
     State(departments): State<Arc<DepartmentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, department_id, role, principal_id)): Path<(Uuid, Uuid, String, Uuid)>,
+    Json(payload): Json<RoleAssignmentPayload>,
 ) -> AppResult<impl IntoResponse> {
     let role = role_from_path(&role)?;
     departments
@@ -234,8 +250,11 @@ async fn assign_role_json(
             user.id,
             company_id,
             DepartmentId::new(department_id),
-            role,
-            PrincipalId::new(principal_id),
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role,
+                principal: PrincipalId::new(principal_id),
+                decider: payload.decider,
+            },
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)
@@ -245,6 +264,7 @@ async fn clear_role_json(
     State(departments): State<Arc<DepartmentUseCases>>,
     user: AuthenticatedUser,
     Path((company_id, department_id, role, principal_id)): Path<(Uuid, Uuid, String, Uuid)>,
+    axum::extract::Query(query): axum::extract::Query<RoleRemovalQuery>,
 ) -> AppResult<impl IntoResponse> {
     let role = role_from_path(&role)?;
     departments
@@ -252,8 +272,11 @@ async fn clear_role_json(
             user.id,
             company_id,
             DepartmentId::new(department_id),
-            role,
-            PrincipalId::new(principal_id),
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role,
+                principal: PrincipalId::new(principal_id),
+                successor: query.successor.map(PrincipalId::new),
+            },
         )
         .await?;
     Ok(StatusCode::NO_CONTENT)

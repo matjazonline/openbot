@@ -194,3 +194,5 @@ pub(crate) mod integration_authority;
 mod reviewer_resolution;
 
 mod approval_accounts;
+
+mod decision_information;

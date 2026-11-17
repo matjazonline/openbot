@@ -1,0 +1,527 @@
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/lifecycle.rs:58:
+     .bind(&write.charter)
+     .bind(write.parent_id.map(DepartmentId::as_uuid))
+     .bind(created_by)
+[31m-    .bind(write.escalation.map(serde_json::to_value).transpose().map_err(|error| AppError::Internal(error.to_string()))?)
+(B[m[32m+    .bind(
+(B[m[32m+        write
+(B[m[32m+            .escalation
+(B[m[32m+            .map(serde_json::to_value)
+(B[m[32m+            .transpose()
+(B[m[32m+            .map_err(|error| AppError::Internal(error.to_string()))?,
+(B[m[32m+    )
+(B[m     .fetch_one(&mut **tx)
+     .await
+     .map_err(|error| slug_conflict(error, &write.slug))?;
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/lifecycle.rs:80:
+             company,
+             actor,
+             department.id,
+[31m-            DepartmentRoleAssignment { role: DepartmentRole::Lead, principal: lead, decider: false },
+(B[m[32m+            DepartmentRoleAssignment {
+(B[m[32m+                role: DepartmentRole::Lead,
+(B[m[32m+                principal: lead,
+(B[m[32m+                decider: false,
+(B[m[32m+            },
+(B[m         )
+         .await?;
+     }
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:9:
+     department: DepartmentId,
+     assignment: DepartmentRoleAssignment,
+ ) -> AppResult<()> {
+[31m-    let DepartmentRoleAssignment {role, principal, ..} = assignment;
+(B[m[32m+    let DepartmentRoleAssignment {
+(B[m[32m+        role, principal, ..
+(B[m[32m+    } = assignment;
+(B[m     write_placement_on(tx, company, department, principal, false, Some(assignment)).await?;
+     follow_lead_on(
+         tx,
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:24:
+     Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
+ }
+ 
+[31m-
+(B[m pub(crate) async fn clear_department_role_on(
+     tx: &mut Transaction<'_, Postgres>,
+     templates: &ProvisioningDeployment,
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:33:
+     department: DepartmentId,
+     removal: DepartmentRoleRemoval,
+ ) -> AppResult<()> {
+[31m-    let DepartmentRoleRemoval {role, principal, ..} = removal;
+(B[m[32m+    let DepartmentRoleRemoval {
+(B[m[32m+        role, principal, ..
+(B[m[32m+    } = removal;
+(B[m     lock_department_on(tx, company, department).await?;
+     clear_sponsor_on(tx, company, department, removal).await?;
+     lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:71:
+ }
+ 
+ fn needs_decider() -> AppError {
+[31m-    AppError::Conflict("department.sponsor_needs_decider: choose a remaining sponsor to decide".into())
+(B[m[32m+    AppError::Conflict(
+(B[m[32m+        "department.sponsor_needs_decider: choose a remaining sponsor to decide".into(),
+(B[m[32m+    )
+(B[m }
+ 
+ pub(super) async fn assign_sponsor_on(
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:84:
+         "SELECT count(*) AS holders,count(*) FILTER (WHERE decider) AS deciders, \
+          coalesce(bool_or(principal_id=$3),false) AS existing FROM department_roles \
+          WHERE company_id=$1 AND department_id=$2 AND role='sponsor'",
+[31m-    ).bind(company.as_uuid()).bind(department.as_uuid()).bind(assignment.principal.as_uuid())
+(B[m[31m-        .fetch_one(&mut **tx).await?;
+(B[m[31m-    if !state.existing && state.holders >= crate::domain::workflow::TokenAllowance::MAX_REVIEWERS as i64 {
+(B[m[31m-        return Err(AppError::Conflict("department.sponsor_limit: at most 16 sponsors".into()));
+(B[m[32m+    )
+(B[m[32m+    .bind(company.as_uuid())
+(B[m[32m+    .bind(department.as_uuid())
+(B[m[32m+    .bind(assignment.principal.as_uuid())
+(B[m[32m+    .fetch_one(&mut **tx)
+(B[m[32m+    .await?;
+(B[m[32m+    if !state.existing
+(B[m[32m+        && state.holders >= crate::domain::workflow::TokenAllowance::MAX_REVIEWERS as i64
+(B[m[32m+    {
+(B[m[32m+        return Err(AppError::Conflict(
+(B[m[32m+            "department.sponsor_limit: at most 16 sponsors".into(),
+(B[m[32m+        ));
+(B[m     }
+     if state.holders > 0 && state.deciders == 0 && !assignment.decider {
+         return Err(needs_decider());
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:102:
+          SELECT $1,$2,'sponsor',$3,$4 FROM (SELECT count(*) FROM demoted) AS completed \
+          ON CONFLICT (department_id,role,principal_id) DO UPDATE \
+            SET decider=EXCLUDED.decider OR department_roles.decider",
+[31m-    ).bind(company.as_uuid()).bind(department.as_uuid()).bind(assignment.principal.as_uuid())
+(B[m[31m-        .bind(assignment.decider || state.holders == 0).execute(&mut **tx).await?;
+(B[m[32m+    )
+(B[m[32m+    .bind(company.as_uuid())
+(B[m[32m+    .bind(department.as_uuid())
+(B[m[32m+    .bind(assignment.principal.as_uuid())
+(B[m[32m+    .bind(assignment.decider || state.holders == 0)
+(B[m[32m+    .execute(&mut **tx)
+(B[m[32m+    .await?;
+(B[m     Ok(())
+ }
+ 
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:121:
+ ) -> AppResult<()> {
+     if removal.role != DepartmentRole::Sponsor {
+         if removal.successor.is_some() {
+[31m-            return Err(AppError::BadRequest("Only sponsor removal takes a successor".into()));
+(B[m[32m+            return Err(AppError::BadRequest(
+(B[m[32m+                "Only sponsor removal takes a successor".into(),
+(B[m[32m+            ));
+(B[m         }
+         return Ok(());
+     }
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:128:
+     let holders: Vec<Sponsor> = sqlx::query_as(
+         "SELECT principal_id,decider FROM department_roles WHERE company_id=$1 \
+          AND department_id=$2 AND role='sponsor' ORDER BY principal_id LIMIT 17",
+[31m-    ).bind(company.as_uuid()).bind(department.as_uuid()).fetch_all(&mut **tx).await?;
+(B[m[32m+    )
+(B[m[32m+    .bind(company.as_uuid())
+(B[m[32m+    .bind(department.as_uuid())
+(B[m[32m+    .fetch_all(&mut **tx)
+(B[m[32m+    .await?;
+(B[m     let principals: Vec<_> = holders.iter().map(|holder| holder.principal_id).collect();
+     lock_principals_on(tx, company, &principals).await?;
+[31m-    let Some(removed) = holders.iter().find(|holder| holder.principal_id == removal.principal.as_uuid()) else {
+(B[m[32m+    let Some(removed) = holders
+(B[m[32m+        .iter()
+(B[m[32m+        .find(|holder| holder.principal_id == removal.principal.as_uuid())
+(B[m[32m+    else {
+(B[m         return Ok(()); // The authoritative DELETE supplies the ordinary not-found outcome.
+     };
+     if let Some(successor) = removal.successor {
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department/roles.rs:138:
+         if successor == removal.principal || !principals.contains(&successor.as_uuid()) {
+[31m-            return Err(AppError::BadRequest("The successor must be another existing sponsor".into()));
+(B[m[32m+            return Err(AppError::BadRequest(
+(B[m[32m+                "The successor must be another existing sponsor".into(),
+(B[m[32m+            ));
+(B[m         }
+[31m-        assign_sponsor_on(tx, company, department, DepartmentRoleAssignment {
+(B[m[31m-            role: DepartmentRole::Sponsor, principal: successor, decider: true,
+(B[m[31m-        }).await?;
+(B[m[31m-    } else if holders.len() > 1 && (removed.decider || !holders.iter().any(|holder| holder.decider)) {
+(B[m[32m+        assign_sponsor_on(
+(B[m[32m+            tx,
+(B[m[32m+            company,
+(B[m[32m+            department,
+(B[m[32m+            DepartmentRoleAssignment {
+(B[m[32m+                role: DepartmentRole::Sponsor,
+(B[m[32m+                principal: successor,
+(B[m[32m+                decider: true,
+(B[m[32m+            },
+(B[m[32m+        )
+(B[m[32m+        .await?;
+(B[m[32m+    } else if holders.len() > 1 && (removed.decider || !holders.iter().any(|holder| holder.decider))
+(B[m[32m+    {
+(B[m         return Err(needs_decider());
+     }
+     Ok(())
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:50:
+ 
+ mod lifecycle;
+ mod roles;
+[31m-pub(crate) use roles::{assign_department_role_on, clear_department_role_on};
+(B[m pub(crate) use lifecycle::{
+     create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
+ };
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:57:
+[32m+pub(crate) use roles::{assign_department_role_on, clear_department_role_on};
+(B[m 
+ /// A principal named as the department pages show it: an agent by its current name and handle, a
+ /// person by their account's username and email (not `display_label`, which a rename leaves).
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:118:
+             description: db.description,
+             charter: db.charter,
+             parent_id: db.parent_id.map(DepartmentId::new),
+[31m-            escalation: db.escalation.map(serde_json::from_value).transpose().map_err(|error| AppError::Internal(format!("Invalid departments.escalation for {}: {error}", db.id)))?,
+(B[m[32m+            escalation: db
+(B[m[32m+                .escalation
+(B[m[32m+                .map(serde_json::from_value)
+(B[m[32m+                .transpose()
+(B[m[32m+                .map_err(|error| {
+(B[m[32m+                    AppError::Internal(format!(
+(B[m[32m+                        "Invalid departments.escalation for {}: {error}",
+(B[m[32m+                        db.id
+(B[m[32m+                    ))
+(B[m[32m+                })?,
+(B[m             created_at: db.created_at,
+         })
+     }
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:324:
+     principal: PrincipalId,
+     role: Option<DepartmentRole>,
+ ) -> AppResult<()> {
+[31m-    write_placement_on(tx, company, department, principal, true, role.map(|role| DepartmentRoleAssignment { role, principal, decider: false })).await?;
+(B[m[32m+    write_placement_on(
+(B[m[32m+        tx,
+(B[m[32m+        company,
+(B[m[32m+        department,
+(B[m[32m+        principal,
+(B[m[32m+        true,
+(B[m[32m+        role.map(|role| DepartmentRoleAssignment {
+(B[m[32m+            role,
+(B[m[32m+            principal,
+(B[m[32m+            decider: false,
+(B[m[32m+        }),
+(B[m[32m+    )
+(B[m[32m+    .await?;
+(B[m     if let Some(role) = role {
+         follow_lead_on(
+             tx,
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:374:
+ ) -> AppResult<()> {
+     lock_department_on(tx, company, department).await?;
+     // The holder a single-holder role replaces loses a row: lock them with the new one, first.
+[31m-    let mut involved: Vec<Uuid> = match role.filter(|write| write.role.is_single_holder() || write.role == DepartmentRole::Sponsor) {
+(B[m[32m+    let mut involved: Vec<Uuid> = match role
+(B[m[32m+        .filter(|write| write.role.is_single_holder() || write.role == DepartmentRole::Sponsor)
+(B[m[32m+    {
+(B[m         Some(role) => {
+             sqlx::query_scalar(
+                 "SELECT holder.principal_id FROM department_roles AS holder \
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:410:
+     };
+     let role = assignment.role;
+     if role != DepartmentRole::Sponsor && assignment.decider {
+[31m-        return Err(AppError::BadRequest("Only a sponsor can be marked as decider".into()));
+(B[m[32m+        return Err(AppError::BadRequest(
+(B[m[32m+            "Only a sponsor can be marked as decider".into(),
+(B[m[32m+        ));
+(B[m     }
+     if role.is_single_holder() {
+         sqlx::query(
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:427:
+     if role == DepartmentRole::Sponsor {
+         roles::assign_sponsor_on(tx, company, department, assignment).await?;
+     } else {
+[31m-    sqlx::query(
+(B[m[31m-        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+(B[m[32m+        sqlx::query(
+(B[m[32m+            "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
+(B[m          VALUES ($1, $2, $3, $4) \
+          ON CONFLICT (department_id, role, principal_id) DO NOTHING",
+[31m-    )
+(B[m[31m-    .bind(company.as_uuid())
+(B[m[31m-    .bind(department.as_uuid())
+(B[m[31m-    .bind(role.as_str())
+(B[m[31m-    .bind(principal.as_uuid())
+(B[m[31m-    .execute(&mut **tx)
+(B[m[31m-    .await?;
+(B[m[32m+        )
+(B[m[32m+        .bind(company.as_uuid())
+(B[m[32m+        .bind(department.as_uuid())
+(B[m[32m+        .bind(role.as_str())
+(B[m[32m+        .bind(principal.as_uuid())
+(B[m[32m+        .execute(&mut **tx)
+(B[m[32m+        .await?;
+(B[m     }
+     super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
+     // The reach contains the department itself, so one sync covers the membership too.
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/department.rs:722:
+         department: DepartmentId,
+     ) -> AppResult<Vec<DepartmentRoleHolder>> {
+         #[derive(sqlx::FromRow)]
+[31m-        struct Holder { role: String, principal_id: Uuid, decider: bool }
+(B[m[32m+        struct Holder {
+(B[m[32m+            role: String,
+(B[m[32m+            principal_id: Uuid,
+(B[m[32m+            decider: bool,
+(B[m[32m+        }
+(B[m         let rows: Vec<Holder> = sqlx::query_as(
+             "SELECT holder.role, holder.principal_id, holder.decider FROM department_roles AS holder \
+              WHERE holder.company_id = $1 AND holder.department_id = $2 \
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/agent_manifest/roles.rs:6:
+ };
+ use crate::application::workflow::roles::{RoleDepartment, RoleHolder, RoleNeed, resolve_role};
+ use crate::entities::department::{
+[31m-    DepartmentId, DepartmentRole, RoleCapacity, MAX_DEPARTMENT_DEPTH, RoleAdmissionRefusal, RoleRefusalKind,
+(B[m[32m+    DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH, RoleAdmissionRefusal, RoleCapacity,
+(B[m[32m+    RoleRefusalKind,
+(B[m };
+ use crate::entities::participant::PrincipalKind;
+ use crate::entities::transport::PrincipalId;
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/agent_manifest/roles.rs:218:
+     ) -> AppResult<Vec<RoleResolution>> {
+         // All selected agent SHARE locks already exist. Principal locks follow agents, ordered
+         // by principal ID, matching retirement rather than introducing the reverse edge.
+[31m-        let principals: std::collections::BTreeSet<_> = self.roles.values()
+(B[m[31m-            .flat_map(|capture| capture.principals.iter().chain(&capture.informed).copied()).collect();
+(B[m[32m+        let principals: std::collections::BTreeSet<_> = self
+(B[m[32m+            .roles
+(B[m[32m+            .values()
+(B[m[32m+            .flat_map(|capture| capture.principals.iter().chain(&capture.informed).copied())
+(B[m[32m+            .collect();
+(B[m         for principal in principals {
+             self.within_bound()?;
+             let actual: Option<(String, Option<Uuid>)> = sqlx::query_as(
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/agent_manifest/roles.rs:226:
+                 "SELECT kind,agent_id FROM principals WHERE company_id=$1 AND id=$2 FOR KEY SHARE",
+[31m-            ).bind(self.company.as_uuid()).bind(principal.as_uuid()).fetch_optional(&mut *tx).await?;
+(B[m[32m+            )
+(B[m[32m+            .bind(self.company.as_uuid())
+(B[m[32m+            .bind(principal.as_uuid())
+(B[m[32m+            .fetch_optional(&mut *tx)
+(B[m[32m+            .await?;
+(B[m             for capture in self.roles.values() {
+                 let valid = if capture.principals.contains(&principal) {
+[31m-                    actual == Some(capture.agent.map_or_else(
+(B[m[31m-                        || ("person".into(), None), |agent| ("agent".into(), Some(agent.as_uuid()))))
+(B[m[32m+                    actual
+(B[m[32m+                        == Some(capture.agent.map_or_else(
+(B[m[32m+                            || ("person".into(), None),
+(B[m[32m+                            |agent| ("agent".into(), Some(agent.as_uuid())),
+(B[m[32m+                        ))
+(B[m                 } else if capture.informed.contains(&principal) {
+[31m-                    actual.as_ref().is_some_and(|(kind,_)| matches!(kind.as_str(),"person"|"agent"))
+(B[m[31m-                } else { continue; };
+(B[m[31m-                if !valid { return Err(role_error(&capture.reference, RoleRefusalKind::WrongKind)); }
+(B[m[32m+                    actual
+(B[m[32m+                        .as_ref()
+(B[m[32m+                        .is_some_and(|(kind, _)| matches!(kind.as_str(), "person" | "agent"))
+(B[m[32m+                } else {
+(B[m[32m+                    continue;
+(B[m[32m+                };
+(B[m[32m+                if !valid {
+(B[m[32m+                    return Err(role_error(&capture.reference, RoleRefusalKind::WrongKind));
+(B[m[32m+                }
+(B[m             }
+         }
+         self.roles
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/agent_manifest/roles.rs:260:
+                             agent_id: capture.agent,
+                             revision_id: revision,
+                         })
+[31m-                        .chain(capture.informed.iter().map(|principal| RolePrincipalSelection {
+(B[m[31m-                            principal_id: *principal,
+(B[m[31m-                            capacity: RoleCapacity::Informed,
+(B[m[31m-                            agent_id: None,
+(B[m[31m-                            revision_id: None,
+(B[m[31m-                        }))
+(B[m[32m+                        .chain(
+(B[m[32m+                            capture
+(B[m[32m+                                .informed
+(B[m[32m+                                .iter()
+(B[m[32m+                                .map(|principal| RolePrincipalSelection {
+(B[m[32m+                                    principal_id: *principal,
+(B[m[32m+                                    capacity: RoleCapacity::Informed,
+(B[m[32m+                                    agent_id: None,
+(B[m[32m+                                    revision_id: None,
+(B[m[32m+                                }),
+(B[m[32m+                        )
+(B[m                         .collect(),
+                 })
+             })
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/follow_reviewers/roles.rs:136:
+                     .filter(|row| row.capacity == "decides")
+                     .map(|row| PrincipalId::new(row.principal_id))
+                     .collect(),
+[31m-                informed: rows.iter().filter(|row| row.capacity == "informed").map(|row| PrincipalId::new(row.principal_id)).collect(),
+(B[m[32m+                informed: rows
+(B[m[32m+                    .iter()
+(B[m[32m+                    .filter(|row| row.capacity == "informed")
+(B[m[32m+                    .map(|row| PrincipalId::new(row.principal_id))
+(B[m[32m+                    .collect(),
+(B[m                 refusal: None,
+             })
+         }
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/people_resolutions.rs:52:
+     .bind(resolution).bind(value.context_department_id.as_uuid())
+     .bind(value.department_id.map(|department| department.as_uuid())).bind(refusal).bind(&content)
+     .execute(&mut *db).await?;
+[31m-    if value.principals.is_empty() { return Ok(()); }
+(B[m[32m+    if value.principals.is_empty() {
+(B[m[32m+        return Ok(());
+(B[m[32m+    }
+(B[m     let department = value.department_id.ok_or_else(invalid)?;
+[31m-    for (principal,capacity) in value.principals.iter().map(|id| (id,"decides"))
+(B[m[31m-        .chain(value.informed.iter().map(|id| (id,"informed"))) {
+(B[m[32m+    for (principal, capacity) in value
+(B[m[32m+        .principals
+(B[m[32m+        .iter()
+(B[m[32m+        .map(|id| (id, "decides"))
+(B[m[32m+        .chain(value.informed.iter().map(|id| (id, "informed")))
+(B[m[32m+    {
+(B[m         sqlx::query(
+             "INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role, \
+              resolution_revision,department_id,principal_id,capacity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/adapters/persistence/workflow/role_views.rs:25:
+             department: DepartmentId::new(self.department_id),
+             principal: PrincipalId::new(self.principal_id),
+             label: self.display_label,
+[31m-            capacity: serde_json::from_value(serde_json::Value::String(self.capacity)).map_err(|_| invalid())?,
+(B[m[32m+            capacity: serde_json::from_value(serde_json::Value::String(self.capacity))
+(B[m[32m+                .map_err(|_| invalid())?,
+(B[m         })
+     }
+ }
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/agent/manifest.rs:112:
+             {
+                 return Err(invalid("Invalid or duplicate captured role requirement"));
+             }
+[31m-            let deciding = role.principals.iter().filter(|holder| holder.capacity == RoleCapacity::Decides).count();
+(B[m[31m-            if deciding == 0 || (role.role == DepartmentRole::Sponsor && deciding != 1)
+(B[m[31m-                || (role.role != DepartmentRole::Sponsor && deciding != role.principals.len()) {
+(B[m[32m+            let deciding = role
+(B[m[32m+                .principals
+(B[m[32m+                .iter()
+(B[m[32m+                .filter(|holder| holder.capacity == RoleCapacity::Decides)
+(B[m[32m+                .count();
+(B[m[32m+            if deciding == 0
+(B[m[32m+                || (role.role == DepartmentRole::Sponsor && deciding != 1)
+(B[m[32m+                || (role.role != DepartmentRole::Sponsor && deciding != role.principals.len())
+(B[m[32m+            {
+(B[m                 return Err(invalid("Invalid role capacities"));
+             }
+             let mut principals = BTreeSet::new();
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/agent/manifest.rs:125:
+                 match (holder.agent_id, holder.revision_id) {
+                     (None, None) => {}
+                     (Some(agent), Some(revision))
+[31m-                        if holder.capacity == RoleCapacity::Decides && deciding == 1
+(B[m[32m+                        if holder.capacity == RoleCapacity::Decides
+(B[m[32m+                            && deciding == 1
+(B[m                             && self.agents.iter().any(|selected| {
+                                 selected.agent_id == agent && selected.revision_id == revision
+                             }) => {}
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/workflow/escalation_recipients.rs:65:
+         let mut selected = BTreeMap::new();
+         let has_sponsors = role == DepartmentRole::Sponsor
+             && department.holders.iter().any(|holder| holder.role == role);
+[31m-        for holder in department
+(B[m[31m-            .holders
+(B[m[31m-            .iter()
+(B[m[31m-            .filter(|holder| holder.role == role && (role != DepartmentRole::Sponsor || holder.decider))
+(B[m[31m-        {
+(B[m[32m+        for holder in department.holders.iter().filter(|holder| {
+(B[m[32m+            holder.role == role && (role != DepartmentRole::Sponsor || holder.decider)
+(B[m[32m+        }) {
+(B[m             if let Some(prior) = selected.insert(holder.principal, holder.kind)
+                 && prior != holder.kind
+             {
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/workflow/escalation_recipients.rs:86:
+             }
+         }
+         if has_sponsors && selected.is_empty() {
+[31m-            return NotificationRecipients::Refused { department: Some(department.department), reason: NotificationRoleRefusal::NoDecider };
+(B[m[32m+            return NotificationRecipients::Refused {
+(B[m[32m+                department: Some(department.department),
+(B[m[32m+                reason: NotificationRoleRefusal::NoDecider,
+(B[m[32m+            };
+(B[m         }
+         if !selected.is_empty() {
+             return NotificationRecipients::Holders {
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/workflow/people_resolution.rs:69:
+ impl PeopleResolution {
+     pub fn validate(&self) -> AppResult<()> {
+         if self.principals.len() + self.informed.len() > super::registry::MAX_REVIEWERS
+[31m-            || (self.role == DepartmentRole::Sponsor && self.refusal.is_none() && self.principals.len() != 1)
+(B[m[32m+            || (self.role == DepartmentRole::Sponsor
+(B[m[32m+                && self.refusal.is_none()
+(B[m[32m+                && self.principals.len() != 1)
+(B[m             || (self.role != DepartmentRole::Sponsor && !self.informed.is_empty())
+             || self.informed.iter().any(|id| self.principals.contains(id))
+             || self.informed.iter().collect::<BTreeSet<_>>().len() != self.informed.len()
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/workflow/roles.rs:81:
+             return Err(RoleRefusalKind::TooMany);
+         }
+         let informed = if role == DepartmentRole::Sponsor {
+[31m-            holders.iter().filter(|holder| !holder.decider)
+(B[m[31m-                .map(|holder| holder.principal).collect::<BTreeSet<_>>()
+(B[m[31m-        } else { BTreeSet::new() };
+(B[m[32m+            holders
+(B[m[32m+                .iter()
+(B[m[32m+                .filter(|holder| !holder.decider)
+(B[m[32m+                .map(|holder| holder.principal)
+(B[m[32m+                .collect::<BTreeSet<_>>()
+(B[m[32m+        } else {
+(B[m[32m+            BTreeSet::new()
+(B[m[32m+        };
+(B[m         let holders = if role == DepartmentRole::Sponsor {
+[31m-            let deciding: Vec<_> = holders.into_iter().filter(|holder| holder.decider).collect();
+(B[m[32m+            let deciding: Vec<_> = holders
+(B[m[32m+                .into_iter()
+(B[m[32m+                .filter(|holder| holder.decider)
+(B[m[32m+                .collect();
+(B[m             match deciding.len() {
+                 0 => return Err(RoleRefusalKind::NoDecider),
+                 1 => deciding,
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/application/workflow/roles.rs:92:
+                 _ => return Err(RoleRefusalKind::Ambiguous),
+             }
+[31m-        } else { holders };
+(B[m[32m+        } else {
+(B[m[32m+            holders
+(B[m[32m+        };
+(B[m         let expected = match need {
+             RoleNeed::Agent => PrincipalKind::Agent,
+             RoleNeed::People => PrincipalKind::Person,
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/domain/entities/workflow_escalation.rs:1:
+ //! Identities shared by workflow escalation commands and durable notification projections.
+[31m-use crate::entities::transport::uuid_id;
+(B[m use crate::entities::department::DepartmentRole;
+[32m+use crate::entities::transport::uuid_id;
+(B[m use serde::{Deserialize, Serialize};
+ use uuid::Uuid;
+ 
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/domain/entities/workflow_escalation.rs:40:
+     }
+ }
+ 
+[31m-
+(B[m #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+ #[serde(deny_unknown_fields)]
+ pub struct EscalationPolicy {
+Diff in /Users/mac02/orca/workspaces/openbot/plan08_ph1/src/domain/entities/workflow_escalation.rs:74:
+         self.0
+     }
+ }
+[31m-
+(B[m 

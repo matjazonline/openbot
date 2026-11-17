@@ -1,41 +1,5 @@
 //! Validated routing and acknowledgement bounds for an opted-in escalation ladder.
-use crate::entities::department::DepartmentRole;
-use serde::{Deserialize, Serialize};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-pub struct EscalationPolicy {
-    pub notify: DepartmentRole,
-    pub hops: EscalationHops,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(try_from = "u8", into = "u8")]
-pub struct EscalationHops(u8);
-
-impl TryFrom<u8> for EscalationHops {
-    type Error = &'static str;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            1 | 2 => Ok(Self(value)),
-            _ => Err("Escalation hops must be 1 or 2"),
-        }
-    }
-}
-
-impl From<EscalationHops> for u8 {
-    fn from(value: EscalationHops) -> Self {
-        value.0
-    }
-}
-
-impl EscalationHops {
-    pub const fn get(self) -> u8 {
-        self.0
-    }
-}
-
+pub use crate::entities::workflow_escalation::{EscalationHops, EscalationPolicy};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct EscalationAckHours(u16);
 

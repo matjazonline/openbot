@@ -1,0 +1,12 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 6m 29s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/target/debug/deps/open_bots-6145e191a69c5cd2)
+error: test failed, to rerun pass `--lib`
+
+Caused by:
+  process didn't exit successfully: `/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/target/debug/deps/open_bots-6145e191a69c5cd2 sponsor workflow_escalation_default_ workflow_role_resolve_ workflow_role_reviewer_picker_` (signal: 9, SIGKILL: kill)

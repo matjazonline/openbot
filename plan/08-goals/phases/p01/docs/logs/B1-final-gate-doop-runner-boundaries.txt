@@ -1,0 +1,32 @@
+...................Managed package ready: 5324bbba883d560745cb71cbca03fb43ddd97b2700ae2bc3f6090f5e9f86e542
+...Managed source ready: 8504a3b4a4e897fa865712b8437254f6350c5a1607b1980ad8d407dd4ae7b1f4
+.....E..................
+======================================================================
+ERROR: test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes (__main__.ImageAndPackageTests.test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/plan08_ph1/scripts/tests/doop-test.py", line 597, in test_tls_ingress_validates_local_ca_and_hostname_and_preserves_actual_bytes
+    with tls.client.wrap_socket(raw, server_hostname="localhost") as secure:
+         ~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 469, in wrap_socket
+    return self.sslsocket_class._create(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        sock=sock,
+        ^^^^^^^^^^
+    ...<5 lines>...
+        session=session
+        ^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1087, in _create
+    self.do_handshake()
+    ~~~~~~~~~~~~~~~~~^^
+  File "/opt/homebrew/Cellar/python@3.13/3.13.18/Frameworks/Python.framework/Versions/3.13/lib/python3.13/ssl.py", line 1383, in do_handshake
+    self._sslobj.do_handshake()
+    ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+ssl.SSLCertVerificationError: [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: Missing Authority Key Identifier (_ssl.c:1035)
+
+----------------------------------------------------------------------
+Ran 46 tests in 6.642s
+
+FAILED (errors=1)

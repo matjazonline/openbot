@@ -56,16 +56,22 @@ pub(super) async fn persist_on(db: &mut PgConnection, value: &PeopleResolution) 
         return Ok(());
     }
     let department = value.department_id.ok_or_else(invalid)?;
-    for principal in &value.principals {
+    for (principal, capacity) in value
+        .principals
+        .iter()
+        .map(|id| (id, "decides"))
+        .chain(value.informed.iter().map(|id| (id, "informed")))
+    {
         sqlx::query(
             "INSERT INTO workflow_run_role_bindings(company_id,run_id,manifest_id,version_id,step,role, \
-             resolution_revision,department_id,principal_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+             resolution_revision,department_id,principal_id,capacity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
         )
         .bind(value.company_id.as_uuid()).bind(value.root_run_id.as_uuid()).bind(value.manifest_id.as_uuid())
         .bind(value.version_id.as_uuid()).bind(value.step.as_str()).bind(value.role.as_str())
-        .bind(resolution).bind(department.as_uuid()).bind(principal.as_uuid())
+        .bind(resolution).bind(department.as_uuid()).bind(principal.as_uuid()).bind(capacity)
         .execute(&mut *db).await?;
     }
+
     Ok(())
 }
 

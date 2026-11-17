@@ -1,0 +1,43 @@
+    Blocking waiting for file lock on build directory
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 7m 51s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/target/debug/deps/open_bots-6145e191a69c5cd2)
+
+running 29 tests
+test adapters::http::pages::tests::department_ui::department_sponsor_ui_lists_decider_controls_and_named_inherited_escalation ... ok
+test adapters::http::routes::department::tests::department_sponsor_json_carries_decider_and_round_trips_escalation_patch ... ok
+test adapters::persistence::department::tests::sponsors::department_sponsor_competing_writers_leave_exactly_one_decider ... ok
+test adapters::persistence::department::tests::sponsors::department_sponsor_escalation_create_update_and_sql_rust_shape_validation_agree ... ok
+test adapters::persistence::department::tests::sponsors::department_sponsor_constraints_reject_a_second_decider_and_other_roles ... ok
+test adapters::http::routes::ui_departments::tests::department_sponsor_ui_mutations_hide_unauthorized_and_foreign_units ... ok
+test adapters::persistence::department::tests::sponsors::department_sponsor_retirement_never_promotes_and_person_repairs_the_gap ... ok
+test adapters::persistence::department::tests::sponsors::department_sponsor_first_moves_and_requires_an_explicit_successor ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::follow_tests::workflow_reviewer_follow_real_notification_worker_proves_opt_out_open_and_withdrawal ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::sponsors::workflow_role_sponsor_later_people_sql_refuses_informed_capacity_on_other_roles ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::sponsors::workflow_role_sponsor_later_people_sql_rejects_invalid_informed_documents_and_retains_controls ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::resolution_tests::sponsors::workflow_role_sponsor_later_people_sql_rejects_missing_extra_and_wrong_capacity_members ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::department_sponsor_competing_retirement_and_admission_refuse_or_keep_one_frozen_decider ... ok
+test application::workflow::escalation::recipients::tests::workflow_escalation_default_sponsor_notifies_the_decider_or_stops_without_one ... ok
+test application::workflow::publication::tests::role_tests::workflow_role_source_sample_and_help_explain_the_same_requirement ... ok
+test application::workflow::roles::tests::workflow_role_resolve_sponsor_no_decider_stops_at_the_nearest_unit ... ok
+test application::workflow::roles::tests::workflow_role_resolve_sponsor_uses_only_decider_kind_and_freezes_information ... ok
+test application::workflow::roles::tests::workflow_role_sponsor_admission_selector_bound_includes_three_roles_and_still_rejects_overflow ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::workflow_escalation_default_sponsor_without_decider_skips_to_the_parent_lead ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::workflow_role_sponsor_admission_information_projection_waits_for_account_before_company ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::defaults::workflow_escalation_default_sql_run_guard_rejects_stale_defaults_and_binding_override ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::defaults::workflow_escalation_default_sql_empty_guard_rejects_stale_defaults_and_binding_override ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::workflow_role_sponsor_admission_sealed_capacities_and_information_sources_reject_forgery ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::escalation_guards::defaults::workflow_escalation_default_sql_admission_guard_rejects_stale_defaults_and_binding_override ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::sponsor_agents::workflow_role_sponsor_admission_agent_decider_captures_its_revision_and_informed_person ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::workflow_role_sponsor_admission_retired_information_event_cannot_project_or_hot_loop ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_follow_replaces_decider_and_information_in_one_commit ... ok
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_two_units_freeze_deciders_information_and_settlement_authority ... ok
+test adapters::persistence::workflow::tests::admission_tests::role_snapshot_tests::reviewer_tests::sponsor_notices::workflow_role_sponsor_admission_information_retirement_cancels_pending_and_inflight_for_both_policies ... ok
+
+test result: ok. 29 passed; 0 failed; 0 ignored; 0 measured; 4708 filtered out; finished in 35.44s
+

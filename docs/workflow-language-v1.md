@@ -493,3 +493,28 @@ retries later.
 
 See `src/application/workflow/fixtures/role-lead-response.yaml` for the reusable
 `context.history` → role-based `agent.run` → reply example.
+
+
+A `sponsor` role can have several people or agents; exactly one is marked **decides**.
+A step resolves only that decider in the nearest unit with sponsors. `decision.human`
+uses a person decider; `agent.run`, `decision.agent` and `ai.classify` need an agent
+and return `workflow.role_wrong_kind` for a person decider. Other holders do not change
+that kind check. A unit with sponsors but no decider refuses with
+`workflow.role_no_decider` instead of falling through to an ancestor. Retirement never
+promotes another sponsor automatically.
+
+The admitted run freezes all sponsor holders with `decides` or `informed` capacity.
+Only the deciding holder can settle the role-derived decision. Other person sponsors
+receive a notice marked **for information only**; agent sponsors receive no notice.
+`reviewers_follow_role` updates both capacities and their notices in one commit while
+the decision is parked; without it the admission snapshot stays selected.
+See `src/application/workflow/fixtures/role-sponsor-approval.yaml` for a lead-agent
+draft followed by sponsor approval and a reply.
+
+A unit can set **When work stalls, tell** (role and one or two hops). A binding's own
+escalation policy wins; otherwise the live default of the desk's unit, then its nearest
+ancestor within eight levels, applies when escalation triggers. Changing that default
+also affects already-admitted runs that have no binding policy. No default means no
+ladder. `notify: sponsor` uses its decider; no sponsor or no decider skips to the parent
+lead when a second hop is enabled. The escalation case retains the selected policy
+and each hop records the role and principal it used.

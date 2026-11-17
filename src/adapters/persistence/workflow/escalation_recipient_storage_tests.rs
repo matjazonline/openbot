@@ -23,8 +23,11 @@ async fn assign(f: &PeopleFixture, department: DepartmentId, principal: Principa
             actor,
             f.role.company().as_uuid(),
             department,
-            DepartmentRole::Reviewer,
-            principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -88,8 +91,11 @@ async fn clear_reviewers(f: &PeopleFixture) {
                 f.role.admission.binding.target.actor.user_id(),
                 f.role.company().as_uuid(),
                 f.role.department,
-                DepartmentRole::Reviewer,
-                *principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: *principal,
+                    successor: None,
+                },
             )
             .await
             .unwrap();

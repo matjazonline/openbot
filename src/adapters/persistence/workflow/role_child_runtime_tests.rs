@@ -18,8 +18,11 @@ async fn workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_
             d.fixture.target.actor.user_id(),
             d.fixture.target.company.as_uuid(),
             desk.department,
-            DepartmentRole::Reviewer,
-            reviewer.principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal: reviewer.principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -42,8 +45,11 @@ async fn workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_
             binding.actor.user_id(),
             binding.company.as_uuid(),
             desk.department,
-            DepartmentRole::Lead,
-            reviewer.principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: reviewer.principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();

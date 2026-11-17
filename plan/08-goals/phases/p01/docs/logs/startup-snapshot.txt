@@ -1,0 +1,6 @@
+COMMAND: PATH=/opt/homebrew/opt/coreutils/libexec/gnubin:$PATH bash .agents/skills/implement-astra-reviewed-2-3/scripts/snapshot.sh plan/08-goals/phases/p01/docs
+EXIT: 0
+base:   2df562d6c0880dbfc7498e4fe8ecb19ef3fe34ee
+digest: 9895e268758e08a1d72e68aabbc3a007e75645913f00e84a596951a109737d47
+files:
+  plan/08-goals/COORDINATION.md

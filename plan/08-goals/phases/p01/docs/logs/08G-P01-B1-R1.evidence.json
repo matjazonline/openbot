@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "round": "08G-P01-B1-R1",
+  "artifact": "1b179b0de6235e6c456a742bcf63b6da0d55db5ddd11e64ad35f1cd7a7f405d6",
+  "checks": [
+    {
+      "command": "cargo test --locked --offline --lib -- sponsor workflow_escalation_default_ workflow_role_resolve_ workflow_role_reviewer_picker_",
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7"
+      ],
+      "status": "FAIL",
+      "fixture": "phase-owned openbot_08gp01_mac02_test plus per-test isolated databases; no credentials",
+      "files": [
+        {
+          "path": "logs/B1-focused-4.txt",
+          "sha256": "4ff15bed83f0c2f786e1cf12aca24b405d6db3ed140240ee368dc1434b0e35c0"
+        }
+      ]
+    },
+    {
+      "command": "SQLX_OFFLINE=false cargo sqlx prepare -- --all-targets",
+      "criteria": [
+        "schema",
+        "offline-cache"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned openbot_08gp01_mac02_test plus per-test isolated databases; no credentials",
+      "files": [
+        {
+          "path": "logs/B1-sqlx-prepare.txt",
+          "sha256": "c879f768fc364665e279aa076259efe9de18e80cc68448ef435c8368f7c0650e"
+        }
+      ]
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "criteria": [
+        "format"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned openbot_08gp01_mac02_test plus per-test isolated databases; no credentials",
+      "files": [
+        {
+          "path": "logs/B1-format-correction.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "npm run build:css",
+      "criteria": [
+        "AC7"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned openbot_08gp01_mac02_test plus per-test isolated databases; no credentials",
+      "files": [
+        {
+          "path": "logs/B1-css-final.txt",
+          "sha256": "9bfa7082b50aea03d5b2da6d5483c21c039c6f68e1568cfa08eab69500f66794"
+        }
+      ]
+    },
+    {
+      "command": "trail check",
+      "criteria": [
+        "learnings"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned openbot_08gp01_mac02_test plus per-test isolated databases; no credentials",
+      "files": [
+        {
+          "path": "logs/B1-trail-check-review.txt",
+          "sha256": "d3df4ec538d25600eb10522e81ac1b51a8ccd31a8cc208fd5db4989b62c70448"
+        }
+      ]
+    },
+    {
+      "command": "bash scripts/check.sh and corrected end-to-end settlement rerun",
+      "criteria": [
+        "final-gate",
+        "AC3",
+        "AC4"
+      ],
+      "status": "NOT EXERCISED",
+      "fixture": "Fresh invocation-owned openbot_check database; tests running, no completed result yet",
+      "reason": "In progress; final evidence will be retained in a separate immutable manifest."
+    }
+  ]
+}

@@ -1,0 +1,105 @@
+checking 84 changed files against 20 learnings and 4 skills
+
+● docs/departments.md:229
+  brings back decision email role, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The initial Phase 01 design reused synchronous
+  decision-email composition during followed-role updates.
+● docs/workflow-language-v1.md:498
+  brings back decision followed role, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The initial Phase 01 design reused synchronous
+  decision-email composition during followed-role updates.
+● docs/workflow-language-v1.md:498
+  brings back sponsor human step, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The sponsor feature's scripted Deployment built its
+  human step from the registry example, so it inherited the required
+  literal data_schema.
+● migrations/20260817000000_init_schema.sql:16179
+  brings back check exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● migrations/20260817000000_init_schema.sql:17622
+  brings back direct delivery notification, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: A separate direct-delivery owner would also miss the
+  existing notification retirement cancellation union.
+● migrations/20260817000000_init_schema.sql:19735
+  brings back exist selected check, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Running the existing fixture matrix after adding
+  explicit data_schema and feedback_required passed all 16 selected
+  checks.
+● migrations/20260817000000_init_schema.sql:19736
+  brings back source guard company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/adapters/http/pages/department_ui_tests.rs:786
+  brings back sponsor example inherited, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The sponsor feature's scripted Deployment built its
+  human step from the registry example, so it inherited the required
+  literal data_schema.
+● src/adapters/http/routes/department_tests.rs:286
+  brings back sponsor test fixture, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Its sponsor runtime and rendering tests passed, while
+  the later full suite failed three shared fixture tests with
+  registry.literal at /steps/review/with/data_schema.
+● src/adapters/http/routes/ui_departments_tests.rs:625
+  brings back sponsor test fixture, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Its sponsor runtime and rendering tests passed, while
+  the later full suite failed three shared fixture tests with
+  registry.literal at /steps/review/with/data_schema.
+● src/adapters/persistence/workflow/role_runtime_tests.rs:369
+  brings back sponsor runtime test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Its sponsor runtime and rendering tests passed, while
+  the later full suite failed three shared fixture tests with
+  registry.literal at /steps/review/with/data_schema.
+● src/application/workflow/registry/help.rs:66
+  brings back sponsor step literal, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The sponsor feature's scripted Deployment built its
+  human step from the registry example, so it inherited the required
+  literal data_schema.
+● src/application/workflow/registry/help.rs:69
+  brings back role mcp step, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+● src/application/workflow/registry/help.rs:69
+  brings back per call actual, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: A synchronous per-connection pause with a held real
+  HTTP call and actual SDK deletion entry now forces that interval;
+  removing only the registration lock makes the real wire-order
+  assertion fail.
+● src/application/workflow/roles_tests.rs:235
+  brings back sponsor test three, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: Its sponsor runtime and rendering tests passed, while
+  the later full suite failed three shared fixture tests with
+  registry.literal at /steps/review/with/data_schema.
+● src/application/workflow/roles_tests.rs:235
+  brings back role selector test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+✓ docs/departments.md
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ docs/departments.md
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ docs/departments.md
+  follows Mac02's learning: Preserve all tenant, agent, manifest, run, origin and visibility
+✓ docs/workflow-language-v1.md
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+
+· no conflicts · 16 worth a look

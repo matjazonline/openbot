@@ -471,6 +471,7 @@ async fn department_write_a_name_only_edit_keeps_every_other_field() {
     assert_eq!(
         renamed,
         Department {
+            escalation: None,
             name: "Greenhouse".into(),
             ..department.clone()
         },
@@ -480,6 +481,7 @@ async fn department_write_a_name_only_edit_keeps_every_other_field() {
     assert_eq!(
         rooted,
         Department {
+            escalation: None,
             name: "Greenhouse".into(),
             parent_id: None,
             ..department
@@ -504,6 +506,7 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
         .unwrap();
     let lead = |principal| {
         vec![DepartmentRoleHolder {
+            decider: false,
             role: DepartmentRole::Lead,
             principal_id: principal,
         }]
@@ -515,8 +518,11 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
             f.owner,
             f.company,
             department.id,
-            DepartmentRole::Lead,
-            f.member_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: f.member_principal,
+                decider: false,
+            },
         )
         .await
         .expect("assigning the lead replaces the holder");
@@ -526,8 +532,11 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
             f.owner,
             f.company,
             department.id,
-            DepartmentRole::Lead,
-            f.member_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: f.member_principal,
+                decider: false,
+            },
         )
         .await
         .expect("assigning the holder again changes nothing");
@@ -543,8 +552,11 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
             f.owner,
             f.company,
             department.id,
-            DepartmentRole::Lead,
-            f.agent_principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: f.agent_principal,
+                successor: None,
+            },
         )
         .await;
     assert!(
@@ -556,8 +568,11 @@ async fn department_write_assigns_replaces_and_clears_the_lead() {
             f.owner,
             f.company,
             department.id,
-            DepartmentRole::Lead,
-            f.member_principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: f.member_principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -759,16 +774,22 @@ async fn department_write_refuses_members_and_strangers_with_not_found() {
                 user,
                 company,
                 department,
-                DepartmentRole::Lead,
-                f.member_principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal: f.member_principal,
+                    decider: false,
+                },
             )
             .await,
             uc.clear_role(
                 user,
                 company,
                 department,
-                DepartmentRole::Lead,
-                f.member_principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Lead,
+                    principal: f.member_principal,
+                    successor: None,
+                },
             )
             .await,
             uc.add_member(user, company, department, f.member_principal)
@@ -840,8 +861,11 @@ async fn department_write_shows_a_member_only_their_departments() {
             f.owner,
             f.company,
             led.id,
-            DepartmentRole::Lead,
-            f.member_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: f.member_principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -908,8 +932,11 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
             f.owner,
             f.company,
             department.id,
-            DepartmentRole::Lead,
-            f.agent_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: f.agent_principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -945,15 +972,21 @@ async fn department_write_persistence_reauthorizes_every_write_under_the_lock() 
             p.assign_role(
                 scope,
                 department.id,
-                DepartmentRole::Lead,
-                f.member_principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal: f.member_principal,
+                    decider: false,
+                },
             )
             .await,
             p.clear_role(
                 scope,
                 department.id,
-                DepartmentRole::Lead,
-                f.agent_principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Lead,
+                    principal: f.agent_principal,
+                    successor: None,
+                },
             )
             .await,
             p.add_member(scope, department.id, f.member_principal).await,
@@ -1041,3 +1074,6 @@ mod roster;
 
 #[path = "department_ui_reads_tests.rs"]
 mod ui_reads;
+
+#[path = "department_sponsor_tests.rs"]
+mod sponsors;

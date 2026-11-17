@@ -132,7 +132,12 @@ fn workflow_role_source_sample_and_help_explain_the_same_requirement() {
         DepartmentRole::Lead
     );
     assert!(bundle.snapshots().agents.is_empty());
-    for kind in ["agent.run", "ai.classify", "decision.agent"] {
+    for kind in [
+        "agent.run",
+        "ai.classify",
+        "decision.agent",
+        "decision.human",
+    ] {
         let example = registry::example(kind).unwrap();
         let help = registry::authoring_help(
             decode(&example.source).unwrap(),
@@ -142,9 +147,16 @@ fn workflow_role_source_sample_and_help_explain_the_same_requirement() {
             &example.dependencies,
         )
         .unwrap();
-        assert!(help.notes.contains("role"));
-        assert!(help.notes.contains("reviewer"));
-        assert!(help.notes.contains("nearest ancestor"));
+        for role in DepartmentRole::ALL {
+            assert!(help.notes.contains(role.as_str()), "{kind}: {role}");
+        }
+        if kind == "decision.human" {
+            assert!(help.notes.contains("one deciding person"));
+            assert!(help.notes.contains("cannot settle"));
+        } else {
+            assert!(help.notes.contains("nearest ancestor"));
+            assert!(help.notes.contains("one deciding agent"));
+        }
     }
 }
 

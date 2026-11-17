@@ -1,0 +1,211 @@
+{
+  "command": "bash scripts/check.sh",
+  "exit_code": 1,
+  "gates": [
+    {
+      "name": "Runner test coverage",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Local-agent plugin tests and guards",
+      "status": "PASS",
+      "seconds": 23
+    },
+    {
+      "name": "Reproducible plugin package and runtime install",
+      "status": "FAIL",
+      "seconds": 0
+    },
+    {
+      "name": "Generated CSS is current",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Frontend protocols",
+      "status": "PASS",
+      "seconds": 47
+    },
+    {
+      "name": "Deployment script tests",
+      "status": "PASS",
+      "seconds": 1
+    },
+    {
+      "name": "Knowledge artifact preparation tests",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Doop runner boundaries",
+      "status": "FAIL",
+      "seconds": 7
+    },
+    {
+      "name": "Doop probe protocols",
+      "status": "PASS",
+      "seconds": 2
+    },
+    {
+      "name": "Formatting",
+      "status": "PASS",
+      "seconds": 4
+    },
+    {
+      "name": "Patch whitespace",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Transport abstraction boundary",
+      "status": "PASS",
+      "seconds": 8
+    },
+    {
+      "name": "Workflow sample boundary tests",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Workflow sample boundary",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Integration boundary tests",
+      "status": "PASS",
+      "seconds": 1
+    },
+    {
+      "name": "Integration boundary",
+      "status": "PASS",
+      "seconds": 1
+    },
+    {
+      "name": "Integration documentation",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Workflow evidence validator fixtures",
+      "status": "PASS",
+      "seconds": 2
+    },
+    {
+      "name": "Retained workflow evidence",
+      "status": "PASS",
+      "seconds": 67
+    },
+    {
+      "name": "Fetch locked Rust dependencies",
+      "status": "PASS",
+      "seconds": 1
+    },
+    {
+      "name": "Offline compilation",
+      "status": "PASS",
+      "seconds": 118
+    },
+    {
+      "name": "Clippy",
+      "status": "PASS",
+      "seconds": 125
+    },
+    {
+      "name": "Test database for this run",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Migrations",
+      "status": "PASS",
+      "seconds": 1
+    },
+    {
+      "name": "SQLx metadata matches migrated schema",
+      "status": "PASS",
+      "seconds": 128
+    },
+    {
+      "name": "Compile tests",
+      "status": "PASS",
+      "seconds": 218
+    },
+    {
+      "name": "Query statistics prerequisites",
+      "status": "PASS",
+      "seconds": 0
+    },
+    {
+      "name": "Integration conformance families are registered",
+      "status": "PASS",
+      "seconds": 4
+    },
+    {
+      "name": "Database-backed test suite (isolated network)",
+      "status": "FAIL",
+      "seconds": 2888
+    },
+    {
+      "name": "Ignored browser fixture producers",
+      "status": "PASS",
+      "seconds": 4
+    },
+    {
+      "name": "Browser protocols using native markup",
+      "status": "FAIL",
+      "seconds": 587
+    },
+    {
+      "name": "Stack budget",
+      "status": "FAIL",
+      "seconds": 2359
+    },
+    {
+      "name": "Lease budget",
+      "status": "PASS",
+      "seconds": 266
+    },
+    {
+      "name": "Knowledge production image",
+      "status": "FAIL",
+      "seconds": 1
+    },
+    {
+      "name": "Memory model preparation",
+      "status": "PASS",
+      "seconds": 66
+    },
+    {
+      "name": "Memory extracted service suite",
+      "status": "FAIL",
+      "seconds": 4
+    },
+    {
+      "name": "Memory backup and restore",
+      "status": "FAIL",
+      "seconds": 57
+    },
+    {
+      "name": "Memory standalone journey",
+      "status": "FAIL",
+      "seconds": 19
+    },
+    {
+      "name": "OpenBot and memory integration",
+      "status": "FAIL",
+      "seconds": 1
+    },
+    {
+      "name": "Memory production image",
+      "status": "FAIL",
+      "seconds": 0
+    },
+    {
+      "name": "Managed Doop service and private integration",
+      "status": "FAIL",
+      "seconds": 0
+    }
+  ]
+}

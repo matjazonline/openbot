@@ -1,0 +1,77 @@
+COMMAND: git merge-tree --write-tree HEAD codex/departments-addressing-plans
+EXIT: 1
+3755b831c62ba20f6bc5bc3b2bcb054da31ed095
+100644 8c53307d620e1cfdc9c55db679fb9d8f79a72070 1	migrations/20260817000000_init_schema.sql
+100644 2850aca08f40dab3581820faa3030e85b57dcab0 2	migrations/20260817000000_init_schema.sql
+100644 6c2144a135d9f200bc60d90e55a74bff846d8920 3	migrations/20260817000000_init_schema.sql
+100644 63aaeff75cc5ba5ff0590ce2d60dc0049b1068b6 1	src/adapters/persistence/agent_publication/commands.rs
+100644 bc5794dffaf7671e1d36e87fe89a8f3339cacf8d 2	src/adapters/persistence/agent_publication/commands.rs
+100644 b6e2e23954ccc7e0037c8a98c94bc411ee72ac1d 3	src/adapters/persistence/agent_publication/commands.rs
+100644 698f8098ce17e2a189d5a61e5773fe45888119ed 1	src/adapters/persistence/workflow/action_authority.rs
+100644 23d35a163fc0d7b3200e01b957da79bfc6645693 2	src/adapters/persistence/workflow/action_authority.rs
+100644 a1b7b670bec99152b5808a2f100b70060c838a32 3	src/adapters/persistence/workflow/action_authority.rs
+100644 82fc80999bb8ea064a0065744b3650f29ec6987e 1	src/adapters/persistence/workflow/admission_write.rs
+100644 8e2038c0558b2664729f51abfcf02aff76ca063d 2	src/adapters/persistence/workflow/admission_write.rs
+100644 88943881f00097e5bdf68ba93b790351ee08c4a1 3	src/adapters/persistence/workflow/admission_write.rs
+100644 447cbdcd0fb4a1c80f85037d443ab01332fa94f9 1	src/adapters/persistence/workflow/agent_manifest/mod.rs
+100644 9f2b35d0166a8ff089bec31a81c65a2831df67e5 2	src/adapters/persistence/workflow/agent_manifest/mod.rs
+100644 eac2124696d5bb77fb325524d43ce154a714fa3c 3	src/adapters/persistence/workflow/agent_manifest/mod.rs
+100644 76fab55f11e3be74b77824ee8c6f0762c9748c20 1	src/adapters/persistence/workflow/agent_manifest/storage.rs
+100644 c82572e18948fa43024be48b7fb51e3bfc3d49a7 2	src/adapters/persistence/workflow/agent_manifest/storage.rs
+100644 9b8b138622acff8c3e5067e0ae4ebcd6bc40df71 3	src/adapters/persistence/workflow/agent_manifest/storage.rs
+100644 5d4f4173e199d5b97c08d033145ad14a7f75ff80 1	src/adapters/persistence/workflow/mod.rs
+100644 edab3cbb7cfca5352e01e3e75808af8172bc994d 2	src/adapters/persistence/workflow/mod.rs
+100644 921c88d6b22b58e10a50be9245310fde96e7e8d8 3	src/adapters/persistence/workflow/mod.rs
+100644 748c9c275f03eb8e855c6ffb87955f487cd3c008 1	src/application/workflow/mod.rs
+100644 57e8a21f9e3e3b7bab634fdb08add4b22f321898 2	src/application/workflow/mod.rs
+100644 0f5aafbafb3f2b1dcf5fa199ebd945e3cbf37317 3	src/application/workflow/mod.rs
+
+Auto-merging migrations/20260817000000_init_schema.sql
+CONFLICT (content): Merge conflict in migrations/20260817000000_init_schema.sql
+Auto-merging src/adapters/http/app_error_impl.rs
+Auto-merging src/adapters/http/pages/workflow_authoring/agent_picker.rs
+Auto-merging src/adapters/http/pages/workflow_runs/provenance.rs
+Auto-merging src/adapters/http/routes/workflows/ui/runs/pages_tests.rs
+Auto-merging src/adapters/persistence/agent.rs
+Auto-merging src/adapters/persistence/agent_publication/commands.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/agent_publication/commands.rs
+Auto-merging src/adapters/persistence/agent_publication/tools.rs
+Auto-merging src/adapters/persistence/workflow/action_authority.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/workflow/action_authority.rs
+Auto-merging src/adapters/persistence/workflow/admission.rs
+Auto-merging src/adapters/persistence/workflow/admission_write.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/workflow/admission_write.rs
+Auto-merging src/adapters/persistence/workflow/agent_manifest/mod.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/workflow/agent_manifest/mod.rs
+Auto-merging src/adapters/persistence/workflow/agent_manifest/storage.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/workflow/agent_manifest/storage.rs
+Auto-merging src/adapters/persistence/workflow/agent_runtime_tests.rs
+Auto-merging src/adapters/persistence/workflow/authoring_reads.rs
+Auto-merging src/adapters/persistence/workflow/authority.rs
+Auto-merging src/adapters/persistence/workflow/autonomous_agent_storage_support.rs
+Auto-merging src/adapters/persistence/workflow/binding_rows.rs
+Auto-merging src/adapters/persistence/workflow/children.rs
+Auto-merging src/adapters/persistence/workflow/controls.rs
+Auto-merging src/adapters/persistence/workflow/doop_document_tests.rs
+Auto-merging src/adapters/persistence/workflow/lease.rs
+Auto-merging src/adapters/persistence/workflow/local_agent_continuation_tests.rs
+Auto-merging src/adapters/persistence/workflow/local_agent_tests.rs
+Auto-merging src/adapters/persistence/workflow/local_agents/mod.rs
+Auto-merging src/adapters/persistence/workflow/mcp_test_support.rs
+Auto-merging src/adapters/persistence/workflow/mod.rs
+CONFLICT (content): Merge conflict in src/adapters/persistence/workflow/mod.rs
+Auto-merging src/adapters/persistence/workflow/reads.rs
+Auto-merging src/adapters/persistence/workflow/run_provenance/mod.rs
+Auto-merging src/adapters/persistence/workflow/tests.rs
+Auto-merging src/application/agent/contract_tests.rs
+Auto-merging src/application/app_error.rs
+Auto-merging src/application/services/inbound_event_worker.rs
+Auto-merging src/application/workflow/agent.rs
+Auto-merging src/application/workflow/mod.rs
+CONFLICT (content): Merge conflict in src/application/workflow/mod.rs
+Auto-merging src/application/workflow/publication/capabilities.rs
+Auto-merging src/application/workflow/publication/tests.rs
+Auto-merging src/application/workflow/run_views.rs
+Auto-merging src/application/workflow/sample/tests.rs
+Auto-merging src/domain/entities/mod.rs
+Auto-merging src/infra/workflow.rs

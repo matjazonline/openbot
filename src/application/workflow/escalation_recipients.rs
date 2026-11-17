@@ -15,6 +15,7 @@ pub(crate) struct NotificationRoleHolder {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NotificationRoleRefusal {
     NoHolder,
+    NoDecider,
     MissingContext,
     RecipientLimit,
     InvalidAncestry,
@@ -25,6 +26,7 @@ impl NotificationRoleRefusal {
     pub const fn as_str(self) -> &'static str {
         match self {
             Self::NoHolder => "no_holder",
+            Self::NoDecider => "no_decider",
             Self::MissingContext => "missing_context",
             Self::RecipientLimit => "recipient_limit",
             Self::InvalidAncestry => "invalid_ancestry",
@@ -61,11 +63,11 @@ pub(crate) fn resolve_notification_recipients(
     }
     for department in chain {
         let mut selected = BTreeMap::new();
-        for holder in department
-            .holders
-            .iter()
-            .filter(|holder| holder.role == role)
-        {
+        let has_sponsors = role == DepartmentRole::Sponsor
+            && department.holders.iter().any(|holder| holder.role == role);
+        for holder in department.holders.iter().filter(|holder| {
+            holder.role == role && (role != DepartmentRole::Sponsor || holder.decider)
+        }) {
             if let Some(prior) = selected.insert(holder.principal, holder.kind)
                 && prior != holder.kind
             {
@@ -80,6 +82,12 @@ pub(crate) fn resolve_notification_recipients(
                     reason: NotificationRoleRefusal::RecipientLimit,
                 };
             }
+        }
+        if has_sponsors && selected.is_empty() {
+            return NotificationRecipients::Refused {
+                department: Some(department.department),
+                reason: NotificationRoleRefusal::NoDecider,
+            };
         }
         if !selected.is_empty() {
             return NotificationRecipients::Holders {

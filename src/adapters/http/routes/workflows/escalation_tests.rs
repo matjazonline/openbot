@@ -68,8 +68,11 @@ impl Escalating {
                 f.owner,
                 f.company,
                 department.id,
-                DepartmentRole::Reviewer,
-                PrincipalId::new(principal),
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal: PrincipalId::new(principal),
+                    decider: false,
+                },
             )
             .await
             .unwrap();

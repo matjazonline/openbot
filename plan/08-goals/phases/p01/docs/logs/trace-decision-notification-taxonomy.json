@@ -1,0 +1,308 @@
+{
+  "pattern": "DecisionReviewer|DecisionReview",
+  "filesSearched": 2066,
+  "totalHits": 18,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/projection.rs#source_snapshot",
+        "name": "source_snapshot",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/projection.rs",
+        "span": "L101-L172"
+      },
+      "path": "src/adapters/persistence/notification/projection.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 162,
+          "text": "(NotificationSourceKind::DecisionReviewer, NotificationActionKind::DecisionReview) => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#email_preference",
+        "name": "email_preference",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L101-L107"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 104,
+          "text": "Self::DecisionReview | Self::EscalationReview => preferences.decision_email_enabled,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/projection_lock.rs#lock_on",
+        "name": "lock_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/projection_lock.rs",
+        "span": "L15-L78"
+      },
+      "path": "src/adapters/persistence/notification/projection_lock.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 55,
+          "text": "NotificationSourceKind::DecisionReviewer => {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/notification/reviewer_notice.rs#record_receipt_on",
+        "name": "record_receipt_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+        "span": "L91-L112"
+      },
+      "path": "src/adapters/persistence/notification/reviewer_notice.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 95,
+          "text": "if projection.event.source_kind != NotificationSourceKind::DecisionReviewer {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#read_on",
+        "name": "read_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L37-L103"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 63,
+          "text": ".map(|(principal, label)| DecisionReviewer { principal, label })"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions/read.rs#DecisionReadParts",
+        "name": "DecisionReadParts",
+        "kind": "struct",
+        "path": "src/adapters/persistence/workflow/decisions/read.rs",
+        "span": "L105-L116"
+      },
+      "path": "src/adapters/persistence/workflow/decisions/read.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 109,
+          "text": "reviewer_labels: Vec<DecisionReviewer>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#DecisionReviewer",
+        "name": "DecisionReviewer",
+        "kind": "struct",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L202-L205"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 202,
+          "text": "pub struct DecisionReviewer {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/decisions.rs#DecisionView",
+        "name": "DecisionView",
+        "kind": "struct",
+        "path": "src/application/workflow/decisions.rs",
+        "span": "L209-L235"
+      },
+      "path": "src/application/workflow/decisions.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 229,
+          "text": "pub reviewer_labels: Vec<DecisionReviewer>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#NotificationSourceKind",
+        "name": "NotificationSourceKind",
+        "kind": "enum",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L21-L27"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "DecisionReviewer,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#as_str",
+        "name": "as_str",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L30-L38"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 33,
+          "text": "Self::DecisionReviewer => \"decision_reviewer\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#from_str",
+        "name": "from_str",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L44-L53"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "\"decision_reviewer\" => Ok(Self::DecisionReviewer),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#NotificationActionKind",
+        "name": "NotificationActionKind",
+        "kind": "enum",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L64-L70"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 66,
+          "text": "DecisionReview,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#ALL",
+        "name": "ALL",
+        "kind": "constant",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L73-L79"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 75,
+          "text": "Self::DecisionReview,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#as_str~2",
+        "name": "as_str~2",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L81-L89"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 84,
+          "text": "Self::DecisionReview => \"decision_review\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#label",
+        "name": "label",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L91-L99"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 94,
+          "text": "Self::DecisionReview => \"Workflow decision needs your review\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#from_str~2",
+        "name": "from_str~2",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L113-L122"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 116,
+          "text": "\"decision_review\" => Ok(Self::DecisionReview),"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/notification.rs#workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference",
+        "name": "workflow_reviewer_follow_notification_taxonomy_uses_only_its_own_preference",
+        "kind": "function",
+        "path": "src/domain/entities/notification.rs",
+        "span": "L377-L401"
+      },
+      "path": "src/domain/entities/notification.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 387,
+          "text": "NotificationActionKind::DecisionReview"
+        },
+        {
+          "line": 399,
+          "text": "Ok(NotificationSourceKind::DecisionReviewer)"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 6,
+    "baselineChars": 64451
+  }
+}

@@ -16,6 +16,7 @@
 //! The `_on` functions are steps 2–3 on a caller's transaction, for a caller that already holds
 //! the company write lock and must change a department inside its own commit.
 
+use crate::application::ports::department::{DepartmentRoleAssignment, DepartmentRoleRemoval};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use sqlx::{Postgres, Transaction};
@@ -48,9 +49,11 @@ use crate::use_cases::company::company_not_found;
 use crate::use_cases::department::department_not_found;
 
 mod lifecycle;
+mod roles;
 pub(crate) use lifecycle::{
     create_department_on, create_department_with_id_on, delete_department_on, update_department_on,
 };
+pub(crate) use roles::{assign_department_role_on, clear_department_role_on};
 
 /// A principal named as the department pages show it: an agent by its current name and handle, a
 /// person by their account's username and email (not `display_label`, which a rename leaves).
@@ -81,7 +84,7 @@ fn principal_choices(
 
 const DEPARTMENT_COLUMNS: &str = "department.id, department.company_id, department.name, \
      department.slug::text AS slug, department.description, department.charter, \
-     department.parent_id, department.created_by, department.created_at";
+     department.parent_id, department.created_by, department.created_at, department.escalation";
 
 #[derive(sqlx::FromRow)]
 struct DepartmentDb {
@@ -93,6 +96,7 @@ struct DepartmentDb {
     charter: Option<String>,
     parent_id: Option<Uuid>,
     created_by: serde_json::Value,
+    escalation: Option<serde_json::Value>,
     created_at: DateTime<Utc>,
 }
 
@@ -114,6 +118,16 @@ impl TryFrom<DepartmentDb> for Department {
             description: db.description,
             charter: db.charter,
             parent_id: db.parent_id.map(DepartmentId::new),
+            escalation: db
+                .escalation
+                .map(serde_json::from_value)
+                .transpose()
+                .map_err(|error| {
+                    AppError::Internal(format!(
+                        "Invalid departments.escalation for {}: {error}",
+                        db.id
+                    ))
+                })?,
             created_at: db.created_at,
         })
     }
@@ -302,32 +316,6 @@ async fn lock_principals_on(
     Ok(())
 }
 
-/// Give `principal` the role. A single-holder role replaces its current holder in this same
-/// transaction, so the one-lead index is never the person's error. Assigning the current holder
-/// again changes nothing. The caller holds the company write lock.
-pub(crate) async fn assign_department_role_on(
-    tx: &mut Transaction<'_, Postgres>,
-    templates: &ProvisioningDeployment,
-    company: CompanyId,
-    actor: WorkflowActor,
-    department: DepartmentId,
-    role: DepartmentRole,
-    principal: PrincipalId,
-) -> AppResult<()> {
-    write_placement_on(tx, company, department, principal, false, Some(role)).await?;
-    follow_lead_on(
-        tx,
-        templates,
-        company,
-        actor,
-        department,
-        role,
-        Some(principal),
-    )
-    .await?;
-    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
-}
-
 /// Make `principal` a member of the department and, with `role`, its holder of that role, as
 /// company-agent creation places a new agent (plan 01-departments 03C item 0). One write: the
 /// rows, then a single grant sync over everything they reach, so the department's desk gates
@@ -342,7 +330,19 @@ pub(crate) async fn place_in_department_on(
     principal: PrincipalId,
     role: Option<DepartmentRole>,
 ) -> AppResult<()> {
-    write_placement_on(tx, company, department, principal, true, role).await?;
+    write_placement_on(
+        tx,
+        company,
+        department,
+        principal,
+        true,
+        role.map(|role| DepartmentRoleAssignment {
+            role,
+            principal,
+            decider: false,
+        }),
+    )
+    .await?;
     if let Some(role) = role {
         follow_lead_on(
             tx,
@@ -388,11 +388,13 @@ async fn write_placement_on(
     department: DepartmentId,
     principal: PrincipalId,
     member: bool,
-    role: Option<DepartmentRole>,
+    role: Option<DepartmentRoleAssignment>,
 ) -> AppResult<()> {
     lock_department_on(tx, company, department).await?;
     // The holder a single-holder role replaces loses a row: lock them with the new one, first.
-    let mut involved: Vec<Uuid> = match role.filter(|role| role.is_single_holder()) {
+    let mut involved: Vec<Uuid> = match role
+        .filter(|write| write.role.is_single_holder() || write.role == DepartmentRole::Sponsor)
+    {
         Some(role) => {
             sqlx::query_scalar(
                 "SELECT holder.principal_id FROM department_roles AS holder \
@@ -400,7 +402,7 @@ async fn write_placement_on(
             )
             .bind(company.as_uuid())
             .bind(department.as_uuid())
-            .bind(role.as_str())
+            .bind(role.role.as_str())
             .fetch_all(&mut **tx)
             .await?
         }
@@ -422,76 +424,18 @@ async fn write_placement_on(
         .execute(&mut **tx)
         .await?;
     }
-    let Some(role) = role else {
+    let Some(assignment) = role else {
         super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
         return sync_department_grants_on(tx, company, &[department]).await;
     };
-    if role.is_single_holder() {
-        sqlx::query(
-            "DELETE FROM department_roles \
-              WHERE company_id = $1 AND department_id = $2 AND role = $3 AND principal_id <> $4",
-        )
-        .bind(company.as_uuid())
-        .bind(department.as_uuid())
-        .bind(role.as_str())
-        .bind(principal.as_uuid())
-        .execute(&mut **tx)
-        .await?;
-    }
-    sqlx::query(
-        "INSERT INTO department_roles (company_id, department_id, role, principal_id) \
-         VALUES ($1, $2, $3, $4) \
-         ON CONFLICT (department_id, role, principal_id) DO NOTHING",
-    )
-    .bind(company.as_uuid())
-    .bind(department.as_uuid())
-    .bind(role.as_str())
-    .bind(principal.as_uuid())
-    .execute(&mut **tx)
-    .await?;
+    roles::write_role_on(tx, company, department, assignment).await?;
     super::workflow::role_binding::check_principals_on(tx, company, &involved).await?;
     // The reach contains the department itself, so one sync covers the membership too.
     let reach = role_reach_on(tx, company, department).await?;
     sync_department_grants_on(tx, company, &reach).await
 }
 
-/// Take the role from `principal`. The caller holds the company write lock.
-pub(crate) async fn clear_department_role_on(
-    tx: &mut Transaction<'_, Postgres>,
-    templates: &ProvisioningDeployment,
-    company: CompanyId,
-    actor: WorkflowActor,
-    department: DepartmentId,
-    role: DepartmentRole,
-    principal: PrincipalId,
-) -> AppResult<()> {
-    lock_department_on(tx, company, department).await?;
-    lock_principals_on(tx, company, &[principal.as_uuid()]).await?;
-    let cleared = sqlx::query(
-        "DELETE FROM department_roles \
-          WHERE company_id = $1 AND department_id = $2 AND role = $3 AND principal_id = $4",
-    )
-    .bind(company.as_uuid())
-    .bind(department.as_uuid())
-    .bind(role.as_str())
-    .bind(principal.as_uuid())
-    .execute(&mut **tx)
-    .await?
-    .rows_affected();
-    if cleared == 0 {
-        return Err(AppError::NotFound(format!(
-            "That principal does not hold the {role} role in this department."
-        )));
-    }
-    super::workflow::role_binding::check_principals_on(tx, company, &[principal.as_uuid()]).await?;
-    let reach = role_reach_on(tx, company, department).await?;
-    sync_department_grants_on(tx, company, &reach).await?;
-    follow_lead_on(tx, templates, company, actor, department, role, None).await?;
-    Box::pin(super::workflow::follow_reviewers::refresh_on(tx, company)).await
-}
-
-/// Add `principal` to the department; adding a member again changes nothing. The caller holds
-/// the company write lock.
+/// Add a department member under company ownership.
 pub(crate) async fn add_department_member_on(
     tx: &mut Transaction<'_, Postgres>,
     company: CompanyId,
@@ -632,8 +576,7 @@ impl DepartmentPersistence for PostgresDepartments {
         &self,
         scope: DepartmentScope,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        assignment: DepartmentRoleAssignment,
     ) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
         assign_department_role_on(
@@ -642,8 +585,7 @@ impl DepartmentPersistence for PostgresDepartments {
             scope.company,
             scope.actor,
             department,
-            role,
-            principal,
+            assignment,
         )
         .await?;
         tx.commit().await?;
@@ -654,8 +596,7 @@ impl DepartmentPersistence for PostgresDepartments {
         &self,
         scope: DepartmentScope,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        removal: DepartmentRoleRemoval,
     ) -> AppResult<()> {
         let mut tx = begin_department_write(&self.persistence, scope).await?;
         clear_department_role_on(
@@ -664,8 +605,7 @@ impl DepartmentPersistence for PostgresDepartments {
             scope.company,
             scope.actor,
             department,
-            role,
-            principal,
+            removal,
         )
         .await?;
         tx.commit().await?;
@@ -771,8 +711,14 @@ impl DepartmentPersistence for PostgresDepartments {
         company: CompanyId,
         department: DepartmentId,
     ) -> AppResult<Vec<DepartmentRoleHolder>> {
-        let rows: Vec<(String, Uuid)> = sqlx::query_as(
-            "SELECT holder.role, holder.principal_id FROM department_roles AS holder \
+        #[derive(sqlx::FromRow)]
+        struct Holder {
+            role: String,
+            principal_id: Uuid,
+            decider: bool,
+        }
+        let rows: Vec<Holder> = sqlx::query_as(
+            "SELECT holder.role, holder.principal_id, holder.decider FROM department_roles AS holder \
              WHERE holder.company_id = $1 AND holder.department_id = $2 \
              ORDER BY holder.role, holder.created_at, holder.principal_id",
         )
@@ -781,10 +727,11 @@ impl DepartmentPersistence for PostgresDepartments {
         .fetch_all(&self.persistence.pool)
         .await?;
         rows.into_iter()
-            .map(|(role, principal_id)| {
+            .map(|holder| {
                 Ok(DepartmentRoleHolder {
-                    role: stored_role(&role)?,
-                    principal_id: PrincipalId::new(principal_id),
+                    decider: holder.decider,
+                    role: stored_role(&holder.role)?,
+                    principal_id: PrincipalId::new(holder.principal_id),
                 })
             })
             .collect()

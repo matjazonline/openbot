@@ -1,0 +1,5 @@
+COMMAND: git status --short --branch
+EXIT: 0
+## plan08_ph1
+?? plan/08-goals/COORDINATION.md
+?? plan/08-goals/phases/

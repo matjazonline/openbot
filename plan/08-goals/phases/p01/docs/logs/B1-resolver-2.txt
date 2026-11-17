@@ -1,0 +1,32 @@
+   Compiling open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+warning: linker stderr: ld: __eh_frame section too large (max 16MB) to encode dwarf unwind offsets in compact unwind table, performance of exception handling might be affected
+  |
+  = note: `#[warn(linker_messages)]` on by default
+
+warning: `open_bots` (lib test) generated 1 warning
+    Finished `test` profile [unoptimized] target(s) in 6m 14s
+     Running unittests src/lib.rs (/Users/mac02/Library/Caches/openbot/08g-p01-01a1e095/target/debug/deps/open_bots-6145e191a69c5cd2)
+
+running 6 tests
+test application::workflow::roles::tests::workflow_role_resolve_sponsor_no_decider_stops_at_the_nearest_unit ... ok
+test application::workflow::roles::tests::workflow_role_resolve_missing_depth_and_cycle_are_bounded ... ok
+test application::workflow::roles::tests::workflow_role_resolve_sponsor_uses_only_decider_kind_and_freezes_information ... ok
+test application::workflow::roles::tests::workflow_role_resolve_nearest_holder_and_wrong_kind_never_fall_through ... ok
+test application::workflow::roles::tests::workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_principals ... ok
+test application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents ... FAILED
+
+failures:
+
+---- application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents stdout ----
+
+thread 'application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents' (26075428) panicked at src/application/workflow/roles_tests.rs:131:14:
+called `Result::unwrap()` on an `Err` value: TooMany
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    application::workflow::roles::tests::workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents
+
+test result: FAILED. 5 passed; 1 failed; 0 ignored; 0 measured; 4713 filtered out; finished in 0.10s
+
+error: test failed, to rerun pass `--lib`

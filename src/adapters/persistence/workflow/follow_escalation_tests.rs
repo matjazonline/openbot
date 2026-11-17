@@ -19,8 +19,11 @@ async fn people() -> PeopleFixture {
             binding.target.actor.user_id(),
             role.company().as_uuid(),
             role.department,
-            DepartmentRole::Lead,
-            role.principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: role.principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -29,8 +32,11 @@ async fn people() -> PeopleFixture {
             binding.target.actor.user_id(),
             role.company().as_uuid(),
             role.department,
-            DepartmentRole::Lead,
-            people.principals[0],
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: people.principals[0],
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -103,8 +109,11 @@ async fn workflow_reviewer_follow_initial_empty_park_creates_the_same_real_sourc
             people.role.admission.binding.target.actor.user_id(),
             people.role.company().as_uuid(),
             people.role.department,
-            DepartmentRole::Reviewer,
-            people.principals[0],
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Reviewer,
+                principal: people.principals[0],
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -175,8 +184,11 @@ async fn workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_w
                 f.people.role.admission.binding.target.actor.user_id(),
                 f.scope.company.as_uuid(),
                 f.people.role.department,
-                DepartmentRole::Reviewer,
-                f.people.principals[0],
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: f.people.principals[0],
+                    successor: None,
+                },
             )
             .await;
     assert!(result.is_err());

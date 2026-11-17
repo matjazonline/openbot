@@ -6,7 +6,8 @@ use crate::application::workflow::reviewers::{
 };
 use crate::application::workflow::roles::{RoleDepartment, RoleHolder, RoleNeed, resolve_role};
 use crate::entities::department::{
-    DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH, RoleAdmissionRefusal, RoleRefusalKind,
+    DepartmentId, DepartmentRole, MAX_DEPARTMENT_DEPTH, RoleAdmissionRefusal, RoleCapacity,
+    RoleRefusalKind,
 };
 use crate::entities::participant::PrincipalKind;
 use crate::entities::transport::PrincipalId;
@@ -27,6 +28,7 @@ pub(super) struct RoleCapture {
     reference: RoleReference,
     department: DepartmentId,
     principals: Vec<PrincipalId>,
+    informed: Vec<PrincipalId>,
     agent: Option<AgentId>,
 }
 
@@ -45,6 +47,7 @@ struct HolderRow {
     principal: Option<Uuid>,
     kind: Option<String>,
     agent: Option<Uuid>,
+    decider: bool,
 }
 
 async fn load_facts_on(
@@ -74,9 +77,9 @@ async fn load_context_on(
            WHERE department.company_id=$1 AND department.id=$2 \
            UNION ALL SELECT parent.id,parent.parent_id,chain.depth+1 FROM departments AS parent \
            JOIN chain ON chain.parent_id=parent.id WHERE parent.company_id=$1 AND chain.depth<$3 \
-         ) SELECT chain.id AS department,vocabulary.role,holder.principal_id AS principal,principal.kind,principal.agent_id AS agent \
+         ) SELECT chain.id AS department,vocabulary.role,holder.principal_id AS principal,principal.kind,principal.agent_id AS agent,coalesce(holder.decider,false) AS decider \
          FROM chain CROSS JOIN unnest($5::text[]) AS vocabulary(role) \
-         LEFT JOIN LATERAL (SELECT principal_id FROM department_roles \
+         LEFT JOIN LATERAL (SELECT principal_id,decider FROM department_roles \
              WHERE company_id=$1 AND department_id=chain.id AND role=vocabulary.role \
              ORDER BY principal_id LIMIT $4) AS holder ON true \
          LEFT JOIN principals AS principal ON principal.company_id=$1 AND principal.id=holder.principal_id \
@@ -130,6 +133,7 @@ fn facts_from_rows(rows: Vec<HolderRow>) -> AppResult<RoleFacts> {
                 role,
                 principal,
                 kind,
+                decider: row.decider,
             });
     }
     Ok(facts)
@@ -201,6 +205,7 @@ impl Closure {
                     reference: reference.clone(),
                     department: resolved.department,
                     principals: resolved.principals,
+                    informed: resolved.informed,
                     agent,
                 },
             );
@@ -214,17 +219,12 @@ impl Closure {
     ) -> AppResult<Vec<RoleResolution>> {
         // All selected agent SHARE locks already exist. Principal locks follow agents, ordered
         // by principal ID, matching retirement rather than introducing the reverse edge.
-        let principals: BTreeMap<_, _> = self
+        let principals: std::collections::BTreeSet<_> = self
             .roles
             .values()
-            .flat_map(|capture| {
-                capture
-                    .principals
-                    .iter()
-                    .map(move |principal| (*principal, capture))
-            })
+            .flat_map(|capture| capture.principals.iter().chain(&capture.informed).copied())
             .collect();
-        for (principal, capture) in principals {
+        for principal in principals {
             self.within_bound()?;
             let actual: Option<(String, Option<Uuid>)> = sqlx::query_as(
                 "SELECT kind,agent_id FROM principals WHERE company_id=$1 AND id=$2 FOR KEY SHARE",
@@ -233,12 +233,23 @@ impl Closure {
             .bind(principal.as_uuid())
             .fetch_optional(&mut *tx)
             .await?;
-            let expected = capture.agent.map_or_else(
-                || ("person".into(), None),
-                |agent| ("agent".into(), Some(agent.as_uuid())),
-            );
-            if actual != Some(expected) {
-                return Err(role_error(&capture.reference, RoleRefusalKind::WrongKind));
+            for capture in self.roles.values() {
+                let valid = if capture.principals.contains(&principal) {
+                    actual
+                        == Some(capture.agent.map_or_else(
+                            || ("person".into(), None),
+                            |agent| ("agent".into(), Some(agent.as_uuid())),
+                        ))
+                } else if capture.informed.contains(&principal) {
+                    actual
+                        .as_ref()
+                        .is_some_and(|(kind, _)| matches!(kind.as_str(), "person" | "agent"))
+                } else {
+                    continue;
+                };
+                if !valid {
+                    return Err(role_error(&capture.reference, RoleRefusalKind::WrongKind));
+                }
             }
         }
         self.roles
@@ -262,9 +273,21 @@ impl Closure {
                         .iter()
                         .map(|principal| RolePrincipalSelection {
                             principal_id: *principal,
+                            capacity: RoleCapacity::Decides,
                             agent_id: capture.agent,
                             revision_id: revision,
                         })
+                        .chain(
+                            capture
+                                .informed
+                                .iter()
+                                .map(|principal| RolePrincipalSelection {
+                                    principal_id: *principal,
+                                    capacity: RoleCapacity::Informed,
+                                    agent_id: None,
+                                    revision_id: None,
+                                }),
+                        )
                         .collect(),
                 })
             })

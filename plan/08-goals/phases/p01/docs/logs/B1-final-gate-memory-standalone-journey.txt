@@ -1,0 +1,3 @@
+standalone-journey: building the extracted copy in /var/folders/y1/v99y__1j741fh8z9fqd8rvlc0000gn/T//memory-journey.99Ajen/memory
+ERROR:  extension "vector" is not available
+HINT:  The extension must first be installed on the system where PostgreSQL is running.

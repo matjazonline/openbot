@@ -53,10 +53,18 @@ pub(super) fn role_markers(
     let mut result = String::new();
     let limit = crate::application::workflow::run_views::MAX_STEP_ITEMS as usize;
     for holder in holders.iter().take(limit) {
-        if seen.insert((holder.role.as_str(), holder.principal)) {
+        if seen.insert((
+            holder.role.as_str(),
+            holder.principal,
+            holder.capacity.as_str(),
+        )) {
             result.push_str(&format!(
                 r#"<span class="badge badge-sm badge-ghost">{}: {} · via role</span>"#,
-                holder.role.as_str(),
+                if holder.role == crate::entities::department::DepartmentRole::Sponsor {
+                    format!("sponsor · {}", holder.capacity.as_str())
+                } else {
+                    holder.role.to_string()
+                },
                 escape_html_text(&holder.label)
             ));
         }
@@ -184,6 +192,7 @@ mod role_tests {
     #[test]
     fn workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers() {
         let holder = RunRoleHolder {
+            capacity: crate::entities::department::RoleCapacity::Decides,
             version: VersionId::new(Uuid::new_v4()),
             step: StepId::parse("start").unwrap(),
             role: DepartmentRole::Lead,

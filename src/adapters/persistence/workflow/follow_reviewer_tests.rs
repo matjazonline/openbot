@@ -73,8 +73,11 @@ impl FollowFixture {
                 self.people.role.admission.binding.target.actor.user_id(),
                 self.scope.company.as_uuid(),
                 self.people.role.department,
-                DepartmentRole::Reviewer,
-                self.people.principals[index],
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: self.people.principals[index],
+                    successor: None,
+                },
             )
             .await
             .unwrap();
@@ -85,8 +88,11 @@ impl FollowFixture {
                 self.people.role.admission.binding.target.actor.user_id(),
                 self.scope.company.as_uuid(),
                 self.people.role.department,
-                DepartmentRole::Reviewer,
-                self.people.principals[index],
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal: self.people.principals[index],
+                    decider: false,
+                },
             )
             .await
             .unwrap();

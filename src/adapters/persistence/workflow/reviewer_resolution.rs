@@ -44,7 +44,7 @@ pub(super) async fn resolve_on(
            AND captured.manifest_id=ownership.manifest_id AND captured.run_id=ownership.root_run_id \
          WHERE ownership.company_id=$1 AND ownership.run_id=$2 AND captured.version_id=$3 \
            AND captured.step=$4 AND captured.role=ANY($5) AND captured.resolution_revision=0 \
-           AND captured.agent_id IS NULL AND captured.agent_revision_id IS NULL \
+           AND captured.capacity='decides' AND captured.agent_id IS NULL AND captured.agent_revision_id IS NULL \
          ORDER BY captured.role,captured.principal_id LIMIT 33")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).bind(step.version_id).bind(&step.step_id)
         .bind(names).fetch_all(&mut *db).await?;

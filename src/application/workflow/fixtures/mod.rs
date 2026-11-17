@@ -23,9 +23,10 @@ pub enum Fixture {
     /// A department lead's desk (01DEP-P03-D12); its department framing comes from preparation.
     DepartmentLead,
     RoleLeadResponse,
+    RoleSponsorApproval,
 }
 
-pub const ALL: [Fixture; 9] = [
+pub const ALL: [Fixture; 10] = [
     Fixture::ReviewedSupport,
     Fixture::AutonomousResponse,
     Fixture::TriageRouting,
@@ -35,6 +36,7 @@ pub const ALL: [Fixture; 9] = [
     Fixture::ReviewFeedbackSuccessor,
     Fixture::DepartmentLead,
     Fixture::RoleLeadResponse,
+    Fixture::RoleSponsorApproval,
 ];
 
 impl Fixture {
@@ -49,6 +51,7 @@ impl Fixture {
             Self::ReviewFeedbackSuccessor => include_str!("review-feedback-successor.yaml"),
             Self::DepartmentLead => include_str!("department-lead.yaml"),
             Self::RoleLeadResponse => include_str!("role-lead-response.yaml"),
+            Self::RoleSponsorApproval => include_str!("role-sponsor-approval.yaml"),
         }
     }
 
@@ -63,6 +66,7 @@ impl Fixture {
             Self::ReviewFeedbackSuccessor => 107,
             Self::DepartmentLead => 108,
             Self::RoleLeadResponse => 109,
+            Self::RoleSponsorApproval => 110,
         };
         VersionId::new(Uuid::from_u128(suffix))
     }
@@ -74,7 +78,7 @@ impl Fixture {
     /// Caller chooses the test tenant. These synthetic facts never confer authority.
     pub fn snapshots(self, company: CompanyId) -> DependencySnapshots {
         match self {
-            Self::RoleLeadResponse => DependencySnapshots::default(),
+            Self::RoleLeadResponse | Self::RoleSponsorApproval => DependencySnapshots::default(),
             Self::ReviewedSupport
             | Self::AutonomousResponse
             | Self::RepeatedHumanRevision
@@ -106,7 +110,7 @@ fn agent_snapshots(fixture: Fixture, company: CompanyId) -> DependencySnapshots 
         ],
         Fixture::RepeatedHumanRevision => &[("specialist", AgentUseMode::Tools)],
         Fixture::DepartmentLead => &[("lead", AgentUseMode::Tools)],
-        Fixture::McpLookup | Fixture::RoleLeadResponse => &[],
+        Fixture::McpLookup | Fixture::RoleLeadResponse | Fixture::RoleSponsorApproval => &[],
     };
     let key = match fixture {
         Fixture::DepartmentLead => "lead",

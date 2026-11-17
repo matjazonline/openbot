@@ -1,0 +1,27 @@
+    Checking tokio v1.50.0
+    Checking tokio-util v0.7.19
+    Checking tower v0.5.2
+    Checking tokio-rustls v0.26.4
+    Checking tokio-rustls v0.24.1
+    Checking tokio-tungstenite v0.26.2
+    Checking hickory-proto v0.24.4
+    Checking lettre v0.11.23
+    Checking tower-http v0.6.11
+    Checking h2 v0.4.15
+    Checking tokio-stream v0.1.17
+    Checking sqlx-core v0.8.6
+    Checking hickory-resolver v0.24.4
+    Checking sqlx-postgres v0.8.6
+    Checking hyper v1.7.0
+    Checking mail-auth v0.6.1
+    Checking hyper-util v0.1.16
+    Checking sqlx v0.8.6
+    Checking hyper-rustls v0.27.9
+    Checking axum v0.8.4
+    Checking reqwest v0.13.4
+    Checking rig-core v0.42.0
+    Checking rmcp v1.8.0
+    Checking axum-extra v0.10.1
+    Checking rig-agent v0.42.0
+    Checking open_bots v0.1.0 (/Users/mac02/orca/workspaces/openbot/plan08_ph1)
+    Finished `dev` profile [unoptimized] target(s) in 1m 24s

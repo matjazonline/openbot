@@ -1,0 +1,82 @@
+{
+  "version": 1,
+  "round": "08G-P01-B1-R2",
+  "artifact": "55433874cdfe70da7de428e2981dfe8c3a173fb640b866859bf9a6fa4240b3a1",
+  "checks": [
+    {
+      "command": "cargo test --locked --offline --lib -- sponsor workflow_escalation_default_sql_ workflow_role_source_sample_and_help_ notification_worker",
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7",
+        "F1",
+        "F2",
+        "F3",
+        "F4"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned PostgreSQL18 databases and isolated test fixtures; scripted loopback LLM for Deployment",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "9046a4ad187ac7b01eb1a923f0d4638d2c62fb77d6d6ae0a754190a2552a0447"
+        }
+      ]
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "criteria": [
+        "format"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned PostgreSQL18 databases and isolated test fixtures; scripted loopback LLM for Deployment",
+      "files": [
+        {
+          "path": "logs/B1-R2-format-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "criteria": [
+        "whitespace"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned PostgreSQL18 databases and isolated test fixtures; scripted loopback LLM for Deployment",
+      "files": [
+        {
+          "path": "logs/B1-R2-whitespace-check.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "trail check",
+      "criteria": [
+        "learnings"
+      ],
+      "status": "PASS",
+      "fixture": "phase-owned PostgreSQL18 databases and isolated test fixtures; scripted loopback LLM for Deployment",
+      "files": [
+        {
+          "path": "logs/B1-R2-trail-check-final.txt",
+          "sha256": "bc2c9d12f29f901e4a7478d9d318b982bbad6c5142991ca008fdac99e7d7a9bc"
+        }
+      ]
+    },
+    {
+      "command": "bash scripts/check.sh; final serialized cargo sqlx prepare -- --all-targets",
+      "criteria": [
+        "final-gate"
+      ],
+      "status": "NOT EXERCISED",
+      "fixture": "full runner database openbot_check_83cea926bc114cb2ba1dfbee3485d386",
+      "reason": "Full runner still compiling tests; final serial metadata regeneration will run after it and after this review freeze ends. Phase acceptance remains pending."
+    }
+  ]
+}

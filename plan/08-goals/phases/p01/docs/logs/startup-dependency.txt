@@ -1,0 +1,15 @@
+COMMAND: trail grep EscalationPolicy
+EXIT: 0
+no hits for "EscalationPolicy" in 2098 indexed files. The pattern may be too specific — retry trail grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)
+
+COMMAND: trail grep resolve_role
+EXIT: 0
+no hits for "resolve_role" in 2098 indexed files. The pattern may be too specific — retry trail grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)
+
+COMMAND: trail grep reviewers_follow_role
+EXIT: 0
+no hits for "reviewers_follow_role" in 2098 indexed files. The pattern may be too specific — retry trail grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)
+
+COMMAND: trail grep workflow_run_role_bindings
+EXIT: 0
+no hits for "workflow_run_role_bindings" in 2098 indexed files. The pattern may be too specific — retry trail grep with a bare symbol name or short substring (drop the receiver, full signature, and regex anchors). All indexed code was searched; use raw grep -rn only for genuinely unindexed files (docs, configs, brand-new files)

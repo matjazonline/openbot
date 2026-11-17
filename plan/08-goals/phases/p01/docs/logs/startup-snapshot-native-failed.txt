@@ -1,0 +1,4 @@
+COMMAND: bash .agents/skills/implement-astra-reviewed-2-3/scripts/snapshot.sh plan/08-goals/phases/p01/docs
+EXIT: 1
+realpath: illegal option -- m
+usage: realpath [-q] [path ...]

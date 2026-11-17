@@ -221,6 +221,7 @@ async fn write_park_on(
             insert_reviewers(tx, scope.company, decision, &reviewers, &composed).await?;
         }
     }
+    decision_information::refresh_on(tx, scope.company, decision).await?;
     completion_job::finish(tx, scope, completion_job::CompletionOwner::Pure).await?;
     sqlx::query("UPDATE workflow_runs SET state='waiting',waiting_reason='decision' WHERE company_id=$1 AND id=$2")
         .bind(scope.company.as_uuid()).bind(scope.run.as_uuid()).execute(&mut **tx).await?;

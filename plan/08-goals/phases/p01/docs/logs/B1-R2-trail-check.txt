@@ -1,0 +1,73 @@
+checking 84 changed files against 18 learnings and 4 skills
+
+● docs/departments.md:229
+  brings back decision email role, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The initial Phase 01 design reused synchronous
+  decision-email composition during followed-role updates.
+● docs/workflow-language-v1.md:498
+  brings back decision followed role, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: The initial Phase 01 design reused synchronous
+  decision-email composition during followed-role updates.
+● migrations/20260817000000_init_schema.sql:16179
+  brings back check exist role, which Mac02's learning ruled out
+  worth a look, can't fail the check: a learning just for you
+  Mac02 · Nov 12: Granting it SUPERUSER or skipping performance checks
+  were rejected in favour of the existing superuser role.
+● migrations/20260817000000_init_schema.sql:17622
+  brings back direct delivery notification, which Mac02's learning ruled out
+  worth a look, can't fail the check: not on the base branch yet
+  Mac02 · Nov 16: A separate direct-delivery owner would also miss the
+  existing notification retirement cancellation union.
+● migrations/20260817000000_init_schema.sql:19736
+  brings back source guard company, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: An inner native source guard with NOWAIT did not
+  prevent the earlier shared facts helper from taking ordinary waiting
+  account/company locks.
+● src/application/workflow/registry/help.rs:69
+  brings back role mcp step, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+● src/application/workflow/registry/help.rs:69
+  brings back per call actual, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: A synchronous per-connection pause with a held real
+  HTTP call and actual SDK deletion entry now forces that interval;
+  removing only the registration lock makes the real wire-order
+  assertion fail.
+● src/application/workflow/roles_tests.rs:235
+  brings back role selector test, which Mac02's learning ruled out
+  worth a look, can't fail the check: not about this file
+  Mac02 · Nov 15: The role-selector helper test passed while the real
+  mcp_step_request boundary still blocked; the new genuine
+  originating-workflow test and PostgreSQL wait sampling exposed it.
+✓ docs/departments.md
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ docs/departments.md
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ docs/departments.md
+  follows Mac02's learning: Preserve all tenant, agent, manifest, run, origin and visibility
+✓ docs/workflow-language-v1.md
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+✓ docs/workflow-language-v1.md
+  follows Mac02's learning: Merge the original workflow actor/requester with broker and credential-owner/reviewer
+✓ docs/workflow-language-v1.md
+  follows Mac02's learning: Preserve all tenant, agent, manifest, run, origin and visibility
+✓ docs/workflow-language-v1.md
+  follows Mac02's learning: The full check suite runs against the local Homebrew
+✓ docs/workflow-language-v1.md
+  follows skill implement-opus-reviewed-2_3: Never combine authorship and independent review in one agent
+✓ docs/workflow-language-v1.md
+  follows skill implement-opus-reviewed-2_4: Never combine authorship and independent review in one agent
+✓ docs/workflow-language-v1.md
+  follows skill implement-opus-2_3-system-improvement: Do not spawn agents, change application code, alter role
+✓ docs/workflow-language-v1.md
+  follows skill implement-opus-2_4-system-improvement: Do not spawn agents, change application code, alter role
+✓ migrations/20260817000000_init_schema.sql
+  follows Mac02's learning: Messages the application creates itself, such as an escalation
+
+· no conflicts · 8 worth a look

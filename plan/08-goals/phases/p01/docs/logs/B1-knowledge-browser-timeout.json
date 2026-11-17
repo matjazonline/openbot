@@ -1,0 +1,33 @@
+{
+  "check": "Browser protocols using native markup",
+  "file": "scripts/tests/knowledge-browser.mjs",
+  "status": "FAIL",
+  "reason": "Owned test child remained idle for over nine minutes after earlier browser cases completed; no final result. Terminated only this child and its headless browser descendants to let the runner continue. Related script/knowledge page/assets diff against HEAD is empty.",
+  "processes": [
+    {
+      "pid": 63695,
+      "elapsed": "09:47",
+      "executable": "node"
+    },
+    {
+      "pid": 63745,
+      "elapsed": "09:47",
+      "executable": "headless_shell"
+    },
+    {
+      "pid": 63765,
+      "elapsed": "09:46",
+      "executable": "headless_shell"
+    },
+    {
+      "pid": 63777,
+      "elapsed": "09:46",
+      "executable": "headless_shell"
+    },
+    {
+      "pid": 63788,
+      "elapsed": "09:46",
+      "executable": "headless_shell"
+    }
+  ]
+}

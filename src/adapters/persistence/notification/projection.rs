@@ -159,9 +159,11 @@ async fn source_snapshot(
         (NotificationSourceKind::DirectMessage, NotificationActionKind::DirectMessageReceived) => {
             super::direct_message::source_on(connection, event).await
         }
-        (NotificationSourceKind::DecisionReviewer, NotificationActionKind::DecisionReview) => {
-            super::reviewer_notice::source_on(connection, event).await
-        }
+        (NotificationSourceKind::DecisionReviewer, NotificationActionKind::DecisionReview)
+        | (
+            NotificationSourceKind::DecisionInformation,
+            NotificationActionKind::DecisionInformation,
+        ) => super::reviewer_notice::source_on(connection, event).await,
         (NotificationSourceKind::EscalationNotice, NotificationActionKind::EscalationReview) => {
             super::escalation_notice::source_on(connection, event).await
         }

@@ -13,7 +13,7 @@ impl Registration<'_> {
                 let value = self.literal("role").map_err(|_| {
                     self.error(
                         "registry.role",
-                        "Choose a literal role: lead or reviewer",
+                        "Choose a literal role: lead, reviewer or sponsor",
                         "role",
                     )
                 })?;
@@ -24,7 +24,7 @@ impl Registration<'_> {
                 {
                     return Err(self.error(
                         "registry.role",
-                        "Unknown role; choose lead or reviewer",
+                        "Unknown role; choose lead, reviewer or sponsor",
                         "role",
                     ));
                 }

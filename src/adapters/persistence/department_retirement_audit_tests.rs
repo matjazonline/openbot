@@ -51,8 +51,11 @@ impl AuditFixture {
                 f.owner,
                 f.company,
                 department.id,
-                DepartmentRole::Reviewer,
-                f.member_principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal: f.member_principal,
+                    decider: false,
+                },
             )
             .await
             .unwrap();
@@ -191,8 +194,11 @@ async fn workflow_reviewer_follow_retirement_audit_history_survives_principal_de
             f.departments.owner,
             f.departments.company,
             department,
-            DepartmentRole::Reviewer,
-            f.departments.member_principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal: f.departments.member_principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -449,8 +455,11 @@ async fn workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_ca
             f.departments.owner,
             f.departments.company,
             department.id,
-            DepartmentRole::Reviewer,
-            retiring,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Reviewer,
+                principal: retiring,
+                decider: false,
+            },
         )
         .await
         .unwrap();

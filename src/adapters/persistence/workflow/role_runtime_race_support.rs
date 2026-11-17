@@ -43,8 +43,11 @@ pub(super) async fn admit_while_reassigning(
                     binding.actor.user_id(),
                     binding.company.as_uuid(),
                     department,
-                    DepartmentRole::Lead,
-                    replacement,
+                    crate::application::ports::department::DepartmentRoleAssignment {
+                        role: DepartmentRole::Lead,
+                        principal: replacement,
+                        decider: false,
+                    },
                 )
                 .await
         });

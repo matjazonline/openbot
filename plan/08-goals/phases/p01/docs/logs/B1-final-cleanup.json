@@ -1,0 +1,50 @@
+{
+  "removed_generated_bytecode": [
+    {
+      "path": "scripts/__pycache__/doop-test.cpython-313.pyc",
+      "sha256": "6e68975dfc9558380c7104b82714ed1eb08bd4f0cb612de585d3de1cdc6f0a66",
+      "executable": false
+    },
+    {
+      "path": "scripts/__pycache__/integration-boundary.cpython-313.pyc",
+      "sha256": "77487b912eb3e689427e134fe806b3c72079dbacb55897d90d38f16a4f8cda05",
+      "executable": false
+    },
+    {
+      "path": "scripts/__pycache__/prepare-knowledge-model.cpython-313.pyc",
+      "sha256": "5ec3faddf89145f6f9a33b606c995f4444c212e22120f7aba5cf35b3133f6777",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/acceptance.cpython-313.pyc",
+      "sha256": "4003acfe8838e2ae3ede1c27b092f50d47d922f5f704c04227423d10601b4e00",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/image_service.cpython-313.pyc",
+      "sha256": "2d327cbb80a2d171fc4865199d1db82bc866617c6343803918bd7509c06964a4",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/ingress.cpython-313.pyc",
+      "sha256": "060f33c68ffcdb39a1269b39be80c0c0451d1ea74ebd6be9fca27d54f6abadd4",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/ownership.cpython-313.pyc",
+      "sha256": "6e6731a463e64f71575ed86de152e1ed0c622c95f2ad55611552e4655ac1a2dd",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/private_deployment.cpython-313.pyc",
+      "sha256": "3b1c676f8e3ad07b1d8879503568767f11631c44f1538e2e49e2ff6ea4f545a3",
+      "executable": false
+    },
+    {
+      "path": "scripts/doop-test/__pycache__/restore.cpython-313.pyc",
+      "sha256": "548f0e2ad40ce2c6294af26d8faa2d2491358677f0b830fa02284c429111277a",
+      "executable": false
+    }
+  ],
+  "source_changes_since_R3": []
+}

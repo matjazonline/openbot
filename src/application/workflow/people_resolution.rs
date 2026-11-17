@@ -61,13 +61,20 @@ pub struct PeopleResolution {
     #[serde(deserialize_with = "Option::deserialize")]
     pub department_id: Option<DepartmentId>,
     pub principals: Vec<PrincipalId>,
+    pub informed: Vec<PrincipalId>,
     #[serde(deserialize_with = "Option::deserialize")]
     pub refusal: Option<RoleRefusalKind>,
 }
 
 impl PeopleResolution {
     pub fn validate(&self) -> AppResult<()> {
-        if self.principals.len() > super::registry::MAX_REVIEWERS
+        if self.principals.len() + self.informed.len() > super::registry::MAX_REVIEWERS
+            || (self.role == DepartmentRole::Sponsor
+                && self.refusal.is_none()
+                && self.principals.len() != 1)
+            || (self.role != DepartmentRole::Sponsor && !self.informed.is_empty())
+            || self.informed.iter().any(|id| self.principals.contains(id))
+            || self.informed.iter().collect::<BTreeSet<_>>().len() != self.informed.len()
             || self
                 .principals
                 .iter()
@@ -80,7 +87,7 @@ impl PeopleResolution {
         }
         match self.refusal {
             None if self.principals.is_empty() || self.department_id.is_none() => Err(invalid()),
-            Some(_) if !self.principals.is_empty() => Err(invalid()),
+            Some(_) if !self.principals.is_empty() || !self.informed.is_empty() => Err(invalid()),
             _ => Ok(()),
         }
     }
@@ -98,6 +105,7 @@ impl PeopleResolution {
         self.validate()?;
         let mut value = self.clone();
         value.principals.sort_unstable();
+        value.informed.sort_unstable();
         // Match the ordinary manifest's sorted object representation and identity encoding.
         let value = serde_json::to_value(value).map_err(|_| invalid())?;
         let bytes = serde_json::to_vec(&value).map_err(|_| invalid())?;
@@ -119,6 +127,7 @@ mod tests {
 
     fn resolution() -> PeopleResolution {
         PeopleResolution {
+            informed: Vec::new(),
             format: PeopleResolutionFormat::V1,
             company_id: CompanyId::new(Uuid::new_v4()),
             root_run_id: RunId::new(Uuid::new_v4()),

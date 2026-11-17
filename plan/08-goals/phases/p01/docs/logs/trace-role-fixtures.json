@@ -1,0 +1,66 @@
+{
+  "pattern": "role: lead|role-lead|role-human",
+  "filesSearched": 252,
+  "totalHits": 3,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/application/workflow/registry/roles.rs#agent_or_role",
+        "name": "agent_or_role",
+        "kind": "function",
+        "path": "src/application/workflow/registry/roles.rs",
+        "span": "L5-L39"
+      },
+      "path": "src/application/workflow/registry/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 16,
+          "text": "\"Choose a literal role: lead or reviewer\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/compiler/roles.rs#references",
+        "name": "references",
+        "kind": "function",
+        "path": "src/application/workflow/compiler/roles.rs",
+        "span": "L9-L68"
+      },
+      "path": "src/application/workflow/compiler/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "\"Choose a literal department role: lead or reviewer\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/fixtures/mod.rs#source",
+        "name": "source",
+        "kind": "function",
+        "path": "src/application/workflow/fixtures/mod.rs",
+        "span": "L41-L53"
+      },
+      "path": "src/application/workflow/fixtures/mod.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 51,
+          "text": "Self::RoleLeadResponse => include_str!(\"role-lead-response.yaml\"),"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 3,
+    "baselineChars": 15607
+  }
+}

@@ -5,6 +5,7 @@
 //! department request re-renders whole, so a write's refusal comes back on the form that made it
 //! and the tree always shows what was just saved.
 
+mod roles;
 use super::*;
 use crate::entities::department::{
     Department, DepartmentDesk, DepartmentId, DepartmentPrincipal, DepartmentRole, department_tree,
@@ -43,6 +44,8 @@ pub enum DepartmentForm {
     Create,
     Edit,
     Lead,
+    Sponsors,
+    Escalation,
     Members,
     Delete,
 }
@@ -434,6 +437,8 @@ fn department_detail(
                 {charter}
             </div>
             {lead}
+            {sponsors}
+            {escalation}
             {members}
             {desks}
             {edit}
@@ -442,6 +447,8 @@ fn department_detail(
         name = escape_html_text(&department.name),
         slug = escape_html_text(department.slug.as_str()),
         lead = lead_card(section, view),
+        sponsors = roles::sponsors_card(section, view),
+        escalation = roles::escalation_card(section, view),
         members = members_card(section, view),
         desks = desks_card(section, &view.desks),
     )

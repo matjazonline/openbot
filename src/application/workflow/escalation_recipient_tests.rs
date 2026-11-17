@@ -10,6 +10,7 @@ fn department(kinds: &[PrincipalKind]) -> RoleDepartment {
             .iter()
             .enumerate()
             .map(|(index, kind)| RoleHolder {
+                decider: false,
                 role: DepartmentRole::Reviewer,
                 principal: PrincipalId::new(Uuid::from_u128(index as u128 + 1)),
                 kind: *kind,
@@ -119,6 +120,32 @@ fn workflow_escalation_notification_selection_does_not_change_agent_or_people_mo
         NotificationRecipients::Refused {
             department: None,
             reason: NotificationRoleRefusal::InvalidAncestry
+        }
+    );
+}
+
+#[test]
+fn workflow_escalation_default_sponsor_notifies_the_decider_or_stops_without_one() {
+    let mut local = department(&[PrincipalKind::Person, PrincipalKind::Agent]);
+    for holder in &mut local.holders {
+        holder.role = DepartmentRole::Sponsor;
+    }
+    local.holders[1].decider = true;
+    let selected = local.holders[1].principal;
+    assert!(
+        matches!(resolve_notification_recipients(std::slice::from_ref(&local),DepartmentRole::Sponsor),
+        NotificationRecipients::Holders {holders,..} if holders.len()==1 && holders[0].principal==selected)
+    );
+    local.holders[1].decider = false;
+    let mut ancestor = department(&[PrincipalKind::Person]);
+    ancestor.holders[0].role = DepartmentRole::Sponsor;
+    ancestor.holders[0].decider = true;
+    let chosen = local.department;
+    assert_eq!(
+        resolve_notification_recipients(&[local, ancestor], DepartmentRole::Sponsor),
+        NotificationRecipients::Refused {
+            department: Some(chosen),
+            reason: NotificationRoleRefusal::NoDecider
         }
     );
 }

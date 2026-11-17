@@ -1,0 +1,16 @@
+{
+  "command": "scripts/test-network-isolation.sh scripts/stack-budget.sh --offline",
+  "status": "FAIL",
+  "passed": 4707,
+  "failed": 3,
+  "ignored": 27,
+  "duration_seconds": 2358.21,
+  "stack_kib": 2048,
+  "stack_overflow": false,
+  "failed_test_names": [
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_observe_policy_keeps_error_observation_available_to_the_model",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::agent_tests::doop_agent_published_editor_approvals_and_worker_restart_reuse_one_canvas",
+    "adapters::persistence::workflow::tests::mcp_tests::doop_setup_tests::document_tests::recovery_tests::doop_recovery_create_call_timeout_after_acceptance_remains_unknown"
+  ],
+  "scope": "All three failed names are a subset of the17 already independently assessed as outside p01; signatures retained, identical root cause not claimed."
+}

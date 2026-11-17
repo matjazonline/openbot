@@ -1,0 +1,727 @@
+{
+  "pattern": "reviewer.*notice|notice.*reviewer",
+  "filesSearched": 826,
+  "totalHits": 64,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decisions.rs#insert_reviewers",
+        "name": "insert_reviewers",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decisions.rs",
+        "span": "L308-L337"
+      },
+      "path": "src/adapters/persistence/workflow/decisions.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 333,
+          "text": "sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_delivery_id,notice_opted_out) VALUES($1,$2,$3,$4,$5,$6)\""
+        },
+        {
+          "line": 334,
+          "text": ".bind(company.as_uuid()).bind(decision).bind(i16::try_from(ordinal).map_err(|_| invalid())?).bind(reviewer.principal_id).bind(notice).bind(notice.is_none()).exe"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tests.rs#reviewer_rows",
+        "name": "reviewer_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_tests.rs",
+        "span": "L508-L511"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 509,
+          "text": "sqlx::query_as(\"SELECT principal_id, notice_delivery_id, notice_opted_out FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 ORDER BY ordin"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/checkpoint_models.rs#settle_on",
+        "name": "settle_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+        "span": "L221-L279"
+      },
+      "path": "src/adapters/persistence/workflow/checkpoint_models.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 255,
+          "text": "let Some(notices) = notices.filter(|_| authority.reviewers_available) else {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/storage.rs#insert_reviewer_on",
+        "name": "insert_reviewer_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+        "span": "L113-L129"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 119,
+          "text": "let revision = i64::try_from(reviewer.notice_assignment_revision.get()).map_err(|_| limit())?;"
+        },
+        {
+          "line": 121,
+          "text": ".bind(reviewer.notice_event_id.as_uuid()).bind(current.company_id).bind(source).bind(revision).execute(&mut *db).await?;"
+        },
+        {
+          "line": 122,
+          "text": "sqlx::query(\"INSERT INTO workflow_reviewer_notices(company_id,id,decision_id,principal_id,assignment_revision,event_id) VALUES($1,$2,$3,$4,$5,$6)\")"
+        },
+        {
+          "line": 124,
+          "text": ".bind(reviewer.notice_event_id.as_uuid()).execute(&mut *db).await?;"
+        },
+        {
+          "line": 125,
+          "text": "sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_event_id,notice_assignment_revision) VALUES($1,$2,$3,$4,"
+        },
+        {
+          "line": 127,
+          "text": ".bind(reviewer.notice_event_id.as_uuid()).bind(revision).execute(db).await?;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/storage.rs#withdraw_on",
+        "name": "withdraw_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+        "span": "L138-L170"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 146,
+          "text": "JOIN workflow_reviewer_notices AS source ON source.company_id=reviewer.company_id AND source.decision_id=reviewer.decision_id \\"
+        },
+        {
+          "line": 147,
+          "text": "AND source.principal_id=reviewer.principal_id AND source.event_id=reviewer.notice_event_id \\"
+        },
+        {
+          "line": 148,
+          "text": "AND source.assignment_revision=reviewer.notice_assignment_revision \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/approval_account_order_tests.rs#workflow_action_approval_park_first_serializes_retirement_and_cancels_the_retired_notice",
+        "name": "workflow_action_approval_park_first_serializes_retirement_and_cancels_the_retired_notice",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/approval_account_order_tests.rs",
+        "span": "L173-L234"
+      },
+      "path": "src/adapters/persistence/workflow/approval_account_order_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 216,
+          "text": "JOIN message_deliveries AS delivery ON delivery.id=reviewer.notice_delivery_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/channel_question_approval_tests.rs#channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question",
+        "name": "channel_reply_hitl_prompt_approval_notice_stays_private_and_then_parks_the_original_question",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/channel_question_approval_tests.rs",
+        "span": "L12-L82"
+      },
+      "path": "src/adapters/persistence/workflow/channel_question_approval_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 54,
+          "text": "let reviewers:i64=sqlx::query_scalar(\"SELECT count(*) FROM workflow_decision_reviewers WHERE company_id=$1 AND notice_delivery_id IS NOT NULL\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_approvals.rs#park",
+        "name": "park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+        "span": "L55-L107"
+      },
+      "path": "src/adapters/persistence/workflow/decision_approvals.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 93,
+          "text": "let composed = match compose_notices(notices, &reviewers, &context, &step, decision, deadline) {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_boundary_tests.rs#workflow_decision_whole_output_cannot_activate_message_delivery",
+        "name": "workflow_decision_whole_output_cannot_activate_message_delivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_boundary_tests.rs",
+        "span": "L72-L109"
+      },
+      "path": "src/adapters/persistence/workflow/decision_boundary_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 100,
+          "text": "// Only internal reviewer notices exist: no publish/transport dispatch occurred."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_lifecycle_tests.rs#workflow_decision_notices_are_atomic_private_and_never_settle",
+        "name": "workflow_decision_notices_are_atomic_private_and_never_settle",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_lifecycle_tests.rs",
+        "span": "L141-L212"
+      },
+      "path": "src/adapters/persistence/workflow/decision_lifecycle_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 147,
+          "text": "sqlx::query(\"ALTER TABLE workflow_decision_reviewers ADD CONSTRAINT injected_notice_failure CHECK(ordinal=0)\").execute(f.persistence().pool()).await.unwrap();"
+        },
+        {
+          "line": 158,
+          "text": "sqlx::query(\"ALTER TABLE workflow_decision_reviewers DROP CONSTRAINT injected_notice_failure\")"
+        },
+        {
+          "line": 182,
+          "text": "let deliveries: Vec<Uuid> = sqlx::query_scalar(\"SELECT notice_delivery_id FROM workflow_decision_reviewers WHERE decision_id=$1 ORDER BY ordinal\").bind(view.dec"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_provenance_tests.rs#workflow_decision_cross_tenant_relationships_and_access",
+        "name": "workflow_decision_cross_tenant_relationships_and_access",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+        "span": "L59-L122"
+      },
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,1,$4)\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_provenance_tests.rs#workflow_decision_notice_cross_company_and_unique_link",
+        "name": "workflow_decision_notice_cross_company_and_unique_link",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+        "span": "L125-L162"
+      },
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 129,
+          "text": "let rows: Vec<NoticeAssignment> = sqlx::query_as(\"SELECT principal_id,notice_delivery_id FROM workflow_decision_reviewers WHERE decision_id=$1 ORDER BY ordinal\""
+        },
+        {
+          "line": 139,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,0,$4)\")"
+        },
+        {
+          "line": 158,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id,reviewer_label) VALUES($1,$2,$3,"
+        },
+        {
+          "line": 159,
+          "text": ".bind(f.scope.company.as_uuid()).bind(view.decision.0).bind(rows[0].principal_id).bind(rows[1].notice_delivery_id).bind(&view.reviewer_labels[0].label).execute("
+        },
+        {
+          "line": 160,
+          "text": "constraint(error, \"workflow_decision_reviewer_notice\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_provenance_tests.rs#workflow_decision_notice_rejects_non_notification_independently",
+        "name": "workflow_decision_notice_rejects_non_notification_independently",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+        "span": "L165-L193"
+      },
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 168,
+          "text": "let row: NoticeAssignment = sqlx::query_as(\"SELECT principal_id,notice_delivery_id FROM workflow_decision_reviewers WHERE decision_id=$1\")"
+        },
+        {
+          "line": 189,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,0,$4)\")"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 195,
+          "text": "/// fix-app 05 (FIXAPP-P05-G1-F1): a parked decision's reviewers hold their notices, which now"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_provenance_tests.rs#notification_delivery_tenant_company_deletion_removes_parked_decision_notices",
+        "name": "notification_delivery_tenant_company_deletion_removes_parked_decision_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+        "span": "L199-L241"
+      },
+      "path": "src/adapters/persistence/workflow/decision_provenance_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 214,
+          "text": "\"SELECT count(*) FROM workflow_decision_reviewers WHERE company_id = $1 AND notice_delivery_id IS NOT NULL\","
+        },
+        {
+          "line": 220,
+          "text": "assert_eq!(noticed, 2, \"both reviewers hold a notice\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_sql_tests.rs#workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery",
+        "name": "workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_sql_tests.rs",
+        "span": "L70-L117"
+      },
+      "path": "src/adapters/persistence/workflow/decision_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 70,
+          "text": "async fn workflow_decision_reviewer_notice_provenance_rejects_foreign_delivery() {"
+        },
+        {
+          "line": 73,
+          "text": "let rows: Vec<Assignment> = sqlx::query_as(\"SELECT principal_id,notice_delivery_id,ordinal FROM workflow_decision_reviewers WHERE decision_id=$1 ORDER BY ordina"
+        },
+        {
+          "line": 96,
+          "text": "let other_notice: Uuid = sqlx::query_scalar(\"SELECT reviewer.notice_delivery_id FROM workflow_decision_reviewers AS reviewer JOIN workflow_decisions AS decision"
+        },
+        {
+          "line": 102,
+          "text": "let error = sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,principal_id,ordinal,notice_delivery_id) VALUES($1,$2,$3,$4,$5)\")"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/decision_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 525,
+          "text": "/// P08-Q8: an opted-out reviewer gets no notice, a reviewer row that records the opt-out, and can"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/decision_tests.rs#workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews",
+        "name": "workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/decision_tests.rs",
+        "span": "L529-L573"
+      },
+      "path": "src/adapters/persistence/workflow/decision_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 529,
+          "text": "async fn workflow_decision_opted_out_reviewer_gets_no_notice_and_still_reviews() {"
+        },
+        {
+          "line": 541,
+          "text": "\"the opted-in reviewer is noticed\""
+        },
+        {
+          "line": 554,
+          "text": "sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,notice_delivery_id,notice_opted_out) VALUES($1,$2,2,$3,NULL,$4)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs#workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "name": "workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+        "span": "L19-L95"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 47,
+          "text": "\"one withdrawn ordinary reviewer notice and one escalation control\""
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email",
+        "name": "workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L121-L163"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 121,
+          "text": "async fn workflow_reviewer_follow_repair_withdraws_real_escalation_notice_and_queued_email() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation",
+        "name": "workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L192-L221"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 192,
+          "text": "async fn workflow_reviewer_follow_repair_and_actual_notice_worker_compete_without_reactivation() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_retirement_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+        "span": "L4-L80"
+      },
+      "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 69,
+          "text": "AND NOT EXISTS(SELECT 1 FROM workflow_reviewer_notices WHERE company_id=$2)\","
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_retirement_tests.rs#workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices",
+        "name": "workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+        "span": "L177-L246"
+      },
+      "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 177,
+          "text": "async fn workflow_reviewer_follow_failed_final_statement_rolls_back_actual_account_retirement_and_notices()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal",
+        "name": "workflow_reviewer_follow_real_role_writer_replaces_only_current_rows_and_preserves_proposal",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L118-L207"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 163,
+          "text": "\"SELECT count(*) FROM workflow_reviewer_notices WHERE company_id=$1 AND decision_id=$2\","
+        },
+        {
+          "line": 170,
+          "text": "assert_eq!(notices, 2, \"unchanged reviewer is not notified twice\");"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice",
+        "name": "workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L210-L243"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 210,
+          "text": "async fn workflow_reviewer_follow_empty_role_stays_parked_and_repair_has_a_fresh_notice() {"
+        },
+        {
+          "line": 232,
+          "text": "repaired.reviewers[0].notice_event_id,"
+        },
+        {
+          "line": 233,
+          "text": "before.reviewers[0].notice_event_id"
+        },
+        {
+          "line": 235,
+          "text": "assert_eq!(repaired.reviewers[0].notice_assignment_revision.get(), 3);"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#receipt_outcomes",
+        "name": "receipt_outcomes",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L260-L263"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 261,
+          "text": "sqlx::query_scalar(\"SELECT outcome FROM workflow_reviewer_notice_receipts WHERE company_id=$1 ORDER BY outcome\")"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewers/storage.rs#persist_on",
+        "name": "persist_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+        "span": "L81-L111"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewers/storage.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 105,
+          "text": "if reviewer.notice_assignment_revision != assignment.assignment_revision {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs#workflow_harness_token_park_first_blocks_retirement_before_the_company",
+        "name": "workflow_harness_token_park_first_blocks_retirement_before_the_company",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs",
+        "span": "L110-L153"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 145,
+          "text": "JOIN message_deliveries AS delivery ON delivery.id=reviewer.notice_delivery_id \\"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs#workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer",
+        "name": "workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs",
+        "span": "L345-L379"
+      },
+      "path": "src/adapters/persistence/workflow/harness_token_account_order_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 345,
+          "text": "async fn workflow_harness_token_unavailable_notices_settlement_does_not_lock_unused_reviewer() {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/pending_recovery.rs#PendingFailure",
+        "name": "PendingFailure",
+        "kind": "enum",
+        "path": "src/adapters/persistence/workflow/pending_recovery.rs",
+        "span": "L6-L17"
+      },
+      "path": "src/adapters/persistence/workflow/pending_recovery.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "/// A listed decision reviewer cannot be assigned or given a provable notice. Never routed:"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs#workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock",
+        "name": "workflow_reviewer_principal_publication_first_retirement_waits_for_owner_account_lock",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+        "span": "L281-L327"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 324,
+          "text": "let cancelled:i64=sqlx::query_scalar(\"SELECT count(*) FROM workflow_decision_reviewers AS reviewer JOIN message_deliveries AS delivery ON delivery.id=reviewer.n"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_principal_tests.rs#workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices",
+        "name": "workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+        "span": "L55-L117"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 55,
+          "text": "async fn workflow_reviewer_principal_retirement_cancels_pending_and_inflight_notices() {"
+        },
+        {
+          "line": 102,
+          "text": "let kept:i64=sqlx::query_scalar(\"SELECT count(*) FROM workflow_decision_reviewers AS reviewer JOIN message_deliveries AS delivery ON delivery.id=reviewer.notice"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_principal_tests.rs#workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label",
+        "name": "workflow_reviewer_principal_schema_person_guard_and_immutable_bounded_label",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+        "span": "L120-L178"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 172,
+          "text": "let error=sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,reviewer_label,notice_opted_out) VALUES($1,$2,1,$3,'f"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_principal_tests.rs#workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it",
+        "name": "workflow_reviewer_principal_insert_derives_label_and_decision_ui_escapes_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+        "span": "L181-L213"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_principal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 200,
+          "text": "sqlx::query(\"INSERT INTO workflow_decision_reviewers(company_id,decision_id,ordinal,principal_id,reviewer_label,notice_opted_out) VALUES($1,$2,1,$3,'forged',tru"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits",
+        "name": "workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L147-L209"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 147,
+          "text": "async fn workflow_role_reviewer_captures_all_people_parks_notices_labels_and_submits() {"
+        },
+        {
+          "line": 191,
+          "text": "let deliveries: i64 = sqlx::query_scalar(\"SELECT count(*) FROM workflow_decision_reviewers WHERE company_id=$1 AND decision_id=$2 AND notice_delivery_id IS NOT "
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "name": "workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L411-L449"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 411,
+          "text": "async fn workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices() {"
+        },
+        {
+          "line": 437,
+          "text": "let notice:Uuid=sqlx::query_scalar(\"SELECT reviewer.notice_delivery_id FROM workflow_decision_reviewers AS reviewer JOIN workflow_decisions AS decision ON decis"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 20,
+    "baselineChars": 257657
+  }
+}

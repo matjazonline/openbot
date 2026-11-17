@@ -185,6 +185,7 @@ async fn replace_on(
         refusal,
     };
     storage::persist_on(db, current, &assignment, previous.as_ref()).await?;
+    super::decision_information::refresh_on(db, current.company(), current.decision_id).await?;
     if previous.is_some() {
         Box::pin(escalations::assignment_changed_on(
             db,

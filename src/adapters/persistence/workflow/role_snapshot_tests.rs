@@ -78,8 +78,11 @@ impl RoleFixture {
                 binding.target.actor.user_id(),
                 binding.target.company.as_uuid(),
                 department,
-                DepartmentRole::Lead,
-                principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal,
+                    decider: false,
+                },
             )
             .await
             .unwrap();
@@ -233,8 +236,11 @@ async fn workflow_role_admission_missing_holder_has_no_run_or_partial_capture() 
             f.admission.binding.target.actor.user_id(),
             f.company().as_uuid(),
             f.department,
-            DepartmentRole::Lead,
-            f.principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: f.principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -318,3 +324,6 @@ mod reviewer_tests;
 
 #[path = "role_context_tests.rs"]
 mod context_tests;
+
+#[path = "sponsor_agent_snapshot_tests.rs"]
+mod sponsor_agents;

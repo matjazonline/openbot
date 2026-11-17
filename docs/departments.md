@@ -23,15 +23,21 @@ for someone outside the company.
 **Members** are principals: the company's people and agents. A principal may be in several
 departments. Membership grants nothing by itself; it is a fact the desk rules below read.
 
-**Roles** are held by principals. There are two. `lead` has at most one holder: assigning a new
+**Roles** are held by principals. There are three. `lead` has at most one holder: assigning a new
 lead replaces the old one, and clearing it leaves none. An agent lead must be a company agent that
-can be published. `reviewer` may have several holders. A holder need not be a member. Workflows can
+can be published. `reviewer` may have several holders. `sponsor` may also have several people or
+agents, with one marked **decides** and the others informed. The first sponsor decides; assigning
+another with `decider: true` moves that flag atomically. Removing a deciding sponsor while others
+remain requires an existing sponsor as successor (`department.sponsor_needs_decider`); removing the
+last is allowed. At most 16 sponsors may be assigned. A holder need not be a member. Workflows can
 name a role instead of a fixed person or agent (see [Roles](workflow-language-v1.md#roles)), and a
 desk's workflow binding can escalate to a role's holders (see "Escalation").
 
 Deleting an agent, or removing a person from the company, clears every role they hold in the same
 transaction and records each cleared role as a department administration event. Nobody is
-appointed in their place. Until someone is, a workflow role step and an escalation's first hop
+appointed in their place. Sponsors left without a decider refuse with `workflow.role_no_decider`
+at that unit; no ancestor replaces its missing decider. A manager must choose one. For other roles,
+until someone is appointed, a workflow role step and an escalation's first hop
 fall back to the nearest ancestor department with a holder of that role; when there is none, the
 step is refused with `workflow.role_no_holder` and the escalation moves on as "Escalation"
 describes.
@@ -121,7 +127,12 @@ A workflow binding on a department-owned desk can opt into escalation in its con
 "escalation": {"notify": "lead", "hops": 2}
 ```
 
-`notify` is `lead` or `reviewer`; `hops` is 1 or 2. Without it nothing escalates. Activating a
+`notify` is `lead`, `reviewer` or `sponsor`; `hops` is 1 or 2. A binding policy wins over the
+unit default. With none on the binding, the live default of the desk's unit, then the nearest
+ancestor within eight levels, applies when escalation triggers; no default means no ladder.
+The department page edits this under **When work stalls, tell** and names an inherited source.
+`notify: sponsor` sends to its decider; a missing decider skips to the parent lead when hop 2
+is enabled. The case retains the policy it selected. Activating a
 binding that escalates on a desk without a department, or detaching the department from a desk
 with such a binding active, is refused with `binding.escalation_needs_department`.
 
@@ -199,14 +210,24 @@ someone outside the company.
 | Method and path | Does |
 | --- | --- |
 | `GET /departments` | Lists the departments the caller can see. |
-| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id). |
+| `POST /departments` | Creates one: `name`, optional `slug` (from the name when left out), `description`, `charter`, `parent_id`, `lead` (a principal id), `escalation` (role/hops or null). |
 | `GET /departments/{department_id}` | One department with its `members` and `roles`. |
 | `PATCH /departments/{department_id}` | Changes only the fields present; `null` clears an optional field, and for `parent_id` makes it top level. |
 | `DELETE /departments/{department_id}` | Deletes it (see "Delete"). |
 | `PUT` / `DELETE /departments/{department_id}/members/{principal_id}` | Adds or removes a member. |
-| `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role: `lead` replaces the current lead; `reviewer` adds or removes that holder. |
+| `PUT` / `DELETE /departments/{department_id}/roles/{role}/{principal_id}` | Assigns or clears a role. PUT requires JSON `{ "decider": false }` (`true` selects a sponsor decider); DELETE accepts `?successor={principal_id}` for sponsor handover. Reads include `decider` for every role holder. |
 
 Refusals: `409 Conflict` for a taken slug or a department that still owns desks or has children;
 `400 Bad Request` for a cycle, too deep a tree, or one of the company's principals that is neither
 a person nor an agent; `404 Not Found` for a principal or parent department that is not the
 company's.
+
+
+`PATCH` accepts `escalation: {"notify":"sponsor","hops":2}`; `escalation: null` clears the
+local setting and restores inheritance. Omission preserves it. The same validated shape is used
+for binding and department policies. Only the sponsor decider resolves as a reviewer or executor:
+`decision.human` needs a person; `agent.run`, `decision.agent` and `ai.classify` need an agent.
+Other person sponsors receive a private information notice; agents receive none, and informed
+holders cannot settle a decision. Decision-email preferences apply. Parked decisions with
+`reviewers_follow_role` replace both deciding and informed holders atomically; otherwise the run
+keeps its admission snapshot.

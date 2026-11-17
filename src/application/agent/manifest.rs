@@ -3,7 +3,7 @@ use crate::app_error::AppResult;
 use crate::domain::entities::agent_capability::{AgentId, AgentRevisionId, DependencyManifestId};
 use crate::domain::workflow::StepId;
 use crate::domain::workflow::{CompanyId, RunId, VersionId, WorkflowId};
-use crate::entities::department::{DepartmentId, DepartmentRole};
+use crate::entities::department::{DepartmentId, DepartmentRole, RoleCapacity};
 use crate::entities::transport::PrincipalId;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -31,6 +31,7 @@ pub struct WorkflowVersionSelection {
 #[serde(deny_unknown_fields)]
 pub struct RolePrincipalSelection {
     pub principal_id: PrincipalId,
+    pub capacity: RoleCapacity,
     pub agent_id: Option<AgentId>,
     pub revision_id: Option<AgentRevisionId>,
 }
@@ -111,6 +112,17 @@ impl DependencyManifest {
             {
                 return Err(invalid("Invalid or duplicate captured role requirement"));
             }
+            let deciding = role
+                .principals
+                .iter()
+                .filter(|holder| holder.capacity == RoleCapacity::Decides)
+                .count();
+            if deciding == 0
+                || (role.role == DepartmentRole::Sponsor && deciding != 1)
+                || (role.role != DepartmentRole::Sponsor && deciding != role.principals.len())
+            {
+                return Err(invalid("Invalid role capacities"));
+            }
             let mut principals = BTreeSet::new();
             for holder in &role.principals {
                 if !principals.insert(holder.principal_id) {
@@ -119,7 +131,8 @@ impl DependencyManifest {
                 match (holder.agent_id, holder.revision_id) {
                     (None, None) => {}
                     (Some(agent), Some(revision))
-                        if role.principals.len() == 1
+                        if holder.capacity == RoleCapacity::Decides
+                            && deciding == 1
                             && self.agents.iter().any(|selected| {
                                 selected.agent_id == agent && selected.revision_id == revision
                             }) => {}

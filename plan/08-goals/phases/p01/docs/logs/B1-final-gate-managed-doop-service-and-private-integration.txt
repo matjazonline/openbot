@@ -1,0 +1,8 @@
+::error::Doop gate failed: check-doop.py%0ADOOP_TEST_UI_CHROME must name an executable sandboxed system Chrome
+Traceback (most recent call last):
+  File "/Users/mac02/orca/workspaces/openbot/plan08_ph1/scripts/check-doop.py", line 145, in <module>
+    main()
+    ~~~~^^
+  File "/Users/mac02/orca/workspaces/openbot/plan08_ph1/scripts/check-doop.py", line 111, in main
+    raise RuntimeError("DOOP_TEST_UI_CHROME must name an executable sandboxed system Chrome")
+RuntimeError: DOOP_TEST_UI_CHROME must name an executable sandboxed system Chrome

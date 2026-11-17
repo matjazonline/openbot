@@ -14,6 +14,7 @@ fn department(holders: Vec<RoleHolder>) -> RoleDepartment {
 
 fn holder(role: DepartmentRole, kind: PrincipalKind) -> RoleHolder {
     RoleHolder {
+        decider: role == DepartmentRole::Sponsor,
         role,
         principal: PrincipalId::new(Uuid::new_v4()),
         kind,
@@ -119,6 +120,7 @@ fn workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_a
         .map(|_| holder(role, PrincipalKind::Person))
         .collect();
     people.push(RoleHolder {
+        decider: false,
         role,
         principal: people[0].principal,
         kind: PrincipalKind::Person,
@@ -228,4 +230,78 @@ fn workflow_role_resolve_refusal_details_are_versioned_bounded_and_contain_no_pr
             "the existing refusal-code bound never moves"
         );
     }
+}
+
+#[test]
+fn workflow_role_resolve_sponsor_uses_only_decider_kind_and_freezes_information() {
+    for (kind, need, wrong) in [
+        (PrincipalKind::Person, RoleNeed::People, RoleNeed::Agent),
+        (PrincipalKind::Agent, RoleNeed::Agent, RoleNeed::People),
+    ] {
+        let mut decider = holder(DepartmentRole::Sponsor, kind);
+        decider.decider = true;
+        let deciding = decider.principal;
+        let mut other = holder(
+            DepartmentRole::Sponsor,
+            if kind == PrincipalKind::Person {
+                PrincipalKind::Agent
+            } else {
+                PrincipalKind::Person
+            },
+        );
+        other.decider = false;
+        let informed = other.principal;
+        let chain = vec![department(vec![]), department(vec![decider, other])];
+        let resolved = resolve_role(&chain, DepartmentRole::Sponsor, need).unwrap();
+        assert_eq!(resolved.department, chain[1].department);
+        assert_eq!(resolved.principals, vec![deciding]);
+        assert_eq!(resolved.informed, vec![informed]);
+        assert_eq!(
+            resolve_role(&chain, DepartmentRole::Sponsor, wrong),
+            Err(RoleRefusalKind::WrongKind)
+        );
+    }
+}
+
+#[test]
+fn workflow_role_resolve_sponsor_no_decider_stops_at_the_nearest_unit() {
+    let mut absent = holder(DepartmentRole::Sponsor, PrincipalKind::Person);
+    absent.decider = false;
+    let mut ancestor = holder(DepartmentRole::Sponsor, PrincipalKind::Person);
+    ancestor.decider = true;
+    let chain = vec![department(vec![absent]), department(vec![ancestor])];
+    assert_eq!(
+        resolve_role(&chain, DepartmentRole::Sponsor, RoleNeed::People),
+        Err(RoleRefusalKind::NoDecider)
+    );
+    assert_eq!(
+        RoleRefusalKind::NoDecider.code(),
+        "workflow.role_no_decider"
+    );
+    assert_eq!(
+        resolve_role(&[], DepartmentRole::Sponsor, RoleNeed::People),
+        Err(RoleRefusalKind::NoHolder)
+    );
+}
+
+#[test]
+fn workflow_role_sponsor_admission_selector_bound_includes_three_roles_and_still_rejects_overflow()
+{
+    let mut selectors: Vec<_> = (0..crate::application::workflow::registry::MAX_REVIEWERS)
+        .map(|_| json!({"kind":"principal","id":Uuid::new_v4()}))
+        .collect();
+    selectors.extend(
+        DepartmentRole::ALL
+            .into_iter()
+            .map(|role| json!(role.as_str())),
+    );
+    assert_eq!(selectors.len(), 19);
+    assert_eq!(
+        crate::application::workflow::reviewers::parse_reviewers(&json!(selectors))
+            .unwrap()
+            .len(),
+        19
+    );
+    selectors.push(json!("sponsor"));
+    assert!(crate::application::workflow::reviewers::parse_reviewers(&json!(selectors)).is_err());
 }

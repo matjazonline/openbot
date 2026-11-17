@@ -1,0 +1,578 @@
+{
+  "pattern": "RoleHolder",
+  "filesSearched": 2066,
+  "totalHits": 39,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/provenance.rs#role_markers",
+        "name": "role_markers",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+        "span": "L48-L70"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 49,
+          "text": "holders: &[crate::application::workflow::reads::RunRoleHolder],"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipient_tests.rs#department",
+        "name": "department",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipient_tests.rs",
+        "span": "L6-L19"
+      },
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 12,
+          "text": ".map(|(index, kind)| RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipients.rs#resolve_notification_recipients",
+        "name": "resolve_notification_recipients",
+        "kind": "function",
+        "path": "src/application/workflow/escalation_recipients.rs",
+        "span": "L48-L98"
+      },
+      "path": "src/application/workflow/escalation_recipients.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 89,
+          "text": ".map(|(principal, kind)| NotificationRoleHolder { principal, kind })"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L276-L281"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 276,
+          "text": "async fn roles(&self, department: DepartmentId) -> Vec<DepartmentRoleHolder> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#holder",
+        "name": "holder",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L15-L21"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 15,
+          "text": "fn holder(role: DepartmentRole, kind: PrincipalKind) -> RoleHolder {"
+        },
+        {
+          "line": 16,
+          "text": "RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs#preview",
+        "name": "preview",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+        "span": "L206-L263"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 232,
+          "text": "holders.push(RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/agent_manifest/roles.rs#facts_from_rows",
+        "name": "facts_from_rows",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+        "span": "L93-L136"
+      },
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 129,
+          "text": ".push(RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_views.rs#holder",
+        "name": "holder",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_views.rs",
+        "span": "L19-L28"
+      },
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 19,
+          "text": "fn holder(self) -> AppResult<RunRoleHolder> {"
+        },
+        {
+          "line": 20,
+          "text": "Ok(RunRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_views.rs#for_step",
+        "name": "for_step",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_views.rs",
+        "span": "L70-L89"
+      },
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 76,
+          "text": ") -> AppResult<Option<RunRoleHolder>> {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#department",
+        "name": "department",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L8-L13"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 8,
+          "text": "fn department(holders: Vec<RoleHolder>) -> RoleDepartment {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "DepartmentRole, DepartmentRoleHolder, department_tree,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/department_ui_tests.rs#department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "name": "department_ui_pane_indents_the_tree_and_shows_the_selected_department",
+        "kind": "function",
+        "path": "src/adapters/http/pages/department_ui_tests.rs",
+        "span": "L119-L234"
+      },
+      "path": "src/adapters/http/pages/department_ui_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 142,
+          "text": "roles: vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/provenance.rs#role_tests",
+        "name": "role_tests",
+        "kind": "module",
+        "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+        "span": "L177-L210"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 179,
+          "text": "use crate::application::workflow::reads::RunRoleHolder;"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/pages/workflow_runs/provenance.rs#workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers",
+        "name": "workflow_role_views_escape_labels_and_expose_bounded_deduplicated_markers",
+        "kind": "function",
+        "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+        "span": "L185-L209"
+      },
+      "path": "src/adapters/http/pages/workflow_runs/provenance.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 186,
+          "text": "let holder = RunRoleHolder {"
+        },
+        {
+          "line": 199,
+          "text": ".map(|_| RunRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::application::workflow::roles::{RoleDepartment, RoleHolder, RoleNeed, resolve_role};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_with_an_agent_lead_answers_on_it",
+        "name": "department_lead_desk_with_an_agent_lead_answers_on_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L167-L209"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 204,
+          "text": "vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_assigns_replaces_and_clears_the_lead",
+        "name": "department_write_assigns_replaces_and_clears_the_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L491-L572"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 506,
+          "text": "vec![DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 42,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole, MAX_DEPARTMENT_DEPTH,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L769-L791"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 773,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>> {"
+        },
+        {
+          "line": 785,
+          "text": "Ok(DepartmentRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/agent_manifest/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 7,
+          "text": "use crate::application::workflow::roles::{RoleDepartment, RoleHolder, RoleNeed, resolve_role};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/workflow/role_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::application::workflow::reads::{RunRoleHolder, RunSummary};"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 14,
+          "text": "DepartmentRole, DepartmentRoleHolder, HeldDepartmentRole,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#roles",
+        "name": "roles",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L110-L114"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": ") -> AppResult<Vec<DepartmentRoleHolder>>;"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 24,
+          "text": "DepartmentRole, DepartmentRoleHolder, DeskDepartments, MAX_DEPARTMENT_CHARTER_BYTES,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#DepartmentDetail",
+        "name": "DepartmentDetail",
+        "kind": "struct",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L119-L124"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 123,
+          "text": "pub roles: Vec<DepartmentRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/workflow/escalation_recipient_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 2,
+          "text": "use crate::application::workflow::roles::{RoleHolder, RoleNeed, resolve_role};"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipients.rs#NotificationRoleHolder",
+        "name": "NotificationRoleHolder",
+        "kind": "struct",
+        "path": "src/application/workflow/escalation_recipients.rs",
+        "span": "L10-L13"
+      },
+      "path": "src/application/workflow/escalation_recipients.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 10,
+          "text": "pub(crate) struct NotificationRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/escalation_recipients.rs#NotificationRecipients",
+        "name": "NotificationRecipients",
+        "kind": "enum",
+        "path": "src/application/workflow/escalation_recipients.rs",
+        "span": "L37-L46"
+      },
+      "path": "src/application/workflow/escalation_recipients.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 40,
+          "text": "holders: Vec<NotificationRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reads.rs#RunSummary",
+        "name": "RunSummary",
+        "kind": "struct",
+        "path": "src/application/workflow/reads.rs",
+        "span": "L89-L108"
+      },
+      "path": "src/application/workflow/reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 90,
+          "text": "pub role_holders: Vec<RunRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/reads.rs#RunRoleHolder",
+        "name": "RunRoleHolder",
+        "kind": "struct",
+        "path": "src/application/workflow/reads.rs",
+        "span": "L112-L119"
+      },
+      "path": "src/application/workflow/reads.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 112,
+          "text": "pub struct RunRoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles_tests.rs#workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents",
+        "name": "workflow_role_resolve_cardinality_deduplicates_people_and_refuses_ambiguous_agents",
+        "kind": "function",
+        "path": "src/application/workflow/roles_tests.rs",
+        "span": "L108-L149"
+      },
+      "path": "src/application/workflow/roles_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 121,
+          "text": "people.push(RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles.rs#RoleHolder",
+        "name": "RoleHolder",
+        "kind": "struct",
+        "path": "src/application/workflow/roles.rs",
+        "span": "L15-L19"
+      },
+      "path": "src/application/workflow/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "pub struct RoleHolder {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/roles.rs#RoleDepartment",
+        "name": "RoleDepartment",
+        "kind": "struct",
+        "path": "src/application/workflow/roles.rs",
+        "span": "L21-L24"
+      },
+      "path": "src/application/workflow/roles.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 23,
+          "text": "pub holders: Vec<RoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/workflow/run_views.rs#SelectedAgentSummary",
+        "name": "SelectedAgentSummary",
+        "kind": "struct",
+        "path": "src/application/workflow/run_views.rs",
+        "span": "L191-L202"
+      },
+      "path": "src/application/workflow/run_views.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 192,
+          "text": "pub via_role: Option<super::reads::RunRoleHolder>,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/domain/entities/department.rs#DepartmentRoleHolder",
+        "name": "DepartmentRoleHolder",
+        "kind": "struct",
+        "path": "src/domain/entities/department.rs",
+        "span": "L103-L106"
+      },
+      "path": "src/domain/entities/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 103,
+          "text": "pub struct DepartmentRoleHolder {"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 17,
+    "baselineChars": 247501
+  }
+}

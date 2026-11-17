@@ -296,8 +296,11 @@ async fn workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_be
             f.admission.binding.target.actor.user_id(),
             f.company().as_uuid(),
             f.department,
-            DepartmentRole::Lead,
-            PrincipalId::new(owner),
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: PrincipalId::new(owner),
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -317,8 +320,11 @@ async fn workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_be
                 f.admission.binding.target.actor.user_id(),
                 f.company().as_uuid(),
                 f.department,
-                DepartmentRole::Reviewer,
-                principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal,
+                    decider: false,
+                },
             )
             .await
             .unwrap();

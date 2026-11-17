@@ -205,7 +205,12 @@ impl NotificationWorker {
         let NotificationDisposition::Active(recipient) = &projection.disposition else {
             return Ok(None);
         };
-        let subject = format!("Action required: {}", projection.event.action_kind.label());
+        let subject = match projection.event.action_kind {
+            crate::entities::notification::NotificationActionKind::DecisionInformation => {
+                projection.event.action_kind.label().to_owned()
+            }
+            _ => format!("Action required: {}", projection.event.action_kind.label()),
+        };
         let link = format!(
             "{}/ui/notifications/{}/open",
             self.settings.public_base_url, projection.event.notification_id

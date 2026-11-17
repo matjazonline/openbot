@@ -233,6 +233,7 @@ async fn preview(
                 role: role.role,
                 principal: principal.principal_id,
                 kind: principal.kind,
+                decider: role.decider,
             });
         }
         chain.push(RoleDepartment {

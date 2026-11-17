@@ -21,10 +21,12 @@ pub(in crate::adapters::persistence::workflow) async fn assignment_changed_on(
          (company_id,id,source_kind,run_id,execution_id,empty_decision_id,binding_id,binding_revision, \
           origin_department_id,policy,reason_code,step_id) \
          SELECT run.company_id,gen_random_uuid(),'empty_reviewers',run.id,follow.execution_id,follow.decision_id, \
-                run.binding_id,run.binding_revision,follow.context_department_id,run.escalation,'decision.empty_reviewers',follow.step \
+                run.binding_id,run.binding_revision,origin.department_id,chosen.policy,'decision.empty_reviewers',follow.step \
          FROM workflow_follow_decisions AS follow JOIN workflow_runs AS run \
            ON run.company_id=follow.company_id AND run.id=follow.run_id \
-         WHERE follow.company_id=$1 AND follow.decision_id=$2 AND run.escalation IS NOT NULL \
+         CROSS JOIN LATERAL (SELECT workflow_escalation_origin(run.company_id,run.channel_id,run.principal_id,follow.context_department_id,run.escalation) AS department_id) AS origin \
+         CROSS JOIN LATERAL (SELECT workflow_effective_escalation_policy(run.company_id,origin.department_id,run.escalation) AS policy) AS chosen \
+         WHERE follow.company_id=$1 AND follow.decision_id=$2 AND chosen.policy IS NOT NULL \
            AND NOT EXISTS(SELECT 1 FROM workflow_run_notification_origins AS origin \
              WHERE origin.company_id=run.company_id AND origin.run_id=run.id) \
            AND workflow_follow_is_open(follow.company_id,follow.decision_id) \

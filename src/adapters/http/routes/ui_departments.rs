@@ -73,6 +73,18 @@ pub fn router() -> Router<AppState> {
             "/ui/companies/{company_id}/departments/{department_id}/lead/{principal_id}",
             delete(clear_lead),
         )
+        .route(
+            "/ui/companies/{company_id}/departments/{department_id}/sponsors",
+            post(assign_sponsor),
+        )
+        .route(
+            "/ui/companies/{company_id}/departments/{department_id}/sponsors/remove",
+            post(remove_sponsor),
+        )
+        .route(
+            "/ui/companies/{company_id}/departments/{department_id}/escalation",
+            post(set_escalation),
+        )
 }
 
 /// What the tab's right-hand column shows.
@@ -279,6 +291,7 @@ impl DepartmentFormData {
 
     fn write(&self) -> AppResult<DepartmentWrite> {
         Ok(DepartmentWrite {
+            escalation: None,
             name: self.name.clone(),
             slug: self.slug(),
             description: self.description.clone(),
@@ -292,6 +305,7 @@ impl DepartmentFormData {
     /// the department desk's address.
     fn edit(&self) -> AppResult<DepartmentEdit> {
         Ok(DepartmentEdit {
+            escalation: None,
             name: Some(self.name.clone()),
             slug: self
                 .slug
@@ -605,8 +619,11 @@ async fn assign_lead(
                     workspace.user_id,
                     company_id,
                     department,
-                    DepartmentRole::Lead,
-                    principal,
+                    crate::application::ports::department::DepartmentRoleAssignment {
+                        role: DepartmentRole::Lead,
+                        principal,
+                        decider: false,
+                    },
                 )
                 .await
         }
@@ -639,8 +656,11 @@ async fn clear_lead(
             workspace.user_id,
             company_id,
             department,
-            DepartmentRole::Lead,
-            PrincipalId::new(principal_id),
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: PrincipalId::new(principal_id),
+                successor: None,
+            },
         )
         .await;
     principal_change(
@@ -651,6 +671,140 @@ async fn clear_lead(
         result,
         "Lead cleared.",
         "Failed to clear the lead",
+    )
+    .await
+}
+
+#[derive(Deserialize)]
+struct SponsorForm {
+    principal_id: Uuid,
+    decider: Option<bool>,
+    successor: Option<String>,
+}
+
+async fn assign_sponsor(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<SponsorForm>,
+) -> AppResult<Response> {
+    let access = workspace.managed(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let result = workspace
+        .department_use_cases
+        .assign_role(
+            workspace.user_id,
+            company_id,
+            department,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Sponsor,
+                principal: PrincipalId::new(form.principal_id),
+                decider: form.decider.unwrap_or(false),
+            },
+        )
+        .await;
+    principal_change(
+        &workspace,
+        &access,
+        department,
+        DepartmentForm::Sponsors,
+        result,
+        "Sponsor saved.",
+        "Failed to save the sponsor",
+    )
+    .await
+}
+
+async fn remove_sponsor(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<SponsorForm>,
+) -> AppResult<Response> {
+    let access = workspace.managed(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let result = match optional_id(form.successor.as_deref()) {
+        Ok(successor) => {
+            workspace
+                .department_use_cases
+                .clear_role(
+                    workspace.user_id,
+                    company_id,
+                    department,
+                    crate::application::ports::department::DepartmentRoleRemoval {
+                        role: DepartmentRole::Sponsor,
+                        principal: PrincipalId::new(form.principal_id),
+                        successor: successor.map(PrincipalId::new),
+                    },
+                )
+                .await
+        }
+        Err(error) => Err(error),
+    };
+    principal_change(
+        &workspace,
+        &access,
+        department,
+        DepartmentForm::Sponsors,
+        result,
+        "Sponsor removed.",
+        "Failed to remove the sponsor",
+    )
+    .await
+}
+
+#[derive(Deserialize)]
+struct EscalationForm {
+    notify: String,
+    hops: u8,
+}
+
+async fn set_escalation(
+    workspace: Workspace,
+    Path((company_id, department_id)): Path<(Uuid, Uuid)>,
+    Form(form): Form<EscalationForm>,
+) -> AppResult<Response> {
+    let access = workspace.managed(company_id).await?;
+    let department = DepartmentId::new(department_id);
+    let policy = if form.notify.is_empty() {
+        Ok(None)
+    } else {
+        form.notify
+            .parse::<DepartmentRole>()
+            .map_err(|error| AppError::BadRequest(error.to_string()))
+            .and_then(|notify| {
+                crate::entities::workflow_escalation::EscalationHops::try_from(form.hops)
+                    .map(|hops| {
+                        Some(crate::entities::workflow_escalation::EscalationPolicy {
+                            notify,
+                            hops,
+                        })
+                    })
+                    .map_err(|error| AppError::BadRequest(error.into()))
+            })
+    };
+    let result = match policy {
+        Ok(policy) => workspace
+            .department_use_cases
+            .update_department(
+                workspace.user_id,
+                company_id,
+                department,
+                DepartmentEdit {
+                    escalation: Some(policy),
+                    ..Default::default()
+                },
+            )
+            .await
+            .map(|_| ()),
+        Err(error) => Err(error),
+    };
+    principal_change(
+        &workspace,
+        &access,
+        department,
+        DepartmentForm::Escalation,
+        result,
+        "Escalation default saved.",
+        "Failed to save the escalation default",
     )
     .await
 }

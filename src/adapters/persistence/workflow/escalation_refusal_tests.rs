@@ -25,8 +25,11 @@ async fn clear(f: &RoleFixture) {
             f.admission.binding.target.actor.user_id(),
             f.company().as_uuid(),
             f.department,
-            DepartmentRole::Lead,
-            f.principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: f.principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();
@@ -87,8 +90,11 @@ async fn workflow_escalation_refusal_commits_once_and_replay_does_not_admit_afte
             f.admission.binding.target.actor.user_id(),
             f.company().as_uuid(),
             f.department,
-            DepartmentRole::Lead,
-            f.principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: f.principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();

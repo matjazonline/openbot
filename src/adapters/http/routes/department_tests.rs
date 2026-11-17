@@ -18,6 +18,7 @@ fn use_cases(f: &Fixture) -> Arc<DepartmentUseCases> {
 
 fn create_payload(name: &str) -> DepartmentCreatePayload {
     DepartmentCreatePayload {
+        escalation: None,
         name: name.into(),
         slug: None,
         description: None,
@@ -101,6 +102,7 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
                 state(),
                 auth(),
                 Path((company, department, "lead".into(), principal)),
+                Json(RoleAssignmentPayload { decider: false }),
             )
             .await,
             StatusCode::NOT_FOUND,
@@ -112,6 +114,7 @@ async fn department_routes_hide_foreign_companies_and_refuse_members_and_strange
                 state(),
                 auth(),
                 Path((company, department, "lead".into(), principal)),
+                axum::extract::Query(RoleRemovalQuery { successor: None }),
             )
             .await,
             StatusCode::NOT_FOUND,
@@ -262,6 +265,7 @@ async fn department_routes_round_trip_and_refuse_an_unknown_role() {
         state(),
         owner(),
         Path((f.company.id, department, "boss".into(), Uuid::new_v4())),
+        Json(RoleAssignmentPayload { decider: false }),
     )
     .await;
     denied(unknown, StatusCode::BAD_REQUEST, &f.foreign.name).await;
@@ -277,4 +281,117 @@ async fn department_routes_round_trip_and_refuse_an_unknown_role() {
     assert_eq!(detail["id"], serde_json::json!(department));
     assert_eq!(detail["members"], serde_json::json!([]));
     assert_eq!(detail["roles"], serde_json::json!([]));
+}
+
+#[tokio::test]
+async fn department_sponsor_json_carries_decider_and_round_trips_escalation_patch() {
+    let Some(f) = Fixture::new().await else {
+        return;
+    };
+    let departments = use_cases(&f);
+    let created = departments
+        .create_department(
+            f.owner.id,
+            f.company.id,
+            crate::application::ports::department::DepartmentWrite {
+                name: "API sponsors".into(),
+                slug: "api-sponsors".into(),
+                ..Default::default()
+            },
+            None,
+        )
+        .await
+        .unwrap();
+    let person: Uuid =
+        sqlx::query_scalar("SELECT id FROM principals WHERE company_id=$1 AND user_id=$2")
+            .bind(f.company.id)
+            .bind(f.owner.id)
+            .fetch_one(f.persistence.pool())
+            .await
+            .unwrap();
+    assign_role_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, created.id.as_uuid(), "sponsor".into(), person)),
+        Json(RoleAssignmentPayload { decider: false }),
+    )
+    .await
+    .unwrap();
+    let response = get_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, created.id.as_uuid())),
+    )
+    .await
+    .unwrap()
+    .into_response();
+    let bytes = axum::body::to_bytes(response.into_body(), 65536)
+        .await
+        .unwrap();
+    let detail: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+    assert_eq!(detail["roles"][0]["role"], "sponsor");
+    assert_eq!(detail["roles"][0]["decider"], true);
+    let payload: DepartmentUpdatePayload =
+        serde_json::from_value(serde_json::json!({"escalation":{"notify":"sponsor","hops":2}}))
+            .unwrap();
+    update_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, created.id.as_uuid())),
+        Json(payload),
+    )
+    .await
+    .unwrap();
+    let stored = departments
+        .visible_department(f.owner.id, f.company.id, created.id)
+        .await
+        .unwrap();
+    assert_eq!(
+        serde_json::to_value(stored.department.escalation).unwrap(),
+        serde_json::json!({"notify":"sponsor","hops":2})
+    );
+    let payload: DepartmentUpdatePayload =
+        serde_json::from_value(serde_json::json!({"description":"keep policy"})).unwrap();
+    update_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, created.id.as_uuid())),
+        Json(payload),
+    )
+    .await
+    .unwrap();
+    assert!(
+        departments
+            .visible_department(f.owner.id, f.company.id, created.id)
+            .await
+            .unwrap()
+            .department
+            .escalation
+            .is_some()
+    );
+    let payload: DepartmentUpdatePayload =
+        serde_json::from_value(serde_json::json!({"escalation":null})).unwrap();
+    update_department_json(
+        State(departments.clone()),
+        Fixture::auth(&f.owner),
+        Path((f.company.id, created.id.as_uuid())),
+        Json(payload),
+    )
+    .await
+    .unwrap();
+    assert!(
+        departments
+            .visible_department(f.owner.id, f.company.id, created.id)
+            .await
+            .unwrap()
+            .department
+            .escalation
+            .is_none()
+    );
+    assert!(
+        serde_json::from_value::<DepartmentUpdatePayload>(
+            serde_json::json!({"escalation":{"notify":"sponsor","hops":3}})
+        )
+        .is_err()
+    );
 }

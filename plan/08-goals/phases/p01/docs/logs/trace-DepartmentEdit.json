@@ -1,0 +1,407 @@
+{
+  "pattern": "DepartmentEdit",
+  "filesSearched": 2066,
+  "totalHits": 34,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#reparent",
+        "name": "reparent",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L237-L253"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 247,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 249,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#held_department",
+        "name": "held_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L19-L60"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 38,
+          "text": "DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/department.rs#update_department_json",
+        "name": "update_department_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/department.rs",
+        "span": "L156-L181"
+      },
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 162,
+          "text": "let edit = DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#edit",
+        "name": "edit",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L293-L306"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 293,
+          "text": "fn edit(&self) -> AppResult<DepartmentEdit> {"
+        },
+        {
+          "line": 294,
+          "text": "Ok(DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department/lifecycle.rs#update_department_on",
+        "name": "update_department_on",
+        "kind": "function",
+        "path": "src/adapters/persistence/department/lifecycle.rs",
+        "span": "L91-L148"
+      },
+      "path": "src/adapters/persistence/department/lifecycle.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 95,
+          "text": "edit: &DepartmentEdit,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 19,
+          "text": "application::ports::department::{DepartmentEdit, DepartmentWrite},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments_tests.rs#department_ui_owner_writes_render_and_refusals_land_on_their_form",
+        "name": "department_ui_owner_writes_render_and_refusals_land_on_their_form",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments_tests.rs",
+        "span": "L207-L424"
+      },
+      "path": "src/adapters/http/routes/ui_departments_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 276,
+          "text": "crate::application::ports::department::DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 29,
+          "text": "application::ports::department::{DepartmentEdit, DepartmentWrite},"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_survives_a_rename_and_is_left_once_detached",
+        "name": "department_lead_desk_survives_a_rename_and_is_left_once_detached",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L318-L382"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 331,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 334,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_round_trips_create_rename_reparent_and_delete",
+        "name": "department_write_round_trips_create_rename_reparent_and_delete",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L358-L434"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 387,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 391,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_a_name_only_edit_keeps_every_other_field",
+        "name": "department_write_a_name_only_edit_keeps_every_other_field",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L439-L488"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 464,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 466,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_refuses_a_taken_slug_with_conflict",
+        "name": "department_write_refuses_a_taken_slug_with_conflict",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L626-L669"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 646,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 648,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_refuses_members_and_strangers_with_not_found",
+        "name": "department_write_refuses_members_and_strangers_with_not_found",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L736-L824"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 751,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 753,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "name": "department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L897-L976"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 937,
+          "text": "DepartmentEdit {"
+        },
+        {
+          "line": 939,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": "DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department.rs#update",
+        "name": "update",
+        "kind": "function",
+        "path": "src/adapters/persistence/department.rs",
+        "span": "L612-L622"
+      },
+      "path": "src/adapters/persistence/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 616,
+          "text": "edit: DepartmentEdit,"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 37,
+          "text": "/// fields cannot lose either. Values arrive normalized — see `DepartmentEdit::normalize`."
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#DepartmentEdit",
+        "name": "DepartmentEdit",
+        "kind": "struct",
+        "path": "src/application/ports/department.rs",
+        "span": "L39-L45"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 39,
+          "text": "pub struct DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/ports/department.rs#update",
+        "name": "update",
+        "kind": "function",
+        "path": "src/application/ports/department.rs",
+        "span": "L63-L68"
+      },
+      "path": "src/application/ports/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 67,
+          "text": "edit: DepartmentEdit,"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department_tests.rs#department_edit_normalize_touches_only_the_fields_it_sets",
+        "name": "department_edit_normalize_touches_only_the_fields_it_sets",
+        "kind": "function",
+        "path": "src/application/use_cases/department_tests.rs",
+        "span": "L63-L86"
+      },
+      "path": "src/application/use_cases/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 64,
+          "text": "let mut edit = DepartmentEdit {"
+        },
+        {
+          "line": 68,
+          "text": "..DepartmentEdit::default()"
+        },
+        {
+          "line": 81,
+          "text": "let mut bad = DepartmentEdit {"
+        },
+        {
+          "line": 83,
+          "text": "..DepartmentEdit::default()"
+        }
+      ]
+    },
+    {
+      "symbol": null,
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 15,
+          "text": "DepartmentEdit, DepartmentPersistence, DepartmentScope, DepartmentWrite,"
+        },
+        {
+          "line": 98,
+          "text": "impl DepartmentEdit {"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#update_department",
+        "name": "update_department",
+        "kind": "function",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L191-L202"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 196,
+          "text": "mut edit: DepartmentEdit,"
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 11,
+    "baselineChars": 198513
+  }
+}

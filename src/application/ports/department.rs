@@ -27,6 +27,7 @@ pub struct DepartmentWrite {
     pub description: Option<String>,
     pub charter: Option<String>,
     pub parent_id: Option<DepartmentId>,
+    pub escalation: Option<crate::entities::workflow_escalation::EscalationPolicy>,
     /// Set by the use case; persistence stores the system when it is absent.
     pub created_by: Option<CreationProvenance>,
 }
@@ -42,6 +43,23 @@ pub struct DepartmentEdit {
     pub description: Option<Option<String>>,
     pub charter: Option<Option<String>>,
     pub parent_id: Option<Option<DepartmentId>>,
+    pub escalation: Option<Option<crate::entities::workflow_escalation::EscalationPolicy>>,
+}
+
+/// The actor explicitly chooses whether this sponsor decides.
+#[derive(Debug, Clone, Copy)]
+pub struct DepartmentRoleAssignment {
+    pub role: DepartmentRole,
+    pub principal: PrincipalId,
+    pub decider: bool,
+}
+
+/// Removing a sponsor decider can name an existing sponsor as successor.
+#[derive(Debug, Clone, Copy)]
+pub struct DepartmentRoleRemoval {
+    pub role: DepartmentRole,
+    pub principal: PrincipalId,
+    pub successor: Option<PrincipalId>,
 }
 
 /// One authenticated write against one company. Persistence re-checks the actor under the
@@ -71,15 +89,13 @@ pub trait DepartmentPersistence: Send + Sync {
         &self,
         scope: DepartmentScope,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        assignment: DepartmentRoleAssignment,
     ) -> AppResult<()>;
     async fn clear_role(
         &self,
         scope: DepartmentScope,
         department: DepartmentId,
-        role: DepartmentRole,
-        principal: PrincipalId,
+        removal: DepartmentRoleRemoval,
     ) -> AppResult<()>;
     async fn add_member(
         &self,

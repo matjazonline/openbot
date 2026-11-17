@@ -94,8 +94,11 @@ async fn desk(d: &Deployment, slug: &str, agent: &RoleAgent) -> RoleDesk {
             d.fixture.target.actor.user_id(),
             d.fixture.target.company.as_uuid(),
             department.id,
-            DepartmentRole::Lead,
-            agent.principal,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal: agent.principal,
+                decider: false,
+            },
         )
         .await
         .unwrap();
@@ -362,3 +365,6 @@ async fn execute_original(d: &mut Deployment, queued: RunId, a: &RoleAgent) {
         .expect("agent.run retains its frozen tools");
     assert!(!tools.is_empty());
 }
+
+#[path = "role_sponsor_runtime_tests.rs"]
+mod sponsors;

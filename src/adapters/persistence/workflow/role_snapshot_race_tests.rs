@@ -148,8 +148,11 @@ async fn workflow_role_competing_reassignment_that_commits_waits_for_capture_the
                 actor,
                 company.as_uuid(),
                 department,
-                DepartmentRole::Lead,
-                new_principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Lead,
+                    principal: new_principal,
+                    decider: false,
+                },
             )
             .await
     });

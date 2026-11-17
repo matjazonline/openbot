@@ -16,6 +16,7 @@ pub struct RoleHolder {
     pub role: DepartmentRole,
     pub principal: PrincipalId,
     pub kind: PrincipalKind,
+    pub decider: bool,
 }
 
 pub struct RoleDepartment {
@@ -27,6 +28,7 @@ pub struct RoleDepartment {
 pub struct ResolvedRole {
     pub department: DepartmentId,
     pub principals: Vec<PrincipalId>,
+    pub informed: Vec<PrincipalId>,
 }
 
 /// Scripted samples have no admitted department or immutable holder capture.
@@ -75,6 +77,38 @@ pub fn resolve_role(
         if holders.is_empty() {
             continue;
         }
+        if role == DepartmentRole::Sponsor
+            && holders
+                .iter()
+                .map(|holder| holder.principal)
+                .collect::<BTreeSet<_>>()
+                .len()
+                > crate::domain::workflow::TokenAllowance::MAX_REVIEWERS
+        {
+            return Err(RoleRefusalKind::TooMany);
+        }
+        let informed = if role == DepartmentRole::Sponsor {
+            holders
+                .iter()
+                .filter(|holder| !holder.decider)
+                .map(|holder| holder.principal)
+                .collect::<BTreeSet<_>>()
+        } else {
+            BTreeSet::new()
+        };
+        let holders = if role == DepartmentRole::Sponsor {
+            let deciding: Vec<_> = holders
+                .into_iter()
+                .filter(|holder| holder.decider)
+                .collect();
+            match deciding.len() {
+                0 => return Err(RoleRefusalKind::NoDecider),
+                1 => deciding,
+                _ => return Err(RoleRefusalKind::Ambiguous),
+            }
+        } else {
+            holders
+        };
         let expected = match need {
             RoleNeed::Agent => PrincipalKind::Agent,
             RoleNeed::People => PrincipalKind::Person,
@@ -92,6 +126,7 @@ pub fn resolve_role(
         return Ok(ResolvedRole {
             department: department.department,
             principals: principals.into_iter().collect(),
+            informed: informed.into_iter().collect(),
         });
     }
     Err(RoleRefusalKind::NoHolder)

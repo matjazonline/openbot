@@ -1,0 +1,101 @@
+
+running 1 test
+
+thread 'adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_two_units_freeze_deciders_information_and_settlement_authority' (26227387) panicked at src/adapters/persistence/workflow/message_ingress_tests.rs:313:13:
+the engine never reached: both sponsor decisions parked
+pool size 5 idle 5
+{
+  "events": null,
+  "intents": null,
+  "jobs": [
+    {
+      "id": "5977a8de-7c70-4531-96bf-225b93670f73",
+      "lock_expires_at": null,
+      "run_at": "2026-11-16T19:49:39.509918+00:00",
+      "status": "completed"
+    },
+    {
+      "id": "e29aa8d4-df54-455e-b18d-3f7ff0b06dc7",
+      "lock_expires_at": null,
+      "run_at": "2026-11-16T19:49:39.255203+00:00",
+      "status": "completed"
+    },
+    {
+      "id": "3f234b0b-86e5-416c-b8fd-ec9aee2c138e",
+      "lock_expires_at": null,
+      "run_at": "2026-11-16T19:49:40.078196+00:00",
+      "status": "failed"
+    },
+    {
+      "id": "cd190651-a5bf-473d-9fee-bb805de3ea64",
+      "lock_expires_at": null,
+      "run_at": "2026-11-16T19:49:40.454293+00:00",
+      "status": "failed"
+    }
+  ],
+  "runs": [
+    {
+      "id": "892b48be-b45e-4346-8854-d6e3f5b6f083",
+      "state": "failed",
+      "waiting": null
+    },
+    {
+      "id": "f67eccf3-312d-415c-8744-710a4d80d9a6",
+      "state": "failed",
+      "waiting": null
+    }
+  ],
+  "sessions": [
+    {
+      "blocked_by": [],
+      "pid": 32038,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 32039,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 32040,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 31988,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    },
+    {
+      "blocked_by": [],
+      "pid": 32041,
+      "query": "SELECT transaction_timestamp() <> statement_timestamp()",
+      "state": "idle",
+      "wait": "Client:ClientRead",
+      "xact_start": null
+    }
+  ],
+  "waits": null
+}
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_two_units_freeze_deciders_information_and_settlement_authority ... FAILED
+
+failures:
+
+failures:
+    adapters::persistence::workflow::tests::message_tests::ingress_tests::role_runtime_tests::sponsors::workflow_role_sponsor_admission_two_units_freeze_deciders_information_and_settlement_authority
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 4730 filtered out; finished in 35.95s
+

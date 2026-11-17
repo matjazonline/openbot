@@ -144,8 +144,11 @@ async fn role_department(fixture: &Fixture) -> RoleDepartment {
                 owner,
                 fixture.target.company.as_uuid(),
                 department,
-                DepartmentRole::Reviewer,
-                *principal,
+                crate::application::ports::department::DepartmentRoleAssignment {
+                    role: DepartmentRole::Reviewer,
+                    principal: *principal,
+                    decider: false,
+                },
             )
             .await
             .unwrap();
@@ -189,8 +192,11 @@ async fn workflow_role_reviewer_protected_action_uses_frozen_people_and_current_
                 owner,
                 company.as_uuid(),
                 f.department,
-                DepartmentRole::Reviewer,
-                *principal,
+                crate::application::ports::department::DepartmentRoleRemoval {
+                    role: DepartmentRole::Reviewer,
+                    principal: *principal,
+                    successor: None,
+                },
             )
             .await
             .unwrap();

@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "round": "08G-P01-B1-R3",
+  "artifact": "7c658d6ea48bf801b7e7225c10c4e1fda406eca2f6412036cd4eacabf3a6ae3a",
+  "checks": [
+    {
+      "command": "cargo test --locked --offline --lib -- workflow_fixtures_ workflow_storage_restores_all_frozen_fixtures_and_child_identity",
+      "criteria": [
+        "AC7",
+        "sample-publication"
+      ],
+      "status": "PASS",
+      "fixture": "R3 sample checks exercise actual Fixture::ALL compilation, representative input and immutable bundle storage; R2 runtime/DB fixture evidence unchanged",
+      "files": [
+        {
+          "path": "logs/B1-R3-fixtures.txt",
+          "sha256": "606283446c11e130f9d5527c464f7409e0d063b90f597c2db3fee5d9b41d5392"
+        }
+      ]
+    },
+    {
+      "command": "cargo fmt --all -- --check",
+      "criteria": [
+        "format"
+      ],
+      "status": "PASS",
+      "fixture": "R3 sample checks exercise actual Fixture::ALL compilation, representative input and immutable bundle storage; R2 runtime/DB fixture evidence unchanged",
+      "files": [
+        {
+          "path": "logs/B1-R3-format.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "git diff --check",
+      "criteria": [
+        "whitespace"
+      ],
+      "status": "PASS",
+      "fixture": "R3 sample checks exercise actual Fixture::ALL compilation, representative input and immutable bundle storage; R2 runtime/DB fixture evidence unchanged",
+      "files": [
+        {
+          "path": "logs/B1-R3-whitespace.txt",
+          "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        }
+      ]
+    },
+    {
+      "command": "cargo test --locked --offline --lib -- sponsor workflow_escalation_default_sql_ workflow_role_source_sample_and_help_ notification_worker (unchanged R2 mechanisms reused)",
+      "criteria": [
+        "AC1",
+        "AC2",
+        "AC3",
+        "AC4",
+        "AC5",
+        "AC6",
+        "AC7"
+      ],
+      "status": "PASS",
+      "fixture": "R3 sample checks exercise actual Fixture::ALL compilation, representative input and immutable bundle storage; R2 runtime/DB fixture evidence unchanged",
+      "files": [
+        {
+          "path": "logs/B1-R2-focused.txt",
+          "sha256": "9046a4ad187ac7b01eb1a923f0d4638d2c62fb77d6d6ae0a754190a2552a0447"
+        }
+      ]
+    },
+    {
+      "command": "Full required repository runner; final serialized SQLx generation and skipped Cargo targets",
+      "criteria": [
+        "final-gate"
+      ],
+      "status": "NOT EXERCISED",
+      "fixture": "owned PostgreSQL18.7 cluster127.0.0.1:15481",
+      "reason": "Full runner currently executes stock-stack gate; core FAIL includes corrected sample plus17 historical timeout failures. Main/source_modules targets need explicit execution because Cargo stopped after failed lib target. Final metadata generation pending after all compilers stop."
+    }
+  ]
+}

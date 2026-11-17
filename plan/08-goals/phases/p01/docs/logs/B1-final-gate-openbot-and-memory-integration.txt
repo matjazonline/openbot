@@ -1,0 +1,4 @@
+building the memory service in /Users/mac02/orca/workspaces/openbot/plan08_ph1/services/memory
+    Finished `dev` profile [unoptimized] target(s) in 0.14s
+ERROR:  extension "vector" is not available
+HINT:  The extension must first be installed on the system where PostgreSQL is running.

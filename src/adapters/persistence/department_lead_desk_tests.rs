@@ -156,7 +156,16 @@ async fn lead(
     principal: PrincipalId,
 ) -> AppResult<()> {
     f.use_cases
-        .assign_role(by, f.company, department, DepartmentRole::Lead, principal)
+        .assign_role(
+            by,
+            f.company,
+            department,
+            crate::application::ports::department::DepartmentRoleAssignment {
+                role: DepartmentRole::Lead,
+                principal,
+                decider: false,
+            },
+        )
         .await
 }
 
@@ -202,6 +211,7 @@ async fn department_lead_desk_with_an_agent_lead_answers_on_it() {
     assert_eq!(
         f.roles(department.id).await,
         vec![DepartmentRoleHolder {
+            decider: false,
             role: DepartmentRole::Lead,
             principal_id: f.agent_principal
         }]
@@ -496,8 +506,11 @@ async fn department_lead_desk_follows_person_and_agent_leads_with_one_binding() 
             f.owner,
             f.company,
             plain.id,
-            DepartmentRole::Lead,
-            f.agent_principal,
+            crate::application::ports::department::DepartmentRoleRemoval {
+                role: DepartmentRole::Lead,
+                principal: f.agent_principal,
+                successor: None,
+            },
         )
         .await
         .unwrap();

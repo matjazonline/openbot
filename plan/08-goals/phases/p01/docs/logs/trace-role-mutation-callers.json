@@ -1,0 +1,981 @@
+{
+  "pattern": "\\.assign_role\\(|\\.clear_role\\(",
+  "filesSearched": 2066,
+  "totalHits": 66,
+  "groups": [
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#lead",
+        "name": "lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L152-L161"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 7,
+      "hits": [
+        {
+          "line": 159,
+          "text": ".assign_role(by, f.company, department, DepartmentRole::Lead, principal)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#clear",
+        "name": "clear",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L22-L33"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 5,
+      "hits": [
+        {
+          "line": 24,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/escalation_tests.rs#new",
+        "name": "new",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/escalation_tests.rs",
+        "span": "L21-L180"
+      },
+      "path": "src/adapters/http/routes/workflows/escalation_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 67,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#held_department",
+        "name": "held_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L19-L60"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 50,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#assign",
+        "name": "assign",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L14-L31"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 22,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs#clear_reviewers",
+        "name": "clear_reviewers",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+        "span": "L83-L97"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_recipient_storage_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 87,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#with_tracking",
+        "name": "with_tracking",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L35-L94"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 4,
+      "hits": [
+        {
+          "line": 79,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#assign_lead",
+        "name": "assign_lead",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L593-L625"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 604,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#clear",
+        "name": "clear",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L70-L81"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 3,
+      "hits": [
+        {
+          "line": 72,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/department.rs#assign_role_json",
+        "name": "assign_role_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/department.rs",
+        "span": "L226-L242"
+      },
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 233,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_desks_tests.rs#lead",
+        "name": "lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_desks_tests.rs",
+        "span": "L176-L187"
+      },
+      "path": "src/adapters/persistence/department_desks_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 178,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs#edit_role",
+        "name": "edit_role",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs",
+        "span": "L39-L50"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_agent_role_lock_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 41,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#people",
+        "name": "people",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L7-L45"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 18,
+          "text": ".clear_role("
+        },
+        {
+          "line": 28,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs#clear_lead",
+        "name": "clear_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+        "span": "L10-L21"
+      },
+      "path": "src/adapters/persistence/workflow/role_refusal_runtime_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 12,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#from_binding",
+        "name": "from_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L51-L122"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 2,
+      "hits": [
+        {
+          "line": 77,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/department.rs#clear_role_json",
+        "name": "clear_role_json",
+        "kind": "function",
+        "path": "src/adapters/http/routes/department.rs",
+        "span": "L244-L260"
+      },
+      "path": "src/adapters/http/routes/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 251,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs#preview_desk",
+        "name": "preview_desk",
+        "kind": "function",
+        "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+        "span": "L15-L79"
+      },
+      "path": "src/adapters/http/routes/workflows/ui/authoring/reviewer_picker_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 53,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_reviewer_tests.rs#assign",
+        "name": "assign",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+        "span": "L82-L93"
+      },
+      "path": "src/adapters/persistence/workflow/follow_reviewer_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 84,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_action_tests.rs#role_department",
+        "name": "role_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+        "span": "L109-L176"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 143,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs#replace_people",
+        "name": "replace_people",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs",
+        "span": "L64-L91"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_child_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 69,
+          "text": ".clear_role("
+        },
+        {
+          "line": 81,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_runtime_race_support.rs#admit_while_reassigning",
+        "name": "admit_while_reassigning",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_runtime_race_support.rs",
+        "span": "L14-L70"
+      },
+      "path": "src/adapters/persistence/workflow/role_runtime_race_support.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 42,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_runtime_tests.rs#desk",
+        "name": "desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+        "span": "L77-L124"
+      },
+      "path": "src/adapters/persistence/workflow/role_runtime_tests.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 93,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#assign_role",
+        "name": "assign_role",
+        "kind": "function",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L217-L230"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 228,
+          "text": ".assign_role(scope, department, role, principal)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/application/use_cases/department.rs#clear_role",
+        "name": "clear_role",
+        "kind": "function",
+        "path": "src/application/use_cases/department.rs",
+        "span": "L233-L246"
+      },
+      "path": "src/application/use_cases/department.rs",
+      "inDegree": 1,
+      "hits": [
+        {
+          "line": 244,
+          "text": ".clear_role(scope, department, role, principal)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments_tests.rs#department_ui_foreign_ids_under_the_owners_path_change_nothing",
+        "name": "department_ui_foreign_ids_under_the_owners_path_change_nothing",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments_tests.rs",
+        "span": "L429-L620"
+      },
+      "path": "src/adapters/http/routes/ui_departments_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 470,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/http/routes/ui_departments.rs#clear_lead",
+        "name": "clear_lead",
+        "kind": "function",
+        "path": "src/adapters/http/routes/ui_departments.rs",
+        "span": "L630-L656"
+      },
+      "path": "src/adapters/http/routes/ui_departments.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 638,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_competing_tests.rs#department_competing_lead_assignments_leave_one_holder",
+        "name": "department_competing_lead_assignments_leave_one_holder",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_competing_tests.rs",
+        "span": "L101-L136"
+      },
+      "path": "src/adapters/persistence/department_competing_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 114,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_desks_tests.rs#department_desk_members_only_reaches_one_step_up_and_down",
+        "name": "department_desk_members_only_reaches_one_step_up_and_down",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_desks_tests.rs",
+        "span": "L403-L477"
+      },
+      "path": "src/adapters/persistence/department_desks_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 462,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_lead_desk_tests.rs#department_lead_desk_follows_person_and_agent_leads_with_one_binding",
+        "name": "department_lead_desk_follows_person_and_agent_leads_with_one_binding",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+        "span": "L431-L505"
+      },
+      "path": "src/adapters/persistence/department_lead_desk_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 495,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant",
+        "name": "workflow_reviewer_follow_retirement_audit_history_survives_principal_department_delete_and_regrant",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L145-L251"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 190,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_retirement_audit_tests.rs#workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle",
+        "name": "workflow_reviewer_follow_retirement_audit_agent_nonholder_and_tenant_cascade_use_actual_lifecycle",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+        "span": "L391-L487"
+      },
+      "path": "src/adapters/persistence/department_retirement_audit_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 448,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_roster_tests.rs#department_context_roster_lists_the_desks_around_the_department",
+        "name": "department_context_roster_lists_the_desks_around_the_department",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_roster_tests.rs",
+        "span": "L58-L170"
+      },
+      "path": "src/adapters/persistence/department_roster_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 72,
+          "text": ".assign_role(f.owner, f.company, sales.id, DepartmentRole::Lead, closer)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_assigns_replaces_and_clears_the_lead",
+        "name": "department_write_assigns_replaces_and_clears_the_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L491-L572"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 514,
+          "text": ".assign_role("
+        },
+        {
+          "line": 525,
+          "text": ".assign_role("
+        },
+        {
+          "line": 542,
+          "text": ".clear_role("
+        },
+        {
+          "line": 555,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_refuses_members_and_strangers_with_not_found",
+        "name": "department_write_refuses_members_and_strangers_with_not_found",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L736-L824"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 758,
+          "text": "uc.assign_role("
+        },
+        {
+          "line": 766,
+          "text": "uc.clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_shows_a_member_only_their_departments",
+        "name": "department_write_shows_a_member_only_their_departments",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L827-L891"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 839,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/department_tests.rs#department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "name": "department_write_persistence_reauthorizes_every_write_under_the_lock",
+        "kind": "function",
+        "path": "src/adapters/persistence/department_tests.rs",
+        "span": "L897-L976"
+      },
+      "path": "src/adapters/persistence/department_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 907,
+          "text": ".assign_role("
+        },
+        {
+          "line": 945,
+          "text": "p.assign_role("
+        },
+        {
+          "line": 952,
+          "text": "p.clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs#workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "name": "workflow_escalation_decision_live_run_cancel_uses_actual_wait_job_and_run_cancellation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+        "span": "L19-L95"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 35,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs#workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged",
+        "name": "workflow_escalation_decision_admission_refusal_has_no_run_control_and_can_be_acknowledged",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+        "span": "L98-L166"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_cancellation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 108,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/escalation_refusal_tests.rs#workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair",
+        "name": "workflow_escalation_refusal_commits_once_and_replay_does_not_admit_after_role_repair",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+        "span": "L79-L104"
+      },
+      "path": "src/adapters/persistence/workflow/escalation_refusal_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 86,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source",
+        "name": "workflow_reviewer_follow_initial_empty_park_creates_the_same_real_source",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L98-L118"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 102,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_escalation_tests.rs#workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write",
+        "name": "workflow_reviewer_follow_case_insert_failure_rolls_back_the_real_role_write",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+        "span": "L166-L189"
+      },
+      "path": "src/adapters/persistence/workflow/follow_escalation_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 174,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/follow_retirement_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_a_live_followed_decision",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+        "span": "L4-L80"
+      },
+      "path": "src/adapters/persistence/workflow/follow_retirement_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 30,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#department_lead_desk_answers_through_its_current_lead",
+        "name": "department_lead_desk_answers_through_its_current_lead",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L630-L758"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 705,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, leads[0].1)"
+        },
+        {
+          "line": 731,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, leads[1].1)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs#department_context_reaches_the_lead_on_its_department_desk",
+        "name": "department_context_reaches_the_lead_on_its_department_desk",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+        "span": "L776-L914"
+      },
+      "path": "src/adapters/persistence/workflow/provisioning_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 843,
+          "text": ".assign_role(scope, department.id, DepartmentRole::Lead, created[0].1)"
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs#workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action",
+        "name": "workflow_reviewer_follow_owner_retirement_commits_with_held_role_and_protected_action",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+        "span": "L17-L87"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_account_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 43,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/reviewer_action_tests.rs#workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority",
+        "name": "workflow_role_reviewer_protected_action_uses_frozen_people_and_current_approval_authority",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+        "span": "L179-L226"
+      },
+      "path": "src/adapters/persistence/workflow/reviewer_action_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 188,
+          "text": ".clear_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_binding_tests.rs#workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders",
+        "name": "workflow_role_binding_reviewer_vocabulary_round_trips_multiple_holders",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+        "span": "L211-L269"
+      },
+      "path": "src/adapters/persistence/workflow/role_binding_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 241,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_child_runtime_tests.rs#workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "name": "workflow_role_admission_pinned_child_reused_step_ids_execute_their_own_frozen_selection",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+        "span": "L6-L76"
+      },
+      "path": "src/adapters/persistence/workflow/role_child_runtime_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 17,
+          "text": ".assign_role("
+        },
+        {
+          "line": 41,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park",
+        "name": "workflow_role_reviewer_frozen_members_survive_role_reassignment_before_park",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L230-L280"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 236,
+          "text": ".clear_role("
+        },
+        {
+          "line": 253,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen",
+        "name": "workflow_role_reviewer_effective_union_deduplicates_sixteen_and_refuses_seventeen",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L283-L347"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 304,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_reviewer_tests.rs#workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "name": "workflow_reviewer_principal_owner_and_missing_member_removal_keep_review_notices",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+        "span": "L411-L449"
+      },
+      "path": "src/adapters/persistence/workflow/role_reviewer_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 418,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs#workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it",
+        "name": "workflow_role_competing_reassignment_that_commits_waits_for_capture_then_next_admission_sees_it",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+        "span": "L125-L170"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_race_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 147,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs#workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation",
+        "name": "workflow_role_admission_wrong_kind_and_ambiguous_real_holders_refuse_before_run_creation",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+        "span": "L283-L332"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_sql_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 295,
+          "text": ".assign_role("
+        },
+        {
+          "line": 316,
+          "text": ".assign_role("
+        }
+      ]
+    },
+    {
+      "symbol": {
+        "id": "src/adapters/persistence/workflow/role_snapshot_tests.rs#workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "name": "workflow_role_admission_missing_holder_has_no_run_or_partial_capture",
+        "kind": "function",
+        "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+        "span": "L228-L272"
+      },
+      "path": "src/adapters/persistence/workflow/role_snapshot_tests.rs",
+      "inDegree": 0,
+      "hits": [
+        {
+          "line": 232,
+          "text": ".clear_role("
+        }
+      ]
+    }
+  ],
+  "truncated": {
+    "files": 0,
+    "hits": 0
+  },
+  "saved": {
+    "files": 32,
+    "baselineChars": 439913
+  }
+}
